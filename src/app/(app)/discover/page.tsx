@@ -1,4 +1,57 @@
+"use client";
+
+import { useState, useCallback } from "react";
+import { Search } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { SearchResults } from "@/components/podcasts/search-results";
+import type { PodcastIndexPodcast } from "@/lib/podcastindex";
+
 export default function DiscoverPage() {
+  const [searchQuery, setSearchQuery] = useState("");
+  const [submittedQuery, setSubmittedQuery] = useState("");
+  const [podcasts, setPodcasts] = useState<PodcastIndexPodcast[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSearch = useCallback(async (query: string) => {
+    if (!query.trim()) {
+      setPodcasts([]);
+      setSubmittedQuery("");
+      setError(null);
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+    setSubmittedQuery(query);
+
+    try {
+      const response = await fetch(
+        `/api/podcasts/search?q=${encodeURIComponent(query)}&max=20`
+      );
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || "Failed to search podcasts");
+      }
+
+      const data = await response.json();
+      setPodcasts(data.podcasts || []);
+    } catch (err) {
+      console.error("Search error:", err);
+      setError(err instanceof Error ? err.message : "Failed to search podcasts");
+      setPodcasts([]);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    handleSearch(searchQuery);
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -7,11 +60,29 @@ export default function DiscoverPage() {
           Search and explore podcasts to find your next favorite show.
         </p>
       </div>
-      <div className="rounded-lg border bg-card p-6">
-        <p className="text-sm text-muted-foreground">
-          Podcast search coming soon...
-        </p>
-      </div>
+
+      <form onSubmit={handleSubmit} className="flex gap-2">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            type="search"
+            placeholder="Search podcasts..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9"
+          />
+        </div>
+        <Button type="submit" disabled={isLoading}>
+          {isLoading ? "Searching..." : "Search"}
+        </Button>
+      </form>
+
+      <SearchResults
+        podcasts={podcasts}
+        isLoading={isLoading}
+        error={error}
+        query={submittedQuery}
+      />
     </div>
-  )
+  );
 }

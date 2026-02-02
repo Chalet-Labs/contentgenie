@@ -250,7 +250,7 @@ MVP is complete when a user can:
       "Create src/components/podcasts/podcast-card.tsx for individual podcast display",
       "Add loading states and error handling"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "feature",
