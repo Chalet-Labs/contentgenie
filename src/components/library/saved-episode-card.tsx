@@ -6,17 +6,20 @@ import Image from "next/image";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Clock, Calendar, Rss, Trash2, Loader2 } from "lucide-react";
+import { Clock, Calendar, Rss, Trash2, Loader2, Folder } from "lucide-react";
 import { removeEpisodeFromLibrary } from "@/app/actions/library";
-import type { Episode, Podcast, UserLibraryEntry } from "@/db/schema";
+import { MoveToCollection } from "./move-to-collection";
+import type { Episode, Podcast, UserLibraryEntry, Collection } from "@/db/schema";
 
 interface SavedEpisodeCardProps {
   item: UserLibraryEntry & {
     episode: Episode & {
       podcast: Podcast;
     };
+    collection?: Collection | null;
   };
   onRemoved?: () => void;
+  onCollectionChanged?: () => void;
 }
 
 function formatDuration(seconds: number | null): string {
@@ -42,10 +45,10 @@ function stripHtml(html: string): string {
   return html.replace(/<[^>]*>/g, "").trim();
 }
 
-export function SavedEpisodeCard({ item, onRemoved }: SavedEpisodeCardProps) {
+export function SavedEpisodeCard({ item, onRemoved, onCollectionChanged }: SavedEpisodeCardProps) {
   const [isRemoving, setIsRemoving] = useState(false);
   const [isPending, startTransition] = useTransition();
-  const { episode } = item;
+  const { episode, collection } = item;
   const { podcast } = episode;
 
   const handleRemove = (e: React.MouseEvent) => {
@@ -134,24 +137,37 @@ export function SavedEpisodeCard({ item, onRemoved }: SavedEpisodeCardProps) {
               )}
             </div>
 
-            {/* Saved date and actions */}
+            {/* Saved date, collection, and actions */}
             <div className="mt-2 flex items-center justify-between">
-              <span className="text-xs text-muted-foreground">
-                Saved {formatDate(item.savedAt)}
-              </span>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleRemove}
-                disabled={isPending || isRemoving}
-                className="h-8 px-2 text-muted-foreground hover:text-destructive"
-              >
-                {isPending || isRemoving ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Trash2 className="h-4 w-4" />
+              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                <span>Saved {formatDate(item.savedAt)}</span>
+                {collection && (
+                  <Badge variant="outline" className="text-xs">
+                    <Folder className="mr-1 h-3 w-3" />
+                    {collection.name}
+                  </Badge>
                 )}
-              </Button>
+              </div>
+              <div className="flex items-center gap-1">
+                <MoveToCollection
+                  libraryEntryId={item.id}
+                  currentCollectionId={item.collectionId}
+                  onMoved={onCollectionChanged}
+                />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleRemove}
+                  disabled={isPending || isRemoving}
+                  className="h-8 px-2 text-muted-foreground hover:text-destructive"
+                >
+                  {isPending || isRemoving ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Trash2 className="h-4 w-4" />
+                  )}
+                </Button>
+              </div>
             </div>
           </div>
         </div>
