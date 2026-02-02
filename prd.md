@@ -371,7 +371,7 @@ MVP is complete when a user can:
       "Add toast notifications for user actions (save, subscribe, etc.)",
       "Ensure consistent spacing and typography throughout"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "feature",

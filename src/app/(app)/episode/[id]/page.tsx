@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { toast } from "sonner";
 import {
   ArrowLeft,
   Clock,
@@ -171,11 +172,18 @@ export default function EpisodePage({ params }: EpisodePageProps) {
         worthItReason: data.worthItReason,
         cached: data.cached,
       });
+      if (!data.cached) {
+        toast.success("Summary generated!", {
+          description: "AI insights are now available for this episode",
+        });
+      }
     } catch (error) {
       console.error("Error generating summary:", error);
-      setSummaryError(
-        error instanceof Error ? error.message : "Failed to generate summary"
-      );
+      const errorMessage = error instanceof Error ? error.message : "Failed to generate summary";
+      setSummaryError(errorMessage);
+      toast.error("Failed to generate summary", {
+        description: errorMessage,
+      });
     } finally {
       setIsLoadingSummary(false);
     }

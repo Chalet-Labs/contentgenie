@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useTransition } from "react";
+import { toast } from "sonner";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -44,13 +45,24 @@ export function MoveToCollection({
     loadCollections();
   }, []);
 
-  const handleMove = (collectionId: number | null) => {
+  const handleMove = (collectionId: number | null, collectionName?: string) => {
     if (collectionId === currentCollectionId) return;
 
     startTransition(async () => {
       const result = await moveEpisodeToCollection(libraryEntryId, collectionId);
       if (result.success) {
         onMoved?.();
+        if (collectionId === null) {
+          toast.success("Removed from collection");
+        } else {
+          toast.success("Moved to collection", {
+            description: `Episode moved to "${collectionName}"`,
+          });
+        }
+      } else {
+        toast.error("Failed to move episode", {
+          description: result.error || "Please try again",
+        });
       }
     });
   };
@@ -91,7 +103,7 @@ export function MoveToCollection({
               {/* Remove from collection option */}
               {currentCollectionId !== null && (
                 <>
-                  <DropdownMenuItem onClick={() => handleMove(null)}>
+                  <DropdownMenuItem onClick={() => handleMove(null, undefined)}>
                     <span className="text-muted-foreground">No collection</span>
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
@@ -107,7 +119,7 @@ export function MoveToCollection({
                 collections.map((collection) => (
                   <DropdownMenuItem
                     key={collection.id}
-                    onClick={() => handleMove(collection.id)}
+                    onClick={() => handleMove(collection.id, collection.name)}
                     className="flex items-center justify-between"
                   >
                     <span className="truncate">{collection.name}</span>

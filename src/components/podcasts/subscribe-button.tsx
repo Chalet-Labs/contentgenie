@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { Rss, Check, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   subscribeToPodcast,
@@ -44,6 +45,13 @@ export function SubscribeButton({
         const result = await unsubscribeFromPodcast(podcastIndexId);
         if (result.success) {
           setIsSubscribed(false);
+          toast.success("Unsubscribed", {
+            description: `You've unsubscribed from ${title}`,
+          });
+        } else {
+          toast.error("Failed to unsubscribe", {
+            description: result.error || "Please try again",
+          });
         }
       } else {
         const result = await subscribeToPodcast({
@@ -61,6 +69,13 @@ export function SubscribeButton({
         });
         if (result.success) {
           setIsSubscribed(true);
+          toast.success("Subscribed!", {
+            description: `You're now subscribed to ${title}`,
+          });
+        } else {
+          toast.error("Failed to subscribe", {
+            description: result.error || "Please try again",
+          });
         }
       }
     });
