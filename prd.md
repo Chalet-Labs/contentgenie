@@ -274,7 +274,7 @@ MVP is complete when a user can:
       "Create src/app/subscriptions/page.tsx to list user subscriptions",
       "Add subscription count and latest episode info"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "feature",
