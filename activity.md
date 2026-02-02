@@ -1,9 +1,9 @@
 # ContentGenie - Activity Log
 
 ## Current Status
-**Last Updated:** 2026-01-28
-**Tasks Completed:** 4 / 18
-**Current Task:** Task 5 - Create base layout and navigation
+**Last Updated:** 2026-01-29
+**Tasks Completed:** 5 / 18
+**Current Task:** Task 6 - Implement podcast search with PodcastIndex API
 
 ---
 
@@ -152,4 +152,67 @@ ContentGenie is a podcast summarization and discovery platform for busy professi
 **Verification:** Verified in browser that:
 - Home page shows Sign In/Sign Up buttons for unauthenticated users
 - Sign-in page displays Clerk form with OAuth (Apple, GitHub, Google, MetaMask) and username/password options
+- Build and lint pass without errors
+
+### 2026-01-29 - Task 5: Create base layout and navigation
+
+**Status:** COMPLETED
+
+**What was done:**
+- Installed `next-themes` for dark mode support
+- Added Shadcn Sheet and Separator components for mobile navigation
+- Created `src/components/theme-provider.tsx` - ThemeProvider wrapper component
+- Created `src/components/layout/header.tsx` with:
+  - Logo and branding (Headphones icon + ContentGenie text)
+  - Desktop navigation links (Dashboard, Discover, Subscriptions, Library)
+  - Mobile hamburger menu with Sheet slide-out drawer
+  - Theme toggle dropdown (Light/Dark/System options)
+  - Clerk auth buttons (Sign In/Sign Up for guests, UserButton for signed-in users)
+- Created `src/components/layout/sidebar.tsx` with:
+  - Main navigation links with icons (Dashboard, Discover, Subscriptions, Library)
+  - Settings link at bottom
+  - Active state highlighting based on current route
+  - Hidden on mobile (md: breakpoint)
+- Created `src/app/(app)/layout.tsx` - App layout wrapper with Header and Sidebar
+- Created placeholder pages for authenticated routes:
+  - `src/app/(app)/dashboard/page.tsx`
+  - `src/app/(app)/discover/page.tsx`
+  - `src/app/(app)/subscriptions/page.tsx`
+  - `src/app/(app)/library/page.tsx`
+  - `src/app/(app)/settings/page.tsx`
+- Updated `src/app/layout.tsx` to wrap with ThemeProvider
+- Updated `src/app/page.tsx` to use new Header component
+
+**Commands run:**
+- `npm install next-themes` - installed theme support
+- `npx shadcn@latest add sheet separator --yes` - added mobile navigation components
+- `npm run lint` - passed
+- `npm run build` - passed (9 routes generated)
+
+**Files created/modified:**
+- `src/components/theme-provider.tsx` - NEW: Theme provider wrapper
+- `src/components/layout/header.tsx` - NEW: Main header with nav and auth
+- `src/components/layout/sidebar.tsx` - NEW: Sidebar navigation
+- `src/components/ui/sheet.tsx` - NEW: Shadcn Sheet component
+- `src/components/ui/separator.tsx` - NEW: Shadcn Separator component
+- `src/app/layout.tsx` - Added ThemeProvider
+- `src/app/page.tsx` - Updated to use Header component
+- `src/app/(app)/layout.tsx` - NEW: App layout wrapper
+- `src/app/(app)/dashboard/page.tsx` - NEW: Dashboard placeholder
+- `src/app/(app)/discover/page.tsx` - NEW: Discover placeholder
+- `src/app/(app)/subscriptions/page.tsx` - NEW: Subscriptions placeholder
+- `src/app/(app)/library/page.tsx` - NEW: Library placeholder
+- `src/app/(app)/settings/page.tsx` - NEW: Settings placeholder
+
+**Screenshots:**
+- `screenshots/task5-home-page.png` - Home page with new header (light mode)
+- `screenshots/task5-dark-mode.png` - Home page in dark mode
+- `screenshots/task5-mobile-menu.png` - Mobile navigation drawer
+- `screenshots/task5-signin.png` - Sign-in page (auth redirect working)
+
+**Verification:** Verified in browser that:
+- Header displays logo, navigation links, theme toggle, and auth buttons
+- Dark mode toggle works correctly with Light/Dark/System options
+- Mobile navigation drawer slides in from left with all navigation links
+- Route protection works - unauthenticated users redirected to sign-in
 - Build and lint pass without errors
