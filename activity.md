@@ -2,8 +2,8 @@
 
 ## Current Status
 **Last Updated:** 2026-02-01
-**Tasks Completed:** 16 / 18
-**Current Task:** Task 17 - Implement settings page
+**Tasks Completed:** 17 / 18
+**Current Task:** Task 18 - End-to-end flow verification
 
 ---
 
@@ -866,4 +866,67 @@ ContentGenie is a podcast summarization and discovery platform for busy professi
   - Consistent use of shadcn/ui components and Tailwind classes throughout
 
 **Note:** The UI polish task is complete. Toast notifications provide immediate feedback for user actions, loading states give visual feedback during async operations, and empty states guide users to take action. The app maintains a consistent, professional look across all pages with proper mobile responsiveness.
+
+### 2026-02-01 - Task 17: Implement settings page
+
+**Status:** COMPLETED
+
+**What was done:**
+- Implemented full settings page at `src/app/(app)/settings/page.tsx` with four main sections:
+
+**1. Appearance Section:**
+  - Theme selector with Light/Dark/System options using next-themes
+  - Select dropdown with icons for each theme option
+  - Toast notification on theme change
+  - Proper hydration handling to avoid client/server mismatch
+
+**2. Notifications Section:**
+  - Email notifications preference with "Coming Soon" placeholder
+  - Push notifications preference with "Coming Soon" placeholder
+  - Clear descriptions for each notification type
+
+**3. Connected Accounts Section:**
+  - Displays user's primary email from Clerk
+  - Lists any connected OAuth accounts (Google, GitHub, Apple support)
+  - Provider-specific icons for OAuth accounts
+  - "Manage Account in Clerk" button that opens Clerk user profile
+  - Shows "No OAuth accounts connected" if none exist
+
+**4. Danger Zone Section:**
+  - Delete Account button with destructive styling
+  - AlertDialog confirmation with detailed warning about data deletion
+  - Lists all data that will be deleted (subscriptions, library, collections, notes, bookmarks, ratings)
+  - Cancel and "Yes, delete my account" buttons
+  - Opens Clerk profile for account management
+
+**Additional features:**
+- Loading skeleton state while user data loads
+- Proper use of Clerk hooks (useUser, useClerk)
+- Toast notifications for user feedback
+- Consistent styling with shadcn/ui components
+
+**Commands run:**
+- `npm run lint` - passed (no warnings or errors)
+- `npm run build` - passed (11 routes generated, settings page at 9.39 kB)
+
+**Files modified:**
+- `src/app/(app)/settings/page.tsx` - Complete rewrite with full settings implementation
+
+**Screenshots:**
+- `screenshots/task17-settings.png` - Full settings page (light mode)
+- `screenshots/task17-settings-theme.png` - Theme dropdown open showing options
+- `screenshots/task17-settings-dark.png` - Settings page in dark mode
+- `screenshots/task17-settings-delete-dialog.png` - Delete account confirmation dialog
+
+**Verification:**
+- Build and lint pass without errors
+- All TypeScript types compile correctly
+- Browser testing confirms:
+  - Settings page loads with all four sections
+  - Theme dropdown works with Light/Dark/System options
+  - Theme changes apply immediately with toast notification
+  - Notifications section shows Coming Soon placeholders
+  - Connected Accounts shows user email and manage button
+  - Delete Account button opens confirmation dialog
+  - Dialog can be cancelled, closing without action
 

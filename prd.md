@@ -383,7 +383,7 @@ MVP is complete when a user can:
       "Display connected OAuth accounts via Clerk",
       "Add account deletion option"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "testing",
