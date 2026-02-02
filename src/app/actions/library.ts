@@ -192,8 +192,14 @@ export async function isEpisodeSaved(episodePodcastIndexId: string): Promise<boo
   }
 }
 
+export type LibrarySortOption = "savedAt" | "rating" | "publishDate" | "title";
+export type SortDirection = "asc" | "desc";
+
 // Get all saved episodes for the current user
-export async function getUserLibrary() {
+export async function getUserLibrary(
+  sortBy: LibrarySortOption = "savedAt",
+  sortDirection: SortDirection = "desc"
+) {
   const { userId } = await auth();
 
   if (!userId) {
@@ -211,10 +217,40 @@ export async function getUserLibrary() {
         },
         collection: true,
       },
-      orderBy: [desc(userLibrary.savedAt)],
+      orderBy: [desc(userLibrary.savedAt)], // Default order from DB
     });
 
-    return { items, error: null };
+    // Sort in JavaScript to handle episode properties and null ratings
+    const sortedItems = [...items].sort((a, b) => {
+      let comparison = 0;
+
+      switch (sortBy) {
+        case "rating":
+          // Items with ratings come first, then sort by rating value
+          const ratingA = a.rating ?? -1;
+          const ratingB = b.rating ?? -1;
+          comparison = ratingB - ratingA; // Default high to low
+          break;
+        case "publishDate":
+          const dateA = a.episode.publishDate?.getTime() ?? 0;
+          const dateB = b.episode.publishDate?.getTime() ?? 0;
+          comparison = dateB - dateA; // Default newest first
+          break;
+        case "title":
+          comparison = a.episode.title.localeCompare(b.episode.title);
+          break;
+        case "savedAt":
+        default:
+          const savedA = a.savedAt.getTime();
+          const savedB = b.savedAt.getTime();
+          comparison = savedB - savedA; // Default newest first
+          break;
+      }
+
+      return sortDirection === "asc" ? -comparison : comparison;
+    });
+
+    return { items: sortedItems, error: null };
   } catch (error) {
     console.error("Error fetching library:", error);
     return { items: [], error: "Failed to load library" };
@@ -373,6 +409,97 @@ export async function deleteBookmark(bookmarkId: number) {
   } catch (error) {
     console.error("Error deleting bookmark:", error);
     return { success: false, error: "Failed to delete bookmark. Please try again." };
+  }
+}
+
+// Update rating for a library entry
+export async function updateLibraryRating(
+  episodePodcastIndexId: string,
+  rating: number
+) {
+  const { userId } = await auth();
+
+  if (!userId) {
+    return { success: false, error: "You must be signed in to rate episodes" };
+  }
+
+  if (rating < 1 || rating > 5) {
+    return { success: false, error: "Rating must be between 1 and 5" };
+  }
+
+  try {
+    const episode = await db.query.episodes.findFirst({
+      where: eq(episodes.podcastIndexId, episodePodcastIndexId),
+    });
+
+    if (!episode) {
+      return { success: false, error: "Episode not found" };
+    }
+
+    const libraryEntry = await db.query.userLibrary.findFirst({
+      where: and(
+        eq(userLibrary.userId, userId),
+        eq(userLibrary.episodeId, episode.id)
+      ),
+    });
+
+    if (!libraryEntry) {
+      return { success: false, error: "Episode not in library" };
+    }
+
+    await db
+      .update(userLibrary)
+      .set({ rating })
+      .where(eq(userLibrary.id, libraryEntry.id));
+
+    revalidatePath("/library");
+
+    return { success: true, message: "Rating updated" };
+  } catch (error) {
+    console.error("Error updating rating:", error);
+    return { success: false, error: "Failed to update rating. Please try again." };
+  }
+}
+
+// Get average rating for an episode across all users
+export async function getEpisodeAverageRating(episodePodcastIndexId: string) {
+  try {
+    const episode = await db.query.episodes.findFirst({
+      where: eq(episodes.podcastIndexId, episodePodcastIndexId),
+    });
+
+    if (!episode) {
+      return { averageRating: null, ratingCount: 0, error: null };
+    }
+
+    const ratings = await db.query.userLibrary.findMany({
+      where: and(
+        eq(userLibrary.episodeId, episode.id),
+        // Only include entries that have a rating
+      ),
+      columns: {
+        rating: true,
+      },
+    });
+
+    // Filter out null ratings
+    const validRatings = ratings.filter(r => r.rating !== null);
+
+    if (validRatings.length === 0) {
+      return { averageRating: null, ratingCount: 0, error: null };
+    }
+
+    const sum = validRatings.reduce((acc, r) => acc + (r.rating || 0), 0);
+    const average = sum / validRatings.length;
+
+    return {
+      averageRating: Math.round(average * 10) / 10, // Round to 1 decimal
+      ratingCount: validRatings.length,
+      error: null,
+    };
+  } catch (error) {
+    console.error("Error fetching average rating:", error);
+    return { averageRating: null, ratingCount: 0, error: "Failed to load ratings" };
   }
 }
 

@@ -18,6 +18,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SummaryDisplay } from "@/components/episodes/summary-display";
 import { SaveButton } from "@/components/episodes/save-button";
+import { CommunityRating } from "@/components/episodes/community-rating";
 import { isEpisodeSaved } from "@/app/actions/library";
 
 interface EpisodePageProps {
@@ -309,6 +310,12 @@ export default function EpisodePage({ params }: EpisodePageProps) {
               </div>
             )}
             {episode.season > 0 && <span>Season {episode.season}</span>}
+          </div>
+
+          {/* Community Rating */}
+          <div>
+            <span className="mr-2 text-sm text-muted-foreground">Community Rating:</span>
+            <CommunityRating episodePodcastIndexId={episodeId} size="md" showCount={true} />
           </div>
 
           {/* Actions */}

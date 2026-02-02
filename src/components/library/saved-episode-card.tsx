@@ -21,11 +21,13 @@ import {
   ChevronDown,
   ChevronUp,
   StickyNote,
+  Star,
 } from "lucide-react";
-import { removeEpisodeFromLibrary } from "@/app/actions/library";
+import { removeEpisodeFromLibrary, updateLibraryRating } from "@/app/actions/library";
 import { MoveToCollection } from "./move-to-collection";
 import { NotesEditor } from "./notes-editor";
 import { BookmarksList } from "./bookmarks-list";
+import { RatingInput } from "@/components/episodes/rating-input";
 import type { Episode, Podcast, UserLibraryEntry, Collection } from "@/db/schema";
 
 interface SavedEpisodeCardProps {
@@ -161,6 +163,12 @@ export function SavedEpisodeCard({ item, onRemoved, onCollectionChanged }: Saved
                     <span>Has notes</span>
                   </div>
                 )}
+                {item.rating && (
+                  <div className="flex items-center gap-1 text-yellow-500">
+                    <Star className="h-3 w-3 fill-current" />
+                    <span>{item.rating}/5</span>
+                  </div>
+                )}
               </div>
 
               {/* Saved date, collection, and actions */}
@@ -214,9 +222,21 @@ export function SavedEpisodeCard({ item, onRemoved, onCollectionChanged }: Saved
             </div>
           </div>
 
-          {/* Expandable notes and bookmarks section */}
+          {/* Expandable notes, rating, and bookmarks section */}
           <CollapsibleContent>
             <div className="mt-4 space-y-4 border-t pt-4">
+              {/* Your Rating */}
+              <div>
+                <h4 className="mb-2 text-sm font-medium">Your Rating</h4>
+                <RatingInput
+                  initialRating={item.rating}
+                  onRatingChange={async (rating) => {
+                    return await updateLibraryRating(episode.podcastIndexId, rating);
+                  }}
+                  size="md"
+                  showLabel={true}
+                />
+              </div>
               <NotesEditor
                 episodePodcastIndexId={episode.podcastIndexId}
                 initialNotes={item.notes || ""}

@@ -347,7 +347,7 @@ MVP is complete when a user can:
       "Show average community rating on episodes (if multiple users rate)",
       "Update library sorting to include rating"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "feature",

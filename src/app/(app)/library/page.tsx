@@ -2,11 +2,18 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { Bookmark, Search } from "lucide-react";
+import { Bookmark, Search, ArrowUpDown, Star, Calendar, Clock, Type } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { SavedEpisodeCard } from "@/components/library/saved-episode-card";
-import { getUserLibrary } from "@/app/actions/library";
+import { getUserLibrary, type LibrarySortOption, type SortDirection } from "@/app/actions/library";
 import type { Episode, Podcast, UserLibraryEntry, Collection } from "@/db/schema";
 
 type LibraryItem = UserLibraryEntry & {
@@ -20,12 +27,14 @@ export default function LibraryPage() {
   const [items, setItems] = useState<LibraryItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [sortBy, setSortBy] = useState<LibrarySortOption>("savedAt");
+  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
 
   const loadLibrary = useCallback(async () => {
     setIsLoading(true);
     setError(null);
 
-    const result = await getUserLibrary();
+    const result = await getUserLibrary(sortBy, sortDirection);
 
     if (result.error) {
       setError(result.error);
@@ -34,7 +43,7 @@ export default function LibraryPage() {
     }
 
     setIsLoading(false);
-  }, []);
+  }, [sortBy, sortDirection]);
 
   useEffect(() => {
     loadLibrary();
@@ -46,6 +55,24 @@ export default function LibraryPage() {
 
   const handleCollectionChanged = () => {
     loadLibrary();
+  };
+
+  const toggleSortDirection = () => {
+    setSortDirection(prev => prev === "desc" ? "asc" : "desc");
+  };
+
+  const getSortIcon = (option: LibrarySortOption) => {
+    switch (option) {
+      case "rating":
+        return <Star className="h-4 w-4" />;
+      case "publishDate":
+        return <Calendar className="h-4 w-4" />;
+      case "title":
+        return <Type className="h-4 w-4" />;
+      case "savedAt":
+      default:
+        return <Clock className="h-4 w-4" />;
+    }
   };
 
   return (
@@ -62,6 +89,53 @@ export default function LibraryPage() {
           </p>
         </div>
       </div>
+
+      {/* Sorting controls - only show when there are items */}
+      {!isLoading && !error && items.length > 0 && (
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-muted-foreground">Sort by:</span>
+          <Select value={sortBy} onValueChange={(value) => setSortBy(value as LibrarySortOption)}>
+            <SelectTrigger className="w-[160px]">
+              <SelectValue placeholder="Sort by..." />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="savedAt">
+                <div className="flex items-center gap-2">
+                  <Clock className="h-4 w-4" />
+                  <span>Date Saved</span>
+                </div>
+              </SelectItem>
+              <SelectItem value="rating">
+                <div className="flex items-center gap-2">
+                  <Star className="h-4 w-4" />
+                  <span>Your Rating</span>
+                </div>
+              </SelectItem>
+              <SelectItem value="publishDate">
+                <div className="flex items-center gap-2">
+                  <Calendar className="h-4 w-4" />
+                  <span>Publish Date</span>
+                </div>
+              </SelectItem>
+              <SelectItem value="title">
+                <div className="flex items-center gap-2">
+                  <Type className="h-4 w-4" />
+                  <span>Title</span>
+                </div>
+              </SelectItem>
+            </SelectContent>
+          </Select>
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={toggleSortDirection}
+            className="shrink-0"
+            title={sortDirection === "desc" ? "Sort descending" : "Sort ascending"}
+          >
+            <ArrowUpDown className={`h-4 w-4 transition-transform ${sortDirection === "asc" ? "rotate-180" : ""}`} />
+          </Button>
+        </div>
+      )}
 
       {/* Loading state */}
       {isLoading && (
