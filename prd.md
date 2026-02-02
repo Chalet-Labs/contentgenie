@@ -359,7 +359,7 @@ MVP is complete when a user can:
       "Add quick access to continue where left off",
       "Show personalized recommendations based on subscriptions"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "styling",
