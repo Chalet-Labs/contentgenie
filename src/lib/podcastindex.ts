@@ -1,8 +1,15 @@
 import crypto from "crypto";
 
 const API_BASE_URL = "https://api.podcastindex.org/api/1.0";
-const API_KEY = process.env.PODCASTINDEX_API_KEY || "";
-const API_SECRET = process.env.PODCASTINDEX_API_SECRET || "";
+
+// Read env vars at runtime, not module load time (Next.js bundling issue)
+function getApiKey(): string {
+  return process.env.PODCASTINDEX_API_KEY || "";
+}
+
+function getApiSecret(): string {
+  return process.env.PODCASTINDEX_API_SECRET || "";
+}
 
 // Types for PodcastIndex API responses
 export interface PodcastIndexPodcast {
@@ -121,15 +128,19 @@ export interface TrendingPodcastsResponse {
 
 // Generate authentication headers for PodcastIndex API
 function getAuthHeaders(): Record<string, string> {
+  const apiKey = getApiKey();
+  const apiSecret = getApiSecret();
+  console.log("DEBUG: API_KEY length:", apiKey.length, "first 4:", apiKey.substring(0, 4));
+  console.log("DEBUG: API_SECRET length:", apiSecret.length);
   const apiHeaderTime = Math.floor(Date.now() / 1000);
   const hash = crypto
     .createHash("sha1")
-    .update(API_KEY + API_SECRET + apiHeaderTime)
+    .update(apiKey + apiSecret + apiHeaderTime)
     .digest("hex");
 
   return {
     "X-Auth-Date": apiHeaderTime.toString(),
-    "X-Auth-Key": API_KEY,
+    "X-Auth-Key": apiKey,
     Authorization: hash,
     "User-Agent": "ContentGenie/1.0",
   };
