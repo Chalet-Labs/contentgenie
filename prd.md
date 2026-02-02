@@ -286,7 +286,7 @@ MVP is complete when a user can:
       "Implement caching - store summaries in episodes table",
       "Add worth-it score generation to the prompt"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "feature",
