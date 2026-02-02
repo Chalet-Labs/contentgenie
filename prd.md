@@ -237,7 +237,7 @@ MVP is complete when a user can:
       "Create responsive mobile navigation",
       "Add dark mode toggle using next-themes"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "feature",
