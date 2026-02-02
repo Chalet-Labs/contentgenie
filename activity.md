@@ -2,8 +2,8 @@
 
 ## Current Status
 **Last Updated:** 2026-01-28
-**Tasks Completed:** 2 / 18
-**Current Task:** Task 3 - Set up Drizzle ORM with Neon PostgreSQL
+**Tasks Completed:** 3 / 18
+**Current Task:** Task 4 - Configure Clerk authentication
 
 ---
 
@@ -72,3 +72,42 @@ ContentGenie is a podcast summarization and discovery platform for busy professi
 **Screenshot:** `screenshots/task2-shadcn-ui.png`
 
 **Verification:** Verified in browser that Button, Card, and Badge components render correctly with proper styling.
+
+### 2026-01-28 - Task 3: Set up Drizzle ORM with Neon PostgreSQL
+
+**Status:** COMPLETED
+
+**What was done:**
+- Installed drizzle-orm, drizzle-kit, and @neondatabase/serverless packages
+- Created `drizzle.config.ts` in project root with PostgreSQL dialect configuration
+- Created `src/db/index.ts` for Neon database connection using drizzle-orm/neon-http
+- Created `src/db/schema.ts` with full data model for the application:
+  - `users` - User profiles synced from Clerk
+  - `podcasts` - Podcast metadata from PodcastIndex
+  - `episodes` - Episode data with transcription, summary, and worth-it score
+  - `userSubscriptions` - User podcast subscriptions
+  - `collections` - User-created collections for organizing saved content
+  - `userLibrary` - User's saved episodes with notes and ratings
+  - `bookmarks` - Timestamped bookmarks within episodes
+- Added all table relations using Drizzle's `relations()` helper
+- Added type exports for all tables (select and insert types)
+- Added database scripts to package.json (db:generate, db:push, db:studio)
+
+**Commands run:**
+- `npm install drizzle-orm @neondatabase/serverless` - installed ORM and Neon driver
+- `npm install -D drizzle-kit` - installed Drizzle CLI tools
+- `npm run lint` - passed
+- `npm run build` - passed
+- `npm run db:generate` - successfully generated SQL migration (7 tables)
+
+**Files created/modified:**
+- `drizzle.config.ts` - Drizzle configuration
+- `src/db/index.ts` - Database connection setup
+- `src/db/schema.ts` - Complete database schema with relations
+- `package.json` - Added db:generate, db:push, db:studio scripts
+- `drizzle/0000_fine_cardiac.sql` - Generated migration file
+- `drizzle/meta/` - Drizzle migration metadata
+
+**Screenshot:** `screenshots/task3-drizzle-orm.png`
+
+**Verification:** Application builds successfully. Drizzle generates migrations with all 7 tables and proper indexes.
