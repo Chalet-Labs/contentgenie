@@ -2,8 +2,8 @@
 
 ## Current Status
 **Last Updated:** 2026-01-30
-**Tasks Completed:** 14 / 18
-**Current Task:** Task 15 - Create dashboard with personalized content
+**Tasks Completed:** 15 / 18
+**Current Task:** Task 16 - Polish UI and responsive design
 
 ---
 
@@ -739,4 +739,69 @@ ContentGenie is a podcast summarization and discovery platform for busy professi
   - Library sorting by rating, date saved, publish date, and title
 
 **Note:** The user ratings feature is fully implemented. Users can rate saved episodes 1-5 stars in the expandable card section. Ratings appear in the metadata row with a star icon. The library page has sorting controls to sort by rating. Episode detail pages show the average community rating from all users.
+
+### 2026-01-30 - Task 15: Create dashboard with personalized content
+
+**Status:** COMPLETED
+
+**What was done:**
+- Created `src/app/actions/dashboard.ts` - Server actions for dashboard data:
+  - `getRecentEpisodesFromSubscriptions()`: Fetches recent episodes from user's subscribed podcasts via PodcastIndex API
+  - `getRecentlySavedItems()`: Fetches recently saved items from user's library
+  - `getRecommendedPodcasts()`: Fetches trending podcasts from PodcastIndex, filtering out already subscribed ones
+  - `getDashboardStats()`: Returns subscription and saved episode counts
+- Created `src/components/dashboard/recent-episodes.tsx` - Component for displaying recent episodes:
+  - Shows episode title, podcast name, duration, and publish date
+  - Loading skeleton and empty states
+  - Links to episode detail pages
+  - "View all" link to subscriptions page
+- Created `src/components/dashboard/saved-items.tsx` - Component for recently saved library items:
+  - Shows episode title, podcast name, saved date, and user rating
+  - Loading skeleton and empty states
+  - Links to episode detail pages
+  - "View all" link to library page
+- Created `src/components/dashboard/recommendations.tsx` - Component for recommended podcasts:
+  - Shows trending podcasts not already subscribed to
+  - Displays podcast artwork, title, author, and categories
+  - Loading skeleton and empty states
+  - Links to podcast detail pages
+  - "Discover more" link to discover page
+- Created `src/components/dashboard/stats-cards.tsx` - Quick stats cards component:
+  - Subscription count with link to subscriptions
+  - Saved episodes count with link to library
+  - Quick access to Discover and Library pages
+  - Hover effects for interactivity
+- Updated `src/app/(app)/dashboard/page.tsx` - Full dashboard implementation:
+  - Uses React Suspense for streaming server-side rendering
+  - Shows stats cards at top with subscription and saved counts
+  - Two-column grid with recent episodes and saved items
+  - Full-width recommendations section at bottom
+  - Loading skeletons during data fetch
+
+**Commands run:**
+- `npm run lint` - passed (no warnings or errors)
+- `npm run build` - passed (dashboard route now dynamic)
+
+**Files created:**
+- `src/app/actions/dashboard.ts` - NEW: Server actions for dashboard data
+- `src/components/dashboard/recent-episodes.tsx` - NEW: Recent episodes component
+- `src/components/dashboard/saved-items.tsx` - NEW: Saved items component
+- `src/components/dashboard/recommendations.tsx` - NEW: Recommendations component
+- `src/components/dashboard/stats-cards.tsx` - NEW: Stats cards component
+
+**Files modified:**
+- `src/app/(app)/dashboard/page.tsx` - Complete rewrite with personalized content
+
+**Verification:**
+- Build and lint pass without errors
+- All TypeScript types compile correctly
+- Dashboard page implements all required features:
+  - Shows recent episodes from subscribed podcasts
+  - Displays recently saved library items
+  - Quick access stats cards linking to subscriptions and library
+  - Personalized recommendations based on trending podcasts (excluding subscriptions)
+  - Loading states with skeleton placeholders
+  - Empty states with calls-to-action
+
+**Note:** The dashboard with personalized content is fully implemented. Users see stats cards showing their subscription and library counts, recent episodes from their subscribed podcasts, recently saved items, and personalized recommendations. All sections have proper loading and empty states with links to relevant pages.
 
