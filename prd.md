@@ -225,7 +225,7 @@ MVP is complete when a user can:
       "Create sign-in and sign-up pages at src/app/(auth)/sign-in/[[...sign-in]]/page.tsx and sign-up equivalent",
       "Add UserButton to header for signed-in users"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "setup",
