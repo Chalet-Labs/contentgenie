@@ -17,6 +17,8 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SummaryDisplay } from "@/components/episodes/summary-display";
+import { SaveButton } from "@/components/episodes/save-button";
+import { isEpisodeSaved } from "@/app/actions/library";
 
 interface EpisodePageProps {
   params: {
@@ -92,6 +94,7 @@ export default function EpisodePage({ params }: EpisodePageProps) {
   const [isLoadingSummary, setIsLoadingSummary] = useState(false);
   const [episodeError, setEpisodeError] = useState<string | null>(null);
   const [summaryError, setSummaryError] = useState<string | null>(null);
+  const [isSaved, setIsSaved] = useState(false);
 
   // Fetch episode and podcast data
   useEffect(() => {
@@ -123,6 +126,10 @@ export default function EpisodePage({ params }: EpisodePageProps) {
             cached: true,
           });
         }
+
+        // Check if episode is saved to library
+        const saved = await isEpisodeSaved(String(data.episode.id));
+        setIsSaved(saved);
       } catch (error) {
         console.error("Error fetching episode:", error);
         setEpisodeError(
@@ -318,6 +325,26 @@ export default function EpisodePage({ params }: EpisodePageProps) {
                 </a>
               </Button>
             )}
+            <SaveButton
+              episodeData={{
+                podcastIndexId: String(episode.id),
+                title: episode.title,
+                description: episode.description,
+                audioUrl: episode.enclosureUrl,
+                duration: episode.duration,
+                publishDate: episode.datePublished ? new Date(episode.datePublished * 1000) : undefined,
+                podcast: {
+                  podcastIndexId: String(podcast?.id || episode.feedId),
+                  title: podcast?.title || "",
+                  description: undefined,
+                  publisher: podcast?.author || podcast?.ownerName,
+                  imageUrl: podcast?.artwork || podcast?.image,
+                  categories: categories,
+                },
+              }}
+              initialSaved={isSaved}
+              size="lg"
+            />
             {episode.link && (
               <Button variant="outline" size="lg" asChild>
                 <a
