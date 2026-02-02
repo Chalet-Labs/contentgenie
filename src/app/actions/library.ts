@@ -209,6 +209,7 @@ export async function getUserLibrary() {
             podcast: true,
           },
         },
+        collection: true,
       },
       orderBy: [desc(userLibrary.savedAt)],
     });

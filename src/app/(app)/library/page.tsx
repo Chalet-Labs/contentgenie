@@ -7,12 +7,13 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SavedEpisodeCard } from "@/components/library/saved-episode-card";
 import { getUserLibrary } from "@/app/actions/library";
-import type { Episode, Podcast, UserLibraryEntry } from "@/db/schema";
+import type { Episode, Podcast, UserLibraryEntry, Collection } from "@/db/schema";
 
 type LibraryItem = UserLibraryEntry & {
   episode: Episode & {
     podcast: Podcast;
   };
+  collection?: Collection | null;
 };
 
 export default function LibraryPage() {
@@ -40,6 +41,10 @@ export default function LibraryPage() {
   }, [loadLibrary]);
 
   const handleRemoved = () => {
+    loadLibrary();
+  };
+
+  const handleCollectionChanged = () => {
     loadLibrary();
   };
 
@@ -118,6 +123,7 @@ export default function LibraryPage() {
               key={item.id}
               item={item}
               onRemoved={handleRemoved}
+              onCollectionChanged={handleCollectionChanged}
             />
           ))}
         </div>

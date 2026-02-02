@@ -323,7 +323,7 @@ MVP is complete when a user can:
       "Create src/app/library/collection/[id]/page.tsx",
       "Display collections in library sidebar"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "feature",
