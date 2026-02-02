@@ -5,11 +5,13 @@ import { ArrowLeft, Rss, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { EpisodeList } from "@/components/podcasts/episode-list";
+import { SubscribeButton } from "@/components/podcasts/subscribe-button";
 import {
   getPodcastById,
   getEpisodesByFeedId,
   formatPublishDate,
 } from "@/lib/podcastindex";
+import { isSubscribedToPodcast } from "@/app/actions/subscriptions";
 
 interface PodcastPageProps {
   params: {
@@ -36,6 +38,9 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
     if (!podcast) {
       notFound();
     }
+
+    // Check subscription status
+    const subscribed = await isSubscribedToPodcast(podcast.id.toString());
 
     const categories = podcast.categories
       ? Object.values(podcast.categories)
@@ -111,10 +116,18 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
 
             {/* Actions */}
             <div className="flex flex-wrap gap-3">
-              <Button size="lg">
-                <Rss className="mr-2 h-4 w-4" />
-                Subscribe
-              </Button>
+              <SubscribeButton
+                podcastIndexId={podcast.id.toString()}
+                title={podcast.title}
+                description={podcast.description}
+                publisher={podcast.author || podcast.ownerName}
+                imageUrl={podcast.artwork || podcast.image}
+                rssFeedUrl={podcast.url}
+                categories={categories}
+                totalEpisodes={podcast.episodeCount}
+                latestEpisodeDate={podcast.newestItemPubdate}
+                initialSubscribed={subscribed}
+              />
               {podcast.link && (
                 <Button variant="outline" size="lg" asChild>
                   <a
