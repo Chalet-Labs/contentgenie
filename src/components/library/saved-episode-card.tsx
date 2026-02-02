@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -81,6 +82,13 @@ export function SavedEpisodeCard({ item, onRemoved, onCollectionChanged }: Saved
       const result = await removeEpisodeFromLibrary(episode.podcastIndexId);
       if (result.success) {
         onRemoved?.();
+        toast.success("Removed from library", {
+          description: `"${episode.title}" has been removed`,
+        });
+      } else {
+        toast.error("Failed to remove", {
+          description: result.error || "Please try again",
+        });
       }
       setIsRemoving(false);
     });

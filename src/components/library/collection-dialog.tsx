@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useTransition } from "react";
+import { toast } from "sonner";
 import {
   Dialog,
   DialogContent,
@@ -61,6 +62,11 @@ export function CollectionDialog({
       if (result.success) {
         onOpenChange(false);
         onSuccess?.();
+        toast.success(isEditing ? "Collection updated" : "Collection created", {
+          description: isEditing
+            ? `"${name}" has been updated`
+            : `"${name}" has been created`,
+        });
       } else {
         setError(result.error || "An error occurred");
       }

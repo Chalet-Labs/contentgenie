@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { Bookmark, BookmarkCheck, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { saveEpisodeToLibrary, removeEpisodeFromLibrary } from "@/app/actions/library";
 
@@ -46,11 +47,25 @@ export function SaveButton({
         const result = await removeEpisodeFromLibrary(episodeData.podcastIndexId);
         if (result.success) {
           setIsSaved(false);
+          toast.success("Removed from library", {
+            description: `"${episodeData.title}" has been removed`,
+          });
+        } else {
+          toast.error("Failed to remove", {
+            description: result.error || "Please try again",
+          });
         }
       } else {
         const result = await saveEpisodeToLibrary(episodeData);
         if (result.success) {
           setIsSaved(true);
+          toast.success("Saved to library!", {
+            description: `"${episodeData.title}" has been saved`,
+          });
+        } else {
+          toast.error("Failed to save", {
+            description: result.error || "Please try again",
+          });
         }
       }
     });

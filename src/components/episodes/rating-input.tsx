@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { Star, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
 interface RatingInputProps {
@@ -43,8 +44,12 @@ export function RatingInput({
         const result = await onRatingChange(newRating);
         if (result.success) {
           setRating(newRating);
+          toast.success("Rating saved", {
+            description: `You rated this episode ${newRating} star${newRating > 1 ? "s" : ""}`,
+          });
         } else {
           setError(result.error || "Failed to save rating");
+          toast.error("Failed to save rating");
         }
       } else {
         // For removing rating, we'd need a separate action

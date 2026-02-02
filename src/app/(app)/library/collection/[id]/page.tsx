@@ -3,7 +3,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Bookmark, Search, Pencil, Trash2, Loader2, Folder } from "lucide-react";
+import { toast } from "sonner";
+import { ArrowLeft, Bookmark, Pencil, Trash2, Loader2, Folder } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SavedEpisodeCard } from "@/components/library/saved-episode-card";
@@ -85,10 +86,18 @@ export default function CollectionDetailPage() {
 
   const handleDelete = async () => {
     setIsDeleting(true);
+    const collectionName = collection?.name;
     const result = await deleteCollection(collectionId);
     if (result.success) {
+      toast.success("Collection deleted", {
+        description: `"${collectionName}" has been deleted`,
+      });
       // Redirect to library after deletion
       window.location.href = "/library";
+    } else {
+      toast.error("Failed to delete collection", {
+        description: result.error || "Please try again",
+      });
     }
     setIsDeleting(false);
   };

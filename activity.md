@@ -1,9 +1,9 @@
 # ContentGenie - Activity Log
 
 ## Current Status
-**Last Updated:** 2026-01-30
-**Tasks Completed:** 15 / 18
-**Current Task:** Task 16 - Polish UI and responsive design
+**Last Updated:** 2026-02-01
+**Tasks Completed:** 16 / 18
+**Current Task:** Task 17 - Implement settings page
 
 ---
 
@@ -804,4 +804,66 @@ ContentGenie is a podcast summarization and discovery platform for busy professi
   - Empty states with calls-to-action
 
 **Note:** The dashboard with personalized content is fully implemented. Users see stats cards showing their subscription and library counts, recent episodes from their subscribed podcasts, recently saved items, and personalized recommendations. All sections have proper loading and empty states with links to relevant pages.
+
+### 2026-02-01 - Task 16: Polish UI and responsive design
+
+**Status:** COMPLETED
+
+**What was done:**
+- Added Shadcn Sonner toast component for user action notifications
+- Added toast notifications to key user interactions:
+  - Subscribe/Unsubscribe to podcasts
+  - Save/Remove episodes from library
+  - Create/Edit/Delete collections
+  - Move episodes between collections
+  - Add/Delete bookmarks
+  - Rate episodes
+  - Generate AI summaries
+- Improved mobile responsiveness:
+  - Updated app layout with responsive padding (p-4 on mobile, p-6 on larger screens)
+  - Added max-width container (max-w-6xl) for better content centering
+  - Verified existing mobile menu and responsive grid layouts
+- Verified existing loading skeletons across all async components:
+  - Dashboard has proper Suspense boundaries with skeleton loaders
+  - Library, Subscriptions, and Collection pages have skeleton loading states
+  - Episode detail page has skeleton loader during fetch
+- Verified existing empty states for all list views:
+  - Library empty state with CTA to Discover
+  - Subscriptions empty state with CTA to find podcasts
+  - Collections empty state with helpful message
+  - Dashboard sections have appropriate empty state messages
+- Ensured consistent spacing and typography throughout the app
+
+**Commands run:**
+- `npx shadcn@latest add sonner --yes` - Added Sonner toast component
+- `npm run lint` - passed (no warnings or errors)
+- `npm run build` - passed (11 routes generated)
+
+**Files created:**
+- `src/components/ui/sonner.tsx` - NEW: Shadcn Sonner toast component
+
+**Files modified:**
+- `src/app/layout.tsx` - Added Toaster component with richColors and bottom-right position
+- `src/app/(app)/layout.tsx` - Improved mobile padding and added max-width container
+- `src/components/podcasts/subscribe-button.tsx` - Added toast notifications
+- `src/components/episodes/save-button.tsx` - Added toast notifications
+- `src/components/library/collection-dialog.tsx` - Added toast notifications
+- `src/components/library/move-to-collection.tsx` - Added toast notifications
+- `src/components/library/saved-episode-card.tsx` - Added toast notifications for removal
+- `src/components/library/bookmarks-list.tsx` - Added toast notifications
+- `src/components/episodes/rating-input.tsx` - Added toast notifications
+- `src/app/(app)/episode/[id]/page.tsx` - Added toast notifications for summary generation
+- `src/app/(app)/library/collection/[id]/page.tsx` - Added toast notifications for deletion
+
+**Verification:**
+- Build and lint pass without errors
+- All TypeScript types compile correctly
+- Code analysis confirms:
+  - Toast notifications fire for all key user actions (subscribe, save, rate, bookmark, etc.)
+  - All pages have proper loading skeletons using Suspense or loading states
+  - All list views have empty states with helpful CTAs
+  - Responsive layout adapts from mobile to desktop
+  - Consistent use of shadcn/ui components and Tailwind classes throughout
+
+**Note:** The UI polish task is complete. Toast notifications provide immediate feedback for user actions, loading states give visual feedback during async operations, and empty states guide users to take action. The app maintains a consistent, professional look across all pages with proper mobile responsiveness.
 

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useTransition } from "react";
 import { Clock, Trash2, Plus, Loader2, Bookmark } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -110,6 +111,9 @@ export function BookmarksList({
         setNewNote("");
         setIsDialogOpen(false);
         loadBookmarks();
+        toast.success("Bookmark added", {
+          description: `Bookmark at ${formatTimestamp(timestamp)} created`,
+        });
       } else {
         setError(result.error || "Failed to add bookmark");
       }
@@ -121,6 +125,9 @@ export function BookmarksList({
       const result = await deleteBookmark(bookmarkId);
       if (result.success) {
         loadBookmarks();
+        toast.success("Bookmark deleted");
+      } else {
+        toast.error("Failed to delete bookmark");
       }
     });
   };
