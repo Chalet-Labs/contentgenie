@@ -299,7 +299,7 @@ MVP is complete when a user can:
       "Add loading state while summary generates",
       "Create src/components/episodes/summary-display.tsx"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "feature",
