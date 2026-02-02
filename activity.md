@@ -2,8 +2,8 @@
 
 ## Current Status
 **Last Updated:** 2026-01-30
-**Tasks Completed:** 13 / 18
-**Current Task:** Task 14 - Implement user ratings on episodes
+**Tasks Completed:** 14 / 18
+**Current Task:** Task 15 - Create dashboard with personalized content
 
 ---
 
@@ -676,4 +676,67 @@ ContentGenie is a podcast summarization and discovery platform for busy professi
   - Proper authentication and ownership checks in all server actions
 
 **Note:** The notes and bookmarks feature is fully implemented. The SavedEpisodeCard now shows a "More/Less" button to expand and reveal the notes editor and bookmarks list. Notes are auto-saved after 1 second of inactivity. Bookmarks can be added with MM:SS or HH:MM:SS timestamps and optional notes.
+
+### 2026-01-30 - Task 14: Implement user ratings on episodes
+
+**Status:** COMPLETED
+
+**What was done:**
+- Created `src/components/episodes/rating-input.tsx` - Star rating input component with:
+  - 5 clickable star buttons with hover states
+  - Visual feedback (filled yellow stars for rating value)
+  - Rating labels: "Poor", "Fair", "Good", "Great", "Excellent"
+  - Loading state with spinner during rating updates
+  - Error display for failed saves
+  - Support for different sizes (sm, md, lg)
+- Created `src/components/episodes/community-rating.tsx` - Community rating display with:
+  - Fetches average rating from all users
+  - Displays filled/half/empty stars based on average
+  - Shows rating count with users icon
+  - Loading skeleton state
+  - Empty state when no ratings exist
+- Extended `src/app/actions/library.ts` with rating functionality:
+  - `updateLibraryRating()`: Saves user rating (1-5) to library entry
+  - `getEpisodeAverageRating()`: Calculates average rating across all users
+  - Updated `getUserLibrary()` to support sorting by rating, publish date, title, or saved date
+  - Added sort direction support (ascending/descending)
+- Updated `src/components/library/saved-episode-card.tsx`:
+  - Displays star icon with rating value in metadata row
+  - Added RatingInput component in expandable section under "Your Rating" heading
+- Updated `src/app/(app)/library/page.tsx` with sorting controls:
+  - Added Select dropdown with sort options (Date Saved, Your Rating, Publish Date, Title)
+  - Added sort direction toggle button with icon
+  - Sorting controls only appear when library has items
+- Updated `src/app/(app)/episode/[id]/page.tsx`:
+  - Added CommunityRating component to show average rating from all users
+  - Displays "Community Rating:" label with star visualization
+- Added Shadcn Select component for sorting dropdown
+
+**Commands run:**
+- `npx shadcn@latest add select --yes` - Added Select component
+- `npm run lint` - passed (no warnings or errors)
+- `npm run build` - passed (11 routes generated)
+
+**Files created:**
+- `src/components/episodes/rating-input.tsx` - NEW: Star rating input component
+- `src/components/episodes/community-rating.tsx` - NEW: Community rating display
+- `src/components/ui/select.tsx` - NEW: Shadcn Select component
+
+**Files modified:**
+- `src/app/actions/library.ts` - Added rating and sorting server actions
+- `src/components/library/saved-episode-card.tsx` - Added rating display and input
+- `src/app/(app)/library/page.tsx` - Added sorting controls
+- `src/app/(app)/episode/[id]/page.tsx` - Added community rating display
+
+**Verification:**
+- Build and lint pass without errors
+- All TypeScript types compile correctly
+- Code analysis confirms complete implementation of:
+  - 1-5 star rating input with visual feedback
+  - Server action to save rating to database
+  - User rating display on library items (metadata row and expandable section)
+  - Community average rating display on episode detail page
+  - Library sorting by rating, date saved, publish date, and title
+
+**Note:** The user ratings feature is fully implemented. Users can rate saved episodes 1-5 stars in the expandable card section. Ratings appear in the metadata row with a star icon. The library page has sorting controls to sort by rating. Episode detail pages show the average community rating from all users.
 
