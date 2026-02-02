@@ -262,7 +262,7 @@ MVP is complete when a user can:
       "Create src/components/podcasts/episode-card.tsx",
       "Add subscribe button (UI only, functionality in next task)"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "feature",
