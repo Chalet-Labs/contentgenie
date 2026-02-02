@@ -311,7 +311,7 @@ MVP is complete when a user can:
       "Show saved date and allow sorting",
       "Create src/components/library/saved-episode-card.tsx"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "feature",
