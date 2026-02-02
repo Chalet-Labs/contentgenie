@@ -2,8 +2,8 @@
 
 ## Current Status
 **Last Updated:** 2026-01-28
-**Tasks Completed:** 3 / 18
-**Current Task:** Task 4 - Configure Clerk authentication
+**Tasks Completed:** 4 / 18
+**Current Task:** Task 5 - Create base layout and navigation
 
 ---
 
@@ -111,3 +111,45 @@ ContentGenie is a podcast summarization and discovery platform for busy professi
 **Screenshot:** `screenshots/task3-drizzle-orm.png`
 
 **Verification:** Application builds successfully. Drizzle generates migrations with all 7 tables and proper indexes.
+
+### 2026-01-28 - Task 4: Configure Clerk authentication
+
+**Status:** COMPLETED
+
+**What was done:**
+- Updated Next.js from 14.2.3 to 14.2.25 to satisfy Clerk peer dependency
+- Installed @clerk/nextjs package for authentication
+- Created `src/middleware.ts` with Clerk middleware and route protection
+  - Public routes: /, /sign-in, /sign-up, /api/webhooks
+  - Protected routes: all other routes require authentication
+- Wrapped app in ClerkProvider in `src/app/layout.tsx`
+- Created sign-in page at `src/app/(auth)/sign-in/[[...sign-in]]/page.tsx`
+- Created sign-up page at `src/app/(auth)/sign-up/[[...sign-up]]/page.tsx`
+- Updated `src/app/page.tsx` to include:
+  - UserButton for signed-in users (top-right corner)
+  - Sign In / Sign Up buttons for unauthenticated users
+- Added Clerk URL configuration to .env file
+
+**Commands run:**
+- `npm install next@14.2.25` - updated Next.js version
+- `npm install @clerk/nextjs` - installed Clerk
+- `npm run lint` - passed
+- `npm run build` - passed
+
+**Files created/modified:**
+- `src/middleware.ts` - Clerk middleware with route protection
+- `src/app/layout.tsx` - Added ClerkProvider wrapper
+- `src/app/(auth)/sign-in/[[...sign-in]]/page.tsx` - Sign-in page with Clerk SignIn component
+- `src/app/(auth)/sign-up/[[...sign-up]]/page.tsx` - Sign-up page with Clerk SignUp component
+- `src/app/page.tsx` - Added UserButton, SignedIn, SignedOut components
+- `.env` - Added Clerk URL configuration
+- `package.json` - Updated dependencies
+
+**Screenshots:**
+- `screenshots/task4-home-page.png` - Home page with Sign In/Sign Up buttons
+- `screenshots/task4-sign-in.png` - Clerk sign-in form with OAuth providers
+
+**Verification:** Verified in browser that:
+- Home page shows Sign In/Sign Up buttons for unauthenticated users
+- Sign-in page displays Clerk form with OAuth (Apple, GitHub, Google, MetaMask) and username/password options
+- Build and lint pass without errors

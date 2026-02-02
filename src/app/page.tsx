@@ -1,11 +1,27 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { SignedIn, SignedOut, UserButton } from "@clerk/nextjs";
 import Link from "next/link";
 
 export default function Home() {
   return (
     <main className="flex min-h-screen flex-col items-center justify-center p-24">
+      <header className="absolute top-0 right-0 p-6">
+        <SignedIn>
+          <UserButton afterSignOutUrl="/" />
+        </SignedIn>
+        <SignedOut>
+          <div className="flex gap-2">
+            <Button variant="ghost" asChild>
+              <Link href="/sign-in">Sign In</Link>
+            </Button>
+            <Button asChild>
+              <Link href="/sign-up">Sign Up</Link>
+            </Button>
+          </div>
+        </SignedOut>
+      </header>
       <div className="text-center max-w-3xl">
         <Badge variant="secondary" className="mb-4">AI-Powered</Badge>
         <h1 className="text-4xl font-bold tracking-tight sm:text-6xl">
