@@ -2,9 +2,9 @@
 
 import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, asc } from "drizzle-orm";
 import { db } from "@/db";
-import { users, podcasts, episodes, userLibrary } from "@/db/schema";
+import { users, podcasts, episodes, userLibrary, bookmarks } from "@/db/schema";
 
 interface EpisodeData {
   podcastIndexId: string;
@@ -263,5 +263,148 @@ export async function updateLibraryNotes(
   } catch (error) {
     console.error("Error updating notes:", error);
     return { success: false, error: "Failed to update notes. Please try again." };
+  }
+}
+
+// Add a bookmark to a library entry
+export async function addBookmark(
+  libraryEntryId: number,
+  timestamp: number,
+  note?: string
+) {
+  const { userId } = await auth();
+
+  if (!userId) {
+    return { success: false, error: "You must be signed in to add bookmarks" };
+  }
+
+  try {
+    // Verify the library entry belongs to the user
+    const libraryEntry = await db.query.userLibrary.findFirst({
+      where: and(
+        eq(userLibrary.id, libraryEntryId),
+        eq(userLibrary.userId, userId)
+      ),
+    });
+
+    if (!libraryEntry) {
+      return { success: false, error: "Library entry not found" };
+    }
+
+    const [bookmark] = await db
+      .insert(bookmarks)
+      .values({
+        userLibraryId: libraryEntryId,
+        timestamp,
+        note: note || null,
+      })
+      .returning();
+
+    revalidatePath("/library");
+
+    return { success: true, bookmark };
+  } catch (error) {
+    console.error("Error adding bookmark:", error);
+    return { success: false, error: "Failed to add bookmark. Please try again." };
+  }
+}
+
+// Update a bookmark's note
+export async function updateBookmark(bookmarkId: number, note: string) {
+  const { userId } = await auth();
+
+  if (!userId) {
+    return { success: false, error: "You must be signed in to update bookmarks" };
+  }
+
+  try {
+    // Verify the bookmark belongs to the user
+    const bookmark = await db.query.bookmarks.findFirst({
+      where: eq(bookmarks.id, bookmarkId),
+      with: {
+        libraryEntry: true,
+      },
+    });
+
+    if (!bookmark || bookmark.libraryEntry.userId !== userId) {
+      return { success: false, error: "Bookmark not found" };
+    }
+
+    await db
+      .update(bookmarks)
+      .set({ note })
+      .where(eq(bookmarks.id, bookmarkId));
+
+    revalidatePath("/library");
+
+    return { success: true, message: "Bookmark updated" };
+  } catch (error) {
+    console.error("Error updating bookmark:", error);
+    return { success: false, error: "Failed to update bookmark. Please try again." };
+  }
+}
+
+// Delete a bookmark
+export async function deleteBookmark(bookmarkId: number) {
+  const { userId } = await auth();
+
+  if (!userId) {
+    return { success: false, error: "You must be signed in to delete bookmarks" };
+  }
+
+  try {
+    // Verify the bookmark belongs to the user
+    const bookmark = await db.query.bookmarks.findFirst({
+      where: eq(bookmarks.id, bookmarkId),
+      with: {
+        libraryEntry: true,
+      },
+    });
+
+    if (!bookmark || bookmark.libraryEntry.userId !== userId) {
+      return { success: false, error: "Bookmark not found" };
+    }
+
+    await db.delete(bookmarks).where(eq(bookmarks.id, bookmarkId));
+
+    revalidatePath("/library");
+
+    return { success: true, message: "Bookmark deleted" };
+  } catch (error) {
+    console.error("Error deleting bookmark:", error);
+    return { success: false, error: "Failed to delete bookmark. Please try again." };
+  }
+}
+
+// Get bookmarks for a library entry
+export async function getBookmarks(libraryEntryId: number) {
+  const { userId } = await auth();
+
+  if (!userId) {
+    return { bookmarks: [], error: "You must be signed in to view bookmarks" };
+  }
+
+  try {
+    // Verify the library entry belongs to the user
+    const libraryEntry = await db.query.userLibrary.findFirst({
+      where: and(
+        eq(userLibrary.id, libraryEntryId),
+        eq(userLibrary.userId, userId)
+      ),
+    });
+
+    if (!libraryEntry) {
+      return { bookmarks: [], error: "Library entry not found" };
+    }
+
+    const result = await db.query.bookmarks.findMany({
+      where: eq(bookmarks.userLibraryId, libraryEntryId),
+      orderBy: [asc(bookmarks.timestamp)],
+    });
+
+    return { bookmarks: result, error: null };
+  } catch (error) {
+    console.error("Error fetching bookmarks:", error);
+    return { bookmarks: [], error: "Failed to load bookmarks" };
   }
 }
