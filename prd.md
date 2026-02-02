@@ -335,7 +335,7 @@ MVP is complete when a user can:
       "Create src/components/library/bookmarks-list.tsx",
       "Auto-save notes with debounce"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "feature",

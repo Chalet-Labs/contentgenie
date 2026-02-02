@@ -2,8 +2,8 @@
 
 ## Current Status
 **Last Updated:** 2026-01-30
-**Tasks Completed:** 12 / 18
-**Current Task:** Task 13 - Implement notes and bookmarks on saved episodes
+**Tasks Completed:** 13 / 18
+**Current Task:** Task 14 - Implement user ratings on episodes
 
 ---
 
@@ -619,4 +619,61 @@ ContentGenie is a podcast summarization and discovery platform for busy professi
   - Library page layout renders correctly with sidebar
 
 **Note:** The collections feature is fully implemented. Database connectivity issues prevent full end-to-end testing, but all UI components and server actions are complete and functional.
+
+### 2026-01-30 - Task 13: Implement notes and bookmarks on saved episodes
+
+**Status:** COMPLETED
+
+**What was done:**
+- Added Shadcn Textarea and Collapsible components for the notes/bookmarks UI
+- Created `src/components/library/notes-editor.tsx` - Notes editor component with:
+  - Auto-save with 1-second debounce to avoid excessive API calls
+  - Visual feedback for saving state (Saving... / Saved)
+  - Error display for failed saves
+  - Preserves last saved state to avoid unnecessary API calls
+- Created `src/components/library/bookmarks-list.tsx` - Bookmarks list component with:
+  - Display of bookmarks sorted by timestamp
+  - Add bookmark dialog with timestamp input (MM:SS or HH:MM:SS format)
+  - Optional note field for each bookmark
+  - Delete bookmark functionality
+  - Loading and empty states
+  - Timestamp parsing and formatting utilities
+- Extended `src/app/actions/library.ts` with bookmark CRUD operations:
+  - `addBookmark()`: Add a new timestamp bookmark with optional note
+  - `updateBookmark()`: Update a bookmark's note
+  - `deleteBookmark()`: Delete a bookmark
+  - `getBookmarks()`: Fetch all bookmarks for a library entry
+  - All actions include proper authentication and ownership verification
+- Updated `src/components/library/saved-episode-card.tsx`:
+  - Added collapsible section with "More/Less" toggle
+  - Integrated NotesEditor and BookmarksList components
+  - Added "Has notes" indicator badge when notes exist
+  - Expandable content area shows notes textarea and bookmarks list
+
+**Commands run:**
+- `npx shadcn@latest add textarea --yes` - Added Textarea component
+- `npx shadcn@latest add collapsible --yes` - Added Collapsible component
+- `npm run lint` - passed (no warnings or errors)
+- `npm run build` - passed (11 routes generated)
+
+**Files created:**
+- `src/components/library/notes-editor.tsx` - NEW: Notes editor with auto-save
+- `src/components/library/bookmarks-list.tsx` - NEW: Bookmarks list with CRUD
+- `src/components/ui/textarea.tsx` - NEW: Shadcn Textarea component
+- `src/components/ui/collapsible.tsx` - NEW: Shadcn Collapsible component
+
+**Files modified:**
+- `src/app/actions/library.ts` - Added bookmark CRUD server actions
+- `src/components/library/saved-episode-card.tsx` - Added expandable notes/bookmarks section
+
+**Verification:**
+- Build and lint pass without errors
+- All TypeScript types compile correctly
+- Code analysis confirms complete implementation of:
+  - Notes textarea with auto-save debounce (1-second delay)
+  - Timestamp bookmarks with add/delete functionality
+  - Collapsible UI integration in SavedEpisodeCard
+  - Proper authentication and ownership checks in all server actions
+
+**Note:** The notes and bookmarks feature is fully implemented. The SavedEpisodeCard now shows a "More/Less" button to expand and reveal the notes editor and bookmarks list. Notes are auto-saved after 1 second of inactivity. Bookmarks can be added with MM:SS or HH:MM:SS timestamps and optional notes.
 
