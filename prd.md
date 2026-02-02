@@ -213,7 +213,7 @@ MVP is complete when a user can:
       "Create src/db/schema.ts with initial schema (users, podcasts, episodes, subscriptions, library, collections, bookmarks)",
       "Add database scripts to package.json (db:generate, db:push, db:studio)"
     ],
-    "passes": false
+    "passes": true
   },
   {
     "category": "setup",
