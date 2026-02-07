@@ -2,7 +2,7 @@
 
 import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
-import { eq, and, desc, asc } from "drizzle-orm";
+import { eq, and, desc, asc, isNotNull } from "drizzle-orm";
 import { db } from "@/db";
 import { users, podcasts, episodes, userLibrary, bookmarks } from "@/db/schema";
 
@@ -472,18 +472,15 @@ export async function getEpisodeAverageRating(episodePodcastIndexId: string) {
       return { averageRating: null, ratingCount: 0, error: null };
     }
 
-    const ratings = await db.query.userLibrary.findMany({
+    const validRatings = await db.query.userLibrary.findMany({
       where: and(
         eq(userLibrary.episodeId, episode.id),
-        // Only include entries that have a rating
+        isNotNull(userLibrary.rating)
       ),
       columns: {
         rating: true,
       },
     });
-
-    // Filter out null ratings
-    const validRatings = ratings.filter(r => r.rating !== null);
 
     if (validRatings.length === 0) {
       return { averageRating: null, ratingCount: 0, error: null };
