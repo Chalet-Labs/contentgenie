@@ -1,9 +1,9 @@
 "use server";
 
 import { auth } from "@clerk/nextjs/server";
-import { eq, desc, inArray } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 import { db } from "@/db";
-import { userSubscriptions, episodes, userLibrary } from "@/db/schema";
+import { userSubscriptions, userLibrary } from "@/db/schema";
 import {
   getEpisodesByFeedId,
   getTrendingPodcasts,

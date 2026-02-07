@@ -9,7 +9,6 @@ import {
   Rss,
   Library,
   Settings,
-  Headphones
 } from "lucide-react"
 
 const sidebarLinks = [

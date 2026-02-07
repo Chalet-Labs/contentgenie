@@ -4,7 +4,6 @@ import Image from "next/image";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Badge } from "@/components/ui/badge";
 import { Bookmark, ChevronRight, Rss, Star } from "lucide-react";
 import type { Episode, Podcast, UserLibraryEntry } from "@/db/schema";
 

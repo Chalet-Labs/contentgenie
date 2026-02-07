@@ -130,8 +130,6 @@ export interface TrendingPodcastsResponse {
 function getAuthHeaders(): Record<string, string> {
   const apiKey = getApiKey();
   const apiSecret = getApiSecret();
-  console.log("DEBUG: API_KEY length:", apiKey.length, "first 4:", apiKey.substring(0, 4));
-  console.log("DEBUG: API_SECRET length:", apiSecret.length);
   const apiHeaderTime = Math.floor(Date.now() / 1000);
   const hash = crypto
     .createHash("sha1")

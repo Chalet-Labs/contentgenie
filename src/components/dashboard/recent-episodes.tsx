@@ -4,7 +4,6 @@ import Image from "next/image";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Badge } from "@/components/ui/badge";
 import { Calendar, Clock, Rss, ChevronRight } from "lucide-react";
 import type { RecentEpisode } from "@/app/actions/dashboard";
 
@@ -30,10 +29,6 @@ function formatDate(timestamp: number): string {
     month: "short",
     day: "numeric",
   });
-}
-
-function stripHtml(html: string): string {
-  return html.replace(/<[^>]*>/g, "").trim();
 }
 
 export function RecentEpisodes({ episodes, isLoading }: RecentEpisodesProps) {
