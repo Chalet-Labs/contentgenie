@@ -9,7 +9,8 @@
     "lint": "next lint",
     "db:generate": "doppler run -- drizzle-kit generate",
     "db:push": "doppler run -- drizzle-kit push",
-    "db:studio": "doppler run -- drizzle-kit studio"
+    "db:studio": "doppler run -- drizzle-kit studio",
+    "prepare": "husky"
   },
   "dependencies": {
     "@clerk/nextjs": "^6.37.0",
@@ -41,6 +42,7 @@
     "drizzle-kit": "^0.31.8",
     "eslint": "^8.57.0",
     "eslint-config-next": "14.2.3",
+    "husky": "^9.1.7",
     "playwright": "^1.58.0",
     "postcss": "^8.4.38",
     "puppeteer": "^24.36.1",
