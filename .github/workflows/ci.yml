@@ -28,6 +28,12 @@ jobs:
       - name: Lint
         run: npx next lint
 
+      - name: Test
+        run: npx vitest run
+
+      - name: Build Storybook
+        run: npx storybook build
+
       - name: Build
         run: doppler run -- npx next build
         env:

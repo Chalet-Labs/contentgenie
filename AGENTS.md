@@ -33,20 +33,29 @@ Podcast discovery, AI-powered summarization, and library management app for busy
 ## Development commands
 
 ```bash
-npm run dev          # Start dev server (port 3000)
-npm run build        # Production build
-npm run lint         # ESLint (next lint)
-npm run db:generate  # Generate Drizzle migrations
-npm run db:push      # Push schema to database
-npm run db:studio    # Open Drizzle Studio (DB browser)
+npm run dev            # Start dev server (port 3000)
+npm run build          # Production build
+npm run lint           # ESLint (next lint)
+npm run test           # Run Vitest unit tests
+npm run test:watch     # Run tests in watch mode
+npm run test:coverage  # Run tests with coverage (80% threshold on src/lib/)
+npm run storybook      # Launch Storybook dev server (port 6006)
+npm run build-storybook # Build static Storybook
+npm run db:generate    # Generate Drizzle migrations
+npm run db:push        # Push schema to database
+npm run db:studio      # Open Drizzle Studio (DB browser)
 ```
 
 ## Testing instructions
 
-- CI is defined in `.github/workflows/ci.yml` — it runs lint and build on every PR to `main`.
-- Always run `npm run lint` and `npm run build` before committing. The build must succeed.
-- There is no test suite yet. If you add tests, also add a `test` script to `package.json` and a CI step.
+- **Test framework:** Vitest with React Testing Library. Config: `vitest.config.ts`, setup: `src/test/setup.ts`.
+- **Component stories:** Storybook 8 (`@storybook/react-vite`). Config: `.storybook/main.ts`.
+- CI is defined in `.github/workflows/ci.yml` — it runs lint, tests, Storybook build, and Next.js build on every PR to `main`.
+- Always run `npm run lint`, `npm run test`, and `npm run build` before committing.
+- Unit tests live in `__tests__/` directories co-located with source (`src/lib/__tests__/`, `src/components/__tests__/`, `src/app/api/__tests__/`).
+- Stories live alongside components as `*.stories.tsx` files.
 - After changing imports or moving files, run `npm run lint` to catch broken references.
+- The pre-commit hook automatically runs lint and tests when a `test` script exists.
 
 ## PR and commit instructions
 

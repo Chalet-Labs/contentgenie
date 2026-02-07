@@ -34,6 +34,12 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# Storybook
+storybook-static/
+
+# Claude Code
+.claude/
+
 # Project specific
 venv
 clerk-nextjs-guide
