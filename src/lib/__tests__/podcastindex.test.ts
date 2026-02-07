@@ -45,19 +45,14 @@ describe("formatPublishDate", () => {
 
 // API function tests require mocking crypto and fetch
 describe("PodcastIndex API functions", () => {
-  const originalEnv = process.env;
-
   beforeEach(() => {
-    process.env = {
-      ...originalEnv,
-      PODCASTINDEX_API_KEY: "test-api-key",
-      PODCASTINDEX_API_SECRET: "test-api-secret",
-    };
+    vi.stubEnv("PODCASTINDEX_API_KEY", "test-api-key");
+    vi.stubEnv("PODCASTINDEX_API_SECRET", "test-api-secret");
     vi.stubGlobal("fetch", vi.fn());
   });
 
   afterEach(() => {
-    process.env = originalEnv;
+    vi.unstubAllEnvs();
     vi.unstubAllGlobals();
     vi.resetModules();
   });

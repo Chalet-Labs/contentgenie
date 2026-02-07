@@ -40,27 +40,24 @@ describe("parseJsonResponse", () => {
 });
 
 describe("generateCompletion", () => {
-  const originalEnv = process.env;
-
   beforeEach(() => {
-    process.env = { ...originalEnv };
     vi.stubGlobal("fetch", vi.fn());
   });
 
   afterEach(() => {
-    process.env = originalEnv;
     vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
   });
 
   it("throws when API key is missing", async () => {
-    process.env.OPENROUTER_API_KEY = "";
+    vi.stubEnv("OPENROUTER_API_KEY", "");
     await expect(
       generateCompletion([{ role: "user", content: "test" }])
     ).rejects.toThrow("OpenRouter API key is not configured");
   });
 
   it("sends correct headers and body", async () => {
-    process.env.OPENROUTER_API_KEY = "test-key";
+    vi.stubEnv("OPENROUTER_API_KEY", "test-key");
     const mockFetch = vi.fn().mockResolvedValue({
       ok: true,
       json: () =>
@@ -90,7 +87,7 @@ describe("generateCompletion", () => {
   });
 
   it("returns content from response", async () => {
-    process.env.OPENROUTER_API_KEY = "test-key";
+    vi.stubEnv("OPENROUTER_API_KEY", "test-key");
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue({
@@ -109,7 +106,7 @@ describe("generateCompletion", () => {
   });
 
   it("throws on non-ok response", async () => {
-    process.env.OPENROUTER_API_KEY = "test-key";
+    vi.stubEnv("OPENROUTER_API_KEY", "test-key");
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue({
@@ -125,7 +122,7 @@ describe("generateCompletion", () => {
   });
 
   it("throws when no choices returned", async () => {
-    process.env.OPENROUTER_API_KEY = "test-key";
+    vi.stubEnv("OPENROUTER_API_KEY", "test-key");
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue({
@@ -140,7 +137,7 @@ describe("generateCompletion", () => {
   });
 
   it("uses default model and params when not specified", async () => {
-    process.env.OPENROUTER_API_KEY = "test-key";
+    vi.stubEnv("OPENROUTER_API_KEY", "test-key");
     const mockFetch = vi.fn().mockResolvedValue({
       ok: true,
       json: () =>
