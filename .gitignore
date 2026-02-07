@@ -36,6 +36,5 @@ next-env.d.ts
 
 # Project specific
 venv
-CLAUDE.md
 clerk-nextjs-guide
 .cache

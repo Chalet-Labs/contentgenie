@@ -1,0 +1,150 @@
+# ContentGenie
+
+Podcast discovery, AI-powered summarization, and library management app for busy professionals.
+
+## Tech Stack
+
+- **Framework:** Next.js 14 (App Router), React 18, TypeScript
+- **Styling:** Tailwind CSS, shadcn/ui (Radix primitives)
+- **Auth:** Clerk (`@clerk/nextjs`)
+- **Database:** Neon (serverless Postgres) via Drizzle ORM
+- **AI:** OpenRouter API for episode summarization
+- **Podcast Data:** PodcastIndex API
+- **Notifications:** Sonner (toast)
+- **Theme:** next-themes (light/dark/system)
+
+## Workflow
+
+- Before planning any work, always pull the latest `main` (`git fetch upstream && git merge upstream/main` or equivalent).
+- Before editing any code, always create a new branch from an up-to-date `main`.
+- This is a fork. Remotes: `origin` = `rube-de/contentgenie`, `upstream` = `Chalet-Labs/contentgenie`.
+- Push feature branches to `upstream` and open PRs against `upstream/main`.
+
+## Dev environment tips
+
+- Run `doppler setup` once after cloning to configure secrets injection. After that, `npm run dev` just works.
+- Use `doppler run -- <command>` to run any one-off command that needs env vars (e.g. `doppler run -- npx drizzle-kit studio`).
+- The `@/*` path alias maps to `./src/*` — use it for all imports.
+- shadcn/ui components live in `src/components/ui/`. Add new ones with `npx shadcn@latest add <component>`.
+- Server components are the default. Only add `"use client"` when you need browser APIs, hooks, or event handlers.
+- Server actions use `"use server"` and live in `src/app/actions/`. They handle all data mutations.
+- API routes in `src/app/api/` are for proxying external services only (PodcastIndex, OpenRouter).
+
+## Development commands
+
+```bash
+npm run dev          # Start dev server (port 3000)
+npm run build        # Production build
+npm run lint         # ESLint (next lint)
+npm run db:generate  # Generate Drizzle migrations
+npm run db:push      # Push schema to database
+npm run db:studio    # Open Drizzle Studio (DB browser)
+```
+
+## Testing instructions
+
+- CI is defined in `.github/workflows/ci.yml` — it runs lint and build on every PR to `main`.
+- Always run `npm run lint` and `npm run build` before committing. The build must succeed.
+- There is no test suite yet. If you add tests, also add a `test` script to `package.json` and a CI step.
+- After changing imports or moving files, run `npm run lint` to catch broken references.
+
+## PR and commit instructions
+
+- Commit message format: `type: Description` (e.g. `feat:`, `fix:`, `chore:`, `refactor:`, `test:`, `docs:`).
+- Keep commit messages concise (1-2 sentences) and focused on the "why".
+- PR title: same format as commits, under 70 characters.
+- PR body: include a `## Summary` with bullet points and a `## Test plan` checklist.
+- Always run lint and build before pushing. The CI must pass.
+
+## Project structure
+
+```
+src/
+├── app/
+│   ├── layout.tsx            # Root layout (ClerkProvider, ThemeProvider, Toaster)
+│   ├── page.tsx              # Landing page (public)
+│   ├── globals.css
+│   ├── actions/              # Server actions (mutations)
+│   │   ├── collections.ts
+│   │   ├── dashboard.ts
+│   │   ├── library.ts
+│   │   └── subscriptions.ts
+│   ├── api/                  # API routes (external service calls)
+│   │   ├── episodes/[id]/route.ts
+│   │   ├── episodes/summarize/route.ts
+│   │   └── podcasts/search/route.ts
+│   ├── (app)/                # Authenticated app routes
+│   │   ├── layout.tsx        # App shell with sidebar
+│   │   ├── dashboard/
+│   │   ├── discover/
+│   │   ├── episode/
+│   │   ├── library/
+│   │   ├── podcast/
+│   │   ├── settings/
+│   │   └── subscriptions/
+│   └── (auth)/               # Auth routes (sign-in, sign-up)
+├── components/
+│   ├── ui/                   # shadcn/ui primitives (button, card, dialog, etc.)
+│   ├── layout/               # Header, sidebar
+│   ├── dashboard/            # Stats cards, recommendations, recent episodes
+│   ├── podcasts/             # Podcast/episode cards, search results, subscribe
+│   ├── episodes/             # Summary display, ratings, save button
+│   ├── library/              # Saved episodes, collections, bookmarks, notes
+│   └── theme-provider.tsx
+├── db/
+│   ├── index.ts              # Neon connection (drizzle + neon serverless)
+│   └── schema.ts             # Drizzle schema & relations
+├── lib/
+│   ├── openrouter.ts         # OpenRouter API client
+│   ├── podcastindex.ts       # PodcastIndex API client
+│   ├── prompts.ts            # AI prompt templates
+│   └── utils.ts              # cn() utility (clsx + tailwind-merge)
+└── middleware.ts              # Clerk auth middleware (protects non-public routes)
+```
+
+## Architecture patterns
+
+- **App Router with route groups:** `(auth)` for sign-in/sign-up, `(app)` for authenticated pages with shared sidebar layout.
+- **Server actions** (`src/app/actions/`) for all data mutations — subscriptions, library management, collections.
+- **API routes** (`src/app/api/`) for proxying external services (PodcastIndex search, episode summarization).
+- **Clerk middleware** protects all routes except `/`, `/sign-in`, `/sign-up`, and `/api/webhooks`.
+- **Component organization:** Feature folders (`dashboard/`, `podcasts/`, `episodes/`, `library/`) alongside shared `ui/` primitives.
+
+## Database schema
+
+Tables: `users`, `podcasts`, `episodes`, `user_subscriptions`, `collections`, `user_library`, `bookmarks`
+
+- Users are synced from Clerk (text ID primary key).
+- Podcasts/episodes reference PodcastIndex IDs.
+- Episodes have AI-generated fields: `summary`, `key_takeaways`, `worth_it_score`.
+- Type exports available: `User`, `Podcast`, `Episode`, `UserSubscription`, `Collection`, `UserLibraryEntry`, `Bookmark` (and `New*` variants).
+- Schema is defined in `src/db/schema.ts`. After changes, run `npm run db:generate` then `npm run db:push`.
+
+## Code style
+
+- TypeScript strict mode.
+- Functional React components (no classes).
+- Server components by default; `"use client"` only when needed.
+- `"use server"` directive for server actions.
+- Imports use `@/` path alias.
+- shadcn/ui components in `src/components/ui/`.
+- Tailwind for all styling (no CSS modules).
+
+## Environment & secrets
+
+Secrets are managed via **Doppler** (not `.env` files). Run `doppler setup` after cloning.
+
+Available environment variables:
+- `CLERK_SECRET_KEY` — Clerk backend auth
+- `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` — Clerk frontend auth
+- `DATABASE_URL` — Neon Postgres connection string
+- `OPENROUTER_API_KEY` — OpenRouter AI API
+- `PODCASTINDEX_API_KEY` — PodcastIndex API key
+- `PODCASTINDEX_API_SECRET` — PodcastIndex API secret
+
+## Security
+
+- All non-public routes protected by Clerk middleware.
+- No `.env` files committed — Doppler handles secrets injection.
+- Server actions validate `auth()` before mutations.
+- API routes verify authentication before processing.
