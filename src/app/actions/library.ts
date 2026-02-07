@@ -475,7 +475,7 @@ export async function getEpisodeAverageRating(episodePodcastIndexId: string) {
     const validRatings = await db.query.userLibrary.findMany({
       where: and(
         eq(userLibrary.episodeId, episode.id),
-        isNotNull(userLibrary.rating)
+        isNotNull(userLibrary.rating) // Only include entries that have a rating
       ),
       columns: {
         rating: true,
