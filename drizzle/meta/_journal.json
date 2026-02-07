@@ -15,6 +15,13 @@
       "when": 1770487425633,
       "tag": "0001_pink_roland_deschain",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1770487652437,
+      "tag": "0002_perpetual_terror",
+      "breakpoints": true
     }
   ]
 }

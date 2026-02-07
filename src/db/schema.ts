@@ -9,8 +9,9 @@ import {
   decimal,
   index,
   uniqueIndex,
+  check,
 } from "drizzle-orm/pg-core";
-import { relations } from "drizzle-orm";
+import { relations, sql } from "drizzle-orm";
 
 // Users table (synced from Clerk)
 export const users = pgTable("users", {
@@ -74,6 +75,10 @@ export const episodes = pgTable(
   (table) => [
     uniqueIndex("episodes_podcast_index_id_idx").on(table.podcastIndexId),
     index("episodes_podcast_id_idx").on(table.podcastId),
+    check(
+      "worth_it_score_range",
+      sql`${table.worthItScore} >= 0 AND ${table.worthItScore} <= 10`
+    ),
   ]
 );
 
