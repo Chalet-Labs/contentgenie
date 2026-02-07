@@ -1,5 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
+import { auth } from "@clerk/nextjs/server";
+import { db } from "@/db";
+import { getEpisodeById, getPodcastById } from "@/lib/podcastindex";
+import { GET } from "@/app/api/episodes/[id]/route";
 
 vi.mock("@clerk/nextjs/server", () => ({
   auth: vi.fn(),
@@ -30,10 +34,8 @@ describe("GET /api/episodes/[id]", () => {
   });
 
   it("returns 401 when unauthenticated", async () => {
-    const { auth } = await import("@clerk/nextjs/server");
     vi.mocked(auth).mockResolvedValue({ userId: null } as never);
 
-    const { GET } = await import("@/app/api/episodes/[id]/route");
     const request = new NextRequest("http://localhost:3000/api/episodes/123");
     const response = await GET(request, { params: { id: "123" } });
     const data = await response.json();
@@ -43,10 +45,8 @@ describe("GET /api/episodes/[id]", () => {
   });
 
   it("returns 400 for non-numeric ID", async () => {
-    const { auth } = await import("@clerk/nextjs/server");
     vi.mocked(auth).mockResolvedValue({ userId: "user-1" } as never);
 
-    const { GET } = await import("@/app/api/episodes/[id]/route");
     const request = new NextRequest("http://localhost:3000/api/episodes/abc");
     const response = await GET(request, { params: { id: "abc" } });
     const data = await response.json();
@@ -56,17 +56,14 @@ describe("GET /api/episodes/[id]", () => {
   });
 
   it("returns 404 when episode not found", async () => {
-    const { auth } = await import("@clerk/nextjs/server");
     vi.mocked(auth).mockResolvedValue({ userId: "user-1" } as never);
 
-    const { getEpisodeById } = await import("@/lib/podcastindex");
     vi.mocked(getEpisodeById).mockResolvedValue({
       status: "true",
       episode: null as never,
       description: "",
     });
 
-    const { GET } = await import("@/app/api/episodes/[id]/route");
     const request = new NextRequest("http://localhost:3000/api/episodes/999");
     const response = await GET(request, { params: { id: "999" } });
     const data = await response.json();
@@ -76,15 +73,11 @@ describe("GET /api/episodes/[id]", () => {
   });
 
   it("returns episode data with podcast and cached summary", async () => {
-    const { auth } = await import("@clerk/nextjs/server");
     vi.mocked(auth).mockResolvedValue({ userId: "user-1" } as never);
 
     const mockEpisode = { id: 123, title: "Ep", feedId: 456 };
     const mockPodcast = { id: 456, title: "Pod" };
 
-    const { getEpisodeById, getPodcastById } = await import(
-      "@/lib/podcastindex"
-    );
     vi.mocked(getEpisodeById).mockResolvedValue({
       status: "true",
       episode: mockEpisode as never,
@@ -96,7 +89,6 @@ describe("GET /api/episodes/[id]", () => {
       description: "",
     });
 
-    const { db } = await import("@/db");
     vi.mocked(db.query.episodes.findFirst).mockResolvedValue({
       summary: "Cached summary",
       keyTakeaways: ["Point 1"],
@@ -104,7 +96,6 @@ describe("GET /api/episodes/[id]", () => {
       processedAt: new Date(),
     } as never);
 
-    const { GET } = await import("@/app/api/episodes/[id]/route");
     const request = new NextRequest("http://localhost:3000/api/episodes/123");
     const response = await GET(request, { params: { id: "123" } });
     const data = await response.json();

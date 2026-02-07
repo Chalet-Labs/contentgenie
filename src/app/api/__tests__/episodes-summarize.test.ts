@@ -1,5 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
+import { auth } from "@clerk/nextjs/server";
+import { db } from "@/db";
+import { POST, GET } from "@/app/api/episodes/summarize/route";
 
 vi.mock("@clerk/nextjs/server", () => ({
   auth: vi.fn(),
@@ -42,10 +45,8 @@ describe("POST /api/episodes/summarize", () => {
   });
 
   it("returns 401 when unauthenticated", async () => {
-    const { auth } = await import("@clerk/nextjs/server");
     vi.mocked(auth).mockResolvedValue({ userId: null } as never);
 
-    const { POST } = await import("@/app/api/episodes/summarize/route");
     const request = new NextRequest(
       "http://localhost:3000/api/episodes/summarize",
       {
@@ -61,10 +62,8 @@ describe("POST /api/episodes/summarize", () => {
   });
 
   it("returns 400 when episodeId is missing", async () => {
-    const { auth } = await import("@clerk/nextjs/server");
     vi.mocked(auth).mockResolvedValue({ userId: "user-1" } as never);
 
-    const { POST } = await import("@/app/api/episodes/summarize/route");
     const request = new NextRequest(
       "http://localhost:3000/api/episodes/summarize",
       {
@@ -80,10 +79,8 @@ describe("POST /api/episodes/summarize", () => {
   });
 
   it("returns cached summary when exists", async () => {
-    const { auth } = await import("@clerk/nextjs/server");
     vi.mocked(auth).mockResolvedValue({ userId: "user-1" } as never);
 
-    const { db } = await import("@/db");
     vi.mocked(db.query.episodes.findFirst).mockResolvedValue({
       summary: "Cached summary",
       keyTakeaways: ["Point 1"],
@@ -91,7 +88,6 @@ describe("POST /api/episodes/summarize", () => {
       processedAt: new Date(),
     } as never);
 
-    const { POST } = await import("@/app/api/episodes/summarize/route");
     const request = new NextRequest(
       "http://localhost:3000/api/episodes/summarize",
       {
@@ -115,10 +111,8 @@ describe("GET /api/episodes/summarize", () => {
   });
 
   it("returns 401 when unauthenticated", async () => {
-    const { auth } = await import("@clerk/nextjs/server");
     vi.mocked(auth).mockResolvedValue({ userId: null } as never);
 
-    const { GET } = await import("@/app/api/episodes/summarize/route");
     const request = new NextRequest(
       "http://localhost:3000/api/episodes/summarize?episodeId=123"
     );
@@ -130,10 +124,8 @@ describe("GET /api/episodes/summarize", () => {
   });
 
   it("returns existing summary status", async () => {
-    const { auth } = await import("@clerk/nextjs/server");
     vi.mocked(auth).mockResolvedValue({ userId: "user-1" } as never);
 
-    const { db } = await import("@/db");
     vi.mocked(db.query.episodes.findFirst).mockResolvedValue({
       summary: "Summary text",
       keyTakeaways: ["Takeaway"],
@@ -141,7 +133,6 @@ describe("GET /api/episodes/summarize", () => {
       processedAt: new Date("2024-01-15"),
     } as never);
 
-    const { GET } = await import("@/app/api/episodes/summarize/route");
     const request = new NextRequest(
       "http://localhost:3000/api/episodes/summarize?episodeId=123"
     );
@@ -154,13 +145,10 @@ describe("GET /api/episodes/summarize", () => {
   });
 
   it("returns exists=false when no summary", async () => {
-    const { auth } = await import("@clerk/nextjs/server");
     vi.mocked(auth).mockResolvedValue({ userId: "user-1" } as never);
 
-    const { db } = await import("@/db");
     vi.mocked(db.query.episodes.findFirst).mockResolvedValue(null as never);
 
-    const { GET } = await import("@/app/api/episodes/summarize/route");
     const request = new NextRequest(
       "http://localhost:3000/api/episodes/summarize?episodeId=123"
     );

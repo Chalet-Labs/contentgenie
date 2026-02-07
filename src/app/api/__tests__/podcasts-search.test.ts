@@ -1,14 +1,22 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { NextRequest } from "next/server";
 import { GET } from "@/app/api/podcasts/search/route";
+import { searchPodcasts } from "@/lib/podcastindex";
 
 vi.mock("@/lib/podcastindex", () => ({
   searchPodcasts: vi.fn(),
 }));
 
+const originalEnv = process.env;
+
 describe("GET /api/podcasts/search", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    process.env = { ...originalEnv };
+  });
+
+  afterEach(() => {
+    process.env = originalEnv;
   });
 
   it("returns 400 when query is missing", async () => {
@@ -21,8 +29,6 @@ describe("GET /api/podcasts/search", () => {
   });
 
   it("returns 500 when API credentials are missing", async () => {
-    const originalKey = process.env.PODCASTINDEX_API_KEY;
-    const originalSecret = process.env.PODCASTINDEX_API_SECRET;
     delete process.env.PODCASTINDEX_API_KEY;
     delete process.env.PODCASTINDEX_API_SECRET;
 
@@ -34,16 +40,12 @@ describe("GET /api/podcasts/search", () => {
 
     expect(response.status).toBe(500);
     expect(data.error).toBe("PodcastIndex API credentials not configured");
-
-    process.env.PODCASTINDEX_API_KEY = originalKey;
-    process.env.PODCASTINDEX_API_SECRET = originalSecret;
   });
 
   it("returns search results", async () => {
     process.env.PODCASTINDEX_API_KEY = "key";
     process.env.PODCASTINDEX_API_SECRET = "secret";
 
-    const { searchPodcasts } = await import("@/lib/podcastindex");
     vi.mocked(searchPodcasts).mockResolvedValue({
       status: "true",
       feeds: [
@@ -71,7 +73,6 @@ describe("GET /api/podcasts/search", () => {
     process.env.PODCASTINDEX_API_KEY = "key";
     process.env.PODCASTINDEX_API_SECRET = "secret";
 
-    const { searchPodcasts } = await import("@/lib/podcastindex");
     vi.mocked(searchPodcasts).mockRejectedValue(new Error("API down"));
 
     const request = new NextRequest(
