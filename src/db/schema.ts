@@ -66,7 +66,7 @@ export const episodes = pgTable(
     transcription: text("transcription"),
     summary: text("summary"),
     keyTakeaways: json("key_takeaways").$type<string[]>(),
-    worthItScore: decimal("worth_it_score", { precision: 3, scale: 2 }), // 0.00 - 10.00
+    worthItScore: decimal("worth_it_score", { precision: 4, scale: 2 }), // 0.00 - 10.00
     processedAt: timestamp("processed_at"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
