@@ -1,0 +1,6 @@
+npm run lint
+
+# Run tests only if a test script exists
+if node -e "const p=require('./package.json'); process.exit(p.scripts?.test ? 0 : 1)" 2>/dev/null; then
+  npm test
+fi
