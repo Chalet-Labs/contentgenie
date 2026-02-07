@@ -7,16 +7,10 @@ vi.mock("@/lib/podcastindex", () => ({
   searchPodcasts: vi.fn(),
 }));
 
-const originalEnv = process.env;
-
 describe("GET /api/podcasts/search", () => {
-  beforeEach(() => {
-    vi.clearAllMocks();
-    process.env = { ...originalEnv };
-  });
-
   afterEach(() => {
-    process.env = originalEnv;
+    vi.clearAllMocks();
+    vi.unstubAllEnvs();
   });
 
   it("returns 400 when query is missing", async () => {
@@ -29,8 +23,8 @@ describe("GET /api/podcasts/search", () => {
   });
 
   it("returns 500 when API credentials are missing", async () => {
-    delete process.env.PODCASTINDEX_API_KEY;
-    delete process.env.PODCASTINDEX_API_SECRET;
+    vi.stubEnv("PODCASTINDEX_API_KEY", "");
+    vi.stubEnv("PODCASTINDEX_API_SECRET", "");
 
     const request = new NextRequest(
       "http://localhost:3000/api/podcasts/search?q=test"
@@ -43,8 +37,8 @@ describe("GET /api/podcasts/search", () => {
   });
 
   it("returns search results", async () => {
-    process.env.PODCASTINDEX_API_KEY = "key";
-    process.env.PODCASTINDEX_API_SECRET = "secret";
+    vi.stubEnv("PODCASTINDEX_API_KEY", "key");
+    vi.stubEnv("PODCASTINDEX_API_SECRET", "secret");
 
     vi.mocked(searchPodcasts).mockResolvedValue({
       status: "true",
@@ -70,8 +64,8 @@ describe("GET /api/podcasts/search", () => {
   });
 
   it("returns 500 on API error", async () => {
-    process.env.PODCASTINDEX_API_KEY = "key";
-    process.env.PODCASTINDEX_API_SECRET = "secret";
+    vi.stubEnv("PODCASTINDEX_API_KEY", "key");
+    vi.stubEnv("PODCASTINDEX_API_SECRET", "secret");
 
     vi.mocked(searchPodcasts).mockRejectedValue(new Error("API down"));
 
