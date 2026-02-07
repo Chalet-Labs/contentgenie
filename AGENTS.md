@@ -22,8 +22,8 @@ Podcast discovery, AI-powered summarization, and library management app for busy
 
 ## Dev environment tips
 
-- Run `doppler setup` once after cloning to configure secrets injection. After that, `npm run dev` just works.
-- Use `doppler run -- <command>` to run any one-off command that needs env vars (e.g. `doppler run -- npx drizzle-kit studio`).
+- Run `doppler setup` once after cloning to configure secrets injection. After that, `npm run dev` just works (scripts already wrap `doppler run --`).
+- Use `doppler run -- <command>` if you need to run a one-off command that needs env vars outside of the npm scripts.
 - The `@/*` path alias maps to `./src/*` — use it for all imports.
 - shadcn/ui components live in `src/components/ui/`. Add new ones with `npx shadcn@latest add <component>`.
 - Server components are the default. Only add `"use client"` when you need browser APIs, hooks, or event handlers.
