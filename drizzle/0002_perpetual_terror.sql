@@ -1,0 +1,1 @@
+ALTER TABLE "episodes" ADD CONSTRAINT "worth_it_score_range" CHECK ("episodes"."worth_it_score" >= 0 AND "episodes"."worth_it_score" <= 10);

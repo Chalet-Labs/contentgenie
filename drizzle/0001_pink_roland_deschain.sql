@@ -1,0 +1,1 @@
+ALTER TABLE "episodes" ALTER COLUMN "worth_it_score" SET DATA TYPE numeric(4, 2);
