@@ -39,6 +39,9 @@ storybook-static/
 
 # Claude Code
 .claude/
+!.claude/settings.json
+!.claude/mcp.json
+!.claude/skills/
 
 # Project specific
 venv
