@@ -29,6 +29,6 @@ jobs:
         run: npx next lint
 
       - name: Build
-        run: doppler run -- next build
+        run: doppler run -- npx next build
         env:
           DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
