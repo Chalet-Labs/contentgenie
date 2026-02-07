@@ -4,17 +4,12 @@ import Image from "next/image";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Badge } from "@/components/ui/badge";
 import { ChevronRight, Sparkles, Rss } from "lucide-react";
 import type { PodcastIndexPodcast } from "@/lib/podcastindex";
 
 interface RecommendationsProps {
   podcasts: PodcastIndexPodcast[];
   isLoading?: boolean;
-}
-
-function stripHtml(html: string): string {
-  return html.replace(/<[^>]*>/g, "").trim();
 }
 
 export function Recommendations({ podcasts, isLoading }: RecommendationsProps) {

@@ -2,10 +2,9 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { Rss, Bell, BellOff, Clock } from "lucide-react";
+import { Rss, Clock } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { SubscribeButton } from "./subscribe-button";
 import type { Podcast } from "@/db/schema";
 

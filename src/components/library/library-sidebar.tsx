@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Folder, Plus, Loader2, Bookmark } from "lucide-react";
+import { Folder, Plus, Bookmark } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CollectionDialog } from "./collection-dialog";

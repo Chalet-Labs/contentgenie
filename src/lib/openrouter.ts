@@ -1,5 +1,4 @@
 const OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions";
-const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || "";
 
 // Default model: Gemini Flash (cost-effective)
 const DEFAULT_MODEL = "google/gemini-flash-1.5";
@@ -43,14 +42,15 @@ export async function generateCompletion(
     temperature?: number;
   } = {}
 ): Promise<string> {
-  if (!OPENROUTER_API_KEY) {
+  const apiKey = process.env.OPENROUTER_API_KEY || "";
+  if (!apiKey) {
     throw new Error("OpenRouter API key is not configured");
   }
 
   const response = await fetch(OPENROUTER_API_URL, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${OPENROUTER_API_KEY}`,
+      Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
       "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
       "X-Title": "ContentGenie",

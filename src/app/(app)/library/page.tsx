@@ -61,20 +61,6 @@ export default function LibraryPage() {
     setSortDirection(prev => prev === "desc" ? "asc" : "desc");
   };
 
-  const getSortIcon = (option: LibrarySortOption) => {
-    switch (option) {
-      case "rating":
-        return <Star className="h-4 w-4" />;
-      case "publishDate":
-        return <Calendar className="h-4 w-4" />;
-      case "title":
-        return <Type className="h-4 w-4" />;
-      case "savedAt":
-      default:
-        return <Clock className="h-4 w-4" />;
-    }
-  };
-
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
