@@ -1,3 +1,5 @@
+#!/usr/bin/env sh
+
 npm run lint
 
 # Run tests only if a test script exists
