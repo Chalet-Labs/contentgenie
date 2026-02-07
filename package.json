@@ -3,13 +3,13 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
+    "dev": "doppler run -- next dev",
+    "build": "doppler run -- next build",
+    "start": "doppler run -- next start",
     "lint": "next lint",
-    "db:generate": "drizzle-kit generate",
-    "db:push": "drizzle-kit push",
-    "db:studio": "drizzle-kit studio"
+    "db:generate": "doppler run -- drizzle-kit generate",
+    "db:push": "doppler run -- drizzle-kit push",
+    "db:studio": "doppler run -- drizzle-kit studio"
   },
   "dependencies": {
     "@clerk/nextjs": "^6.37.0",
