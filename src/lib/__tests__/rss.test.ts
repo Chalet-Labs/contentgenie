@@ -356,10 +356,15 @@ describe("generatePodcastSyntheticId", () => {
     expect(a).toBe(b);
   });
 
-  it("normalizes case", () => {
-    const a = generatePodcastSyntheticId("https://Example.COM/Feed.xml");
+  it("normalizes hostname case but preserves path case", () => {
+    const a = generatePodcastSyntheticId("https://Example.COM/feed.xml");
     const b = generatePodcastSyntheticId("https://example.com/feed.xml");
     expect(a).toBe(b);
+
+    // Different path casing should produce different IDs
+    const c = generatePodcastSyntheticId("https://example.com/Feed.xml");
+    const d = generatePodcastSyntheticId("https://example.com/feed.xml");
+    expect(c).not.toBe(d);
   });
 
   it("produces different IDs for different URLs", () => {
@@ -389,7 +394,7 @@ describe("generateEpisodeSyntheticId", () => {
     expect(a).not.toBe(b);
   });
 
-  it("normalizes feed URL consistently", () => {
+  it("normalizes hostname and trailing slashes consistently", () => {
     const a = generateEpisodeSyntheticId("http://Example.COM/feed/", "ep-001");
     const b = generateEpisodeSyntheticId("https://example.com/feed", "ep-001");
     expect(a).toBe(b);

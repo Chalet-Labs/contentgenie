@@ -158,6 +158,16 @@ describe("addPodcastByRssUrl", () => {
   });
 
   it("successfully imports a podcast and returns metadata", async () => {
+    // The returning() mock handler calls mockReturning twice per invocation
+    // (once as tracker, once for the value). Set up the sequence:
+    // calls 1-2: podcast insert returning → [{ id: 1 }]
+    // calls 3-4: episode batch insert returning → [{ id: 1 }, { id: 2 }]
+    mockReturning
+      .mockReturnValueOnce([{ id: 1 }])
+      .mockReturnValueOnce([{ id: 1 }])
+      .mockReturnValueOnce([{ id: 1 }, { id: 2 }])
+      .mockReturnValueOnce([{ id: 1 }, { id: 2 }]);
+
     mockParsePodcastFeed.mockResolvedValue({
       title: "Test Podcast",
       description: "A test podcast",
