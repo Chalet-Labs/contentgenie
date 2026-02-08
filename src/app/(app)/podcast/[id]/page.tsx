@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { eq, desc as descOrder } from "drizzle-orm";
 import { ArrowLeft, Rss, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -11,7 +12,10 @@ import {
   getEpisodesByFeedId,
   formatPublishDate,
 } from "@/lib/podcastindex";
+import type { PodcastIndexEpisode } from "@/lib/podcastindex";
 import { isSubscribedToPodcast } from "@/app/actions/subscriptions";
+import { db } from "@/db";
+import { podcasts, episodes as episodesTable } from "@/db/schema";
 
 interface PodcastPageProps {
   params: {
@@ -19,8 +23,184 @@ interface PodcastPageProps {
   };
 }
 
+function isRssSourced(id: string): boolean {
+  return id.startsWith("rss-");
+}
+
+async function loadRssPodcast(podcastIndexId: string) {
+  const podcast = await db.query.podcasts.findFirst({
+    where: eq(podcasts.podcastIndexId, podcastIndexId),
+  });
+
+  if (!podcast) return null;
+
+  const dbEpisodes = await db.query.episodes.findMany({
+    where: eq(episodesTable.podcastId, podcast.id),
+    orderBy: [descOrder(episodesTable.publishDate)],
+    limit: 50,
+  });
+
+  // Map DB episodes to PodcastIndexEpisode shape for reuse of EpisodeList
+  // Use podcastIndexId (rss-...) as the id so EpisodeCard links to /episode/rss-...
+  // which the episode API route handles correctly.
+  const mappedEpisodes: PodcastIndexEpisode[] = dbEpisodes.map((ep) => ({
+    id: ep.podcastIndexId as unknown as number,
+    title: ep.title,
+    link: "",
+    description: ep.description ?? "",
+    guid: ep.rssGuid ?? ep.podcastIndexId,
+    datePublished: ep.publishDate
+      ? Math.floor(ep.publishDate.getTime() / 1000)
+      : 0,
+    datePublishedPretty: ep.publishDate
+      ? ep.publishDate.toLocaleDateString("en-US", {
+          year: "numeric",
+          month: "short",
+          day: "numeric",
+        })
+      : "",
+    dateCrawled: 0,
+    enclosureUrl: ep.audioUrl ?? "",
+    enclosureType: "audio/mpeg",
+    enclosureLength: 0,
+    duration: ep.duration ?? 0,
+    explicit: 0,
+    episode: null,
+    episodeType: "full",
+    season: 0,
+    image: "",
+    feedItunesId: null,
+    feedImage: podcast.imageUrl ?? "",
+    feedId: podcast.id,
+    feedLanguage: "",
+    feedDead: 0,
+    feedDuplicateOf: null,
+    chaptersUrl: null,
+    transcriptUrl: null,
+    soundbite: null,
+    soundbites: [],
+    transcripts: [],
+  }));
+
+  return { podcast, episodes: mappedEpisodes };
+}
+
 export default async function PodcastPage({ params }: PodcastPageProps) {
-  const feedId = parseInt(params.id, 10);
+  const id = params.id;
+
+  if (isRssSourced(id)) {
+    // Load RSS-sourced podcast from database
+    const data = await loadRssPodcast(id);
+
+    if (!data) {
+      notFound();
+    }
+
+    const { podcast, episodes } = data;
+    const subscribed = await isSubscribedToPodcast(podcast.podcastIndexId);
+    const categories = (podcast.categories as string[]) ?? [];
+
+    return (
+      <div className="space-y-8">
+        <Link
+          href="/discover"
+          className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back to Discover
+        </Link>
+
+        <div className="flex flex-col gap-6 md:flex-row">
+          <div className="relative h-48 w-48 shrink-0 overflow-hidden rounded-xl bg-muted shadow-lg">
+            {podcast.imageUrl ? (
+              <Image
+                src={podcast.imageUrl}
+                alt={podcast.title}
+                fill
+                className="object-cover"
+                sizes="192px"
+                priority
+              />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center text-muted-foreground">
+                <Rss className="h-16 w-16" />
+              </div>
+            )}
+          </div>
+
+          <div className="flex flex-1 flex-col gap-4">
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight">
+                {podcast.title}
+              </h1>
+              <p className="mt-1 text-lg text-muted-foreground">
+                {podcast.publisher ?? "Unknown author"}
+              </p>
+            </div>
+
+            {categories.length > 0 && (
+              <div className="flex flex-wrap gap-2">
+                {categories.map((category, index) => (
+                  <Badge key={index} variant="secondary">
+                    {category}
+                  </Badge>
+                ))}
+              </div>
+            )}
+
+            <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
+              <span>{episodes.length} episodes</span>
+              <Badge variant="outline">RSS Import</Badge>
+            </div>
+
+            <div className="flex flex-wrap gap-3">
+              <SubscribeButton
+                podcastIndexId={podcast.podcastIndexId}
+                title={podcast.title}
+                description={podcast.description ?? undefined}
+                publisher={podcast.publisher ?? undefined}
+                imageUrl={podcast.imageUrl ?? undefined}
+                rssFeedUrl={podcast.rssFeedUrl ?? undefined}
+                categories={categories}
+                initialSubscribed={subscribed}
+              />
+              {podcast.rssFeedUrl && (
+                <Button variant="outline" size="lg" asChild>
+                  <a
+                    href={podcast.rssFeedUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    <Rss className="mr-2 h-4 w-4" />
+                    RSS Feed
+                  </a>
+                </Button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {podcast.description && (
+          <div className="rounded-lg border bg-card p-6">
+            <h2 className="mb-3 text-lg font-semibold">About</h2>
+            <p className="whitespace-pre-wrap text-muted-foreground">
+              {stripHtml(podcast.description)}
+            </p>
+          </div>
+        )}
+
+        <div>
+          <h2 className="mb-4 text-xl font-semibold">
+            Episodes ({episodes.length})
+          </h2>
+          <EpisodeList episodes={episodes} />
+        </div>
+      </div>
+    );
+  }
+
+  // PodcastIndex-sourced podcast (existing behavior)
+  const feedId = parseInt(id, 10);
 
   if (isNaN(feedId)) {
     notFound();

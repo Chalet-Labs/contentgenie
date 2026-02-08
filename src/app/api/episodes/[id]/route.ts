@@ -2,8 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { episodes } from "@/db/schema";
+import { episodes, podcasts } from "@/db/schema";
 import { getEpisodeById, getPodcastById } from "@/lib/podcastindex";
+
+function isRssSourced(id: string): boolean {
+  return id.startsWith("rss-");
+}
 
 export async function GET(
   request: NextRequest,
@@ -16,7 +20,70 @@ export async function GET(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const episodeId = parseInt(params.id, 10);
+    const id = params.id;
+
+    // RSS-sourced episode: load from database
+    if (isRssSourced(id)) {
+      const dbEpisode = await db.query.episodes.findFirst({
+        where: eq(episodes.podcastIndexId, id),
+        with: { podcast: true },
+      });
+
+      if (!dbEpisode) {
+        return NextResponse.json(
+          { error: "Episode not found" },
+          { status: 404 }
+        );
+      }
+
+      // Map to the shape the episode detail page expects
+      const episode = {
+        id: dbEpisode.id,
+        title: dbEpisode.title,
+        link: "",
+        description: dbEpisode.description ?? "",
+        guid: dbEpisode.rssGuid ?? dbEpisode.podcastIndexId,
+        datePublished: dbEpisode.publishDate
+          ? Math.floor(dbEpisode.publishDate.getTime() / 1000)
+          : 0,
+        enclosureUrl: dbEpisode.audioUrl ?? "",
+        duration: dbEpisode.duration ?? 0,
+        episode: null,
+        episodeType: "full",
+        season: 0,
+        image: "",
+        feedImage: dbEpisode.podcast?.imageUrl ?? "",
+        feedId: dbEpisode.podcastId,
+      };
+
+      const podcast = dbEpisode.podcast
+        ? {
+            id: dbEpisode.podcast.podcastIndexId,
+            title: dbEpisode.podcast.title,
+            author: dbEpisode.podcast.publisher ?? "",
+            ownerName: dbEpisode.podcast.publisher ?? "",
+            image: dbEpisode.podcast.imageUrl ?? "",
+            artwork: dbEpisode.podcast.imageUrl ?? "",
+            categories: {},
+          }
+        : null;
+
+      let summary = null;
+      if (dbEpisode.summary && dbEpisode.processedAt) {
+        summary = {
+          summary: dbEpisode.summary,
+          keyTakeaways: dbEpisode.keyTakeaways || [],
+          worthItScore: dbEpisode.worthItScore
+            ? parseFloat(dbEpisode.worthItScore)
+            : null,
+        };
+      }
+
+      return NextResponse.json({ episode, podcast, summary });
+    }
+
+    // PodcastIndex-sourced episode (existing behavior)
+    const episodeId = parseInt(id, 10);
     if (isNaN(episodeId)) {
       return NextResponse.json(
         { error: "Invalid episode ID" },
