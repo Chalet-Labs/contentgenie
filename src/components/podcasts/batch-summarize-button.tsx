@@ -75,7 +75,7 @@ export function BatchSummarizeButton({
       setRunId(null);
       setAccessToken(null);
     }
-  }, [run?.status, run?.metadata]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [run]);
 
   // Auto-dismiss done state after 5 seconds
   useEffect(() => {
