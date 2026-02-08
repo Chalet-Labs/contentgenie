@@ -65,6 +65,8 @@ Most `package.json` scripts are wrapped with `doppler run --`, which injects env
 | `NEXT_PUBLIC_APP_URL` | Public | Application URL (inlined at build time) |
 | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Public | Clerk publishable key (inlined at build time) |
 | `CLERK_SECRET_KEY` | Server | Clerk secret key |
+| `CLERK_SIGN_IN_FORCE_REDIRECT_URL` | Server | URL to redirect to after sign-in (e.g. `/dashboard`) |
+| `CLERK_SIGN_UP_FORCE_REDIRECT_URL` | Server | URL to redirect to after sign-up (e.g. `/dashboard`) |
 | `TRIGGER_SECRET_KEY` | Server | Trigger.dev secret key (background jobs) |
 | `ASSEMBLYAI_API_KEY` | Server | AssemblyAI transcription API key |
 

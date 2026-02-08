@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+- Authenticated users are now redirected from landing page to dashboard after login (#50)
+
 ### Changed
 - Rate limiting upgraded from in-memory to distributed (Postgres-backed) for serverless compatibility
 - CI workflow simplified to quality checks only (lint, test, Storybook); Vercel handles builds and deploys

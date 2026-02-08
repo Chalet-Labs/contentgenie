@@ -152,6 +152,8 @@ Secrets are managed via **Doppler** (not `.env` files). Run `doppler setup` afte
 
 Available environment variables:
 - `CLERK_SECRET_KEY` — Clerk backend auth
+- `CLERK_SIGN_IN_FORCE_REDIRECT_URL` — Post-sign-in redirect URL (e.g. `/dashboard`)
+- `CLERK_SIGN_UP_FORCE_REDIRECT_URL` — Post-sign-up redirect URL (e.g. `/dashboard`)
 - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` — Clerk frontend auth
 - `DATABASE_URL` — Neon Postgres connection string
 - `OPENROUTER_API_KEY` — OpenRouter AI API
