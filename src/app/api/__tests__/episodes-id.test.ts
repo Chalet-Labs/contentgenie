@@ -91,6 +91,36 @@ describe("GET /api/episodes/[id]", () => {
     expect(data.error).toBe("Episode not found");
   });
 
+  it("returns episode data without summary when DB query fails", async () => {
+    vi.mocked(auth).mockResolvedValue({ userId: "user-1" } as never);
+
+    const mockEpisode = { id: 123, title: "Ep", feedId: 456 };
+    const mockPodcast = { id: 456, title: "Pod" };
+
+    vi.mocked(getEpisodeById).mockResolvedValue({
+      status: "true",
+      episode: mockEpisode as never,
+      description: "",
+    });
+    vi.mocked(getPodcastById).mockResolvedValue({
+      status: "true",
+      feed: mockPodcast as never,
+      description: "",
+    });
+    vi.mocked(db.query.episodes.findFirst).mockRejectedValue(
+      new Error("DB connection failed")
+    );
+
+    const request = new NextRequest("http://localhost:3000/api/episodes/123");
+    const response = await GET(request, { params: { id: "123" } });
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.episode).toEqual(mockEpisode);
+    expect(data.podcast).toEqual(mockPodcast);
+    expect(data.summary).toBeNull();
+  });
+
   it("returns episode data with podcast and cached summary", async () => {
     vi.mocked(auth).mockResolvedValue({ userId: "user-1" } as never);
 
