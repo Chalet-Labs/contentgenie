@@ -8,6 +8,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 - Rate limiting upgraded from in-memory to distributed (Postgres-backed) for serverless compatibility
+- CI workflow simplified to quality checks only (lint, test, Storybook); Vercel handles builds and deploys
+
+### Added
+- Vercel deployment pipeline with automatic PR previews and production deploy on merge
+- Doppler-to-Vercel integration for secrets sync across dev/preview/production environments
+- Neon-to-Vercel integration for automatic per-PR database branches
+- Trigger.dev GitHub integration for automatic task deployment on merge
 
 ### Added
 - Batch episode summarization via Trigger.dev with concurrency-limited fan-out

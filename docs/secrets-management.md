@@ -58,7 +58,7 @@ Most `package.json` scripts are wrapped with `doppler run --`, which injects env
 
 | Variable | Type | Description |
 |----------|------|-------------|
-| `DATABASE_URL` | Server | Neon PostgreSQL connection string |
+| `DATABASE_URL` | Server | Neon PostgreSQL connection string (Doppler `dev` only; Neon integration handles Vercel) |
 | `PODCASTINDEX_API_KEY` | Server | PodcastIndex API key |
 | `PODCASTINDEX_API_SECRET` | Server | PodcastIndex API secret |
 | `OPENROUTER_API_KEY` | Server | OpenRouter AI API key |
@@ -77,11 +77,20 @@ Doppler syncs secrets to Vercel automatically via the [Doppler Vercel integratio
 
 The Vercel integration injects env vars directly into the Vercel build environment. Vercel's build command should be set to `next build` (without `doppler run --`) in the Vercel project settings, since Doppler's native integration handles the injection.
 
+## Neon Integration
+
+The [Neon Vercel integration](https://docs.neon.tech/docs/integrations/vercel) manages `DATABASE_URL` for Vercel deployments:
+
+- **Production** deployments use the Neon `main` branch
+- **Preview** deployments automatically get an isolated Neon database branch per PR
+
+Because Neon owns `DATABASE_URL` in Vercel, this variable is **not** included in Doppler `stg` or `prd` configs. It is only in Doppler `dev` for local development.
+
 ## CI/CD
 
-GitHub Actions uses a `DOPPLER_TOKEN` secret (a Doppler service token) to access secrets during CI builds. The workflow at `.github/workflows/ci.yml` installs the Doppler CLI and prefixes build commands with `doppler run --`.
+GitHub Actions runs quality checks (lint, test, Storybook build) on every PR and push to `main`. Vercel handles production and preview builds/deploys separately, so CI does not need Doppler or a `next build` step.
 
-The `DOPPLER_TOKEN` should be a service token scoped to the CI-appropriate config (e.g., `stg`). Create one in the Doppler dashboard under the project's config tokens, then add it as a repository secret in GitHub.
+Trigger.dev tasks are auto-deployed via the [Trigger.dev GitHub integration](https://trigger.dev/docs/github-integration) when changes are pushed to `main`.
 
 ## Troubleshooting
 

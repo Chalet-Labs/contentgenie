@@ -7,14 +7,11 @@ on:
     branches: [main]
 
 jobs:
-  build:
+  quality:
     runs-on: ubuntu-latest
 
     steps:
       - uses: actions/checkout@v4
-
-      - name: Install Doppler CLI
-        uses: dopplerhq/cli-action@v3
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
@@ -30,8 +27,3 @@ jobs:
 
       - name: Build Storybook
         run: bun run build-storybook
-
-      - name: Build
-        run: doppler run -- bun run --bun next build
-        env:
-          DOPPLER_TOKEN: ${{ secrets.DOPPLER_TOKEN }}
