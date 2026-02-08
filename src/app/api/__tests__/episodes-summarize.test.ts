@@ -2,10 +2,15 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { db } from "@/db";
+import { checkRateLimit } from "@/lib/rate-limit";
 import { POST, GET } from "@/app/api/episodes/summarize/route";
 
 vi.mock("@clerk/nextjs/server", () => ({
   auth: vi.fn(),
+}));
+
+vi.mock("@/lib/rate-limit", () => ({
+  checkRateLimit: vi.fn().mockResolvedValue({ allowed: true }),
 }));
 
 vi.mock("@/db", () => ({
@@ -41,6 +46,7 @@ vi.mock("@/trigger/summarize-episode", () => ({}));
 describe("POST /api/episodes/summarize", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(checkRateLimit).mockResolvedValue({ allowed: true });
   });
 
   it("returns 401 when unauthenticated", async () => {
@@ -129,6 +135,24 @@ describe("POST /api/episodes/summarize", () => {
       { episodeId: 123 },
       { idempotencyKey: "summarize-episode-123", idempotencyKeyTTL: "10m" }
     );
+  });
+
+  it("returns 429 when rate limit is exceeded", async () => {
+    vi.mocked(auth).mockResolvedValue({ userId: "user-1" } as never);
+    vi.mocked(checkRateLimit).mockResolvedValue({ allowed: false, retryAfterMs: 3600000 });
+
+    const request = new NextRequest(
+      "http://localhost:3000/api/episodes/summarize",
+      {
+        method: "POST",
+        body: JSON.stringify({ episodeId: "123" }),
+      }
+    );
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(429);
+    expect(data.error).toBe("Rate limit exceeded. Please try again later.");
   });
 
   it("returns 202 for existing in-progress run", async () => {

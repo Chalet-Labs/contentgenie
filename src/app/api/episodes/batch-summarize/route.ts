@@ -4,27 +4,8 @@ import { tasks, auth } from "@trigger.dev/sdk";
 import { inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { episodes } from "@/db/schema";
+import { checkRateLimit } from "@/lib/rate-limit";
 import type { batchSummarizeEpisodes } from "@/trigger/batch-summarize-episodes";
-
-// Simple in-memory rate limiter (per-instance; sufficient as first defense)
-const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
-const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000; // 1 hour
-const RATE_LIMIT_MAX = 10; // 10 summarizations per hour per user
-
-function checkRateLimit(userId: string, count: number): boolean {
-  const now = Date.now();
-  const entry = rateLimitMap.get(userId);
-  if (!entry || now > entry.resetAt) {
-    if (count > RATE_LIMIT_MAX) return false;
-    rateLimitMap.set(userId, { count, resetAt: now + RATE_LIMIT_WINDOW_MS });
-    return true;
-  }
-  if (entry.count + count > RATE_LIMIT_MAX) {
-    return false;
-  }
-  entry.count += count;
-  return true;
-}
 
 export async function POST(request: NextRequest) {
   try {
@@ -97,7 +78,8 @@ export async function POST(request: NextRequest) {
     );
 
     // Rate limit check (only count uncached episodes against quota)
-    if (!checkRateLimit(userId, uncachedIds.length)) {
+    const rateLimit = await checkRateLimit(userId, uncachedIds.length);
+    if (!rateLimit.allowed) {
       return NextResponse.json(
         { error: "Rate limit exceeded. Please try again later." },
         { status: 429 }

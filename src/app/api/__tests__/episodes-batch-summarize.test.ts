@@ -2,10 +2,15 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { db } from "@/db";
+import { checkRateLimit } from "@/lib/rate-limit";
 import { POST } from "@/app/api/episodes/batch-summarize/route";
 
 vi.mock("@clerk/nextjs/server", () => ({
   auth: vi.fn(),
+}));
+
+vi.mock("@/lib/rate-limit", () => ({
+  checkRateLimit: vi.fn().mockResolvedValue({ allowed: true }),
 }));
 
 vi.mock("@/db", () => ({
@@ -185,14 +190,8 @@ describe("POST /api/episodes/batch-summarize", () => {
   it("returns 429 when rate limit is exceeded", async () => {
     vi.mocked(auth).mockResolvedValue({ userId: "rate-limit-user" } as never);
     vi.mocked(db.query.episodes.findMany).mockResolvedValue([] as never);
+    vi.mocked(checkRateLimit).mockResolvedValue({ allowed: false, retryAfterMs: 3600000 });
 
-    // Exhaust rate limit (10 max per hour) with a single batch of 10
-    const firstResponse = await POST(
-      makeRequest({ episodeIds: Array.from({ length: 10 }, (_, i) => i + 1) })
-    );
-    expect(firstResponse.status).toBe(202);
-
-    // Next request should be rate-limited
     const response = await POST(makeRequest({ episodeIds: [100] }));
     const data = await response.json();
 
