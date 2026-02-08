@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { EpisodeList } from "@/components/podcasts/episode-list";
 import { SubscribeButton } from "@/components/podcasts/subscribe-button";
+import { BatchSummarizeButton } from "@/components/podcasts/batch-summarize-button";
 import {
   getPodcastById,
   getEpisodesByFeedId,
@@ -176,6 +177,9 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
                   </a>
                 </Button>
               )}
+              <BatchSummarizeButton
+                episodeIds={episodes.map((e) => e.id)}
+              />
             </div>
           </div>
         </div>
@@ -320,6 +324,9 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
                   </a>
                 </Button>
               )}
+              <BatchSummarizeButton
+                episodeIds={episodes.map((e) => e.id)}
+              />
             </div>
           </div>
         </div>
