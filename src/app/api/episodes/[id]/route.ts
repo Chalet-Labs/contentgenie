@@ -92,7 +92,15 @@ export async function GET(
     }
 
     // Fetch episode from PodcastIndex
-    const episodeResponse = await getEpisodeById(episodeId);
+    let episodeResponse;
+    try {
+      episodeResponse = await getEpisodeById(episodeId);
+    } catch {
+      return NextResponse.json(
+        { error: "Episode not found" },
+        { status: 404 }
+      );
+    }
     if (!episodeResponse?.episode) {
       return NextResponse.json(
         { error: "Episode not found" },

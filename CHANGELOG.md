@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Fixed
 - Authenticated users are now redirected from landing page to dashboard after login (#50)
+- Episode detail page now returns 404 instead of 500 for invalid/missing PodcastIndex episode IDs (#52)
 
 ### Changed
 - Rate limiting upgraded from in-memory to distributed (Postgres-backed) for serverless compatibility
