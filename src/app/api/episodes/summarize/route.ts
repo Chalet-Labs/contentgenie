@@ -6,6 +6,25 @@ import { db } from "@/db";
 import { episodes } from "@/db/schema";
 import type { summarizeEpisode } from "@/trigger/summarize-episode";
 
+// Simple in-memory rate limiter (per-instance; sufficient as first defense)
+const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
+const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000; // 1 hour
+const RATE_LIMIT_MAX = 10; // 10 summarizations per hour per user
+
+function checkRateLimit(userId: string): boolean {
+  const now = Date.now();
+  const entry = rateLimitMap.get(userId);
+  if (!entry || now > entry.resetAt) {
+    rateLimitMap.set(userId, { count: 1, resetAt: now + RATE_LIMIT_WINDOW_MS });
+    return true;
+  }
+  if (entry.count >= RATE_LIMIT_MAX) {
+    return false;
+  }
+  entry.count++;
+  return true;
+}
+
 export async function POST(request: NextRequest) {
   try {
     // Verify authentication
@@ -18,10 +37,19 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { episodeId } = body;
 
-    if (!episodeId) {
+    const numericEpisodeId = Number(episodeId);
+    if (!episodeId || !Number.isFinite(numericEpisodeId) || numericEpisodeId <= 0) {
       return NextResponse.json(
-        { error: "Episode ID is required" },
+        { error: "A valid positive episode ID is required" },
         { status: 400 }
+      );
+    }
+
+    // Rate limit check
+    if (!checkRateLimit(userId)) {
+      return NextResponse.json(
+        { error: "Rate limit exceeded. Please try again later." },
+        { status: 429 }
       );
     }
 
@@ -68,10 +96,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Trigger the summarization task
+    // Trigger the summarization task (idempotencyKey prevents duplicate runs)
     const handle = await tasks.trigger<typeof summarizeEpisode>(
       "summarize-episode",
-      { episodeId: Number(episodeId) }
+      { episodeId: numericEpisodeId },
+      { idempotencyKey: `summarize-episode-${numericEpisodeId}`, idempotencyKeyTTL: "10m" }
     );
 
     // Generate public access token for realtime frontend subscription
