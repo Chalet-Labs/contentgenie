@@ -10,24 +10,20 @@ const config: StorybookConfig = {
   },
   viteFinal: async (config) => {
     config.resolve = config.resolve || {};
-    config.resolve.alias = {
-      ...config.resolve.alias,
-      "@": path.resolve(__dirname, "../src"),
+    // Use array format so specific aliases are checked before the general "@" prefix
+    config.resolve.alias = [
       // Stub out server-only modules that break Storybook's browser build
-      "@clerk/nextjs/server": path.resolve(__dirname, "mocks/clerk-server.ts"),
-      "@/db": path.resolve(__dirname, "mocks/db.ts"),
-      "@/db/schema": path.resolve(__dirname, "mocks/db-schema.ts"),
-      "@/app/actions/library": path.resolve(__dirname, "mocks/actions.ts"),
-      "@/app/actions/subscriptions": path.resolve(
-        __dirname,
-        "mocks/actions.ts"
-      ),
-      "@/app/actions/collections": path.resolve(
-        __dirname,
-        "mocks/actions.ts"
-      ),
-      "@/app/actions/dashboard": path.resolve(__dirname, "mocks/actions.ts"),
-    };
+      { find: "@clerk/nextjs/server", replacement: path.resolve(__dirname, "mocks/clerk-server.ts") },
+      { find: "@/db/schema", replacement: path.resolve(__dirname, "mocks/db-schema.ts") },
+      { find: "@/db", replacement: path.resolve(__dirname, "mocks/db.ts") },
+      { find: "@/app/actions/library", replacement: path.resolve(__dirname, "mocks/actions.ts") },
+      { find: "@/app/actions/subscriptions", replacement: path.resolve(__dirname, "mocks/actions.ts") },
+      { find: "@/app/actions/collections", replacement: path.resolve(__dirname, "mocks/actions.ts") },
+      { find: "@/app/actions/dashboard", replacement: path.resolve(__dirname, "mocks/actions.ts") },
+      { find: "@/lib/podcastindex", replacement: path.resolve(__dirname, "mocks/podcastindex.ts") },
+      // General path alias — must come last
+      { find: "@", replacement: path.resolve(__dirname, "../src") },
+    ];
     return config;
   },
 };

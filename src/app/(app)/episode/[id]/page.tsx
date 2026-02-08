@@ -183,8 +183,8 @@ export default function EpisodePage({ params }: EpisodePageProps) {
               setAccessToken(statusData.publicAccessToken);
               setIsLoadingSummary(true);
             }
-          } catch {
-            // Ignore errors checking for in-progress runs
+          } catch (error) {
+            console.warn("Failed to check for in-progress summary run:", error);
           }
         }
 
