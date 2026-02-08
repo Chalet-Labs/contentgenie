@@ -188,10 +188,9 @@ describe("summarize-episode task", () => {
     );
   });
 
-  it("uses cached transcription from database", async () => {
+  it("uses cached transcription from database and skips external fetches", async () => {
     vi.mocked(getEpisodeById).mockResolvedValue({ episode: mockEpisode } as never);
     vi.mocked(getPodcastById).mockResolvedValue({ feed: mockPodcast } as never);
-    vi.mocked(fetchTranscript).mockResolvedValue(undefined);
     mockFindFirst.mockResolvedValue({ transcription: "Cached transcript text" });
     vi.mocked(generateEpisodeSummary).mockResolvedValue(mockSummary);
     vi.mocked(persistEpisodeSummary).mockResolvedValue(undefined);
@@ -202,6 +201,7 @@ describe("summarize-episode task", () => {
     );
 
     expect(result).toEqual(mockSummary);
+    expect(fetchTranscript).not.toHaveBeenCalled();
     expect(transcribeAudio).not.toHaveBeenCalled();
     expect(generateEpisodeSummary).toHaveBeenCalledWith(
       mockPodcast,
