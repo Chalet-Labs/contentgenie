@@ -15,8 +15,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Doppler-to-Vercel integration for secrets sync across dev/preview/production environments
 - Neon-to-Vercel integration for automatic per-PR database branches
 - Trigger.dev GitHub integration for automatic task deployment on merge
-
-### Added
 - Batch episode summarization via Trigger.dev with concurrency-limited fan-out
 - `BatchSummarizeButton` component on podcast detail page for bulk processing
 - `/api/episodes/batch-summarize` endpoint with rate limiting and cached-episode filtering
