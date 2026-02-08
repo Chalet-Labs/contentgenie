@@ -35,6 +35,7 @@
       "Bash(sudo:*)",
       "Bash(docker:*)",
       "Bash(rm -rf:*)",
+      "Bash(npx skills:*)",
       "Read(./.env)",
       "Read(./.env.*)",
       "Read(~/.ssh/**)",
@@ -46,6 +47,16 @@
     ],
     "defaultMode": "acceptEdits"
   },
+  "enabledPlugins": {
+    "context7@claude-plugins-official": true,
+    "cdt@rube-cc-skills": true,
+    "frontend-design@claude-plugins-official": true,
+    "security-guidance@claude-plugins-official": true,
+    "serena@claude-plugins-official": true,
+    "claude-md-management@claude-plugins-official": true,
+    "devops-tools@cc-skills": true,
+    "doc-tools@cc-skills": true
+  },
   "sandbox": {
     "enabled": false,
     "autoAllowBashIfSandboxed": true,
@@ -53,8 +64,5 @@
     "network": {
       "allowLocalBinding": true
     }
-  },
-  "enabledPlugins": {
-    "context7@claude-plugins-official": true
   }
 }
