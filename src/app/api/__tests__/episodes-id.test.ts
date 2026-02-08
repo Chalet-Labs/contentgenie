@@ -72,6 +72,25 @@ describe("GET /api/episodes/[id]", () => {
     expect(data.error).toBe("Episode not found");
   });
 
+  it("returns 404 when PodcastIndex API throws an error", async () => {
+    vi.mocked(auth).mockResolvedValue({ userId: "user-1" } as never);
+
+    vi.mocked(getEpisodeById).mockRejectedValue(
+      new Error("PodcastIndex API error: 400 Bad Request")
+    );
+
+    const request = new NextRequest(
+      "http://localhost:3000/api/episodes/49731529531"
+    );
+    const response = await GET(request, {
+      params: { id: "49731529531" },
+    });
+    const data = await response.json();
+
+    expect(response.status).toBe(404);
+    expect(data.error).toBe("Episode not found");
+  });
+
   it("returns episode data with podcast and cached summary", async () => {
     vi.mocked(auth).mockResolvedValue({ userId: "user-1" } as never);
 
