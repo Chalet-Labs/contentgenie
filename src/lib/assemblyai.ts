@@ -56,7 +56,12 @@ export async function submitTranscription(audioUrl: string): Promise<string> {
   }
 
   const data = await response.json();
-  return data.id as string;
+  if (typeof data?.id !== "string" || !data.id) {
+    throw new Error(
+      "AssemblyAI API error: submit response did not include a transcript ID"
+    );
+  }
+  return data.id;
 }
 
 // Get the current status of a transcription
@@ -76,9 +81,14 @@ export async function getTranscriptionStatus(
   }
 
   const data = await response.json();
+  if (typeof data?.id !== "string" || typeof data?.status !== "string") {
+    throw new Error(
+      "AssemblyAI API error: invalid response from status check"
+    );
+  }
   return {
     id: data.id,
-    status: data.status,
+    status: data.status as TranscriptionStatus,
     text: data.text ?? null,
     error: data.error ?? null,
   };
