@@ -3,14 +3,16 @@
 import { EpisodeCard } from "./episode-card";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { PodcastIndexEpisode } from "@/lib/podcastindex";
+import type { SummaryStatus } from "@/db/schema";
 
 interface EpisodeListProps {
   episodes: PodcastIndexEpisode[];
   isLoading?: boolean;
   error?: string | null;
+  statusMap?: Map<string, SummaryStatus>;
 }
 
-export function EpisodeList({ episodes, isLoading, error }: EpisodeListProps) {
+export function EpisodeList({ episodes, isLoading, error, statusMap }: EpisodeListProps) {
   if (isLoading) {
     return (
       <div className="space-y-4">
@@ -42,7 +44,7 @@ export function EpisodeList({ episodes, isLoading, error }: EpisodeListProps) {
   return (
     <div className="space-y-4">
       {episodes.map((episode) => (
-        <EpisodeCard key={episode.id} episode={episode} />
+        <EpisodeCard key={episode.id} episode={episode} summaryStatus={statusMap?.get(String(episode.id))} />
       ))}
     </div>
   );

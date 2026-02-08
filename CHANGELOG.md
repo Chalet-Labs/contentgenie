@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- Processing status tracking with granular pipeline stages (transcribing, summarizing)
+- `ProcessingStatus` badge component for compact status display on episode cards
+- `processingError` column for persistent error messages on failed summarizations
+- Transcribing audio step in the realtime progress UI
+- Failed episode detection on page load with stored error messages and retry
+
 ## [2026-02-08]
 
 ### Added

@@ -3,7 +3,7 @@ import { auth as clerkAuth } from "@clerk/nextjs/server";
 import { eq } from "drizzle-orm";
 import { tasks, auth } from "@trigger.dev/sdk";
 import { db } from "@/db";
-import { episodes } from "@/db/schema";
+import { episodes, IN_PROGRESS_STATUSES } from "@/db/schema";
 import type { summarizeEpisode } from "@/trigger/summarize-episode";
 
 // Simple in-memory rate limiter (per-instance; sufficient as first defense)
@@ -73,8 +73,8 @@ export async function POST(request: NextRequest) {
     // Check if there's already a run in progress
     if (
       existingEpisode?.summaryRunId &&
-      (existingEpisode.summaryStatus === "queued" ||
-        existingEpisode.summaryStatus === "running")
+      existingEpisode.summaryStatus &&
+      IN_PROGRESS_STATUSES.includes(existingEpisode.summaryStatus)
     ) {
       // Generate a new public access token for the existing run
       const publicAccessToken = await auth.createPublicToken({
@@ -184,8 +184,8 @@ export async function GET(request: NextRequest) {
     // Check if there's an in-progress run
     if (
       existingEpisode?.summaryRunId &&
-      (existingEpisode.summaryStatus === "queued" ||
-        existingEpisode.summaryStatus === "running")
+      existingEpisode.summaryStatus &&
+      IN_PROGRESS_STATUSES.includes(existingEpisode.summaryStatus)
     ) {
       const publicAccessToken = await auth.createPublicToken({
         scopes: {
@@ -201,6 +201,15 @@ export async function GET(request: NextRequest) {
         status: existingEpisode.summaryStatus,
         runId: existingEpisode.summaryRunId,
         publicAccessToken,
+      });
+    }
+
+    // Return error info for failed episodes
+    if (existingEpisode?.summaryStatus === "failed") {
+      return NextResponse.json({
+        exists: false,
+        status: "failed",
+        processingError: existingEpisode.processingError,
       });
     }
 

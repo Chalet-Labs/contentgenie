@@ -72,6 +72,7 @@ export async function trackEpisodeRun(
       .set({
         summaryRunId: runId,
         summaryStatus: "running",
+        processingError: null,
         updatedAt: new Date(),
       })
       .where(eq(episodes.id, existingEp.id));
@@ -93,6 +94,23 @@ export async function trackEpisodeRun(
       })
       .onConflictDoNothing({ target: episodes.podcastIndexId });
   }
+}
+
+/**
+ * Updates the episode's summaryStatus during processing pipeline transitions.
+ * Non-critical — callers should wrap in try/catch.
+ */
+export async function updateEpisodeStatus(
+  episodeId: number | string,
+  status: "transcribing" | "summarizing"
+): Promise<void> {
+  await db
+    .update(episodes)
+    .set({
+      summaryStatus: status,
+      updatedAt: new Date(),
+    })
+    .where(eq(episodes.podcastIndexId, String(episodeId)));
 }
 
 export async function persistEpisodeSummary(

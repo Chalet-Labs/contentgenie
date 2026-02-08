@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { getEpisodeById, getPodcastById } from "./helpers/podcastindex";
 import { fetchTranscript } from "./helpers/transcript";
 import { generateEpisodeSummary, type SummaryResult } from "./helpers/openrouter";
-import { trackEpisodeRun, persistEpisodeSummary } from "./helpers/database";
+import { trackEpisodeRun, persistEpisodeSummary, updateEpisodeStatus } from "./helpers/database";
 import { db } from "@/db";
 import { episodes } from "@/db/schema";
 import type { PodcastIndexEpisode, PodcastIndexPodcast } from "@/lib/podcastindex";
@@ -29,6 +29,7 @@ export const summarizeEpisode = task({
       .set({
         summaryStatus: "failed",
         summaryRunId: null,
+        processingError: "Summarization failed after maximum retry attempts",
         updatedAt: new Date(),
       })
       .where(eq(episodes.podcastIndexId, String(episodeId)));
@@ -124,6 +125,14 @@ export const summarizeEpisode = task({
       logger.info("Transcribing audio via AssemblyAI", { audioUrl: episode.enclosureUrl });
 
       try {
+        await updateEpisodeStatus(episodeId, "transcribing");
+      } catch (error) {
+        logger.warn("Failed to update episode status to transcribing", {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+
+      try {
         const result = await transcribeAudio(episode.enclosureUrl, { maxWaitMs: 5 * 60 * 1000 });
 
         if (result.status === "completed" && result.text) {
@@ -145,6 +154,14 @@ export const summarizeEpisode = task({
     // Step 4: Generate AI summary via OpenRouter
     metadata.set("step", "generating-summary");
     logger.info("Generating AI summary via OpenRouter");
+
+    try {
+      await updateEpisodeStatus(episodeId, "summarizing");
+    } catch (error) {
+      logger.warn("Failed to update episode status to summarizing", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
 
     const summary = await retry.onThrow(
       async () => generateEpisodeSummary(podcast, episode, transcript),

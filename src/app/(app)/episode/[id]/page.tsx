@@ -25,6 +25,7 @@ import {
 import { SaveButton } from "@/components/episodes/save-button";
 import { CommunityRating } from "@/components/episodes/community-rating";
 import { isEpisodeSaved } from "@/app/actions/library";
+import { IN_PROGRESS_STATUSES } from "@/db/schema";
 import type { summarizeEpisode } from "@/trigger/summarize-episode";
 
 interface EpisodePageProps {
@@ -169,7 +170,7 @@ export default function EpisodePage({ params }: EpisodePageProps) {
             cached: true,
           });
         } else {
-          // Check for in-progress summarization run
+          // Check for in-progress or failed summarization run
           try {
             const statusResponse = await fetch(
               `/api/episodes/summarize?episodeId=${episodeId}`
@@ -178,11 +179,17 @@ export default function EpisodePage({ params }: EpisodePageProps) {
             if (
               statusData.runId &&
               statusData.publicAccessToken &&
-              (statusData.status === "queued" || statusData.status === "running")
+              IN_PROGRESS_STATUSES.includes(statusData.status)
             ) {
               setRunId(statusData.runId);
               setAccessToken(statusData.publicAccessToken);
               setIsLoadingSummary(true);
+            } else if (statusData.status === "failed") {
+              setSummaryError(
+                statusData.processingError ||
+                  "Summary generation failed. Please try again."
+              );
+              setIsLoadingSummary(false);
             }
           } catch (error) {
             console.warn("Failed to check for in-progress summary run:", error);
