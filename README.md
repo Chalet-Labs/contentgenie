@@ -20,7 +20,7 @@ ContentGenie helps you find podcasts, get AI-generated episode summaries with ke
 
 ### Prerequisites
 
-- Node.js 18+
+- [Bun](https://bun.sh/) (package manager and script runner)
 - [Doppler CLI](https://docs.doppler.com/docs/install-cli) for secrets management
 - Access to the Doppler `contentgenie` project
 
@@ -36,13 +36,13 @@ doppler login
 doppler setup
 
 # Install dependencies
-npm install
+bun install
 
 # Push database schema (if first time)
-npm run db:push
+bun run db:push
 
 # Start the dev server
-npm run dev
+bun run dev
 ```
 
 The app runs at [http://localhost:3000](http://localhost:3000).
@@ -50,22 +50,22 @@ The app runs at [http://localhost:3000](http://localhost:3000).
 ## Development
 
 ```bash
-npm run dev              # Dev server (port 3000)
-npm run build            # Production build
-npm run lint             # ESLint
-npm run test             # Vitest unit tests
-npm run test:watch       # Tests in watch mode
-npm run test:coverage    # Tests with coverage
-npm run storybook        # Storybook (port 6006)
-npm run db:generate      # Generate Drizzle migrations
-npm run db:push          # Push schema to database
-npm run db:studio        # Drizzle Studio (DB browser)
-npm run trigger:dev      # Trigger.dev dev server
+bun run dev              # Dev server (port 3000, Turbopack)
+bun run build            # Production build
+bun run lint             # ESLint
+bun run test             # Vitest unit tests
+bun run test:watch       # Tests in watch mode
+bun run test:coverage    # Tests with coverage
+bun run storybook        # Storybook (port 6006)
+bun run db:generate      # Generate Drizzle migrations
+bun run db:push          # Push schema to database
+bun run db:studio        # Drizzle Studio (DB browser)
+bun run trigger:dev      # Trigger.dev dev server
 ```
 
 ### Secrets
 
-Secrets are managed via [Doppler](https://docs.doppler.com/) -- not `.env` files. All npm scripts that need environment variables are wrapped with `doppler run --`. For one-off commands, use `doppler run -- <command>`.
+Secrets are managed via [Doppler](https://docs.doppler.com/) -- not `.env` files. All bun scripts that need environment variables are wrapped with `doppler run --`. For one-off commands, use `doppler run -- <command>`.
 
 See [docs/secrets-management.md](docs/secrets-management.md) for full details.
 
@@ -108,7 +108,7 @@ src/
 
 1. Create a branch from `main`
 2. Make your changes
-3. Run `npm run lint && npm run test && npm run build`
+3. Run `bun run lint && bun run test && bun run build`
 4. Open a PR with a `## Summary` and `## Test plan`
 
 Commit format: `type: Description` (e.g. `feat:`, `fix:`, `chore:`, `refactor:`, `test:`, `docs:`)

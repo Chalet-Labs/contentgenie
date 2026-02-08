@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "doppler run -- next dev",
+    "dev": "doppler run -- next dev --turbo",
     "build": "doppler run -- next build",
     "start": "doppler run -- next start",
     "lint": "next lint",
@@ -15,8 +15,8 @@
     "db:generate": "doppler run -- drizzle-kit generate",
     "db:push": "doppler run -- drizzle-kit push",
     "db:studio": "doppler run -- drizzle-kit studio",
-    "trigger:dev": "doppler run -- npx trigger.dev@latest dev",
-    "trigger:deploy": "doppler run -- npx trigger.dev@latest deploy",
+    "trigger:dev": "doppler run -- bunx trigger.dev@latest dev",
+    "trigger:deploy": "doppler run -- bunx trigger.dev@latest deploy",
     "prepare": "husky"
   },
   "dependencies": {
