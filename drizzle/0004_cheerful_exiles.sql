@@ -1,0 +1,1 @@
+ALTER TABLE "podcasts" ADD CONSTRAINT "source_enum" CHECK ("podcasts"."source" IN ('podcastindex', 'rss'));

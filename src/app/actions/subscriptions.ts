@@ -163,19 +163,26 @@ export async function addPodcastByRssUrl(
         publishDate: ep.publishDate,
         rssGuid: ep.guid,
       }));
-      const inserted = await db
-        .insert(episodes)
-        .values(episodeValues)
-        .onConflictDoNothing()
-        .returning({ id: episodes.id });
-      insertedCount = inserted.length;
+      // Batch episode insert + subscription insert atomically
+      const [insertedEpisodes] = await db.batch([
+        db
+          .insert(episodes)
+          .values(episodeValues)
+          .onConflictDoNothing()
+          .returning({ id: episodes.id }),
+        db
+          .insert(userSubscriptions)
+          .values({ userId, podcastId })
+          .onConflictDoNothing(),
+      ]);
+      insertedCount = insertedEpisodes.length;
+    } else {
+      // No episodes to insert — just create subscription
+      await db
+        .insert(userSubscriptions)
+        .values({ userId, podcastId })
+        .onConflictDoNothing();
     }
-
-    // Create subscription (onConflictDoNothing handles race conditions)
-    await db
-      .insert(userSubscriptions)
-      .values({ userId, podcastId })
-      .onConflictDoNothing();
 
     revalidatePath("/subscriptions");
     revalidatePath("/discover");

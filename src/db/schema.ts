@@ -51,6 +51,7 @@ export const podcasts = pgTable(
   },
   (table) => [
     uniqueIndex("podcasts_podcast_index_id_idx").on(table.podcastIndexId),
+    check("source_enum", sql`${table.source} IN ('podcastindex', 'rss')`),
   ]
 );
 
