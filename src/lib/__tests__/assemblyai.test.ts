@@ -58,6 +58,23 @@ describe("submitTranscription", () => {
       submitTranscription("https://example.com/audio.mp3")
     ).rejects.toThrow("AssemblyAI API error: 401 - Unauthorized");
   });
+
+  it("throws when response is missing transcript ID", async () => {
+    vi.stubEnv("ASSEMBLYAI_API_KEY", "test-api-key");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ status: "queued" }),
+      })
+    );
+
+    await expect(
+      submitTranscription("https://example.com/audio.mp3")
+    ).rejects.toThrow(
+      "AssemblyAI API error: submit response did not include a transcript ID"
+    );
+  });
 });
 
 describe("getTranscriptionStatus", () => {
@@ -135,6 +152,21 @@ describe("getTranscriptionStatus", () => {
 
     await expect(getTranscriptionStatus("bad-id")).rejects.toThrow(
       "AssemblyAI API error: 404 - Not found"
+    );
+  });
+
+  it("throws on malformed response missing id or status", async () => {
+    vi.stubEnv("ASSEMBLYAI_API_KEY", "test-api-key");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ text: "some text" }),
+      })
+    );
+
+    await expect(getTranscriptionStatus("transcript-123")).rejects.toThrow(
+      "AssemblyAI API error: invalid response from status check"
     );
   });
 });
