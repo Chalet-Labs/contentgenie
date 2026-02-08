@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+- Rate limiting upgraded from in-memory to distributed (Postgres-backed) for serverless compatibility
+
 ### Added
 - Batch episode summarization via Trigger.dev with concurrency-limited fan-out
 - `BatchSummarizeButton` component on podcast detail page for bulk processing
