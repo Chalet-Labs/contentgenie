@@ -73,7 +73,7 @@ describe("POST /api/episodes/summarize", () => {
     const data = await response.json();
 
     expect(response.status).toBe(400);
-    expect(data.error).toBe("Episode ID is required");
+    expect(data.error).toBe("A valid positive episode ID is required");
   });
 
   it("returns cached summary when exists", async () => {
@@ -123,9 +123,11 @@ describe("POST /api/episodes/summarize", () => {
     expect(data.runId).toBe("run_abc123");
     expect(data.publicAccessToken).toBe("test-public-token");
     expect(data.status).toBe("queued");
-    expect(tasks.trigger).toHaveBeenCalledWith("summarize-episode", {
-      episodeId: 123,
-    });
+    expect(tasks.trigger).toHaveBeenCalledWith(
+      "summarize-episode",
+      { episodeId: 123 },
+      { idempotencyKey: "summarize-episode-123", idempotencyKeyTTL: "10m" }
+    );
   });
 
   it("returns 202 for existing in-progress run", async () => {

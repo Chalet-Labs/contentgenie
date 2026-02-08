@@ -129,14 +129,15 @@ export default function EpisodePage({ params }: EpisodePageProps) {
       toast.success("Summary generated!", {
         description: "AI insights are now available for this episode",
       });
-    } else if (run.status === "FAILED") {
+    } else if (run.status === "FAILED" || run.status === "CANCELED" || run.status === "TIMED_OUT" || run.status === "SYSTEM_FAILURE" || run.status === "CRASHED" || run.status === "EXPIRED") {
       setSummaryError("Summary generation failed. Please try again.");
       setIsLoadingSummary(false);
       setRunId(null);
       setAccessToken(null);
       toast.error("Failed to generate summary");
     }
-  }, [run]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only react to status transitions, not every metadata update
+  }, [run?.status]);
 
   // Fetch episode and podcast data
   useEffect(() => {

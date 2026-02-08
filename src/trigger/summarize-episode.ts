@@ -1,8 +1,11 @@
 import { task, retry, logger, metadata, AbortTaskRunError } from "@trigger.dev/sdk";
+import { eq } from "drizzle-orm";
 import { getEpisodeById, getPodcastById } from "./helpers/podcastindex";
 import { fetchTranscript } from "./helpers/transcript";
 import { generateEpisodeSummary, type SummaryResult } from "./helpers/openrouter";
-import { persistEpisodeSummary } from "./helpers/database";
+import { trackEpisodeRun, persistEpisodeSummary } from "./helpers/database";
+import { db } from "@/db";
+import { episodes } from "@/db/schema";
 import type { PodcastIndexEpisode, PodcastIndexPodcast } from "@/lib/podcastindex";
 
 export type SummarizeEpisodePayload = {
@@ -17,7 +20,19 @@ export const summarizeEpisode = task({
     minTimeoutInMs: 1000,
     maxTimeoutInMs: 30000,
   },
-  run: async (payload: SummarizeEpisodePayload): Promise<SummaryResult> => {
+  onFailure: async (params: { payload: SummarizeEpisodePayload }) => {
+    const { episodeId } = params.payload;
+    logger.error("Summarization task failed permanently", { episodeId });
+    await db
+      .update(episodes)
+      .set({
+        summaryStatus: "failed",
+        summaryRunId: null,
+        updatedAt: new Date(),
+      })
+      .where(eq(episodes.podcastIndexId, String(episodeId)));
+  },
+  run: async (payload: SummarizeEpisodePayload, { ctx }): Promise<SummaryResult> => {
     const { episodeId } = payload;
 
     // Step 1: Fetch episode from PodcastIndex
@@ -49,6 +64,15 @@ export const summarizeEpisode = task({
       podcast = podcastResponse?.feed;
     } catch (error) {
       logger.warn("Failed to fetch podcast context, continuing without it", {
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+
+    // Track run in database so the GET endpoint can discover it on page refresh
+    try {
+      await trackEpisodeRun(episode, podcast, ctx.run.id);
+    } catch (error) {
+      logger.warn("Failed to track run in database, continuing anyway", {
         error: error instanceof Error ? error.message : String(error),
       });
     }

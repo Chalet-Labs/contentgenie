@@ -22,6 +22,24 @@ vi.mock("@trigger.dev/sdk", () => ({
   },
 }));
 
+vi.mock("@/db", () => ({
+  db: {
+    update: vi.fn().mockReturnValue({
+      set: vi.fn().mockReturnValue({
+        where: vi.fn().mockResolvedValue(undefined),
+      }),
+    }),
+  },
+}));
+
+vi.mock("@/db/schema", () => ({
+  episodes: { podcastIndexId: "podcastIndexId" },
+}));
+
+vi.mock("drizzle-orm", () => ({
+  eq: vi.fn(),
+}));
+
 vi.mock("@/trigger/helpers/podcastindex", () => ({
   getEpisodeById: vi.fn(),
   getPodcastById: vi.fn(),
@@ -36,14 +54,17 @@ vi.mock("@/trigger/helpers/openrouter", () => ({
 }));
 
 vi.mock("@/trigger/helpers/database", () => ({
+  trackEpisodeRun: vi.fn(),
   persistEpisodeSummary: vi.fn(),
 }));
 
 import { getEpisodeById, getPodcastById } from "@/trigger/helpers/podcastindex";
 import { fetchTranscript } from "@/trigger/helpers/transcript";
 import { generateEpisodeSummary } from "@/trigger/helpers/openrouter";
-import { persistEpisodeSummary } from "@/trigger/helpers/database";
+import { trackEpisodeRun, persistEpisodeSummary } from "@/trigger/helpers/database";
 import { summarizeEpisode } from "@/trigger/summarize-episode";
+
+const mockCtx = { run: { id: "run_test123" } } as never;
 
 const mockEpisode = {
   id: 123,
@@ -83,7 +104,7 @@ describe("summarize-episode task", () => {
     // The task config is extracted by our mock — call the run function directly
     const result = await summarizeEpisode.run(
       { episodeId: 123 },
-      {} as never
+      mockCtx
     );
 
     expect(result).toEqual(mockSummary);
@@ -112,7 +133,7 @@ describe("summarize-episode task", () => {
 
     const result = await summarizeEpisode.run(
       { episodeId: 123 },
-      {} as never
+      mockCtx
     );
 
     expect(result).toEqual(mockSummary);
@@ -127,7 +148,7 @@ describe("summarize-episode task", () => {
     vi.mocked(getEpisodeById).mockResolvedValue({ episode: null } as never);
 
     await expect(
-      summarizeEpisode.run({ episodeId: 999 }, {} as never)
+      summarizeEpisode.run({ episodeId: 999 }, mockCtx)
     ).rejects.toThrow("Episode 999 not found");
   });
 
@@ -140,7 +161,7 @@ describe("summarize-episode task", () => {
 
     const result = await summarizeEpisode.run(
       { episodeId: 123 },
-      {} as never
+      mockCtx
     );
 
     expect(result).toEqual(mockSummary);

@@ -1,6 +1,7 @@
 import type { PodcastIndexEpisode } from "@/lib/podcastindex";
 
 const MAX_TRANSCRIPT_LENGTH = 50000;
+const FETCH_TIMEOUT_MS = 30000;
 
 export async function fetchTranscript(
   episode: PodcastIndexEpisode
@@ -17,7 +18,16 @@ export async function fetchTranscript(
     return undefined;
   }
 
-  const response = await fetch(transcriptEntry.url);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+
+  let response: Response;
+  try {
+    response = await fetch(transcriptEntry.url, { signal: controller.signal });
+  } finally {
+    clearTimeout(timeout);
+  }
+
   if (!response.ok) {
     throw new Error(
       `Transcript fetch failed: ${response.status} ${response.statusText}`
