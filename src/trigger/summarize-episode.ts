@@ -78,55 +78,53 @@ export const summarizeEpisode = task({
       });
     }
 
-    // Step 3: Fetch transcript (non-fatal)
+    // Step 3: Check cached transcription in database (cheapest source)
     metadata.set("step", "fetching-transcript");
-    logger.info("Fetching transcript");
+    logger.info("Checking for cached transcription");
 
     let transcript: string | undefined;
     try {
-      transcript = await retry.onThrow(
-        async () => fetchTranscript(episode),
-        { maxAttempts: 2 }
-      );
-      if (transcript) {
-        logger.info("Transcript fetched", { length: transcript.length });
-      } else {
-        logger.info("No transcript available for this episode");
+      const existing = await db.query.episodes.findFirst({
+        where: eq(episodes.podcastIndexId, String(episodeId)),
+        columns: { transcription: true },
+      });
+      if (existing?.transcription) {
+        transcript = existing.transcription;
+        logger.info("Using cached transcription", { length: transcript.length });
       }
     } catch (error) {
-      logger.warn("Transcript unavailable, proceeding without it", {
+      logger.warn("Failed to check cached transcription, continuing without it", {
         error: error instanceof Error ? error.message : String(error),
       });
     }
 
-    // Step 3a: Check cached transcription in database
+    // Step 3a: Fetch transcript from PodcastIndex (non-fatal)
     if (!transcript) {
+      logger.info("Fetching transcript from PodcastIndex");
       try {
-        const existing = await db.query.episodes.findFirst({
-          where: eq(episodes.podcastIndexId, String(episodeId)),
-          columns: { transcription: true },
-        });
-        if (existing?.transcription) {
-          transcript = existing.transcription;
-          logger.info("Using cached transcription", { length: transcript.length });
+        transcript = await retry.onThrow(
+          async () => fetchTranscript(episode),
+          { maxAttempts: 2 }
+        );
+        if (transcript) {
+          logger.info("Transcript fetched", { length: transcript.length });
+        } else {
+          logger.info("No transcript available from PodcastIndex");
         }
       } catch (error) {
-        logger.warn("Failed to check cached transcription, continuing without it", {
+        logger.warn("Transcript unavailable, proceeding without it", {
           error: error instanceof Error ? error.message : String(error),
         });
       }
     }
 
-    // Step 3b: AssemblyAI transcription fallback
+    // Step 3b: AssemblyAI transcription fallback (non-idempotent, no retry)
     if (!transcript && episode.enclosureUrl) {
       metadata.set("step", "transcribing-audio");
       logger.info("Transcribing audio via AssemblyAI", { audioUrl: episode.enclosureUrl });
 
       try {
-        const result = await retry.onThrow(
-          async () => transcribeAudio(episode.enclosureUrl, { maxWaitMs: 5 * 60 * 1000 }),
-          { maxAttempts: 2, minTimeoutInMs: 60000, maxTimeoutInMs: 300000 }
-        );
+        const result = await transcribeAudio(episode.enclosureUrl, { maxWaitMs: 5 * 60 * 1000 });
 
         if (result.status === "completed" && result.text) {
           transcript = result.text;
