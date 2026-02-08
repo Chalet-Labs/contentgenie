@@ -7,6 +7,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Batch episode summarization via Trigger.dev with concurrency-limited fan-out
+- `BatchSummarizeButton` component on podcast detail page for bulk processing
+- `/api/episodes/batch-summarize` endpoint with rate limiting and cached-episode filtering
+- Realtime progress tracking for batch summarization runs
 - Processing status tracking with granular pipeline stages (transcribing, summarizing)
 - `ProcessingStatus` badge component for compact status display on episode cards
 - `processingError` column for persistent error messages on failed summarizations
