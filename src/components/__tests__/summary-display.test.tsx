@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { SummaryDisplay } from "@/components/episodes/summary-display";
 
 describe("SummaryDisplay", () => {
-  it("shows loading state with skeletons", () => {
+  it("shows loading state with skeleton fallback", () => {
     render(
       <SummaryDisplay
         summary={null}
@@ -14,8 +14,21 @@ describe("SummaryDisplay", () => {
       />
     );
     expect(screen.getByText("Generating Summary...")).toBeInTheDocument();
-    expect(screen.getByText("Worth-It Score")).toBeInTheDocument();
-    expect(screen.getByText("Key Takeaways")).toBeInTheDocument();
+  });
+
+  it("shows loading state with step progress", () => {
+    render(
+      <SummaryDisplay
+        summary={null}
+        keyTakeaways={null}
+        worthItScore={null}
+        isLoading={true}
+        currentStep="generating-summary"
+      />
+    );
+    expect(screen.getByText("Generating Summary...")).toBeInTheDocument();
+    expect(screen.getByText("Generating AI summary")).toBeInTheDocument();
+    expect(screen.getByText("Fetching episode data")).toBeInTheDocument();
   });
 
   it("shows error state with retry button", () => {

@@ -16,6 +16,8 @@ vi.mock("@/db", () => ({
     },
     insert: vi.fn().mockReturnThis(),
     update: vi.fn().mockReturnThis(),
+    set: vi.fn().mockReturnThis(),
+    where: vi.fn().mockResolvedValue(undefined),
   },
 }));
 
@@ -24,20 +26,16 @@ vi.mock("@/db/schema", () => ({
   podcasts: { podcastIndexId: "podcastIndexId" },
 }));
 
-vi.mock("@/lib/podcastindex", () => ({
-  getEpisodeById: vi.fn(),
-  getPodcastById: vi.fn(),
+vi.mock("@trigger.dev/sdk", () => ({
+  tasks: {
+    trigger: vi.fn().mockResolvedValue({ id: "run_abc123" }),
+  },
+  auth: {
+    createPublicToken: vi.fn().mockResolvedValue("test-public-token"),
+  },
 }));
 
-vi.mock("@/lib/openrouter", () => ({
-  generateCompletion: vi.fn(),
-  parseJsonResponse: vi.fn(),
-}));
-
-vi.mock("@/lib/prompts", () => ({
-  SYSTEM_PROMPT: "system prompt",
-  getSummarizationPrompt: vi.fn().mockReturnValue("prompt"),
-}));
+vi.mock("@/trigger/summarize-episode", () => ({}));
 
 describe("POST /api/episodes/summarize", () => {
   beforeEach(() => {
@@ -103,6 +101,55 @@ describe("POST /api/episodes/summarize", () => {
     expect(data.summary).toBe("Cached summary");
     expect(data.worthItScore).toBe(8);
   });
+
+  it("returns 202 with run handle when triggering new summarization", async () => {
+    vi.mocked(auth).mockResolvedValue({ userId: "user-1" } as never);
+
+    vi.mocked(db.query.episodes.findFirst).mockResolvedValue(null as never);
+
+    const { tasks } = await import("@trigger.dev/sdk");
+
+    const request = new NextRequest(
+      "http://localhost:3000/api/episodes/summarize",
+      {
+        method: "POST",
+        body: JSON.stringify({ episodeId: "123" }),
+      }
+    );
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(202);
+    expect(data.runId).toBe("run_abc123");
+    expect(data.publicAccessToken).toBe("test-public-token");
+    expect(data.status).toBe("queued");
+    expect(tasks.trigger).toHaveBeenCalledWith("summarize-episode", {
+      episodeId: 123,
+    });
+  });
+
+  it("returns 202 for existing in-progress run", async () => {
+    vi.mocked(auth).mockResolvedValue({ userId: "user-1" } as never);
+
+    vi.mocked(db.query.episodes.findFirst).mockResolvedValue({
+      summaryStatus: "running",
+      summaryRunId: "run_existing",
+    } as never);
+
+    const request = new NextRequest(
+      "http://localhost:3000/api/episodes/summarize",
+      {
+        method: "POST",
+        body: JSON.stringify({ episodeId: "123" }),
+      }
+    );
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(202);
+    expect(data.runId).toBe("run_existing");
+    expect(data.status).toBe("running");
+  });
 });
 
 describe("GET /api/episodes/summarize", () => {
@@ -157,5 +204,26 @@ describe("GET /api/episodes/summarize", () => {
 
     expect(response.status).toBe(200);
     expect(data.exists).toBe(false);
+  });
+
+  it("returns in-progress run info when summary is being generated", async () => {
+    vi.mocked(auth).mockResolvedValue({ userId: "user-1" } as never);
+
+    vi.mocked(db.query.episodes.findFirst).mockResolvedValue({
+      summaryRunId: "run_inprogress",
+      summaryStatus: "queued",
+    } as never);
+
+    const request = new NextRequest(
+      "http://localhost:3000/api/episodes/summarize?episodeId=123"
+    );
+    const response = await GET(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.exists).toBe(false);
+    expect(data.status).toBe("queued");
+    expect(data.runId).toBe("run_inprogress");
+    expect(data.publicAccessToken).toBe("test-public-token");
   });
 });

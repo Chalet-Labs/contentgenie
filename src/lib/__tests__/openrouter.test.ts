@@ -150,7 +150,7 @@ describe("generateCompletion", () => {
     await generateCompletion([{ role: "user", content: "test" }]);
 
     const body = JSON.parse(mockFetch.mock.calls[0][1].body);
-    expect(body.model).toBe("google/gemini-flash-1.5");
+    expect(body.model).toBe("google/gemini-2.5-flash-lite");
     expect(body.max_tokens).toBe(2048);
     expect(body.temperature).toBe(0.7);
   });

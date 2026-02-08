@@ -1,16 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth } from "@clerk/nextjs/server";
+import { auth as clerkAuth } from "@clerk/nextjs/server";
 import { eq } from "drizzle-orm";
+import { tasks, auth } from "@trigger.dev/sdk";
 import { db } from "@/db";
-import { episodes, podcasts } from "@/db/schema";
-import { getEpisodeById, getPodcastById } from "@/lib/podcastindex";
-import { generateCompletion, parseJsonResponse, SummaryResult } from "@/lib/openrouter";
-import { SYSTEM_PROMPT, getSummarizationPrompt } from "@/lib/prompts";
+import { episodes } from "@/db/schema";
+import type { summarizeEpisode } from "@/trigger/summarize-episode";
 
 export async function POST(request: NextRequest) {
   try {
     // Verify authentication
-    const { userId } = await auth();
+    const { userId } = await clerkAuth();
     if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -43,150 +42,75 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Fetch episode details from PodcastIndex
-    const episodeResponse = await getEpisodeById(Number(episodeId));
-    if (!episodeResponse?.episode) {
+    // Check if there's already a run in progress
+    if (
+      existingEpisode?.summaryStatus === "queued" ||
+      existingEpisode?.summaryStatus === "running"
+    ) {
+      // Generate a new public access token for the existing run
+      const publicAccessToken = await auth.createPublicToken({
+        scopes: {
+          read: {
+            runs: existingEpisode.summaryRunId
+              ? [existingEpisode.summaryRunId]
+              : true,
+          },
+        },
+        expirationTime: "15m",
+      });
+
       return NextResponse.json(
-        { error: "Episode not found" },
-        { status: 404 }
+        {
+          runId: existingEpisode.summaryRunId,
+          publicAccessToken,
+          status: existingEpisode.summaryStatus,
+        },
+        { status: 202 }
       );
     }
 
-    const episode = episodeResponse.episode;
-
-    // Fetch podcast details for context
-    const podcastResponse = await getPodcastById(episode.feedId);
-    const podcast = podcastResponse?.feed;
-
-    // Fetch transcript if available
-    let transcript: string | undefined;
-    if (episode.transcripts && episode.transcripts.length > 0) {
-      // Try to fetch the transcript
-      const transcriptEntry = episode.transcripts.find(
-        (t) => t.type === "text/plain" || t.type === "application/srt"
-      );
-      if (transcriptEntry?.url) {
-        try {
-          const transcriptResponse = await fetch(transcriptEntry.url);
-          if (transcriptResponse.ok) {
-            transcript = await transcriptResponse.text();
-            // Limit transcript length to avoid token limits
-            if (transcript.length > 50000) {
-              transcript = transcript.slice(0, 50000) + "\n\n[Transcript truncated...]";
-            }
-          }
-        } catch {
-          // Continue without transcript if fetch fails
-          console.log("Failed to fetch transcript, continuing without it");
-        }
-      }
-    }
-
-    // Generate summary using OpenRouter
-    const prompt = getSummarizationPrompt(
-      podcast?.title || "Unknown Podcast",
-      episode.title,
-      episode.description || "",
-      episode.duration || 0,
-      transcript
+    // Trigger the summarization task
+    const handle = await tasks.trigger<typeof summarizeEpisode>(
+      "summarize-episode",
+      { episodeId: Number(episodeId) }
     );
 
-    const completion = await generateCompletion([
-      { role: "system", content: SYSTEM_PROMPT },
-      { role: "user", content: prompt },
-    ]);
-
-    // Parse the JSON response
-    let summaryResult: SummaryResult;
-    try {
-      summaryResult = parseJsonResponse<SummaryResult>(completion);
-    } catch {
-      // If JSON parsing fails, create a basic result
-      summaryResult = {
-        summary: completion,
-        keyTakeaways: [],
-        worthItScore: 5,
-        worthItReason: "Unable to parse structured response",
-      };
-    }
-
-    // Ensure or create podcast in database
-    let dbPodcast = await db.query.podcasts.findFirst({
-      where: eq(podcasts.podcastIndexId, episode.feedId.toString()),
+    // Generate public access token for realtime frontend subscription
+    const publicAccessToken = await auth.createPublicToken({
+      scopes: {
+        read: {
+          runs: [handle.id],
+        },
+      },
+      expirationTime: "15m",
     });
 
-    if (!dbPodcast && podcast) {
-      const categories = podcast.categories
-        ? Object.values(podcast.categories)
-        : [];
-
-      const [newPodcast] = await db
-        .insert(podcasts)
-        .values({
-          podcastIndexId: episode.feedId.toString(),
-          title: podcast.title,
-          description: podcast.description,
-          publisher: podcast.author || podcast.ownerName,
-          imageUrl: podcast.artwork || podcast.image,
-          rssFeedUrl: podcast.url,
-          categories,
-          totalEpisodes: podcast.episodeCount,
-          latestEpisodeDate: podcast.newestItemPubdate
-            ? new Date(podcast.newestItemPubdate * 1000)
-            : null,
+    // Store run ID and status on the episode row if it exists
+    // If no episode row exists yet, the task will create it on completion
+    if (existingEpisode) {
+      await db
+        .update(episodes)
+        .set({
+          summaryRunId: handle.id,
+          summaryStatus: "queued",
+          updatedAt: new Date(),
         })
-        .returning();
-      dbPodcast = newPodcast;
+        .where(eq(episodes.id, existingEpisode.id));
     }
 
-    // Store or update episode with summary in database
-    if (dbPodcast) {
-      if (existingEpisode) {
-        // Update existing episode
-        await db
-          .update(episodes)
-          .set({
-            summary: summaryResult.summary,
-            keyTakeaways: summaryResult.keyTakeaways,
-            worthItScore: summaryResult.worthItScore.toFixed(2),
-            transcription: transcript,
-            processedAt: new Date(),
-            updatedAt: new Date(),
-          })
-          .where(eq(episodes.id, existingEpisode.id));
-      } else {
-        // Insert new episode
-        await db.insert(episodes).values({
-          podcastId: dbPodcast.id,
-          podcastIndexId: episodeId.toString(),
-          title: episode.title,
-          description: episode.description,
-          audioUrl: episode.enclosureUrl,
-          duration: episode.duration,
-          publishDate: episode.datePublished
-            ? new Date(episode.datePublished * 1000)
-            : null,
-          transcription: transcript,
-          summary: summaryResult.summary,
-          keyTakeaways: summaryResult.keyTakeaways,
-          worthItScore: summaryResult.worthItScore.toFixed(2),
-          processedAt: new Date(),
-        });
-      }
-    }
-
-    return NextResponse.json({
-      summary: summaryResult.summary,
-      keyTakeaways: summaryResult.keyTakeaways,
-      worthItScore: summaryResult.worthItScore,
-      worthItReason: summaryResult.worthItReason,
-      cached: false,
-    });
-  } catch (error) {
-    console.error("Error generating summary:", error);
     return NextResponse.json(
       {
-        error: "Failed to generate summary",
+        runId: handle.id,
+        publicAccessToken,
+        status: "queued",
+      },
+      { status: 202 }
+    );
+  } catch (error) {
+    console.error("Error triggering summary:", error);
+    return NextResponse.json(
+      {
+        error: "Failed to trigger summary generation",
         details: error instanceof Error ? error.message : "Unknown error",
       },
       { status: 500 }
@@ -197,7 +121,7 @@ export async function POST(request: NextRequest) {
 // GET endpoint to check if a summary exists
 export async function GET(request: NextRequest) {
   try {
-    const { userId } = await auth();
+    const { userId } = await clerkAuth();
     if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -226,6 +150,29 @@ export async function GET(request: NextRequest) {
           ? parseFloat(existingEpisode.worthItScore)
           : null,
         processedAt: existingEpisode.processedAt,
+      });
+    }
+
+    // Check if there's an in-progress run
+    if (
+      existingEpisode?.summaryRunId &&
+      (existingEpisode.summaryStatus === "queued" ||
+        existingEpisode.summaryStatus === "running")
+    ) {
+      const publicAccessToken = await auth.createPublicToken({
+        scopes: {
+          read: {
+            runs: [existingEpisode.summaryRunId],
+          },
+        },
+        expirationTime: "15m",
+      });
+
+      return NextResponse.json({
+        exists: false,
+        status: existingEpisode.summaryStatus,
+        runId: existingEpisode.summaryRunId,
+        publicAccessToken,
       });
     }
 

@@ -15,6 +15,8 @@
     "db:generate": "doppler run -- drizzle-kit generate",
     "db:push": "doppler run -- drizzle-kit push",
     "db:studio": "doppler run -- drizzle-kit studio",
+    "trigger:dev": "doppler run -- npx trigger.dev@latest dev",
+    "trigger:deploy": "doppler run -- npx trigger.dev@latest deploy",
     "prepare": "husky"
   },
   "dependencies": {
@@ -28,6 +30,8 @@
     "@radix-ui/react-select": "^2.2.6",
     "@radix-ui/react-separator": "^1.1.8",
     "@radix-ui/react-slot": "^1.2.4",
+    "@trigger.dev/react-hooks": "^4.3.3",
+    "@trigger.dev/sdk": "^4.3.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "drizzle-orm": "^0.45.1",

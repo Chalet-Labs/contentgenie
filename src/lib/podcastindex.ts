@@ -1,4 +1,4 @@
-import crypto from "crypto";
+import { createHash } from "crypto";
 
 const API_BASE_URL = "https://api.podcastindex.org/api/1.0";
 
@@ -131,9 +131,9 @@ function getAuthHeaders(): Record<string, string> {
   const apiKey = getApiKey();
   const apiSecret = getApiSecret();
   const apiHeaderTime = Math.floor(Date.now() / 1000);
-  const hash = crypto
-    .createHash("sha1")
-    .update(apiKey + apiSecret + apiHeaderTime)
+  const dataToHash = apiKey + apiSecret + apiHeaderTime;
+  const hash = createHash("sha1")
+    .update(dataToHash)
     .digest("hex");
 
   return {

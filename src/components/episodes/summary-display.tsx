@@ -14,6 +14,14 @@ import {
   ChevronUp,
 } from "lucide-react";
 
+export type SummarizationStep =
+  | "fetching-episode"
+  | "fetching-podcast"
+  | "fetching-transcript"
+  | "generating-summary"
+  | "saving-results"
+  | "completed";
+
 interface SummaryDisplayProps {
   summary: string | null;
   keyTakeaways: string[] | null;
@@ -21,8 +29,26 @@ interface SummaryDisplayProps {
   worthItReason?: string;
   isLoading?: boolean;
   error?: string | null;
+  currentStep?: SummarizationStep | null;
   onGenerateSummary?: () => void;
 }
+
+const STEP_LABELS: Record<SummarizationStep, string> = {
+  "fetching-episode": "Fetching episode data",
+  "fetching-podcast": "Fetching podcast info",
+  "fetching-transcript": "Fetching transcript",
+  "generating-summary": "Generating AI summary",
+  "saving-results": "Saving results",
+  completed: "Complete",
+};
+
+const STEP_ORDER: SummarizationStep[] = [
+  "fetching-episode",
+  "fetching-podcast",
+  "fetching-transcript",
+  "generating-summary",
+  "saving-results",
+];
 
 export function SummaryDisplay({
   summary,
@@ -31,6 +57,7 @@ export function SummaryDisplay({
   worthItReason,
   isLoading = false,
   error = null,
+  currentStep = null,
   onGenerateSummary,
 }: SummaryDisplayProps) {
   const [showFullSummary, setShowFullSummary] = useState(false);
@@ -52,30 +79,14 @@ export function SummaryDisplay({
     return "Not Recommended";
   };
 
-  // Loading state
+  // Loading state with step progress
   if (isLoading) {
+    const activeStepIndex = currentStep
+      ? STEP_ORDER.indexOf(currentStep)
+      : -1;
+
     return (
       <div className="space-y-6">
-        {/* Worth-it Score Skeleton */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <Sparkles className="h-5 w-5 text-primary" />
-              Worth-It Score
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center gap-4">
-              <Skeleton className="h-16 w-16 rounded-full" />
-              <div className="space-y-2">
-                <Skeleton className="h-5 w-32" />
-                <Skeleton className="h-4 w-48" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Summary Skeleton */}
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-lg">
@@ -83,26 +94,47 @@ export function SummaryDisplay({
               Generating Summary...
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <Skeleton className="h-4 w-full" />
-            <Skeleton className="h-4 w-full" />
-            <Skeleton className="h-4 w-3/4" />
-            <Skeleton className="h-4 w-5/6" />
-          </CardContent>
-        </Card>
-
-        {/* Key Takeaways Skeleton */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <CheckCircle className="h-5 w-5 text-primary" />
-              Key Takeaways
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <Skeleton className="h-4 w-full" />
-            <Skeleton className="h-4 w-5/6" />
-            <Skeleton className="h-4 w-4/5" />
+          <CardContent>
+            {currentStep ? (
+              <ul className="space-y-2">
+                {STEP_ORDER.map((step, index) => {
+                  const isActive = step === currentStep;
+                  const isCompleted = index < activeStepIndex;
+                  return (
+                    <li
+                      key={step}
+                      className="flex items-center gap-3 text-sm"
+                    >
+                      {isCompleted ? (
+                        <CheckCircle className="h-4 w-4 shrink-0 text-green-500" />
+                      ) : isActive ? (
+                        <Loader2 className="h-4 w-4 shrink-0 animate-spin text-primary" />
+                      ) : (
+                        <div className="h-4 w-4 shrink-0 rounded-full border-2 border-muted" />
+                      )}
+                      <span
+                        className={
+                          isActive
+                            ? "font-medium text-foreground"
+                            : isCompleted
+                              ? "text-muted-foreground line-through"
+                              : "text-muted-foreground"
+                        }
+                      >
+                        {STEP_LABELS[step]}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : (
+              <div className="space-y-4">
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-3/4" />
+                <Skeleton className="h-4 w-5/6" />
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
