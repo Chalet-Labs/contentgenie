@@ -21,6 +21,10 @@ export const summarizeEpisode = task({
     minTimeoutInMs: 1000,
     maxTimeoutInMs: 30000,
   },
+  queue: {
+    name: "summarize-queue",
+    concurrencyLimit: 3,
+  },
   onFailure: async (params: { payload: SummarizeEpisodePayload }) => {
     const { episodeId } = params.payload;
     logger.error("Summarization task failed permanently", { episodeId });
