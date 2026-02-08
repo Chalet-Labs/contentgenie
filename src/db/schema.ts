@@ -69,6 +69,10 @@ export const episodes = pgTable(
     keyTakeaways: json("key_takeaways").$type<string[]>(),
     worthItScore: decimal("worth_it_score", { precision: 4, scale: 2 }), // 0.00 - 10.00
     processedAt: timestamp("processed_at"),
+    summaryRunId: text("summary_run_id"),
+    summaryStatus: text("summary_status").$type<
+      "queued" | "running" | "completed" | "failed"
+    >(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },

@@ -10,6 +10,7 @@ Podcast discovery, AI-powered summarization, and library management app for busy
 - **Database:** Neon (serverless Postgres) via Drizzle ORM
 - **AI:** OpenRouter API for episode summarization
 - **Podcast Data:** PodcastIndex API
+- **Background Jobs:** Trigger.dev (`@trigger.dev/sdk`)
 - **Notifications:** Sonner (toast)
 - **Theme:** next-themes (light/dark/system)
 
@@ -44,6 +45,8 @@ npm run build-storybook # Build static Storybook
 npm run db:generate    # Generate Drizzle migrations
 npm run db:push        # Push schema to database
 npm run db:studio      # Open Drizzle Studio (DB browser)
+npm run trigger:dev    # Start Trigger.dev dev server
+npm run trigger:deploy # Deploy tasks to Trigger.dev Cloud
 ```
 
 ## Testing instructions
@@ -108,7 +111,10 @@ src/
 │   ├── podcastindex.ts       # PodcastIndex API client
 │   ├── prompts.ts            # AI prompt templates
 │   └── utils.ts              # cn() utility (clsx + tailwind-merge)
-└── middleware.ts              # Clerk auth middleware (protects non-public routes)
+├── middleware.ts              # Clerk auth middleware (protects non-public routes)
+└── trigger/
+    ├── summarize-episode.ts  # Durable summarization task (Trigger.dev)
+    └── helpers/              # Shared helpers for trigger tasks
 ```
 
 ## Architecture patterns
@@ -150,6 +156,7 @@ Available environment variables:
 - `OPENROUTER_API_KEY` — OpenRouter AI API
 - `PODCASTINDEX_API_KEY` — PodcastIndex API key
 - `PODCASTINDEX_API_SECRET` — PodcastIndex API secret
+- `TRIGGER_SECRET_KEY` — Trigger.dev secret key (background jobs)
 
 ## Security
 

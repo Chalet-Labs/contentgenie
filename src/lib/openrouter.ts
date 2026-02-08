@@ -1,7 +1,7 @@
 const OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions";
 
 // Default model: Gemini Flash (cost-effective)
-const DEFAULT_MODEL = "google/gemini-flash-1.5";
+const DEFAULT_MODEL = "google/gemini-2.5-flash-lite";
 
 export interface OpenRouterMessage {
   role: "system" | "user" | "assistant";

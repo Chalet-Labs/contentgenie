@@ -43,6 +43,9 @@ storybook-static/
 !.claude/mcp.json
 !.claude/skills/
 
+# Trigger.dev
+.trigger/
+
 # Project specific
 venv
 clerk-nextjs-guide

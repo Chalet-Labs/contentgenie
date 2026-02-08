@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { toast } from "sonner";
+import { useRealtimeRun } from "@trigger.dev/react-hooks";
 import {
   ArrowLeft,
   Clock,
@@ -17,10 +18,14 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { SummaryDisplay } from "@/components/episodes/summary-display";
+import {
+  SummaryDisplay,
+  type SummarizationStep,
+} from "@/components/episodes/summary-display";
 import { SaveButton } from "@/components/episodes/save-button";
 import { CommunityRating } from "@/components/episodes/community-rating";
 import { isEpisodeSaved } from "@/app/actions/library";
+import type { summarizeEpisode } from "@/trigger/summarize-episode";
 
 interface EpisodePageProps {
   params: {
@@ -97,6 +102,41 @@ export default function EpisodePage({ params }: EpisodePageProps) {
   const [episodeError, setEpisodeError] = useState<string | null>(null);
   const [summaryError, setSummaryError] = useState<string | null>(null);
   const [isSaved, setIsSaved] = useState(false);
+  const [runId, setRunId] = useState<string | null>(null);
+  const [accessToken, setAccessToken] = useState<string | null>(null);
+
+  // Realtime subscription to the Trigger.dev run
+  const { run } = useRealtimeRun<typeof summarizeEpisode>(runId ?? "", {
+    accessToken: accessToken ?? "",
+    enabled: !!runId && !!accessToken,
+  });
+
+  // React to run status changes
+  useEffect(() => {
+    if (!run) return;
+
+    if (run.status === "COMPLETED" && run.output) {
+      setSummaryData({
+        summary: run.output.summary,
+        keyTakeaways: run.output.keyTakeaways || [],
+        worthItScore: run.output.worthItScore,
+        worthItReason: run.output.worthItReason,
+        cached: false,
+      });
+      setIsLoadingSummary(false);
+      setRunId(null);
+      setAccessToken(null);
+      toast.success("Summary generated!", {
+        description: "AI insights are now available for this episode",
+      });
+    } else if (run.status === "FAILED") {
+      setSummaryError("Summary generation failed. Please try again.");
+      setIsLoadingSummary(false);
+      setRunId(null);
+      setAccessToken(null);
+      toast.error("Failed to generate summary");
+    }
+  }, [run]);
 
   // Fetch episode and podcast data
   useEffect(() => {
@@ -127,6 +167,25 @@ export default function EpisodePage({ params }: EpisodePageProps) {
             worthItReason: data.summary.worthItReason,
             cached: true,
           });
+        } else {
+          // Check for in-progress summarization run
+          try {
+            const statusResponse = await fetch(
+              `/api/episodes/summarize?episodeId=${episodeId}`
+            );
+            const statusData = await statusResponse.json();
+            if (
+              statusData.runId &&
+              statusData.publicAccessToken &&
+              (statusData.status === "queued" || statusData.status === "running")
+            ) {
+              setRunId(statusData.runId);
+              setAccessToken(statusData.publicAccessToken);
+              setIsLoadingSummary(true);
+            }
+          } catch {
+            // Ignore errors checking for in-progress runs
+          }
         }
 
         // Check if episode is saved to library
@@ -145,7 +204,7 @@ export default function EpisodePage({ params }: EpisodePageProps) {
     fetchEpisodeData();
   }, [episodeId]);
 
-  // Generate summary
+  // Generate summary — triggers a background task and subscribes to realtime updates
   const generateSummary = useCallback(async () => {
     setIsLoadingSummary(true);
     setSummaryError(null);
@@ -161,31 +220,37 @@ export default function EpisodePage({ params }: EpisodePageProps) {
 
       const data = await response.json();
 
-      if (!response.ok) {
+      if (!response.ok && response.status !== 202) {
         throw new Error(data.error || "Failed to generate summary");
       }
 
-      setSummaryData({
-        summary: data.summary,
-        keyTakeaways: data.keyTakeaways || [],
-        worthItScore: data.worthItScore,
-        worthItReason: data.worthItReason,
-        cached: data.cached,
-      });
-      if (!data.cached) {
-        toast.success("Summary generated!", {
-          description: "AI insights are now available for this episode",
+      // If the response is cached (200), display immediately
+      if (data.cached) {
+        setSummaryData({
+          summary: data.summary,
+          keyTakeaways: data.keyTakeaways || [],
+          worthItScore: data.worthItScore,
+          worthItReason: data.worthItReason,
+          cached: true,
         });
+        setIsLoadingSummary(false);
+        return;
+      }
+
+      // Otherwise it's a 202 — subscribe to the run for realtime updates
+      if (data.runId && data.publicAccessToken) {
+        setRunId(data.runId);
+        setAccessToken(data.publicAccessToken);
       }
     } catch (error) {
       console.error("Error generating summary:", error);
-      const errorMessage = error instanceof Error ? error.message : "Failed to generate summary";
+      const errorMessage =
+        error instanceof Error ? error.message : "Failed to generate summary";
       setSummaryError(errorMessage);
+      setIsLoadingSummary(false);
       toast.error("Failed to generate summary", {
         description: errorMessage,
       });
-    } finally {
-      setIsLoadingSummary(false);
     }
   }, [episodeId]);
 
@@ -398,6 +463,9 @@ export default function EpisodePage({ params }: EpisodePageProps) {
           worthItReason={summaryData?.worthItReason}
           isLoading={isLoadingSummary}
           error={summaryError}
+          currentStep={
+            (run?.metadata?.step as SummarizationStep | undefined) ?? null
+          }
           onGenerateSummary={generateSummary}
         />
       </div>

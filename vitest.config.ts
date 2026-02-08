@@ -20,6 +20,7 @@ export default defineConfig({
         "src/app/actions/**/*.ts",
         "src/components/**/*.{ts,tsx}",
         "src/lib/**/*.ts",
+        "src/trigger/**/*.ts",
       ],
       exclude: [
         "src/**/*.test.{ts,tsx}",
