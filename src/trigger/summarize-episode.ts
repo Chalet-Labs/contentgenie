@@ -7,6 +7,7 @@ import { trackEpisodeRun, persistEpisodeSummary } from "./helpers/database";
 import { db } from "@/db";
 import { episodes } from "@/db/schema";
 import type { PodcastIndexEpisode, PodcastIndexPodcast } from "@/lib/podcastindex";
+import { transcribeAudio } from "@/lib/assemblyai";
 
 export type SummarizeEpisodePayload = {
   episodeId: number;
@@ -96,6 +97,45 @@ export const summarizeEpisode = task({
       logger.warn("Transcript unavailable, proceeding without it", {
         error: error instanceof Error ? error.message : String(error),
       });
+    }
+
+    // Step 3a: Check cached transcription in database
+    if (!transcript) {
+      const existing = await db.query.episodes.findFirst({
+        where: eq(episodes.podcastIndexId, String(episodeId)),
+        columns: { transcription: true },
+      });
+      if (existing?.transcription) {
+        transcript = existing.transcription;
+        logger.info("Using cached transcription", { length: transcript.length });
+      }
+    }
+
+    // Step 3b: AssemblyAI transcription fallback
+    if (!transcript && episode.enclosureUrl) {
+      metadata.set("step", "transcribing-audio");
+      logger.info("Transcribing audio via AssemblyAI", { audioUrl: episode.enclosureUrl });
+
+      try {
+        const result = await retry.onThrow(
+          async () => transcribeAudio(episode.enclosureUrl),
+          { maxAttempts: 2, minTimeoutInMs: 60000, maxTimeoutInMs: 300000 }
+        );
+
+        if (result.status === "completed" && result.text) {
+          transcript = result.text;
+          logger.info("Audio transcribed successfully", { length: transcript.length });
+        } else {
+          logger.warn("AssemblyAI transcription failed", {
+            status: result.status,
+            error: result.error,
+          });
+        }
+      } catch (error) {
+        logger.warn("AssemblyAI transcription unavailable, proceeding without it", {
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
     }
 
     // Step 4: Generate AI summary via OpenRouter
