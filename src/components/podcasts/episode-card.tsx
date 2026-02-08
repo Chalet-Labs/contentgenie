@@ -6,12 +6,15 @@ import { Badge } from "@/components/ui/badge";
 import { Clock, Calendar, Mic } from "lucide-react";
 import type { PodcastIndexEpisode } from "@/lib/podcastindex";
 import { formatDuration, formatPublishDate } from "@/lib/podcastindex";
+import { ProcessingStatus } from "@/components/episodes/processing-status";
+import type { SummaryStatus } from "@/db/schema";
 
 interface EpisodeCardProps {
   episode: PodcastIndexEpisode;
+  summaryStatus?: SummaryStatus | null;
 }
 
-export function EpisodeCard({ episode }: EpisodeCardProps) {
+export function EpisodeCard({ episode, summaryStatus }: EpisodeCardProps) {
   return (
     <Link href={`/episode/${episode.id}`}>
       <Card className="group transition-colors hover:bg-accent">
@@ -23,11 +26,14 @@ export function EpisodeCard({ episode }: EpisodeCardProps) {
                   {episode.title}
                 </h3>
               </div>
-              {episode.episodeType && episode.episodeType !== "full" && (
-                <Badge variant="secondary" className="shrink-0 text-xs">
-                  {episode.episodeType}
-                </Badge>
-              )}
+              <div className="flex shrink-0 items-center gap-1.5">
+                {episode.episodeType && episode.episodeType !== "full" && (
+                  <Badge variant="secondary" className="text-xs">
+                    {episode.episodeType}
+                  </Badge>
+                )}
+                <ProcessingStatus status={summaryStatus ?? null} className="text-xs" />
+              </div>
             </div>
 
             <p className="line-clamp-2 text-sm text-muted-foreground">

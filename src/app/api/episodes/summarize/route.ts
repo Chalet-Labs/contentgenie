@@ -74,7 +74,9 @@ export async function POST(request: NextRequest) {
     if (
       existingEpisode?.summaryRunId &&
       (existingEpisode.summaryStatus === "queued" ||
-        existingEpisode.summaryStatus === "running")
+        existingEpisode.summaryStatus === "running" ||
+        existingEpisode.summaryStatus === "transcribing" ||
+        existingEpisode.summaryStatus === "summarizing")
     ) {
       // Generate a new public access token for the existing run
       const publicAccessToken = await auth.createPublicToken({
@@ -185,7 +187,9 @@ export async function GET(request: NextRequest) {
     if (
       existingEpisode?.summaryRunId &&
       (existingEpisode.summaryStatus === "queued" ||
-        existingEpisode.summaryStatus === "running")
+        existingEpisode.summaryStatus === "running" ||
+        existingEpisode.summaryStatus === "transcribing" ||
+        existingEpisode.summaryStatus === "summarizing")
     ) {
       const publicAccessToken = await auth.createPublicToken({
         scopes: {
@@ -201,6 +205,15 @@ export async function GET(request: NextRequest) {
         status: existingEpisode.summaryStatus,
         runId: existingEpisode.summaryRunId,
         publicAccessToken,
+      });
+    }
+
+    // Return error info for failed episodes
+    if (existingEpisode?.summaryStatus === "failed") {
+      return NextResponse.json({
+        exists: false,
+        status: "failed",
+        processingError: existingEpisode.processingError,
       });
     }
 

@@ -18,6 +18,7 @@ export type SummarizationStep =
   | "fetching-episode"
   | "fetching-podcast"
   | "fetching-transcript"
+  | "transcribing-audio"
   | "generating-summary"
   | "saving-results"
   | "completed";
@@ -37,6 +38,7 @@ const STEP_LABELS: Record<SummarizationStep, string> = {
   "fetching-episode": "Fetching episode data",
   "fetching-podcast": "Fetching podcast info",
   "fetching-transcript": "Fetching transcript",
+  "transcribing-audio": "Transcribing audio",
   "generating-summary": "Generating AI summary",
   "saving-results": "Saving results",
   completed: "Complete",
@@ -46,6 +48,7 @@ const STEP_ORDER: SummarizationStep[] = [
   "fetching-episode",
   "fetching-podcast",
   "fetching-transcript",
+  "transcribing-audio",
   "generating-summary",
   "saving-results",
 ];

@@ -76,8 +76,9 @@ export const episodes = pgTable(
     processedAt: timestamp("processed_at"),
     summaryRunId: text("summary_run_id"),
     summaryStatus: text("summary_status").$type<
-      "queued" | "running" | "completed" | "failed"
+      "queued" | "running" | "transcribing" | "summarizing" | "completed" | "failed"
     >(),
+    processingError: text("processing_error"),
     rssGuid: text("rss_guid"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -92,7 +93,7 @@ export const episodes = pgTable(
     ),
     check(
       "summary_status_enum",
-      sql`${table.summaryStatus} IN ('queued', 'running', 'completed', 'failed')`
+      sql`${table.summaryStatus} IN ('queued', 'running', 'transcribing', 'summarizing', 'completed', 'failed')`
     ),
   ]
 );
@@ -266,3 +267,5 @@ export type NewUserLibraryEntry = typeof userLibrary.$inferInsert;
 
 export type Bookmark = typeof bookmarks.$inferSelect;
 export type NewBookmark = typeof bookmarks.$inferInsert;
+
+export type SummaryStatus = NonNullable<Episode["summaryStatus"]>;
