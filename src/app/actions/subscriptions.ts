@@ -114,8 +114,8 @@ export async function addPodcastByRssUrl(
       .values({ id: userId, email: "" })
       .onConflictDoNothing();
 
-    // Insert podcast
-    const [newPodcast] = await db
+    // Insert podcast (onConflictDoNothing handles race conditions)
+    const insertResult = await db
       .insert(podcasts)
       .values({
         podcastIndexId: syntheticPodcastId,
@@ -126,9 +126,24 @@ export async function addPodcastByRssUrl(
         rssFeedUrl: trimmedUrl,
         source: "rss",
       })
+      .onConflictDoNothing()
       .returning({ id: podcasts.id });
 
-    // Insert episodes (up to MAX_EPISODES_PER_IMPORT, newest first)
+    // If insert was a no-op (race condition), re-query for the existing podcast
+    let podcastId: number;
+    if (insertResult.length > 0) {
+      podcastId = insertResult[0].id;
+    } else {
+      const existing = await db.query.podcasts.findFirst({
+        where: eq(podcasts.podcastIndexId, syntheticPodcastId),
+      });
+      if (!existing) {
+        return { success: false, error: "Failed to add podcast. Please try again." };
+      }
+      podcastId = existing.id;
+    }
+
+    // Insert episodes in batch (up to MAX_EPISODES_PER_IMPORT, newest first)
     const sortedEpisodes = [...feed.episodes].sort((a, b) => {
       const dateA = a.publishDate?.getTime() ?? 0;
       const dateB = b.publishDate?.getTime() ?? 0;
@@ -137,33 +152,30 @@ export async function addPodcastByRssUrl(
     const episodesToInsert = sortedEpisodes.slice(0, MAX_EPISODES_PER_IMPORT);
 
     let insertedCount = 0;
-    for (const ep of episodesToInsert) {
-      const syntheticEpisodeId = generateEpisodeSyntheticId(
-        trimmedUrl,
-        ep.guid,
-      );
-      const result = await db
+    if (episodesToInsert.length > 0) {
+      const episodeValues = episodesToInsert.map((ep) => ({
+        podcastId,
+        podcastIndexId: generateEpisodeSyntheticId(trimmedUrl, ep.guid),
+        title: ep.title,
+        description: ep.description,
+        audioUrl: ep.audioUrl,
+        duration: ep.duration,
+        publishDate: ep.publishDate,
+        rssGuid: ep.guid,
+      }));
+      const inserted = await db
         .insert(episodes)
-        .values({
-          podcastId: newPodcast.id,
-          podcastIndexId: syntheticEpisodeId,
-          title: ep.title,
-          description: ep.description,
-          audioUrl: ep.audioUrl,
-          duration: ep.duration,
-          publishDate: ep.publishDate,
-          rssGuid: ep.guid,
-        })
+        .values(episodeValues)
         .onConflictDoNothing()
         .returning({ id: episodes.id });
-      if (result.length > 0) insertedCount++;
+      insertedCount = inserted.length;
     }
 
-    // Create subscription
-    await db.insert(userSubscriptions).values({
-      userId,
-      podcastId: newPodcast.id,
-    });
+    // Create subscription (onConflictDoNothing handles race conditions)
+    await db
+      .insert(userSubscriptions)
+      .values({ userId, podcastId })
+      .onConflictDoNothing();
 
     revalidatePath("/subscriptions");
     revalidatePath("/discover");

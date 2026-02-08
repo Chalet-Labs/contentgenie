@@ -114,7 +114,14 @@ export async function parsePodcastFeed(feedUrl: string): Promise<ParsedFeed> {
 }
 
 function normalizeFeedUrl(url: string): string {
-  return url.toLowerCase().replace(/\/+$/, "").replace(/^https?:\/\//, "");
+  try {
+    const parsed = new URL(url);
+    // Only lowercase hostname (case-insensitive per RFC), preserve path case
+    return `${parsed.hostname.toLowerCase()}${parsed.pathname.replace(/\/+$/, "")}${parsed.search}`;
+  } catch {
+    // Fallback for non-parseable URLs: just strip protocol and trailing slashes
+    return url.replace(/^https?:\/\//, "").replace(/\/+$/, "");
+  }
 }
 
 /** Generate a deterministic synthetic podcastIndexId for an RSS-sourced podcast. */
