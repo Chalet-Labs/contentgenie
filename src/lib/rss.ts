@@ -19,9 +19,12 @@ export interface ParsedFeed {
   episodes: ParsedEpisode[];
 }
 
-const parser = new Parser({
+interface CustomItem {
+  "itunes:duration"?: string;
+}
+
+const parser = new Parser<Record<string, never>, CustomItem>({
   customFields: {
-    feed: ["itunes:author", "itunes:image"],
     item: ["itunes:duration"],
   },
 });
@@ -50,37 +53,36 @@ export function parseDuration(
   if (parts.some((p) => !Number.isFinite(p))) return null;
 
   if (parts.length === 3) {
-    return parts[0] * 3600 + parts[1] * 60 + parts[2];
+    return Math.round(parts[0] * 3600 + parts[1] * 60 + parts[2]);
   }
   if (parts.length === 2) {
-    return parts[0] * 60 + parts[1];
+    return Math.round(parts[0] * 60 + parts[1]);
   }
 
   return null;
 }
 
 function parseEpisodeItem(
-  item: Record<string, unknown>,
+  item: Parser.Item & CustomItem,
 ): ParsedEpisode {
-  const enclosure = item.enclosure as { url?: string } | undefined;
-  const pubDate = item.pubDate as string | undefined;
-  const publishDate = pubDate ? new Date(pubDate) : null;
+  const publishDate = item.pubDate ? new Date(item.pubDate) : null;
+  const guid =
+    item.guid ?? item.link ?? item.enclosure?.url ?? undefined;
+
+  if (!guid) {
+    throw new Error(
+      `Could not determine a unique identifier for episode: ${JSON.stringify(item).substring(0, 200)}`,
+    );
+  }
 
   return {
-    title: (item.title as string) ?? "Untitled Episode",
-    description:
-      (item.contentSnippet as string) ?? (item.content as string) ?? null,
-    audioUrl: enclosure?.url ?? null,
-    guid:
-      (item.guid as string) ??
-      (item.link as string) ??
-      (item.title as string) ??
-      "",
+    title: item.title ?? "Untitled Episode",
+    description: item.contentSnippet ?? item.content ?? null,
+    audioUrl: item.enclosure?.url ?? null,
+    guid,
     publishDate:
       publishDate && !isNaN(publishDate.getTime()) ? publishDate : null,
-    duration: parseDuration(
-      item["itunes:duration"] as string | undefined,
-    ),
+    duration: parseDuration(item["itunes:duration"]),
   };
 }
 
@@ -89,32 +91,23 @@ function parseEpisodeItem(
  * episode list.
  */
 export async function parsePodcastFeed(feedUrl: string): Promise<ParsedFeed> {
-  let feed: Record<string, unknown>;
+  let feed: Parser.Output<CustomItem>;
 
   try {
-    feed = await parser.parseURL(feedUrl) as unknown as Record<string, unknown>;
+    feed = await parser.parseURL(feedUrl);
   } catch (error) {
     throw new Error(
       `Failed to parse RSS feed at ${feedUrl}: ${error instanceof Error ? error.message : String(error)}`,
     );
   }
 
-  const image = feed.image as { url?: string } | undefined;
-  const imageHref =
-    image?.url ?? (feed["itunes:image"] as string | undefined) ?? null;
-
   return {
-    title: (feed.title as string) ?? "Untitled Podcast",
-    description: (feed.description as string) ?? null,
-    author:
-      (feed["itunes:author"] as string | undefined) ??
-      (feed.creator as string | undefined) ??
-      null,
-    imageUrl: typeof imageHref === "string" ? imageHref : null,
-    link: (feed.link as string) ?? null,
+    title: feed.title ?? "Untitled Podcast",
+    description: feed.description ?? null,
+    author: feed.itunes?.author ?? null,
+    imageUrl: feed.image?.url ?? feed.itunes?.image ?? null,
+    link: feed.link ?? null,
     feedUrl,
-    episodes: ((feed.items as Record<string, unknown>[]) ?? []).map(
-      parseEpisodeItem,
-    ),
+    episodes: (feed.items ?? []).map(parseEpisodeItem),
   };
 }

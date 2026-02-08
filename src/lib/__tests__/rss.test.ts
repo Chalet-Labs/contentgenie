@@ -53,6 +53,14 @@ describe("parseDuration", () => {
   it("handles fractional numeric strings", () => {
     expect(parseDuration("90.5")).toBe(91);
   });
+
+  it("rounds fractional seconds in HH:MM:SS format", () => {
+    expect(parseDuration("01:02:03.45")).toBe(3723);
+  });
+
+  it("rounds fractional seconds in MM:SS format", () => {
+    expect(parseDuration("02:30.5")).toBe(151);
+  });
 });
 
 describe("parsePodcastFeed", () => {
@@ -65,8 +73,10 @@ describe("parsePodcastFeed", () => {
     description: "A great podcast about testing",
     link: "https://example.com/podcast",
     image: { url: "https://example.com/image.jpg" },
-    "itunes:author": "Test Author",
-    "itunes:image": "https://example.com/itunes-image.jpg",
+    itunes: {
+      author: "Test Author",
+      image: "https://example.com/itunes-image.jpg",
+    },
     items: [
       {
         title: "Episode 1",
@@ -127,7 +137,7 @@ describe("parsePodcastFeed", () => {
     expect(result.episodes[1].duration).toBe(2730);
   });
 
-  it("falls back to itunes:image when feed.image is missing", async () => {
+  it("falls back to itunes.image when feed.image is missing", async () => {
     mockParseURL.mockResolvedValueOnce({
       ...fullFeed,
       image: undefined,
@@ -168,7 +178,7 @@ describe("parsePodcastFeed", () => {
     expect(result.episodes[0].audioUrl).toBeNull();
   });
 
-  it("falls back for episodes missing guid", async () => {
+  it("falls back guid to link when guid is missing", async () => {
     mockParseURL.mockResolvedValueOnce({
       title: "Podcast",
       items: [
@@ -183,6 +193,36 @@ describe("parsePodcastFeed", () => {
     const result = await parsePodcastFeed("https://example.com/feed.xml");
 
     expect(result.episodes[0].guid).toBe("https://example.com/ep1");
+  });
+
+  it("falls back guid to enclosure URL when guid and link are missing", async () => {
+    mockParseURL.mockResolvedValueOnce({
+      title: "Podcast",
+      items: [
+        {
+          title: "Audio Only",
+          enclosure: { url: "https://example.com/ep1.mp3" },
+        },
+      ],
+    });
+
+    const { parsePodcastFeed } = await import("@/lib/rss");
+    const result = await parsePodcastFeed("https://example.com/feed.xml");
+
+    expect(result.episodes[0].guid).toBe("https://example.com/ep1.mp3");
+  });
+
+  it("throws when no unique identifier is available for an episode", async () => {
+    mockParseURL.mockResolvedValueOnce({
+      title: "Podcast",
+      items: [{ title: "Completely Unknown" }],
+    });
+
+    const { parsePodcastFeed } = await import("@/lib/rss");
+
+    await expect(
+      parsePodcastFeed("https://example.com/feed.xml"),
+    ).rejects.toThrow("Could not determine a unique identifier for episode");
   });
 
   it("handles episodes with missing duration", async () => {
