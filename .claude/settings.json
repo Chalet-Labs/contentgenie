@@ -2,7 +2,8 @@
   "env": {
     "XDG_CACHE_HOME": ".cache",
     "npm_config_cache": ".cache/npm",
-    "PIP_CACHE_DIR": ".cache/pip"
+    "PIP_CACHE_DIR": ".cache/pip",
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
   },
   "permissions": {
     "allow": [
