@@ -1,5 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { parseDuration } from "@/lib/rss";
+import {
+  parseDuration,
+  generatePodcastSyntheticId,
+  generateEpisodeSyntheticId,
+} from "@/lib/rss";
 
 // Mock rss-parser at module level — vi.hoisted ensures the fn is available
 // when the factory runs (vi.mock is hoisted above imports)
@@ -329,5 +333,65 @@ describe("parsePodcastFeed", () => {
     const result = await parsePodcastFeed("https://example.com/feed.xml");
 
     expect(result.episodes[0].description).toBe("<p>HTML only</p>");
+  });
+});
+
+describe("generatePodcastSyntheticId", () => {
+  it("returns a deterministic rss- prefixed ID", () => {
+    const id1 = generatePodcastSyntheticId("https://example.com/feed.xml");
+    const id2 = generatePodcastSyntheticId("https://example.com/feed.xml");
+    expect(id1).toBe(id2);
+    expect(id1).toMatch(/^rss-[a-f0-9]{16}$/);
+  });
+
+  it("normalizes trailing slashes", () => {
+    const a = generatePodcastSyntheticId("https://example.com/feed/");
+    const b = generatePodcastSyntheticId("https://example.com/feed");
+    expect(a).toBe(b);
+  });
+
+  it("normalizes protocol (http vs https)", () => {
+    const a = generatePodcastSyntheticId("http://example.com/feed.xml");
+    const b = generatePodcastSyntheticId("https://example.com/feed.xml");
+    expect(a).toBe(b);
+  });
+
+  it("normalizes case", () => {
+    const a = generatePodcastSyntheticId("https://Example.COM/Feed.xml");
+    const b = generatePodcastSyntheticId("https://example.com/feed.xml");
+    expect(a).toBe(b);
+  });
+
+  it("produces different IDs for different URLs", () => {
+    const a = generatePodcastSyntheticId("https://example.com/feed1.xml");
+    const b = generatePodcastSyntheticId("https://example.com/feed2.xml");
+    expect(a).not.toBe(b);
+  });
+});
+
+describe("generateEpisodeSyntheticId", () => {
+  it("returns a deterministic rss- prefixed ID", () => {
+    const id1 = generateEpisodeSyntheticId("https://example.com/feed.xml", "ep-001");
+    const id2 = generateEpisodeSyntheticId("https://example.com/feed.xml", "ep-001");
+    expect(id1).toBe(id2);
+    expect(id1).toMatch(/^rss-[a-f0-9]{16}$/);
+  });
+
+  it("produces different IDs for different GUIDs", () => {
+    const a = generateEpisodeSyntheticId("https://example.com/feed.xml", "ep-001");
+    const b = generateEpisodeSyntheticId("https://example.com/feed.xml", "ep-002");
+    expect(a).not.toBe(b);
+  });
+
+  it("produces different IDs for same GUID on different feeds", () => {
+    const a = generateEpisodeSyntheticId("https://example.com/feed1.xml", "ep-001");
+    const b = generateEpisodeSyntheticId("https://example.com/feed2.xml", "ep-001");
+    expect(a).not.toBe(b);
+  });
+
+  it("normalizes feed URL consistently", () => {
+    const a = generateEpisodeSyntheticId("http://Example.COM/feed/", "ep-001");
+    const b = generateEpisodeSyntheticId("https://example.com/feed", "ep-001");
+    expect(a).toBe(b);
   });
 });

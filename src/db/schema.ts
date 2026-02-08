@@ -42,6 +42,10 @@ export const podcasts = pgTable(
     categories: json("categories").$type<string[]>(),
     totalEpisodes: integer("total_episodes"),
     latestEpisodeDate: timestamp("latest_episode_date"),
+    source: text("source")
+      .$type<"podcastindex" | "rss">()
+      .default("podcastindex")
+      .notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
@@ -73,12 +77,14 @@ export const episodes = pgTable(
     summaryStatus: text("summary_status").$type<
       "queued" | "running" | "completed" | "failed"
     >(),
+    rssGuid: text("rss_guid"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
   (table) => [
     uniqueIndex("episodes_podcast_index_id_idx").on(table.podcastIndexId),
     index("episodes_podcast_id_idx").on(table.podcastId),
+    index("episodes_rss_guid_idx").on(table.rssGuid),
     check(
       "worth_it_score_range",
       sql`${table.worthItScore} >= 0 AND ${table.worthItScore} <= 10`

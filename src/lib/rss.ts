@@ -1,3 +1,4 @@
+import { createHash } from "crypto";
 import Parser from "rss-parser";
 
 export interface ParsedEpisode {
@@ -110,4 +111,27 @@ export async function parsePodcastFeed(feedUrl: string): Promise<ParsedFeed> {
     feedUrl,
     episodes: (feed.items ?? []).map(parseEpisodeItem),
   };
+}
+
+function normalizeFeedUrl(url: string): string {
+  return url.toLowerCase().replace(/\/+$/, "").replace(/^https?:\/\//, "");
+}
+
+/** Generate a deterministic synthetic podcastIndexId for an RSS-sourced podcast. */
+export function generatePodcastSyntheticId(feedUrl: string): string {
+  const hash = createHash("sha256")
+    .update(normalizeFeedUrl(feedUrl))
+    .digest("hex");
+  return `rss-${hash.slice(0, 16)}`;
+}
+
+/** Generate a deterministic synthetic podcastIndexId for an RSS-sourced episode. */
+export function generateEpisodeSyntheticId(
+  feedUrl: string,
+  episodeGuid: string,
+): string {
+  const hash = createHash("sha256")
+    .update(`${normalizeFeedUrl(feedUrl)}|${episodeGuid}`)
+    .digest("hex");
+  return `rss-${hash.slice(0, 16)}`;
 }

@@ -5,6 +5,7 @@ import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { SearchResults } from "@/components/podcasts/search-results";
+import { RssFeedForm } from "@/components/podcasts/rss-feed-form";
 import type { PodcastIndexPodcast } from "@/lib/podcastindex";
 
 export default function DiscoverPage() {
@@ -76,6 +77,19 @@ export default function DiscoverPage() {
           {isLoading ? "Searching..." : "Search"}
         </Button>
       </form>
+
+      <div className="relative">
+        <div className="absolute inset-0 flex items-center">
+          <span className="w-full border-t" />
+        </div>
+        <div className="relative flex justify-center text-xs uppercase">
+          <span className="bg-background px-2 text-muted-foreground">
+            or add by RSS feed
+          </span>
+        </div>
+      </div>
+
+      <RssFeedForm />
 
       <SearchResults
         podcasts={podcasts}
