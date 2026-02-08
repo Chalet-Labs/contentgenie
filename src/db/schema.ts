@@ -269,3 +269,11 @@ export type Bookmark = typeof bookmarks.$inferSelect;
 export type NewBookmark = typeof bookmarks.$inferInsert;
 
 export type SummaryStatus = NonNullable<Episode["summaryStatus"]>;
+
+/** Statuses that indicate a summarization run is still in progress. */
+export const IN_PROGRESS_STATUSES: SummaryStatus[] = [
+  "queued",
+  "running",
+  "transcribing",
+  "summarizing",
+];

@@ -24,6 +24,7 @@ vi.mock("@/db", () => ({
 vi.mock("@/db/schema", () => ({
   episodes: { podcastIndexId: "podcastIndexId", id: "id" },
   podcasts: { podcastIndexId: "podcastIndexId" },
+  IN_PROGRESS_STATUSES: ["queued", "running", "transcribing", "summarizing"],
 }));
 
 vi.mock("@trigger.dev/sdk", () => ({
