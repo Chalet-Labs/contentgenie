@@ -1,5 +1,6 @@
 #!/usr/bin/env sh
 
+bunx tsc --noEmit
 bun run lint
 
 # Run tests only if a test script exists

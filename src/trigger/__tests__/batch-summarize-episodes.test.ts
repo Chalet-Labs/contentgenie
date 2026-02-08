@@ -25,6 +25,16 @@ vi.mock("@/trigger/summarize-episode", () => ({
 import { batchSummarizeEpisodes } from "@/trigger/batch-summarize-episodes";
 import { metadata } from "@trigger.dev/sdk";
 
+// The task mock returns the raw config object, so `.run` is available at runtime
+const taskConfig = batchSummarizeEpisodes as unknown as {
+  run: (payload: { episodeIds: number[]; skippedCount: number; totalRequested: number }) => Promise<{
+    succeeded: number;
+    failed: number;
+    skipped: number;
+    results: Array<{ episodeId: number; status: string; error?: string }>;
+  }>;
+};
+
 describe("batch-summarize-episodes task", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -32,7 +42,7 @@ describe("batch-summarize-episodes task", () => {
   });
 
   it("returns early when episodeIds is empty (all pre-filtered by API)", async () => {
-    const result = await batchSummarizeEpisodes.run({
+    const result = await taskConfig.run({
       episodeIds: [],
       skippedCount: 3,
       totalRequested: 3,
@@ -59,7 +69,7 @@ describe("batch-summarize-episodes task", () => {
       { ok: true, output: { summary: "Summary 3" } },
     ] });
 
-    const result = await batchSummarizeEpisodes.run({
+    const result = await taskConfig.run({
       episodeIds: [10, 20, 30],
       skippedCount: 0,
       totalRequested: 3,
@@ -86,7 +96,7 @@ describe("batch-summarize-episodes task", () => {
       { ok: true, output: { summary: "Summary 3" } },
     ] });
 
-    const result = await batchSummarizeEpisodes.run({
+    const result = await taskConfig.run({
       episodeIds: [2, 3],
       skippedCount: 1,
       totalRequested: 3,
@@ -114,7 +124,7 @@ describe("batch-summarize-episodes task", () => {
       { ok: true, output: { summary: "Summary 3" } },
     ] });
 
-    const result = await batchSummarizeEpisodes.run({
+    const result = await taskConfig.run({
       episodeIds: [10, 20, 30],
       skippedCount: 0,
       totalRequested: 3,
@@ -138,7 +148,7 @@ describe("batch-summarize-episodes task", () => {
       { ok: false, error: new Error("Error 2") },
     ] });
 
-    const result = await batchSummarizeEpisodes.run({
+    const result = await taskConfig.run({
       episodeIds: [10, 20],
       skippedCount: 0,
       totalRequested: 2,
@@ -155,7 +165,7 @@ describe("batch-summarize-episodes task", () => {
       { ok: false, error: undefined },
     ] });
 
-    const result = await batchSummarizeEpisodes.run({
+    const result = await taskConfig.run({
       episodeIds: [10, 20],
       skippedCount: 0,
       totalRequested: 2,
@@ -179,7 +189,7 @@ describe("batch-summarize-episodes task", () => {
       { ok: false, error: new Error("Failed") },
     ] });
 
-    await batchSummarizeEpisodes.run({
+    await taskConfig.run({
       episodeIds: [2, 3],
       skippedCount: 1,
       totalRequested: 3,
@@ -209,7 +219,7 @@ describe("batch-summarize-episodes task", () => {
       { ok: true, output: { summary: "Solo summary" } },
     ] });
 
-    const result = await batchSummarizeEpisodes.run({
+    const result = await taskConfig.run({
       episodeIds: [42],
       skippedCount: 0,
       totalRequested: 1,
