@@ -44,16 +44,15 @@ export async function POST(request: NextRequest) {
 
     // Check if there's already a run in progress
     if (
-      existingEpisode?.summaryStatus === "queued" ||
-      existingEpisode?.summaryStatus === "running"
+      existingEpisode?.summaryRunId &&
+      (existingEpisode.summaryStatus === "queued" ||
+        existingEpisode.summaryStatus === "running")
     ) {
       // Generate a new public access token for the existing run
       const publicAccessToken = await auth.createPublicToken({
         scopes: {
           read: {
-            runs: existingEpisode.summaryRunId
-              ? [existingEpisode.summaryRunId]
-              : true,
+            runs: [existingEpisode.summaryRunId],
           },
         },
         expirationTime: "15m",

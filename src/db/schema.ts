@@ -83,6 +83,10 @@ export const episodes = pgTable(
       "worth_it_score_range",
       sql`${table.worthItScore} >= 0 AND ${table.worthItScore} <= 10`
     ),
+    check(
+      "summary_status_enum",
+      sql`${table.summaryStatus} IN ('queued', 'running', 'completed', 'failed')`
+    ),
   ]
 );
 
