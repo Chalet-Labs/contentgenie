@@ -156,6 +156,7 @@ Available environment variables:
 - `OPENROUTER_API_KEY` — OpenRouter AI API
 - `PODCASTINDEX_API_KEY` — PodcastIndex API key
 - `PODCASTINDEX_API_SECRET` — PodcastIndex API secret
+- `NEXT_PUBLIC_APP_URL` — Application URL (inlined at build time)
 - `TRIGGER_SECRET_KEY` — Trigger.dev secret key (background jobs)
 
 ## Security

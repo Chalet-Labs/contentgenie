@@ -65,6 +65,7 @@ Most `package.json` scripts are wrapped with `doppler run --`, which injects env
 | `NEXT_PUBLIC_APP_URL` | Public | Application URL (inlined at build time) |
 | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Public | Clerk publishable key (inlined at build time) |
 | `CLERK_SECRET_KEY` | Server | Clerk secret key |
+| `TRIGGER_SECRET_KEY` | Server | Trigger.dev secret key (background jobs) |
 
 ## Vercel Integration
 
