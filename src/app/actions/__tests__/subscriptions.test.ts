@@ -47,6 +47,7 @@ vi.mock("@/db", () => ({
         },
       };
     },
+    batch: (queries: unknown[]) => Promise.resolve(queries),
   },
 }));
 

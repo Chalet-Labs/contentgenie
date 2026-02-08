@@ -48,7 +48,7 @@ export interface PodcastIndexPodcast {
 }
 
 export interface PodcastIndexEpisode {
-  id: number;
+  id: number | string;
   title: string;
   link: string;
   description: string;

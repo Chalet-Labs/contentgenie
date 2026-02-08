@@ -44,7 +44,7 @@ async function loadRssPodcast(podcastIndexId: string) {
   // Use podcastIndexId (rss-...) as the id so EpisodeCard links to /episode/rss-...
   // which the episode API route handles correctly.
   const mappedEpisodes: PodcastIndexEpisode[] = dbEpisodes.map((ep) => ({
-    id: ep.podcastIndexId as unknown as number,
+    id: ep.podcastIndexId,
     title: ep.title,
     link: "",
     description: ep.description ?? "",
