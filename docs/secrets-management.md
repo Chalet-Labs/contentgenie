@@ -66,6 +66,7 @@ Most `package.json` scripts are wrapped with `doppler run --`, which injects env
 | `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Public | Clerk publishable key (inlined at build time) |
 | `CLERK_SECRET_KEY` | Server | Clerk secret key |
 | `TRIGGER_SECRET_KEY` | Server | Trigger.dev secret key (background jobs) |
+| `ASSEMBLYAI_API_KEY` | Server | AssemblyAI transcription API key |
 
 ## Vercel Integration
 

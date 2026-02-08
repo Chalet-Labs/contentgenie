@@ -151,7 +151,7 @@ describe("summarize-episode task", () => {
     );
 
     expect(result).toEqual(mockSummary);
-    expect(transcribeAudio).toHaveBeenCalledWith("https://example.com/audio.mp3");
+    expect(transcribeAudio).toHaveBeenCalledWith("https://example.com/audio.mp3", { maxWaitMs: 300000 });
     expect(generateEpisodeSummary).toHaveBeenCalledWith(
       mockPodcast,
       mockEpisode,
@@ -229,11 +229,40 @@ describe("summarize-episode task", () => {
     );
 
     expect(result).toEqual(mockSummary);
-    expect(transcribeAudio).toHaveBeenCalledWith("https://example.com/audio.mp3");
+    expect(transcribeAudio).toHaveBeenCalledWith("https://example.com/audio.mp3", { maxWaitMs: 300000 });
     expect(generateEpisodeSummary).toHaveBeenCalledWith(
       mockPodcast,
       mockEpisode,
       "AssemblyAI transcript text"
+    );
+  });
+
+  it("falls back to AssemblyAI when cached transcription lookup fails", async () => {
+    vi.mocked(getEpisodeById).mockResolvedValue({ episode: mockEpisode } as never);
+    vi.mocked(getPodcastById).mockResolvedValue({ feed: mockPodcast } as never);
+    vi.mocked(fetchTranscript).mockResolvedValue(undefined);
+    mockFindFirst.mockRejectedValue(new Error("DB connection lost"));
+    vi.mocked(transcribeAudio).mockResolvedValue({
+      id: "transcript-789",
+      status: "completed",
+      text: "AssemblyAI fallback text",
+      error: null,
+    });
+    vi.mocked(generateEpisodeSummary).mockResolvedValue(mockSummary);
+    vi.mocked(persistEpisodeSummary).mockResolvedValue(undefined);
+
+    const result = await summarizeEpisode.run(
+      { episodeId: 123 },
+      mockCtx
+    );
+
+    expect(result).toEqual(mockSummary);
+    expect(mockFindFirst).toHaveBeenCalled();
+    expect(transcribeAudio).toHaveBeenCalledWith("https://example.com/audio.mp3", { maxWaitMs: 300000 });
+    expect(generateEpisodeSummary).toHaveBeenCalledWith(
+      mockPodcast,
+      mockEpisode,
+      "AssemblyAI fallback text"
     );
   });
 
