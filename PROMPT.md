@@ -8,7 +8,7 @@ First read activity.md to see what was recently accomplished.
 
 Start the Next.js development server:
 ```bash
-npm run dev
+bun run dev
 ```
 
 The app will be available at http://localhost:3000
@@ -22,9 +22,9 @@ Open prd.md and find the single highest priority task where `"passes": false`.
 Work on exactly ONE task:
 1. Implement the change according to the task steps
 2. Run checks to verify code quality:
-   - `npm run lint` - ESLint checks
-   - `npm run build` - TypeScript + build verification
-   - `npm run db:generate` - Generate Drizzle migrations (after schema changes)
+   - `bun run lint` - ESLint checks
+   - `bun run build` - TypeScript + build verification
+   - `bun run db:generate` - Generate Drizzle migrations (after schema changes)
 
 ## Verify in Browser
 

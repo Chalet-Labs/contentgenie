@@ -23,10 +23,10 @@ Podcast discovery, AI-powered summarization, and library management app for busy
 
 ## Dev environment tips
 
-- Run `doppler setup` once after cloning to configure secrets injection. After that, `npm run dev` just works (scripts already wrap `doppler run --`).
-- Use `doppler run -- <command>` if you need to run a one-off command that needs env vars outside of the npm scripts.
+- Run `doppler setup` once after cloning to configure secrets injection. After that, `bun run dev` just works (scripts already wrap `doppler run --`).
+- Use `doppler run -- <command>` if you need to run a one-off command that needs env vars outside of the bun scripts.
 - The `@/*` path alias maps to `./src/*` — use it for all imports.
-- shadcn/ui components live in `src/components/ui/`. Add new ones with `npx shadcn@latest add <component>`.
+- shadcn/ui components live in `src/components/ui/`. Add new ones with `bunx shadcn@latest add <component>`.
 - Server components are the default. Only add `"use client"` when you need browser APIs, hooks, or event handlers.
 - Server actions use `"use server"` and live in `src/app/actions/`. They handle all data mutations.
 - API routes in `src/app/api/` are for proxying external services only (PodcastIndex, OpenRouter).
@@ -34,19 +34,19 @@ Podcast discovery, AI-powered summarization, and library management app for busy
 ## Development commands
 
 ```bash
-npm run dev            # Start dev server (port 3000)
-npm run build          # Production build
-npm run lint           # ESLint (next lint)
-npm run test           # Run Vitest unit tests
-npm run test:watch     # Run tests in watch mode
-npm run test:coverage  # Run tests with coverage (80% threshold on src/lib/)
-npm run storybook      # Launch Storybook dev server (port 6006)
-npm run build-storybook # Build static Storybook
-npm run db:generate    # Generate Drizzle migrations
-npm run db:push        # Push schema to database
-npm run db:studio      # Open Drizzle Studio (DB browser)
-npm run trigger:dev    # Start Trigger.dev dev server
-npm run trigger:deploy # Deploy tasks to Trigger.dev Cloud
+bun run dev            # Start dev server (port 3000, Turbopack)
+bun run build          # Production build
+bun run lint           # ESLint (next lint)
+bun run test           # Run Vitest unit tests
+bun run test:watch     # Run tests in watch mode
+bun run test:coverage  # Run tests with coverage (80% threshold on src/lib/)
+bun run storybook      # Launch Storybook dev server (port 6006)
+bun run build-storybook # Build static Storybook
+bun run db:generate    # Generate Drizzle migrations
+bun run db:push        # Push schema to database
+bun run db:studio      # Open Drizzle Studio (DB browser)
+bun run trigger:dev    # Start Trigger.dev dev server
+bun run trigger:deploy # Deploy tasks to Trigger.dev Cloud
 ```
 
 ## Testing instructions
@@ -54,10 +54,10 @@ npm run trigger:deploy # Deploy tasks to Trigger.dev Cloud
 - **Test framework:** Vitest with React Testing Library. Config: `vitest.config.ts`, setup: `src/test/setup.ts`.
 - **Component stories:** Storybook 8 (`@storybook/react-vite`). Config: `.storybook/main.ts`.
 - CI is defined in `.github/workflows/ci.yml` — it runs lint, tests, Storybook build, and Next.js build on every PR to `main`.
-- Always run `npm run lint`, `npm run test`, and `npm run build` before committing.
+- Always run `bun run lint`, `bun run test`, and `bun run build` before committing.
 - Unit tests live in `__tests__/` directories co-located with source (`src/lib/__tests__/`, `src/components/__tests__/`, `src/app/api/__tests__/`).
 - Stories live alongside components as `*.stories.tsx` files.
-- After changing imports or moving files, run `npm run lint` to catch broken references.
+- After changing imports or moving files, run `bun run lint` to catch broken references.
 - The pre-commit hook automatically runs lint and tests when a `test` script exists.
 
 ## PR and commit instructions
@@ -133,7 +133,7 @@ Tables: `users`, `podcasts`, `episodes`, `user_subscriptions`, `collections`, `u
 - Podcasts/episodes reference PodcastIndex IDs.
 - Episodes have AI-generated fields: `summary`, `key_takeaways`, `worth_it_score`.
 - Type exports available: `User`, `Podcast`, `Episode`, `UserSubscription`, `Collection`, `UserLibraryEntry`, `Bookmark` (and `New*` variants).
-- Schema is defined in `src/db/schema.ts`. After changes, run `npm run db:generate` then `npm run db:push`.
+- Schema is defined in `src/db/schema.ts`. After changes, run `bun run db:generate` then `bun run db:push`.
 
 ## Code style
 

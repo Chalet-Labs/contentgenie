@@ -41,7 +41,7 @@ The `doppler.yaml` in the repo root pre-configures the project name (`contentgen
 ### 3. Run the app
 
 ```bash
-npm run dev
+bun run dev
 ```
 
 Most `package.json` scripts are wrapped with `doppler run --`, which injects environment variables from your configured Doppler environment before running the command. Scripts that don't need secrets (like `lint`) run without Doppler.
@@ -94,4 +94,4 @@ Run `doppler setup` in the project root to link your local environment.
 Run `doppler login` to re-authenticate, then `doppler setup` to re-link.
 
 **"NEXT_PUBLIC_* variables not available in browser"**
-`NEXT_PUBLIC_*` variables are inlined at build time. If you change them in Doppler, you must rebuild the app (`npm run build`).
+`NEXT_PUBLIC_*` variables are inlined at build time. If you change them in Doppler, you must rebuild the app (`bun run build`).
