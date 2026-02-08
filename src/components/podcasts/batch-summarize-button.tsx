@@ -149,7 +149,7 @@ export function BatchSummarizeButton({
     return (
       <Button
         variant="outline"
-        size="sm"
+        size="lg"
         onClick={() => setState("confirming")}
         disabled={numericIds.length === 0}
       >
@@ -161,14 +161,23 @@ export function BatchSummarizeButton({
 
   if (state === "confirming") {
     return (
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2" aria-live="polite">
         <span className="text-sm text-muted-foreground">
           Summarize {numericIds.length} episodes?
         </span>
-        <Button variant="outline" size="sm" onClick={() => setState("idle")}>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => setState("idle")}
+          aria-label="Cancel batch summarization"
+        >
           Cancel
         </Button>
-        <Button size="sm" onClick={handleConfirm}>
+        <Button
+          size="sm"
+          onClick={handleConfirm}
+          aria-label={`Confirm summarizing ${numericIds.length} episodes`}
+        >
           Confirm
         </Button>
       </div>
@@ -181,10 +190,14 @@ export function BatchSummarizeButton({
     const pct = total > 0 ? (completed / total) * 100 : 0;
 
     return (
-      <div className="flex items-center gap-3 min-w-[200px]">
-        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+      <div
+        className="flex items-center gap-3 min-w-[200px]"
+        role="status"
+        aria-live="polite"
+      >
+        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" aria-hidden="true" />
         <div className="flex-1 space-y-1">
-          <Progress value={pct} className="h-2" />
+          <Progress value={pct} className="h-2" aria-label="Batch summarization progress" />
           <p className="text-xs text-muted-foreground">
             Processing {completed}/{total} episodes...
           </p>
@@ -199,8 +212,8 @@ export function BatchSummarizeButton({
     const failed = progress?.failed ?? 0;
 
     return (
-      <div className="flex items-center gap-2">
-        <CheckCircle2 className="h-4 w-4 text-green-500" />
+      <div className="flex items-center gap-2" aria-live="polite">
+        <CheckCircle2 className="h-4 w-4 text-green-600" aria-hidden="true" />
         <span className="text-sm text-muted-foreground">
           {succeeded} summarized, {skipped} skipped
           {failed > 0 && (
@@ -213,8 +226,8 @@ export function BatchSummarizeButton({
 
   // error state
   return (
-    <div className="flex items-center gap-2">
-      <XCircle className="h-4 w-4 text-destructive" />
+    <div className="flex flex-wrap items-center gap-2" aria-live="assertive">
+      <XCircle className="h-4 w-4 text-destructive" aria-hidden="true" />
       <span className="text-sm text-destructive">
         {errorMessage || "Something went wrong"}
       </span>
