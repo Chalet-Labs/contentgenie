@@ -49,3 +49,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 - Initial project setup
+
+[Unreleased]: https://github.com/Chalet-Labs/contentgenie/compare/4974644...HEAD
+[2026-02-08]: https://github.com/Chalet-Labs/contentgenie/compare/23eee8f...4974644
+[2026-02-07]: https://github.com/Chalet-Labs/contentgenie/compare/b635331...23eee8f
+[2026-02-02]: https://github.com/Chalet-Labs/contentgenie/compare/f6a7781...b635331
+[2026-01-20]: https://github.com/Chalet-Labs/contentgenie/commits/f6a7781
