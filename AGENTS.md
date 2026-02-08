@@ -158,6 +158,7 @@ Available environment variables:
 - `PODCASTINDEX_API_SECRET` — PodcastIndex API secret
 - `NEXT_PUBLIC_APP_URL` — Application URL (inlined at build time)
 - `TRIGGER_SECRET_KEY` — Trigger.dev secret key (background jobs)
+- `ASSEMBLYAI_API_KEY` — AssemblyAI transcription API key
 
 ## Security
 

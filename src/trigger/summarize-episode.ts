@@ -101,13 +101,19 @@ export const summarizeEpisode = task({
 
     // Step 3a: Check cached transcription in database
     if (!transcript) {
-      const existing = await db.query.episodes.findFirst({
-        where: eq(episodes.podcastIndexId, String(episodeId)),
-        columns: { transcription: true },
-      });
-      if (existing?.transcription) {
-        transcript = existing.transcription;
-        logger.info("Using cached transcription", { length: transcript.length });
+      try {
+        const existing = await db.query.episodes.findFirst({
+          where: eq(episodes.podcastIndexId, String(episodeId)),
+          columns: { transcription: true },
+        });
+        if (existing?.transcription) {
+          transcript = existing.transcription;
+          logger.info("Using cached transcription", { length: transcript.length });
+        }
+      } catch (error) {
+        logger.warn("Failed to check cached transcription, continuing without it", {
+          error: error instanceof Error ? error.message : String(error),
+        });
       }
     }
 
@@ -118,7 +124,7 @@ export const summarizeEpisode = task({
 
       try {
         const result = await retry.onThrow(
-          async () => transcribeAudio(episode.enclosureUrl),
+          async () => transcribeAudio(episode.enclosureUrl, { maxWaitMs: 5 * 60 * 1000 }),
           { maxAttempts: 2, minTimeoutInMs: 60000, maxTimeoutInMs: 300000 }
         );
 
