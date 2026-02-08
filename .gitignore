@@ -43,6 +43,9 @@ storybook-static/
 !.claude/mcp.json
 !.claude/skills/
 
+# Serena
+.serena/
+
 # Trigger.dev
 .trigger/
 
