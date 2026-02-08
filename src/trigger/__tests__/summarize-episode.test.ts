@@ -76,6 +76,11 @@ import { trackEpisodeRun, persistEpisodeSummary } from "@/trigger/helpers/databa
 import { transcribeAudio } from "@/lib/assemblyai";
 import { summarizeEpisode } from "@/trigger/summarize-episode";
 
+// The task mock returns the raw config object, so `.run` is available at runtime
+const taskConfig = summarizeEpisode as unknown as {
+  run: (payload: { episodeId: number }, ctx: unknown) => Promise<unknown>;
+};
+
 const mockCtx = { run: { id: "run_test123" } } as never;
 
 const mockEpisode = {
@@ -115,7 +120,7 @@ describe("summarize-episode task", () => {
     vi.mocked(persistEpisodeSummary).mockResolvedValue(undefined);
 
     // The task config is extracted by our mock — call the run function directly
-    const result = await summarizeEpisode.run(
+    const result = await taskConfig.run(
       { episodeId: 123 },
       mockCtx
     );
@@ -145,7 +150,7 @@ describe("summarize-episode task", () => {
     vi.mocked(generateEpisodeSummary).mockResolvedValue(mockSummary);
     vi.mocked(persistEpisodeSummary).mockResolvedValue(undefined);
 
-    const result = await summarizeEpisode.run(
+    const result = await taskConfig.run(
       { episodeId: 123 },
       mockCtx
     );
@@ -163,7 +168,7 @@ describe("summarize-episode task", () => {
     vi.mocked(getEpisodeById).mockResolvedValue({ episode: null } as never);
 
     await expect(
-      summarizeEpisode.run({ episodeId: 999 }, mockCtx)
+      taskConfig.run({ episodeId: 999 }, mockCtx)
     ).rejects.toThrow("Episode 999 not found");
   });
 
@@ -175,7 +180,7 @@ describe("summarize-episode task", () => {
     vi.mocked(generateEpisodeSummary).mockResolvedValue(mockSummary);
     vi.mocked(persistEpisodeSummary).mockResolvedValue(undefined);
 
-    const result = await summarizeEpisode.run(
+    const result = await taskConfig.run(
       { episodeId: 123 },
       mockCtx
     );
@@ -195,7 +200,7 @@ describe("summarize-episode task", () => {
     vi.mocked(generateEpisodeSummary).mockResolvedValue(mockSummary);
     vi.mocked(persistEpisodeSummary).mockResolvedValue(undefined);
 
-    const result = await summarizeEpisode.run(
+    const result = await taskConfig.run(
       { episodeId: 123 },
       mockCtx
     );
@@ -223,7 +228,7 @@ describe("summarize-episode task", () => {
     vi.mocked(generateEpisodeSummary).mockResolvedValue(mockSummary);
     vi.mocked(persistEpisodeSummary).mockResolvedValue(undefined);
 
-    const result = await summarizeEpisode.run(
+    const result = await taskConfig.run(
       { episodeId: 123 },
       mockCtx
     );
@@ -251,7 +256,7 @@ describe("summarize-episode task", () => {
     vi.mocked(generateEpisodeSummary).mockResolvedValue(mockSummary);
     vi.mocked(persistEpisodeSummary).mockResolvedValue(undefined);
 
-    const result = await summarizeEpisode.run(
+    const result = await taskConfig.run(
       { episodeId: 123 },
       mockCtx
     );
@@ -279,7 +284,7 @@ describe("summarize-episode task", () => {
     vi.mocked(generateEpisodeSummary).mockResolvedValue(mockSummary);
     vi.mocked(persistEpisodeSummary).mockResolvedValue(undefined);
 
-    const result = await summarizeEpisode.run(
+    const result = await taskConfig.run(
       { episodeId: 123 },
       mockCtx
     );
