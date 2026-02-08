@@ -121,19 +121,23 @@ export async function GET(
     }
 
     // Check if we have a cached summary in the database
-    const cachedEpisode = await db.query.episodes.findFirst({
-      where: eq(episodes.podcastIndexId, episodeId.toString()),
-    });
-
     let summary = null;
-    if (cachedEpisode?.summary && cachedEpisode?.processedAt) {
-      summary = {
-        summary: cachedEpisode.summary,
-        keyTakeaways: cachedEpisode.keyTakeaways || [],
-        worthItScore: cachedEpisode.worthItScore
-          ? parseFloat(cachedEpisode.worthItScore)
-          : null,
-      };
+    try {
+      const cachedEpisode = await db.query.episodes.findFirst({
+        where: eq(episodes.podcastIndexId, episodeId.toString()),
+      });
+
+      if (cachedEpisode?.summary && cachedEpisode?.processedAt) {
+        summary = {
+          summary: cachedEpisode.summary,
+          keyTakeaways: cachedEpisode.keyTakeaways || [],
+          worthItScore: cachedEpisode.worthItScore
+            ? parseFloat(cachedEpisode.worthItScore)
+            : null,
+        };
+      }
+    } catch {
+      // Continue without cached summary if DB query fails
     }
 
     return NextResponse.json({
