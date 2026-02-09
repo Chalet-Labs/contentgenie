@@ -20,6 +20,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - CI workflow simplified to quality checks only (lint, test, Storybook); Vercel handles builds and deploys
 
 ### Added
+- Scheduled feed polling via Trigger.dev (every 2h) with manual refresh server action (#24)
 - Persist AI-generated worth-it reason to database and expose in episode API responses (#56)
 - AI summary status indicator (left border accent) and color-coded worth-it score on episode cards in podcast overview (#59)
 - Batch DB query for summary data on PodcastIndex-sourced podcast pages (no per-episode API calls)

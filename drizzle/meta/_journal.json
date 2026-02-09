@@ -43,6 +43,13 @@
       "when": 1770568385602,
       "tag": "0005_sleepy_siren",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1770671977941,
+      "tag": "0006_adorable_bloodstrike",
+      "breakpoints": true
     }
   ]
 }

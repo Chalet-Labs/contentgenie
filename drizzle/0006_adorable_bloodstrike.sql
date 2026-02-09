@@ -1,0 +1,1 @@
+ALTER TABLE "podcasts" ADD COLUMN "last_polled_at" timestamp;
