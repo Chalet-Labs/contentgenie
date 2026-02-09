@@ -62,3 +62,33 @@ export const NoEpisodeNumber: Story = {
     episode: { ...baseEpisode, episode: null, season: 0 },
   },
 };
+
+export const SummarizedHighScore: Story = {
+  args: {
+    episode: baseEpisode,
+    summaryStatus: "completed",
+    worthItScore: "9.20",
+  },
+};
+
+export const SummarizedMediumScore: Story = {
+  args: {
+    episode: baseEpisode,
+    summaryStatus: "completed",
+    worthItScore: "6.50",
+  },
+};
+
+export const SummarizedLowScore: Story = {
+  args: {
+    episode: baseEpisode,
+    summaryStatus: "completed",
+    worthItScore: "3.00",
+  },
+};
+
+export const NoSummaryData: Story = {
+  args: {
+    episode: baseEpisode,
+  },
+};

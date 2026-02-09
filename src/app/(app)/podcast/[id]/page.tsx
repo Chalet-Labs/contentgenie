@@ -1,7 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { eq, desc as descOrder } from "drizzle-orm";
+import { eq, desc as descOrder, inArray } from "drizzle-orm";
 import { ArrowLeft, Rss, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -17,6 +17,7 @@ import type { PodcastIndexEpisode } from "@/lib/podcastindex";
 import { isSubscribedToPodcast } from "@/app/actions/subscriptions";
 import { db } from "@/db";
 import { podcasts, episodes as episodesTable } from "@/db/schema";
+import type { SummaryStatus } from "@/db/schema";
 
 interface PodcastPageProps {
   params: {
@@ -40,6 +41,14 @@ async function loadRssPodcast(podcastIndexId: string) {
     orderBy: [descOrder(episodesTable.publishDate)],
     limit: 50,
   });
+
+  // Build status/score maps from DB episodes
+  const statusMap = new Map<string, SummaryStatus>();
+  const scoreMap = new Map<string, string>();
+  for (const ep of dbEpisodes) {
+    if (ep.summaryStatus) statusMap.set(ep.podcastIndexId, ep.summaryStatus);
+    if (ep.worthItScore !== null) scoreMap.set(ep.podcastIndexId, ep.worthItScore);
+  }
 
   // Map DB episodes to PodcastIndexEpisode shape for reuse of EpisodeList
   // Use podcastIndexId (rss-...) as the id so EpisodeCard links to /episode/rss-...
@@ -83,7 +92,7 @@ async function loadRssPodcast(podcastIndexId: string) {
     transcripts: [],
   }));
 
-  return { podcast, episodes: mappedEpisodes };
+  return { podcast, episodes: mappedEpisodes, statusMap, scoreMap };
 }
 
 export default async function PodcastPage({ params }: PodcastPageProps) {
@@ -97,7 +106,7 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
       notFound();
     }
 
-    const { podcast, episodes } = data;
+    const { podcast, episodes, statusMap, scoreMap } = data;
     const subscribed = await isSubscribedToPodcast(podcast.podcastIndexId);
     const categories = (podcast.categories as string[]) ?? [];
 
@@ -197,7 +206,7 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
           <h2 className="mb-4 text-xl font-semibold">
             Episodes ({episodes.length})
           </h2>
-          <EpisodeList episodes={episodes} />
+          <EpisodeList episodes={episodes} statusMap={statusMap} scoreMap={scoreMap} />
         </div>
       </div>
     );
@@ -218,6 +227,21 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
 
     const podcast = podcastResponse.feed;
     const episodes = episodesResponse.items || [];
+
+    // Batch-query DB for summary data
+    const episodeStringIds = episodes.map((e) => String(e.id));
+    const dbEpisodeData = episodeStringIds.length > 0
+      ? await db.query.episodes.findMany({
+          where: inArray(episodesTable.podcastIndexId, episodeStringIds),
+          columns: { podcastIndexId: true, summaryStatus: true, worthItScore: true },
+        })
+      : [];
+    const statusMap = new Map<string, SummaryStatus>();
+    const scoreMap = new Map<string, string>();
+    for (const ep of dbEpisodeData) {
+      if (ep.summaryStatus) statusMap.set(ep.podcastIndexId, ep.summaryStatus);
+      if (ep.worthItScore !== null) scoreMap.set(ep.podcastIndexId, ep.worthItScore);
+    }
 
     if (!podcast) {
       notFound();
@@ -346,7 +370,7 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
           <h2 className="mb-4 text-xl font-semibold">
             Episodes ({episodes.length})
           </h2>
-          <EpisodeList episodes={episodes} />
+          <EpisodeList episodes={episodes} statusMap={statusMap} scoreMap={scoreMap} />
         </div>
       </div>
     );
