@@ -135,6 +135,7 @@ Tables: `users`, `podcasts`, `episodes`, `user_subscriptions`, `collections`, `u
 - Episodes have AI-generated fields: `summary`, `key_takeaways`, `worth_it_score`.
 - Type exports available: `User`, `Podcast`, `Episode`, `UserSubscription`, `Collection`, `UserLibraryEntry`, `Bookmark` (and `New*` variants).
 - Schema is defined in `src/db/schema.ts`. After changes, run `bun run db:generate` then `bun run db:push`.
+- Preview deployments run `drizzle-kit push --force` automatically via the `vercel-build` script before `next build`. Production migrations remain manual.
 
 ## Code style
 
