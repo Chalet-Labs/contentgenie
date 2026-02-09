@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
         worthItScore: existingEpisode.worthItScore
           ? parseFloat(existingEpisode.worthItScore)
           : null,
-        worthItReason: existingEpisode.worthItReason,
+        worthItReason: existingEpisode.worthItReason ?? undefined,
         cached: true,
       });
     }
@@ -161,7 +161,7 @@ export async function GET(request: NextRequest) {
         worthItScore: existingEpisode.worthItScore
           ? parseFloat(existingEpisode.worthItScore)
           : null,
-        worthItReason: existingEpisode.worthItReason,
+        worthItReason: existingEpisode.worthItReason ?? undefined,
         processedAt: existingEpisode.processedAt,
       });
     }
