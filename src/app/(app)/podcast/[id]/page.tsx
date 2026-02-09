@@ -29,6 +29,18 @@ function isRssSourced(id: string): boolean {
   return id.startsWith("rss-");
 }
 
+function buildSummaryMaps(
+  episodes: { podcastIndexId: string; summaryStatus: string | null; worthItScore: string | null }[],
+) {
+  const statusMap = new Map<string, SummaryStatus>();
+  const scoreMap = new Map<string, string>();
+  for (const ep of episodes) {
+    if (ep.summaryStatus) statusMap.set(ep.podcastIndexId, ep.summaryStatus as SummaryStatus);
+    if (ep.worthItScore !== null) scoreMap.set(ep.podcastIndexId, ep.worthItScore);
+  }
+  return { statusMap, scoreMap };
+}
+
 async function loadRssPodcast(podcastIndexId: string) {
   const podcast = await db.query.podcasts.findFirst({
     where: eq(podcasts.podcastIndexId, podcastIndexId),
@@ -42,13 +54,7 @@ async function loadRssPodcast(podcastIndexId: string) {
     limit: 50,
   });
 
-  // Build status/score maps from DB episodes
-  const statusMap = new Map<string, SummaryStatus>();
-  const scoreMap = new Map<string, string>();
-  for (const ep of dbEpisodes) {
-    if (ep.summaryStatus) statusMap.set(ep.podcastIndexId, ep.summaryStatus);
-    if (ep.worthItScore !== null) scoreMap.set(ep.podcastIndexId, ep.worthItScore);
-  }
+  const { statusMap, scoreMap } = buildSummaryMaps(dbEpisodes);
 
   // Map DB episodes to PodcastIndexEpisode shape for reuse of EpisodeList
   // Use podcastIndexId (rss-...) as the id so EpisodeCard links to /episode/rss-...
@@ -236,12 +242,7 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
           columns: { podcastIndexId: true, summaryStatus: true, worthItScore: true },
         })
       : [];
-    const statusMap = new Map<string, SummaryStatus>();
-    const scoreMap = new Map<string, string>();
-    for (const ep of dbEpisodeData) {
-      if (ep.summaryStatus) statusMap.set(ep.podcastIndexId, ep.summaryStatus);
-      if (ep.worthItScore !== null) scoreMap.set(ep.podcastIndexId, ep.worthItScore);
-    }
+    const { statusMap, scoreMap } = buildSummaryMaps(dbEpisodeData);
 
     if (!podcast) {
       notFound();

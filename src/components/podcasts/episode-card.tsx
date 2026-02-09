@@ -22,6 +22,17 @@ function getScoreColor(score: number): string {
   return "text-red-600 dark:text-red-400";
 }
 
+function ScoreIndicator({ value }: { value: string }) {
+  const score = parseFloat(value);
+  if (isNaN(score)) return null;
+  return (
+    <div className={cn("flex items-center gap-1", getScoreColor(score))}>
+      <Star className="h-3 w-3" />
+      <span>{score.toFixed(1)}</span>
+    </div>
+  );
+}
+
 export function EpisodeCard({ episode, summaryStatus, worthItScore }: EpisodeCardProps) {
   return (
     <Link href={`/episode/${episode.id}`}>
@@ -70,16 +81,7 @@ export function EpisodeCard({ episode, summaryStatus, worthItScore }: EpisodeCar
               {episode.season > 0 && (
                 <span>Season {episode.season}</span>
               )}
-              {worthItScore != null && (() => {
-                const score = parseFloat(worthItScore);
-                if (isNaN(score)) return null;
-                return (
-                  <div className={cn("flex items-center gap-1", getScoreColor(score))}>
-                    <Star className="h-3 w-3" />
-                    <span>{score.toFixed(1)}</span>
-                  </div>
-                );
-              })()}
+              {worthItScore != null && <ScoreIndicator value={worthItScore} />}
             </div>
           </div>
         </CardContent>
