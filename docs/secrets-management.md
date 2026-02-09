@@ -121,6 +121,13 @@ Trigger.dev tasks run on Trigger.dev Cloud infrastructure, not in Vercel. Secret
 
 For **local development**, `bun run trigger:dev` is already wrapped with `doppler run --`, so secrets are injected from your local Doppler `dev` config.
 
+### Updating secrets
+
+Secrets are synced at **deploy time only**. If you add or change secrets in Doppler, you must redeploy Trigger.dev for the changes to take effect:
+
+- **Manually:** `bun run trigger:deploy`
+- **Automatically:** Push to `main` — the Trigger.dev GitHub integration will redeploy and re-sync secrets.
+
 ## CI/CD
 
 GitHub Actions runs quality checks (lint, test, Storybook build) on every PR and push to `main`. Vercel handles production and preview builds/deploys separately, so CI does not need Doppler or a `next build` step.
