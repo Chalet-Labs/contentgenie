@@ -55,7 +55,8 @@
     "security-guidance@claude-plugins-official": true,
     "claude-md-management@claude-plugins-official": true,
     "devops-tools@cc-skills": true,
-    "doc-tools@cc-skills": true
+    "doc-tools@cc-skills": true,
+    "project-manager@rube-cc-skills": true
   },
   "sandbox": {
     "enabled": false,
