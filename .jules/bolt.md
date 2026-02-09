@@ -1,0 +1,3 @@
+## 2025-05-15 - Header Stabilization for Next.js Fetch Caching
+**Learning:** In Next.js App Router, the `fetch` cache key includes the request headers. APIs that use time-based signatures (like PodcastIndex) generate different headers every second, effectively disabling the built-in fetch cache even for identical URLs. By rounding the timestamp to a stable interval (e.g., 30 seconds), we can enable caching for that window, provided the API allows some time drift.
+**Action:** When working with signed APIs in Next.js, check for time-drift tolerance in the documentation and stabilize the timestamp used for headers to the largest safe interval.
