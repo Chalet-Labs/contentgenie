@@ -77,7 +77,7 @@ Doppler syncs secrets to Vercel automatically via the [Doppler Vercel integratio
 - Vercel **Preview** syncs from Doppler `stg` config
 - Vercel **Production** syncs from Doppler `prd` config
 
-The Vercel integration injects env vars directly into the Vercel build environment. Vercel's build command should be set to `next build` (without `doppler run --`) in the Vercel project settings, since Doppler's native integration handles the injection.
+The Vercel integration injects env vars directly into the Vercel build environment. Vercel auto-detects the `vercel-build` script in `package.json`, so the dashboard build command should be left unset (or set to `null`). Doppler's native integration handles secrets injection.
 
 ## Neon Integration
 
@@ -87,6 +87,20 @@ The [Neon Vercel integration](https://docs.neon.tech/docs/integrations/vercel) m
 - **Preview** deployments automatically get an isolated Neon database branch per PR
 
 Because Neon owns `DATABASE_URL` in Vercel, this variable is **not** included in Doppler `stg` or `prd` configs. It is only in Doppler `dev` for local development.
+
+### Preview schema migrations
+
+Preview Neon branches start as copies of the production schema but need any pending schema changes applied. The `vercel-build` script in `package.json` handles this automatically:
+
+```bash
+"vercel-build": "if [ \"$VERCEL_ENV\" = \"preview\" ]; then npx drizzle-kit push --force; fi && next build"
+```
+
+- For **preview** deployments, `drizzle-kit push --force` runs against the Neon branch's `DATABASE_URL` before `next build`, ensuring the schema is up to date.
+- For **production** deployments, the migration step is skipped. Production schema changes are applied manually via `bun run db:push`.
+- `drizzle-kit push` is idempotent — safe to run on every build even if the schema hasn't changed.
+
+See [ADR-002](adr/002-preview-database-migrations.md) for the full decision record.
 
 ## CI/CD
 

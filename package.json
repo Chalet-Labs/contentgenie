@@ -17,7 +17,8 @@
     "db:studio": "doppler run -- drizzle-kit studio",
     "trigger:dev": "doppler run -- bunx trigger.dev@latest dev",
     "trigger:deploy": "doppler run -- bunx trigger.dev@latest deploy",
-    "prepare": "husky"
+    "prepare": "husky",
+    "vercel-build": "if [ \"$VERCEL_ENV\" = \"preview\" ]; then npx drizzle-kit push --force; fi && next build"
   },
   "dependencies": {
     "@clerk/nextjs": "^6.37.0",

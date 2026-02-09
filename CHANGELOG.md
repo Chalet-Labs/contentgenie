@@ -9,6 +9,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Fixed
 - Authenticated users are now redirected from landing page to dashboard after login (#50)
 - Episode detail page now returns 404 instead of 500 for invalid/missing PodcastIndex episode IDs (#52)
+- Preview deployments no longer get 500 errors from schema drift — `drizzle-kit push` now runs in the Vercel build targeting the correct Neon branch
+
+### Removed
+- GitHub Actions Neon branch workflow (`.github/workflows/neon-branch.yml`) — replaced by `vercel-build` script to eliminate dual Neon branch problem
 
 ### Changed
 - Rate limiting upgraded from in-memory to distributed (Postgres-backed) for serverless compatibility
