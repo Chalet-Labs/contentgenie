@@ -73,6 +73,7 @@ export const episodes = pgTable(
     summary: text("summary"),
     keyTakeaways: json("key_takeaways").$type<string[]>(),
     worthItScore: decimal("worth_it_score", { precision: 4, scale: 2 }), // 0.00 - 10.00
+    worthItReason: text("worth_it_reason"),
     processedAt: timestamp("processed_at"),
     summaryRunId: text("summary_run_id"),
     summaryStatus: text("summary_status").$type<

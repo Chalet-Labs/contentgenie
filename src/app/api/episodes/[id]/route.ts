@@ -76,6 +76,7 @@ export async function GET(
           worthItScore: dbEpisode.worthItScore
             ? parseFloat(dbEpisode.worthItScore)
             : null,
+          worthItReason: dbEpisode.worthItReason ?? undefined,
         };
       }
 
@@ -135,6 +136,7 @@ export async function GET(
           worthItScore: cachedEpisode.worthItScore
             ? parseFloat(cachedEpisode.worthItScore)
             : null,
+          worthItReason: cachedEpisode.worthItReason ?? undefined,
         };
       }
     } catch {
