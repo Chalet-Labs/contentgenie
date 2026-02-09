@@ -19,6 +19,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - CI workflow simplified to quality checks only (lint, test, Storybook); Vercel handles builds and deploys
 
 ### Added
+- Doppler-to-Trigger.dev secrets sync via `syncEnvVars` build extension (`trigger.config.ts`)
 - Vercel deployment pipeline with automatic PR previews and production deploy on merge
 - Doppler-to-Vercel integration for secrets sync across dev/preview/production environments
 - Neon-to-Vercel integration for automatic per-PR database branches

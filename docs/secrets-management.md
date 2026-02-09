@@ -102,11 +102,30 @@ Preview Neon branches start as copies of the production schema but need any pend
 
 See [ADR-002](adr/002-preview-database-migrations.md) for the full decision record.
 
+## Trigger.dev Integration
+
+Trigger.dev tasks run on Trigger.dev Cloud infrastructure, not in Vercel. Secrets are synced from Doppler at deploy time via the [`syncEnvVars`](https://trigger.dev/docs/config/extensions/syncEnvVars) build extension in `trigger.config.ts`.
+
+### Setup
+
+1. Create a **read-only Service Token** in Doppler for each config that maps to a Trigger.dev environment:
+
+   | Doppler Config | Trigger.dev Environment |
+   |---------------|------------------------|
+   | `dev` | Dev |
+   | `prd` | Prod |
+
+2. Add each token as `DOPPLER_TOKEN` in the [Trigger.dev dashboard](https://cloud.trigger.dev) → Environment Variables, selecting the matching environment.
+
+3. On deploy, `syncEnvVars` fetches all secrets from Doppler using the token and injects them into the Trigger.dev runtime.
+
+For **local development**, `bun run trigger:dev` is already wrapped with `doppler run --`, so secrets are injected from your local Doppler `dev` config.
+
 ## CI/CD
 
 GitHub Actions runs quality checks (lint, test, Storybook build) on every PR and push to `main`. Vercel handles production and preview builds/deploys separately, so CI does not need Doppler or a `next build` step.
 
-Trigger.dev tasks are auto-deployed via the [Trigger.dev GitHub integration](https://trigger.dev/docs/github-integration) when changes are pushed to `main`.
+Trigger.dev tasks are auto-deployed via the [Trigger.dev GitHub integration](https://trigger.dev/docs/github-integration) when changes are pushed to `main`. The `syncEnvVars` build extension ensures secrets from Doppler are available in the Trigger.dev runtime (see [Trigger.dev Integration](#triggerdev-integration) above).
 
 ## Troubleshooting
 
