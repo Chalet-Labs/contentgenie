@@ -167,12 +167,12 @@ describe("refreshPodcastFeed", () => {
     expect(result.success).toBe(true);
     expect(result.newEpisodes).toBe(2);
 
-    // Verify batchTrigger was called with the 2 new episode IDs
+    // Verify batchTrigger was called with the 2 new episode IDs + idempotency keys
     expect(mockBatchTrigger).toHaveBeenCalledWith(
       "summarize-episode",
       [
-        { payload: { episodeId: 5001 } },
-        { payload: { episodeId: 5003 } },
+        { payload: { episodeId: 5001 }, options: { idempotencyKey: "refresh-summarize-5001" } },
+        { payload: { episodeId: 5003 }, options: { idempotencyKey: "refresh-summarize-5003" } },
       ]
     );
   });

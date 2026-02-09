@@ -20,7 +20,7 @@ export async function getSubscribedPodcasts() {
     .select()
     .from(podcasts)
     .where(
-      inArray(podcasts.id, subscribedPodcastIds) as ReturnType<typeof eq>
+      inArray(podcasts.id, subscribedPodcastIds)
     );
 
   // Separate PodcastIndex-sourced from RSS-sourced
@@ -40,7 +40,8 @@ export async function getSubscribedPodcasts() {
  * Polls a single podcast feed for new episodes, triggers summarization for
  * any episodes not already in the database.
  *
- * Per-feed error isolation: exceptions are caught and reported, never propagated.
+ * Errors are allowed to propagate to the caller; per-feed error isolation is
+ * handled by the scheduled task's run loop.
  */
 export async function pollSingleFeed(podcast: typeof podcasts.$inferSelect) {
   const feedId = Number(podcast.podcastIndexId);
@@ -59,48 +60,41 @@ export async function pollSingleFeed(podcast: typeof podcasts.$inferSelect) {
     episodeCount: fetchedEpisodes.length,
   });
 
-  if (fetchedEpisodes.length === 0) {
-    // Update lastPolledAt even when no episodes returned
-    await db
-      .update(podcasts)
-      .set({ lastPolledAt: new Date(), updatedAt: new Date() })
-      .where(eq(podcasts.id, podcast.id));
-    return { newEpisodes: 0, triggered: 0 };
-  }
+  let newEpisodes: typeof fetchedEpisodes = [];
+  if (fetchedEpisodes.length > 0) {
+    // Deduplicate: find which episodes already exist in DB
+    const fetchedIds = fetchedEpisodes.map((ep) => String(ep.id));
+    const existingEpisodes = await db
+      .select({ podcastIndexId: episodes.podcastIndexId })
+      .from(episodes)
+      .where(inArray(episodes.podcastIndexId, fetchedIds));
 
-  // Deduplicate: find which episodes already exist in DB
-  const fetchedIds = fetchedEpisodes.map((ep) => String(ep.id));
-  const existingEpisodes = await db
-    .select({ podcastIndexId: episodes.podcastIndexId })
-    .from(episodes)
-    .where(inArray(episodes.podcastIndexId, fetchedIds));
+    const existingIds = new Set(existingEpisodes.map((e) => e.podcastIndexId));
+    newEpisodes = fetchedEpisodes.filter(
+      (ep) => !existingIds.has(String(ep.id))
+    );
 
-  const existingIds = new Set(existingEpisodes.map((e) => e.podcastIndexId));
-  const newEpisodes = fetchedEpisodes.filter(
-    (ep) => !existingIds.has(String(ep.id))
-  );
-
-  logger.info("Deduplication complete", {
-    feedId,
-    fetched: fetchedEpisodes.length,
-    existing: existingIds.size,
-    new: newEpisodes.length,
-  });
-
-  // Fire-and-forget summarization for new episodes
-  let triggered = 0;
-  if (newEpisodes.length > 0) {
-    const batchItems = newEpisodes.map((ep) => ({
-      payload: { episodeId: Number(ep.id) },
-    }));
-
-    await summarizeEpisode.batchTrigger(batchItems);
-    triggered = newEpisodes.length;
-
-    logger.info("Triggered summarization for new episodes", {
+    logger.info("Deduplication complete", {
       feedId,
-      count: triggered,
+      fetched: fetchedEpisodes.length,
+      existing: existingIds.size,
+      new: newEpisodes.length,
     });
+
+    // Fire-and-forget summarization for new episodes
+    if (newEpisodes.length > 0) {
+      const batchItems = newEpisodes.map((ep) => ({
+        payload: { episodeId: Number(ep.id) },
+        options: { idempotencyKey: `poll-summarize-${ep.id}` },
+      }));
+
+      await summarizeEpisode.batchTrigger(batchItems);
+
+      logger.info("Triggered summarization for new episodes", {
+        feedId,
+        count: newEpisodes.length,
+      });
+    }
   }
 
   // Update lastPolledAt after successful poll
@@ -109,7 +103,7 @@ export async function pollSingleFeed(podcast: typeof podcasts.$inferSelect) {
     .set({ lastPolledAt: new Date(), updatedAt: new Date() })
     .where(eq(podcasts.id, podcast.id));
 
-  return { newEpisodes: newEpisodes.length, triggered };
+  return { newEpisodes: newEpisodes.length, triggered: newEpisodes.length };
 }
 
 /**

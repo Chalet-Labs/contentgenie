@@ -70,8 +70,8 @@ vi.mock("@/trigger/helpers/podcastindex", () => ({
 import { getSubscribedPodcasts, pollSingleFeed, pollNewEpisodes } from "@/trigger/poll-new-episodes";
 import { podcasts } from "@/db/schema";
 
-// The scheduled task mock returns the raw config, so `.run` is available at runtime
-const taskConfig = pollNewEpisodes as unknown as {
+// schedules.task mock returns the raw config, so `.run` is available
+const taskRunner = pollNewEpisodes as unknown as {
   run: (payload: { timestamp: Date }) => Promise<{
     feedsPolled: number;
     newEpisodesFound: number;
@@ -183,8 +183,8 @@ describe("poll-new-episodes", () => {
       await pollSingleFeed(podcast);
 
       expect(mockBatchTrigger).toHaveBeenCalledWith([
-        { payload: { episodeId: 2001 } },
-        { payload: { episodeId: 2002 } },
+        { payload: { episodeId: 2001 }, options: { idempotencyKey: "poll-summarize-2001" } },
+        { payload: { episodeId: 2002 }, options: { idempotencyKey: "poll-summarize-2002" } },
       ]);
     });
 
@@ -265,6 +265,66 @@ describe("poll-new-episodes", () => {
           updatedAt: expect.any(Date),
         })
       );
+    });
+  });
+
+  describe("pollNewEpisodes.run (scheduled runner)", () => {
+    it("returns zeroed summary when no subscribed podcasts exist", async () => {
+      // getSubscribedPodcasts relies on mockWhere for the podcast query;
+      // return empty array to simulate no subscriptions
+      mockWhere.mockResolvedValue([]);
+
+      const result = await taskRunner.run({ timestamp: new Date() });
+
+      expect(result).toEqual({
+        feedsPolled: 0,
+        newEpisodesFound: 0,
+        summarizationsTriggered: 0,
+        feedErrors: 0,
+      });
+    });
+
+    it("aggregates results across multiple feeds", async () => {
+      const podcastA = makePodcast({ id: 1, podcastIndexId: "111", title: "Podcast A" });
+      const podcastB = makePodcast({ id: 2, podcastIndexId: "222", title: "Podcast B" });
+
+      // First call: getSubscribedPodcasts query returns both podcasts
+      // Subsequent calls: pollSingleFeed dedup queries return no existing episodes
+      mockWhere
+        .mockResolvedValueOnce([podcastA, podcastB]) // getSubscribedPodcasts
+        .mockResolvedValueOnce([])                    // pollSingleFeed(A) dedup
+        .mockResolvedValueOnce([]);                   // pollSingleFeed(B) dedup
+
+      mockGetEpisodesByFeedId
+        .mockResolvedValueOnce({ status: "true", items: [{ id: 1001, title: "Ep A1" }], count: 1 })
+        .mockResolvedValueOnce({ status: "true", items: [{ id: 2001, title: "Ep B1" }, { id: 2002, title: "Ep B2" }], count: 2 });
+
+      const result = await taskRunner.run({ timestamp: new Date() });
+
+      expect(result.feedsPolled).toBe(2);
+      expect(result.newEpisodesFound).toBe(3);
+      expect(result.summarizationsTriggered).toBe(3);
+      expect(result.feedErrors).toBe(0);
+    });
+
+    it("isolates per-feed errors and continues polling remaining feeds", async () => {
+      const podcastA = makePodcast({ id: 1, podcastIndexId: "111", title: "Failing Podcast" });
+      const podcastB = makePodcast({ id: 2, podcastIndexId: "222", title: "Good Podcast" });
+
+      mockWhere
+        .mockResolvedValueOnce([podcastA, podcastB]) // getSubscribedPodcasts
+        .mockResolvedValueOnce([]);                   // pollSingleFeed(B) dedup
+
+      // First feed fails, second succeeds
+      mockGetEpisodesByFeedId
+        .mockRejectedValueOnce(new Error("API timeout"))
+        .mockResolvedValueOnce({ status: "true", items: [{ id: 3001, title: "Ep" }], count: 1 });
+
+      const result = await taskRunner.run({ timestamp: new Date() });
+
+      expect(result.feedErrors).toBe(1);
+      expect(result.feedsPolled).toBe(1);
+      expect(result.newEpisodesFound).toBe(1);
     });
   });
 });
