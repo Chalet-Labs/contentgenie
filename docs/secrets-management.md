@@ -136,6 +136,8 @@ Set the following variables **manually** in the [Trigger.dev dashboard](https://
 - **Dev:** Update in Doppler, then redeploy Trigger.dev (`bun run trigger:deploy` or push to `main`).
 - **Prod:** Update in both Doppler (for Vercel) **and** the Trigger.dev dashboard, then redeploy.
 
+> **Warning:** Prod secrets live in two places — Doppler (for Vercel) and the Trigger.dev dashboard (for background jobs). If you update one but not the other, Vercel and Trigger.dev will run with different credentials, which can cause silent failures or data going to the wrong database.
+
 ## CI/CD
 
 GitHub Actions runs quality checks (lint, test, Storybook build) on every PR and push to `main`. Vercel handles production and preview builds/deploys separately, so CI does not need Doppler or a `next build` step.
