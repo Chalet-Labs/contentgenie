@@ -164,4 +164,39 @@ describe("PodcastIndex API functions", () => {
       "PodcastIndex API error"
     );
   });
+
+  it("generates stable auth headers for 30-second windows", async () => {
+    const { searchPodcasts } = await import("@/lib/podcastindex");
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({}),
+    });
+    vi.stubGlobal("fetch", mockFetch);
+
+    // Use a fixed time
+    let now = 1700000010 * 1000;
+    const dateSpy = vi.spyOn(Date, "now").mockImplementation(() => now);
+
+    // First call
+    await searchPodcasts("test");
+    const firstDate = mockFetch.mock.calls[0][1].headers["X-Auth-Date"];
+    const firstAuth = mockFetch.mock.calls[0][1].headers["Authorization"];
+
+    // 10 seconds later - should be the same
+    now += 10000;
+    await searchPodcasts("test");
+    const secondDate = mockFetch.mock.calls[1][1].headers["X-Auth-Date"];
+    const secondAuth = mockFetch.mock.calls[1][1].headers["Authorization"];
+
+    expect(secondDate).toBe(firstDate);
+    expect(secondAuth).toBe(firstAuth);
+
+    // 35 seconds later (total) - should be different
+    now += 25000;
+    await searchPodcasts("test");
+    const thirdDate = mockFetch.mock.calls[2][1].headers["X-Auth-Date"];
+    expect(thirdDate).not.toBe(firstDate);
+
+    dateSpy.mockRestore();
+  });
 });
