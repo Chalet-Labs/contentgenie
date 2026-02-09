@@ -2,7 +2,7 @@
 
 import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { users, podcasts, episodes, userSubscriptions } from "@/db/schema";
 import {
@@ -373,6 +373,110 @@ export async function isSubscribedToPodcast(
   } catch (error) {
     console.error("Error checking subscription status:", error);
     return false;
+  }
+}
+
+export async function refreshPodcastFeed(podcastId: number) {
+  const { userId } = await auth();
+
+  if (!userId) {
+    return { success: false, error: "You must be signed in to refresh a feed" };
+  }
+
+  try {
+    // Verify podcast exists
+    const podcast = await db.query.podcasts.findFirst({
+      where: eq(podcasts.id, podcastId),
+    });
+
+    if (!podcast) {
+      return { success: false, error: "Podcast not found" };
+    }
+
+    // Early return for non-PodcastIndex sources
+    if (podcast.source !== "podcastindex") {
+      return {
+        success: false,
+        error: "Feed refresh is only available for PodcastIndex podcasts",
+      };
+    }
+
+    // Verify user is subscribed
+    const subscription = await db.query.userSubscriptions.findFirst({
+      where: and(
+        eq(userSubscriptions.userId, userId),
+        eq(userSubscriptions.podcastId, podcastId)
+      ),
+    });
+
+    if (!subscription) {
+      return {
+        success: false,
+        error: "You must be subscribed to refresh this feed",
+      };
+    }
+
+    // Fetch latest episodes from PodcastIndex
+    const { getEpisodesByFeedId } = await import("@/lib/podcastindex");
+    const feedId = Number(podcast.podcastIndexId);
+    const response = await getEpisodesByFeedId(feedId, 20);
+    const fetchedEpisodes = response?.items ?? [];
+
+    if (fetchedEpisodes.length === 0) {
+      await db
+        .update(podcasts)
+        .set({ lastPolledAt: new Date(), updatedAt: new Date() })
+        .where(eq(podcasts.id, podcastId));
+
+      revalidatePath(`/podcast/${podcast.podcastIndexId}`);
+      return { success: true, message: "Feed is up to date", newEpisodes: 0 };
+    }
+
+    // Deduplicate: find which episodes already exist in DB
+    const fetchedIds = fetchedEpisodes.map((ep) => String(ep.id));
+    const existingEpisodes = await db
+      .select({ podcastIndexId: episodes.podcastIndexId })
+      .from(episodes)
+      .where(inArray(episodes.podcastIndexId, fetchedIds));
+
+    const existingIds = new Set(existingEpisodes.map((e) => e.podcastIndexId));
+    const newEpisodes = fetchedEpisodes.filter(
+      (ep) => !existingIds.has(String(ep.id))
+    );
+
+    // Trigger summarization for new episodes (fire-and-forget from server context)
+    if (newEpisodes.length > 0) {
+      const { tasks } = await import("@trigger.dev/sdk");
+      const batchItems = newEpisodes.map((ep) => ({
+        payload: { episodeId: Number(ep.id) },
+      }));
+
+      await tasks.batchTrigger(
+        "summarize-episode",
+        batchItems
+      );
+    }
+
+    // Update lastPolledAt
+    await db
+      .update(podcasts)
+      .set({ lastPolledAt: new Date(), updatedAt: new Date() })
+      .where(eq(podcasts.id, podcastId));
+
+    revalidatePath(`/podcast/${podcast.podcastIndexId}`);
+    revalidatePath("/subscriptions");
+
+    return {
+      success: true,
+      message: `Found ${newEpisodes.length} new episode(s)`,
+      newEpisodes: newEpisodes.length,
+    };
+  } catch (error) {
+    console.error("Error refreshing podcast feed:", error);
+    return {
+      success: false,
+      error: "Failed to refresh feed. Please try again.",
+    };
   }
 }
 
