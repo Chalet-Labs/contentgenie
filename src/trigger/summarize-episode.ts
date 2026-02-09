@@ -95,6 +95,7 @@ export const summarizeEpisode = task({
     logger.info("Checking for cached transcription");
 
     let transcript: string | undefined;
+    let transcriptSource: "cached" | "podcastindex" | "assemblyai" | "none" = "none";
     try {
       const existing = await db.query.episodes.findFirst({
         where: eq(episodes.podcastIndexId, String(episodeId)),
@@ -102,6 +103,7 @@ export const summarizeEpisode = task({
       });
       if (existing?.transcription) {
         transcript = existing.transcription;
+        transcriptSource = "cached";
         logger.info("Using cached transcription", { length: transcript.length });
       }
     } catch (error) {
@@ -119,6 +121,7 @@ export const summarizeEpisode = task({
           { maxAttempts: 2 }
         );
         if (transcript) {
+          transcriptSource = "podcastindex";
           logger.info("Transcript fetched", { length: transcript.length });
         } else {
           logger.info("No transcript available from PodcastIndex");
@@ -148,6 +151,7 @@ export const summarizeEpisode = task({
 
         if (result.status === "completed" && result.text) {
           transcript = result.text;
+          transcriptSource = "assemblyai";
           logger.info("Audio transcribed successfully", { length: transcript.length });
         } else {
           logger.warn("AssemblyAI transcription failed", {
@@ -161,6 +165,19 @@ export const summarizeEpisode = task({
         });
       }
     }
+
+    // Defensive: normalize whitespace-only transcripts
+    if (transcript && !transcript.trim()) {
+      logger.warn("Transcript was whitespace-only, treating as unavailable", { source: transcriptSource });
+      transcript = undefined;
+      transcriptSource = "none";
+    }
+
+    logger.info("Transcript acquisition complete", {
+      source: transcriptSource,
+      hasTranscript: !!transcript,
+      length: transcript?.length,
+    });
 
     // Step 4: Generate AI summary via OpenRouter
     metadata.set("step", "generating-summary");

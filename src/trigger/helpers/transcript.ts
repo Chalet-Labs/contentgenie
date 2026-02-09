@@ -35,6 +35,10 @@ export async function fetchTranscript(
   }
 
   let transcript = await response.text();
+  transcript = transcript.trim();
+  if (!transcript) {
+    return undefined;
+  }
   if (transcript.length > MAX_TRANSCRIPT_LENGTH) {
     transcript =
       transcript.slice(0, MAX_TRANSCRIPT_LENGTH) + "\n\n[Transcript truncated...]";

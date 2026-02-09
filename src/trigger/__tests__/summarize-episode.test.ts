@@ -271,6 +271,89 @@ describe("summarize-episode task", () => {
     );
   });
 
+  it("does not call AssemblyAI when PodcastIndex returns valid transcript", async () => {
+    vi.mocked(getEpisodeById).mockResolvedValue({ episode: mockEpisode } as never);
+    vi.mocked(getPodcastById).mockResolvedValue({ feed: mockPodcast } as never);
+    vi.mocked(fetchTranscript).mockResolvedValue("Valid PodcastIndex transcript");
+    vi.mocked(generateEpisodeSummary).mockResolvedValue(mockSummary);
+    vi.mocked(persistEpisodeSummary).mockResolvedValue(undefined);
+
+    await taskConfig.run({ episodeId: 123 }, mockCtx);
+
+    expect(transcribeAudio).not.toHaveBeenCalled();
+  });
+
+  it("logs transcript source as 'podcastindex' when PodcastIndex provides transcript", async () => {
+    vi.mocked(getEpisodeById).mockResolvedValue({ episode: mockEpisode } as never);
+    vi.mocked(getPodcastById).mockResolvedValue({ feed: mockPodcast } as never);
+    vi.mocked(fetchTranscript).mockResolvedValue("PodcastIndex transcript");
+    vi.mocked(generateEpisodeSummary).mockResolvedValue(mockSummary);
+    vi.mocked(persistEpisodeSummary).mockResolvedValue(undefined);
+
+    await taskConfig.run({ episodeId: 123 }, mockCtx);
+
+    const { logger } = await import("@trigger.dev/sdk");
+    expect(vi.mocked(logger.info)).toHaveBeenCalledWith(
+      "Transcript acquisition complete",
+      expect.objectContaining({ source: "podcastindex" })
+    );
+  });
+
+  it("logs transcript source as 'cached' when database cache provides transcript", async () => {
+    vi.mocked(getEpisodeById).mockResolvedValue({ episode: mockEpisode } as never);
+    vi.mocked(getPodcastById).mockResolvedValue({ feed: mockPodcast } as never);
+    mockFindFirst.mockResolvedValue({ transcription: "Cached transcript text" });
+    vi.mocked(generateEpisodeSummary).mockResolvedValue(mockSummary);
+    vi.mocked(persistEpisodeSummary).mockResolvedValue(undefined);
+
+    await taskConfig.run({ episodeId: 123 }, mockCtx);
+
+    const { logger } = await import("@trigger.dev/sdk");
+    expect(vi.mocked(logger.info)).toHaveBeenCalledWith(
+      "Transcript acquisition complete",
+      expect.objectContaining({ source: "cached" })
+    );
+  });
+
+  it("logs transcript source as 'assemblyai' when AssemblyAI provides transcript", async () => {
+    vi.mocked(getEpisodeById).mockResolvedValue({ episode: mockEpisode } as never);
+    vi.mocked(getPodcastById).mockResolvedValue({ feed: mockPodcast } as never);
+    vi.mocked(fetchTranscript).mockResolvedValue(undefined);
+    vi.mocked(transcribeAudio).mockResolvedValue({
+      id: "transcript-source-test",
+      status: "completed",
+      text: "AssemblyAI transcript text",
+      error: null,
+    });
+    vi.mocked(generateEpisodeSummary).mockResolvedValue(mockSummary);
+    vi.mocked(persistEpisodeSummary).mockResolvedValue(undefined);
+
+    await taskConfig.run({ episodeId: 123 }, mockCtx);
+
+    const { logger } = await import("@trigger.dev/sdk");
+    expect(vi.mocked(logger.info)).toHaveBeenCalledWith(
+      "Transcript acquisition complete",
+      expect.objectContaining({ source: "assemblyai" })
+    );
+  });
+
+  it("logs transcript source as 'none' when no source provides transcript", async () => {
+    vi.mocked(getEpisodeById).mockResolvedValue({ episode: mockEpisode } as never);
+    vi.mocked(getPodcastById).mockResolvedValue({ feed: mockPodcast } as never);
+    vi.mocked(fetchTranscript).mockResolvedValue(undefined);
+    vi.mocked(transcribeAudio).mockRejectedValue(new Error("AssemblyAI unavailable"));
+    vi.mocked(generateEpisodeSummary).mockResolvedValue(mockSummary);
+    vi.mocked(persistEpisodeSummary).mockResolvedValue(undefined);
+
+    await taskConfig.run({ episodeId: 123 }, mockCtx);
+
+    const { logger } = await import("@trigger.dev/sdk");
+    expect(vi.mocked(logger.info)).toHaveBeenCalledWith(
+      "Transcript acquisition complete",
+      expect.objectContaining({ source: "none" })
+    );
+  });
+
   it("handles AssemblyAI error status gracefully", async () => {
     vi.mocked(getEpisodeById).mockResolvedValue({ episode: mockEpisode } as never);
     vi.mocked(getPodcastById).mockResolvedValue({ feed: mockPodcast } as never);
