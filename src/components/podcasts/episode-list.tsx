@@ -10,9 +10,10 @@ interface EpisodeListProps {
   isLoading?: boolean;
   error?: string | null;
   statusMap?: Map<string, SummaryStatus>;
+  scoreMap?: Map<string, string>;
 }
 
-export function EpisodeList({ episodes, isLoading, error, statusMap }: EpisodeListProps) {
+export function EpisodeList({ episodes, isLoading, error, statusMap, scoreMap }: EpisodeListProps) {
   if (isLoading) {
     return (
       <div className="space-y-4">
@@ -44,7 +45,7 @@ export function EpisodeList({ episodes, isLoading, error, statusMap }: EpisodeLi
   return (
     <div className="space-y-4">
       {episodes.map((episode) => (
-        <EpisodeCard key={episode.id} episode={episode} summaryStatus={statusMap?.get(String(episode.id))} />
+        <EpisodeCard key={episode.id} episode={episode} summaryStatus={statusMap?.get(String(episode.id))} worthItScore={scoreMap?.get(String(episode.id))} />
       ))}
     </div>
   );

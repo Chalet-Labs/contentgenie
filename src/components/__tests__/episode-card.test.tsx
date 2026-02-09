@@ -92,4 +92,53 @@ describe("EpisodeCard", () => {
       screen.getByText("No description available")
     ).toBeInTheDocument();
   });
+
+  it("shows left border accent when summaryStatus is completed", () => {
+    const { container } = render(
+      <EpisodeCard episode={mockEpisode} summaryStatus="completed" />
+    );
+    const card = container.querySelector("[class*='border-l-2']");
+    expect(card).toBeInTheDocument();
+    expect(card).toHaveClass("border-primary");
+  });
+
+  it("does not show left border accent without summaryStatus", () => {
+    const { container } = render(
+      <EpisodeCard episode={mockEpisode} />
+    );
+    const card = container.querySelector("[class*='border-l-2']");
+    expect(card).not.toBeInTheDocument();
+  });
+
+  it("renders high score in green", () => {
+    render(
+      <EpisodeCard episode={mockEpisode} summaryStatus="completed" worthItScore="8.50" />
+    );
+    expect(screen.getByText("8.5")).toBeInTheDocument();
+    const scoreContainer = screen.getByText("8.5").closest("div");
+    expect(scoreContainer).toHaveClass("text-green-600");
+  });
+
+  it("renders medium score in amber", () => {
+    render(
+      <EpisodeCard episode={mockEpisode} summaryStatus="completed" worthItScore="6.00" />
+    );
+    expect(screen.getByText("6.0")).toBeInTheDocument();
+    const scoreContainer = screen.getByText("6.0").closest("div");
+    expect(scoreContainer).toHaveClass("text-amber-600");
+  });
+
+  it("renders low score in red", () => {
+    render(
+      <EpisodeCard episode={mockEpisode} summaryStatus="completed" worthItScore="3.50" />
+    );
+    expect(screen.getByText("3.5")).toBeInTheDocument();
+    const scoreContainer = screen.getByText("3.5").closest("div");
+    expect(scoreContainer).toHaveClass("text-red-600");
+  });
+
+  it("does not render score indicator without worthItScore", () => {
+    render(<EpisodeCard episode={mockEpisode} />);
+    expect(screen.queryByText(/^\d+\.\d$/)).not.toBeInTheDocument();
+  });
 });

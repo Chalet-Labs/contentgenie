@@ -3,21 +3,29 @@
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Clock, Calendar, Mic } from "lucide-react";
+import { Clock, Calendar, Mic, Star } from "lucide-react";
 import type { PodcastIndexEpisode } from "@/lib/podcastindex";
 import { formatDuration, formatPublishDate } from "@/lib/podcastindex";
 import { ProcessingStatus } from "@/components/episodes/processing-status";
+import { cn } from "@/lib/utils";
 import type { SummaryStatus } from "@/db/schema";
 
 interface EpisodeCardProps {
   episode: PodcastIndexEpisode;
   summaryStatus?: SummaryStatus | null;
+  worthItScore?: string | null;
 }
 
-export function EpisodeCard({ episode, summaryStatus }: EpisodeCardProps) {
+function getScoreColor(score: number): string {
+  if (score >= 8) return "text-green-600 dark:text-green-400";
+  if (score >= 5) return "text-amber-600 dark:text-amber-400";
+  return "text-red-600 dark:text-red-400";
+}
+
+export function EpisodeCard({ episode, summaryStatus, worthItScore }: EpisodeCardProps) {
   return (
     <Link href={`/episode/${episode.id}`}>
-      <Card className="group transition-colors hover:bg-accent">
+      <Card className={cn("group transition-colors hover:bg-accent", summaryStatus === "completed" && "border-l-2 border-primary")}>
         <CardContent className="p-4">
           <div className="flex flex-col gap-3">
             <div className="flex items-start justify-between gap-4">
@@ -62,6 +70,16 @@ export function EpisodeCard({ episode, summaryStatus }: EpisodeCardProps) {
               {episode.season > 0 && (
                 <span>Season {episode.season}</span>
               )}
+              {worthItScore != null && (() => {
+                const score = parseFloat(worthItScore);
+                if (isNaN(score)) return null;
+                return (
+                  <div className={cn("flex items-center gap-1", getScoreColor(score))}>
+                    <Star className="h-3 w-3" />
+                    <span>{score.toFixed(1)}</span>
+                  </div>
+                );
+              })()}
             </div>
           </div>
         </CardContent>
