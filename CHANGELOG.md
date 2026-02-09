@@ -15,6 +15,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - GitHub Actions Neon branch workflow (`.github/workflows/neon-branch.yml`) — replaced by `vercel-build` script to eliminate dual Neon branch problem
 
 ### Changed
+- PodcastIndex API authentication headers are now stabilized to 30-second windows, enabling Next.js `fetch` caching and reducing redundant network requests
 - Rate limiting upgraded from in-memory to distributed (Postgres-backed) for serverless compatibility
 - CI workflow simplified to quality checks only (lint, test, Storybook); Vercel handles builds and deploys
 

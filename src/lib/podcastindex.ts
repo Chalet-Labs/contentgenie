@@ -130,7 +130,9 @@ export interface TrendingPodcastsResponse {
 function getAuthHeaders(): Record<string, string> {
   const apiKey = getApiKey();
   const apiSecret = getApiSecret();
-  const apiHeaderTime = Math.floor(Date.now() / 1000);
+  // Round to nearest 30 seconds to enable Next.js fetch caching
+  // PodcastIndex allows a 5-minute drift, so 30 seconds is safe.
+  const apiHeaderTime = Math.floor(Date.now() / 1000 / 30) * 30;
   const dataToHash = apiKey + apiSecret + apiHeaderTime;
   const hash = createHash("sha1")
     .update(dataToHash)
