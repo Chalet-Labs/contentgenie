@@ -2,7 +2,7 @@
 
 import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
-import { eq, and, desc, inArray } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { users, podcasts, episodes, userSubscriptions } from "@/db/schema";
 import {
@@ -422,39 +422,33 @@ export async function refreshPodcastFeed(podcastId: number) {
     const response = await getEpisodesByFeedId(feedId, 20);
     const fetchedEpisodes = response?.items ?? [];
 
-    if (fetchedEpisodes.length === 0) {
-      await db
-        .update(podcasts)
-        .set({ lastPolledAt: new Date(), updatedAt: new Date() })
-        .where(eq(podcasts.id, podcastId));
+    let newEpisodes: typeof fetchedEpisodes = [];
+    if (fetchedEpisodes.length > 0) {
+      // Deduplicate: find which episodes already exist in DB
+      const fetchedIds = fetchedEpisodes.map((ep) => String(ep.id));
+      const existingEpisodes = await db
+        .select({ podcastIndexId: episodes.podcastIndexId })
+        .from(episodes)
+        .where(inArray(episodes.podcastIndexId, fetchedIds));
 
-      revalidatePath(`/podcast/${podcast.podcastIndexId}`);
-      return { success: true, message: "Feed is up to date", newEpisodes: 0 };
-    }
-
-    // Deduplicate: find which episodes already exist in DB
-    const fetchedIds = fetchedEpisodes.map((ep) => String(ep.id));
-    const existingEpisodes = await db
-      .select({ podcastIndexId: episodes.podcastIndexId })
-      .from(episodes)
-      .where(inArray(episodes.podcastIndexId, fetchedIds));
-
-    const existingIds = new Set(existingEpisodes.map((e) => e.podcastIndexId));
-    const newEpisodes = fetchedEpisodes.filter(
-      (ep) => !existingIds.has(String(ep.id))
-    );
-
-    // Trigger summarization for new episodes (fire-and-forget from server context)
-    if (newEpisodes.length > 0) {
-      const { tasks } = await import("@trigger.dev/sdk");
-      const batchItems = newEpisodes.map((ep) => ({
-        payload: { episodeId: Number(ep.id) },
-      }));
-
-      await tasks.batchTrigger(
-        "summarize-episode",
-        batchItems
+      const existingIds = new Set(existingEpisodes.map((e) => e.podcastIndexId));
+      newEpisodes = fetchedEpisodes.filter(
+        (ep) => !existingIds.has(String(ep.id))
       );
+
+      // Trigger summarization for new episodes (fire-and-forget from server context)
+      if (newEpisodes.length > 0) {
+        const { tasks } = await import("@trigger.dev/sdk");
+        const batchItems = newEpisodes.map((ep) => ({
+          payload: { episodeId: Number(ep.id) },
+          options: { idempotencyKey: `refresh-summarize-${ep.id}` },
+        }));
+
+        await tasks.batchTrigger(
+          "summarize-episode",
+          batchItems
+        );
+      }
     }
 
     // Update lastPolledAt
@@ -468,7 +462,10 @@ export async function refreshPodcastFeed(podcastId: number) {
 
     return {
       success: true,
-      message: `Found ${newEpisodes.length} new episode(s)`,
+      message:
+        newEpisodes.length > 0
+          ? `Found ${newEpisodes.length} new episode(s)`
+          : "Feed is up to date",
       newEpisodes: newEpisodes.length,
     };
   } catch (error) {
