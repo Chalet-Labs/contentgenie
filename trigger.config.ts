@@ -19,6 +19,12 @@ export default defineConfig({
   },
   build: {
     extensions: [
+      // Syncs secrets from Doppler for Dev environment only.
+      // Prod env vars are set manually in the Trigger.dev dashboard
+      // to avoid the Doppler token mapping issue that caused
+      // summaries to be written to the wrong database.
+      // This only runs when DOPPLER_TOKEN is present — remove it
+      // from Trigger.dev Prod environment to disable sync there.
       syncEnvVars(async () => {
         const token = process.env.DOPPLER_TOKEN;
         if (!token) return [];
