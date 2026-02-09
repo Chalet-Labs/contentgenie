@@ -19,6 +19,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - CI workflow simplified to quality checks only (lint, test, Storybook); Vercel handles builds and deploys
 
 ### Added
+- Persist AI-generated worth-it reason to database and expose in episode API responses (#56)
 - AI summary status indicator (left border accent) and color-coded worth-it score on episode cards in podcast overview (#59)
 - Batch DB query for summary data on PodcastIndex-sourced podcast pages (no per-episode API calls)
 - Doppler-to-Trigger.dev secrets sync via `syncEnvVars` build extension (`trigger.config.ts`)

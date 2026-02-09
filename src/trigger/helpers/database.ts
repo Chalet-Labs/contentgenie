@@ -136,6 +136,7 @@ export async function persistEpisodeSummary(
         summary: summary.summary,
         keyTakeaways: summary.keyTakeaways,
         worthItScore: summary.worthItScore.toFixed(2),
+        worthItReason: summary.worthItReason,
         transcription: transcript,
         processedAt: new Date(),
         summaryStatus: "completed",
@@ -158,6 +159,7 @@ export async function persistEpisodeSummary(
       summary: summary.summary,
       keyTakeaways: summary.keyTakeaways,
       worthItScore: summary.worthItScore.toFixed(2),
+      worthItReason: summary.worthItReason,
       summaryStatus: "completed",
       processedAt: new Date(),
     });
