@@ -30,3 +30,9 @@ jobs:
 
       - name: Build Storybook
         run: bun run build-storybook
+
+      - name: Validate Trigger.dev tasks (dry-run)
+        if: github.event_name == 'pull_request'
+        run: bunx trigger.dev@latest deploy --dry-run --skip-sync-env-vars
+        env:
+          TRIGGER_SECRET_KEY: ${{ secrets.TRIGGER_SECRET_KEY }}
