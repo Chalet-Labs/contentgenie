@@ -9,8 +9,8 @@ interface EpisodeListProps {
   episodes: PodcastIndexEpisode[];
   isLoading?: boolean;
   error?: string | null;
-  statusMap?: Map<string, SummaryStatus>;
-  scoreMap?: Map<string, string>;
+  statusMap?: Record<string, SummaryStatus>;
+  scoreMap?: Record<string, string>;
 }
 
 export function EpisodeList({ episodes, isLoading, error, statusMap, scoreMap }: EpisodeListProps) {
@@ -45,7 +45,7 @@ export function EpisodeList({ episodes, isLoading, error, statusMap, scoreMap }:
   return (
     <div className="space-y-4">
       {episodes.map((episode) => (
-        <EpisodeCard key={episode.id} episode={episode} summaryStatus={statusMap?.get(String(episode.id))} worthItScore={scoreMap?.get(String(episode.id))} />
+        <EpisodeCard key={episode.id} episode={episode} summaryStatus={statusMap?.[String(episode.id)]} worthItScore={scoreMap?.[String(episode.id)]} />
       ))}
     </div>
   );

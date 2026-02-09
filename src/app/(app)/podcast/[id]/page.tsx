@@ -30,13 +30,13 @@ function isRssSourced(id: string): boolean {
 }
 
 function buildSummaryMaps(
-  episodes: { podcastIndexId: string; summaryStatus: string | null; worthItScore: string | null }[],
+  episodes: { podcastIndexId: string; summaryStatus: SummaryStatus | null; worthItScore: string | null }[],
 ) {
-  const statusMap = new Map<string, SummaryStatus>();
-  const scoreMap = new Map<string, string>();
+  const statusMap: Record<string, SummaryStatus> = {};
+  const scoreMap: Record<string, string> = {};
   for (const ep of episodes) {
-    if (ep.summaryStatus) statusMap.set(ep.podcastIndexId, ep.summaryStatus as SummaryStatus);
-    if (ep.worthItScore !== null) scoreMap.set(ep.podcastIndexId, ep.worthItScore);
+    if (ep.summaryStatus) statusMap[ep.podcastIndexId] = ep.summaryStatus;
+    if (ep.worthItScore !== null) scoreMap[ep.podcastIndexId] = ep.worthItScore;
   }
   return { statusMap, scoreMap };
 }
