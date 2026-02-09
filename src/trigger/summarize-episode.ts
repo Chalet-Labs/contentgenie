@@ -28,15 +28,22 @@ export const summarizeEpisode = task({
   onFailure: async (params: { payload: SummarizeEpisodePayload }) => {
     const { episodeId } = params.payload;
     logger.error("Summarization task failed permanently", { episodeId });
-    await db
-      .update(episodes)
-      .set({
-        summaryStatus: "failed",
-        summaryRunId: null,
-        processingError: "Summarization failed after maximum retry attempts",
-        updatedAt: new Date(),
-      })
-      .where(eq(episodes.podcastIndexId, String(episodeId)));
+    try {
+      await db
+        .update(episodes)
+        .set({
+          summaryStatus: "failed",
+          summaryRunId: null,
+          processingError: "Summarization failed after maximum retry attempts",
+          updatedAt: new Date(),
+        })
+        .where(eq(episodes.podcastIndexId, String(episodeId)));
+    } catch (error) {
+      logger.error("Failed to update episode status to failed in database", {
+        episodeId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
   },
   run: async (payload: SummarizeEpisodePayload, { ctx }): Promise<SummaryResult> => {
     const { episodeId } = payload;
