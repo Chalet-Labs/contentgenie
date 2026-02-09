@@ -104,35 +104,43 @@ See [ADR-002](adr/002-preview-database-migrations.md) for the full decision reco
 
 ## Trigger.dev Integration
 
-Trigger.dev tasks run on Trigger.dev Cloud infrastructure, not in Vercel. Secrets are synced from Doppler at deploy time via the [`syncEnvVars`](https://trigger.dev/docs/config/extensions/syncEnvVars) build extension in `trigger.config.ts`.
+Trigger.dev tasks run on Trigger.dev Cloud infrastructure, not in Vercel. Secrets are managed differently per environment:
 
-### Setup
+- **Dev:** Auto-synced from Doppler via the `syncEnvVars` build extension in `trigger.config.ts`. Requires a `DOPPLER_TOKEN` (read-only service token for Doppler `dev` config) set in the Trigger.dev Dev environment.
+- **Prod:** Set **manually** in the [Trigger.dev dashboard](https://cloud.trigger.dev). Do **not** set `DOPPLER_TOKEN` in the Prod environment — this disables auto-sync.
 
-1. Create a **read-only Service Token** in Doppler for each config that maps to a Trigger.dev environment:
+> **Why manual for Prod?** The previous approach synced all environments from Doppler, but the `DOPPLER_TOKEN` mapping was fragile — a wrong token silently pointed all secrets (including `DATABASE_URL`) at the wrong Doppler config, causing Trigger.dev to write to the dev database while Vercel production read from the main database.
 
-   | Doppler Config | Trigger.dev Environment |
-   |---------------|------------------------|
-   | `dev` | Dev |
-   | `prd` | Prod |
+### Setup — Dev environment
 
-2. Add each token as `DOPPLER_TOKEN` in the [Trigger.dev dashboard](https://cloud.trigger.dev) → Environment Variables, selecting the matching environment.
-
-3. On deploy, `syncEnvVars` fetches all secrets from Doppler using the token and injects them into the Trigger.dev runtime.
+1. Create a **read-only Service Token** in Doppler for the `dev` config.
+2. Add the token as `DOPPLER_TOKEN` in the [Trigger.dev dashboard](https://cloud.trigger.dev) → Environment Variables → **Dev** environment only.
+3. On deploy, `syncEnvVars` fetches all secrets from Doppler and injects them into the Trigger.dev Dev runtime.
 
 For **local development**, `bun run trigger:dev` is already wrapped with `doppler run --`, so secrets are injected from your local Doppler `dev` config.
 
+### Setup — Prod environment
+
+Set the following variables **manually** in the [Trigger.dev dashboard](https://cloud.trigger.dev) → Environment Variables → **Prod** environment:
+
+| Variable | Where to find the value |
+|----------|------------------------|
+| `DATABASE_URL` | Neon Console → main branch → Connection string |
+| `PODCASTINDEX_API_KEY` | Doppler `prd` config |
+| `PODCASTINDEX_API_SECRET` | Doppler `prd` config |
+| `OPENROUTER_API_KEY` | Doppler `prd` config |
+| `ASSEMBLYAI_API_KEY` | Doppler `prd` config |
+
 ### Updating secrets
 
-Secrets are synced at **deploy time only**. If you add or change secrets in Doppler, you must redeploy Trigger.dev for the changes to take effect:
-
-- **Manually:** `bun run trigger:deploy`
-- **Automatically:** Push to `main` — the Trigger.dev GitHub integration will redeploy and re-sync secrets.
+- **Dev:** Update in Doppler, then redeploy Trigger.dev (`bun run trigger:deploy` or push to `main`).
+- **Prod:** Update in both Doppler (for Vercel) **and** the Trigger.dev dashboard, then redeploy.
 
 ## CI/CD
 
 GitHub Actions runs quality checks (lint, test, Storybook build) on every PR and push to `main`. Vercel handles production and preview builds/deploys separately, so CI does not need Doppler or a `next build` step.
 
-Trigger.dev tasks are auto-deployed via the [Trigger.dev GitHub integration](https://trigger.dev/docs/github-integration) when changes are pushed to `main`. The `syncEnvVars` build extension ensures secrets from Doppler are available in the Trigger.dev runtime (see [Trigger.dev Integration](#triggerdev-integration) above).
+Trigger.dev tasks are auto-deployed via the [Trigger.dev GitHub integration](https://trigger.dev/docs/github-integration) when changes are pushed to `main`. Dev secrets are synced from Doppler via `syncEnvVars`; Prod secrets are managed manually in the Trigger.dev dashboard (see [Trigger.dev Integration](#triggerdev-integration) above).
 
 ## Troubleshooting
 
