@@ -95,7 +95,8 @@ export async function GET(
     let episodeResponse;
     try {
       episodeResponse = await getEpisodeById(episodeId);
-    } catch {
+    } catch (error) {
+      console.error(`Error fetching episode ${episodeId} from PodcastIndex:`, error);
       return NextResponse.json(
         { error: "Episode not found" },
         { status: 404 }
