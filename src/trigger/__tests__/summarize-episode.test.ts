@@ -354,6 +354,25 @@ describe("summarize-episode task", () => {
     );
   });
 
+  it("falls back to PodcastIndex when cached transcription is whitespace-only", async () => {
+    vi.mocked(getEpisodeById).mockResolvedValue({ episode: mockEpisode } as never);
+    vi.mocked(getPodcastById).mockResolvedValue({ feed: mockPodcast } as never);
+    mockFindFirst.mockResolvedValue({ transcription: "   \n  " });
+    vi.mocked(fetchTranscript).mockResolvedValue("PodcastIndex fallback transcript");
+    vi.mocked(generateEpisodeSummary).mockResolvedValue(mockSummary);
+    vi.mocked(persistEpisodeSummary).mockResolvedValue(undefined);
+
+    await taskConfig.run({ episodeId: 123 }, mockCtx);
+
+    expect(fetchTranscript).toHaveBeenCalled();
+    expect(transcribeAudio).not.toHaveBeenCalled();
+    const { logger } = await import("@trigger.dev/sdk");
+    expect(vi.mocked(logger.info)).toHaveBeenCalledWith(
+      "Transcript acquisition complete",
+      expect.objectContaining({ source: "podcastindex" })
+    );
+  });
+
   it("handles AssemblyAI error status gracefully", async () => {
     vi.mocked(getEpisodeById).mockResolvedValue({ episode: mockEpisode } as never);
     vi.mocked(getPodcastById).mockResolvedValue({ feed: mockPodcast } as never);

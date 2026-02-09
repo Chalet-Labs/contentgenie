@@ -101,7 +101,7 @@ export const summarizeEpisode = task({
         where: eq(episodes.podcastIndexId, String(episodeId)),
         columns: { transcription: true },
       });
-      if (existing?.transcription) {
+      if (existing?.transcription?.trim()) {
         transcript = existing.transcription;
         transcriptSource = "cached";
         logger.info("Using cached transcription", { length: transcript.length });
