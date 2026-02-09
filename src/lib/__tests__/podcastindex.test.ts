@@ -52,6 +52,7 @@ describe("PodcastIndex API functions", () => {
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
     vi.unstubAllEnvs();
     vi.unstubAllGlobals();
     vi.resetModules();
