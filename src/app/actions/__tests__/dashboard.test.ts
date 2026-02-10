@@ -11,7 +11,7 @@ vi.mock("@clerk/nextjs/server", () => ({
 // Mock database
 vi.mock("@/db", () => ({
   db: {
-    count: vi.fn(),
+    $count: vi.fn(),
   },
 }));
 
@@ -24,7 +24,6 @@ vi.mock("@/db/schema", () => ({
 // Mock drizzle-orm
 vi.mock("drizzle-orm", () => ({
   eq: vi.fn(),
-  count: vi.fn(),
 }));
 
 describe("getDashboardStats", () => {
@@ -45,7 +44,7 @@ describe("getDashboardStats", () => {
   it("returns counts correctly using SQL COUNT()", async () => {
     mockAuth.mockResolvedValue({ userId: "user_123" });
 
-    (db.count as any)
+    (db.$count as any)
       .mockResolvedValueOnce(5) // for subscriptions
       .mockResolvedValueOnce(3); // for library
 
@@ -55,13 +54,13 @@ describe("getDashboardStats", () => {
     expect(result.savedCount).toBe(3);
     expect(result.error).toBeNull();
 
-    expect(db.count).toHaveBeenCalledTimes(2);
+    expect(db.$count).toHaveBeenCalledTimes(2);
   });
 
   it("handles zero counts correctly", async () => {
     mockAuth.mockResolvedValue({ userId: "user_123" });
 
-    (db.count as any).mockResolvedValue(0);
+    (db.$count as any).mockResolvedValue(0);
 
     const result = await getDashboardStats();
 
