@@ -158,7 +158,13 @@ export async function getUserCollections() {
         episodeCount: count(userLibrary.id),
       })
       .from(collections)
-      .leftJoin(userLibrary, eq(collections.id, userLibrary.collectionId))
+      .leftJoin(
+        userLibrary,
+        and(
+          eq(collections.id, userLibrary.collectionId),
+          eq(userLibrary.userId, userId)
+        )
+      )
       .where(eq(collections.userId, userId))
       .groupBy(collections.id)
       .orderBy(desc(collections.createdAt));
