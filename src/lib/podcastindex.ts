@@ -172,12 +172,41 @@ async function fetchFromPodcastIndex<T>(
 // Search for podcasts by term
 export async function searchPodcasts(
   query: string,
-  max: number = 20
+  max: number = 20,
+  options: { similar?: boolean } = {}
 ): Promise<SearchPodcastsResponse> {
-  return fetchFromPodcastIndex<SearchPodcastsResponse>("/search/byterm", {
+  const params: Record<string, string> = {
     q: query,
     max: max.toString(),
-  });
+  };
+  if (options.similar) {
+    params.similar = "true";
+  }
+  return fetchFromPodcastIndex<SearchPodcastsResponse>(
+    "/search/byterm",
+    params
+  );
+}
+
+export interface SearchByPersonResponse {
+  status: string;
+  items: PodcastIndexEpisode[];
+  count: number;
+  query: string;
+  description: string;
+}
+
+export async function searchByPerson(
+  query: string,
+  max: number = 20
+): Promise<SearchByPersonResponse> {
+  return fetchFromPodcastIndex<SearchByPersonResponse>(
+    "/search/byperson",
+    {
+      q: query,
+      max: max.toString(),
+    }
+  );
 }
 
 // Get podcast by feed ID

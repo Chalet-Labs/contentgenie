@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { searchPodcasts } from "@/lib/podcastindex";
+import {
+  searchPodcasts,
+  searchByPerson,
+  type PodcastIndexPodcast,
+} from "@/lib/podcastindex";
+import { searchLocalPodcasts } from "@/lib/podcast-search";
 
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams;
@@ -22,12 +27,73 @@ export async function GET(request: NextRequest) {
 
   try {
     const maxResults = max ? parseInt(max, 10) : 20;
-    const results = await searchPodcasts(query, maxResults);
+
+    const [bytermResult, bypersonResult, localResult] =
+      await Promise.allSettled([
+        searchPodcasts(query, maxResults, { similar: true }),
+        searchByPerson(query, 5),
+        searchLocalPodcasts(query),
+      ]);
+
+    const merged: PodcastIndexPodcast[] = [];
+    const seenIds = new Set<string>();
+
+    // Layer 1a: byterm results (primary)
+    if (bytermResult.status === "fulfilled") {
+      for (const feed of bytermResult.value.feeds ?? []) {
+        const id = String(feed.id);
+        if (!seenIds.has(id)) {
+          seenIds.add(id);
+          merged.push(feed);
+        }
+      }
+    }
+
+    // Layer 1b: byperson results (extract unique feedIds from episodes)
+    if (bypersonResult.status === "fulfilled") {
+      const feedMap = new Map<
+        string,
+        { feedId: number; feedImage: string; title: string }
+      >();
+      for (const episode of bypersonResult.value.items ?? []) {
+        const feedId = String(episode.feedId);
+        if (!seenIds.has(feedId) && !feedMap.has(feedId)) {
+          feedMap.set(feedId, {
+            feedId: episode.feedId,
+            feedImage: episode.feedImage,
+            title: episode.title,
+          });
+        }
+      }
+      feedMap.forEach((info, feedId) => {
+        seenIds.add(feedId);
+        merged.push({
+          id: info.feedId,
+          title: info.title,
+          image: info.feedImage,
+          artwork: info.feedImage,
+        } as PodcastIndexPodcast);
+      });
+    }
+
+    // Layer 2: local fuzzy index results (supplementary)
+    if (localResult.status === "fulfilled") {
+      for (const local of localResult.value) {
+        if (!seenIds.has(local.podcastIndexId)) {
+          seenIds.add(local.podcastIndexId);
+          merged.push({
+            id: Number(local.podcastIndexId),
+            title: local.title,
+            author: local.publisher ?? "",
+          } as PodcastIndexPodcast);
+        }
+      }
+    }
 
     return NextResponse.json({
-      podcasts: results.feeds || [],
-      count: results.count || 0,
-      query: results.query,
+      podcasts: merged,
+      count: merged.length,
+      query,
     });
   } catch (error) {
     console.error("Podcast search error:", error);
