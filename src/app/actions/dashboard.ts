@@ -1,7 +1,7 @@
 "use server";
 
 import { auth } from "@clerk/nextjs/server";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { userSubscriptions, userLibrary } from "@/db/schema";
 import {
@@ -150,20 +150,20 @@ export async function getDashboardStats() {
   }
 
   try {
-    const [subscriptions, library] = await Promise.all([
-      db.query.userSubscriptions.findMany({
-        where: eq(userSubscriptions.userId, userId),
-        columns: { id: true },
-      }),
-      db.query.userLibrary.findMany({
-        where: eq(userLibrary.userId, userId),
-        columns: { id: true },
-      }),
+    const [subscriptionResult, libraryResult] = await Promise.all([
+      db
+        .select({ count: sql<number>`count(*)` })
+        .from(userSubscriptions)
+        .where(eq(userSubscriptions.userId, userId)),
+      db
+        .select({ count: sql<number>`count(*)` })
+        .from(userLibrary)
+        .where(eq(userLibrary.userId, userId)),
     ]);
 
     return {
-      subscriptionCount: subscriptions.length,
-      savedCount: library.length,
+      subscriptionCount: Number(subscriptionResult[0]?.count ?? 0),
+      savedCount: Number(libraryResult[0]?.count ?? 0),
       error: null,
     };
   } catch (error) {
