@@ -2,10 +2,10 @@
 
 import { PodcastCard } from "./podcast-card";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { PodcastIndexPodcast } from "@/lib/podcastindex";
+import type { PodcastSearchResult } from "@/lib/podcastindex";
 
 interface SearchResultsProps {
-  podcasts: PodcastIndexPodcast[];
+  podcasts: PodcastSearchResult[];
   isLoading: boolean;
   error: string | null;
   query: string;

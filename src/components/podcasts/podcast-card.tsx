@@ -4,13 +4,14 @@ import Image from "next/image";
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import type { PodcastIndexPodcast } from "@/lib/podcastindex";
+import type { PodcastSearchResult } from "@/lib/podcastindex";
 
 interface PodcastCardProps {
-  podcast: PodcastIndexPodcast;
+  podcast: PodcastSearchResult;
 }
 
 export function PodcastCard({ podcast }: PodcastCardProps) {
+  const imageUrl = podcast.artwork || podcast.image;
   const categories = podcast.categories
     ? Object.values(podcast.categories).slice(0, 3)
     : [];
@@ -21,9 +22,9 @@ export function PodcastCard({ podcast }: PodcastCardProps) {
         <CardContent className="p-4">
           <div className="flex gap-4">
             <div className="relative h-24 w-24 shrink-0 overflow-hidden rounded-lg bg-muted">
-              {podcast.artwork || podcast.image ? (
+              {imageUrl ? (
                 <Image
-                  src={podcast.artwork || podcast.image}
+                  src={imageUrl}
                   alt={podcast.title}
                   fill
                   className="object-cover"
@@ -72,7 +73,7 @@ export function PodcastCard({ podcast }: PodcastCardProps) {
                     ))}
                   </div>
                 )}
-                {podcast.episodeCount > 0 && (
+                {podcast.episodeCount != null && podcast.episodeCount > 0 && (
                   <span className="text-xs text-muted-foreground">
                     {podcast.episodeCount} episodes
                   </span>
