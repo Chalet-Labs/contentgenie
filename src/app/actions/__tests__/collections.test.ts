@@ -7,8 +7,12 @@ vi.mock("@clerk/nextjs/server", () => ({
   auth: vi.fn().mockResolvedValue({ userId: "user_1" }),
 }));
 
+// Mock next/cache (required since collections.ts imports revalidatePath)
+vi.mock("next/cache", () => ({
+  revalidatePath: vi.fn(),
+}));
+
 // Mock the database
-const mockSelect = vi.fn();
 const mockFrom = vi.fn();
 const mockLeftJoin = vi.fn();
 const mockWhere = vi.fn();
@@ -61,7 +65,7 @@ describe("getUserCollections", () => {
     expect(result.collections[0].episodeCount).toBe(5);
     expect(result.collections[1].episodeCount).toBe(0);
 
-    // Verify the chain was called
+    // Verify the query chain was called (single query, not N+1)
     expect(db.select).toHaveBeenCalled();
     expect(mockFrom).toHaveBeenCalled();
     expect(mockLeftJoin).toHaveBeenCalled();

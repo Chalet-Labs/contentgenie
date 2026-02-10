@@ -2,7 +2,7 @@
 
 import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
-import { eq, and, desc, count } from "drizzle-orm";
+import { eq, and, desc, count, getTableColumns } from "drizzle-orm";
 import { db } from "@/db";
 import { users, collections, userLibrary } from "@/db/schema";
 
@@ -148,14 +148,8 @@ export async function getUserCollections() {
     // This eliminates the N+1 problem where we previously performed a separate query for each collection.
     const collectionsWithCounts = await db
       .select({
-        id: collections.id,
-        userId: collections.userId,
-        name: collections.name,
-        description: collections.description,
-        isDefault: collections.isDefault,
-        createdAt: collections.createdAt,
-        updatedAt: collections.updatedAt,
-        episodeCount: count(userLibrary.id),
+        ...getTableColumns(collections),
+        episodeCount: count(userLibrary.id).mapWith(Number),
       })
       .from(collections)
       .leftJoin(
