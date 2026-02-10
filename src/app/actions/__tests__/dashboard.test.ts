@@ -9,12 +9,9 @@ vi.mock("@clerk/nextjs/server", () => ({
 }));
 
 // Mock database
-const mockFrom = vi.fn();
-const mockWhere = vi.fn();
-
 vi.mock("@/db", () => ({
   db: {
-    select: vi.fn(),
+    count: vi.fn(),
   },
 }));
 
@@ -33,13 +30,6 @@ vi.mock("drizzle-orm", () => ({
 describe("getDashboardStats", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-
-    // Setup chained mock
-    (db.select as any).mockReturnValue({
-      from: mockFrom.mockReturnValue({
-        where: mockWhere,
-      }),
-    });
   });
 
   it("returns error when not authenticated", async () => {
@@ -55,9 +45,9 @@ describe("getDashboardStats", () => {
   it("returns counts correctly using SQL COUNT()", async () => {
     mockAuth.mockResolvedValue({ userId: "user_123" });
 
-    mockWhere
-      .mockResolvedValueOnce([{ count: 5 }]) // for subscriptions
-      .mockResolvedValueOnce([{ count: 3 }]); // for library
+    (db.count as any)
+      .mockResolvedValueOnce(5) // for subscriptions
+      .mockResolvedValueOnce(3); // for library
 
     const result = await getDashboardStats();
 
@@ -65,15 +55,13 @@ describe("getDashboardStats", () => {
     expect(result.savedCount).toBe(3);
     expect(result.error).toBeNull();
 
-    expect(db.select).toHaveBeenCalledTimes(2);
-    expect(mockFrom).toHaveBeenCalledTimes(2);
-    expect(mockWhere).toHaveBeenCalledTimes(2);
+    expect(db.count).toHaveBeenCalledTimes(2);
   });
 
   it("handles zero counts correctly", async () => {
     mockAuth.mockResolvedValue({ userId: "user_123" });
 
-    mockWhere.mockResolvedValue([]); // for both
+    (db.count as any).mockResolvedValue(0);
 
     const result = await getDashboardStats();
 
