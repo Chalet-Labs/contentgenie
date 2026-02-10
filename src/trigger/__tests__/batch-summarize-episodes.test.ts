@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 // Mock Trigger.dev SDK before imports
 vi.mock("@trigger.dev/sdk", () => ({

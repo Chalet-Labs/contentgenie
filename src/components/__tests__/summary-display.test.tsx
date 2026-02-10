@@ -1,9 +1,16 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { SummaryDisplay } from "@/components/episodes/summary-display";
 
 describe("SummaryDisplay", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+    vi.resetModules();
+  });
+
   it("shows loading state with skeleton fallback", () => {
     render(
       <SummaryDisplay
