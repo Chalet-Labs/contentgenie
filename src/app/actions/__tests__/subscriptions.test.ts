@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 // Mock Clerk auth
 const mockAuth = vi.fn();
@@ -83,6 +83,13 @@ describe("addPodcastByRssUrl", () => {
     mockFindFirstPodcast.mockResolvedValue(null);
     mockFindFirstSubscription.mockResolvedValue(null);
     mockReturning.mockReturnValue([{ id: 1 }]);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+    vi.resetModules();
   });
 
   it("returns error when not authenticated", async () => {

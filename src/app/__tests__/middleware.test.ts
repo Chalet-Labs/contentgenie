@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import type { NextFetchEvent } from "next/server";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -29,6 +29,13 @@ const stubEvent = {} as NextFetchEvent;
 
 describe("middleware", () => {
   beforeEach(() => {
+    vi.resetModules();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
     vi.resetModules();
   });
 

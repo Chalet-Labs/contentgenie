@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 // Mock Trigger.dev SDK before imports
 vi.mock("@trigger.dev/sdk", () => ({
@@ -110,6 +110,13 @@ describe("summarize-episode task", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockFindFirst.mockResolvedValue(null);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+    vi.resetModules();
   });
 
   it("completes the full pipeline successfully", async () => {
