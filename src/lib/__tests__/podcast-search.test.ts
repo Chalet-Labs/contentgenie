@@ -41,7 +41,9 @@ vi.mock("@/db", () => ({
       return {
         from: (...fArgs: unknown[]) => {
           mockFrom(...fArgs);
-          return mockFrom();
+          return {
+            where: () => mockFrom(),
+          };
         },
       };
     },
@@ -49,13 +51,16 @@ vi.mock("@/db", () => ({
 }));
 
 vi.mock("@/db/schema", () => ({
-  podcasts: { id: "id", podcastIndexId: "podcastIndexId", title: "title", publisher: "publisher", description: "description" },
+  podcasts: { id: "id", podcastIndexId: "podcastIndexId", title: "title", publisher: "publisher", description: "description", source: "source" },
+}));
+
+vi.mock("drizzle-orm", () => ({
+  eq: vi.fn(),
 }));
 
 import {
   searchLocalPodcasts,
   invalidateIndex,
-  getOrBuildIndex,
 } from "@/lib/podcast-search";
 
 describe("podcast-search", () => {

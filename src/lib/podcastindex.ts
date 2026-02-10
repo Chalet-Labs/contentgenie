@@ -68,6 +68,7 @@ export interface PodcastIndexEpisode {
   feedItunesId: number | null;
   feedImage: string;
   feedId: number;
+  feedTitle?: string;
   feedLanguage: string;
   feedDead: number;
   feedDuplicateOf: number | null;

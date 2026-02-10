@@ -61,7 +61,7 @@ export async function GET(request: NextRequest) {
           feedMap.set(feedId, {
             feedId: episode.feedId,
             feedImage: episode.feedImage,
-            title: episode.title,
+            title: episode.feedTitle ?? episode.title,
           });
         }
       }
@@ -79,10 +79,12 @@ export async function GET(request: NextRequest) {
     // Layer 2: local fuzzy index results (supplementary)
     if (localResult.status === "fulfilled") {
       for (const local of localResult.value) {
+        const numericId = Number(local.podcastIndexId);
+        if (!Number.isFinite(numericId)) continue;
         if (!seenIds.has(local.podcastIndexId)) {
           seenIds.add(local.podcastIndexId);
           merged.push({
-            id: Number(local.podcastIndexId),
+            id: numericId,
             title: local.title,
             author: local.publisher ?? "",
           } as PodcastIndexPodcast);
@@ -90,9 +92,11 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    const capped = merged.slice(0, maxResults);
+
     return NextResponse.json({
-      podcasts: merged,
-      count: merged.length,
+      podcasts: capped,
+      count: capped.length,
       query,
     });
   } catch (error) {

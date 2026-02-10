@@ -77,7 +77,7 @@ describe("GET /api/podcasts/search", () => {
     vi.mocked(searchByPerson).mockResolvedValue({
       status: "true",
       items: [
-        { feedId: 3, title: "Person Episode", feedImage: "img.jpg" } as never,
+        { feedId: 3, title: "Person Episode", feedTitle: "Person Pod", feedImage: "img.jpg" } as never,
       ],
       count: 1,
       query: "test",
@@ -105,8 +105,8 @@ describe("GET /api/podcasts/search", () => {
     // byterm results come first
     expect(data.podcasts[0].title).toBe("Test Pod");
     expect(data.podcasts[1].title).toBe("Another Pod");
-    // byperson results next
-    expect(data.podcasts[2].title).toBe("Person Episode");
+    // byperson results next (feedTitle preferred over episode title)
+    expect(data.podcasts[2].title).toBe("Person Pod");
     // local results last
     expect(data.podcasts[3].title).toBe("Local Match");
   });
