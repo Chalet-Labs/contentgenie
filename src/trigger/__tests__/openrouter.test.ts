@@ -1,8 +1,4 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { generateEpisodeSummary } from "../helpers/openrouter";
-import { generateCompletion, parseJsonResponse } from "@/lib/openrouter";
-import { SYSTEM_PROMPT, getSummarizationPrompt } from "@/lib/prompts";
-import type { PodcastIndexPodcast, PodcastIndexEpisode } from "@/lib/podcastindex";
 
 vi.mock("@/lib/openrouter", () => ({
   generateCompletion: vi.fn(),
@@ -14,21 +10,26 @@ vi.mock("@/lib/prompts", () => ({
   getSummarizationPrompt: vi.fn().mockReturnValue("Mock Summarization Prompt"),
 }));
 
+import { generateEpisodeSummary } from "../helpers/openrouter";
+import { generateCompletion, parseJsonResponse } from "@/lib/openrouter";
+import { SYSTEM_PROMPT, getSummarizationPrompt } from "@/lib/prompts";
+import type { PodcastIndexPodcast, PodcastIndexEpisode } from "@/lib/podcastindex";
+
 describe("generateEpisodeSummary", () => {
-  const mockPodcast: PodcastIndexPodcast = {
+  const mockPodcast = {
     id: 1,
     title: "Test Podcast",
     url: "https://example.com/rss",
     image: "https://example.com/image.jpg",
-  } as any;
+  } as unknown as PodcastIndexPodcast;
 
-  const mockEpisode: PodcastIndexEpisode = {
+  const mockEpisode = {
     id: 101,
     title: "Test Episode",
     description: "Test Description",
     duration: 3600,
     enclosureUrl: "https://example.com/audio.mp3",
-  } as any;
+  } as unknown as PodcastIndexEpisode;
 
   const mockTranscript = "Test transcript content";
 
@@ -85,10 +86,10 @@ describe("generateEpisodeSummary", () => {
   });
 
   it("handles undefined podcast and missing episode fields", async () => {
-    const minimalEpisode: PodcastIndexEpisode = {
+    const minimalEpisode = {
       id: 102,
       title: "Minimal Episode",
-    } as any;
+    } as unknown as PodcastIndexEpisode;
 
     const mockRawResponse = '{"summary":"Min summary","keyTakeaways":[],"worthItScore":5,"worthItReason":"OK"}';
     vi.mocked(generateCompletion).mockResolvedValue(mockRawResponse);
