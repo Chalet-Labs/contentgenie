@@ -1,7 +1,7 @@
 "use server";
 
 import { auth } from "@clerk/nextjs/server";
-import { eq, desc, count } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 import { db } from "@/db";
 import { userSubscriptions, userLibrary } from "@/db/schema";
 import {
@@ -151,8 +151,8 @@ export async function getDashboardStats() {
 
   try {
     const [subscriptionCount, savedCount] = await Promise.all([
-      db.count(userSubscriptions, eq(userSubscriptions.userId, userId)),
-      db.count(userLibrary, eq(userLibrary.userId, userId)),
+      db.$count(userSubscriptions, eq(userSubscriptions.userId, userId)),
+      db.$count(userLibrary, eq(userLibrary.userId, userId)),
     ]);
 
     return {
