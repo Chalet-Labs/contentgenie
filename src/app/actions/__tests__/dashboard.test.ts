@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { getDashboardStats } from "../dashboard";
 import { db } from "@/db";
 
@@ -29,6 +29,10 @@ vi.mock("drizzle-orm", () => ({
 describe("getDashboardStats", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
   it("returns error when not authenticated", async () => {
