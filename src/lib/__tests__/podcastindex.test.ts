@@ -200,4 +200,73 @@ describe("PodcastIndex API functions", () => {
 
     dateSpy.mockRestore();
   });
+
+  it("searchPodcasts passes similar param when enabled", async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          status: "true",
+          feeds: [],
+          count: 0,
+          query: "test",
+          description: "Found 0 feeds",
+        }),
+    });
+    vi.stubGlobal("fetch", mockFetch);
+
+    const { searchPodcasts } = await import("@/lib/podcastindex");
+    await searchPodcasts("test", 10, { similar: true });
+
+    const url = new URL(mockFetch.mock.calls[0][0]);
+    expect(url.searchParams.get("similar")).toBe("true");
+    expect(url.searchParams.get("q")).toBe("test");
+    expect(url.searchParams.get("max")).toBe("10");
+  });
+
+  it("searchPodcasts omits similar param when not specified", async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          status: "true",
+          feeds: [],
+          count: 0,
+          query: "test",
+          description: "Found 0 feeds",
+        }),
+    });
+    vi.stubGlobal("fetch", mockFetch);
+
+    const { searchPodcasts } = await import("@/lib/podcastindex");
+    await searchPodcasts("test", 10);
+
+    const url = new URL(mockFetch.mock.calls[0][0]);
+    expect(url.searchParams.has("similar")).toBe(false);
+  });
+
+  it("searchByPerson calls correct endpoint with params", async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          status: "true",
+          items: [{ id: 1, title: "Episode by Person" }],
+          count: 1,
+          query: "lex fridman",
+          description: "Found 1 items",
+        }),
+    });
+    vi.stubGlobal("fetch", mockFetch);
+
+    const { searchByPerson } = await import("@/lib/podcastindex");
+    const result = await searchByPerson("lex fridman", 5);
+
+    expect(mockFetch).toHaveBeenCalledOnce();
+    const url = new URL(mockFetch.mock.calls[0][0]);
+    expect(url.pathname).toBe("/api/1.0/search/byperson");
+    expect(url.searchParams.get("q")).toBe("lex fridman");
+    expect(url.searchParams.get("max")).toBe("5");
+    expect(result.items).toHaveLength(1);
+  });
 });
