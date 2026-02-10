@@ -7,7 +7,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Fixed
-- Optimized dashboard stats retrieval by using SQL `COUNT(*)` aggregation instead of in-memory counting, significantly reducing memory and network overhead
 - Authenticated users are now redirected from landing page to dashboard after login (#50)
 - Episode detail page now returns 404 instead of 500 for invalid/missing PodcastIndex episode IDs (#52)
 - Preview deployments no longer get 500 errors from schema drift — `drizzle-kit push` now runs in the Vercel build targeting the correct Neon branch
@@ -19,6 +18,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - GitHub Actions Neon branch workflow (`.github/workflows/neon-branch.yml`) — replaced by `vercel-build` script to eliminate dual Neon branch problem
 
 ### Changed
+- Optimized dashboard stats retrieval by using SQL `COUNT(*)` aggregation instead of in-memory counting, significantly reducing memory and network overhead (#71)
 - PodcastIndex API authentication headers are now stabilized to 30-second windows, enabling Next.js `fetch` caching and reducing redundant network requests
 - Rate limiting upgraded from in-memory to distributed (Postgres-backed) for serverless compatibility
 - CI workflow simplified to quality checks only (lint, test, Storybook); Vercel handles builds and deploys

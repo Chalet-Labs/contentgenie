@@ -33,6 +33,9 @@ describe("getDashboardStats", () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+    vi.resetModules();
   });
 
   it("returns error when not authenticated", async () => {

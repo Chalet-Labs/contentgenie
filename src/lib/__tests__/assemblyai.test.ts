@@ -11,8 +11,10 @@ describe("submitTranscription", () => {
   });
 
   afterEach(() => {
-    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
     vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+    vi.resetModules();
   });
 
   it("throws when API key is missing", async () => {
@@ -83,8 +85,10 @@ describe("getTranscriptionStatus", () => {
   });
 
   afterEach(() => {
-    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
     vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+    vi.resetModules();
   });
 
   it("returns result for completed transcript", async () => {
@@ -178,8 +182,10 @@ describe("transcribeAudio", () => {
   });
 
   afterEach(() => {
-    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
     vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+    vi.resetModules();
     vi.useRealTimers();
   });
 

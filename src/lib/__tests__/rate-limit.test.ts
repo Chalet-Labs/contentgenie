@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 const mockConsume = vi.fn();
 
@@ -22,6 +22,13 @@ describe("checkRateLimit", () => {
     vi.resetModules();
     vi.stubEnv("DATABASE_URL", "postgres://test:test@localhost/test");
     mockConsume.mockReset();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+    vi.resetModules();
   });
 
   it("returns allowed: true when consume succeeds", async () => {

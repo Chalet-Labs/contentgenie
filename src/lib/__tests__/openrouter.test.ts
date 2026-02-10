@@ -45,8 +45,10 @@ describe("generateCompletion", () => {
   });
 
   afterEach(() => {
-    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
     vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+    vi.resetModules();
   });
 
   it("throws when API key is missing", async () => {

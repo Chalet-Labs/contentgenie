@@ -41,6 +41,13 @@ describe("batch-summarize-episodes task", () => {
     mockBatchTriggerAndWait.mockResolvedValue({ id: "batch_default", runs: [] });
   });
 
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+    vi.resetModules();
+  });
+
   it("returns early when episodeIds is empty (all pre-filtered by API)", async () => {
     const result = await taskConfig.run({
       episodeIds: [],

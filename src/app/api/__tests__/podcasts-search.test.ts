@@ -33,8 +33,10 @@ function mockAllLayersEmpty() {
 
 describe("GET /api/podcasts/search", () => {
   afterEach(() => {
-    vi.clearAllMocks();
+    vi.restoreAllMocks();
     vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+    vi.resetModules();
   });
 
   it("returns 400 when query is missing", async () => {
