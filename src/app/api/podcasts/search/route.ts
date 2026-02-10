@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   searchPodcasts,
   searchByPerson,
-  type PodcastIndexPodcast,
+  type PodcastSearchResult,
 } from "@/lib/podcastindex";
 import { searchLocalPodcasts } from "@/lib/podcast-search";
 
@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
         searchLocalPodcasts(query),
       ]);
 
-    const merged: PodcastIndexPodcast[] = [];
+    const merged: PodcastSearchResult[] = [];
     const seenIds = new Set<string>();
 
     // Layer 1a: byterm results (primary)
@@ -72,7 +72,7 @@ export async function GET(request: NextRequest) {
           title: info.title,
           image: info.feedImage,
           artwork: info.feedImage,
-        } as PodcastIndexPodcast);
+        });
       });
     }
 
@@ -87,7 +87,7 @@ export async function GET(request: NextRequest) {
             id: numericId,
             title: local.title,
             author: local.publisher ?? "",
-          } as PodcastIndexPodcast);
+          });
         }
       }
     }

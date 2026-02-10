@@ -47,6 +47,26 @@ export interface PodcastIndexPodcast {
   newestItemPubdate: number;
 }
 
+/**
+ * Lightweight DTO for podcast search results. Covers the union of fields
+ * populated by byterm (full), byperson (partial), and local fuzzy (partial)
+ * search layers — only the fields the search UI actually reads.
+ *
+ * PodcastIndexPodcast is structurally assignable to this type, so full
+ * API results can be used without conversion.
+ */
+export interface PodcastSearchResult {
+  id: number;
+  title: string;
+  author?: string;
+  ownerName?: string;
+  image?: string;
+  artwork?: string;
+  description?: string;
+  categories?: Record<string, string>;
+  episodeCount?: number;
+}
+
 export interface PodcastIndexEpisode {
   id: number | string;
   title: string;

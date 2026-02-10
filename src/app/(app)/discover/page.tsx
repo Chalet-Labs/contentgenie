@@ -6,12 +6,12 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { SearchResults } from "@/components/podcasts/search-results";
 import { RssFeedForm } from "@/components/podcasts/rss-feed-form";
-import type { PodcastIndexPodcast } from "@/lib/podcastindex";
+import type { PodcastSearchResult } from "@/lib/podcastindex";
 
 export default function DiscoverPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [submittedQuery, setSubmittedQuery] = useState("");
-  const [podcasts, setPodcasts] = useState<PodcastIndexPodcast[]>([]);
+  const [podcasts, setPodcasts] = useState<PodcastSearchResult[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
