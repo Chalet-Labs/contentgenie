@@ -1,4 +1,5 @@
 import MiniSearch from "minisearch";
+import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { podcasts } from "@/db/schema";
 
@@ -68,7 +69,8 @@ async function fetchPodcastsFromDB(): Promise<IndexedPodcast[]> {
       publisher: podcasts.publisher,
       description: podcasts.description,
     })
-    .from(podcasts);
+    .from(podcasts)
+    .where(eq(podcasts.source, "podcastindex"));
 
   return rows.map((row) => ({
     id: row.id,
