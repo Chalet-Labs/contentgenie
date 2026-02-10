@@ -150,20 +150,14 @@ export async function getDashboardStats() {
   }
 
   try {
-    const [subscriptionResult, libraryResult] = await Promise.all([
-      db
-        .select({ count: count() })
-        .from(userSubscriptions)
-        .where(eq(userSubscriptions.userId, userId)),
-      db
-        .select({ count: count() })
-        .from(userLibrary)
-        .where(eq(userLibrary.userId, userId)),
+    const [subscriptionCount, savedCount] = await Promise.all([
+      db.count(userSubscriptions, eq(userSubscriptions.userId, userId)),
+      db.count(userLibrary, eq(userLibrary.userId, userId)),
     ]);
 
     return {
-      subscriptionCount: Number(subscriptionResult[0]?.count ?? 0),
-      savedCount: Number(libraryResult[0]?.count ?? 0),
+      subscriptionCount,
+      savedCount,
       error: null,
     };
   } catch (error) {
