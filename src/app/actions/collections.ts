@@ -2,7 +2,7 @@
 
 import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, count } from "drizzle-orm";
 import { db } from "@/db";
 import { users, collections, userLibrary } from "@/db/schema";
 
@@ -144,26 +144,24 @@ export async function getUserCollections() {
   }
 
   try {
-    const userCollections = await db.query.collections.findMany({
-      where: eq(collections.userId, userId),
-      orderBy: [desc(collections.createdAt)],
-    });
-
-    // Get episode counts for each collection
-    const collectionsWithCounts = await Promise.all(
-      userCollections.map(async (collection) => {
-        const items = await db.query.userLibrary.findMany({
-          where: and(
-            eq(userLibrary.userId, userId),
-            eq(userLibrary.collectionId, collection.id)
-          ),
-        });
-        return {
-          ...collection,
-          episodeCount: items.length,
-        };
+    // Optimized query to fetch all collections and their episode counts in a single query
+    // This eliminates the N+1 problem where we previously performed a separate query for each collection.
+    const collectionsWithCounts = await db
+      .select({
+        id: collections.id,
+        userId: collections.userId,
+        name: collections.name,
+        description: collections.description,
+        isDefault: collections.isDefault,
+        createdAt: collections.createdAt,
+        updatedAt: collections.updatedAt,
+        episodeCount: count(userLibrary.id),
       })
-    );
+      .from(collections)
+      .leftJoin(userLibrary, eq(collections.id, userLibrary.collectionId))
+      .where(eq(collections.userId, userId))
+      .groupBy(collections.id)
+      .orderBy(desc(collections.createdAt));
 
     return { collections: collectionsWithCounts, error: null };
   } catch (error) {
