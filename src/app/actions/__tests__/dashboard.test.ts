@@ -27,7 +27,7 @@ vi.mock("@/db/schema", () => ({
 // Mock drizzle-orm
 vi.mock("drizzle-orm", () => ({
   eq: vi.fn(),
-  sql: vi.fn(),
+  count: vi.fn(),
 }));
 
 describe("getDashboardStats", () => {

@@ -1,7 +1,7 @@
 "use server";
 
 import { auth } from "@clerk/nextjs/server";
-import { eq, desc, sql } from "drizzle-orm";
+import { eq, desc, count } from "drizzle-orm";
 import { db } from "@/db";
 import { userSubscriptions, userLibrary } from "@/db/schema";
 import {
@@ -152,11 +152,11 @@ export async function getDashboardStats() {
   try {
     const [subscriptionResult, libraryResult] = await Promise.all([
       db
-        .select({ count: sql<number>`count(*)` })
+        .select({ count: count() })
         .from(userSubscriptions)
         .where(eq(userSubscriptions.userId, userId)),
       db
-        .select({ count: sql<number>`count(*)` })
+        .select({ count: count() })
         .from(userLibrary)
         .where(eq(userLibrary.userId, userId)),
     ]);
