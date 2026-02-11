@@ -120,14 +120,14 @@ export async function getRecommendedPodcasts(limit: number = 6) {
       },
     });
 
-    const subscribedIds = subscriptions.map((s) => s.podcast.podcastIndexId);
+    const subscribedIds = new Set(subscriptions.map((s) => s.podcast.podcastIndexId));
 
     // Fetch trending podcasts from PodcastIndex
-    const trending = await getTrendingPodcasts(limit + subscribedIds.length);
+    const trending = await getTrendingPodcasts(limit + subscribedIds.size);
 
     // Filter out already subscribed podcasts
     const recommendations = trending.feeds
-      .filter((podcast) => !subscribedIds.includes(podcast.id.toString()))
+      .filter((podcast) => !subscribedIds.has(podcast.id.toString()))
       .slice(0, limit);
 
     return { podcasts: recommendations, error: null };
