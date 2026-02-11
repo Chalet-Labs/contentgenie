@@ -10,6 +10,7 @@ import {
   generatePodcastSyntheticId,
   generateEpisodeSyntheticId,
 } from "@/lib/rss";
+import { isSafeUrl } from "@/lib/security";
 
 const MAX_EPISODES_PER_IMPORT = 50;
 
@@ -20,15 +21,6 @@ interface AddByRssResult {
   podcastIndexId?: string;
   title?: string;
   episodeCount?: number;
-}
-
-function isValidUrl(urlString: string): boolean {
-  try {
-    const url = new URL(urlString);
-    return url.protocol === "http:" || url.protocol === "https:";
-  } catch {
-    return false;
-  }
 }
 
 // Add a podcast by RSS feed URL
@@ -42,10 +34,10 @@ export async function addPodcastByRssUrl(
   }
 
   const trimmedUrl = feedUrl.trim();
-  if (!trimmedUrl || !isValidUrl(trimmedUrl)) {
+  if (!trimmedUrl || !(await isSafeUrl(trimmedUrl))) {
     return {
       success: false,
-      error: "Please enter a valid RSS feed URL",
+      error: "Please enter a valid and safe RSS feed URL",
     };
   }
 
