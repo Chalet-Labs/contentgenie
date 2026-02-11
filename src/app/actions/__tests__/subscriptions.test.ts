@@ -76,6 +76,12 @@ vi.mock("drizzle-orm", () => ({
   desc: vi.fn(),
 }));
 
+// Mock SSRF security utility
+const mockIsSafeUrl = vi.fn().mockResolvedValue(true);
+vi.mock("@/lib/security", () => ({
+  isSafeUrl: (url: string) => mockIsSafeUrl(url),
+}));
+
 describe("addPodcastByRssUrl", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -105,33 +111,36 @@ describe("addPodcastByRssUrl", () => {
   });
 
   it("returns error for invalid URL", async () => {
+    mockIsSafeUrl.mockResolvedValueOnce(false);
     const { addPodcastByRssUrl } = await import(
       "@/app/actions/subscriptions"
     );
     const result = await addPodcastByRssUrl("not-a-url");
 
     expect(result.success).toBe(false);
-    expect(result.error).toMatch(/valid RSS feed URL/i);
+    expect(result.error).toMatch(/valid and safe RSS feed URL/i);
   });
 
   it("returns error for empty URL", async () => {
+    mockIsSafeUrl.mockResolvedValueOnce(false);
     const { addPodcastByRssUrl } = await import(
       "@/app/actions/subscriptions"
     );
     const result = await addPodcastByRssUrl("");
 
     expect(result.success).toBe(false);
-    expect(result.error).toMatch(/valid RSS feed URL/i);
+    expect(result.error).toMatch(/valid and safe RSS feed URL/i);
   });
 
   it("returns error for non-http URL", async () => {
+    mockIsSafeUrl.mockResolvedValueOnce(false);
     const { addPodcastByRssUrl } = await import(
       "@/app/actions/subscriptions"
     );
     const result = await addPodcastByRssUrl("ftp://example.com/feed.xml");
 
     expect(result.success).toBe(false);
-    expect(result.error).toMatch(/valid RSS feed URL/i);
+    expect(result.error).toMatch(/valid and safe RSS feed URL/i);
   });
 
   it("returns already subscribed for existing podcast + subscription", async () => {
