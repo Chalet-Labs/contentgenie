@@ -2,7 +2,7 @@
 
 import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
-import { eq, and, desc, asc, isNotNull } from "drizzle-orm";
+import { eq, and, desc, asc, isNotNull, avg, count } from "drizzle-orm";
 import { db } from "@/db";
 import { users, podcasts, episodes, userLibrary, bookmarks } from "@/db/schema";
 
@@ -466,32 +466,35 @@ export async function getEpisodeAverageRating(episodePodcastIndexId: string) {
   try {
     const episode = await db.query.episodes.findFirst({
       where: eq(episodes.podcastIndexId, episodePodcastIndexId),
+      columns: { id: true },
     });
 
     if (!episode) {
       return { averageRating: null, ratingCount: 0, error: null };
     }
 
-    const validRatings = await db.query.userLibrary.findMany({
-      where: and(
-        eq(userLibrary.episodeId, episode.id),
-        isNotNull(userLibrary.rating) // Only include entries that have a rating
-      ),
-      columns: {
-        rating: true,
-      },
-    });
+    // Optimized: Calculate average and count in the database instead of in-memory.
+    // This avoids fetching all library entries for an episode, significantly reducing
+    // memory and network overhead as the number of users/ratings grows.
+    const [stats] = await db
+      .select({
+        avgRating: avg(userLibrary.rating),
+        totalCount: count(userLibrary.id),
+      })
+      .from(userLibrary)
+      .where(
+        and(
+          eq(userLibrary.episodeId, episode.id),
+          isNotNull(userLibrary.rating)
+        )
+      );
 
-    if (validRatings.length === 0) {
-      return { averageRating: null, ratingCount: 0, error: null };
-    }
-
-    const sum = validRatings.reduce((acc, r) => acc + (r.rating || 0), 0);
-    const average = sum / validRatings.length;
+    const ratingCount = Number(stats?.totalCount || 0);
+    const averageRating = stats?.avgRating ? Math.round(Number(stats.avgRating) * 10) / 10 : null;
 
     return {
-      averageRating: Math.round(average * 10) / 10, // Round to 1 decimal
-      ratingCount: validRatings.length,
+      averageRating,
+      ratingCount,
       error: null,
     };
   } catch (error) {
