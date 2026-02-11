@@ -25,6 +25,7 @@ interface CustomItem {
 }
 
 const parser = new Parser<Record<string, never>, CustomItem>({
+  maxRedirects: 0,
   customFields: {
     item: ["itunes:duration"],
   },

@@ -64,10 +64,20 @@ export function isPrivateIP(ip: string): boolean {
 
     // IPv4-mapped IPv6 ::ffff:0:0/96
     if (normalizedIp.startsWith("::ffff:")) {
-      const parts = normalizedIp.split(":");
-      const lastPart = parts[parts.length - 1];
-      if (net.isIPv4(lastPart)) {
-        return isPrivateIP(lastPart);
+      const ipv4Part = normalizedIp.substring("::ffff:".length);
+      if (net.isIPv4(ipv4Part)) {
+        // Dot-decimal form: ::ffff:127.0.0.1
+        return isPrivateIP(ipv4Part);
+      }
+      // Hex notation form: ::ffff:7f00:1 (same as 127.0.0.1)
+      const hexParts = ipv4Part.split(":");
+      if (hexParts.length === 2) {
+        const high = parseInt(hexParts[0], 16);
+        const low = parseInt(hexParts[1], 16);
+        if (!isNaN(high) && !isNaN(low)) {
+          const reconstructedIPv4 = `${(high >> 8) & 0xff}.${high & 0xff}.${(low >> 8) & 0xff}.${low & 0xff}`;
+          return isPrivateIP(reconstructedIPv4);
+        }
       }
     }
 
@@ -75,13 +85,17 @@ export function isPrivateIP(ip: string): boolean {
     if (normalizedIp === "::" || normalizedIp === "0:0:0:0:0:0:0:0") return true;
 
     // Discard prefix 100::/64
-    if (normalizedIp.startsWith("0100:")) return true;
+    if (normalizedIp.startsWith("100:") || normalizedIp.startsWith("0100:")) return true;
 
     // Documentation prefix 2001:db8::/32
     if (normalizedIp.startsWith("2001:db8")) return true;
 
-    // Teredo prefix 2001::/32
-    if (normalizedIp.startsWith("2001:0000")) return true;
+    // Teredo prefix 2001::/32 (match both compressed and expanded forms)
+    if (
+      normalizedIp.startsWith("2001:0:") ||
+      normalizedIp.startsWith("2001::") ||
+      normalizedIp.startsWith("2001:0000")
+    ) return true;
   }
 
   return false;
@@ -99,9 +113,11 @@ export async function isSafeUrl(urlString: string): Promise<boolean> {
       return false;
     }
 
-    // Restrict to standard web ports to prevent internal port scanning
-    // Standard ports are empty (defaults to 80/443), or explicitly 80/443
-    if (url.port !== "" && url.port !== "80" && url.port !== "443") {
+    // Restrict to standard web ports per protocol to prevent internal port scanning
+    const isStandardPort =
+      (url.protocol === "http:" && (url.port === "" || url.port === "80")) ||
+      (url.protocol === "https:" && (url.port === "" || url.port === "443"));
+    if (!isStandardPort) {
       return false;
     }
 
@@ -127,11 +143,16 @@ export async function isSafeUrl(urlString: string): Promise<boolean> {
       return false;
     }
 
-    // Resolve hostname to IP and check if it's private
+    // Resolve hostname to all IPs and reject if any is private
     try {
-      // We use dns.lookup which follows system configuration (e.g., /etc/hosts)
-      const { address } = await lookup(cleanHostname);
-      return !isPrivateIP(address);
+      const addresses = await lookup(cleanHostname, { all: true });
+      const results = Array.isArray(addresses) ? addresses : [addresses];
+      for (const { address } of results) {
+        if (isPrivateIP(address)) {
+          return false;
+        }
+      }
+      return results.length > 0;
     } catch {
       // If resolution fails, we cannot verify the safety, so we block it
       return false;
