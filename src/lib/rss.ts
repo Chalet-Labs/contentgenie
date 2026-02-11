@@ -25,11 +25,14 @@ interface CustomItem {
 }
 
 const parser = new Parser<Record<string, never>, CustomItem>({
-  maxRedirects: 0,
   customFields: {
     item: ["itunes:duration"],
   },
 });
+// Post-construction patch: rss-parser's constructor uses `if (!options.maxRedirects)`
+// which treats 0 as falsy and overwrites it with the default (5). Setting it after
+// construction bypasses that check and truly disables redirect following.
+(parser as unknown as { options: { maxRedirects: number } }).options.maxRedirects = 0;
 
 /**
  * Parse an iTunes-style duration string or numeric seconds into an integer

@@ -12,6 +12,7 @@ const { mockParseURL } = vi.hoisted(() => ({
 }));
 vi.mock("rss-parser", () => ({
   default: class MockParser {
+    options: Record<string, unknown> = {};
     parseURL = mockParseURL;
   },
 }));
