@@ -8,6 +8,19 @@ vi.mock("node:dns", () => ({
   },
 }));
 
+// Default DNS mock resolving to a public IP — override in specific tests
+function mockDnsPublic() {
+  // @ts-ignore
+  dns.lookup.mockImplementation(
+    (hostname: string, opts: unknown, cb?: unknown) => {
+      // Handle both (hostname, cb) and (hostname, opts, cb) signatures
+      const callback = typeof opts === "function" ? opts : cb;
+      // Return array format for { all: true }
+      (callback as Function)(null, [{ address: "93.184.216.34", family: 4 }]);
+    },
+  );
+}
+
 describe("isPrivateIP", () => {
   it("identifies private IPv4 addresses", () => {
     expect(isPrivateIP("127.0.0.1")).toBe(true);
@@ -32,6 +45,33 @@ describe("isPrivateIP", () => {
     expect(isPrivateIP("::ffff:127.0.0.1")).toBe(true);
   });
 
+  it("identifies IPv4-mapped IPv6 in hex notation as private", () => {
+    // ::ffff:7f00:1 is the hex form of ::ffff:127.0.0.1
+    expect(isPrivateIP("::ffff:7f00:1")).toBe(true);
+    // ::ffff:c0a8:1 is the hex form of ::ffff:192.168.0.1
+    expect(isPrivateIP("::ffff:c0a8:1")).toBe(true);
+    // ::ffff:a9fe:a9fe is the hex form of ::ffff:169.254.169.254
+    expect(isPrivateIP("::ffff:a9fe:a9fe")).toBe(true);
+    // ::ffff:a00:1 is the hex form of ::ffff:10.0.0.1
+    expect(isPrivateIP("::ffff:a00:1")).toBe(true);
+  });
+
+  it("identifies IPv4-mapped IPv6 in hex notation as public", () => {
+    // ::ffff:0808:0808 is the hex form of ::ffff:8.8.8.8
+    expect(isPrivateIP("::ffff:808:808")).toBe(false);
+  });
+
+  it("identifies Teredo addresses in compressed forms", () => {
+    expect(isPrivateIP("2001:0000::1")).toBe(true);
+    expect(isPrivateIP("2001:0:a:b::1")).toBe(true);
+    expect(isPrivateIP("2001::1")).toBe(true);
+  });
+
+  it("identifies discard prefix addresses", () => {
+    expect(isPrivateIP("100::1")).toBe(true);
+    expect(isPrivateIP("0100::1")).toBe(true);
+  });
+
   it("identifies public IPv6 addresses", () => {
     expect(isPrivateIP("2001:4860:4860::8888")).toBe(false);
   });
@@ -40,11 +80,10 @@ describe("isPrivateIP", () => {
 describe("isSafeUrl", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockDnsPublic();
   });
 
   it("allows safe public URLs", async () => {
-    // @ts-ignore
-    dns.lookup.mockImplementation((hostname, cb) => cb(null, { address: "8.8.8.8" }));
     expect(await isSafeUrl("https://google.com/feed.xml")).toBe(true);
   });
 
@@ -61,6 +100,12 @@ describe("isSafeUrl", () => {
     expect(await isSafeUrl("http://example.com:80/feed.xml")).toBe(true);
   });
 
+  it("blocks cross-protocol port usage", async () => {
+    // https on port 80 and http on port 443 should be blocked
+    expect(await isSafeUrl("https://example.com:80/feed.xml")).toBe(false);
+    expect(await isSafeUrl("http://example.com:443/feed.xml")).toBe(false);
+  });
+
   it("blocks local hostnames", async () => {
     expect(await isSafeUrl("http://localhost/feed.xml")).toBe(false);
     expect(await isSafeUrl("http://my.server.local/")).toBe(false);
@@ -74,13 +119,37 @@ describe("isSafeUrl", () => {
 
   it("blocks hostnames resolving to private IPs", async () => {
     // @ts-ignore
-    dns.lookup.mockImplementation((hostname, cb) => cb(null, { address: "127.0.0.1" }));
+    dns.lookup.mockImplementation(
+      (hostname: string, opts: unknown, cb?: unknown) => {
+        const callback = typeof opts === "function" ? opts : cb;
+        (callback as Function)(null, [{ address: "127.0.0.1", family: 4 }]);
+      },
+    );
     expect(await isSafeUrl("https://malicious.com/feed.xml")).toBe(false);
+  });
+
+  it("blocks when any resolved IP is private", async () => {
+    // @ts-ignore
+    dns.lookup.mockImplementation(
+      (hostname: string, opts: unknown, cb?: unknown) => {
+        const callback = typeof opts === "function" ? opts : cb;
+        (callback as Function)(null, [
+          { address: "93.184.216.34", family: 4 },
+          { address: "10.0.0.1", family: 4 },
+        ]);
+      },
+    );
+    expect(await isSafeUrl("https://dual-record.com/feed.xml")).toBe(false);
   });
 
   it("blocks when DNS resolution fails", async () => {
     // @ts-ignore
-    dns.lookup.mockImplementation((hostname, cb) => cb(new Error("ENOTFOUND")));
+    dns.lookup.mockImplementation(
+      (hostname: string, opts: unknown, cb?: unknown) => {
+        const callback = typeof opts === "function" ? opts : cb;
+        (callback as Function)(new Error("ENOTFOUND"));
+      },
+    );
     expect(await isSafeUrl("https://nonexistent.example.com/feed.xml")).toBe(false);
   });
 });

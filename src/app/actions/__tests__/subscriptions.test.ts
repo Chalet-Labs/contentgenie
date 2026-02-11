@@ -85,6 +85,9 @@ vi.mock("@/lib/security", () => ({
 describe("addPodcastByRssUrl", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // mockResolvedValueOnce queue isn't cleared by clearAllMocks — reset explicitly
+    mockIsSafeUrl.mockReset();
+    mockIsSafeUrl.mockResolvedValue(true);
     mockAuth.mockResolvedValue({ userId: "user_123" });
     mockFindFirstPodcast.mockResolvedValue(null);
     mockFindFirstSubscription.mockResolvedValue(null);
