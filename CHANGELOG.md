@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Fixed
+- Discover page search query now persists in URL (`?q=`) — back navigation, bookmarks, and shared links restore search state (#85)
 - SSRF vulnerability in podcast RSS subscription — validates URLs before fetching (#77)
 - Authenticated users are now redirected from landing page to dashboard after login (#50)
 - Episode detail page now returns 404 instead of 500 for invalid/missing PodcastIndex episode IDs (#52)
