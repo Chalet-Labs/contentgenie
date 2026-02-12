@@ -109,7 +109,7 @@ describe("DiscoverContent", () => {
     render(<DiscoverContent />);
 
     await waitFor(() => {
-      expect(mockFetch).toHaveBeenCalled();
+      expect(screen.getByText("Service unavailable")).toBeInTheDocument();
     });
   });
 
