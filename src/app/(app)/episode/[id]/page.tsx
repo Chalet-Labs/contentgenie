@@ -17,6 +17,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { stripHtml } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   SummaryDisplay,
@@ -86,10 +87,6 @@ function formatPublishDate(timestamp: number): string {
     month: "short",
     day: "numeric",
   });
-}
-
-function stripHtml(html: string): string {
-  return html.replace(/<[^>]*>/g, "").trim();
 }
 
 export default function EpisodePage({ params }: EpisodePageProps) {
