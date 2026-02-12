@@ -54,12 +54,7 @@ export function DiscoverContent() {
 
   useEffect(() => {
     setSearchQuery(urlQuery);
-    if (urlQuery) {
-      handleSearch(urlQuery);
-    } else {
-      setPodcasts([]);
-      setError(null);
-    }
+    handleSearch(urlQuery);
   }, [urlQuery, handleSearch]);
 
   const handleSubmit = (e: React.FormEvent) => {
