@@ -1,5 +1,6 @@
 import { createHash } from "crypto";
 import Parser from "rss-parser";
+import { safeFetch } from "@/lib/security";
 
 export interface ParsedEpisode {
   title: string;
@@ -29,10 +30,6 @@ const parser = new Parser<Record<string, never>, CustomItem>({
     item: ["itunes:duration"],
   },
 });
-// Post-construction patch: rss-parser's constructor uses `if (!options.maxRedirects)`
-// which treats 0 as falsy and overwrites it with the default (5). Setting it after
-// construction bypasses that check and truly disables redirect following.
-(parser as unknown as { options: { maxRedirects: number } }).options.maxRedirects = 0;
 
 /**
  * Parse an iTunes-style duration string or numeric seconds into an integer
@@ -99,7 +96,8 @@ export async function parsePodcastFeed(feedUrl: string): Promise<ParsedFeed> {
   let feed: Parser.Output<CustomItem>;
 
   try {
-    feed = await parser.parseURL(feedUrl);
+    const xmlContent = await safeFetch(feedUrl);
+    feed = await parser.parseString(xmlContent);
   } catch (error) {
     throw new Error(
       `Failed to parse RSS feed at ${feedUrl}: ${error instanceof Error ? error.message : String(error)}`,

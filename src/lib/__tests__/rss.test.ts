@@ -5,15 +5,27 @@ import {
   generateEpisodeSyntheticId,
 } from "@/lib/rss";
 
+// Mock safeFetch
+// We need to import safeFetch to mock it specifically for certain tests if needed
+import * as security from "@/lib/security";
+
+vi.mock("@/lib/security", () => ({
+  safeFetch: vi.fn().mockResolvedValue("<rss>...</rss>"),
+  isSafeUrl: vi.fn().mockResolvedValue(true),
+}));
+
 // Mock rss-parser at module level — vi.hoisted ensures the fn is available
 // when the factory runs (vi.mock is hoisted above imports)
-const { mockParseURL } = vi.hoisted(() => ({
+const { mockParseURL, mockParseString } = vi.hoisted(() => ({
   mockParseURL: vi.fn(),
+  mockParseString: vi.fn(),
 }));
+
 vi.mock("rss-parser", () => ({
   default: class MockParser {
     options: Record<string, unknown> = {};
     parseURL = mockParseURL;
+    parseString = mockParseString;
   },
 }));
 
@@ -71,6 +83,8 @@ describe("parseDuration", () => {
 describe("parsePodcastFeed", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Reset safeFetch to default success
+    vi.mocked(security.safeFetch).mockResolvedValue("<rss>...</rss>");
   });
 
   afterEach(() => {
@@ -111,7 +125,7 @@ describe("parsePodcastFeed", () => {
   };
 
   it("parses a well-formed feed with full metadata", async () => {
-    mockParseURL.mockResolvedValueOnce(fullFeed);
+    mockParseString.mockResolvedValueOnce(fullFeed);
 
     const { parsePodcastFeed } = await import("@/lib/rss");
     const result = await parsePodcastFeed("https://example.com/feed.xml");
@@ -126,7 +140,7 @@ describe("parsePodcastFeed", () => {
   });
 
   it("maps episode fields correctly", async () => {
-    mockParseURL.mockResolvedValueOnce(fullFeed);
+    mockParseString.mockResolvedValueOnce(fullFeed);
 
     const { parsePodcastFeed } = await import("@/lib/rss");
     const result = await parsePodcastFeed("https://example.com/feed.xml");
@@ -141,7 +155,7 @@ describe("parsePodcastFeed", () => {
   });
 
   it("parses MM:SS duration in episodes", async () => {
-    mockParseURL.mockResolvedValueOnce(fullFeed);
+    mockParseString.mockResolvedValueOnce(fullFeed);
 
     const { parsePodcastFeed } = await import("@/lib/rss");
     const result = await parsePodcastFeed("https://example.com/feed.xml");
@@ -150,7 +164,7 @@ describe("parsePodcastFeed", () => {
   });
 
   it("falls back to itunes.image when feed.image is missing", async () => {
-    mockParseURL.mockResolvedValueOnce({
+    mockParseString.mockResolvedValueOnce({
       ...fullFeed,
       image: undefined,
     });
@@ -162,7 +176,7 @@ describe("parsePodcastFeed", () => {
   });
 
   it("handles feed with missing optional fields", async () => {
-    mockParseURL.mockResolvedValueOnce({
+    mockParseString.mockResolvedValueOnce({
       title: "Minimal Podcast",
       items: [],
     });
@@ -179,7 +193,7 @@ describe("parsePodcastFeed", () => {
   });
 
   it("handles episodes with missing enclosure", async () => {
-    mockParseURL.mockResolvedValueOnce({
+    mockParseString.mockResolvedValueOnce({
       title: "Podcast",
       items: [{ title: "No Audio", guid: "no-audio-001" }],
     });
@@ -191,7 +205,7 @@ describe("parsePodcastFeed", () => {
   });
 
   it("falls back guid to link when guid is missing", async () => {
-    mockParseURL.mockResolvedValueOnce({
+    mockParseString.mockResolvedValueOnce({
       title: "Podcast",
       items: [
         {
@@ -208,7 +222,7 @@ describe("parsePodcastFeed", () => {
   });
 
   it("falls back guid to enclosure URL when guid and link are missing", async () => {
-    mockParseURL.mockResolvedValueOnce({
+    mockParseString.mockResolvedValueOnce({
       title: "Podcast",
       items: [
         {
@@ -225,7 +239,7 @@ describe("parsePodcastFeed", () => {
   });
 
   it("throws when no unique identifier is available for an episode", async () => {
-    mockParseURL.mockResolvedValueOnce({
+    mockParseString.mockResolvedValueOnce({
       title: "Podcast",
       items: [{ title: "Completely Unknown" }],
     });
@@ -238,7 +252,7 @@ describe("parsePodcastFeed", () => {
   });
 
   it("handles episodes with missing duration", async () => {
-    mockParseURL.mockResolvedValueOnce({
+    mockParseString.mockResolvedValueOnce({
       title: "Podcast",
       items: [{ title: "No Duration", guid: "nd-001" }],
     });
@@ -250,7 +264,7 @@ describe("parsePodcastFeed", () => {
   });
 
   it("handles episodes with invalid publish date", async () => {
-    mockParseURL.mockResolvedValueOnce({
+    mockParseString.mockResolvedValueOnce({
       title: "Podcast",
       items: [
         { title: "Bad Date", guid: "bd-001", pubDate: "not-a-date" },
@@ -264,7 +278,7 @@ describe("parsePodcastFeed", () => {
   });
 
   it("defaults title to 'Untitled Podcast' when missing", async () => {
-    mockParseURL.mockResolvedValueOnce({ items: [] });
+    mockParseString.mockResolvedValueOnce({ items: [] });
 
     const { parsePodcastFeed } = await import("@/lib/rss");
     const result = await parsePodcastFeed("https://example.com/feed.xml");
@@ -273,7 +287,7 @@ describe("parsePodcastFeed", () => {
   });
 
   it("defaults episode title to 'Untitled Episode' when missing", async () => {
-    mockParseURL.mockResolvedValueOnce({
+    mockParseString.mockResolvedValueOnce({
       title: "Podcast",
       items: [{ guid: "notitle-001" }],
     });
@@ -285,7 +299,8 @@ describe("parsePodcastFeed", () => {
   });
 
   it("throws descriptive error on network failure", async () => {
-    mockParseURL.mockRejectedValueOnce(new Error("ECONNREFUSED"));
+    // Mock safeFetch failure
+    vi.mocked(security.safeFetch).mockRejectedValueOnce(new Error("ECONNREFUSED"));
 
     const { parsePodcastFeed } = await import("@/lib/rss");
 
@@ -297,7 +312,7 @@ describe("parsePodcastFeed", () => {
   });
 
   it("throws descriptive error on invalid XML", async () => {
-    mockParseURL.mockRejectedValueOnce(new Error("Invalid XML"));
+    mockParseString.mockRejectedValueOnce(new Error("Invalid XML"));
 
     const { parsePodcastFeed } = await import("@/lib/rss");
 
@@ -307,7 +322,7 @@ describe("parsePodcastFeed", () => {
   });
 
   it("prefers contentSnippet over content for description", async () => {
-    mockParseURL.mockResolvedValueOnce({
+    mockParseString.mockResolvedValueOnce({
       title: "Podcast",
       items: [
         {
@@ -326,7 +341,7 @@ describe("parsePodcastFeed", () => {
   });
 
   it("falls back to content when contentSnippet is missing", async () => {
-    mockParseURL.mockResolvedValueOnce({
+    mockParseString.mockResolvedValueOnce({
       title: "Podcast",
       items: [
         {
