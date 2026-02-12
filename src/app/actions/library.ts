@@ -2,7 +2,7 @@
 
 import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
-import { eq, and, desc, asc, isNotNull } from "drizzle-orm";
+import { eq, and, desc, asc, isNotNull, avg, count } from "drizzle-orm";
 import { db } from "@/db";
 import { users, podcasts, episodes, userLibrary, bookmarks } from "@/db/schema";
 
@@ -462,36 +462,31 @@ export async function updateLibraryRating(
 }
 
 // Get average rating for an episode across all users
+// Optimized: Uses SQL aggregate functions and a single query to calculate average and count.
+// Performance impact: Reduces DB roundtrips from 2 to 1 and avoids loading all ratings into memory.
 export async function getEpisodeAverageRating(episodePodcastIndexId: string) {
   try {
-    const episode = await db.query.episodes.findFirst({
-      where: eq(episodes.podcastIndexId, episodePodcastIndexId),
-    });
+    const [result] = await db
+      .select({
+        averageRating: avg(userLibrary.rating),
+        ratingCount: count(userLibrary.rating),
+      })
+      .from(userLibrary)
+      .innerJoin(episodes, eq(userLibrary.episodeId, episodes.id))
+      .where(
+        and(
+          eq(episodes.podcastIndexId, episodePodcastIndexId),
+          isNotNull(userLibrary.rating)
+        )
+      );
 
-    if (!episode) {
+    if (!result || Number(result.ratingCount) === 0) {
       return { averageRating: null, ratingCount: 0, error: null };
     }
-
-    const validRatings = await db.query.userLibrary.findMany({
-      where: and(
-        eq(userLibrary.episodeId, episode.id),
-        isNotNull(userLibrary.rating) // Only include entries that have a rating
-      ),
-      columns: {
-        rating: true,
-      },
-    });
-
-    if (validRatings.length === 0) {
-      return { averageRating: null, ratingCount: 0, error: null };
-    }
-
-    const sum = validRatings.reduce((acc, r) => acc + (r.rating || 0), 0);
-    const average = sum / validRatings.length;
 
     return {
-      averageRating: Math.round(average * 10) / 10, // Round to 1 decimal
-      ratingCount: validRatings.length,
+      averageRating: Math.round(Number(result.averageRating) * 10) / 10, // Round to 1 decimal
+      ratingCount: Number(result.ratingCount),
       error: null,
     };
   } catch (error) {

@@ -164,6 +164,7 @@ export const userLibrary = pgTable(
       table.episodeId
     ),
     index("user_library_user_id_idx").on(table.userId),
+    index("user_library_episode_id_idx").on(table.episodeId),
     index("user_library_collection_id_idx").on(table.collectionId),
   ]
 );

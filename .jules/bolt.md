@@ -5,3 +5,7 @@
 ## 2026-02-10 - SQL Aggregate Optimization for Drizzle
 **Learning:** Drizzle's relational query API (`db.query`) is convenient but often leads to N+1 patterns for aggregations (like counting items in a collection). Transitioning to the core `db.select()` API with `leftJoin` and `groupBy` allows performing these counts at the database level in a single query, significantly reducing latency as the data grows.
 **Action:** Prefer `db.select()` with aggregations over `db.query` loops when fetching counts or averages for related entities.
+
+## 2026-03-24 - Composite vs. Standalone Indexes for Global Aggregations
+**Learning:** While a composite index like `(userId, episodeId)` is efficient for per-user checks, global aggregations (e.g., calculating an episode's average rating across all users) require a standalone index on `episodeId` to avoid full table scans or inefficient index usage in large datasets.
+**Action:** Always verify that frequently aggregated foreign keys have standalone indexes, even if they are already part of a composite unique constraint.
