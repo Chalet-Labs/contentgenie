@@ -1,4 +1,15 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+
+// Mock Clerk auth
+const mockAuth = vi.fn();
+vi.mock("@clerk/nextjs/server", () => ({
+  auth: () => mockAuth(),
+}));
+
+// Mock next/cache
+vi.mock("next/cache", () => ({
+  revalidatePath: vi.fn(),
+}));
 
 // Mock database
 const mockFindFirstEpisode = vi.fn();
@@ -13,16 +24,21 @@ vi.mock("@/db", () => ({
   },
 }));
 
-// Mock schema
+// Mock schema — include all exports used by library.ts
 vi.mock("@/db/schema", () => ({
   episodes: { id: "id", podcastIndexId: "podcast_index_id" },
   userLibrary: { id: "id", episodeId: "episode_id", rating: "rating" },
+  users: {},
+  podcasts: {},
+  bookmarks: {},
 }));
 
-// Mock drizzle-orm
+// Mock drizzle-orm — include all imports used by library.ts
 vi.mock("drizzle-orm", () => ({
   eq: vi.fn(),
   and: vi.fn(),
+  desc: vi.fn(),
+  asc: vi.fn(),
   isNotNull: vi.fn(),
   avg: vi.fn(),
   count: vi.fn(),
@@ -31,6 +47,11 @@ vi.mock("drizzle-orm", () => ({
 describe("getEpisodeAverageRating", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.resetModules();
   });
 
   it("calculates average correctly from multiple ratings using SQL aggregate mock", async () => {

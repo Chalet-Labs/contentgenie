@@ -479,7 +479,7 @@ export async function getEpisodeAverageRating(episodePodcastIndexId: string) {
     const [stats] = await db
       .select({
         avgRating: avg(userLibrary.rating),
-        totalCount: count(userLibrary.id),
+        totalCount: count(),
       })
       .from(userLibrary)
       .where(
@@ -489,8 +489,9 @@ export async function getEpisodeAverageRating(episodePodcastIndexId: string) {
         )
       );
 
-    const ratingCount = Number(stats?.totalCount || 0);
-    const averageRating = stats?.avgRating ? Math.round(Number(stats.avgRating) * 10) / 10 : null;
+    const ratingCount = Number(stats?.totalCount ?? 0);
+    const averageRating =
+      stats?.avgRating != null ? Math.round(Number(stats.avgRating) * 10) / 10 : null;
 
     return {
       averageRating,
