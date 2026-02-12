@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { cn } from "@/lib/utils";
+import { cn, stripHtml } from "@/lib/utils";
 
 describe("cn", () => {
   it("merges class names", () => {
@@ -30,5 +30,31 @@ describe("cn", () => {
 
   it("handles object inputs", () => {
     expect(cn({ foo: true, bar: false, baz: true })).toBe("foo baz");
+  });
+});
+
+describe("stripHtml", () => {
+  it("strips HTML tags from a string", () => {
+    expect(stripHtml("<p>Hello <b>world</b></p>")).toBe("Hello world");
+  });
+
+  it("preserves plain text without tags", () => {
+    expect(stripHtml("no tags here")).toBe("no tags here");
+  });
+
+  it("trims leading and trailing whitespace", () => {
+    expect(stripHtml("  <p>spaced</p>  ")).toBe("spaced");
+  });
+
+  it("handles an empty string", () => {
+    expect(stripHtml("")).toBe("");
+  });
+
+  it("strips self-closing tags", () => {
+    expect(stripHtml("line<br/>break")).toBe("linebreak");
+  });
+
+  it("strips tags with attributes", () => {
+    expect(stripHtml('<a href="https://example.com">link</a>')).toBe("link");
   });
 });
