@@ -27,6 +27,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - CI workflow simplified to quality checks only (lint, test, Storybook); Vercel handles builds and deploys
 
 ### Added
+- GitHub Actions workflow to delete Neon preview branches on PR close, preventing branch accumulation on the free plan
 - Fuzzy podcast search with typo tolerance, host name matching, and local MiniSearch index (#55)
 - Trigger.dev dry-run validation step in CI for PR builds (#25)
 - Scheduled feed polling via Trigger.dev (every 2h) with manual refresh server action (#24)
