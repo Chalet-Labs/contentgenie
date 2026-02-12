@@ -7,7 +7,7 @@ import { Clock, Calendar, Mic, Star } from "lucide-react";
 import type { PodcastIndexEpisode } from "@/lib/podcastindex";
 import { formatDuration, formatPublishDate } from "@/lib/podcastindex";
 import { ProcessingStatus } from "@/components/episodes/processing-status";
-import { cn } from "@/lib/utils";
+import { cn, stripHtml } from "@/lib/utils";
 import type { SummaryStatus } from "@/db/schema";
 
 interface EpisodeCardProps {
@@ -90,6 +90,3 @@ export function EpisodeCard({ episode, summaryStatus, worthItScore }: EpisodeCar
   );
 }
 
-function stripHtml(html: string): string {
-  return html.replace(/<[^>]*>/g, "").trim();
-}

@@ -29,6 +29,7 @@ import { MoveToCollection } from "./move-to-collection";
 import { NotesEditor } from "./notes-editor";
 import { BookmarksList } from "./bookmarks-list";
 import { RatingInput } from "@/components/episodes/rating-input";
+import { stripHtml } from "@/lib/utils";
 import type { Episode, Podcast, UserLibraryEntry, Collection } from "@/db/schema";
 
 interface SavedEpisodeCardProps {
@@ -59,10 +60,6 @@ function formatDate(date: Date | null): string {
     month: "short",
     day: "numeric",
   });
-}
-
-function stripHtml(html: string): string {
-  return html.replace(/<[^>]*>/g, "").trim();
 }
 
 export function SavedEpisodeCard({ item, onRemoved, onCollectionChanged }: SavedEpisodeCardProps) {

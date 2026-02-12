@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { stripHtml } from "@/lib/utils";
 import type { PodcastSearchResult } from "@/lib/podcastindex";
 
 interface PodcastCardProps {
@@ -87,6 +88,3 @@ export function PodcastCard({ podcast }: PodcastCardProps) {
   );
 }
 
-function stripHtml(html: string): string {
-  return html.replace(/<[^>]*>/g, "").trim();
-}

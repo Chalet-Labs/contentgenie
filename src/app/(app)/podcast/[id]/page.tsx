@@ -5,6 +5,7 @@ import { eq, desc as descOrder, inArray } from "drizzle-orm";
 import { ArrowLeft, Rss, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { stripHtml } from "@/lib/utils";
 import { EpisodeList } from "@/components/podcasts/episode-list";
 import { SubscribeButton } from "@/components/podcasts/subscribe-button";
 import { BatchSummarizeButton } from "@/components/podcasts/batch-summarize-button";
@@ -396,6 +397,3 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
   }
 }
 
-function stripHtml(html: string): string {
-  return html.replace(/<[^>]*>/g, "").trim();
-}
