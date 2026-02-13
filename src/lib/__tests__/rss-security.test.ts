@@ -13,16 +13,17 @@ vi.mock("@/lib/security", async () => {
 
 // Mock fetch
 const mockFetch = vi.fn();
-global.fetch = mockFetch;
 
 describe("SSRF Protection via safeFetch", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.stubGlobal("fetch", mockFetch);
     vi.mocked(security.isSafeUrl).mockResolvedValue(true);
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllGlobals();
   });
 
   it("should fail if redirected to a private IP", async () => {
@@ -86,7 +87,7 @@ describe("SSRF Protection via safeFetch", () => {
   });
 
   it("should enforce a maximum redirect limit to prevent loops", async () => {
-    // Use example.com which resolves to a public IP (real isSafeUrl is called internally)
+    // isSafeUrl is mocked to return true (see beforeEach), so every redirect is allowed
     mockFetch.mockImplementation(async () => {
       return {
         ok: false,
