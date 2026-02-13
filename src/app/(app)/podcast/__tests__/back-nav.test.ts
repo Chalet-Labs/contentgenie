@@ -5,47 +5,26 @@ import {
 } from "@/app/(app)/podcast/[id]/back-navigation";
 
 describe("getBackNavigation", () => {
-  it("returns discover navigation for from='discover'", () => {
-    const result = getBackNavigation("discover");
-    expect(result).toEqual({ href: "/discover", label: "Back to Discover" });
-  });
-
-  it("returns subscriptions navigation for from='subscriptions'", () => {
-    const result = getBackNavigation("subscriptions");
-    expect(result).toEqual({
-      href: "/subscriptions",
-      label: "Back to Subscriptions",
-    });
-  });
-
-  it("returns dashboard navigation for from='dashboard'", () => {
-    const result = getBackNavigation("dashboard");
-    expect(result).toEqual({ href: "/dashboard", label: "Back to Dashboard" });
-  });
-
-  it("returns library navigation for from='library'", () => {
-    const result = getBackNavigation("library");
-    expect(result).toEqual({ href: "/library", label: "Back to Library" });
+  it("returns correct navigation for each known key", () => {
+    for (const key of Object.keys(BACK_NAVIGATION)) {
+      expect(getBackNavigation(key)).toBe(BACK_NAVIGATION[key]);
+    }
   });
 
   it("returns default (discover) for undefined", () => {
-    const result = getBackNavigation(undefined);
-    expect(result).toEqual({ href: "/discover", label: "Back to Discover" });
+    expect(getBackNavigation(undefined)).toBe(BACK_NAVIGATION.discover);
   });
 
   it("returns default (discover) for unknown value", () => {
-    const result = getBackNavigation("settings");
-    expect(result).toEqual({ href: "/discover", label: "Back to Discover" });
+    expect(getBackNavigation("settings")).toBe(BACK_NAVIGATION.discover);
   });
 
   it("returns default (discover) for empty string", () => {
-    const result = getBackNavigation("");
-    expect(result).toEqual({ href: "/discover", label: "Back to Discover" });
+    expect(getBackNavigation("")).toBe(BACK_NAVIGATION.discover);
   });
 
   it("returns default (discover) for prototype-chain key", () => {
-    const result = getBackNavigation("toString");
-    expect(result).toEqual({ href: "/discover", label: "Back to Discover" });
+    expect(getBackNavigation("toString")).toBe(BACK_NAVIGATION.discover);
   });
 });
 
