@@ -13,11 +13,13 @@ import {
   Rss,
   ExternalLink,
   Play,
+  Pause,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { stripHtml } from "@/lib/utils";
+import { useAudioPlayerState, useAudioPlayerAPI } from "@/contexts/audio-player-context";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   SummaryDisplay,
@@ -91,6 +93,8 @@ function formatPublishDate(timestamp: number): string {
 
 export default function EpisodePage({ params }: EpisodePageProps) {
   const episodeId = params.id;
+  const playerState = useAudioPlayerState();
+  const playerAPI = useAudioPlayerAPI();
 
   const [episode, setEpisode] = useState<EpisodeData | null>(null);
   const [podcast, setPodcast] = useState<PodcastData | null>(null);
@@ -305,6 +309,25 @@ export default function EpisodePage({ params }: EpisodePageProps) {
   const artworkUrl = episode.image || episode.feedImage || podcast?.artwork || podcast?.image;
   const categories = podcast?.categories ? Object.values(podcast.categories) : [];
 
+  const isCurrentEpisode = playerState.currentEpisode?.id === String(episode.id);
+  const isPlayingThis = isCurrentEpisode && playerState.isPlaying;
+  const isPausedThis = isCurrentEpisode && !playerState.isPlaying;
+
+  const handleListenClick = () => {
+    if (isCurrentEpisode) {
+      playerAPI.togglePlay();
+    } else {
+      playerAPI.playEpisode({
+        id: String(episode.id),
+        title: episode.title,
+        podcastTitle: podcast?.title || "",
+        audioUrl: episode.enclosureUrl,
+        artwork: artworkUrl,
+        duration: episode.duration,
+      });
+    }
+  };
+
   return (
     <div className="space-y-8">
       {/* Back navigation */}
@@ -399,15 +422,23 @@ export default function EpisodePage({ params }: EpisodePageProps) {
           {/* Actions */}
           <div className="flex flex-wrap gap-3">
             {episode.enclosureUrl && (
-              <Button size="lg" asChild>
-                <a
-                  href={episode.enclosureUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  <Play className="mr-2 h-4 w-4" />
-                  Listen to Episode
-                </a>
+              <Button size="lg" onClick={handleListenClick}>
+                {isPlayingThis ? (
+                  <>
+                    <Pause className="mr-2 h-4 w-4" />
+                    Pause
+                  </>
+                ) : isPausedThis ? (
+                  <>
+                    <Play className="mr-2 h-4 w-4" />
+                    Resume
+                  </>
+                ) : (
+                  <>
+                    <Play className="mr-2 h-4 w-4" />
+                    Listen to Episode
+                  </>
+                )}
               </Button>
             )}
             <SaveButton

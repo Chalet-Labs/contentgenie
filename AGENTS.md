@@ -118,6 +118,15 @@ src/
     └── helpers/              # Shared helpers for trigger tasks
 ```
 
+## Architecture Decision Records
+
+ADRs are stored in `docs/adr/`. Read them before designing changes that touch the same areas:
+
+- [ADR-001: Distributed Rate Limiting](docs/adr/001-distributed-rate-limiting.md)
+- [ADR-002: Preview Database Migrations](docs/adr/002-preview-database-migrations.md)
+- [ADR-003: Scheduled Feed Polling](docs/adr/003-scheduled-feed-polling.md)
+- [ADR-004: Audio Player State Management](docs/adr/004-audio-player-state-management.md)
+
 ## Architecture patterns
 
 - **App Router with route groups:** `(auth)` for sign-in/sign-up, `(app)` for authenticated pages with shared sidebar layout.
