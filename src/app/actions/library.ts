@@ -464,33 +464,24 @@ export async function updateLibraryRating(
 // Get average rating for an episode across all users
 export async function getEpisodeAverageRating(episodePodcastIndexId: string) {
   try {
-    const episode = await db.query.episodes.findFirst({
-      where: eq(episodes.podcastIndexId, episodePodcastIndexId),
-      columns: { id: true },
-    });
-
-    if (!episode) {
-      return { averageRating: null, ratingCount: 0, error: null };
-    }
-
-    // Optimized: Calculate average and count in the database instead of in-memory.
-    // This avoids fetching all library entries for an episode, significantly reducing
-    // memory and network overhead as the number of users/ratings grows.
-    const [stats] = await db
+    const [result] = await db
       .select({
-        avgRating: avg(userLibrary.rating),
-        totalCount: count(userLibrary.id),
+        averageRating: avg(userLibrary.rating),
+        ratingCount: count(userLibrary.rating),
       })
       .from(userLibrary)
+      .innerJoin(episodes, eq(userLibrary.episodeId, episodes.id))
       .where(
         and(
-          eq(userLibrary.episodeId, episode.id),
+          eq(episodes.podcastIndexId, episodePodcastIndexId),
           isNotNull(userLibrary.rating)
         )
       );
 
-    const ratingCount = Number(stats?.totalCount || 0);
-    const averageRating = stats?.avgRating ? Math.round(Number(stats.avgRating) * 10) / 10 : null;
+    const ratingCount = Number(result?.ratingCount || 0);
+    const averageRating = result?.averageRating
+      ? Math.round(Number(result.averageRating) * 10) / 10
+      : null;
 
     return {
       averageRating,

@@ -1,14 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // Mock database
-const mockFindFirstEpisode = vi.fn();
 const mockSelect = vi.fn();
 
 vi.mock("@/db", () => ({
   db: {
-    query: {
-      episodes: { findFirst: (...args: unknown[]) => mockFindFirstEpisode(...args) },
-    },
     select: (...args: unknown[]) => mockSelect(...args),
   },
 }));
@@ -28,18 +24,20 @@ vi.mock("drizzle-orm", () => ({
   count: vi.fn(),
 }));
 
+function mockQueryChain(resolvedValue: unknown[]) {
+  const mockWhere = vi.fn().mockResolvedValue(resolvedValue);
+  const mockInnerJoin = vi.fn().mockReturnValue({ where: mockWhere });
+  const mockFrom = vi.fn().mockReturnValue({ innerJoin: mockInnerJoin });
+  mockSelect.mockReturnValue({ from: mockFrom });
+}
+
 describe("getEpisodeAverageRating", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   it("calculates average correctly from multiple ratings using SQL aggregate mock", async () => {
-    mockFindFirstEpisode.mockResolvedValue({ id: 1 });
-
-    // Mock the chain: db.select().from().where()
-    const mockWhere = vi.fn().mockResolvedValue([{ avgRating: "4.0", totalCount: 3 }]);
-    const mockFrom = vi.fn().mockReturnValue({ where: mockWhere });
-    mockSelect.mockReturnValue({ from: mockFrom });
+    mockQueryChain([{ averageRating: "4.0", ratingCount: 3 }]);
 
     const { getEpisodeAverageRating } = await import("@/app/actions/library");
     const result = await getEpisodeAverageRating("ep123");
@@ -50,26 +48,24 @@ describe("getEpisodeAverageRating", () => {
   });
 
   it("handles no ratings correctly with SQL aggregate mock", async () => {
-    mockFindFirstEpisode.mockResolvedValue({ id: 1 });
-
-    const mockWhere = vi.fn().mockResolvedValue([{ avgRating: null, totalCount: 0 }]);
-    const mockFrom = vi.fn().mockReturnValue({ where: mockWhere });
-    mockSelect.mockReturnValue({ from: mockFrom });
+    mockQueryChain([]);
 
     const { getEpisodeAverageRating } = await import("@/app/actions/library");
     const result = await getEpisodeAverageRating("ep123");
 
     expect(result.averageRating).toBeNull();
     expect(result.ratingCount).toBe(0);
+    expect(result.error).toBeNull();
   });
 
   it("handles episode not found", async () => {
-    mockFindFirstEpisode.mockResolvedValue(null);
+    mockQueryChain([]);
 
     const { getEpisodeAverageRating } = await import("@/app/actions/library");
     const result = await getEpisodeAverageRating("nonexistent");
 
     expect(result.averageRating).toBeNull();
     expect(result.ratingCount).toBe(0);
+    expect(result.error).toBeNull();
   });
 });
