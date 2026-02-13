@@ -105,6 +105,7 @@ export async function getRecentlySavedItems(limit: number = 5) {
             podcast: {
               columns: {
                 id: true,
+                podcastIndexId: true,
                 title: true,
                 imageUrl: true,
               },

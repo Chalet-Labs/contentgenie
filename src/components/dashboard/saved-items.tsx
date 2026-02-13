@@ -7,9 +7,12 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Bookmark, ChevronRight, Rss, Star } from "lucide-react";
 import type { Episode, Podcast, UserLibraryEntry } from "@/db/schema";
 
-export type LibraryItemWithRelations = UserLibraryEntry & {
-  episode: Episode & {
-    podcast: Podcast;
+export type LibraryItemWithRelations = Pick<
+  UserLibraryEntry,
+  "id" | "savedAt" | "rating"
+> & {
+  episode: Pick<Episode, "podcastIndexId" | "title"> & {
+    podcast: Pick<Podcast, "title" | "imageUrl">;
   };
 };
 
