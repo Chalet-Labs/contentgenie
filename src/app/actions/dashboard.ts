@@ -83,8 +83,12 @@ export async function getRecentlySavedItems(limit: number = 5) {
       where: eq(userLibrary.userId, userId),
       columns: {
         id: true,
+        userId: true,
+        episodeId: true,
         savedAt: true,
+        notes: true,
         rating: true,
+        collectionId: true,
       },
       with: {
         episode: {
@@ -92,8 +96,10 @@ export async function getRecentlySavedItems(limit: number = 5) {
             id: true,
             podcastIndexId: true,
             title: true,
+            description: true,
             publishDate: true,
             duration: true,
+            worthItScore: true,
           },
           with: {
             podcast: {

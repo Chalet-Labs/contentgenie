@@ -7,13 +7,13 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Bookmark, ChevronRight, Rss, Star } from "lucide-react";
 import type { Episode, Podcast, UserLibraryEntry } from "@/db/schema";
 
-type LibraryItemWithRelations = UserLibraryEntry & {
+export type LibraryItemWithRelations = UserLibraryEntry & {
   episode: Episode & {
     podcast: Podcast;
   };
 };
 
-interface SavedItemsProps {
+export interface SavedItemsProps {
   items: LibraryItemWithRelations[];
   isLoading?: boolean;
 }
