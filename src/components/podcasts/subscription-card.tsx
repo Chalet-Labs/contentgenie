@@ -25,7 +25,7 @@ export function SubscriptionCard({
         <div className="flex gap-4 p-4">
           {/* Podcast artwork */}
           <Link
-            href={`/podcast/${podcast.podcastIndexId}`}
+            href={`/podcast/${podcast.podcastIndexId}?from=subscriptions`}
             className="relative h-24 w-24 shrink-0 overflow-hidden rounded-lg bg-muted"
           >
             {podcast.imageUrl ? (
@@ -47,7 +47,7 @@ export function SubscriptionCard({
           <div className="flex flex-1 flex-col gap-2">
             <div>
               <Link
-                href={`/podcast/${podcast.podcastIndexId}`}
+                href={`/podcast/${podcast.podcastIndexId}?from=subscriptions`}
                 className="font-semibold hover:underline"
               >
                 {podcast.title}

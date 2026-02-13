@@ -19,11 +19,13 @@ import { isSubscribedToPodcast } from "@/app/actions/subscriptions";
 import { db } from "@/db";
 import { podcasts, episodes as episodesTable } from "@/db/schema";
 import type { SummaryStatus } from "@/db/schema";
+import { getBackNavigation } from "./back-navigation";
 
 interface PodcastPageProps {
   params: {
     id: string;
   };
+  searchParams: { [key: string]: string | string[] | undefined };
 }
 
 function isRssSourced(id: string): boolean {
@@ -102,7 +104,9 @@ async function loadRssPodcast(podcastIndexId: string) {
   return { podcast, episodes: mappedEpisodes, statusMap, scoreMap };
 }
 
-export default async function PodcastPage({ params }: PodcastPageProps) {
+export default async function PodcastPage({ params, searchParams }: PodcastPageProps) {
+  const from = typeof searchParams.from === "string" ? searchParams.from : undefined;
+  const backNav = getBackNavigation(from);
   const id = params.id;
 
   if (isRssSourced(id)) {
@@ -120,11 +124,11 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
     return (
       <div className="space-y-8">
         <Link
-          href="/discover"
+          href={backNav.href}
           className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
         >
           <ArrowLeft className="h-4 w-4" />
-          Back to Discover
+          {backNav.label}
         </Link>
 
         <div className="flex flex-col gap-6 md:flex-row">
@@ -260,11 +264,11 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
       <div className="space-y-8">
         {/* Back navigation */}
         <Link
-          href="/discover"
+          href={backNav.href}
           className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
         >
           <ArrowLeft className="h-4 w-4" />
-          Back to Discover
+          {backNav.label}
         </Link>
 
         {/* Podcast header */}
@@ -381,11 +385,11 @@ export default async function PodcastPage({ params }: PodcastPageProps) {
     return (
       <div className="space-y-4">
         <Link
-          href="/discover"
+          href={backNav.href}
           className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
         >
           <ArrowLeft className="h-4 w-4" />
-          Back to Discover
+          {backNav.label}
         </Link>
         <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-6 text-center">
           <p className="text-sm text-destructive">
