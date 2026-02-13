@@ -19,7 +19,7 @@ import { isSubscribedToPodcast } from "@/app/actions/subscriptions";
 import { db } from "@/db";
 import { podcasts, episodes as episodesTable } from "@/db/schema";
 import type { SummaryStatus } from "@/db/schema";
-import { getBackNavigation } from "./back-navigation";
+import { getBackNavigation } from "@/app/(app)/podcast/[id]/back-navigation";
 
 interface PodcastPageProps {
   params: {

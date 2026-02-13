@@ -6,8 +6,8 @@ export const BACK_NAVIGATION: Record<string, { href: string; label: string }> = 
 };
 
 export function getBackNavigation(from: string | undefined) {
-  if (from && from in BACK_NAVIGATION) {
+  if (from && Object.hasOwn(BACK_NAVIGATION, from)) {
     return BACK_NAVIGATION[from];
   }
-  return { href: "/discover", label: "Back to Discover" };
+  return BACK_NAVIGATION.discover;
 }
