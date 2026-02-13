@@ -41,7 +41,7 @@ export function RssFeedForm({ className }: RssFeedFormProps) {
         toast.success(`Subscribed to ${result.title ?? "podcast"}!${episodeMsg}`);
         setUrl("");
         if (result.podcastIndexId) {
-          router.push(`/podcast/${result.podcastIndexId}`);
+          router.push(`/podcast/${result.podcastIndexId}?from=discover`);
         }
       } else {
         toast.error(result.error ?? "Failed to add podcast");

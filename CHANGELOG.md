@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Fixed
+- Podcast page back navigation is now context-aware — shows "Back to Subscriptions", "Back to Dashboard", etc. based on where the user came from (#86)
 - Discover page search query now persists in URL (`?q=`) — back navigation, bookmarks, and shared links restore search state (#85)
 - SSRF vulnerability in podcast RSS subscription — validates URLs before fetching (#77)
 - Authenticated users are now redirected from landing page to dashboard after login (#50)

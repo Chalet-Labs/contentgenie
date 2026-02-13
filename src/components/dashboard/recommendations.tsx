@@ -87,7 +87,7 @@ export function Recommendations({ podcasts, isLoading }: RecommendationsProps) {
             return (
               <Link
                 key={podcast.id}
-                href={`/podcast/${podcast.id}`}
+                href={`/podcast/${podcast.id}?from=dashboard`}
                 className="flex gap-3 rounded-lg p-2 transition-colors hover:bg-accent"
               >
                 <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-muted">

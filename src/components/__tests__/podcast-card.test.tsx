@@ -61,7 +61,7 @@ describe("PodcastCard", () => {
   it("links to podcast detail page", () => {
     render(<PodcastCard podcast={mockPodcast} />);
     const link = screen.getByRole("link");
-    expect(link).toHaveAttribute("href", "/podcast/123");
+    expect(link).toHaveAttribute("href", "/podcast/123?from=discover");
   });
 
   it("shows up to 3 categories", () => {

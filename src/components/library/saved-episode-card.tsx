@@ -128,7 +128,7 @@ export function SavedEpisodeCard({ item, onRemoved, onCollectionChanged }: Saved
                 </h3>
               </Link>
               <Link
-                href={`/podcast/${podcast.podcastIndexId}`}
+                href={`/podcast/${podcast.podcastIndexId}?from=library`}
                 className="text-sm text-muted-foreground hover:text-primary"
               >
                 {podcast.title}

@@ -18,7 +18,7 @@ export function PodcastCard({ podcast }: PodcastCardProps) {
     : [];
 
   return (
-    <Link href={`/podcast/${podcast.id}`}>
+    <Link href={`/podcast/${podcast.id}?from=discover`}>
       <Card className="group h-full overflow-hidden transition-colors hover:bg-accent">
         <CardContent className="p-4">
           <div className="flex gap-4">
