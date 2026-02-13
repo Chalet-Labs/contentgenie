@@ -49,6 +49,15 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      - name: Validate production database secret
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL_PRODUCTION }}
+        run: |
+          if [ -z "$DATABASE_URL" ]; then
+            echo "::error::DATABASE_URL_PRODUCTION secret not configured"
+            exit 1
+          fi
+
       - name: Check for schema drift against production
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL_PRODUCTION }}
