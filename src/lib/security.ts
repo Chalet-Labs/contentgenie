@@ -166,6 +166,9 @@ export async function isSafeUrl(urlString: string): Promise<boolean> {
 /**
  * Safely fetches a URL by validating every redirect against SSRF protections.
  * This prevents attackers from bypassing checks via redirects.
+ *
+ * Note: This function assumes GET-only usage (e.g., RSS feed fetching).
+ * It does not handle HTTP method changes on 303 redirects (POST→GET).
  */
 export async function safeFetch(
   url: string,
@@ -175,20 +178,22 @@ export async function safeFetch(
   let currentUrl = url;
   let redirectCount = 0;
 
-  while (redirectCount <= MAX_REDIRECTS) {
+  while (redirectCount < MAX_REDIRECTS) {
     // 1. Validate URL security
     if (!(await isSafeUrl(currentUrl))) {
       throw new Error(`Unsafe URL detected: ${currentUrl}`);
     }
 
-    // 2. Fetch with manual redirect handling
+    // 2. Fetch with manual redirect handling (strip caller's redirect to enforce manual)
+    const { redirect: _ignoredRedirect, ...safeOptions } = options ?? {};
     const response = await fetch(currentUrl, {
-      ...options,
+      ...safeOptions,
       redirect: "manual",
     });
 
-    // 3. Handle redirects (301, 302, 303, 307, 308)
-    if (response.status >= 300 && response.status < 400) {
+    // 3. Handle redirects (301, 302, 303, 307, 308) — exclude 304 Not Modified
+    const REDIRECT_CODES = [301, 302, 303, 307, 308];
+    if (REDIRECT_CODES.includes(response.status)) {
       const location = response.headers.get("Location");
       if (!location) {
         throw new Error("Redirect response missing Location header");
@@ -197,11 +202,20 @@ export async function safeFetch(
       // Resolve relative URLs
       try {
         currentUrl = new URL(location, currentUrl).toString();
-      } catch {
-        throw new Error(`Invalid redirect URL: ${location}`);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        throw new Error(`Invalid redirect URL: ${location} (${message})`);
       }
 
       redirectCount++;
+
+      // Consume the redirect response body to avoid resource leaks
+      try {
+        await response.text();
+      } catch {
+        // Ignore errors while consuming the body
+      }
+
       continue;
     }
 
