@@ -178,6 +178,13 @@ export async function safeFetch(
   const SENSITIVE_HEADERS = ["authorization", "cookie", "proxy-authorization"];
   let currentUrl = url;
   let redirectCount = 0;
+  const initialOrigin = new URL(url).origin;
+
+  // Build persistent request options outside the loop so header mutations survive across iterations
+  const { redirect: _ignoredRedirect, headers: originalHeaders, ...baseOptions } = options ?? {};
+  let currentHeaders: Headers | undefined = originalHeaders
+    ? new Headers(originalHeaders as HeadersInit)
+    : undefined;
 
   while (redirectCount < MAX_REDIRECTS) {
     // 1. Validate URL security
@@ -185,10 +192,10 @@ export async function safeFetch(
       throw new Error(`Unsafe URL detected: ${currentUrl}`);
     }
 
-    // 2. Fetch with manual redirect handling (strip caller's redirect to enforce manual)
-    const { redirect: _ignoredRedirect, ...safeOptions } = options ?? {};
+    // 2. Fetch with manual redirect handling
     const response = await fetch(currentUrl, {
-      ...safeOptions,
+      ...baseOptions,
+      headers: currentHeaders,
       redirect: "manual",
     });
 
@@ -201,7 +208,6 @@ export async function safeFetch(
       }
 
       // Resolve relative URLs
-      const previousOrigin = new URL(currentUrl).origin;
       try {
         currentUrl = new URL(location, currentUrl).toString();
       } catch (error) {
@@ -209,14 +215,12 @@ export async function safeFetch(
         throw new Error(`Invalid redirect URL: ${location} (${message})`);
       }
 
-      // Strip sensitive headers on cross-origin redirects to prevent credential leaking
+      // Strip sensitive headers when leaving the initial origin to prevent credential leaking
       const newOrigin = new URL(currentUrl).origin;
-      if (previousOrigin !== newOrigin && safeOptions.headers) {
-        const headers = new Headers(safeOptions.headers as HeadersInit);
+      if (initialOrigin !== newOrigin && currentHeaders) {
         for (const name of SENSITIVE_HEADERS) {
-          headers.delete(name);
+          currentHeaders.delete(name);
         }
-        safeOptions.headers = headers;
       }
 
       redirectCount++;
