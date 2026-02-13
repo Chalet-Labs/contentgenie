@@ -190,15 +190,43 @@ export async function getCollection(collectionId: number) {
       return { collection: null, items: [], error: "Collection not found" };
     }
 
+    // BOLT OPTIMIZATION: Use selective column fetching to avoid loading high-volume text fields
+    // (transcription, summary, keyTakeaways) that are not needed for list views.
+    // Expected impact: Faster load times and lower memory footprint for collection views.
     const items = await db.query.userLibrary.findMany({
       where: and(
         eq(userLibrary.userId, userId),
         eq(userLibrary.collectionId, collectionId)
       ),
+      columns: {
+        id: true,
+        userId: true,
+        episodeId: true,
+        savedAt: true,
+        notes: true,
+        rating: true,
+        collectionId: true,
+      },
       with: {
         episode: {
+          columns: {
+            id: true,
+            podcastIndexId: true,
+            title: true,
+            description: true,
+            duration: true,
+            publishDate: true,
+            worthItScore: true,
+          },
           with: {
-            podcast: true,
+            podcast: {
+              columns: {
+                id: true,
+                podcastIndexId: true,
+                title: true,
+                imageUrl: true,
+              },
+            },
           },
         },
       },

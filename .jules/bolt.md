@@ -9,3 +9,7 @@
 ## 2025-05-20 - Indexing for Aggregate Performance
 **Learning:** Even with SQL aggregate functions, performance can degrade on large tables if the columns used in `WHERE` clauses for the aggregation aren't properly indexed. A composite index (e.g., `userId, episodeId`) is not efficient for queries filtering only by the second column. Adding a dedicated index on the foreign key being aggregated significantly speeds up statistic calculations.
 **Action:** When adding aggregate queries, always ensure the filtered columns have appropriate indexes, especially foreign keys in join or junction tables.
+
+## 2026-06-04 - Selective Column Fetching for Large Text Fields
+**Learning:** Drizzle ORM's relational query API (`db.query`) fetches all columns by default. When related entities (like `episodes`) contain large text fields (like `transcription` or `summary`), fetching a list of these entities can result in massive database payloads (megabytes) even if only the title and ID are displayed. Using the `columns` property to explicitly select only needed fields significantly reduces database I/O, network bandwidth, and application memory usage.
+**Action:** Always use selective column fetching (`columns`) when querying lists of entities that contain high-volume data fields that are not displayed in the list.
