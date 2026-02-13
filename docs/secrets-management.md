@@ -144,6 +144,24 @@ GitHub Actions runs quality checks (lint, test, Storybook build) on every PR and
 
 Trigger.dev tasks are auto-deployed via the [Trigger.dev GitHub integration](https://trigger.dev/docs/github-integration) when changes are pushed to `main`. Dev secrets are synced from Doppler via `syncEnvVars`; Prod secrets are managed manually in the Trigger.dev dashboard (see [Trigger.dev Integration](#triggerdev-integration) above).
 
+## GitHub Actions Secrets
+
+The CI workflow uses secrets configured in the [repository settings](https://github.com/Chalet-Labs/contentgenie/settings/secrets/actions):
+
+| Variable | Description |
+|----------|-------------|
+| `DATABASE_URL_PRODUCTION` | Neon production pooler connection string. Used by the `schema-drift` CI job to detect pending schema changes after merges to `main`. |
+| `TRIGGER_ACCESS_TOKEN` | Trigger.dev access token for dry-run deploy validation on PRs. |
+
+### Adding `DATABASE_URL_PRODUCTION`
+
+1. Open the Neon Console and copy the **main branch** pooler connection string
+2. Go to [GitHub repo secrets](https://github.com/Chalet-Labs/contentgenie/settings/secrets/actions) → "New repository secret"
+3. Name: `DATABASE_URL_PRODUCTION`
+4. Value: the pooler connection string from step 1
+
+> **Tip:** For added safety, create a **read-only database role** in Neon and use its connection string. This prevents any accidental writes even if the drift detection script has a bug.
+
 ## Troubleshooting
 
 **"doppler: command not found"**
