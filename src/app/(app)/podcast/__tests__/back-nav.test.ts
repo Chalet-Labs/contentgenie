@@ -42,6 +42,11 @@ describe("getBackNavigation", () => {
     const result = getBackNavigation("");
     expect(result).toEqual({ href: "/discover", label: "Back to Discover" });
   });
+
+  it("returns default (discover) for prototype-chain key", () => {
+    const result = getBackNavigation("toString");
+    expect(result).toEqual({ href: "/discover", label: "Back to Discover" });
+  });
 });
 
 describe("BACK_NAVIGATION", () => {
