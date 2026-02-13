@@ -6,7 +6,7 @@ import {
   getDashboardStats,
 } from "@/app/actions/dashboard";
 import { RecentEpisodes } from "@/components/dashboard/recent-episodes";
-import { SavedItems } from "@/components/dashboard/saved-items";
+import { SavedItems, type LibraryItemWithRelations } from "@/components/dashboard/saved-items";
 import { Recommendations } from "@/components/dashboard/recommendations";
 import { StatsCards } from "@/components/dashboard/stats-cards";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -76,7 +76,7 @@ async function SavedItemsSection() {
   if (error && items.length === 0) {
     return <SavedItems items={[]} />;
   }
-  return <SavedItems items={items} />;
+  return <SavedItems items={items as LibraryItemWithRelations[]} />;
 }
 
 // Server component for recommendations
