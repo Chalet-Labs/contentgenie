@@ -175,6 +175,7 @@ export async function safeFetch(
   options: RequestInit = {}
 ): Promise<string> {
   const MAX_REDIRECTS = 5;
+  const SENSITIVE_HEADERS = ["authorization", "cookie", "proxy-authorization"];
   let currentUrl = url;
   let redirectCount = 0;
 
@@ -200,11 +201,22 @@ export async function safeFetch(
       }
 
       // Resolve relative URLs
+      const previousOrigin = new URL(currentUrl).origin;
       try {
         currentUrl = new URL(location, currentUrl).toString();
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         throw new Error(`Invalid redirect URL: ${location} (${message})`);
+      }
+
+      // Strip sensitive headers on cross-origin redirects to prevent credential leaking
+      const newOrigin = new URL(currentUrl).origin;
+      if (previousOrigin !== newOrigin && safeOptions.headers) {
+        const headers = new Headers(safeOptions.headers as HeadersInit);
+        for (const name of SENSITIVE_HEADERS) {
+          headers.delete(name);
+        }
+        safeOptions.headers = headers;
       }
 
       redirectCount++;
