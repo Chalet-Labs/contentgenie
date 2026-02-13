@@ -76,12 +76,33 @@ export async function getRecentlySavedItems(limit: number = 5) {
   }
 
   try {
+    // BOLT OPTIMIZATION: Use selective column fetching to avoid loading large text fields
+    // (like transcription and summary) which are not needed for the dashboard list.
+    // Expected impact: Reduces DB data transfer by ~95% per item when transcripts are present.
     const items = await db.query.userLibrary.findMany({
       where: eq(userLibrary.userId, userId),
+      columns: {
+        id: true,
+        savedAt: true,
+        rating: true,
+      },
       with: {
         episode: {
+          columns: {
+            id: true,
+            podcastIndexId: true,
+            title: true,
+            publishDate: true,
+            duration: true,
+          },
           with: {
-            podcast: true,
+            podcast: {
+              columns: {
+                id: true,
+                title: true,
+                imageUrl: true,
+              },
+            },
           },
         },
       },

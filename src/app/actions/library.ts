@@ -207,15 +207,48 @@ export async function getUserLibrary(
   }
 
   try {
+    // BOLT OPTIMIZATION: Use selective column fetching to avoid loading high-volume text fields
+    // (transcription, summary, keyTakeaways) that are not needed for list views.
+    // Expected impact: Significant reduction in memory usage and network latency for large libraries.
     const items = await db.query.userLibrary.findMany({
       where: eq(userLibrary.userId, userId),
+      columns: {
+        id: true,
+        userId: true,
+        episodeId: true,
+        savedAt: true,
+        notes: true,
+        rating: true,
+        collectionId: true,
+      },
       with: {
         episode: {
+          columns: {
+            id: true,
+            podcastIndexId: true,
+            title: true,
+            description: true,
+            duration: true,
+            publishDate: true,
+            worthItScore: true,
+          },
           with: {
-            podcast: true,
+            podcast: {
+              columns: {
+                id: true,
+                podcastIndexId: true,
+                title: true,
+                imageUrl: true,
+              },
+            },
           },
         },
-        collection: true,
+        collection: {
+          columns: {
+            id: true,
+            name: true,
+          },
+        },
       },
       orderBy: [desc(userLibrary.savedAt)], // Default order from DB
     });
