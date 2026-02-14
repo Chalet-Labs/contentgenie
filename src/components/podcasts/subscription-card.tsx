@@ -106,7 +106,9 @@ export function SubscriptionCard({
                 totalEpisodes={podcast.totalEpisodes || undefined}
                 latestEpisodeDate={
                   podcast.latestEpisodeDate
-                    ? Math.floor(podcast.latestEpisodeDate.getTime() / 1000)
+                    ? Math.floor(
+                        new Date(podcast.latestEpisodeDate).getTime() / 1000
+                      )
                     : undefined
                 }
                 initialSubscribed={true}
