@@ -85,18 +85,32 @@ describe("SubscriptionCard", () => {
     expect(screen.getByText("42 episodes")).toBeInTheDocument();
   });
 
-  it("stops propagation on button container click", () => {
+  it("stops event propagation on button container", () => {
     render(
       <SubscriptionCard podcast={mockPodcast} subscribedAt={subscribedAt} />
     );
     const button = screen.getByRole("button");
-    // The button's parent div has onClick={e => e.stopPropagation()}
+    // The button's parent div has onClick and onKeyDown handlers
     const buttonContainer = button.closest(
       "[class*='relative z-10']"
     ) as HTMLElement;
+
+    // Test click event
     const clickEvent = new MouseEvent("click", { bubbles: true });
-    const stopPropagationSpy = vi.spyOn(clickEvent, "stopPropagation");
+    const stopPropagationSpyClick = vi.spyOn(clickEvent, "stopPropagation");
     fireEvent(buttonContainer, clickEvent);
-    expect(stopPropagationSpy).toHaveBeenCalled();
+    expect(stopPropagationSpyClick).toHaveBeenCalled();
+
+    // Test keydown event (Enter key)
+    const keydownEvent = new KeyboardEvent("keydown", {
+      key: "Enter",
+      bubbles: true,
+    });
+    const stopPropagationSpyKeydown = vi.spyOn(
+      keydownEvent,
+      "stopPropagation"
+    );
+    fireEvent(buttonContainer, keydownEvent);
+    expect(stopPropagationSpyKeydown).toHaveBeenCalled();
   });
 });

@@ -91,7 +91,9 @@ export function SubscriptionCard({
             <div
               className="relative z-10 flex shrink-0 flex-col items-end justify-between"
               onClick={(e) => e.stopPropagation()}
-              onKeyDown={(e) => e.stopPropagation()}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") e.stopPropagation();
+              }}
             >
               <SubscribeButton
                 podcastIndexId={podcast.podcastIndexId}
