@@ -297,7 +297,7 @@ export async function searchEpisodes(
 
 // Thin wrappers around centralized utils with PodcastIndex-specific fallback.
 // PodcastIndex uses 0 to mean "no value", so falsy inputs return "Unknown".
-import { formatDuration as _formatDuration, formatDateFromUnix } from "./utils";
+import { formatDuration as _formatDuration, formatDateFromUnix } from "@/lib/utils";
 
 export function formatDuration(seconds: number): string {
   return _formatDuration(seconds) || "Unknown";

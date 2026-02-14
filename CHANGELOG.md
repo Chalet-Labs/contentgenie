@@ -15,6 +15,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Preview deployments no longer get 500 errors from schema drift — `drizzle-kit push` now runs in the Vercel build targeting the correct Neon branch
 
 ### Refactored
+- Centralized date and duration formatting into shared `formatDate`, `formatDateFromUnix`, and `formatDuration` utilities in `src/lib/utils.ts`, replacing 6 duplicate implementations across components and pages
 - Replaced unsafe `as PodcastIndexPodcast` type assertions in search route with `PodcastSearchResult` DTO (#72)
 
 ### Removed
