@@ -175,7 +175,7 @@ describe("PlayerBar", () => {
     expect(screen.getByRole("region")).toHaveAttribute("aria-label", "Audio player")
   })
 
-  it("renders episode link with correct href", () => {
+  it("renders episode links correctly in both desktop and mobile layouts", () => {
     mockState.isVisible = true
     mockState.currentEpisode = testEpisode
     render(<PlayerBar />)
@@ -183,35 +183,15 @@ describe("PlayerBar", () => {
     const links = screen.getAllByRole("link", {
       name: `View episode: ${testEpisode.title} - ${testEpisode.podcastTitle}`,
     })
-    expect(links.length).toBeGreaterThan(0)
-    expect(links[0]).toHaveAttribute("href", `/episode/${testEpisode.id}`)
-  })
 
-  it("renders episode link with aria-label", () => {
-    mockState.isVisible = true
-    mockState.currentEpisode = testEpisode
-    render(<PlayerBar />)
-
-    const links = screen.getAllByRole("link", {
-      name: `View episode: ${testEpisode.title} - ${testEpisode.podcastTitle}`,
-    })
-    expect(links[0]).toHaveAttribute(
-      "aria-label",
-      `View episode: ${testEpisode.title} - ${testEpisode.podcastTitle}`
-    )
-  })
-
-  it("renders episode link in both desktop and mobile layouts", () => {
-    mockState.isVisible = true
-    mockState.currentEpisode = testEpisode
-    render(<PlayerBar />)
-
-    const links = screen.getAllByRole("link", {
-      name: `View episode: ${testEpisode.title} - ${testEpisode.podcastTitle}`,
-    })
     expect(links).toHaveLength(2)
-    expect(links[0]).toHaveAttribute("href", `/episode/${testEpisode.id}`)
-    expect(links[1]).toHaveAttribute("href", `/episode/${testEpisode.id}`)
+    links.forEach((link) => {
+      expect(link).toHaveAttribute("href", `/episode/${testEpisode.id}`)
+      expect(link).toHaveAttribute(
+        "aria-label",
+        `View episode: ${testEpisode.title} - ${testEpisode.podcastTitle}`
+      )
+    })
   })
 
   it("shows title attribute for long episode titles", () => {

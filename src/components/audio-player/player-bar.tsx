@@ -28,6 +28,9 @@ export function PlayerBar() {
 
   if (!isVisible || !currentEpisode) return null
 
+  const episodeHref = `/episode/${currentEpisode.id}`
+  const episodeAriaLabel = `View episode: ${currentEpisode.title} - ${currentEpisode.podcastTitle}`
+
   return (
     <div
       role="region"
@@ -38,10 +41,10 @@ export function PlayerBar() {
       <div className="hidden h-[72px] items-center gap-4 px-4 md:flex">
         {/* Track info (left) */}
         <Link
-          href={`/episode/${currentEpisode.id}`}
+          href={episodeHref}
           className="group/info flex min-w-0 flex-1 items-center gap-3"
           prefetch={false}
-          aria-label={`View episode: ${currentEpisode.title} - ${currentEpisode.podcastTitle}`}
+          aria-label={episodeAriaLabel}
         >
           <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded bg-muted">
             {currentEpisode.artwork ? (
@@ -135,10 +138,10 @@ export function PlayerBar() {
         {/* Top row: info + play/pause + close */}
         <div className="flex items-center gap-3 px-3 py-2">
           <Link
-            href={`/episode/${currentEpisode.id}`}
+            href={episodeHref}
             className="group/info flex min-w-0 flex-1 items-center gap-3 active:opacity-90"
             prefetch={false}
-            aria-label={`View episode: ${currentEpisode.title} - ${currentEpisode.podcastTitle}`}
+            aria-label={episodeAriaLabel}
           >
             <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded bg-muted">
               {currentEpisode.artwork ? (
