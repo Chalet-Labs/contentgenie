@@ -29,7 +29,7 @@ import { MoveToCollection } from "./move-to-collection";
 import { NotesEditor } from "./notes-editor";
 import { BookmarksList } from "./bookmarks-list";
 import { RatingInput } from "@/components/episodes/rating-input";
-import { stripHtml } from "@/lib/utils";
+import { stripHtml, formatDate, formatDuration } from "@/lib/utils";
 import type { Episode, Podcast, UserLibraryEntry, Collection } from "@/db/schema";
 
 interface SavedEpisodeCardProps {
@@ -43,24 +43,6 @@ interface SavedEpisodeCardProps {
   onCollectionChanged?: () => void;
 }
 
-function formatDuration(seconds: number | null): string {
-  if (!seconds || seconds <= 0) return "";
-  const hours = Math.floor(seconds / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  if (hours > 0) {
-    return `${hours}h ${minutes}m`;
-  }
-  return `${minutes}m`;
-}
-
-function formatDate(date: Date | null): string {
-  if (!date) return "";
-  return new Date(date).toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
-}
 
 export function SavedEpisodeCard({ item, onRemoved, onCollectionChanged }: SavedEpisodeCardProps) {
   const [isRemoving, setIsRemoving] = useState(false);
