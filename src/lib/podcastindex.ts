@@ -295,15 +295,26 @@ export async function searchEpisodes(
   });
 }
 
-// Thin wrappers around centralized utils with PodcastIndex-specific fallback.
-// PodcastIndex uses 0 to mean "no value", so falsy inputs return "Unknown".
-import { formatDuration as _formatDuration, formatDateFromUnix } from "@/lib/utils";
-
+// Format duration in seconds to human readable string
 export function formatDuration(seconds: number): string {
-  return _formatDuration(seconds) || "Unknown";
+  if (!seconds || seconds <= 0) return "Unknown";
+
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+
+  if (hours > 0) {
+    return `${hours}h ${minutes}m`;
+  }
+  return `${minutes}m`;
 }
 
+// Format Unix timestamp to readable date
 export function formatPublishDate(timestamp: number): string {
   if (!timestamp) return "Unknown";
-  return formatDateFromUnix(timestamp) || "Unknown";
+  const date = new Date(timestamp * 1000);
+  return date.toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
 }
