@@ -18,7 +18,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { stripHtml, formatDuration, formatDateFromUnix } from "@/lib/utils";
+import { stripHtml } from "@/lib/utils";
 import { useAudioPlayerState, useAudioPlayerAPI } from "@/contexts/audio-player-context";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -69,6 +69,26 @@ interface SummaryData {
   worthItScore: number;
   worthItReason?: string;
   cached: boolean;
+}
+
+function formatDuration(seconds: number): string {
+  if (!seconds || seconds <= 0) return "Unknown";
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  if (hours > 0) {
+    return `${hours}h ${minutes}m`;
+  }
+  return `${minutes}m`;
+}
+
+function formatPublishDate(timestamp: number): string {
+  if (!timestamp) return "Unknown";
+  const date = new Date(timestamp * 1000);
+  return date.toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
 }
 
 export default function EpisodePage({ params }: EpisodePageProps) {
@@ -376,12 +396,12 @@ export default function EpisodePage({ params }: EpisodePageProps) {
           <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
             <div className="flex items-center gap-1">
               <Calendar className="h-4 w-4" />
-              <span>{formatDateFromUnix(episode.datePublished) || "Unknown"}</span>
+              <span>{formatPublishDate(episode.datePublished)}</span>
             </div>
             {episode.duration > 0 && (
               <div className="flex items-center gap-1">
                 <Clock className="h-4 w-4" />
-                <span>{formatDuration(episode.duration) || "Unknown"}</span>
+                <span>{formatDuration(episode.duration)}</span>
               </div>
             )}
             {episode.episode !== null && (

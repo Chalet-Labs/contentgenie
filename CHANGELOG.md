@@ -14,12 +14,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Episode detail page now returns 404 instead of 500 for invalid/missing PodcastIndex episode IDs (#52)
 - Preview deployments no longer get 500 errors from schema drift — `drizzle-kit push` now runs in the Vercel build targeting the correct Neon branch
 
+### Refactored
+- Replaced unsafe `as PodcastIndexPodcast` type assertions in search route with `PodcastSearchResult` DTO (#72)
+
 ### Removed
 - GitHub Actions Neon branch workflow (`.github/workflows/neon-branch.yml`) — replaced by `vercel-build` script to eliminate dual Neon branch problem
 
 ### Changed
-- Centralized date and duration formatting into shared `formatDate`, `formatDateFromUnix`, and `formatDuration` utilities in `src/lib/utils.ts`, replacing 6 duplicate implementations across components and pages
-- Replaced unsafe `as PodcastIndexPodcast` type assertions in search route with `PodcastSearchResult` DTO (#72)
 - Consolidated `getEpisodeAverageRating` into a single JOIN query, reducing database round-trips from 2 to 1
 - Optimized dashboard stats retrieval by using SQL `COUNT(*)` aggregation instead of in-memory counting, significantly reducing memory and network overhead (#71)
 - Optimized collections sidebar loading by eliminating N+1 database queries in `getUserCollections` (single SQL aggregation via LEFT JOIN + GROUP BY)

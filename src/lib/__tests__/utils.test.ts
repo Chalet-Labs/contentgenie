@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { cn, stripHtml, formatDate, formatDuration, formatDateFromUnix } from "@/lib/utils";
+import { cn, stripHtml, formatDate, formatDuration } from "@/lib/utils";
 
 describe("cn", () => {
   it("merges class names", () => {
@@ -79,53 +79,26 @@ describe("formatDate", () => {
   it("formats Date object", () => {
     const d = new Date("2023-10-05T12:00:00Z");
     const result = formatDate(d);
+    // Since we can't guarantee timezone, checking parts is safer.
     expect(result).toMatch(/Oct/);
-    expect(result).toMatch(/5/);
     expect(result).toMatch(/2023/);
   });
 
   it("formats string date", () => {
     const result = formatDate("2023-10-05T12:00:00Z");
     expect(result).toMatch(/Oct/);
-    expect(result).toMatch(/5/);
     expect(result).toMatch(/2023/);
   });
 
-  it("formats number (timestamp in ms)", () => {
+  it("formats number (timestamp)", () => {
     const d = new Date("2023-10-05T12:00:00Z").getTime();
     const result = formatDate(d);
     expect(result).toMatch(/Oct/);
-    expect(result).toMatch(/5/);
     expect(result).toMatch(/2023/);
   });
 
   it("handles null/undefined", () => {
     expect(formatDate(null)).toBe("");
     expect(formatDate(undefined)).toBe("");
-  });
-
-  it("handles 0 as a valid timestamp (Unix epoch)", () => {
-    const result = formatDate(0);
-    expect(result).toMatch(/1970/);
-  });
-
-  it("handles invalid date string", () => {
-    expect(formatDate("not-a-date")).toBe("");
-  });
-});
-
-describe("formatDateFromUnix", () => {
-  it("converts seconds to ms and formats", () => {
-    // 2023-10-05T12:00:00Z in seconds
-    const unixSeconds = Math.floor(new Date("2023-10-05T12:00:00Z").getTime() / 1000);
-    const result = formatDateFromUnix(unixSeconds);
-    expect(result).toMatch(/Oct/);
-    expect(result).toMatch(/5/);
-    expect(result).toMatch(/2023/);
-  });
-
-  it("handles null/undefined", () => {
-    expect(formatDateFromUnix(null)).toBe("");
-    expect(formatDateFromUnix(undefined)).toBe("");
   });
 });

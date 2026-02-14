@@ -5,7 +5,6 @@ import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Bookmark, ChevronRight, Rss, Star } from "lucide-react";
-import { formatDate } from "@/lib/utils";
 import type { Episode, Podcast, UserLibraryEntry } from "@/db/schema";
 
 export type LibraryItemWithRelations = Pick<
@@ -20,6 +19,14 @@ export type LibraryItemWithRelations = Pick<
 export interface SavedItemsProps {
   items: LibraryItemWithRelations[];
   isLoading?: boolean;
+}
+
+function formatDate(date: Date | null): string {
+  if (!date) return "";
+  return new Date(date).toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+  });
 }
 
 export function SavedItems({ items, isLoading }: SavedItemsProps) {
@@ -113,7 +120,7 @@ export function SavedItems({ items, isLoading }: SavedItemsProps) {
                 {item.episode.podcast.title}
               </p>
               <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
-                <span>Saved {formatDate(item.savedAt, { includeYear: false })}</span>
+                <span>Saved {formatDate(item.savedAt)}</span>
                 {item.rating && (
                   <span className="flex items-center gap-0.5 text-yellow-500">
                     <Star className="h-3 w-3 fill-current" />
