@@ -23,6 +23,7 @@ export function DiscoverContent() {
     setSearchQuery(urlQuery);
 
     if (!urlQuery.trim()) {
+      setIsLoading(false);
       setPodcasts([]);
       setError(null);
       return;
@@ -30,32 +31,39 @@ export function DiscoverContent() {
 
     const controller = new AbortController();
 
-    setIsLoading(true);
-    setError(null);
+    const fetchData = async () => {
+      setIsLoading(true);
+      setError(null);
+      try {
+        const response = await fetch(
+          `/api/podcasts/search?q=${encodeURIComponent(urlQuery)}&max=20`,
+          { signal: controller.signal }
+        );
 
-    fetch(`/api/podcasts/search?q=${encodeURIComponent(urlQuery)}&max=20`, {
-      signal: controller.signal,
-    })
-      .then(async (response) => {
         if (!response.ok) {
           const data = await response.json();
           throw new Error(data.error || "Failed to search podcasts");
         }
-        return response.json();
-      })
-      .then((data) => {
+
+        const data = await response.json();
         setPodcasts(data.podcasts || []);
-        setIsLoading(false);
-      })
-      .catch((err) => {
-        if (controller.signal.aborted) return;
+      } catch (err) {
+        if (err instanceof DOMException && err.name === "AbortError") {
+          return;
+        }
         console.error("Search error:", err);
         setError(
           err instanceof Error ? err.message : "Failed to search podcasts"
         );
         setPodcasts([]);
-        setIsLoading(false);
-      });
+      } finally {
+        if (!controller.signal.aborted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    fetchData();
 
     return () => controller.abort();
   }, [urlQuery]);
