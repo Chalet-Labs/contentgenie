@@ -6,7 +6,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { RetryButton } from "./retry-button";
+import { RetryButton } from "@/app/offline/retry-button";
 
 export const metadata: Metadata = {
   title: "Offline",
