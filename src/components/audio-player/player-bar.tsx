@@ -1,6 +1,7 @@
 "use client"
 
 import Image from "next/image"
+import Link from "next/link"
 import {
   Play,
   Pause,
@@ -36,7 +37,12 @@ export function PlayerBar() {
       {/* Desktop layout (md+): single row */}
       <div className="hidden h-[72px] items-center gap-4 px-4 md:flex">
         {/* Track info (left) */}
-        <div className="flex min-w-0 flex-1 items-center gap-3">
+        <Link
+          href={`/episode/${currentEpisode.id}`}
+          className="group/info flex min-w-0 flex-1 items-center gap-3"
+          prefetch={false}
+          aria-label={`View episode: ${currentEpisode.title} - ${currentEpisode.podcastTitle}`}
+        >
           <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded bg-muted">
             {currentEpisode.artwork ? (
               <Image
@@ -54,7 +60,7 @@ export function PlayerBar() {
           </div>
           <div className="min-w-0">
             <p
-              className="truncate text-sm font-medium"
+              className="truncate text-sm font-medium group-hover/info:text-primary"
               title={currentEpisode.title}
             >
               {currentEpisode.title}
@@ -66,7 +72,7 @@ export function PlayerBar() {
               {currentEpisode.podcastTitle}
             </p>
           </div>
-        </div>
+        </Link>
 
         {/* Controls (center) */}
         <div className="flex w-full max-w-xl flex-col items-center gap-1">
@@ -128,35 +134,42 @@ export function PlayerBar() {
       <div className="flex flex-col md:hidden">
         {/* Top row: info + play/pause + close */}
         <div className="flex items-center gap-3 px-3 py-2">
-          <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded bg-muted">
-            {currentEpisode.artwork ? (
-              <Image
-                src={currentEpisode.artwork}
-                alt=""
-                fill
-                className="object-cover"
-                sizes="40px"
-              />
-            ) : (
-              <div className="flex h-full w-full items-center justify-center text-muted-foreground">
-                <Rss className="h-4 w-4" />
-              </div>
-            )}
-          </div>
-          <div className="min-w-0 flex-1">
-            <p
-              className="truncate text-sm font-medium"
-              title={currentEpisode.title}
-            >
-              {currentEpisode.title}
-            </p>
-            <p
-              className="truncate text-xs text-muted-foreground"
-              title={currentEpisode.podcastTitle}
-            >
-              {currentEpisode.podcastTitle}
-            </p>
-          </div>
+          <Link
+            href={`/episode/${currentEpisode.id}`}
+            className="group/info flex min-w-0 flex-1 items-center gap-3 active:opacity-90"
+            prefetch={false}
+            aria-label={`View episode: ${currentEpisode.title} - ${currentEpisode.podcastTitle}`}
+          >
+            <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded bg-muted">
+              {currentEpisode.artwork ? (
+                <Image
+                  src={currentEpisode.artwork}
+                  alt=""
+                  fill
+                  className="object-cover"
+                  sizes="40px"
+                />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center text-muted-foreground">
+                  <Rss className="h-4 w-4" />
+                </div>
+              )}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p
+                className="truncate text-sm font-medium group-hover/info:text-primary"
+                title={currentEpisode.title}
+              >
+                {currentEpisode.title}
+              </p>
+              <p
+                className="truncate text-xs text-muted-foreground"
+                title={currentEpisode.podcastTitle}
+              >
+                {currentEpisode.podcastTitle}
+              </p>
+            </div>
+          </Link>
           <Button
             variant="default"
             size="icon"
