@@ -11,6 +11,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Episode artwork and title in the audio player bar now link to the episode detail page (`/episode/[id]`), with hover feedback, aria-label for accessibility, and touch feedback on mobile (#115)
 
 ### Fixed
+- Cancel stale discover search requests when query changes, preventing outdated results from overwriting current results (#104)
 - Podcast page back navigation is now context-aware — shows "Back to Subscriptions", "Back to Dashboard", etc. based on where the user came from (#86)
 - Discover page search query now persists in URL (`?q=`) — back navigation, bookmarks, and shared links restore search state (#85)
 - SSRF vulnerability in podcast RSS subscription — validates URLs before fetching (#77)

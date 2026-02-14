@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -19,43 +19,46 @@ export function DiscoverContent() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleSearch = useCallback(async (query: string) => {
-    if (!query.trim()) {
+  useEffect(() => {
+    setSearchQuery(urlQuery);
+
+    if (!urlQuery.trim()) {
       setPodcasts([]);
       setError(null);
       return;
     }
 
+    const controller = new AbortController();
+
     setIsLoading(true);
     setError(null);
 
-    try {
-      const response = await fetch(
-        `/api/podcasts/search?q=${encodeURIComponent(query)}&max=20`
-      );
+    fetch(`/api/podcasts/search?q=${encodeURIComponent(urlQuery)}&max=20`, {
+      signal: controller.signal,
+    })
+      .then(async (response) => {
+        if (!response.ok) {
+          const data = await response.json();
+          throw new Error(data.error || "Failed to search podcasts");
+        }
+        return response.json();
+      })
+      .then((data) => {
+        setPodcasts(data.podcasts || []);
+        setIsLoading(false);
+      })
+      .catch((err) => {
+        if (controller.signal.aborted) return;
+        console.error("Search error:", err);
+        setError(
+          err instanceof Error ? err.message : "Failed to search podcasts"
+        );
+        setPodcasts([]);
+        setIsLoading(false);
+      });
 
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || "Failed to search podcasts");
-      }
-
-      const data = await response.json();
-      setPodcasts(data.podcasts || []);
-    } catch (err) {
-      console.error("Search error:", err);
-      setError(
-        err instanceof Error ? err.message : "Failed to search podcasts"
-      );
-      setPodcasts([]);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    setSearchQuery(urlQuery);
-    handleSearch(urlQuery);
-  }, [urlQuery, handleSearch]);
+    return () => controller.abort();
+  }, [urlQuery]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
