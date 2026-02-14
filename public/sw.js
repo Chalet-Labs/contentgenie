@@ -48,7 +48,10 @@ self.addEventListener("fetch", (event) => {
           fetch(request).then((response) => {
             if (response.ok) {
               const clone = response.clone();
-              caches.open(CACHE_VERSION).then((cache) => cache.put(request, clone));
+              caches
+                .open(CACHE_VERSION)
+                .then((cache) => cache.put(request, clone))
+                .catch((err) => console.error("SW cache.put failed:", err));
             }
             return response;
           })
