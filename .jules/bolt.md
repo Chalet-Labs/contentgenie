@@ -13,3 +13,7 @@
 ## 2026-02-13 - Selective Column Fetching for Large Text Fields
 **Learning:** Drizzle ORM's relational query API (`db.query`) fetches all columns by default. When related entities (like `episodes`) contain large text fields (like `transcription` or `summary`), fetching a list of these entities can result in massive database payloads (megabytes) even if only the title and ID are displayed. Using the `columns` property to explicitly select only needed fields significantly reduces database I/O, network bandwidth, and application memory usage.
 **Action:** Always use selective column fetching (`columns`) when querying lists of entities that contain high-volume data fields that are not displayed in the list.
+
+## 2026-02-14 - JOIN for Existence Checks
+**Learning:** Checking for an item's existence in a junction table (e.g., checking if an episode is in a user's library using a external ID) is often done via sequential queries: find entity by external ID, then find junction entry by internal ID. This is inefficient. Using a single `db.select()` with a JOIN and `.limit(1)` consolidates the operation into one database round-trip and avoids fetching the full entity data.
+**Action:** Replace multi-step existence checks with a single JOIN query.

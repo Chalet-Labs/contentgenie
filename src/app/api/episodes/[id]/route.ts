@@ -125,8 +125,18 @@ export async function GET(
     // Check if we have a cached summary in the database
     let summary = null;
     try {
+      // BOLT OPTIMIZATION: Selective column fetching to avoid loading large transcription fields
+      // when only checking for cached summary data.
+      // Expected impact: Significant reduction in DB I/O and memory usage per episode view.
       const cachedEpisode = await db.query.episodes.findFirst({
         where: eq(episodes.podcastIndexId, episodeId.toString()),
+        columns: {
+          summary: true,
+          keyTakeaways: true,
+          worthItScore: true,
+          worthItReason: true,
+          processedAt: true,
+        },
       });
 
       if (cachedEpisode?.summary && cachedEpisode?.processedAt) {
