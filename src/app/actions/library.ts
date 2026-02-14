@@ -47,6 +47,7 @@ export async function saveEpisodeToLibrary(episodeData: EpisodeData) {
     // Ensure podcast exists in our database
     let podcast = await db.query.podcasts.findFirst({
       where: eq(podcasts.podcastIndexId, episodeData.podcast.podcastIndexId),
+      columns: { id: true },
     });
 
     let podcastId: number;
@@ -73,6 +74,7 @@ export async function saveEpisodeToLibrary(episodeData: EpisodeData) {
     // Ensure episode exists in our database
     let episode = await db.query.episodes.findFirst({
       where: eq(episodes.podcastIndexId, episodeData.podcastIndexId),
+      columns: { id: true },
     });
 
     let episodeId: number;
@@ -132,9 +134,10 @@ export async function removeEpisodeFromLibrary(episodePodcastIndexId: string) {
   }
 
   try {
-    // Find the episode
+    // BOLT OPTIMIZATION: Selective column fetching to avoid loading large text fields.
     const episode = await db.query.episodes.findFirst({
       where: eq(episodes.podcastIndexId, episodePodcastIndexId),
+      columns: { id: true },
     });
 
     if (!episode) {
@@ -170,20 +173,20 @@ export async function isEpisodeSaved(episodePodcastIndexId: string): Promise<boo
   }
 
   try {
-    const episode = await db.query.episodes.findFirst({
-      where: eq(episodes.podcastIndexId, episodePodcastIndexId),
-    });
-
-    if (!episode) {
-      return false;
-    }
-
-    const libraryEntry = await db.query.userLibrary.findFirst({
-      where: and(
-        eq(userLibrary.userId, userId),
-        eq(userLibrary.episodeId, episode.id)
-      ),
-    });
+    // BOLT OPTIMIZATION: Use a single JOIN query to check existence in the library.
+    // This replaces two separate queries and avoids fetching high-volume episode data.
+    // Expected impact: ~50% reduction in query latency and significant reduction in DB data transfer.
+    const [libraryEntry] = await db
+      .select({ id: userLibrary.id })
+      .from(userLibrary)
+      .innerJoin(episodes, eq(userLibrary.episodeId, episodes.id))
+      .where(
+        and(
+          eq(userLibrary.userId, userId),
+          eq(episodes.podcastIndexId, episodePodcastIndexId)
+        )
+      )
+      .limit(1);
 
     return !!libraryEntry;
   } catch (error) {
@@ -302,8 +305,10 @@ export async function updateLibraryNotes(
   }
 
   try {
+    // BOLT OPTIMIZATION: Selective column fetching to avoid loading large text fields.
     const episode = await db.query.episodes.findFirst({
       where: eq(episodes.podcastIndexId, episodePodcastIndexId),
+      columns: { id: true },
     });
 
     if (!episode) {
@@ -461,8 +466,10 @@ export async function updateLibraryRating(
   }
 
   try {
+    // BOLT OPTIMIZATION: Selective column fetching to avoid loading large text fields.
     const episode = await db.query.episodes.findFirst({
       where: eq(episodes.podcastIndexId, episodePodcastIndexId),
+      columns: { id: true },
     });
 
     if (!episode) {
