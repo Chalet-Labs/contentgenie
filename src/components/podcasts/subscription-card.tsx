@@ -44,9 +44,9 @@ export function SubscriptionCard({
             {/* Podcast info */}
             <div className="flex flex-1 flex-col gap-2">
               <div>
-                <span className="font-semibold group-hover:text-primary">
+                <h3 className="font-semibold group-hover:text-primary">
                   {podcast.title}
-                </span>
+                </h3>
                 {podcast.publisher && (
                   <p className="text-sm text-muted-foreground">
                     {podcast.publisher}
