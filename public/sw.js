@@ -40,14 +40,16 @@ self.addEventListener("fetch", (event) => {
     url.pathname.startsWith("/_next/static/") ||
     /\.(js|css|woff2|woff|ttf|png|jpg|jpeg|svg|ico)$/.test(url.pathname);
 
-  if (isStaticAsset) {
+  if (isStaticAsset && request.method === "GET") {
     event.respondWith(
       caches.match(request).then(
         (cached) =>
           cached ||
           fetch(request).then((response) => {
-            const clone = response.clone();
-            caches.open(CACHE_VERSION).then((cache) => cache.put(request, clone));
+            if (response.ok) {
+              const clone = response.clone();
+              caches.open(CACHE_VERSION).then((cache) => cache.put(request, clone));
+            }
             return response;
           })
       )
