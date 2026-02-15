@@ -216,11 +216,13 @@ export default async function PodcastPage({ params, searchParams }: PodcastPageP
               <BatchSummarizeButton
                 episodeIds={episodes.map((e) => e.id)}
               />
-              <ShareButton
-                title={podcast.title}
-                text="Check out this podcast on ContentGenie"
-                url={`${process.env.NEXT_PUBLIC_APP_URL || ""}/podcast/${podcast.podcastIndexId}`}
-              />
+              {process.env.NEXT_PUBLIC_APP_URL && (
+                <ShareButton
+                  title={podcast.title}
+                  text="Check out this podcast on ContentGenie"
+                  url={`${process.env.NEXT_PUBLIC_APP_URL}/podcast/${podcast.podcastIndexId}`}
+                />
+              )}
             </div>
           </div>
         </div>
@@ -378,11 +380,13 @@ export default async function PodcastPage({ params, searchParams }: PodcastPageP
               <BatchSummarizeButton
                 episodeIds={episodes.map((e) => e.id)}
               />
-              <ShareButton
-                title={podcast.title}
-                text="Check out this podcast on ContentGenie"
-                url={`${process.env.NEXT_PUBLIC_APP_URL || ""}/podcast/${podcast.id}`}
-              />
+              {process.env.NEXT_PUBLIC_APP_URL && (
+                <ShareButton
+                  title={podcast.title}
+                  text="Check out this podcast on ContentGenie"
+                  url={`${process.env.NEXT_PUBLIC_APP_URL}/podcast/${podcast.id}`}
+                />
+              )}
             </div>
           </div>
         </div>

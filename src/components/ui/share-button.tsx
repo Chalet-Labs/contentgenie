@@ -23,9 +23,9 @@ export function ShareButton({
     const shareData = { title, text, url };
 
     // Try Web Share API first (mobile/PWA)
-    if (navigator.share && navigator.canShare) {
+    if (navigator.share) {
       try {
-        if (navigator.canShare(shareData)) {
+        if (!navigator.canShare || navigator.canShare(shareData)) {
           await navigator.share(shareData);
           return;
         }
@@ -50,7 +50,7 @@ export function ShareButton({
 
   return (
     <Button variant={variant} size={size} onClick={handleShare}>
-      <Share2 className="mr-2 h-4 w-4" />
+      <Share2 className="mr-2" />
       Share
     </Button>
   );

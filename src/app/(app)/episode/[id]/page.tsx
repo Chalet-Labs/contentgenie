@@ -484,12 +484,14 @@ export default function EpisodePage({ params }: EpisodePageProps) {
                 </a>
               </Button>
             )}
-            <ShareButton
-              title={episode.title}
-              text={`Check out this episode of ${podcast?.title || "a podcast"} on ContentGenie`}
-              url={`${process.env.NEXT_PUBLIC_APP_URL || ""}/episode/${episode.id}`}
-              size="lg"
-            />
+            {process.env.NEXT_PUBLIC_APP_URL && (
+              <ShareButton
+                title={episode.title}
+                text={`Check out this episode of ${podcast?.title || "a podcast"} on ContentGenie`}
+                url={`${process.env.NEXT_PUBLIC_APP_URL}/episode/${episodeId}`}
+                size="lg"
+              />
+            )}
           </div>
         </div>
       </div>

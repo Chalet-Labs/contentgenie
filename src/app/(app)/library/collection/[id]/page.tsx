@@ -131,11 +131,13 @@ export default function CollectionDetailPage() {
         </div>
         {!isLoading && collection && (
           <div className="flex items-center gap-2">
-            <ShareButton
-              title={collection.name}
-              url={`${process.env.NEXT_PUBLIC_APP_URL || ""}/library/collection/${collectionId}`}
-              size="sm"
-            />
+            {process.env.NEXT_PUBLIC_APP_URL && (
+              <ShareButton
+                title={collection.name}
+                url={`${process.env.NEXT_PUBLIC_APP_URL}/library/collection/${collectionId}`}
+                size="sm"
+              />
+            )}
             <Button
               variant="outline"
               size="sm"
