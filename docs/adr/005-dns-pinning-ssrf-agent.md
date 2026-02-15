@@ -1,8 +1,8 @@
 # ADR-005: DNS-Pinning Fetch to Eliminate TOCTOU in SSRF Protection
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-02-15
-**Issue:** [#80](https://github.com/Chalet-Labs/contentgenie/issues/80)
+**Issue:** [#80](https://github.com/Chalet-Labs/contentgenie/issues/80), [#108](https://github.com/Chalet-Labs/contentgenie/issues/108) (confirmed TOCTOU mitigation is effective)
 
 ## Context
 

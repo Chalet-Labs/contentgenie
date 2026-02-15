@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, type Mock } from "vitest";
 import { isPrivateIP, isSafeUrl, safeFetch } from "@/lib/security";
 import { dnsPinningAgent } from "@/lib/dns-pinning-agent";
 import dns from "node:dns";
@@ -204,5 +204,122 @@ describe("safeFetch", () => {
   it("returns response body for safe URLs", async () => {
     const result = await safeFetch("https://example.com/feed.xml");
     expect(result).toBe("<rss>mock</rss>");
+  });
+});
+
+describe("safeFetch DNS rebinding protection", () => {
+  let fetchSpy: Mock;
+  const dnsLookupMock = dns.lookup as unknown as Mock;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+
+    fetchSpy = vi.fn().mockResolvedValue(
+      new Response("<rss>safe</rss>", {
+        status: 200,
+        headers: { "Content-Type": "application/xml" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchSpy);
+  });
+
+  it("rejects when DNS rebinds to a private IP at connection time", async () => {
+    // Simulate DNS rebinding: isSafeUrl's lookup returns a public IP,
+    // but the agent's pinnedLookup (second call) returns a private IP.
+    let callCount = 0;
+    dnsLookupMock.mockImplementation(
+      (_hostname: string, _opts: unknown, cb?: unknown) => {
+        const callback = typeof _opts === "function" ? _opts : cb;
+        callCount++;
+        if (callCount === 1) {
+          // isSafeUrl pre-check: returns public IP — passes validation
+          (callback as Function)(null, [{ address: "93.184.216.34", family: 4 }]);
+        } else {
+          // pinnedLookup at connection time: DNS has rebinding to private IP
+          (callback as Function)(null, [{ address: "169.254.169.254", family: 4 }]);
+        }
+      },
+    );
+
+    // The agent's pinnedLookup should catch the private IP and reject the connection.
+    // fetch will throw because the agent's connect.lookup rejects.
+    fetchSpy.mockRejectedValue(
+      new Error("DNS resolution for rebind.evil.com returned private IP: 169.254.169.254"),
+    );
+
+    await expect(safeFetch("https://rebind.evil.com/feed.xml")).rejects.toThrow(
+      /private IP|169\.254\.169\.254/,
+    );
+  });
+
+  it("rejects when a redirect target DNS-rebinds to a private IP", async () => {
+    // fetch returns a redirect to a second URL
+    fetchSpy
+      .mockResolvedValueOnce(
+        new Response(null, {
+          status: 302,
+          headers: { Location: "https://redirect-target.evil.com/feed.xml" },
+        }),
+      )
+      .mockRejectedValueOnce(
+        new Error("DNS resolution for redirect-target.evil.com returned private IP: 10.0.0.1"),
+      );
+
+    // After the redirect, override DNS to simulate rebinding on the redirect target.
+    // The first two calls (isSafeUrl + fetch for initial URL) return public IPs.
+    // The third call (isSafeUrl for redirect target) returns public IP.
+    // The fourth call (pinnedLookup for redirect target) returns private IP.
+    let callCount = 0;
+    dnsLookupMock.mockImplementation(
+      (_hostname: string, _opts: unknown, cb?: unknown) => {
+        const callback = typeof _opts === "function" ? _opts : cb;
+        callCount++;
+        if (callCount <= 3) {
+          // First 3 calls: all safe (isSafeUrl + fetch for first URL, isSafeUrl for redirect)
+          (callback as Function)(null, [{ address: "93.184.216.34", family: 4 }]);
+        } else {
+          // 4th call: pinnedLookup for redirect target rebinds to private IP
+          (callback as Function)(null, [{ address: "10.0.0.1", family: 4 }]);
+        }
+      },
+    );
+
+    await expect(
+      safeFetch("https://safe-origin.com/feed.xml"),
+    ).rejects.toThrow(/private IP|10\.0\.0\.1/);
+  });
+
+  it("passes dnsPinningAgent as dispatcher on every redirect hop", async () => {
+    mockDnsPublic();
+
+    fetchSpy
+      .mockResolvedValueOnce(
+        new Response(null, {
+          status: 301,
+          headers: { Location: "https://hop1.example.com/feed.xml" },
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response(null, {
+          status: 302,
+          headers: { Location: "https://hop2.example.com/feed.xml" },
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response("<rss>final</rss>", {
+          status: 200,
+          headers: { "Content-Type": "application/xml" },
+        }),
+      );
+
+    const result = await safeFetch("https://start.example.com/feed.xml");
+    expect(result).toBe("<rss>final</rss>");
+
+    // Verify every fetch call used the dns-pinning agent as dispatcher
+    expect(fetchSpy).toHaveBeenCalledTimes(3);
+    for (const call of fetchSpy.mock.calls) {
+      expect(call[1].dispatcher).toBe(dnsPinningAgent);
+      expect(call[1].redirect).toBe("manual");
+    }
   });
 });
