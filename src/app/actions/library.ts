@@ -176,7 +176,7 @@ export async function isEpisodeSaved(episodePodcastIndexId: string): Promise<boo
     // BOLT OPTIMIZATION: Use a single JOIN query to check existence in the library.
     // This replaces two separate queries and avoids fetching high-volume episode data.
     // Expected impact: ~50% reduction in query latency and significant reduction in DB data transfer.
-    const [libraryEntry] = await db
+    const result = await db
       .select({ id: userLibrary.id })
       .from(userLibrary)
       .innerJoin(episodes, eq(userLibrary.episodeId, episodes.id))
@@ -188,7 +188,7 @@ export async function isEpisodeSaved(episodePodcastIndexId: string): Promise<boo
       )
       .limit(1);
 
-    return !!libraryEntry;
+    return result.length > 0;
   } catch (error) {
     console.error("Error checking library status:", error);
     return false;
