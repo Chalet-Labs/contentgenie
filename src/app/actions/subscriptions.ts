@@ -47,6 +47,7 @@ export async function addPodcastByRssUrl(
     // Check if podcast already exists
     const existingPodcast = await db.query.podcasts.findFirst({
       where: eq(podcasts.podcastIndexId, syntheticPodcastId),
+      columns: { id: true, title: true },
     });
 
     if (existingPodcast) {
@@ -128,6 +129,7 @@ export async function addPodcastByRssUrl(
     } else {
       const existing = await db.query.podcasts.findFirst({
         where: eq(podcasts.podcastIndexId, syntheticPodcastId),
+        columns: { id: true },
       });
       if (!existing) {
         return { success: false, error: "Failed to add podcast. Please try again." };
@@ -229,6 +231,7 @@ export async function subscribeToPodcast(podcastData: PodcastData) {
     // Ensure podcast exists in our database
     const existingPodcast = await db.query.podcasts.findFirst({
       where: eq(podcasts.podcastIndexId, podcastData.podcastIndexId),
+      columns: { id: true },
     });
 
     let podcastId: number;
@@ -309,6 +312,7 @@ export async function unsubscribeFromPodcast(podcastIndexId: string) {
     // Find the podcast
     const podcast = await db.query.podcasts.findFirst({
       where: eq(podcasts.podcastIndexId, podcastIndexId),
+      columns: { id: true },
     });
 
     if (!podcast) {
@@ -348,6 +352,7 @@ export async function isSubscribedToPodcast(
   try {
     const podcast = await db.query.podcasts.findFirst({
       where: eq(podcasts.podcastIndexId, podcastIndexId),
+      columns: { id: true },
     });
 
     if (!podcast) {
