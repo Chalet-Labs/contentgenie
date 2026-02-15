@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { isPrivateIP, isSafeUrl } from "../security";
+import { isPrivateIP, isSafeUrl, safeFetch } from "../security";
 import dns from "node:dns";
 
 vi.mock("node:dns", () => ({
@@ -151,5 +151,58 @@ describe("isSafeUrl", () => {
       },
     );
     expect(await isSafeUrl("https://nonexistent.example.com/feed.xml")).toBe(false);
+  });
+});
+
+describe("safeFetch", () => {
+  let fetchSpy: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockDnsPublic();
+
+    // Mock global fetch to avoid real network calls
+    fetchSpy = vi.fn().mockResolvedValue(
+      new Response("<rss>mock</rss>", {
+        status: 200,
+        headers: { "Content-Type": "application/xml" },
+      }),
+    );
+    vi.stubGlobal("fetch", fetchSpy);
+  });
+
+  it("passes dispatcher option to fetch", async () => {
+    await safeFetch("https://example.com/feed.xml");
+
+    expect(fetchSpy).toHaveBeenCalledWith(
+      "https://example.com/feed.xml",
+      expect.objectContaining({
+        dispatcher: expect.anything(),
+        redirect: "manual",
+      }),
+    );
+  });
+
+  it("includes dnsPinningAgent as the dispatcher", async () => {
+    await safeFetch("https://example.com/feed.xml");
+
+    const callArgs = fetchSpy.mock.calls[0][1];
+    // The dispatcher should be an undici Agent instance
+    expect(callArgs.dispatcher).toBeDefined();
+    expect(typeof callArgs.dispatcher).toBe("object");
+  });
+
+  it("still rejects unsafe URLs before fetching", async () => {
+    await expect(
+      safeFetch("http://127.0.0.1/feed.xml"),
+    ).rejects.toThrow(/Unsafe URL/);
+
+    // fetch should not have been called
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("returns response body for safe URLs", async () => {
+    const result = await safeFetch("https://example.com/feed.xml");
+    expect(result).toBe("<rss>mock</rss>");
   });
 });
