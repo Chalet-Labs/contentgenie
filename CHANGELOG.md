@@ -7,7 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
-- DNS rebinding integration tests for `safeFetch` verifying TOCTOU protection via dns-pinning agent (#108)
+- DNS rebinding tests for `safeFetch` verifying TOCTOU protection via dns-pinning agent (#108)
 - ADR-005 listed in AGENTS.md Architecture Decision Records section
 - Share button on episode, podcast, and collection pages with Web Share API support and clipboard fallback (#83)
 - Compact Worth It Score badge in episode header for above-the-fold visibility (#82)

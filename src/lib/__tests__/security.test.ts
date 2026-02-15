@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, type Mock } from "vitest";
 import { isPrivateIP, isSafeUrl, safeFetch } from "@/lib/security";
-import { dnsPinningAgent } from "@/lib/dns-pinning-agent";
+import { dnsPinningAgent, pinnedLookup } from "@/lib/dns-pinning-agent";
 import dns from "node:dns";
 
 vi.mock("node:dns", () => ({
@@ -220,7 +220,25 @@ describe("safeFetch DNS rebinding protection", () => {
         headers: { "Content-Type": "application/xml" },
       }),
     );
-    vi.stubGlobal("fetch", fetchSpy);
+
+    // Create a fetch stub that simulates undici's DNS-pinning behavior.
+    // A simple vi.stubGlobal("fetch", fetchSpy) would bypass the dispatcher,
+    // so we intercept the dispatcher option and invoke pinnedLookup manually.
+    vi.stubGlobal(
+      "fetch",
+      async (url: RequestInfo | URL, options?: RequestInit) => {
+        if ((options as Record<string, unknown>)?.dispatcher) {
+          const hostname = new URL(url.toString()).hostname;
+          await new Promise<void>((resolve, reject) => {
+            pinnedLookup(hostname, {}, (err) => {
+              if (err) return reject(err);
+              resolve();
+            });
+          });
+        }
+        return fetchSpy(url, options);
+      },
+    );
   });
 
   it("rejects when DNS rebinds to a private IP at connection time", async () => {
@@ -241,12 +259,8 @@ describe("safeFetch DNS rebinding protection", () => {
       },
     );
 
-    // The agent's pinnedLookup should catch the private IP and reject the connection.
-    // fetch will throw because the agent's connect.lookup rejects.
-    fetchSpy.mockRejectedValue(
-      new Error("DNS resolution for rebind.evil.com returned private IP: 169.254.169.254"),
-    );
-
+    // The fetch stub invokes pinnedLookup, which will call dns.lookup (2nd call),
+    // see the private IP, and reject — proving the dns-pinning agent blocks rebinding.
     await expect(safeFetch("https://rebind.evil.com/feed.xml")).rejects.toThrow(
       /private IP|169\.254\.169\.254/,
     );
@@ -254,21 +268,18 @@ describe("safeFetch DNS rebinding protection", () => {
 
   it("rejects when a redirect target DNS-rebinds to a private IP", async () => {
     // fetch returns a redirect to a second URL
-    fetchSpy
-      .mockResolvedValueOnce(
-        new Response(null, {
-          status: 302,
-          headers: { Location: "https://redirect-target.evil.com/feed.xml" },
-        }),
-      )
-      .mockRejectedValueOnce(
-        new Error("DNS resolution for redirect-target.evil.com returned private IP: 10.0.0.1"),
-      );
+    fetchSpy.mockResolvedValueOnce(
+      new Response(null, {
+        status: 302,
+        headers: { Location: "https://redirect-target.evil.com/feed.xml" },
+      }),
+    );
 
-    // After the redirect, override DNS to simulate rebinding on the redirect target.
-    // The first two calls (isSafeUrl + fetch for initial URL) return public IPs.
-    // The third call (isSafeUrl for redirect target) returns public IP.
-    // The fourth call (pinnedLookup for redirect target) returns private IP.
+    // Simulate DNS rebinding on the redirect target.
+    // Call 1: isSafeUrl (initial URL) → public IP → safe
+    // Call 2: pinnedLookup via fetch stub (initial URL) → public IP → ok
+    // Call 3: isSafeUrl (redirect URL) → public IP → safe
+    // Call 4: pinnedLookup via fetch stub (redirect URL) → private IP → rejected
     let callCount = 0;
     dnsLookupMock.mockImplementation(
       (_hostname: string, _opts: unknown, cb?: unknown) => {
