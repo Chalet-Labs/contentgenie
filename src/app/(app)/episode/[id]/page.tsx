@@ -26,6 +26,7 @@ import {
   type SummarizationStep,
 } from "@/components/episodes/summary-display";
 import { SaveButton } from "@/components/episodes/save-button";
+import { WorthItBadge } from "@/components/episodes/worth-it-badge";
 import { CommunityRating } from "@/components/episodes/community-rating";
 import { isEpisodeSaved } from "@/app/actions/library";
 import { IN_PROGRESS_STATUSES } from "@/db/schema";
@@ -269,7 +270,13 @@ export default function EpisodePage({ params }: EpisodePageProps) {
       <div className="space-y-8">
         <Skeleton className="h-5 w-40" />
         <div className="flex flex-col gap-6 md:flex-row">
-          <Skeleton className="h-48 w-48 shrink-0 rounded-xl" />
+          <div className="flex flex-row items-center gap-4 md:flex-col md:items-start">
+            <Skeleton className="h-48 w-48 shrink-0 rounded-xl" />
+            <div className="flex items-center gap-2">
+              <Skeleton className="h-10 w-10 rounded-full" />
+              <Skeleton className="h-4 w-24" />
+            </div>
+          </div>
           <div className="flex flex-1 flex-col gap-4">
             <Skeleton className="h-8 w-3/4" />
             <Skeleton className="h-6 w-1/2" />
@@ -341,22 +348,25 @@ export default function EpisodePage({ params }: EpisodePageProps) {
 
       {/* Episode header */}
       <div className="flex flex-col gap-6 md:flex-row">
-        {/* Episode artwork */}
-        <div className="relative h-48 w-48 shrink-0 overflow-hidden rounded-xl bg-muted shadow-lg">
-          {artworkUrl ? (
-            <Image
-              src={artworkUrl}
-              alt={episode.title}
-              fill
-              className="object-cover"
-              sizes="192px"
-              priority
-            />
-          ) : (
-            <div className="flex h-full w-full items-center justify-center text-muted-foreground">
-              <Rss className="h-16 w-16" />
-            </div>
-          )}
+        {/* Episode artwork + badge */}
+        <div className="flex flex-row items-center gap-4 md:flex-col md:items-start">
+          <div className="relative h-48 w-48 shrink-0 overflow-hidden rounded-xl bg-muted shadow-lg">
+            {artworkUrl ? (
+              <Image
+                src={artworkUrl}
+                alt={episode.title}
+                fill
+                className="object-cover"
+                sizes="192px"
+                priority
+              />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center text-muted-foreground">
+                <Rss className="h-16 w-16" />
+              </div>
+            )}
+          </div>
+          <WorthItBadge score={summaryData?.worthItScore ?? null} />
         </div>
 
         {/* Episode info */}

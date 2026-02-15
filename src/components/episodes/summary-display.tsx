@@ -13,6 +13,7 @@ import {
   ChevronDown,
   ChevronUp,
 } from "lucide-react";
+import { getScoreColor, getScoreLabel } from "@/lib/score-utils";
 
 export type SummarizationStep =
   | "fetching-episode"
@@ -64,23 +65,6 @@ export function SummaryDisplay({
   onGenerateSummary,
 }: SummaryDisplayProps) {
   const [showFullSummary, setShowFullSummary] = useState(false);
-
-  // Determine score color and label
-  const getScoreColor = (score: number) => {
-    if (score >= 8) return "bg-green-500";
-    if (score >= 6) return "bg-emerald-500";
-    if (score >= 4) return "bg-yellow-500";
-    if (score >= 2) return "bg-orange-500";
-    return "bg-red-500";
-  };
-
-  const getScoreLabel = (score: number) => {
-    if (score >= 8) return "Highly Recommended";
-    if (score >= 6) return "Worth Your Time";
-    if (score >= 4) return "Decent";
-    if (score >= 2) return "Skip Unless Interested";
-    return "Not Recommended";
-  };
 
   // Loading state with step progress
   if (isLoading) {
