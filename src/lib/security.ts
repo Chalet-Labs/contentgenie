@@ -2,6 +2,8 @@ import net from "node:net";
 import dns from "node:dns";
 import { promisify } from "node:util";
 
+import { dnsPinningAgent } from "@/lib/dns-pinning-agent";
+
 const lookup = promisify(dns.lookup);
 
 /**
@@ -192,12 +194,15 @@ export async function safeFetch(
       throw new Error(`Unsafe URL detected: ${currentUrl}`);
     }
 
-    // 2. Fetch with manual redirect handling
+    // 2. Fetch with manual redirect handling and DNS-pinning agent
+    // The dispatcher option is a Node.js/undici extension to RequestInit
+    // that allows passing a custom Agent for DNS pinning.
     const response = await fetch(currentUrl, {
       ...baseOptions,
       headers: currentHeaders,
       redirect: "manual",
-    });
+      dispatcher: dnsPinningAgent,
+    } as RequestInit);
 
     // 3. Handle redirects (301, 302, 303, 307, 308) — exclude 304 Not Modified
     const REDIRECT_CODES = [301, 302, 303, 307, 308];
