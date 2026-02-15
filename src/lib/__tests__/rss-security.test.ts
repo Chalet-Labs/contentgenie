@@ -1,9 +1,26 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { parsePodcastFeed } from "@/lib/rss";
 
+// Mock dns.lookup to control hostname resolution in SSRF tests.
+// vi.hoisted ensures the mock is available at hoist time for vi.mock.
+const { mockDnsLookup } = vi.hoisted(() => ({
+  mockDnsLookup: vi.fn(),
+}));
+vi.mock("node:dns", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("node:dns")>();
+  return {
+    ...actual,
+    default: {
+      ...(actual as Record<string, unknown>),
+      lookup: mockDnsLookup,
+    },
+    lookup: mockDnsLookup,
+  };
+});
+
 // Mock fetch
 const mockFetch = vi.fn();
-const PUBLIC_IP = "93.184.216.34";
+const PUBLIC_IP = "93.184.216.34"; // example.com (public IP for deterministic SSRF tests)
 
 describe("SSRF Protection via safeFetch", () => {
   beforeEach(() => {
@@ -155,5 +172,66 @@ describe("SSRF Protection via safeFetch", () => {
     await expect(parsePodcastFeed(`https://${PUBLIC_IP}/chain-start.xml`)).rejects.toThrow(
       /unsafe url/i
     );
+  });
+});
+
+describe("SSRF Protection via hostname DNS resolution", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.stubGlobal("fetch", mockFetch);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+  });
+
+  it("should resolve hostname via DNS and allow when all IPs are public", async () => {
+    mockDnsLookup.mockImplementation(
+      (hostname: string, options: unknown, callback: Function) => {
+        callback(null, [{ address: "93.184.216.34", family: 4 }]);
+      }
+    );
+
+    mockFetch.mockImplementation(async (url: string | URL) => {
+      if (url.toString() === "https://safe.example.com/feed.xml") {
+        return {
+          ok: true,
+          status: 200,
+          text: async () =>
+            '<?xml version="1.0" encoding="UTF-8"?><rss version="2.0"><channel><title>DNS Resolved Podcast</title><description>Test</description><item><title>Ep</title><enclosure url="https://example.com/ep.mp3" type="audio/mpeg"/></item></channel></rss>',
+        } as Response;
+      }
+      return { ok: false, status: 404 } as Response;
+    });
+
+    const result = await parsePodcastFeed("https://safe.example.com/feed.xml");
+    expect(result.title).toBe("DNS Resolved Podcast");
+    // Verify DNS lookup was actually called (hostname path, not IP fast-path)
+    expect(mockDnsLookup).toHaveBeenCalledWith(
+      "safe.example.com",
+      expect.objectContaining({ all: true }),
+      expect.any(Function)
+    );
+  });
+
+  it("should block hostname that resolves to a private IP", async () => {
+    mockDnsLookup.mockImplementation(
+      (hostname: string, options: unknown, callback: Function) => {
+        callback(null, [{ address: "10.0.0.1", family: 4 }]);
+      }
+    );
+
+    await expect(
+      parsePodcastFeed("https://evil.example.com/feed.xml")
+    ).rejects.toThrow(/unsafe url/i);
+
+    expect(mockDnsLookup).toHaveBeenCalledWith(
+      "evil.example.com",
+      expect.objectContaining({ all: true }),
+      expect.any(Function)
+    );
+    // Fetch should never be called — URL blocked before fetching
+    expect(mockFetch).not.toHaveBeenCalled();
   });
 });
