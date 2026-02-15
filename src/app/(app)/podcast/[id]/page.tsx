@@ -9,6 +9,7 @@ import { stripHtml } from "@/lib/utils";
 import { EpisodeList } from "@/components/podcasts/episode-list";
 import { SubscribeButton } from "@/components/podcasts/subscribe-button";
 import { BatchSummarizeButton } from "@/components/podcasts/batch-summarize-button";
+import { ShareButton } from "@/components/ui/share-button";
 import {
   getPodcastById,
   getEpisodesByFeedId,
@@ -215,6 +216,11 @@ export default async function PodcastPage({ params, searchParams }: PodcastPageP
               <BatchSummarizeButton
                 episodeIds={episodes.map((e) => e.id)}
               />
+              <ShareButton
+                title={podcast.title}
+                text="Check out this podcast on ContentGenie"
+                url={`${process.env.NEXT_PUBLIC_APP_URL || ""}/podcast/${podcast.podcastIndexId}`}
+              />
             </div>
           </div>
         </div>
@@ -371,6 +377,11 @@ export default async function PodcastPage({ params, searchParams }: PodcastPageP
               )}
               <BatchSummarizeButton
                 episodeIds={episodes.map((e) => e.id)}
+              />
+              <ShareButton
+                title={podcast.title}
+                text="Check out this podcast on ContentGenie"
+                url={`${process.env.NEXT_PUBLIC_APP_URL || ""}/podcast/${podcast.id}`}
               />
             </div>
           </div>

@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
 import { ArrowLeft, Bookmark, Pencil, Trash2, Loader2, Folder } from "lucide-react";
+import { ShareButton } from "@/components/ui/share-button";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SavedEpisodeCard } from "@/components/library/saved-episode-card";
@@ -130,6 +131,11 @@ export default function CollectionDetailPage() {
         </div>
         {!isLoading && collection && (
           <div className="flex items-center gap-2">
+            <ShareButton
+              title={collection.name}
+              url={`${process.env.NEXT_PUBLIC_APP_URL || ""}/library/collection/${collectionId}`}
+              size="sm"
+            />
             <Button
               variant="outline"
               size="sm"

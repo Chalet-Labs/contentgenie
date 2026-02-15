@@ -26,6 +26,7 @@ import {
   type SummarizationStep,
 } from "@/components/episodes/summary-display";
 import { SaveButton } from "@/components/episodes/save-button";
+import { ShareButton } from "@/components/ui/share-button";
 import { WorthItBadge } from "@/components/episodes/worth-it-badge";
 import { CommunityRating } from "@/components/episodes/community-rating";
 import { isEpisodeSaved } from "@/app/actions/library";
@@ -483,6 +484,12 @@ export default function EpisodePage({ params }: EpisodePageProps) {
                 </a>
               </Button>
             )}
+            <ShareButton
+              title={episode.title}
+              text={`Check out this episode of ${podcast?.title || "a podcast"} on ContentGenie`}
+              url={`${process.env.NEXT_PUBLIC_APP_URL || ""}/episode/${episode.id}`}
+              size="lg"
+            />
           </div>
         </div>
       </div>
