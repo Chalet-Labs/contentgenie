@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Compact Worth It Score badge in episode header for above-the-fold visibility (#82)
 - PWA support: app is installable on desktop and mobile with offline fallback page, custom service worker, and web app manifest (#87)
 - Episode artwork and title in the audio player bar now link to the episode detail page (`/episode/[id]`), with hover feedback, aria-label for accessibility, and touch feedback on mobile (#115)
 
