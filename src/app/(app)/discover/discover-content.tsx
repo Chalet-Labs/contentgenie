@@ -46,6 +46,9 @@ export function DiscoverContent() {
         }
 
         const data = await response.json();
+        if (controller.signal.aborted) {
+          return;
+        }
         setPodcasts(data.podcasts || []);
       } catch (err) {
         if (err instanceof DOMException && err.name === "AbortError") {
