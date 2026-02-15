@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- DNS rebinding integration tests for `safeFetch` verifying TOCTOU protection via dns-pinning agent (#108)
+- ADR-005 listed in AGENTS.md Architecture Decision Records section
 - Share button on episode, podcast, and collection pages with Web Share API support and clipboard fallback (#83)
 - Compact Worth It Score badge in episode header for above-the-fold visibility (#82)
 - PWA support: app is installable on desktop and mobile with offline fallback page, custom service worker, and web app manifest (#87)
@@ -30,6 +32,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - GitHub Actions Neon branch workflow (`.github/workflows/neon-branch.yml`) — replaced by `vercel-build` script to eliminate dual Neon branch problem
 
 ### Changed
+- ADR-005 (DNS-Pinning SSRF Agent) status updated from "Proposed" to "Accepted" with #108 cross-reference
 - Made entire subscription card clickable, consistent with podcast and episode cards (#84)
 - Consolidated `getEpisodeAverageRating` into a single JOIN query, reducing database round-trips from 2 to 1
 - Optimized dashboard stats retrieval by using SQL `COUNT(*)` aggregation instead of in-memory counting, significantly reducing memory and network overhead (#71)
