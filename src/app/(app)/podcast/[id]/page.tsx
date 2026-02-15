@@ -58,6 +58,7 @@ async function loadRssPodcast(podcastIndexId: string) {
     where: eq(episodesTable.podcastId, podcast.id),
     orderBy: [descOrder(episodesTable.publishDate)],
     limit: 50,
+    // id omitted: RSS mapping uses podcastIndexId
     columns: {
       podcastIndexId: true,
       title: true,
