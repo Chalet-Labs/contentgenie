@@ -84,8 +84,8 @@ Let `fetch` resolve DNS and connect normally, but inspect the socket's remote ad
    - Tests for DNS rebinding scenarios (mock DNS returning private IP).
    - Tests confirming TLS hostname verification is preserved.
 
-4. **Integration tests: update `src/lib/__tests__/rss-security.test.ts`**
-   - Add test cases verifying end-to-end protection against DNS rebinding through the `parsePodcastFeed` -> `safeFetch` -> DNS-pinning agent chain.
+4. **Integration tests: `src/lib/__tests__/security.test.ts`**
+   - Add integration tests to `safeFetch` to verify the DNS-pinning agent is passed as the dispatcher.
 
 ## Consequences
 
