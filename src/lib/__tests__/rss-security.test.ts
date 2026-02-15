@@ -110,7 +110,7 @@ describe("SSRF Protection via safeFetch", () => {
   });
 
   it("should treat redirects to private IPs as unsafe", async () => {
-    // Initial URL is safe (example.com), but redirect target is a private IP
+    // Initial URL is safe (PUBLIC_IP), but redirect target is a private IP
     mockFetch.mockImplementation(async (url: string | URL) => {
       const urlStr = url.toString();
       if (urlStr === `https://${PUBLIC_IP}/encoded-feed.xml`) {
@@ -130,7 +130,7 @@ describe("SSRF Protection via safeFetch", () => {
   });
 
   it("should detect unsafe targets in a multi-hop redirect chain", async () => {
-    // First hop is safe (example.com → example.com), second hop goes to private IP
+    // First hop is safe (PUBLIC_IP → PUBLIC_IP), second hop goes to private IP
     mockFetch.mockImplementation(async (url: string | URL) => {
       const urlStr = url.toString();
       if (urlStr === `https://${PUBLIC_IP}/chain-start.xml`) {

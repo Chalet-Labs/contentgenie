@@ -36,7 +36,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - PodcastIndex API authentication headers are now stabilized to 30-second windows, enabling Next.js `fetch` caching and reducing redundant network requests
 - Rate limiting upgraded from in-memory to distributed (Postgres-backed) for serverless compatibility
 - CI workflow simplified to quality checks only (lint, test, Storybook); Vercel handles builds and deploys
-- Pinned `packageManager` to Bun and updated SSRF redirect tests to use public-IP fixtures for deterministic safety checks
+- Updated SSRF redirect tests to use public-IP fixtures for deterministic safety checks
 
 ### Added
 - Persistent in-app audio player with play/pause, seek, skip ±15s, playback speed, volume, and OS media controls via Media Session API (#93)
