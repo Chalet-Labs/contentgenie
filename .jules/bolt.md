@@ -17,3 +17,7 @@
 ## 2026-02-14 - JOIN for Existence Checks
 **Learning:** Checking for an item's existence in a junction table (e.g., checking if an episode is in a user's library using a external ID) is often done via sequential queries: find entity by external ID, then find junction entry by internal ID. This is inefficient. Using a single `db.select()` with a JOIN and `.limit(1)` consolidates the operation into one database round-trip and avoids fetching the full entity data.
 **Action:** Replace multi-step existence checks with a single JOIN query.
+
+## 2026-02-15 - Prefer Column Exclusion for Maintainability
+**Learning:** When using Drizzle's relational query API (`db.query`), optimizing for large text fields can be done via whitelisting (`columns: { title: true, ... }`) or blacklisting (`columns: { transcription: false }`). Blacklisting is more maintainable as it ensures new metadata fields added to the schema automatically flow through to the application without breaking consumers that expect a full object, while still providing the performance benefit of skipping high-volume data.
+**Action:** Use column exclusion (`fieldName: false`) instead of whitelisting for better schema maintainability when optimizing for large fields.
