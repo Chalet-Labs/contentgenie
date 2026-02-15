@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { isPrivateIP, isSafeUrl, safeFetch } from "../security";
+import { isPrivateIP, isSafeUrl, safeFetch } from "@/lib/security";
+import { dnsPinningAgent } from "@/lib/dns-pinning-agent";
 import dns from "node:dns";
 
 vi.mock("node:dns", () => ({
@@ -187,9 +188,8 @@ describe("safeFetch", () => {
     await safeFetch("https://example.com/feed.xml");
 
     const callArgs = fetchSpy.mock.calls[0][1];
-    // The dispatcher should be an undici Agent instance
-    expect(callArgs.dispatcher).toBeDefined();
-    expect(typeof callArgs.dispatcher).toBe("object");
+    // Verify the exact singleton agent is used for DNS-pinning SSRF protection
+    expect(callArgs.dispatcher).toBe(dnsPinningAgent);
   });
 
   it("still rejects unsafe URLs before fetching", async () => {

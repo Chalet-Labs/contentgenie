@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import dns from "node:dns";
 
-import { pinnedLookup, createDnsPinningAgent } from "../dns-pinning-agent";
+import { pinnedLookup, createDnsPinningAgent } from "@/lib/dns-pinning-agent";
 
 vi.mock("node:dns", () => ({
   default: {
