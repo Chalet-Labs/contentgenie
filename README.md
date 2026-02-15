@@ -20,19 +20,14 @@ ContentGenie helps you find podcasts, get AI-generated episode summaries with ke
 
 ### Prerequisites
 
-- [Bun](https://bun.sh/) `v1.3.9` (package manager and script runner)
+- [Bun](https://bun.sh/) (package manager and script runner)
 - [Doppler CLI](https://docs.doppler.com/docs/install-cli) for secrets management
 - Access to the Doppler `contentgenie` project
 
 ```bash
 # Install Bun
 curl -fsSL https://bun.sh/install | bash
-
-# Verify the required version
-bun --version
 ```
-
-This repo relies on the `packageManager` pin in `package.json` (`bun@1.3.9`). If your local Bun version differs, switch to `1.3.9` before running project scripts.
 
 ### Setup
 
