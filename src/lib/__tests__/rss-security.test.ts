@@ -1,24 +1,14 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { parsePodcastFeed } from "@/lib/rss";
-import * as security from "@/lib/security";
-
-// Mock isSafeUrl
-vi.mock("@/lib/security", async () => {
-  const actual = await vi.importActual("@/lib/security");
-  return {
-    ...actual,
-    isSafeUrl: vi.fn(),
-  };
-});
 
 // Mock fetch
 const mockFetch = vi.fn();
+const PUBLIC_IP = "93.184.216.34";
 
 describe("SSRF Protection via safeFetch", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.stubGlobal("fetch", mockFetch);
-    vi.mocked(security.isSafeUrl).mockResolvedValue(true);
   });
 
   afterEach(() => {
@@ -30,7 +20,7 @@ describe("SSRF Protection via safeFetch", () => {
     // Simulate a redirect to a private IP
     mockFetch.mockImplementation(async (url: string | URL, init?: RequestInit) => {
       const urlStr = url.toString();
-      if (urlStr === "https://example.com/feed.xml") {
+      if (urlStr === `https://${PUBLIC_IP}/feed.xml`) {
         return {
           ok: false,
           status: 301,
@@ -41,17 +31,11 @@ describe("SSRF Protection via safeFetch", () => {
       return { ok: false, status: 404 } as Response;
     });
 
-    // Mock isSafeUrl behavior
-    vi.mocked(security.isSafeUrl).mockImplementation(async (url) => {
-      if (url.includes("127.0.0.1")) return false;
-      return true;
-    });
-
     // This should fail with an error about unsafe redirect
-    await expect(parsePodcastFeed("https://example.com/feed.xml")).rejects.toThrow();
+    await expect(parsePodcastFeed(`https://${PUBLIC_IP}/feed.xml`)).rejects.toThrow();
 
     // Ensure fetch was called for the initial URL
-    expect(mockFetch).toHaveBeenCalledWith("https://example.com/feed.xml", expect.objectContaining({ redirect: "manual" }));
+    expect(mockFetch).toHaveBeenCalledWith(`https://${PUBLIC_IP}/feed.xml`, expect.objectContaining({ redirect: "manual" }));
     // Ensure fetch was NOT called for the private IP
     expect(mockFetch).not.toHaveBeenCalledWith("http://127.0.0.1/secret", expect.anything());
   });
@@ -60,15 +44,15 @@ describe("SSRF Protection via safeFetch", () => {
     // Simulate a redirect to a safe URL
     mockFetch.mockImplementation(async (url: string | URL, init?: RequestInit) => {
       const urlStr = url.toString();
-      if (urlStr === "http://example.com/feed.xml") {
+      if (urlStr === `http://${PUBLIC_IP}/feed.xml`) {
         return {
           ok: false,
           status: 301,
-          headers: new Headers({ Location: "https://example.com/feed.xml" }),
+          headers: new Headers({ Location: `https://${PUBLIC_IP}/feed.xml` }),
           text: async () => "",
         } as Response;
       }
-      if (urlStr === "https://example.com/feed.xml") {
+      if (urlStr === `https://${PUBLIC_IP}/feed.xml`) {
         return {
           ok: true,
           status: 200,
@@ -78,26 +62,23 @@ describe("SSRF Protection via safeFetch", () => {
       return { ok: false, status: 404 } as Response;
     });
 
-    vi.mocked(security.isSafeUrl).mockResolvedValue(true);
-
     // This should succeed (safe HTTP -> HTTPS redirect should be allowed)
-    const result = await parsePodcastFeed("http://example.com/feed.xml");
+    const result = await parsePodcastFeed(`http://${PUBLIC_IP}/feed.xml`);
     expect(result.title).toBe("Safe Podcast");
     expect(mockFetch).toHaveBeenCalledTimes(2); // Initial + redirect
   });
 
   it("should enforce a maximum redirect limit to prevent loops", async () => {
-    // isSafeUrl is mocked to return true (see beforeEach), so every redirect is allowed
     mockFetch.mockImplementation(async () => {
       return {
         ok: false,
         status: 301,
-        headers: new Headers({ Location: "https://example.com/loop-feed.xml" }),
+        headers: new Headers({ Location: `https://${PUBLIC_IP}/loop-feed.xml` }),
         text: async () => "",
       } as Response;
     });
 
-    await expect(parsePodcastFeed("https://example.com/loop-feed.xml")).rejects.toThrow(
+    await expect(parsePodcastFeed(`https://${PUBLIC_IP}/loop-feed.xml`)).rejects.toThrow(
       /too many redirects/i
     );
   });
@@ -105,7 +86,7 @@ describe("SSRF Protection via safeFetch", () => {
   it("should correctly handle relative URL redirects", async () => {
     mockFetch.mockImplementation(async (url: string | URL) => {
       const urlStr = url.toString();
-      if (urlStr === "https://example.com/start.xml") {
+      if (urlStr === `https://${PUBLIC_IP}/start.xml`) {
         return {
           ok: false,
           status: 301,
@@ -113,7 +94,7 @@ describe("SSRF Protection via safeFetch", () => {
           text: async () => "",
         } as Response;
       }
-      if (urlStr === "https://example.com/feed.xml") {
+      if (urlStr === `https://${PUBLIC_IP}/feed.xml`) {
         return {
           ok: true,
           status: 200,
@@ -123,7 +104,7 @@ describe("SSRF Protection via safeFetch", () => {
       return { ok: false, status: 404 } as Response;
     });
 
-    const result = await parsePodcastFeed("https://example.com/start.xml");
+    const result = await parsePodcastFeed(`https://${PUBLIC_IP}/start.xml`);
     expect(result.title).toBe("Relative Redirect Podcast");
     expect(mockFetch).toHaveBeenCalledTimes(2);
   });
@@ -132,7 +113,7 @@ describe("SSRF Protection via safeFetch", () => {
     // Initial URL is safe (example.com), but redirect target is a private IP
     mockFetch.mockImplementation(async (url: string | URL) => {
       const urlStr = url.toString();
-      if (urlStr === "https://example.com/encoded-feed.xml") {
+      if (urlStr === `https://${PUBLIC_IP}/encoded-feed.xml`) {
         return {
           ok: false,
           status: 301,
@@ -143,7 +124,7 @@ describe("SSRF Protection via safeFetch", () => {
       return { ok: false, status: 404 } as Response;
     });
 
-    await expect(parsePodcastFeed("https://example.com/encoded-feed.xml")).rejects.toThrow(
+    await expect(parsePodcastFeed(`https://${PUBLIC_IP}/encoded-feed.xml`)).rejects.toThrow(
       /unsafe url/i
     );
   });
@@ -152,15 +133,15 @@ describe("SSRF Protection via safeFetch", () => {
     // First hop is safe (example.com → example.com), second hop goes to private IP
     mockFetch.mockImplementation(async (url: string | URL) => {
       const urlStr = url.toString();
-      if (urlStr === "https://example.com/chain-start.xml") {
+      if (urlStr === `https://${PUBLIC_IP}/chain-start.xml`) {
         return {
           ok: false,
           status: 301,
-          headers: new Headers({ Location: "https://example.com/chain-hop2.xml" }),
+          headers: new Headers({ Location: `https://${PUBLIC_IP}/chain-hop2.xml` }),
           text: async () => "",
         } as Response;
       }
-      if (urlStr === "https://example.com/chain-hop2.xml") {
+      if (urlStr === `https://${PUBLIC_IP}/chain-hop2.xml`) {
         return {
           ok: false,
           status: 301,
@@ -171,7 +152,7 @@ describe("SSRF Protection via safeFetch", () => {
       return { ok: false, status: 404 } as Response;
     });
 
-    await expect(parsePodcastFeed("https://example.com/chain-start.xml")).rejects.toThrow(
+    await expect(parsePodcastFeed(`https://${PUBLIC_IP}/chain-start.xml`)).rejects.toThrow(
       /unsafe url/i
     );
   });
