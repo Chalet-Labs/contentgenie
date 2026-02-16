@@ -127,6 +127,7 @@ ADRs are stored in `docs/adr/`. Read them before designing changes that touch th
 - [ADR-003: Scheduled Feed Polling](docs/adr/003-scheduled-feed-polling.md)
 - [ADR-004: Audio Player State Management](docs/adr/004-audio-player-state-management.md)
 - [ADR-005: DNS-Pinning Fetch to Eliminate TOCTOU in SSRF Protection](docs/adr/005-dns-pinning-ssrf-agent.md)
+- [ADR-006: Bulk OPML Import via Trigger.dev Background Task](docs/adr/006-opml-import-via-trigger-dev.md)
 
 ## Architecture patterns
 
