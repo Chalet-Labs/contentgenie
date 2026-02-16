@@ -5,7 +5,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { podcasts, userSubscriptions } from "@/db/schema";
 import { parseOpml } from "@/lib/opml";
-import type { importOpml } from "@/trigger/import-opml";
+import { importOpml } from "@/trigger/import-opml";
 import { createRateLimitChecker } from "@/lib/rate-limit";
 
 const MAX_FILE_SIZE = 1 * 1024 * 1024; // 1MB
