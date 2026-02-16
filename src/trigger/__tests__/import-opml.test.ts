@@ -81,14 +81,6 @@ describe("import-opml", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // Default: inserts succeed with a new podcast ID
-    mockInsertValues.mockReturnValue({
-      onConflictDoNothing: () => ({
-        returning: () => Promise.resolve([{ id: 1 }]),
-      }),
-      onConflictDoUpdate: () => ({
-        returning: () => Promise.resolve([{ id: 1 }]),
-      }),
-    });
     mockInsertReturning.mockResolvedValue([{ id: 1 }]);
     mockInsertOnConflict.mockReturnValue({
       returning: (...rArgs: unknown[]) => mockInsertReturning(...rArgs),
