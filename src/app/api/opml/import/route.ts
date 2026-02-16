@@ -33,6 +33,10 @@ export async function POST(request: NextRequest) {
       user?.emailAddresses?.[0]?.emailAddress ??
       "";
 
+    if (!userEmail) {
+      console.warn("No email found for user during OPML import", { userId });
+    }
+
     // Rate limit check (distributed via Postgres)
     const rateLimit = await checkImportRateLimit(userId);
     if (!rateLimit.allowed) {

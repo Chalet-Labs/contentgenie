@@ -43,7 +43,7 @@ A parent task fans out to one child task per feed via `batchTriggerAndWait`.
 
 ### Key design decisions
 
-1. **OPML parsing happens in the API route, not the Trigger.dev task.** The file is small (typically <100KB), parsing is fast (<50ms), and validating the file before triggering a background task provides immediate user feedback on malformed files. Only the extracted feed URLs are passed as the task payload.
+1. **OPML parsing happens in the API route, not the Trigger.dev task.** The file is small (typically <100KB), parsing is fast (<50ms), and validating the file before triggering a background task provides immediate user feedback on malformed files. Only the extracted feed URLs are passed as the task payload. The parser uses `fast-xml-parser` with `processEntities: false`, which prevents XML External Entity (XXE) attacks by disabling entity resolution — a standard security consideration for any XML-accepting endpoint.
 
 2. **PodcastIndex lookup first, RSS fallback second.** For each feed URL, attempt to find the podcast via PodcastIndex `searchPodcasts` using the feed URL. If not found, fall back to the existing `addPodcastByRssUrl` logic (parse RSS, create synthetic IDs). This matches the existing dual-source architecture (`source: "podcastindex" | "rss"` in schema).
 
@@ -59,5 +59,6 @@ A parent task fans out to one child task per feed via `batchTriggerAndWait`.
 
 - A new Trigger.dev task (`import-opml`) is added, increasing the task count and run quota usage.
 - The existing `subscribeToPodcast` server action logic (ensure user, ensure podcast, create subscription) is partially duplicated in the Trigger.dev task. This is intentional -- Trigger.dev tasks run on separate infrastructure and cannot call Next.js server actions. The duplication is ~30 lines of DB operations, not worth extracting into a shared module that would need to work in both runtimes (see ADR-003's "No shared dedup helper" precedent).
+- A per-user rate limit of 1 import per 5 minutes (distributed via `RateLimiterPostgres`, per ADR-001) prevents abuse and protects PodcastIndex API rate limits.
 - OPML files are parsed on the server (API route) and not stored. The extracted feed URLs are passed to Trigger.dev as the task payload. If a task fails, the user must re-upload the file.
 - PodcastIndex API rate limits may be stressed by large imports. Sequential processing with built-in delays mitigates this. The existing `retry.onThrow` pattern handles transient failures.
