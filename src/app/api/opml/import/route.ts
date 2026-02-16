@@ -85,10 +85,13 @@ export async function POST(request: NextRequest) {
       existingSubscriptions
         .map((s) => s.rssFeedUrl)
         .filter((url): url is string => url !== null)
+        .map((url) => url.toLowerCase())
     );
 
-    // Filter out already-subscribed feeds
-    const newFeeds = feeds.filter((f) => !subscribedUrls.has(f.feedUrl));
+    // Filter out already-subscribed feeds (case-insensitive URL comparison)
+    const newFeeds = feeds.filter(
+      (f) => !subscribedUrls.has(f.feedUrl.toLowerCase())
+    );
     const alreadySubscribed = total - newFeeds.length;
 
     // If all feeds are already subscribed, return immediately
