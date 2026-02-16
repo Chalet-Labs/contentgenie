@@ -21,9 +21,6 @@ vi.mock("@trigger.dev/sdk", () => ({
 const mockInsertValues = vi.fn();
 const mockInsertOnConflict = vi.fn();
 const mockInsertReturning = vi.fn();
-const mockFindFirst = vi.fn();
-const mockUpdateSet = vi.fn();
-const mockUpdateWhere = vi.fn();
 
 vi.mock("@/db", () => ({
   db: {
@@ -37,18 +34,13 @@ vi.mock("@/db", () => ({
               returning: (...rArgs: unknown[]) => mockInsertReturning(...rArgs),
             };
           },
+          onConflictDoUpdate: (...cArgs: unknown[]) => {
+            mockInsertOnConflict(...cArgs);
+            return {
+              returning: (...rArgs: unknown[]) => mockInsertReturning(...rArgs),
+            };
+          },
         };
-      },
-    }),
-    query: {
-      podcasts: {
-        findFirst: (...args: unknown[]) => mockFindFirst(...args),
-      },
-    },
-    update: vi.fn().mockReturnValue({
-      set: (...args: unknown[]) => {
-        mockUpdateSet(...args);
-        return { where: (...wArgs: unknown[]) => mockUpdateWhere(...wArgs) };
       },
     }),
   },
@@ -63,7 +55,6 @@ vi.mock("@/db/schema", () => ({
 
 vi.mock("drizzle-orm", () => ({
   eq: vi.fn(),
-  and: vi.fn(),
 }));
 
 // Mock PodcastIndex helper
@@ -98,12 +89,14 @@ describe("import-opml", () => {
       onConflictDoNothing: () => ({
         returning: () => Promise.resolve([{ id: 1 }]),
       }),
+      onConflictDoUpdate: () => ({
+        returning: () => Promise.resolve([{ id: 1 }]),
+      }),
     });
     mockInsertReturning.mockResolvedValue([{ id: 1 }]);
     mockInsertOnConflict.mockReturnValue({
       returning: (...rArgs: unknown[]) => mockInsertReturning(...rArgs),
     });
-    mockUpdateWhere.mockResolvedValue(undefined);
   });
 
   afterEach(() => {

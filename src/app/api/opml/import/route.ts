@@ -6,12 +6,12 @@ import { db } from "@/db";
 import { podcasts, userSubscriptions } from "@/db/schema";
 import { parseOpml } from "@/lib/opml";
 import type { importOpml } from "@/trigger/import-opml";
-import { RateLimiterMemory } from "rate-limiter-flexible";
+import { createRateLimitChecker } from "@/lib/rate-limit";
 
 const MAX_FILE_SIZE = 1 * 1024 * 1024; // 1MB
 
-// Per-user rate limit: 1 import per 5 minutes
-const importLimiter = new RateLimiterMemory({
+// Per-user rate limit: 1 import per 5 minutes (distributed via Postgres, per ADR-001)
+const checkImportRateLimit = createRateLimitChecker({
   points: 1,
   duration: 300, // 5 minutes
   keyPrefix: "opml-import",
@@ -25,10 +25,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    // Rate limit check
-    try {
-      await importLimiter.consume(userId);
-    } catch {
+    // Rate limit check (distributed via Postgres)
+    const rateLimit = await checkImportRateLimit(userId);
+    if (!rateLimit.allowed) {
       return NextResponse.json(
         { error: "Rate limit exceeded. Please wait a few minutes before importing again." },
         { status: 429 }
