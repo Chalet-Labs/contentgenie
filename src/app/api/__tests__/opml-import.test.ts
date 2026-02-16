@@ -8,15 +8,11 @@ vi.mock("@clerk/nextjs/server", () => ({
   auth: (...args: unknown[]) => mockAuth(...args),
 }));
 
-// Mock the rate limiter module — consume must survive clearAllMocks
-const mockConsume = vi.fn().mockResolvedValue({ remainingPoints: 0 });
-vi.mock("rate-limiter-flexible", () => {
-  return {
-    RateLimiterMemory: class {
-      consume = (...args: unknown[]) => mockConsume(...args);
-    },
-  };
-});
+// Mock the rate limiter module — checker must survive clearAllMocks
+const mockCheckRateLimit = vi.fn().mockResolvedValue({ allowed: true });
+vi.mock("@/lib/rate-limit", () => ({
+  createRateLimitChecker: () => (...args: unknown[]) => mockCheckRateLimit(...args),
+}));
 
 // Mock OPML parser
 const mockParseOpml = vi.fn();
@@ -85,7 +81,7 @@ describe("POST /api/opml/import", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     // Re-establish defaults after clearAllMocks
-    mockConsume.mockResolvedValue({ remainingPoints: 0 });
+    mockCheckRateLimit.mockResolvedValue({ allowed: true });
     mockTrigger.mockResolvedValue({ id: "run_opml123" });
     mockCreatePublicToken.mockResolvedValue("test-opml-token");
   });
@@ -127,7 +123,7 @@ describe("POST /api/opml/import", () => {
 
   it("returns 429 when rate limit is exceeded", async () => {
     mockAuth.mockResolvedValue({ userId: "user-1" });
-    mockConsume.mockRejectedValue({ remainingPoints: 0, msBeforeNext: 300000 });
+    mockCheckRateLimit.mockResolvedValue({ allowed: false, retryAfterMs: 300000 });
 
     const response = await POST(makeFormRequest(makeOpmlFile("<opml/>")));
     const data = await response.json();

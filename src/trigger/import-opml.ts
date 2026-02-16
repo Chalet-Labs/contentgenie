@@ -1,5 +1,5 @@
 import { task, retry, logger, metadata } from "@trigger.dev/sdk";
-import { eq, and } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import {
   users,
@@ -238,8 +238,7 @@ async function upsertPodcast(data: {
   totalEpisodes?: number;
   source: "podcastindex" | "rss";
 }): Promise<number> {
-  // Try insert first
-  const insertResult = await db
+  const [result] = await db
     .insert(podcasts)
     .values({
       podcastIndexId: data.podcastIndexId,
@@ -252,36 +251,24 @@ async function upsertPodcast(data: {
       totalEpisodes: data.totalEpisodes,
       source: data.source,
     })
-    .onConflictDoNothing()
+    .onConflictDoUpdate({
+      target: podcasts.podcastIndexId,
+      set: {
+        title: data.title,
+        description: data.description,
+        publisher: data.publisher,
+        imageUrl: data.imageUrl,
+        rssFeedUrl: data.rssFeedUrl,
+        categories: data.categories,
+        totalEpisodes: data.totalEpisodes,
+        updatedAt: new Date(),
+      },
+    })
     .returning({ id: podcasts.id });
 
-  if (insertResult.length > 0) {
-    return insertResult[0].id;
-  }
-
-  // Already exists — fetch and update
-  const existing = await db.query.podcasts.findFirst({
-    where: eq(podcasts.podcastIndexId, data.podcastIndexId),
-    columns: { id: true },
-  });
-
-  if (!existing) {
+  if (!result) {
     throw new Error(`Failed to upsert podcast: ${data.podcastIndexId}`);
   }
 
-  await db
-    .update(podcasts)
-    .set({
-      title: data.title,
-      description: data.description,
-      publisher: data.publisher,
-      imageUrl: data.imageUrl,
-      rssFeedUrl: data.rssFeedUrl,
-      categories: data.categories,
-      totalEpisodes: data.totalEpisodes,
-      updatedAt: new Date(),
-    })
-    .where(eq(podcasts.id, existing.id));
-
-  return existing.id;
+  return result.id;
 }

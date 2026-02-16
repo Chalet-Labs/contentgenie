@@ -71,3 +71,76 @@ export async function checkRateLimit(
     throw rejection;
   }
 }
+
+/**
+ * Create a rate limit checker with custom configuration.
+ * Uses RateLimiterPostgres for distributed rate limiting across serverless instances,
+ * with an in-memory insurance limiter as fallback (per ADR-001).
+ */
+export function createRateLimitChecker(config: {
+  points: number;
+  duration: number;
+  keyPrefix: string;
+}): (userId: string, points?: number) => Promise<{ allowed: boolean; retryAfterMs?: number }> {
+  let promise: Promise<RateLimiterPostgres> | null = null;
+
+  function getLimiterInstance(): Promise<RateLimiterPostgres> {
+    if (!promise) {
+      promise = new Promise<RateLimiterPostgres>((resolve, reject) => {
+        try {
+          const connectionString = process.env.DATABASE_URL;
+          if (!connectionString) {
+            throw new Error("DATABASE_URL environment variable is not set.");
+          }
+          const pool = new Pool({ connectionString });
+
+          const limiter = new RateLimiterPostgres({
+            storeClient: pool,
+            storeType: "pool",
+            points: config.points,
+            duration: config.duration,
+            tableName: "rate_limits",
+            keyPrefix: config.keyPrefix,
+            clearExpiredByTimeout: false,
+            insuranceLimiter: new RateLimiterMemory({
+              points: config.points,
+              duration: config.duration,
+            }),
+          }, (err?: Error) => {
+            if (err) {
+              promise = null;
+              reject(err);
+            } else {
+              resolve(limiter);
+            }
+          });
+        } catch (err) {
+          promise = null;
+          reject(err);
+        }
+      });
+    }
+    return promise;
+  }
+
+  return async (userId: string, pts = 1) => {
+    const limiter = await getLimiterInstance();
+    try {
+      await limiter.consume(userId, pts);
+      return { allowed: true };
+    } catch (rejection: unknown) {
+      if (
+        rejection &&
+        typeof rejection === "object" &&
+        "msBeforeNext" in rejection &&
+        typeof (rejection as { msBeforeNext: unknown }).msBeforeNext === "number"
+      ) {
+        return {
+          allowed: false,
+          retryAfterMs: (rejection as { msBeforeNext: number }).msBeforeNext,
+        };
+      }
+      throw rejection;
+    }
+  };
+}
