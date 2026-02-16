@@ -1,6 +1,6 @@
 # ADR-006: Bulk OPML Import via Trigger.dev Background Task
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-02-15
 **Issue:** [#36](https://github.com/Chalet-Labs/contentgenie/issues/36)
 
