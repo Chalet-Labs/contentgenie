@@ -1,5 +1,4 @@
 import { task, retry, logger, metadata } from "@trigger.dev/sdk";
-import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import {
   users,
@@ -7,7 +6,7 @@ import {
   episodes,
   userSubscriptions,
 } from "@/db/schema";
-import { getPodcastByFeedUrl } from "./helpers/podcastindex";
+import { getPodcastByFeedUrl } from "@/trigger/helpers/podcastindex";
 import {
   parsePodcastFeed,
   generatePodcastSyntheticId,
@@ -261,6 +260,7 @@ async function upsertPodcast(data: {
         rssFeedUrl: data.rssFeedUrl,
         categories: data.categories,
         totalEpisodes: data.totalEpisodes,
+        source: data.source,
         updatedAt: new Date(),
       },
     })

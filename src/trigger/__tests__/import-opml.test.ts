@@ -53,10 +53,6 @@ vi.mock("@/db/schema", () => ({
   userSubscriptions: { userId: "user_id", podcastId: "podcast_id" },
 }));
 
-vi.mock("drizzle-orm", () => ({
-  eq: vi.fn(),
-}));
-
 // Mock PodcastIndex helper
 const mockGetPodcastByFeedUrl = vi.fn();
 vi.mock("@/trigger/helpers/podcastindex", () => ({
