@@ -29,7 +29,7 @@ Podcast discovery, AI-powered summarization, and library management app for busy
 - shadcn/ui components live in `src/components/ui/`. Add new ones with `bunx shadcn@latest add <component>`.
 - Server components are the default. Only add `"use client"` when you need browser APIs, hooks, or event handlers.
 - Server actions use `"use server"` and live in `src/app/actions/`. They handle all data mutations.
-- API routes in `src/app/api/` are for proxying external services only (PodcastIndex, OpenRouter).
+- API routes in `src/app/api/` are for proxying external services (PodcastIndex, OpenRouter) and orchestrating Trigger.dev background tasks that need multipart uploads or realtime access tokens (OPML import, batch summarization).
 
 ## Development commands
 
@@ -133,7 +133,7 @@ ADRs are stored in `docs/adr/`. Read them before designing changes that touch th
 
 - **App Router with route groups:** `(auth)` for sign-in/sign-up, `(app)` for authenticated pages with shared sidebar layout.
 - **Server actions** (`src/app/actions/`) for all data mutations — subscriptions, library management, collections.
-- **API routes** (`src/app/api/`) for proxying external services (PodcastIndex search, episode summarization).
+- **API routes** (`src/app/api/`) for proxying external services (PodcastIndex search, episode summarization) and orchestrating Trigger.dev background tasks (OPML import, batch summarization).
 - **Clerk middleware** protects all routes except `/`, `/sign-in`, `/sign-up`, and `/api/webhooks`.
 - **Component organization:** Feature folders (`dashboard/`, `podcasts/`, `episodes/`, `library/`) alongside shared `ui/` primitives.
 
