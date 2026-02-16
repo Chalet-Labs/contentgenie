@@ -4,8 +4,10 @@ import { NextRequest } from "next/server";
 
 // Mock Clerk auth
 const mockAuth = vi.fn();
+const mockCurrentUser = vi.fn();
 vi.mock("@clerk/nextjs/server", () => ({
   auth: (...args: unknown[]) => mockAuth(...args),
+  currentUser: (...args: unknown[]) => mockCurrentUser(...args),
 }));
 
 // Mock the rate limiter module — checker must survive clearAllMocks
@@ -84,6 +86,10 @@ describe("POST /api/opml/import", () => {
     mockCheckRateLimit.mockResolvedValue({ allowed: true });
     mockTrigger.mockResolvedValue({ id: "run_opml123" });
     mockCreatePublicToken.mockResolvedValue("test-opml-token");
+    mockCurrentUser.mockResolvedValue({
+      primaryEmailAddressId: "email_1",
+      emailAddresses: [{ id: "email_1", emailAddress: "user@example.com" }],
+    });
   });
 
   afterEach(() => {
@@ -187,6 +193,7 @@ describe("POST /api/opml/import", () => {
 
     expect(mockTrigger).toHaveBeenCalledWith("import-opml", {
       userId: "user-1",
+      userEmail: "user@example.com",
       feeds: [
         { feedUrl: "https://a.com/feed", title: "A" },
         { feedUrl: "https://c.com/feed", title: "C" },
