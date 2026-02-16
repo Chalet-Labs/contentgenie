@@ -51,7 +51,7 @@ A parent task fans out to one child task per feed via `batchTriggerAndWait`.
 
 4. **Progress reporting via `metadata.set`.** Follow the `batchSummarizeEpisodes` pattern: set a `progress` metadata key with `{ total, succeeded, failed, skipped, completed }`. The client reads this via `useRealtimeRun`.
 
-5. **File upload via API route, not server action.** Server actions with file uploads work but have a 4.5MB body limit by default. An API route gives explicit control over limits and error responses, matching the existing `batch-summarize` pattern.
+5. **File upload via API route, not server action.** Server actions with file uploads work but have a 4.5MB body limit by default — far too generous for OPML files (typically <100KB). An API route gives explicit control: the implementation enforces a **1MB max file size** as a deliberate constraint to prevent resource exhaustion while still accommodating unusually large subscription lists. The API route also provides explicit error responses for validation failures, matching the existing `batch-summarize` pattern.
 
 6. **No schema changes.** The existing `podcasts`, `episodes`, and `user_subscriptions` tables are sufficient. OPML import is a batch subscription creation operation, not a new domain concept.
 
