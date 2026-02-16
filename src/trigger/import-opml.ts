@@ -18,6 +18,7 @@ const MAX_EPISODES_PER_FEED = 50;
 
 export type ImportOpmlPayload = {
   userId: string;
+  userEmail: string;
   feeds: OpmlFeed[];
   alreadySubscribedCount: number;
 };
@@ -48,7 +49,7 @@ export const importOpml = task({
     });
   },
   run: async (payload: ImportOpmlPayload): Promise<ImportOpmlResult> => {
-    const { userId, feeds, alreadySubscribedCount } = payload;
+    const { userId, userEmail, feeds, alreadySubscribedCount } = payload;
     const total = feeds.length + alreadySubscribedCount;
 
     logger.info("Starting OPML import", {
@@ -57,10 +58,10 @@ export const importOpml = task({
       alreadySubscribed: alreadySubscribedCount,
     });
 
-    // Ensure user exists
+    // Ensure user exists (email from Clerk auth context; onConflictDoNothing preserves existing rows)
     await db
       .insert(users)
-      .values({ id: userId, email: "" })
+      .values({ id: userId, email: userEmail })
       .onConflictDoNothing();
 
     let succeeded = 0;

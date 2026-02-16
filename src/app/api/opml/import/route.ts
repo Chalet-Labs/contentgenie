@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { auth as clerkAuth } from "@clerk/nextjs/server";
+import { auth as clerkAuth, currentUser } from "@clerk/nextjs/server";
 import { tasks, auth } from "@trigger.dev/sdk";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
@@ -24,6 +24,14 @@ export async function POST(request: NextRequest) {
     if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    // Fetch user email from Clerk for the background task's defensive user insert
+    const user = await currentUser();
+    const userEmail =
+      user?.emailAddresses?.find((e) => e.id === user.primaryEmailAddressId)
+        ?.emailAddress ??
+      user?.emailAddresses?.[0]?.emailAddress ??
+      "";
 
     // Rate limit check (distributed via Postgres)
     const rateLimit = await checkImportRateLimit(userId);
@@ -105,6 +113,7 @@ export async function POST(request: NextRequest) {
     // Trigger the import task
     const handle = await tasks.trigger<typeof importOpml>("import-opml", {
       userId,
+      userEmail,
       feeds: newFeeds,
       alreadySubscribedCount: alreadySubscribed,
     });

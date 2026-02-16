@@ -117,6 +117,7 @@ describe("import-opml", () => {
 
     const result = await taskRunner.run({
       userId: "user_123",
+      userEmail: "test@example.com",
       feeds: [{ feedUrl: "https://feeds.example.com/tech", title: "Tech Podcast" }],
       alreadySubscribedCount: 2,
     });
@@ -153,6 +154,7 @@ describe("import-opml", () => {
 
     const result = await taskRunner.run({
       userId: "user_123",
+      userEmail: "test@example.com",
       feeds: [{ feedUrl: "https://example.com/rss" }],
       alreadySubscribedCount: 0,
     });
@@ -173,6 +175,7 @@ describe("import-opml", () => {
 
     const result = await taskRunner.run({
       userId: "user_123",
+      userEmail: "test@example.com",
       feeds: [
         { feedUrl: "https://bad.com/feed", title: "Bad Feed" },
         { feedUrl: "https://good.com/feed", title: "Good Feed" },
@@ -191,6 +194,7 @@ describe("import-opml", () => {
 
     await taskRunner.run({
       userId: "user_123",
+      userEmail: "test@example.com",
       feeds: [
         { feedUrl: "https://a.com/feed" },
         { feedUrl: "https://b.com/feed" },
@@ -215,6 +219,7 @@ describe("import-opml", () => {
   it("returns early with correct counts when no feeds to process", async () => {
     const result = await taskRunner.run({
       userId: "user_123",
+      userEmail: "test@example.com",
       feeds: [],
       alreadySubscribedCount: 10,
     });
@@ -231,6 +236,7 @@ describe("import-opml", () => {
 
     await taskRunner.run({
       userId: "user_123",
+      userEmail: "test@example.com",
       feeds: [{ feedUrl: "https://broken.com/feed", title: "Broken" }],
       alreadySubscribedCount: 0,
     });
