@@ -185,6 +185,24 @@ describe("POST /api/opml/import", () => {
     expect(data.runId).toBeUndefined();
   });
 
+  it("deduplicates feeds case-insensitively", async () => {
+    mockAuth.mockResolvedValue({ userId: "user-1" });
+    mockParseOpml.mockReturnValue([
+      { feedUrl: "https://A.COM/FEED", title: "A" },
+    ]);
+    mockWhere.mockResolvedValue([
+      { rssFeedUrl: "https://a.com/feed" },
+    ]);
+
+    const response = await POST(makeFormRequest(makeOpmlFile("<opml/>")));
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.total).toBe(1);
+    expect(data.alreadySubscribed).toBe(1);
+    expect(mockTrigger).not.toHaveBeenCalled();
+  });
+
   it("returns 202 with run handle when triggering import", async () => {
     mockAuth.mockResolvedValue({ userId: "user-1" });
     mockParseOpml.mockReturnValue([
