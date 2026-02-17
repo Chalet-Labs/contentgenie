@@ -35,6 +35,10 @@ export async function POST(request: NextRequest) {
 
     if (!userEmail) {
       console.warn("No email found for user during OPML import", { userId });
+      return NextResponse.json(
+        { error: "Unable to resolve user email. Please try again." },
+        { status: 400 }
+      );
     }
 
     // Rate limit check (distributed via Postgres)

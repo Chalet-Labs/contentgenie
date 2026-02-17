@@ -106,6 +106,20 @@ describe("POST /api/opml/import", () => {
     expect(data.error).toBe("Unauthorized");
   });
 
+  it("returns 400 when user email cannot be resolved", async () => {
+    mockAuth.mockResolvedValue({ userId: "user-1" });
+    mockCurrentUser.mockResolvedValue({
+      primaryEmailAddressId: null,
+      emailAddresses: [],
+    });
+
+    const response = await POST(makeFormRequest(makeOpmlFile("<opml/>")));
+    const data = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(data.error).toContain("Unable to resolve user email");
+  });
+
   it("returns 400 when no file is provided", async () => {
     mockAuth.mockResolvedValue({ userId: "user-1" });
 
