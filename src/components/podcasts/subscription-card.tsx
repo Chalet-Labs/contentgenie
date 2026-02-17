@@ -9,7 +9,7 @@ import { SubscribeButton } from "./subscribe-button";
 import type { Podcast } from "@/db/schema";
 
 interface SubscriptionCardProps {
-  podcast: Podcast;
+  podcast: Omit<Podcast, "description"> & { description?: string | null };
   subscribedAt: Date;
 }
 

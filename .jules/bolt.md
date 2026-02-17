@@ -24,4 +24,4 @@
 
 ## 2026-02-20 - Context-Aware Column Selection
 **Learning:** Blindly applying column exclusion to "large" fields (like `description`) can break functionality if those fields are used by specific UI components or downstream server actions. For example, a podcast description might be skipped in a list view but is required on a detail page or by a subscription action that updates the database.
-**Action:** Always cross-reference the usage of a field in both the immediate component and any subsequent actions (e.g., passing data to a "Subscribe" button) before excluding it from a query.
+**Action:** Always cross-reference the usage of a field in both the immediate component and any subsequent actions (e.g., passing data to a "Subscribe" button) before excluding it from a query. Also, use `Omit` in TypeScript prop definitions to safely handle cases where heavy fields are conditionally excluded for performance.
