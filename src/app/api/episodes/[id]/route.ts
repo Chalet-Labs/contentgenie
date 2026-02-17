@@ -35,7 +35,11 @@ export async function GET(
           transcription: false,
         },
         with: {
-          podcast: true,
+          podcast: {
+            columns: {
+              description: false,
+            },
+          },
         },
       });
 
