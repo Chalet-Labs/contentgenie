@@ -27,7 +27,25 @@ export async function generateEpisodeSummary(
   ]);
 
   try {
-    return parseJsonResponse<SummaryResult>(completion);
+    const result = parseJsonResponse<SummaryResult>(completion);
+    // Recalculate worthItScore server-side from dimensions to ensure arithmetic accuracy
+    if (result.worthItDimensions) {
+      const { uniqueness, actionability, timeValue } = result.worthItDimensions;
+      if (
+        typeof uniqueness === "number" &&
+        typeof actionability === "number" &&
+        typeof timeValue === "number"
+      ) {
+        const computed = parseFloat(((uniqueness + actionability + timeValue) / 3).toFixed(1));
+        if (result.worthItScore !== computed) {
+          console.warn(
+            `[openrouter] worthItScore mismatch: LLM=${result.worthItScore}, computed=${computed}. Using computed value.`
+          );
+        }
+        result.worthItScore = computed;
+      }
+    }
+    return result;
   } catch {
     return {
       summary: completion,
