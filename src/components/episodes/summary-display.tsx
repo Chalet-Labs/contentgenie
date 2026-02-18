@@ -75,6 +75,7 @@ function parseStructuredSections(text: string) {
     const newlineIndex = section.indexOf("\n");
     const heading = newlineIndex !== -1 ? section.slice(0, newlineIndex).trim() : section.trim();
     const body = newlineIndex !== -1 ? section.slice(newlineIndex + 1).trim() : "";
+    if (!heading && !body) return null;
     return { heading, body };
   }).filter(Boolean) as { heading: string | null; body: string }[];
 }
