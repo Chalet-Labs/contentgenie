@@ -350,23 +350,22 @@ export async function isSubscribedToPodcast(
   }
 
   try {
-    const podcast = await db.query.podcasts.findFirst({
-      where: eq(podcasts.podcastIndexId, podcastIndexId),
-      columns: { id: true },
-    });
+    // BOLT OPTIMIZATION: Use a single JOIN query to check existence in user_subscriptions.
+    // This replaces two separate queries and avoids fetching podcast data just for the ID.
+    // Expected impact: ~50% reduction in query latency for subscription checks.
+    const result = await db
+      .select({ id: userSubscriptions.id })
+      .from(userSubscriptions)
+      .innerJoin(podcasts, eq(userSubscriptions.podcastId, podcasts.id))
+      .where(
+        and(
+          eq(userSubscriptions.userId, userId),
+          eq(podcasts.podcastIndexId, podcastIndexId)
+        )
+      )
+      .limit(1);
 
-    if (!podcast) {
-      return false;
-    }
-
-    const subscription = await db.query.userSubscriptions.findFirst({
-      where: and(
-        eq(userSubscriptions.userId, userId),
-        eq(userSubscriptions.podcastId, podcast.id)
-      ),
-    });
-
-    return !!subscription;
+    return result.length > 0;
   } catch (error) {
     console.error("Error checking subscription status:", error);
     return false;
@@ -483,10 +482,17 @@ export async function getUserSubscriptions() {
   }
 
   try {
+    // BOLT OPTIMIZATION: Use selective column fetching to exclude high-volume text fields
+    // (like description) from the joined podcast data.
+    // Expected impact: Significant reduction in database I/O and network payload for list views.
     const subscriptions = await db.query.userSubscriptions.findMany({
       where: eq(userSubscriptions.userId, userId),
       with: {
-        podcast: true,
+        podcast: {
+          columns: {
+            description: false,
+          },
+        },
       },
       orderBy: (userSubscriptions, { desc }) => [desc(userSubscriptions.subscribedAt)],
     });

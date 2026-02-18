@@ -12,8 +12,10 @@ vi.mock("next/cache", () => ({
 }));
 
 // Mock database
+const mockSelect = vi.fn();
 const mockFindFirstPodcast = vi.fn();
 const mockFindFirstSubscription = vi.fn();
+const mockFindManySubscriptions = vi.fn();
 const mockInsert = vi.fn();
 const mockValues = vi.fn();
 const mockOnConflictDoNothing = vi.fn();
@@ -21,10 +23,12 @@ const mockReturning = vi.fn();
 
 vi.mock("@/db", () => ({
   db: {
+    select: (...args: unknown[]) => mockSelect(...args),
     query: {
       podcasts: { findFirst: (...args: unknown[]) => mockFindFirstPodcast(...args) },
       userSubscriptions: {
         findFirst: (...args: unknown[]) => mockFindFirstSubscription(...args),
+        findMany: (...args: unknown[]) => mockFindManySubscriptions(...args),
       },
     },
     insert: (...args: unknown[]) => {
@@ -224,5 +228,82 @@ describe("addPodcastByRssUrl", () => {
     expect(result.title).toBe("Test Podcast");
     expect(result.podcastIndexId).toMatch(/^rss-/);
     expect(result.episodeCount).toBe(2);
+  });
+});
+
+describe("isSubscribedToPodcast (optimized)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockAuth.mockResolvedValue({ userId: "user_123" });
+  });
+
+  function mockSelectChain(resolvedValue: any[]) {
+    const mockLimit = vi.fn().mockResolvedValue(resolvedValue);
+    const mockWhere = vi.fn().mockReturnValue({ limit: mockLimit });
+    const mockInnerJoin = vi.fn().mockReturnValue({ where: mockWhere });
+    const mockFrom = vi.fn().mockReturnValue({ innerJoin: mockInnerJoin });
+    mockSelect.mockReturnValue({ from: mockFrom });
+  }
+
+  it("returns true when subscription exists using optimized JOIN", async () => {
+    mockSelectChain([{ id: 1 }]);
+
+    const { isSubscribedToPodcast } = await import("../subscriptions");
+    const result = await isSubscribedToPodcast("podcast_123");
+
+    expect(result).toBe(true);
+    expect(mockSelect).toHaveBeenCalled();
+  });
+
+  it("returns false when subscription does not exist", async () => {
+    mockSelectChain([]);
+
+    const { isSubscribedToPodcast } = await import("../subscriptions");
+    const result = await isSubscribedToPodcast("podcast_123");
+
+    expect(result).toBe(false);
+  });
+
+  it("returns false when not authenticated", async () => {
+    mockAuth.mockResolvedValue({ userId: null });
+
+    const { isSubscribedToPodcast } = await import("../subscriptions");
+    const result = await isSubscribedToPodcast("podcast_123");
+
+    expect(result).toBe(false);
+    expect(mockSelect).not.toHaveBeenCalled();
+  });
+});
+
+describe("getUserSubscriptions (optimized)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockAuth.mockResolvedValue({ userId: "user_123" });
+  });
+
+  it("fetches subscriptions with optimized column selection", async () => {
+    const mockSubs = [
+      {
+        id: 1,
+        subscribedAt: new Date(),
+        podcast: { id: 1, title: "Test Podcast" }, // description excluded
+      },
+    ];
+    mockFindManySubscriptions.mockResolvedValue(mockSubs);
+
+    const { getUserSubscriptions } = await import("../subscriptions");
+    const result = await getUserSubscriptions();
+
+    expect(result.subscriptions).toHaveLength(1);
+    expect(result.subscriptions[0].podcast.title).toBe("Test Podcast");
+    expect(mockFindManySubscriptions).toHaveBeenCalledWith(
+      expect.objectContaining({
+        with: expect.objectContaining({
+          podcast: expect.objectContaining({
+            columns: { description: false }
+          })
+        })
+      })
+    );
   });
 });
