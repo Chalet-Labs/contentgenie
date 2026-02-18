@@ -2,7 +2,7 @@
 
 import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
-import { eq, and, inArray } from "drizzle-orm";
+import { eq, and, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { users, podcasts, episodes, userSubscriptions } from "@/db/schema";
 import {
@@ -350,11 +350,9 @@ export async function isSubscribedToPodcast(
   }
 
   try {
-    // BOLT OPTIMIZATION: Use a single JOIN query to check existence.
-    // This replaces two separate queries and avoids fetching high-volume podcast data.
-    // Expected impact: ~50% reduction in query latency by consolidating into one DB round-trip.
+    // Single JOIN replaces two sequential queries (podcast lookup + subscription lookup).
     const result = await db
-      .select({ id: userSubscriptions.id })
+      .select({ exists: sql`1` })
       .from(userSubscriptions)
       .innerJoin(podcasts, eq(userSubscriptions.podcastId, podcasts.id))
       .where(
