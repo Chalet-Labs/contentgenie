@@ -43,7 +43,6 @@
       "Read(~/.aws/**)"
     ],
     "ask": [
-      "Bash(git push:*)",
       "Bash(rm *)"
     ],
     "defaultMode": "acceptEdits"
@@ -59,7 +58,8 @@
     "project-manager@rube-cc-skills": true,
     "jules-review@rube-cc-skills": true,
     "council@rube-cc-skills": true,
-    "dlc@rube-cc-skills": true
+    "dlc@rube-cc-skills": true,
+    "codeguard-security@project-codeguard": true
   },
   "sandbox": {
     "enabled": false,
