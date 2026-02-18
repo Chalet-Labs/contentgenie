@@ -34,6 +34,7 @@ export async function generateEpisodeSummary(
       keyTakeaways: [],
       worthItScore: 5,
       worthItReason: "Unable to parse structured response",
+      worthItDimensions: undefined,
     };
   }
 }

@@ -11,19 +11,19 @@ describe("WorthItBadge", () => {
   it("renders score value and label for high score (>= 8)", () => {
     render(<WorthItBadge score={8.5} />);
     expect(screen.getByText("8.5")).toBeInTheDocument();
-    expect(screen.getByText("Highly Recommended")).toBeInTheDocument();
+    expect(screen.getByText("Exceptional")).toBeInTheDocument();
   });
 
   it("renders score value and label for mid score (4-5.9)", () => {
     render(<WorthItBadge score={4.5} />);
     expect(screen.getByText("4.5")).toBeInTheDocument();
-    expect(screen.getByText("Decent")).toBeInTheDocument();
+    expect(screen.getByText("Average")).toBeInTheDocument();
   });
 
   it("renders score value and label for low score (< 2)", () => {
     render(<WorthItBadge score={1.0} />);
     expect(screen.getByText("1.0")).toBeInTheDocument();
-    expect(screen.getByText("Not Recommended")).toBeInTheDocument();
+    expect(screen.getByText("Skip")).toBeInTheDocument();
   });
 
   it("displays score with one decimal place", () => {

@@ -137,6 +137,7 @@ export async function persistEpisodeSummary(
         keyTakeaways: summary.keyTakeaways,
         worthItScore: summary.worthItScore.toFixed(2),
         worthItReason: summary.worthItReason,
+        worthItDimensions: summary.worthItDimensions ?? null,
         transcription: transcript,
         processedAt: new Date(),
         summaryStatus: "completed",
@@ -160,6 +161,7 @@ export async function persistEpisodeSummary(
       keyTakeaways: summary.keyTakeaways,
       worthItScore: summary.worthItScore.toFixed(2),
       worthItReason: summary.worthItReason,
+      worthItDimensions: summary.worthItDimensions ?? null,
       summaryStatus: "completed",
       processedAt: new Date(),
     });

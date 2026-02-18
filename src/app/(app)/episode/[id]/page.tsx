@@ -70,6 +70,11 @@ interface SummaryData {
   keyTakeaways: string[];
   worthItScore: number;
   worthItReason?: string;
+  worthItDimensions?: {
+    uniqueness: number;
+    actionability: number;
+    timeValue: number;
+  } | null;
   cached: boolean;
 }
 
@@ -125,6 +130,7 @@ export default function EpisodePage({ params }: EpisodePageProps) {
         keyTakeaways: run.output.keyTakeaways || [],
         worthItScore: run.output.worthItScore,
         worthItReason: run.output.worthItReason,
+        worthItDimensions: run.output.worthItDimensions ?? null,
         cached: false,
       });
       setIsLoadingSummary(false);
@@ -170,6 +176,7 @@ export default function EpisodePage({ params }: EpisodePageProps) {
             keyTakeaways: data.summary.keyTakeaways || [],
             worthItScore: data.summary.worthItScore,
             worthItReason: data.summary.worthItReason,
+            worthItDimensions: data.summary.worthItDimensions ?? null,
             cached: true,
           });
         } else {
@@ -242,6 +249,7 @@ export default function EpisodePage({ params }: EpisodePageProps) {
           keyTakeaways: data.keyTakeaways || [],
           worthItScore: data.worthItScore,
           worthItReason: data.worthItReason,
+          worthItDimensions: data.worthItDimensions ?? null,
           cached: true,
         });
         setIsLoadingSummary(false);
@@ -516,6 +524,7 @@ export default function EpisodePage({ params }: EpisodePageProps) {
           keyTakeaways={summaryData?.keyTakeaways || null}
           worthItScore={summaryData?.worthItScore ?? null}
           worthItReason={summaryData?.worthItReason}
+          worthItDimensions={summaryData?.worthItDimensions}
           isLoading={isLoadingSummary}
           error={summaryError}
           currentStep={

@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Dimensional worth-it scoring with uniqueness, actionability, and time-value sub-scores for AI episode summaries (#133)
+- Score breakdown progress bars in episode summary display (#133)
 - Bulk re-summarization via Trigger.dev with filters (podcast, date range, quality score), real-time progress tracking, and cancellation (#38)
 - Bulk OPML import: upload an OPML file from the Discover page to subscribe to multiple podcasts at once, with real-time progress tracking (#36)
 - DNS rebinding tests for `safeFetch` verifying TOCTOU protection via dns-pinning agent (#108)
@@ -34,6 +36,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - GitHub Actions Neon branch workflow (`.github/workflows/neon-branch.yml`) — replaced by `vercel-build` script to eliminate dual Neon branch problem
 
 ### Changed
+- AI summarization prompt rewritten with anti-inflation anchoring and structured summary sections (TL;DR, What You'll Learn, Notable Quotes, Action Items, Bottom Line) (#133)
+- Worth-it score labels recalibrated: "Exceptional" (8+), "Above Average" (6-7.9), "Average" (4-5.9), "Below Average" (2-3.9), "Skip" (<2) (#133)
 - ADR-005 (DNS-Pinning SSRF Agent) status updated from "Proposed" to "Accepted" with #108 cross-reference
 - Made entire subscription card clickable, consistent with podcast and episode cards (#84)
 - Optimized subscription existence check by consolidating two sequential queries into a single JOIN query in `isSubscribedToPodcast`

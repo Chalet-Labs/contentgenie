@@ -83,7 +83,7 @@ describe("SummaryDisplay", () => {
       screen.getByText("This is a great episode summary.")
     ).toBeInTheDocument();
     expect(screen.getByText("8.5")).toBeInTheDocument();
-    expect(screen.getByText("Highly Recommended")).toBeInTheDocument();
+    expect(screen.getByText("Exceptional")).toBeInTheDocument();
     expect(screen.getByText("Excellent content")).toBeInTheDocument();
     expect(screen.getByText("Takeaway 1")).toBeInTheDocument();
     expect(screen.getByText("Takeaway 2")).toBeInTheDocument();
@@ -118,7 +118,7 @@ describe("SummaryDisplay", () => {
         worthItScore={9}
       />
     );
-    expect(screen.getByText("Highly Recommended")).toBeInTheDocument();
+    expect(screen.getByText("Exceptional")).toBeInTheDocument();
 
     rerender(
       <SummaryDisplay
@@ -127,7 +127,7 @@ describe("SummaryDisplay", () => {
         worthItScore={6}
       />
     );
-    expect(screen.getByText("Worth Your Time")).toBeInTheDocument();
+    expect(screen.getByText("Above Average")).toBeInTheDocument();
 
     rerender(
       <SummaryDisplay
@@ -136,7 +136,7 @@ describe("SummaryDisplay", () => {
         worthItScore={4}
       />
     );
-    expect(screen.getByText("Decent")).toBeInTheDocument();
+    expect(screen.getByText("Average")).toBeInTheDocument();
 
     rerender(
       <SummaryDisplay
@@ -145,7 +145,7 @@ describe("SummaryDisplay", () => {
         worthItScore={2}
       />
     );
-    expect(screen.getByText("Skip Unless Interested")).toBeInTheDocument();
+    expect(screen.getByText("Below Average")).toBeInTheDocument();
 
     rerender(
       <SummaryDisplay
@@ -154,7 +154,7 @@ describe("SummaryDisplay", () => {
         worthItScore={1}
       />
     );
-    expect(screen.getByText("Not Recommended")).toBeInTheDocument();
+    expect(screen.getByText("Skip")).toBeInTheDocument();
   });
 
   it("does not show score section when worthItScore is null", () => {

@@ -12,9 +12,9 @@ export function getScoreColor(score: number): string {
 }
 
 export function getScoreLabel(score: number): string {
-  if (score >= 8) return "Highly Recommended";
-  if (score >= 6) return "Worth Your Time";
-  if (score >= 4) return "Decent";
-  if (score >= 2) return "Skip Unless Interested";
-  return "Not Recommended";
+  if (score >= 8) return "Exceptional";
+  if (score >= 6) return "Above Average";
+  if (score >= 4) return "Average";
+  if (score >= 2) return "Below Average";
+  return "Skip";
 }
