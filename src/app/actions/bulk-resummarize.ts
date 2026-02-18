@@ -1,9 +1,10 @@
 "use server";
 
 import { auth } from "@clerk/nextjs/server";
-import { and, isNotNull, lte, gte, eq, count } from "drizzle-orm";
+import { and, count } from "drizzle-orm";
 import { db } from "@/db";
 import { episodes } from "@/db/schema";
+import { buildResummarizeConditions } from "@/lib/bulk-resummarize-filters";
 
 export async function getResummarizeEpisodeCount(filters: {
   podcastId?: number;
@@ -18,23 +19,7 @@ export async function getResummarizeEpisodeCount(filters: {
   }
 
   try {
-    const conditions = [isNotNull(episodes.processedAt)];
-
-    if (filters.podcastId !== undefined) {
-      conditions.push(eq(episodes.podcastId, filters.podcastId));
-    }
-
-    if (filters.minDate) {
-      conditions.push(gte(episodes.publishDate, new Date(filters.minDate)));
-    }
-
-    if (filters.maxDate) {
-      conditions.push(lte(episodes.publishDate, new Date(filters.maxDate)));
-    }
-
-    if (filters.maxScore !== undefined) {
-      conditions.push(lte(episodes.worthItScore, String(filters.maxScore)));
-    }
+    const conditions = buildResummarizeConditions(filters);
 
     const [result] = await db
       .select({ count: count() })

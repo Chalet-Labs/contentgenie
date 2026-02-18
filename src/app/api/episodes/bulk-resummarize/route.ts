@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth as clerkAuth } from "@clerk/nextjs/server";
 import { tasks, auth, runs } from "@trigger.dev/sdk";
-import { and, isNotNull, lte, gte, eq, count } from "drizzle-orm";
+import { and, count } from "drizzle-orm";
 import { db } from "@/db";
 import { episodes } from "@/db/schema";
 import { createRateLimitChecker } from "@/lib/rate-limit";
+import { buildResummarizeConditions } from "@/lib/bulk-resummarize-filters";
 import type { bulkResummarize } from "@/trigger/bulk-resummarize";
 
 const checkBulkRateLimit = createRateLimitChecker({
@@ -84,20 +85,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Count matching episodes for estimate
-    const conditions = [isNotNull(episodes.processedAt)];
-
-    if (podcastId !== undefined) {
-      conditions.push(eq(episodes.podcastId, podcastId));
-    }
-    if (minDate) {
-      conditions.push(gte(episodes.publishDate, new Date(minDate)));
-    }
-    if (maxDate) {
-      conditions.push(lte(episodes.publishDate, new Date(maxDate)));
-    }
-    if (maxScore !== undefined) {
-      conditions.push(lte(episodes.worthItScore, String(maxScore)));
-    }
+    const conditions = buildResummarizeConditions({ podcastId, minDate, maxDate, maxScore });
 
     const [countResult] = await db
       .select({ count: count() })

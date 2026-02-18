@@ -262,11 +262,14 @@ export function BulkResummarizeCard() {
     if (!runId) return;
 
     try {
-      await fetch("/api/episodes/bulk-resummarize", {
+      const res = await fetch("/api/episodes/bulk-resummarize", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ runId }),
       });
+      if (!res.ok) {
+        throw new Error("Cancel failed");
+      }
       setState("idle");
       setRunId(null);
       setAccessToken(null);

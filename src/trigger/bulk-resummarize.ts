@@ -1,8 +1,9 @@
 import { task, metadata, logger } from "@trigger.dev/sdk";
-import { and, isNotNull, lte, gte, eq } from "drizzle-orm";
+import { and } from "drizzle-orm";
 import { db } from "@/db";
 import { episodes } from "@/db/schema";
-import { summarizeEpisode } from "./summarize-episode";
+import { summarizeEpisode } from "@/trigger/summarize-episode";
+import { buildResummarizeConditions } from "@/lib/bulk-resummarize-filters";
 
 export type BulkResummarizePayload = {
   podcastId?: number;
@@ -45,23 +46,7 @@ export const bulkResummarize = task({
     logger.info("Starting bulk re-summarization", { podcastId, minDate, maxDate, maxScore });
 
     // Build WHERE conditions: processedAt IS NOT NULL (has existing summary) + optional filters
-    const conditions = [isNotNull(episodes.processedAt)];
-
-    if (podcastId !== undefined) {
-      conditions.push(eq(episodes.podcastId, podcastId));
-    }
-
-    if (minDate) {
-      conditions.push(gte(episodes.publishDate, new Date(minDate)));
-    }
-
-    if (maxDate) {
-      conditions.push(lte(episodes.publishDate, new Date(maxDate)));
-    }
-
-    if (maxScore !== undefined) {
-      conditions.push(lte(episodes.worthItScore, String(maxScore)));
-    }
+    const conditions = buildResummarizeConditions({ podcastId, minDate, maxDate, maxScore });
 
     // Query matching episodes
     const matchingEpisodes = await db
