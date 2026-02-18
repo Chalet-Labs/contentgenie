@@ -13,9 +13,15 @@ vi.mock("next/cache", () => ({
 
 // Mock database
 const mockDbSelect = vi.fn();
+const mockSubscriptionFindFirst = vi.fn().mockResolvedValue({ id: 1 });
 vi.mock("@/db", () => ({
   db: {
     select: (...args: unknown[]) => mockDbSelect(...args),
+    query: {
+      userSubscriptions: {
+        findFirst: (...args: unknown[]) => mockSubscriptionFindFirst(...args),
+      },
+    },
   },
 }));
 
@@ -26,6 +32,10 @@ vi.mock("@/db/schema", () => ({
     podcastId: "podcast_id",
     publishDate: "publish_date",
     worthItScore: "worth_it_score",
+  },
+  userSubscriptions: {
+    userId: "user_id",
+    podcastId: "podcast_id",
   },
 }));
 
@@ -53,6 +63,7 @@ describe("getResummarizeEpisodeCount", () => {
     vi.clearAllMocks();
     mockAuth.mockResolvedValue({ userId: "user_123" });
     mockCountResult(0);
+    mockSubscriptionFindFirst.mockResolvedValue({ id: 1 });
   });
 
   afterEach(() => {
@@ -85,6 +96,19 @@ describe("getResummarizeEpisodeCount", () => {
 
     expect(result.count).toBe(42);
     expect(result.error).toBeUndefined();
+  });
+
+  it("returns error when user is not subscribed to the podcast", async () => {
+    mockSubscriptionFindFirst.mockResolvedValue(null);
+
+    const { getResummarizeEpisodeCount } = await import(
+      "@/app/actions/bulk-resummarize"
+    );
+    const result = await getResummarizeEpisodeCount({ podcastId: 7 });
+
+    expect(result.count).toBe(0);
+    expect(result.error).toMatch(/subscribed/i);
+    expect(mockDbSelect).not.toHaveBeenCalled();
   });
 
   it("applies podcastId filter", async () => {
