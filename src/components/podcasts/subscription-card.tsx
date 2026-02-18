@@ -9,7 +9,9 @@ import { SubscribeButton } from "./subscribe-button";
 import type { Podcast } from "@/db/schema";
 
 interface SubscriptionCardProps {
-  podcast: Podcast;
+  // BOLT OPTIMIZATION: Allow description to be optional to support selective column fetching
+  // while maintaining type safety for components that receive optimized database results.
+  podcast: Omit<Podcast, "description"> & { description?: Podcast["description"] };
   subscribedAt: Date;
 }
 
