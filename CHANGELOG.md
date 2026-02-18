@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Bulk re-summarization via Trigger.dev with filters (podcast, date range, quality score), real-time progress tracking, and cancellation (#38)
 - Bulk OPML import: upload an OPML file from the Discover page to subscribe to multiple podcasts at once, with real-time progress tracking (#36)
 - DNS rebinding tests for `safeFetch` verifying TOCTOU protection via dns-pinning agent (#108)
 - ADR-005 listed in AGENTS.md Architecture Decision Records section

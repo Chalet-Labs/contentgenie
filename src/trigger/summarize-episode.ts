@@ -44,6 +44,7 @@ export const summarizeEpisode = task({
         error: error instanceof Error ? error.message : String(error),
       });
     }
+    metadata.root.increment("failed", 1);
   },
   run: async (payload: SummarizeEpisodePayload, { ctx }): Promise<SummaryResult> => {
     const { episodeId } = payload;
@@ -212,6 +213,7 @@ export const summarizeEpisode = task({
 
     logger.info("Summary persisted successfully");
     metadata.set("step", "completed");
+    metadata.root.increment("completed", 1);
 
     return summary;
   },

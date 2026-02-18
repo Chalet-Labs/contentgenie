@@ -27,6 +27,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton"
 import { toast } from "sonner"
 import { Sun, Moon, Monitor, Bell, Link2, Trash2, ExternalLink, Mail } from "lucide-react"
+import { BulkResummarizeCard } from "@/components/settings/bulk-resummarize-card"
 
 export default function SettingsPage() {
   const { user, isLoaded: userLoaded } = useUser()
@@ -185,6 +186,9 @@ export default function SettingsPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* AI Summaries */}
+      <BulkResummarizeCard />
 
       {/* Connected Accounts */}
       <Card>
