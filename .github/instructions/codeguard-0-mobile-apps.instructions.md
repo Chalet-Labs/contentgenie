@@ -48,7 +48,7 @@ Protect sensitive data at rest and in transit:
 Assume all network communication is insecure:
 - Use HTTPS for all network communication
 - Do not override SSL certificate validation for self-signed certificates
-- Use strong, industry standard cipher suites with appropriate key lengths
+- Use strong, industry-standard cipher suites with appropriate key lengths
 - Use certificates signed by trusted CA providers
 - Consider certificate pinning for additional security
 - Encrypt data even if sent over SSL

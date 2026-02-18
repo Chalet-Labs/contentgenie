@@ -21,7 +21,7 @@ Implement robust, attack-resistant session handling that prevents fixation, hija
 - Prefer non-persistent session cookies (no Expires/Max-Age). Require full HTTPS; enable HSTS site-wide.
 
 Example header:
-```
+```http
 Set-Cookie: id=<opaque>; Secure; HttpOnly; SameSite=Strict; Path=/
 ```
 
