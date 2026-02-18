@@ -31,6 +31,11 @@ export interface SummaryResult {
   keyTakeaways: string[];
   worthItScore: number;
   worthItReason: string;
+  worthItDimensions?: {
+    uniqueness: number;
+    actionability: number;
+    timeValue: number;
+  };
 }
 
 // Generate a chat completion using OpenRouter

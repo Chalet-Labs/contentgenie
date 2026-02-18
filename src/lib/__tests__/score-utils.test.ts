@@ -34,28 +34,28 @@ describe("getScoreColor", () => {
 });
 
 describe("getScoreLabel", () => {
-  it("returns 'Highly Recommended' for scores >= 8", () => {
-    expect(getScoreLabel(8)).toBe("Highly Recommended");
-    expect(getScoreLabel(10)).toBe("Highly Recommended");
+  it("returns 'Exceptional' for scores >= 8", () => {
+    expect(getScoreLabel(8)).toBe("Exceptional");
+    expect(getScoreLabel(10)).toBe("Exceptional");
   });
 
-  it("returns 'Worth Your Time' for scores >= 6 and < 8", () => {
-    expect(getScoreLabel(6)).toBe("Worth Your Time");
-    expect(getScoreLabel(7.9)).toBe("Worth Your Time");
+  it("returns 'Above Average' for scores >= 6 and < 8", () => {
+    expect(getScoreLabel(6)).toBe("Above Average");
+    expect(getScoreLabel(7.9)).toBe("Above Average");
   });
 
-  it("returns 'Decent' for scores >= 4 and < 6", () => {
-    expect(getScoreLabel(4)).toBe("Decent");
-    expect(getScoreLabel(5.9)).toBe("Decent");
+  it("returns 'Average' for scores >= 4 and < 6", () => {
+    expect(getScoreLabel(4)).toBe("Average");
+    expect(getScoreLabel(5.9)).toBe("Average");
   });
 
-  it("returns 'Skip Unless Interested' for scores >= 2 and < 4", () => {
-    expect(getScoreLabel(2)).toBe("Skip Unless Interested");
-    expect(getScoreLabel(3.9)).toBe("Skip Unless Interested");
+  it("returns 'Below Average' for scores >= 2 and < 4", () => {
+    expect(getScoreLabel(2)).toBe("Below Average");
+    expect(getScoreLabel(3.9)).toBe("Below Average");
   });
 
-  it("returns 'Not Recommended' for scores < 2", () => {
-    expect(getScoreLabel(0)).toBe("Not Recommended");
-    expect(getScoreLabel(1.9)).toBe("Not Recommended");
+  it("returns 'Skip' for scores < 2", () => {
+    expect(getScoreLabel(0)).toBe("Skip");
+    expect(getScoreLabel(1.9)).toBe("Skip");
   });
 });
