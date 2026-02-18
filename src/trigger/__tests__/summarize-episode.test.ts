@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 // Mock Trigger.dev SDK before imports
+const mockMetadataRootIncrement = vi.fn();
 vi.mock("@trigger.dev/sdk", () => ({
   task: vi.fn((config) => config),
   retry: {
@@ -13,6 +14,9 @@ vi.mock("@trigger.dev/sdk", () => ({
   },
   metadata: {
     set: vi.fn(),
+    root: {
+      increment: (...args: unknown[]) => mockMetadataRootIncrement(...args),
+    },
   },
   AbortTaskRunError: class AbortTaskRunError extends Error {
     constructor(message: string) {
@@ -76,9 +80,10 @@ import { trackEpisodeRun, persistEpisodeSummary } from "@/trigger/helpers/databa
 import { transcribeAudio } from "@/lib/assemblyai";
 import { summarizeEpisode } from "@/trigger/summarize-episode";
 
-// The task mock returns the raw config object, so `.run` is available at runtime
+// The task mock returns the raw config object, so `.run` and `.onFailure` are available at runtime
 const taskConfig = summarizeEpisode as unknown as {
   run: (payload: { episodeId: number }, ctx: unknown) => Promise<unknown>;
+  onFailure: (params: { payload: { episodeId: number } }) => Promise<void>;
 };
 
 const mockCtx = { run: { id: "run_test123" } } as never;
@@ -404,5 +409,66 @@ describe("summarize-episode task", () => {
       mockEpisode,
       undefined
     );
+  });
+
+  it("calls metadata.root.increment('completed', 1) after successful run", async () => {
+    vi.mocked(getEpisodeById).mockResolvedValue({ episode: mockEpisode } as never);
+    vi.mocked(getPodcastById).mockResolvedValue({ feed: mockPodcast } as never);
+    vi.mocked(fetchTranscript).mockResolvedValue("Full transcript text");
+    vi.mocked(generateEpisodeSummary).mockResolvedValue(mockSummary);
+    vi.mocked(persistEpisodeSummary).mockResolvedValue(undefined);
+
+    await taskConfig.run({ episodeId: 123 }, mockCtx);
+
+    expect(mockMetadataRootIncrement).toHaveBeenCalledWith("completed", 1);
+  });
+
+  it("calls metadata.root.increment('completed', 1) exactly once per successful run", async () => {
+    vi.mocked(getEpisodeById).mockResolvedValue({ episode: mockEpisode } as never);
+    vi.mocked(getPodcastById).mockResolvedValue({ feed: mockPodcast } as never);
+    vi.mocked(fetchTranscript).mockResolvedValue("Transcript");
+    vi.mocked(generateEpisodeSummary).mockResolvedValue(mockSummary);
+    vi.mocked(persistEpisodeSummary).mockResolvedValue(undefined);
+
+    await taskConfig.run({ episodeId: 123 }, mockCtx);
+
+    const completedCalls = mockMetadataRootIncrement.mock.calls.filter(
+      ([key]) => key === "completed"
+    );
+    expect(completedCalls).toHaveLength(1);
+    expect(completedCalls[0]).toEqual(["completed", 1]);
+  });
+
+  it("does not call metadata.root.increment('completed') when episode is not found", async () => {
+    vi.mocked(getEpisodeById).mockResolvedValue({ episode: null } as never);
+
+    await expect(
+      taskConfig.run({ episodeId: 999 }, mockCtx)
+    ).rejects.toThrow("Episode 999 not found");
+
+    const completedCalls = mockMetadataRootIncrement.mock.calls.filter(
+      ([key]) => key === "completed"
+    );
+    expect(completedCalls).toHaveLength(0);
+  });
+
+  it("calls metadata.root.increment('failed', 1) in onFailure", async () => {
+    // taskConfig.onFailure is called by Trigger.dev when the task permanently fails
+    await taskConfig.onFailure({ payload: { episodeId: 42 } });
+
+    expect(mockMetadataRootIncrement).toHaveBeenCalledWith("failed", 1);
+  });
+
+  it("calls metadata.root.increment('failed', 1) even when DB update in onFailure fails", async () => {
+    const { db } = await import("@/db");
+    vi.mocked(db.update).mockReturnValue({
+      set: vi.fn().mockReturnValue({
+        where: vi.fn().mockRejectedValue(new Error("DB unavailable")),
+      }),
+    } as never);
+
+    await taskConfig.onFailure({ payload: { episodeId: 42 } });
+
+    expect(mockMetadataRootIncrement).toHaveBeenCalledWith("failed", 1);
   });
 });
