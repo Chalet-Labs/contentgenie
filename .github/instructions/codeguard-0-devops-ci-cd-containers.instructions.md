@@ -16,7 +16,7 @@ Secure the build, packaging, and deployment supply chain: protect pipelines and 
 - Least privilege: ephemeral, isolated runners with minimal permissions.
 - Security gates in CI: SAST, SCA, DAST, IaC scanning; block on criticals.
 - Dependencies: pin via lockfiles; verify integrity; use private registries.
-- Sign everything: commits and artifacts (containers/jars) and verify prior to deploy; adopt SLSA provenance.
+- Sign everything: commits and artifacts (containers/jars) and verify before deploy; adopt SLSA provenance.
 
 ### Docker and Container Hardening
 - User: run as non‑root; set `USER` in Dockerfile
