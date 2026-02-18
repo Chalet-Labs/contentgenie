@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth as clerkAuth } from "@clerk/nextjs/server";
 import { tasks, auth, runs } from "@trigger.dev/sdk";
-import { and, count } from "drizzle-orm";
+import { and, count, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { episodes } from "@/db/schema";
+import { episodes, userSubscriptions } from "@/db/schema";
 import { createRateLimitChecker } from "@/lib/rate-limit";
 import { buildResummarizeConditions } from "@/lib/bulk-resummarize-filters";
 import type { bulkResummarize } from "@/trigger/bulk-resummarize";
@@ -75,6 +75,22 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Verify subscription when filtering by podcastId
+    if (podcastId !== undefined) {
+      const subscription = await db.query.userSubscriptions.findFirst({
+        where: and(
+          eq(userSubscriptions.userId, userId),
+          eq(userSubscriptions.podcastId, podcastId)
+        ),
+      });
+      if (!subscription) {
+        return NextResponse.json(
+          { error: "You must be subscribed to this podcast to re-summarize its episodes" },
+          { status: 403 }
+        );
+      }
+    }
+
     // Rate limit check
     const rateLimit = await checkBulkRateLimit(userId);
     if (!rateLimit.allowed) {
@@ -94,15 +110,16 @@ export async function POST(request: NextRequest) {
 
     const estimatedEpisodes = countResult.count;
 
-    // Trigger the bulk-resummarize task
+    // Trigger the bulk-resummarize task (tag with userId for ownership verification)
     const handle = await tasks.trigger<typeof bulkResummarize>(
       "bulk-resummarize",
-      { podcastId, minDate, maxDate, maxScore, all }
+      { podcastId, minDate, maxDate, maxScore, all },
+      { tags: [`user:${userId}`] }
     );
 
     // Dynamic token expiry: scale with expected processing time
     // 3 concurrent * ~2 min each = ~2/3 min per episode
-    const expiryMinutes = Math.min(60, Math.max(15, Math.ceil(estimatedEpisodes / 3 * 2)));
+    const expiryMinutes = Math.min(60, Math.max(15, Math.ceil((estimatedEpisodes * 2) / 3)));
     const publicAccessToken = await auth.createPublicToken({
       scopes: {
         read: {
@@ -146,6 +163,15 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json(
         { error: "runId is required" },
         { status: 400 }
+      );
+    }
+
+    // Verify the authenticated user owns this run
+    const run = await runs.retrieve(runId);
+    if (!run.tags?.includes(`user:${userId}`)) {
+      return NextResponse.json(
+        { error: "Forbidden: cannot cancel another user's run" },
+        { status: 403 }
       );
     }
 

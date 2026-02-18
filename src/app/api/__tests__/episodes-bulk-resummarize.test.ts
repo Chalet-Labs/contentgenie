@@ -12,6 +12,7 @@ vi.mock("@/lib/rate-limit", () => ({
 }));
 
 const mockDbSelectWhere = vi.fn().mockResolvedValue([{ count: 10 }]);
+const mockSubscriptionFindFirst = vi.fn().mockResolvedValue({ id: 1 });
 vi.mock("@/db", () => ({
   db: {
     select: vi.fn().mockReturnValue({
@@ -19,6 +20,11 @@ vi.mock("@/db", () => ({
         where: (...args: unknown[]) => mockDbSelectWhere(...args),
       }),
     }),
+    query: {
+      userSubscriptions: {
+        findFirst: (...args: unknown[]) => mockSubscriptionFindFirst(...args),
+      },
+    },
   },
 }));
 
@@ -28,6 +34,10 @@ vi.mock("@/db/schema", () => ({
     podcastId: "podcast_id",
     publishDate: "publish_date",
     worthItScore: "worth_it_score",
+  },
+  userSubscriptions: {
+    userId: "user_id",
+    podcastId: "podcast_id",
   },
 }));
 
@@ -40,6 +50,7 @@ vi.mock("drizzle-orm", () => ({
   count: vi.fn(() => "count(*)"),
 }));
 
+const mockRunsRetrieve = vi.fn().mockResolvedValue({ id: "run_abc123", tags: ["user:user-1"] });
 vi.mock("@trigger.dev/sdk", () => ({
   tasks: {
     trigger: vi.fn().mockResolvedValue({ id: "run_bulk123" }),
@@ -49,6 +60,7 @@ vi.mock("@trigger.dev/sdk", () => ({
   },
   runs: {
     cancel: vi.fn().mockResolvedValue(undefined),
+    retrieve: (...args: unknown[]) => mockRunsRetrieve(...args),
   },
 }));
 
@@ -71,6 +83,7 @@ describe("POST /api/episodes/bulk-resummarize", () => {
     vi.mocked(clerkAuth).mockResolvedValue({ userId: "user-1" } as never);
     mockRateLimitFn.mockResolvedValue({ allowed: true });
     mockDbSelectWhere.mockResolvedValue([{ count: 10 }]);
+    mockSubscriptionFindFirst.mockResolvedValue({ id: 1 });
   });
 
   afterEach(() => {
@@ -158,6 +171,17 @@ describe("POST /api/episodes/bulk-resummarize", () => {
     expect(lowResponse.status).toBe(400);
   });
 
+  it("returns 403 when user is not subscribed to the podcast", async () => {
+    mockSubscriptionFindFirst.mockResolvedValue(null);
+
+    const { POST } = await import("@/app/api/episodes/bulk-resummarize/route");
+    const response = await POST(makeRequest("POST", { podcastId: 5 }));
+    const data = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(data.error).toMatch(/subscribed/i);
+  });
+
   it("returns 429 when rate limit exceeded", async () => {
     mockRateLimitFn.mockResolvedValue({ allowed: false, retryAfterMs: 3600000 });
 
@@ -233,7 +257,8 @@ describe("POST /api/episodes/bulk-resummarize", () => {
 
     expect(tasks.trigger).toHaveBeenCalledWith(
       "bulk-resummarize",
-      expect.objectContaining({ podcastId: 7, maxScore: 5 })
+      expect.objectContaining({ podcastId: 7, maxScore: 5 }),
+      expect.objectContaining({ tags: ["user:user-1"] })
     );
   });
 
@@ -293,6 +318,7 @@ describe("DELETE /api/episodes/bulk-resummarize", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(clerkAuth).mockResolvedValue({ userId: "user-1" } as never);
+    mockRunsRetrieve.mockResolvedValue({ id: "run_abc123", tags: ["user:user-1"] });
   });
 
   afterEach(() => {
@@ -329,6 +355,17 @@ describe("DELETE /api/episodes/bulk-resummarize", () => {
 
     expect(response.status).toBe(400);
     expect(data.error).toMatch(/runId/i);
+  });
+
+  it("returns 403 when user does not own the run", async () => {
+    mockRunsRetrieve.mockResolvedValue({ id: "run_abc123", tags: ["user:other-user"] });
+
+    const { DELETE } = await import("@/app/api/episodes/bulk-resummarize/route");
+    const response = await DELETE(makeRequest("DELETE", { runId: "run_abc123" }));
+    const data = await response.json();
+
+    expect(response.status).toBe(403);
+    expect(data.error).toMatch(/forbidden/i);
   });
 
   it("cancels the run and returns { canceled: true }", async () => {
