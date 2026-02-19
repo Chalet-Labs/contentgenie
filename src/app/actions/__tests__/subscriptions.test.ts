@@ -17,8 +17,10 @@ const mockFindFirstSubscription = vi.fn();
 const mockInsert = vi.fn();
 const mockValues = vi.fn();
 const mockOnConflictDoNothing = vi.fn();
+const mockOnConflictDoUpdate = vi.fn();
 const mockReturning = vi.fn();
 const mockSelect = vi.fn();
+const mockUpdate = vi.fn();
 
 vi.mock("@/db", () => ({
   db: {
@@ -29,12 +31,20 @@ vi.mock("@/db", () => ({
       },
     },
     select: (...args: unknown[]) => mockSelect(...args),
+    update: (...args: unknown[]) => {
+      mockUpdate(...args);
+      return {
+        set: () => ({
+          where: () => Promise.resolve(),
+        }),
+      };
+    },
     insert: (...args: unknown[]) => {
       mockInsert(...args);
       return {
         values: (...vArgs: unknown[]) => {
           mockValues(...vArgs);
-          return {
+          const chain = {
             onConflictDoNothing: () => {
               mockOnConflictDoNothing();
               return {
@@ -44,8 +54,21 @@ vi.mock("@/db", () => ({
                 },
               };
             },
-            returning: () => mockReturning(),
+            onConflictDoUpdate: () => {
+              mockOnConflictDoUpdate();
+              return {
+                returning: () => {
+                  mockReturning();
+                  return mockReturning();
+                },
+              };
+            },
+            returning: () => {
+              mockReturning();
+              return mockReturning();
+            },
           };
+          return chain;
         },
       };
     },
@@ -239,6 +262,58 @@ function mockSelectChain(resolvedValue: unknown[]) {
   const mockFrom = vi.fn().mockReturnValue({ innerJoin: mockInnerJoin });
   mockSelect.mockReturnValue({ from: mockFrom });
 }
+
+describe("subscribeToPodcast", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockAuth.mockResolvedValue({ userId: "user_123" });
+    mockReturning.mockReturnValue([{ id: 1 }]);
+  });
+
+  it("successfully subscribes to a new podcast", async () => {
+    // podcast insert -> returns [{id: 1}]
+    // subscription insert -> returns [{id: 2}]
+    mockReturning
+      .mockReturnValueOnce([{ id: 1 }])
+      .mockReturnValueOnce([{ id: 1 }])
+      .mockReturnValueOnce([{ id: 2 }])
+      .mockReturnValueOnce([{ id: 2 }]);
+
+    const { subscribeToPodcast } = await import(
+      "@/app/actions/subscriptions"
+    );
+    const result = await subscribeToPodcast({
+      podcastIndexId: "12345",
+      title: "Test Podcast",
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.message).toMatch(/subscribed successfully/i);
+    expect(mockOnConflictDoUpdate).toHaveBeenCalled();
+    expect(mockOnConflictDoNothing).toHaveBeenCalled();
+  });
+
+  it("handles already subscribed case correctly", async () => {
+    // podcast insert -> returns [{id: 1}]
+    // subscription insert (onConflictDoNothing) -> returns []
+    mockReturning
+      .mockReturnValueOnce([{ id: 1 }])
+      .mockReturnValueOnce([{ id: 1 }])
+      .mockReturnValueOnce([])
+      .mockReturnValueOnce([]);
+
+    const { subscribeToPodcast } = await import(
+      "@/app/actions/subscriptions"
+    );
+    const result = await subscribeToPodcast({
+      podcastIndexId: "12345",
+      title: "Test Podcast",
+    });
+
+    expect(result.success).toBe(true);
+    expect(result.message).toMatch(/already subscribed/i);
+  });
+});
 
 describe("isSubscribedToPodcast", () => {
   beforeEach(() => {
