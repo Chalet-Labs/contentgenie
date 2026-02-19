@@ -44,21 +44,23 @@ export async function saveEpisodeToLibrary(episodeData: EpisodeData) {
       })
       .onConflictDoNothing();
 
-    // Ensure podcast exists in our database
-    let podcast = await db.query.podcasts.findFirst({
-      where: eq(podcasts.podcastIndexId, episodeData.podcast.podcastIndexId),
-      columns: { id: true },
-    });
-
-    let podcastId: number;
-
-    if (podcast) {
-      podcastId = podcast.id;
-    } else {
-      const [newPodcast] = await db
-        .insert(podcasts)
-        .values({
-          podcastIndexId: episodeData.podcast.podcastIndexId,
+    // BOLT OPTIMIZATION: Use upsert (onConflictDoUpdate) to consolidate podcast lookup,
+    // insertion, and update into a single database round-trip.
+    const [podcast] = await db
+      .insert(podcasts)
+      .values({
+        podcastIndexId: episodeData.podcast.podcastIndexId,
+        title: episodeData.podcast.title,
+        description: episodeData.podcast.description,
+        publisher: episodeData.podcast.publisher,
+        imageUrl: episodeData.podcast.imageUrl,
+        rssFeedUrl: episodeData.podcast.rssFeedUrl,
+        categories: episodeData.podcast.categories,
+        totalEpisodes: episodeData.podcast.totalEpisodes,
+      })
+      .onConflictDoUpdate({
+        target: podcasts.podcastIndexId,
+        set: {
           title: episodeData.podcast.title,
           description: episodeData.podcast.description,
           publisher: episodeData.podcast.publisher,
@@ -66,54 +68,55 @@ export async function saveEpisodeToLibrary(episodeData: EpisodeData) {
           rssFeedUrl: episodeData.podcast.rssFeedUrl,
           categories: episodeData.podcast.categories,
           totalEpisodes: episodeData.podcast.totalEpisodes,
-        })
-        .returning({ id: podcasts.id });
-      podcastId = newPodcast.id;
-    }
+          updatedAt: new Date(),
+        },
+      })
+      .returning({ id: podcasts.id });
 
-    // Ensure episode exists in our database
-    let episode = await db.query.episodes.findFirst({
-      where: eq(episodes.podcastIndexId, episodeData.podcastIndexId),
-      columns: { id: true },
-    });
+    const podcastId = podcast.id;
 
-    let episodeId: number;
-
-    if (episode) {
-      episodeId = episode.id;
-    } else {
-      const [newEpisode] = await db
-        .insert(episodes)
-        .values({
-          podcastId,
-          podcastIndexId: episodeData.podcastIndexId,
+    // BOLT OPTIMIZATION: Use upsert (onConflictDoUpdate) for episodes to consolidate lookup
+    // and insertion into one round-trip.
+    const [episode] = await db
+      .insert(episodes)
+      .values({
+        podcastId,
+        podcastIndexId: episodeData.podcastIndexId,
+        title: episodeData.title,
+        description: episodeData.description,
+        audioUrl: episodeData.audioUrl,
+        duration: episodeData.duration,
+        publishDate: episodeData.publishDate,
+      })
+      .onConflictDoUpdate({
+        target: episodes.podcastIndexId,
+        set: {
           title: episodeData.title,
           description: episodeData.description,
           audioUrl: episodeData.audioUrl,
           duration: episodeData.duration,
           publishDate: episodeData.publishDate,
-        })
-        .returning({ id: episodes.id });
-      episodeId = newEpisode.id;
-    }
+          updatedAt: new Date(),
+        },
+      })
+      .returning({ id: episodes.id });
 
-    // Check if already saved
-    const existingEntry = await db.query.userLibrary.findFirst({
-      where: and(
-        eq(userLibrary.userId, userId),
-        eq(userLibrary.episodeId, episodeId)
-      ),
-    });
+    const episodeId = episode.id;
 
-    if (existingEntry) {
+    // BOLT OPTIMIZATION: Use onConflictDoNothing to handle already saved case in one query.
+    // This replaces a separate existence check and reduces total round-trips significantly.
+    const libraryResult = await db
+      .insert(userLibrary)
+      .values({
+        userId,
+        episodeId,
+      })
+      .onConflictDoNothing()
+      .returning({ id: userLibrary.id });
+
+    if (libraryResult.length === 0) {
       return { success: true, message: "Episode already in library" };
     }
-
-    // Add to library
-    await db.insert(userLibrary).values({
-      userId,
-      episodeId,
-    });
 
     revalidatePath("/library");
     revalidatePath(`/episode/${episodeData.podcastIndexId}`);
