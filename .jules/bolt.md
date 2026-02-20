@@ -21,3 +21,7 @@
 ## 2026-02-15 - Prefer Column Exclusion for Maintainability
 **Learning:** When using Drizzle's relational query API (`db.query`), optimizing for large text fields can be done via whitelisting (`columns: { title: true, ... }`) or blacklisting (`columns: { transcription: false }`). Blacklisting is more maintainable as it ensures new metadata fields added to the schema automatically flow through to the application without breaking consumers that expect a full object, while still providing the performance benefit of skipping high-volume data.
 **Action:** Use column exclusion (`fieldName: false`) instead of whitelisting for better schema maintainability when optimizing for large fields.
+
+## 2026-02-16 - API Batching for Multi-Feed Queries
+**Learning:** The PodcastIndex API supports batching multiple feed IDs in a single request to endpoints like `/episodes/byfeedid`. This allows replacing N sequential or concurrent API calls with a single round-trip when fetching recent episodes from multiple subscriptions.
+**Action:** Always check API documentation for batching support when performing multiple related network requests. Update library utilities to support stringified batch IDs.

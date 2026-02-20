@@ -147,6 +147,30 @@ describe("PodcastIndex API functions", () => {
     expect(url.searchParams.get("id")).toBe("456");
   });
 
+  it("getEpisodesByFeedId supports multiple IDs as a string", async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          status: "true",
+          items: [
+            { id: 101, feedId: 456, title: "Ep 1" },
+            { id: 102, feedId: 789, title: "Ep 2" },
+          ],
+        }),
+    });
+    vi.stubGlobal("fetch", mockFetch);
+
+    const { getEpisodesByFeedId } = await import("@/lib/podcastindex");
+    const result = await getEpisodesByFeedId("456,789", 10);
+
+    const url = new URL(mockFetch.mock.calls[0][0]);
+    expect(url.pathname).toBe("/api/1.0/episodes/byfeedid");
+    expect(url.searchParams.get("id")).toBe("456,789");
+    expect(url.searchParams.get("max")).toBe("10");
+    expect(result.items).toHaveLength(2);
+  });
+
   it("getTrendingPodcasts passes categories when provided", async () => {
     const mockFetch = vi.fn().mockResolvedValue({
       ok: true,
