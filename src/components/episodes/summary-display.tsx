@@ -270,7 +270,14 @@ export function SummaryDisplay({
               </div>
             </div>
             <div className="mt-4">
-              <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+              <div
+                className="h-2 w-full overflow-hidden rounded-full bg-muted"
+                role="progressbar"
+                aria-valuenow={worthItScore}
+                aria-valuemin={0}
+                aria-valuemax={10}
+                aria-label={`Worth-it score: ${worthItScore.toFixed(1)} out of 10`}
+              >
                 <div
                   className={`h-full ${getScoreColor(worthItScore)} transition-all`}
                   style={{ width: `${(worthItScore / 10) * 100}%` }}
@@ -291,7 +298,14 @@ export function SummaryDisplay({
                       <span className="text-muted-foreground">{DIMENSION_LABELS[key] ?? key}</span>
                       <span className="font-medium">{value.toFixed(1)}</span>
                     </div>
-                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                    <div
+                      className="h-1.5 w-full overflow-hidden rounded-full bg-muted"
+                      role="progressbar"
+                      aria-valuenow={value}
+                      aria-valuemin={0}
+                      aria-valuemax={10}
+                      aria-label={`${DIMENSION_LABELS[key] ?? key}: ${value.toFixed(1)} out of 10`}
+                    >
                       <div
                         className={`h-full ${getScoreColor(value)} transition-all`}
                         style={{ width: `${(value / 10) * 100}%` }}
