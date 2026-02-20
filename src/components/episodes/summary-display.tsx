@@ -231,6 +231,14 @@ export function SummaryDisplay({
     isLongSummary && !showFullSummary
       ? summary.slice(0, 600) + "..."
       : summary;
+  const normalizedDimensionEntries = worthItDimensions
+    ? Object.entries(worthItDimensions).reduce<[string, number][]>((acc, [key, raw]) => {
+        const num = typeof raw === "number" ? raw : typeof raw === "string" ? Number(raw) : NaN;
+        if (!Number.isFinite(num)) return acc;
+        acc.push([key, Math.min(10, Math.max(0, num))]);
+        return acc;
+      }, [])
+    : [];
 
   return (
     <div className="space-y-6">
@@ -274,10 +282,10 @@ export function SummaryDisplay({
                 <span>10</span>
               </div>
             </div>
-            {worthItDimensions && (
+            {normalizedDimensionEntries.length > 0 && (
               <div className="mt-4 space-y-3 border-t pt-4">
                 <p className="text-sm font-medium text-foreground">Score Breakdown</p>
-                {(Object.entries(worthItDimensions) as [string, number][]).map(([key, value]) => (
+                {normalizedDimensionEntries.map(([key, value]) => (
                   <div key={key} className="space-y-1">
                     <div className="flex items-center justify-between text-xs">
                       <span className="text-muted-foreground">{DIMENSION_LABELS[key] ?? key}</span>

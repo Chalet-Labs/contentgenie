@@ -37,7 +37,7 @@ ${contentSection}
 
 Please provide your analysis in the following JSON format:
 {
-  "summary": "## TL;DR\\n2-3 sentence overview.\\n\\n## What You'll Learn\\n- Bullet point 1\\n- Bullet point 2\\n- Bullet point 3\\n\\n## Notable Quotes\\n> Quote 1 (if available from transcript)\\n\\n## Action Items\\n- Concrete next step 1\\n- Concrete next step 2\\n\\n## Bottom Line\\n1-2 sentence verdict on whether this episode is worth the time investment.",
+  "summary": "## TL;DR\\n1 sentence.\\n\\n## What You'll Learn\\n- Bullet point 1\\n- Bullet point 2\\n- Bullet point 3\\n\\n## Notable Quotes / Key Moments\\n- Standout moment 1 (~XX:XX)\\n- Standout moment 2 (~XX:XX)\\n\\n## Action Items\\n- Concrete next step 1\\n- Concrete next step 2\\n\\n## Bottom Line\\n1-2 sentence verdict on whether this episode is worth the time investment.",
   "keyTakeaways": [
     "First actionable insight",
     "Second actionable insight",
@@ -71,8 +71,8 @@ Important:
 - 5 is the average baseline. Justify every point above 5 with specific evidence.
 - Extract 3-5 key takeaways, prioritizing actionable insights
 - If working from description only, be honest about the limitations and score conservatively
-- The summary must include all 5 sections (TL;DR, What You'll Learn, Notable Quotes, Action Items, Bottom Line) using ## headers
-- If no notable quotes are available, write "No direct quotes available" under that section
+- The summary must include all 5 sections (TL;DR, What You'll Learn, Notable Quotes / Key Moments, Action Items, Bottom Line) using ## headers
+- For Notable Quotes / Key Moments: include 2-3 standout moments; add approximate timestamps (~XX:XX) when working from a transcript; write "No notable moments available" if nothing stands out
 - Consider the time investment (${durationMinutes} min) when scoring timeValue
 - Focus on value for busy professionals who need to be selective with their time`;
 }
