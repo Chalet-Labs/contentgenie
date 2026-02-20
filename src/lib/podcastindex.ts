@@ -257,9 +257,9 @@ export async function getPodcastByItunesId(
   });
 }
 
-// Get episodes by feed ID
+// Get episodes by feed ID (supports multiple comma-separated IDs)
 export async function getEpisodesByFeedId(
-  feedId: number,
+  feedId: number | string,
   max: number = 20
 ): Promise<GetEpisodesResponse> {
   return fetchFromPodcastIndex<GetEpisodesResponse>("/episodes/byfeedid", {
