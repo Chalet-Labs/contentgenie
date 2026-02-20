@@ -25,3 +25,7 @@
 ## 2026-02-16 - Upsert for Transactional Performance
 **Learning:** Sequential "find then insert/update" patterns in server actions create unnecessary database round-trips. Using Drizzle's `onConflictDoUpdate` (upsert) or `onConflictDoNothing` allows consolidating these into a single query. When using `returning()`, `onConflictDoUpdate` is more reliable for ensuring an ID is returned even when the record already exists.
 **Action:** Replace existence checks followed by insertions/updates with atomic `onConflict` operations to reduce round-trips by ~40-60%.
+
+## 2026-02-16 - API Batching for Multi-Feed Queries
+**Learning:** The PodcastIndex API supports batching multiple feed IDs in a single request to endpoints like `/episodes/byfeedid`. This allows replacing N sequential or concurrent API calls with a single round-trip when fetching recent episodes from multiple subscriptions.
+**Action:** Always check API documentation for batching support when performing multiple related network requests. Update library utilities to support stringified batch IDs.
