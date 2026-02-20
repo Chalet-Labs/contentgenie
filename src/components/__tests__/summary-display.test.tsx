@@ -167,4 +167,71 @@ describe("SummaryDisplay", () => {
     );
     expect(screen.queryByText("Worth-It Score")).not.toBeInTheDocument();
   });
+
+  it("renders structured summary with headings as separate blocks", () => {
+    const structuredSummary =
+      "## TL;DR\nA quick overview.\n\n## What You'll Learn\n- Item 1";
+    render(
+      <SummaryDisplay
+        summary={structuredSummary}
+        keyTakeaways={[]}
+        worthItScore={7}
+      />
+    );
+    expect(screen.getByText("TL;DR")).toBeInTheDocument();
+    expect(screen.getByText("A quick overview.")).toBeInTheDocument();
+    // Second section is hidden by default (collapsed to first section only)
+    expect(screen.queryByText("What You'll Learn")).not.toBeInTheDocument();
+    expect(screen.getByText("Read More")).toBeInTheDocument();
+  });
+
+  it("expands all structured sections when Read More is clicked", async () => {
+    const user = userEvent.setup();
+    const structuredSummary =
+      "## TL;DR\nA quick overview.\n\n## What You'll Learn\n- Item 1";
+    render(
+      <SummaryDisplay
+        summary={structuredSummary}
+        keyTakeaways={[]}
+        worthItScore={7}
+      />
+    );
+    await user.click(screen.getByText("Read More"));
+    expect(screen.getByText("What You'll Learn")).toBeInTheDocument();
+    expect(screen.getByText("Show Less")).toBeInTheDocument();
+  });
+
+  it("renders score breakdown labels when worthItDimensions is present", () => {
+    render(
+      <SummaryDisplay
+        summary="Short summary."
+        keyTakeaways={[]}
+        worthItScore={7}
+        worthItDimensions={{ uniqueness: 3, actionability: 4, timeValue: 9 }}
+      />
+    );
+    expect(screen.getByText("Score Breakdown")).toBeInTheDocument();
+    expect(screen.getByText("Uniqueness")).toBeInTheDocument();
+    expect(screen.getByText("Actionability")).toBeInTheDocument();
+    expect(screen.getByText("Time Value")).toBeInTheDocument();
+  });
+
+  it("omits invalid dimension entries from score breakdown", () => {
+    render(
+      <SummaryDisplay
+        summary="Short summary."
+        keyTakeaways={[]}
+        worthItScore={7}
+        worthItDimensions={{
+          uniqueness: 8,
+          actionability: NaN as unknown as number,
+          timeValue: 6,
+        }}
+      />
+    );
+    expect(screen.getByText("Score Breakdown")).toBeInTheDocument();
+    expect(screen.getByText("Uniqueness")).toBeInTheDocument();
+    expect(screen.queryByText("Actionability")).not.toBeInTheDocument();
+    expect(screen.getByText("Time Value")).toBeInTheDocument();
+  });
 });
