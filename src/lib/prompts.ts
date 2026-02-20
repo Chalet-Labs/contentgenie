@@ -16,7 +16,7 @@ export function getSummarizationPrompt(
   duration: number,
   transcript?: string
 ): string {
-  const durationMinutes = Math.round(duration / 60);
+  const durationMinutes = duration > 0 ? Math.round(duration / 60) : null;
   const hasTranscript = transcript && transcript.length > 100;
 
   const contentSection = hasTranscript
@@ -31,7 +31,7 @@ Note: Full transcript not available. Base your analysis on the episode descripti
 
 ## Podcast: ${podcastTitle}
 ## Episode: ${episodeTitle}
-## Duration: ${durationMinutes} minutes
+## Duration: ${durationMinutes != null ? `${durationMinutes} minutes` : "Unknown"}
 
 ${contentSection}
 
@@ -55,7 +55,7 @@ Please provide your analysis in the following JSON format:
 ## Scoring Dimensions (each 1-10):
 - **uniqueness**: How original is the content? Does it offer perspectives not found elsewhere?
 - **actionability**: How practical are the insights? Can the listener do something concrete afterward?
-- **timeValue**: Is the value delivered worth the ${durationMinutes}-minute time investment?
+- **timeValue**: Is the value delivered worth the ${durationMinutes != null ? `${durationMinutes}-minute` : "unknown"} time investment?
 
 ## Anti-Inflation Scoring Guide:
 - 1-2: Poor — misleading or no useful content
@@ -73,7 +73,7 @@ Important:
 - If working from description only, be honest about the limitations and score conservatively
 - The summary must include all 5 sections (TL;DR, What You'll Learn, Notable Quotes / Key Moments, Action Items, Bottom Line) using ## headers
 - For Notable Quotes / Key Moments: include 2-3 standout moments; add approximate timestamps (~XX:XX) when working from a transcript; write "No notable moments available" if nothing stands out
-- Consider the time investment (${durationMinutes} min) when scoring timeValue
+- Consider the time investment (${durationMinutes != null ? `${durationMinutes} min` : "unknown duration"}) when scoring timeValue
 - Focus on value for busy professionals who need to be selective with their time`;
 }
 
