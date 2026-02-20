@@ -4,7 +4,7 @@
   "customManagers": [
     {
       "customType": "regex",
-      "fileMatch": ["^\\.github/workflows/.*\\.yml$"],
+      "fileMatch": ["^\\.github/workflows/.*\\.ya?ml$"],
       "matchStrings": ["bunx trigger\\.dev@(?<currentValue>[^\\s]+)"],
       "depNameTemplate": "trigger.dev",
       "datasourceTemplate": "npm"
