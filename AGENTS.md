@@ -8,7 +8,7 @@ Podcast discovery, AI-powered summarization, and library management app for busy
 - **Styling:** Tailwind CSS, shadcn/ui (Radix primitives)
 - **Auth:** Clerk (`@clerk/nextjs`)
 - **Database:** Neon (serverless Postgres) via Drizzle ORM
-- **AI:** OpenRouter API for episode summarization
+- **AI:** Provider abstraction (OpenRouter + Z.AI) for episode summarization, admin-selectable via Settings
 - **Podcast Data:** PodcastIndex API
 - **Background Jobs:** Trigger.dev (`@trigger.dev/sdk`)
 - **Notifications:** Sonner (toast)
@@ -129,6 +129,7 @@ ADRs are stored in `docs/adr/`. Read them before designing changes that touch th
 - [ADR-005: DNS-Pinning Fetch to Eliminate TOCTOU in SSRF Protection](docs/adr/005-dns-pinning-ssrf-agent.md)
 - [ADR-006: Bulk OPML Import via Trigger.dev Background Task](docs/adr/006-opml-import-via-trigger-dev.md)
 - [ADR-007: Bulk Re-Summarization via Trigger.dev Parent Task](docs/adr/007-bulk-resummarize-via-trigger-dev.md)
+- [ADR-008: AI Provider Abstraction Layer](docs/adr/008-ai-provider-abstraction.md)
 
 ## Architecture patterns
 
@@ -140,7 +141,7 @@ ADRs are stored in `docs/adr/`. Read them before designing changes that touch th
 
 ## Database schema
 
-Tables: `users`, `podcasts`, `episodes`, `user_subscriptions`, `collections`, `user_library`, `bookmarks`
+Tables: `users`, `podcasts`, `episodes`, `user_subscriptions`, `collections`, `user_library`, `bookmarks`, `ai_config`
 
 - Users are synced from Clerk (text ID primary key).
 - Podcasts/episodes reference PodcastIndex IDs.
@@ -174,6 +175,7 @@ Available environment variables:
 - `PODCASTINDEX_API_SECRET` — PodcastIndex API secret
 - `NEXT_PUBLIC_APP_URL` — Application URL (inlined at build time)
 - `TRIGGER_SECRET_KEY` — Trigger.dev secret key (background jobs)
+- `ZAI_API_KEY` — Z.AI GLM API key
 - `ASSEMBLYAI_API_KEY` — AssemblyAI transcription API key
 
 ## Security
