@@ -174,6 +174,23 @@ export const userLibrary = pgTable(
   ]
 );
 
+// AI Config table (admin-selectable provider and model)
+export const aiConfig = pgTable(
+  "ai_config",
+  {
+    id: serial("id").primaryKey(),
+    provider: text("provider").$type<"openrouter" | "zai">().notNull(),
+    model: text("model").notNull(),
+    updatedBy: text("updated_by").references(() => users.id, {
+      onDelete: "set null",
+    }),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    check("provider_enum", sql`${table.provider} IN ('openrouter', 'zai')`),
+  ]
+);
+
 // Bookmarks table
 export const bookmarks = pgTable(
   "bookmarks",
@@ -254,6 +271,13 @@ export const bookmarksRelations = relations(bookmarks, ({ one }) => ({
   }),
 }));
 
+export const aiConfigRelations = relations(aiConfig, ({ one }) => ({
+  updatedByUser: one(users, {
+    fields: [aiConfig.updatedBy],
+    references: [users.id],
+  }),
+}));
+
 // Type exports for use in the application
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
@@ -275,6 +299,9 @@ export type NewUserLibraryEntry = typeof userLibrary.$inferInsert;
 
 export type Bookmark = typeof bookmarks.$inferSelect;
 export type NewBookmark = typeof bookmarks.$inferInsert;
+
+export type AiConfigRow = typeof aiConfig.$inferSelect;
+export type NewAiConfigRow = typeof aiConfig.$inferInsert;
 
 export type SummaryStatus = NonNullable<Episode["summaryStatus"]>;
 
