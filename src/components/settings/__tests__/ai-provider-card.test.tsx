@@ -3,9 +3,9 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 // Mock Clerk
-const mockUseUser = vi.fn();
+const mockUseAuth = vi.fn();
 vi.mock("@clerk/nextjs", () => ({
-  useUser: () => mockUseUser(),
+  useAuth: () => mockUseAuth(),
 }));
 
 // Mock sonner toast
@@ -41,8 +41,8 @@ describe("AiProviderCard", () => {
   });
 
   it("renders nothing for non-admin users", () => {
-    mockUseUser.mockReturnValue({
-      user: { organizationMemberships: [{ role: "org:member" }] },
+    mockUseAuth.mockReturnValue({
+      has: () => false,
       isLoaded: true,
     });
 
@@ -51,8 +51,8 @@ describe("AiProviderCard", () => {
   });
 
   it("renders nothing when user has no organization memberships", () => {
-    mockUseUser.mockReturnValue({
-      user: { organizationMemberships: [] },
+    mockUseAuth.mockReturnValue({
+      has: () => false,
       isLoaded: true,
     });
 
@@ -61,15 +61,15 @@ describe("AiProviderCard", () => {
   });
 
   it("renders nothing while user is loading", () => {
-    mockUseUser.mockReturnValue({ user: null, isLoaded: false });
+    mockUseAuth.mockReturnValue({ has: undefined, isLoaded: false });
 
     const { container } = render(<AiProviderCard />);
     expect(container.innerHTML).toBe("");
   });
 
   it("renders card for admin users", async () => {
-    mockUseUser.mockReturnValue({
-      user: { organizationMemberships: [{ role: "org:admin" }] },
+    mockUseAuth.mockReturnValue({
+      has: () => true,
       isLoaded: true,
     });
 
@@ -88,8 +88,8 @@ describe("AiProviderCard", () => {
   });
 
   it("loads current config on mount", async () => {
-    mockUseUser.mockReturnValue({
-      user: { organizationMemberships: [{ role: "org:admin" }] },
+    mockUseAuth.mockReturnValue({
+      has: () => true,
       isLoaded: true,
     });
 
@@ -101,8 +101,8 @@ describe("AiProviderCard", () => {
   });
 
   it("calls updateAiConfig on save and shows success toast", async () => {
-    mockUseUser.mockReturnValue({
-      user: { organizationMemberships: [{ role: "org:admin" }] },
+    mockUseAuth.mockReturnValue({
+      has: () => true,
       isLoaded: true,
     });
 
@@ -127,8 +127,8 @@ describe("AiProviderCard", () => {
   });
 
   it("shows error toast on save failure", async () => {
-    mockUseUser.mockReturnValue({
-      user: { organizationMemberships: [{ role: "org:admin" }] },
+    mockUseAuth.mockReturnValue({
+      has: () => true,
       isLoaded: true,
     });
     mockUpdateAiConfig.mockResolvedValue({

@@ -58,11 +58,11 @@ Deploy an AI proxy that handles provider routing, and point ContentGenie at the 
 
 7. **Backward compatibility of `generateCompletion`.** The existing `generateCompletion` export in `src/lib/openrouter.ts` is replaced by a provider-aware version in `src/lib/ai/generate.ts` that reads the active config from the DB. The `parseJsonResponse` and `SummaryResult` types remain in their current location (or are re-exported) to minimize churn in consumers.
 
-8. **Trigger.dev integration.** The `summarize-episode` task calls `getActiveAiConfig()` at the start of `run()`, then passes the config to `generateEpisodeSummary`. This means each run uses the config active at execution time, not at trigger time.
+8. **Trigger.dev integration.** The `summarize-episode` task continues to call `generateEpisodeSummary` as its primary AI entrypoint. `generateEpisodeSummary` now delegates to the provider-aware `generateCompletion`, which looks up the active AI configuration from the database internally for each run. The task itself does not call `getActiveAiConfig()` directly.
 
-9. **Admin UI.** A new `AiProviderCard` component on the Settings page, visible only to users with the `org:admin` Clerk role. The card contains Provider and Model dropdowns and a Save button. The `useUser()` hook's `has()` method checks the role client-side for conditional rendering. The server action validates the role server-side via `auth().has({ role: "org:admin" })`.
+9. **Admin UI.** A new `AiProviderCard` component on the Settings page, visible only to users with the `org:admin` Clerk role. The card contains Provider and Model dropdowns and a Save button. Client-side, visibility is controlled via Clerk's `useUser()` hook by inspecting organization memberships for a membership with role `org:admin`. The server action performs an equivalent check using Clerk's server-side `auth().has({ role: "org:admin" })`.
 
-10. **Role-based access control.** Clerk's `auth().has()` API is used in the server action to enforce `org:admin`. This is the first use of organization roles in the codebase. The middleware is not modified — the settings page itself is already protected by the existing auth middleware; the admin card is conditionally rendered within it.
+10. **Role-based access control.** Clerk organization roles are now used end-to-end to protect AI configuration. The server action enforces `org:admin` via `auth().has({ role: "org:admin" })`. The client-side card renders conditionally based on organization membership role checks. The middleware is not modified — the settings page itself is already protected by the existing auth middleware; the admin card is conditionally rendered within it.
 
 ## Consequences
 

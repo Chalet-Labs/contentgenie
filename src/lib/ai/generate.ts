@@ -1,6 +1,6 @@
-import type { AiMessage } from "./types";
-import { getActiveAiConfig } from "./config";
-import { getAiProvider } from "./provider-factory";
+import type { AiMessage } from "@/lib/ai/types";
+import { getActiveAiConfig } from "@/lib/ai/config";
+import { getAiProvider } from "@/lib/ai/provider-factory";
 
 export async function generateCompletion(
   messages: AiMessage[],

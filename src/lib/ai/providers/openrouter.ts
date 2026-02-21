@@ -44,6 +44,11 @@ export class OpenRouterProvider implements AiProvider {
       throw new Error("No response from OpenRouter");
     }
 
-    return data.choices[0].message.content;
+    const message = data.choices[0].message;
+    if (!message?.content) {
+      throw new Error("Invalid response format from OpenRouter");
+    }
+
+    return message.content;
   }
 }

@@ -71,8 +71,8 @@ describe("getAiConfig", () => {
 });
 
 describe("updateAiConfig", () => {
-  const mockSet = vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue(undefined) });
-  const mockValues = vi.fn().mockResolvedValue(undefined);
+  const mockOnConflictDoUpdate = vi.fn().mockResolvedValue(undefined);
+  const mockValues = vi.fn().mockReturnValue({ onConflictDoUpdate: mockOnConflictDoUpdate });
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -80,30 +80,21 @@ describe("updateAiConfig", () => {
       userId: "user_admin",
       has: () => true,
     });
-    vi.mocked(db.update as any).mockReturnValue({ set: mockSet });
     vi.mocked(db.insert as any).mockReturnValue({ values: mockValues });
   });
 
-  it("allows admin to update config (existing row)", async () => {
-    vi.mocked(db.query.aiConfig.findFirst).mockResolvedValue({
-      id: 1,
-      provider: "openrouter",
-      model: "google/gemini-2.0-flash-001",
-      updatedBy: null,
-      updatedAt: new Date(),
-    });
-
+  it("allows admin to upsert config", async () => {
     const result = await updateAiConfig("zai", "glm-4.7-flash");
     expect(result).toEqual({ success: true });
-    expect(db.update).toHaveBeenCalled();
-  });
-
-  it("creates new row when none exists", async () => {
-    vi.mocked(db.query.aiConfig.findFirst).mockResolvedValue(undefined);
-
-    const result = await updateAiConfig("openrouter", "google/gemini-2.0-flash-001");
-    expect(result).toEqual({ success: true });
     expect(db.insert).toHaveBeenCalled();
+    expect(mockValues).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: 1,
+        provider: "zai",
+        model: "glm-4.7-flash",
+      })
+    );
+    expect(mockOnConflictDoUpdate).toHaveBeenCalled();
   });
 
   it("rejects non-admin users", async () => {
@@ -151,8 +142,6 @@ describe("updateAiConfig", () => {
   });
 
   it("trims model string before saving", async () => {
-    vi.mocked(db.query.aiConfig.findFirst).mockResolvedValue(undefined);
-
     await updateAiConfig("openrouter", "  google/gemini-2.0-flash-001  ");
 
     expect(mockValues).toHaveBeenCalledWith(

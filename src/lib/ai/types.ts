@@ -10,7 +10,7 @@ export interface AiCompletionOptions {
 }
 
 export interface AiProvider {
-  readonly name: string;
+  readonly name: AiProviderName;
   generateCompletion(
     messages: AiMessage[],
     options: AiCompletionOptions

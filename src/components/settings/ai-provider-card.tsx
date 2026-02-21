@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useUser } from "@clerk/nextjs";
+import { useAuth } from "@clerk/nextjs";
 import {
   Card,
   CardContent,
@@ -24,22 +24,27 @@ import { getAiConfig, updateAiConfig } from "@/app/actions/ai-config";
 import type { AiProviderName } from "@/lib/ai";
 
 export function AiProviderCard() {
-  const { user, isLoaded } = useUser();
+  const { has, isLoaded } = useAuth();
   const [provider, setProvider] = useState<AiProviderName>("openrouter");
   const [model, setModel] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
-  const isAdmin = user?.organizationMemberships?.some(
-    (m) => m.role === "org:admin"
-  );
+  const isAdmin = isLoaded && has?.({ role: "org:admin" });
 
   useEffect(() => {
     async function loadConfig() {
-      const { config } = await getAiConfig();
-      setProvider(config.provider);
-      setModel(config.model);
-      setIsLoading(false);
+      try {
+        const { config, error } = await getAiConfig();
+        if (error) {
+          toast.error(error);
+          return;
+        }
+        setProvider(config.provider);
+        setModel(config.model);
+      } finally {
+        setIsLoading(false);
+      }
     }
     if (isLoaded && isAdmin) {
       loadConfig();
