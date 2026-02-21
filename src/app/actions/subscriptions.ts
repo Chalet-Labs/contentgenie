@@ -228,20 +228,27 @@ export async function subscribeToPodcast(podcastData: PodcastData) {
       })
       .onConflictDoNothing();
 
+    // BOLT OPTIMIZATION: Consolidate find-and-update/insert for podcasts and use onConflictDoNothing
+    // to avoid manual existence check for subscription.
+    // Expected impact: Reduces database round-trips from 5 to 3.
+
     // Ensure podcast exists in our database
-    const existingPodcast = await db.query.podcasts.findFirst({
-      where: eq(podcasts.podcastIndexId, podcastData.podcastIndexId),
-      columns: { id: true },
-    });
-
-    let podcastId: number;
-
-    if (existingPodcast) {
-      podcastId = existingPodcast.id;
-      // Update podcast info if needed
-      await db
-        .update(podcasts)
-        .set({
+    const [podcast] = await db
+      .insert(podcasts)
+      .values({
+        podcastIndexId: podcastData.podcastIndexId,
+        title: podcastData.title,
+        description: podcastData.description,
+        publisher: podcastData.publisher,
+        imageUrl: podcastData.imageUrl,
+        rssFeedUrl: podcastData.rssFeedUrl,
+        categories: podcastData.categories,
+        totalEpisodes: podcastData.totalEpisodes,
+        latestEpisodeDate: podcastData.latestEpisodeDate,
+      })
+      .onConflictDoUpdate({
+        target: podcasts.podcastIndexId,
+        set: {
           title: podcastData.title,
           description: podcastData.description,
           publisher: podcastData.publisher,
@@ -251,44 +258,25 @@ export async function subscribeToPodcast(podcastData: PodcastData) {
           totalEpisodes: podcastData.totalEpisodes,
           latestEpisodeDate: podcastData.latestEpisodeDate,
           updatedAt: new Date(),
-        })
-        .where(eq(podcasts.id, podcastId));
-    } else {
-      // Insert new podcast
-      const [newPodcast] = await db
-        .insert(podcasts)
-        .values({
-          podcastIndexId: podcastData.podcastIndexId,
-          title: podcastData.title,
-          description: podcastData.description,
-          publisher: podcastData.publisher,
-          imageUrl: podcastData.imageUrl,
-          rssFeedUrl: podcastData.rssFeedUrl,
-          categories: podcastData.categories,
-          totalEpisodes: podcastData.totalEpisodes,
-          latestEpisodeDate: podcastData.latestEpisodeDate,
-        })
-        .returning({ id: podcasts.id });
-      podcastId = newPodcast.id;
-    }
+        },
+      })
+      .returning({ id: podcasts.id });
 
-    // Check if already subscribed
-    const existingSubscription = await db.query.userSubscriptions.findFirst({
-      where: and(
-        eq(userSubscriptions.userId, userId),
-        eq(userSubscriptions.podcastId, podcastId)
-      ),
-    });
+    const podcastId = podcast.id;
 
-    if (existingSubscription) {
+    // Create subscription (onConflictDoNothing handles "already subscribed" check)
+    const [subscription] = await db
+      .insert(userSubscriptions)
+      .values({
+        userId,
+        podcastId,
+      })
+      .onConflictDoNothing()
+      .returning({ id: userSubscriptions.id });
+
+    if (!subscription) {
       return { success: true, message: "Already subscribed" };
     }
-
-    // Create subscription
-    await db.insert(userSubscriptions).values({
-      userId,
-      podcastId,
-    });
 
     revalidatePath("/subscriptions");
     revalidatePath(`/podcast/${podcastData.podcastIndexId}`);

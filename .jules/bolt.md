@@ -21,3 +21,7 @@
 ## 2026-02-15 - Prefer Column Exclusion for Maintainability
 **Learning:** When using Drizzle's relational query API (`db.query`), optimizing for large text fields can be done via whitelisting (`columns: { title: true, ... }`) or blacklisting (`columns: { transcription: false }`). Blacklisting is more maintainable as it ensures new metadata fields added to the schema automatically flow through to the application without breaking consumers that expect a full object, while still providing the performance benefit of skipping high-volume data.
 **Action:** Use column exclusion (`fieldName: false`) instead of whitelisting for better schema maintainability when optimizing for large fields.
+
+## 2026-02-16 - Consolidate DB Round-trips with Upserts
+**Learning:** Multi-step database operations (like check-then-insert or check-then-update) in server actions create unnecessary network latency. Drizzle's `onConflictDoUpdate` and `onConflictDoNothing().returning()` can consolidate these into single round-trips while also ensuring data freshness.
+**Action:** Replace sequential existence checks and conditional inserts/updates with atomic upserts to minimize database round-trips and prevent race conditions.

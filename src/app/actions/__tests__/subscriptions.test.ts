@@ -44,6 +44,14 @@ vi.mock("@/db", () => ({
                 },
               };
             },
+            onConflictDoUpdate: () => {
+              return {
+                returning: () => {
+                  mockReturning();
+                  return mockReturning();
+                },
+              };
+            },
             returning: () => mockReturning(),
           };
         },
@@ -293,5 +301,47 @@ describe("isSubscribedToPodcast", () => {
     const result = await isSubscribedToPodcast("12345");
 
     expect(result).toBe(false);
+  });
+});
+
+describe("subscribeToPodcast", () => {
+  const mockPodcastData = {
+    podcastIndexId: "12345",
+    title: "Test Podcast",
+    description: "A test podcast",
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockAuth.mockResolvedValue({ userId: "user_123" });
+    mockReturning.mockReturnValue([{ id: 1 }]);
+  });
+
+  it("successfully subscribes to a new podcast", async () => {
+    const { subscribeToPodcast } = await import(
+      "@/app/actions/subscriptions"
+    );
+    const result = await subscribeToPodcast(mockPodcastData);
+
+    expect(result.success).toBe(true);
+    expect(result.message).toMatch(/subscribed successfully/i);
+    expect(mockInsert).toHaveBeenCalledTimes(3); // users, podcasts, userSubscriptions
+  });
+
+  it("handles already subscribed podcast", async () => {
+    // The mock DB calls mockReturning twice per invocation of returning()
+    mockReturning
+      .mockReturnValueOnce([{ id: 1 }]) // podcasts call 1
+      .mockReturnValueOnce([{ id: 1 }]) // podcasts call 2
+      .mockReturnValueOnce([]) // userSubscriptions call 1 (conflict)
+      .mockReturnValueOnce([]); // userSubscriptions call 2 (conflict)
+
+    const { subscribeToPodcast } = await import(
+      "@/app/actions/subscriptions"
+    );
+    const result = await subscribeToPodcast(mockPodcastData);
+
+    expect(result.success).toBe(true);
+    expect(result.message).toMatch(/already subscribed/i);
   });
 });
