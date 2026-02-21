@@ -2,7 +2,7 @@ import { task, retry, logger, metadata, AbortTaskRunError } from "@trigger.dev/s
 import { eq } from "drizzle-orm";
 import { getEpisodeById, getPodcastById } from "./helpers/podcastindex";
 import { fetchTranscript } from "./helpers/transcript";
-import { generateEpisodeSummary, type SummaryResult } from "./helpers/ai-summary";
+import { generateEpisodeSummary, type SummaryResult } from "@/trigger/helpers/ai-summary";
 import { trackEpisodeRun, persistEpisodeSummary, updateEpisodeStatus } from "./helpers/database";
 import { db } from "@/db";
 import { episodes } from "@/db/schema";

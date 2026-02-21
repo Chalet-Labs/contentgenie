@@ -1,7 +1,7 @@
-import { desc } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { aiConfig } from "@/db/schema";
-import type { AiConfig } from "./types";
+import type { AiConfig } from "@/lib/ai/types";
 
 export const DEFAULT_AI_CONFIG: AiConfig = {
   provider: "openrouter",
@@ -11,7 +11,7 @@ export const DEFAULT_AI_CONFIG: AiConfig = {
 export async function getActiveAiConfig(): Promise<AiConfig> {
   try {
     const row = await db.query.aiConfig.findFirst({
-      orderBy: [desc(aiConfig.id)],
+      where: eq(aiConfig.id, 1),
     });
 
     if (!row) {

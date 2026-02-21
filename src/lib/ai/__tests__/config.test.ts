@@ -11,7 +11,7 @@ vi.mock("@/db", () => ({
 }));
 
 import { db } from "@/db";
-import { getActiveAiConfig, DEFAULT_AI_CONFIG } from "../config";
+import { getActiveAiConfig, DEFAULT_AI_CONFIG } from "@/lib/ai/config";
 
 describe("getActiveAiConfig", () => {
   beforeEach(() => {

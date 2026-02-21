@@ -39,7 +39,9 @@ export class ZaiProvider implements AiProvider {
       throw new Error("No response from Z.AI");
     }
 
-    const finishReason = data.choices[0].finish_reason;
+    const choice = data.choices[0];
+
+    const finishReason = choice.finish_reason;
     if (finishReason === "sensitive") {
       throw new Error(
         "Z.AI content filter: the request or response was flagged as sensitive"
@@ -49,6 +51,10 @@ export class ZaiProvider implements AiProvider {
       throw new Error("Z.AI network error during completion");
     }
 
-    return data.choices[0].message.content;
+    if (!choice.message?.content) {
+      throw new Error("Invalid response format from Z.AI");
+    }
+
+    return choice.message.content;
   }
 }

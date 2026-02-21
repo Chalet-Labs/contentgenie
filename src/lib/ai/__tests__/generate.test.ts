@@ -16,7 +16,7 @@ import { getAiProvider } from "../provider-factory";
 describe("generateCompletion", () => {
   const mockGenerateCompletion = vi.fn();
   const mockProvider = {
-    name: "openrouter",
+    name: "openrouter" as const,
     generateCompletion: mockGenerateCompletion,
   };
 
@@ -78,7 +78,7 @@ describe("generateCompletion", () => {
 
   it("dispatches to zai provider when config says zai", async () => {
     const zaiProvider = {
-      name: "zai",
+      name: "zai" as const,
       generateCompletion: vi.fn().mockResolvedValue("ZAI response"),
     };
     vi.mocked(getActiveAiConfig).mockResolvedValue({

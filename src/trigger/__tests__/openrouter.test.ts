@@ -13,7 +13,7 @@ vi.mock("@/lib/prompts", () => ({
   getSummarizationPrompt: vi.fn().mockReturnValue("Mock Summarization Prompt"),
 }));
 
-import { generateEpisodeSummary } from "../helpers/ai-summary";
+import { generateEpisodeSummary } from "@/trigger/helpers/ai-summary";
 import { generateCompletion } from "@/lib/ai";
 import { parseJsonResponse } from "@/lib/openrouter";
 import { SYSTEM_PROMPT, getSummarizationPrompt } from "@/lib/prompts";

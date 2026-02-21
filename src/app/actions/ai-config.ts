@@ -1,7 +1,7 @@
 "use server";
 
 import { auth } from "@clerk/nextjs/server";
-import { eq, desc } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { aiConfig } from "@/db/schema";
 import type { AiConfig, AiProviderName } from "@/lib/ai";
@@ -15,7 +15,7 @@ export async function getAiConfig(): Promise<{
 }> {
   try {
     const row = await db.query.aiConfig.findFirst({
-      orderBy: [desc(aiConfig.id)],
+      where: eq(aiConfig.id, 1),
     });
 
     if (!row) {
@@ -58,30 +58,24 @@ export async function updateAiConfig(
   }
 
   try {
-    // Query for existing row
-    const existing = await db.query.aiConfig.findFirst({
-      orderBy: [desc(aiConfig.id)],
-      columns: { id: true },
-    });
-
-    if (existing) {
-      await db
-        .update(aiConfig)
-        .set({
-          provider,
-          model: trimmedModel,
-          updatedBy: userId,
-          updatedAt: new Date(),
-        })
-        .where(eq(aiConfig.id, existing.id));
-    } else {
-      await db.insert(aiConfig).values({
+    await db
+      .insert(aiConfig)
+      .values({
+        id: 1,
         provider,
         model: trimmedModel,
         updatedBy: userId,
         updatedAt: new Date(),
+      })
+      .onConflictDoUpdate({
+        target: aiConfig.id,
+        set: {
+          provider,
+          model: trimmedModel,
+          updatedBy: userId,
+          updatedAt: new Date(),
+        },
       });
-    }
 
     return { success: true };
   } catch (error) {
