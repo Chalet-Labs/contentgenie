@@ -25,3 +25,7 @@
 ## 2026-02-16 - Consolidate DB Round-trips with Upserts
 **Learning:** Multi-step database operations (like check-then-insert or check-then-update) in server actions create unnecessary network latency. Drizzle's `onConflictDoUpdate` and `onConflictDoNothing().returning()` can consolidate these into single round-trips while also ensuring data freshness.
 **Action:** Replace sequential existence checks and conditional inserts/updates with atomic upserts to minimize database round-trips and prevent race conditions.
+
+## 2026-02-21 - Pin CLI Versions in CI
+**Learning:** Using `@latest` for CLI tools (like `trigger.dev`) in CI workflows is risky as new releases can introduce breaking changes or version mismatches with installed packages. Pinned versions ensure consistency and prevent environment-related failures.
+**Action:** Always pin CLI tool versions in `.github/workflows` and `package.json` to match the project's dependency versions.
