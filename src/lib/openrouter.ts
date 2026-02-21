@@ -1,30 +1,9 @@
-const OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions";
+import type { AiMessage } from "@/lib/ai";
 
-// Default model: Gemini Flash (cost-effective)
-const DEFAULT_MODEL = "google/gemini-2.0-flash-001";
+export { generateCompletion } from "@/lib/ai";
 
-export interface OpenRouterMessage {
-  role: "system" | "user" | "assistant";
-  content: string;
-}
-
-export interface OpenRouterResponse {
-  id: string;
-  model: string;
-  choices: Array<{
-    index: number;
-    message: {
-      role: string;
-      content: string;
-    };
-    finish_reason: string;
-  }>;
-  usage: {
-    prompt_tokens: number;
-    completion_tokens: number;
-    total_tokens: number;
-  };
-}
+/** @deprecated Use `AiMessage` from `@/lib/ai` instead. */
+export type OpenRouterMessage = AiMessage;
 
 export interface SummaryResult {
   summary: string;
@@ -36,50 +15,6 @@ export interface SummaryResult {
     actionability: number;
     timeValue: number;
   };
-}
-
-// Generate a chat completion using OpenRouter
-export async function generateCompletion(
-  messages: OpenRouterMessage[],
-  options: {
-    model?: string;
-    maxTokens?: number;
-    temperature?: number;
-  } = {}
-): Promise<string> {
-  const apiKey = process.env.OPENROUTER_API_KEY || "";
-  if (!apiKey) {
-    throw new Error("OpenRouter API key is not configured");
-  }
-
-  const response = await fetch(OPENROUTER_API_URL, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-      "HTTP-Referer": process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
-      "X-Title": "ContentGenie",
-    },
-    body: JSON.stringify({
-      model: options.model || DEFAULT_MODEL,
-      messages,
-      max_tokens: options.maxTokens || 4096,
-      temperature: options.temperature ?? 0.7,
-    }),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`OpenRouter API error: ${response.status} - ${errorText}`);
-  }
-
-  const data: OpenRouterResponse = await response.json();
-
-  if (!data.choices || data.choices.length === 0) {
-    throw new Error("No response from OpenRouter");
-  }
-
-  return data.choices[0].message.content;
 }
 
 // Parse a JSON response from the LLM, handling potential markdown code blocks

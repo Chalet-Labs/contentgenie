@@ -1,8 +1,5 @@
-import {
-  generateCompletion,
-  parseJsonResponse,
-  type SummaryResult,
-} from "@/lib/openrouter";
+import { generateCompletion } from "@/lib/ai";
+import { parseJsonResponse, type SummaryResult } from "@/lib/openrouter";
 import { SYSTEM_PROMPT, getSummarizationPrompt } from "@/lib/prompts";
 import type { PodcastIndexPodcast, PodcastIndexEpisode } from "@/lib/podcastindex";
 
@@ -39,7 +36,7 @@ export async function generateEpisodeSummary(
         const computed = parseFloat(((uniqueness + actionability + timeValue) / 3).toFixed(1));
         if (result.worthItScore !== computed) {
           console.warn(
-            `[openrouter] worthItScore mismatch: LLM=${result.worthItScore}, computed=${computed}. Using computed value.`
+            `[ai-summary] worthItScore mismatch: LLM=${result.worthItScore}, computed=${computed}. Using computed value.`
           );
         }
         result.worthItScore = computed;

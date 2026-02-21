@@ -27,6 +27,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton"
 import { toast } from "sonner"
 import { Sun, Moon, Monitor, Bell, Link2, Trash2, ExternalLink, Mail } from "lucide-react"
+import { AiProviderCard } from "@/components/settings/ai-provider-card"
 import { BulkResummarizeCard } from "@/components/settings/bulk-resummarize-card"
 
 export default function SettingsPage() {
@@ -186,6 +187,9 @@ export default function SettingsPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* AI Provider (admin only) */}
+      <AiProviderCard />
 
       {/* AI Summaries */}
       <BulkResummarizeCard />

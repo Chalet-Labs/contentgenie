@@ -60,7 +60,7 @@ vi.mock("@/trigger/helpers/transcript", () => ({
   fetchTranscript: vi.fn(),
 }));
 
-vi.mock("@/trigger/helpers/openrouter", () => ({
+vi.mock("@/trigger/helpers/ai-summary", () => ({
   generateEpisodeSummary: vi.fn(),
 }));
 
@@ -75,7 +75,7 @@ vi.mock("@/lib/assemblyai", () => ({
 
 import { getEpisodeById, getPodcastById } from "@/trigger/helpers/podcastindex";
 import { fetchTranscript } from "@/trigger/helpers/transcript";
-import { generateEpisodeSummary } from "@/trigger/helpers/openrouter";
+import { generateEpisodeSummary } from "@/trigger/helpers/ai-summary";
 import { trackEpisodeRun, persistEpisodeSummary } from "@/trigger/helpers/database";
 import { transcribeAudio } from "@/lib/assemblyai";
 import { summarizeEpisode } from "@/trigger/summarize-episode";

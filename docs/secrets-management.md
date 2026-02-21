@@ -68,6 +68,7 @@ Most `package.json` scripts are wrapped with `doppler run --`, which injects env
 | `CLERK_SIGN_IN_FORCE_REDIRECT_URL` | Server | URL to redirect to after sign-in (e.g. `/dashboard`) |
 | `CLERK_SIGN_UP_FORCE_REDIRECT_URL` | Server | URL to redirect to after sign-up (e.g. `/dashboard`) |
 | `TRIGGER_SECRET_KEY` | Server | Trigger.dev secret key (background jobs) |
+| `ZAI_API_KEY` | Server | Z.AI GLM API key (add to Doppler `dev`, `stg`, and `prd` configs) |
 | `ASSEMBLYAI_API_KEY` | Server | AssemblyAI transcription API key |
 
 ## Vercel Integration
@@ -129,6 +130,7 @@ Set the following variables **manually** in the [Trigger.dev dashboard](https://
 | `PODCASTINDEX_API_KEY` | Doppler `prd` config |
 | `PODCASTINDEX_API_SECRET` | Doppler `prd` config |
 | `OPENROUTER_API_KEY` | Doppler `prd` config |
+| `ZAI_API_KEY` | Doppler `prd` config |
 | `ASSEMBLYAI_API_KEY` | Doppler `prd` config |
 
 ### Updating secrets
