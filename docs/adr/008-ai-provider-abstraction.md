@@ -60,7 +60,7 @@ Deploy an AI proxy that handles provider routing, and point ContentGenie at the 
 
 8. **Trigger.dev integration.** The `summarize-episode` task continues to call `generateEpisodeSummary` as its primary AI entrypoint. `generateEpisodeSummary` now delegates to the provider-aware `generateCompletion`, which looks up the active AI configuration from the database internally for each run. The task itself does not call `getActiveAiConfig()` directly.
 
-9. **Admin UI.** A new `AiProviderCard` component on the Settings page, visible only to users with the `org:admin` Clerk role. The card contains Provider and Model dropdowns and a Save button. Client-side, visibility is controlled via Clerk's `useUser()` hook by inspecting organization memberships for a membership with role `org:admin`. The server action performs an equivalent check using Clerk's server-side `auth().has({ role: "org:admin" })`.
+9. **Admin UI.** A new `AiProviderCard` component on the Settings page, visible only to users with the `org:admin` Clerk role. The card contains a Provider dropdown, a freeform Model text input, and a Save button. Client-side, visibility is controlled via Clerk's `useAuth()` hook using `has({ role: "org:admin" })`. The server action performs an equivalent check using Clerk's server-side `auth().has({ role: "org:admin" })`.
 
 10. **Role-based access control.** Clerk organization roles are now used end-to-end to protect AI configuration. The server action enforces `org:admin` via `auth().has({ role: "org:admin" })`. The client-side card renders conditionally based on organization membership role checks. The middleware is not modified — the settings page itself is already protected by the existing auth middleware; the admin card is conditionally rendered within it.
 
