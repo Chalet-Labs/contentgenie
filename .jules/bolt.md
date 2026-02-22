@@ -21,3 +21,7 @@
 ## 2026-02-15 - Prefer Column Exclusion for Maintainability
 **Learning:** When using Drizzle's relational query API (`db.query`), optimizing for large text fields can be done via whitelisting (`columns: { title: true, ... }`) or blacklisting (`columns: { transcription: false }`). Blacklisting is more maintainable as it ensures new metadata fields added to the schema automatically flow through to the application without breaking consumers that expect a full object, while still providing the performance benefit of skipping high-volume data.
 **Action:** Use column exclusion (`fieldName: false`) instead of whitelisting for better schema maintainability when optimizing for large fields.
+
+## 2026-02-16 - Order by Joined Table for Dashboard Relevance
+**Learning:** In dashboard views that aggregate data from multiple subscriptions, ordering by a joined table's metadata (e.g., `podcasts.latestEpisodeDate`) before limiting the number of subscriptions to check ensures that the most active and relevant content is prioritized. This improves both perceived performance and actual utility.
+**Action:** When limiting entities that have related active content, use a JOIN and `orderBy` on the related activity timestamp.
