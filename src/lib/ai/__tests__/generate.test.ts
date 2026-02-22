@@ -1,17 +1,17 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
-vi.mock("../config", () => ({
+vi.mock("@/lib/ai/config", () => ({
   getActiveAiConfig: vi.fn(),
   DEFAULT_AI_CONFIG: { provider: "openrouter", model: "google/gemini-2.0-flash-001" },
 }));
 
-vi.mock("../provider-factory", () => ({
+vi.mock("@/lib/ai/provider-factory", () => ({
   getAiProvider: vi.fn(),
 }));
 
-import { generateCompletion } from "../generate";
-import { getActiveAiConfig } from "../config";
-import { getAiProvider } from "../provider-factory";
+import { generateCompletion } from "@/lib/ai/generate";
+import { getActiveAiConfig } from "@/lib/ai/config";
+import { getAiProvider } from "@/lib/ai/provider-factory";
 
 describe("generateCompletion", () => {
   const mockGenerateCompletion = vi.fn();

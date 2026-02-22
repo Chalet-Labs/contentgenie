@@ -1,4 +1,4 @@
-import type { AiProvider, AiMessage, AiCompletionOptions } from "../types";
+import type { AiProvider, AiMessage, AiCompletionOptions } from "@/lib/ai/types";
 
 const ZAI_API_URL = "https://api.z.ai/api/paas/v4/chat/completions";
 
