@@ -2,6 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
+import { OrganizationSwitcher } from "@clerk/nextjs"
 import { cn } from "@/lib/utils"
 import {
   LayoutDashboard,
@@ -52,7 +53,20 @@ export function Sidebar() {
         </nav>
       </div>
 
-      <div className="py-4 border-t">
+      <div className="py-4 border-t space-y-3">
+        <div className="px-3">
+          <OrganizationSwitcher
+            hidePersonal={false}
+            afterSelectOrganizationUrl="/settings"
+            appearance={{
+              elements: {
+                rootBox: "w-full",
+                organizationSwitcherTrigger:
+                  "w-full justify-start px-3 py-2 text-sm rounded-md border border-border hover:bg-accent transition-colors",
+              },
+            }}
+          />
+        </div>
         <nav className="space-y-1 px-3">
           {bottomLinks.map((link) => {
             const Icon = link.icon
