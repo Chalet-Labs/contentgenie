@@ -6,6 +6,7 @@ import { db } from "@/db";
 import { episodes, userSubscriptions } from "@/db/schema";
 import { createRateLimitChecker } from "@/lib/rate-limit";
 import { buildResummarizeConditions } from "@/lib/bulk-resummarize-filters";
+import { ADMIN_ROLE } from "@/lib/auth-roles";
 import type { bulkResummarize } from "@/trigger/bulk-resummarize";
 
 const checkBulkRateLimit = createRateLimitChecker({
@@ -92,7 +93,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Rate limit check (admins are exempt)
-    const isAdmin = has({ role: "org:admin" });
+    const isAdmin = has({ role: ADMIN_ROLE });
     if (!isAdmin) {
       const rateLimit = await checkBulkRateLimit(userId);
       if (!rateLimit.allowed) {

@@ -22,6 +22,7 @@ import { Bot, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { getAiConfig, updateAiConfig } from "@/app/actions/ai-config";
 import type { AiProviderName } from "@/lib/ai";
+import { ADMIN_ROLE } from "@/lib/auth-roles";
 
 export function AiProviderCard() {
   const { has, isLoaded } = useAuth();
@@ -30,7 +31,7 @@ export function AiProviderCard() {
   const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
-  const isAdmin = isLoaded && has?.({ role: "org:admin" });
+  const isAdmin = isLoaded && has?.({ role: ADMIN_ROLE });
 
   useEffect(() => {
     async function loadConfig() {
