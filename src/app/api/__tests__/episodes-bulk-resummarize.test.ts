@@ -205,6 +205,7 @@ describe("POST /api/episodes/bulk-resummarize", () => {
 
     expect(response.status).toBe(202);
     expect(mockRateLimitFn).not.toHaveBeenCalled();
+    expect(mockHas).toHaveBeenCalledWith({ role: "org:admin" });
   });
 
   it("returns 202 with runId, publicAccessToken and estimatedEpisodes on success", async () => {

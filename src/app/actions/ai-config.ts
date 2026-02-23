@@ -6,6 +6,7 @@ import { db } from "@/db";
 import { aiConfig } from "@/db/schema";
 import type { AiConfig, AiProviderName } from "@/lib/ai";
 import { DEFAULT_AI_CONFIG } from "@/lib/ai";
+import { ADMIN_ROLE } from "@/lib/auth-roles";
 
 const VALID_PROVIDERS: AiProviderName[] = ["openrouter", "zai"];
 
@@ -44,7 +45,7 @@ export async function updateAiConfig(
     return { success: false, error: "You must be signed in" };
   }
 
-  if (!has({ role: "org:admin" })) {
+  if (!has({ role: ADMIN_ROLE })) {
     return { success: false, error: "Admin access required" };
   }
 
