@@ -10,65 +10,61 @@ import { isPrivateIP } from "@/lib/security";
  * If ANY resolved IP is private, the connection is rejected entirely.
  * DNS resolution failures are also rejected (fail-closed).
  *
- * Respects `dnsOptions.all`: when true (undici 7+ default), returns the full
- * validated address array; otherwise returns a single address + family.
+ * Respects `dnsOptions.all`: when true (undici 7+ npm package default), returns
+ * the full validated address array; otherwise returns a single address + family.
  *
  * Exported for unit testing — not intended for direct use outside this module.
  */
 export function pinnedLookup(
   hostname: string,
+  dnsOptions: dns.LookupAllOptions,
+  callback: (err: NodeJS.ErrnoException | null, addresses: dns.LookupAddress[]) => void,
+): void;
+export function pinnedLookup(
+  hostname: string,
+  dnsOptions: dns.LookupOneOptions,
+  callback: (err: NodeJS.ErrnoException | null, address: string, family: number) => void,
+): void;
+export function pinnedLookup(
+  hostname: string,
   dnsOptions: dns.LookupOptions,
-  callback: (
-    err: NodeJS.ErrnoException | null,
-    address: string,
-    family: number,
-  ) => void,
+  callback:
+    | ((err: NodeJS.ErrnoException | null, addresses: dns.LookupAddress[]) => void)
+    | ((err: NodeJS.ErrnoException | null, address: string, family: number) => void),
 ): void {
   dns.lookup(
     hostname,
     { ...dnsOptions, all: true },
     (err, addresses) => {
-      if (err) {
-        callback(err, "", 0);
-        return;
-      }
+      const callbackAll = callback as (err: NodeJS.ErrnoException | null, addresses: dns.LookupAddress[]) => void;
+      const callbackOne = callback as (err: NodeJS.ErrnoException | null, address: string, family: number) => void;
+      const fail = (e: NodeJS.ErrnoException | Error) =>
+        dnsOptions.all ? callbackAll(e as NodeJS.ErrnoException, []) : callbackOne(e as NodeJS.ErrnoException, "", 0);
+
+      if (err) { fail(err); return; }
 
       const results = Array.isArray(addresses) ? addresses : [];
 
       if (results.length === 0) {
-        callback(
-          new Error(
-            `DNS resolution for ${hostname} returned no addresses`,
-          ),
-          "",
-          0,
-        );
+        fail(new Error(`DNS resolution for ${hostname} returned no addresses`));
         return;
       }
 
       // Validate ALL resolved IPs — reject if any is private
       for (const { address } of results) {
         if (isPrivateIP(address)) {
-          callback(
-            new Error(
-              `DNS resolution for ${hostname} returned private IP: ${address}`,
-            ),
-            "",
-            0,
-          );
+          fail(new Error(`DNS resolution for ${hostname} returned private IP: ${address}`));
           return;
         }
       }
 
       // Return format matching what the caller expects:
-      // undici 7+ (Node 23+) passes all:true and expects the array format;
-      // older versions expect (address, family). The cast is needed because
-      // undici's TS types define the single-address signature but the runtime
-      // actually passes all:true and expects the array back.
+      // undici 7+ npm package passes all:true and expects the array format;
+      // older versions expect (address, family).
       if (dnsOptions.all) {
-        (callback as Function)(null, results);
+        callbackAll(null, results);
       } else {
-        callback(null, results[0].address, results[0].family);
+        callbackOne(null, results[0].address, results[0].family);
       }
     },
   );
@@ -87,7 +83,12 @@ export function createDnsPinningAgent(options?: {
 }): Agent {
   return new Agent({
     connect: {
-      lookup: pinnedLookup,
+      // pinnedLookup is overloaded for type safety when called directly.
+      // The cast is required because undici's connect.lookup type declarations
+      // still use the legacy single-address callback signature, while the
+      // runtime in undici 7+ (npm package) passes all:true and expects an
+      // array callback — which pinnedLookup handles correctly at runtime.
+      lookup: pinnedLookup as (hostname: string, options: dns.LookupOptions, callback: (err: NodeJS.ErrnoException | null, address: string, family: number) => void) => void,
       timeout: 30_000,
     },
     bodyTimeout: 60_000,
