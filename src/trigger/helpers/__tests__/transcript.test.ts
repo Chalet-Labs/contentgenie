@@ -66,7 +66,10 @@ describe("fetchTranscriptFromUrl", () => {
     const result = await fetchTranscriptFromUrl("https://example.com/t");
 
     expect(result).toBe("This is transcript text.");
-    expect(safeFetch).toHaveBeenCalledWith("https://example.com/t");
+    expect(safeFetch).toHaveBeenCalledWith(
+      "https://example.com/t",
+      expect.objectContaining({ signal: expect.any(AbortSignal) })
+    );
   });
 
   it("strips HTML tags from HTML response", async () => {

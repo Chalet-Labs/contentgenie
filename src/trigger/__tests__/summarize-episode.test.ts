@@ -80,14 +80,13 @@ vi.mock("@/trigger/helpers/database", () => ({
 
 vi.mock("@/lib/assemblyai", () => ({
   submitTranscriptionAsync: vi.fn(),
-  getTranscriptionStatus: vi.fn(),
 }));
 
 import { getEpisodeById, getPodcastById } from "@/trigger/helpers/podcastindex";
 import { fetchTranscript, extractTranscriptUrl, fetchTranscriptFromUrl } from "@/trigger/helpers/transcript";
 import { generateEpisodeSummary } from "@/trigger/helpers/ai-summary";
 import { trackEpisodeRun, persistEpisodeSummary } from "@/trigger/helpers/database";
-import { submitTranscriptionAsync, getTranscriptionStatus } from "@/lib/assemblyai";
+import { submitTranscriptionAsync } from "@/lib/assemblyai";
 import { summarizeEpisode } from "@/trigger/summarize-episode";
 
 // The task mock returns the raw config object, so `.run` and `.onFailure` are available at runtime
@@ -251,13 +250,7 @@ describe("summarize-episode task", () => {
     vi.mocked(submitTranscriptionAsync).mockResolvedValue("transcript-123");
     mockForToken.mockResolvedValue({
       ok: true,
-      output: { transcript_id: "transcript-123", status: "completed" },
-    });
-    vi.mocked(getTranscriptionStatus).mockResolvedValue({
-      id: "transcript-123",
-      status: "completed",
-      text: "AssemblyAI transcript text",
-      error: null,
+      output: { transcript_id: "transcript-123", status: "completed", text: "AssemblyAI transcript text", error: null },
     });
     vi.mocked(generateEpisodeSummary).mockResolvedValue(mockSummary);
     vi.mocked(persistEpisodeSummary).mockResolvedValue(undefined);
@@ -290,13 +283,7 @@ describe("summarize-episode task", () => {
     vi.mocked(submitTranscriptionAsync).mockResolvedValue("transcript-789");
     mockForToken.mockResolvedValue({
       ok: true,
-      output: { transcript_id: "transcript-789", status: "completed" },
-    });
-    vi.mocked(getTranscriptionStatus).mockResolvedValue({
-      id: "transcript-789",
-      status: "completed",
-      text: "AssemblyAI fallback text",
-      error: null,
+      output: { transcript_id: "transcript-789", status: "completed", text: "AssemblyAI fallback text", error: null },
     });
     vi.mocked(generateEpisodeSummary).mockResolvedValue(mockSummary);
     vi.mocked(persistEpisodeSummary).mockResolvedValue(undefined);
@@ -370,13 +357,7 @@ describe("summarize-episode task", () => {
     vi.mocked(submitTranscriptionAsync).mockResolvedValue("transcript-source-test");
     mockForToken.mockResolvedValue({
       ok: true,
-      output: { transcript_id: "transcript-source-test", status: "completed" },
-    });
-    vi.mocked(getTranscriptionStatus).mockResolvedValue({
-      id: "transcript-source-test",
-      status: "completed",
-      text: "AssemblyAI transcript text",
-      error: null,
+      output: { transcript_id: "transcript-source-test", status: "completed", text: "AssemblyAI transcript text", error: null },
     });
     vi.mocked(generateEpisodeSummary).mockResolvedValue(mockSummary);
     vi.mocked(persistEpisodeSummary).mockResolvedValue(undefined);
@@ -438,7 +419,7 @@ describe("summarize-episode task", () => {
     vi.mocked(submitTranscriptionAsync).mockResolvedValue("transcript-456");
     mockForToken.mockResolvedValue({
       ok: true,
-      output: { transcript_id: "transcript-456", status: "error" },
+      output: { transcript_id: "transcript-456", status: "error", text: null, error: "Audio processing failed" },
     });
     vi.mocked(generateEpisodeSummary).mockResolvedValue(mockSummary);
     vi.mocked(persistEpisodeSummary).mockResolvedValue(undefined);
@@ -449,7 +430,6 @@ describe("summarize-episode task", () => {
     );
 
     expect(result).toEqual(mockSummary);
-    expect(getTranscriptionStatus).not.toHaveBeenCalled();
     expect(generateEpisodeSummary).toHaveBeenCalledWith(
       mockPodcast,
       mockEpisode,
@@ -488,13 +468,7 @@ describe("summarize-episode task", () => {
     vi.mocked(submitTranscriptionAsync).mockResolvedValue("transcript-fallback");
     mockForToken.mockResolvedValue({
       ok: true,
-      output: { transcript_id: "transcript-fallback", status: "completed" },
-    });
-    vi.mocked(getTranscriptionStatus).mockResolvedValue({
-      id: "transcript-fallback",
-      status: "completed",
-      text: "AssemblyAI fallback text",
-      error: null,
+      output: { transcript_id: "transcript-fallback", status: "completed", text: "AssemblyAI fallback text", error: null },
     });
     vi.mocked(generateEpisodeSummary).mockResolvedValue(mockSummary);
     vi.mocked(persistEpisodeSummary).mockResolvedValue(undefined);
