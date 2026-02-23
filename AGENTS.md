@@ -166,9 +166,11 @@ Secrets are managed via **Doppler** (not `.env` files). Run `doppler setup` afte
 
 Available environment variables:
 - `CLERK_SECRET_KEY` — Clerk backend auth
-- `CLERK_SIGN_IN_FORCE_REDIRECT_URL` — Post-sign-in redirect URL (e.g. `/dashboard`)
-- `CLERK_SIGN_UP_FORCE_REDIRECT_URL` — Post-sign-up redirect URL (e.g. `/dashboard`)
 - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` — Clerk frontend auth
+- `NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL` — Fallback redirect after sign-in (e.g. `/dashboard`); only used when no `redirect_url` query param is present
+- `NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL` — Fallback redirect after sign-up (e.g. `/dashboard`); only used when no `redirect_url` query param is present
+- `NEXT_PUBLIC_CLERK_SIGN_IN_URL` — Clerk sign-in page URL (e.g. `/sign-in`)
+- `NEXT_PUBLIC_CLERK_SIGN_UP_URL` — Clerk sign-up page URL (e.g. `/sign-up`)
 - `DATABASE_URL` — Neon Postgres connection string
 - `OPENROUTER_API_KEY` — OpenRouter AI API
 - `PODCASTINDEX_API_KEY` — PodcastIndex API key

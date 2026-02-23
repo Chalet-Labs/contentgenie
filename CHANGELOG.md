@@ -22,6 +22,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Episode artwork and title in the audio player bar now link to the episode detail page (`/episode/[id]`), with hover feedback, aria-label for accessibility, and touch feedback on mobile (#115)
 
 ### Fixed
+- Fixed Clerk hosted sign-in/sign-up not redirecting back to the app by replacing server-only redirect environment variables with correctly-prefixed `NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL` / `NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL` that Clerk's client-side components can read
 - Fixed non-deterministic SSRF redirect tests by using public-IP fixtures instead of hostname-based URLs
 - Fixed DNS rebinding TOCTOU vulnerability in SSRF-protected fetch by pinning validated DNS resolution to TCP connections via undici Agent (#80)
 - Cancel stale discover search requests when query changes, preventing outdated results from overwriting current results (#104)
