@@ -1,6 +1,6 @@
 import type { AiProvider, AiMessage, AiCompletionOptions } from "@/lib/ai/types";
 
-const ZAI_API_URL = "https://api.z.ai/api/paas/v4/chat/completions";
+const ZAI_API_URL = "https://api.z.ai/api/coding/paas/v4/chat/completions";
 
 export class ZaiProvider implements AiProvider {
   readonly name = "zai";

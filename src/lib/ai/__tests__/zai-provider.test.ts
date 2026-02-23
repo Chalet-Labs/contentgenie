@@ -47,7 +47,7 @@ describe("ZaiProvider", () => {
 
     expect(mockFetch).toHaveBeenCalledOnce();
     const [url, options] = mockFetch.mock.calls[0];
-    expect(url).toBe("https://api.z.ai/api/paas/v4/chat/completions");
+    expect(url).toBe("https://api.z.ai/api/coding/paas/v4/chat/completions");
     expect(options.headers.Authorization).toBe("Bearer zai-test-key");
     expect(options.headers["Content-Type"]).toBe("application/json");
     expect(options.headers).not.toHaveProperty("HTTP-Referer");
