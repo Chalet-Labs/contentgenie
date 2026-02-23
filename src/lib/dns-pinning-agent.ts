@@ -5,10 +5,13 @@ import { isPrivateIP } from "@/lib/security";
 
 /**
  * Custom DNS lookup that resolves all IPs, validates them against isPrivateIP(),
- * and returns the first safe IP for the TCP connection.
+ * and returns only safe (public) IPs for the TCP connection.
  *
  * If ANY resolved IP is private, the connection is rejected entirely.
  * DNS resolution failures are also rejected (fail-closed).
+ *
+ * Respects `dnsOptions.all`: when true (undici 7+ default), returns the full
+ * validated address array; otherwise returns a single address + family.
  *
  * Exported for unit testing — not intended for direct use outside this module.
  */
@@ -57,8 +60,16 @@ export function pinnedLookup(
         }
       }
 
-      // All IPs are public — pin the first one for the TCP connection
-      callback(null, results[0].address, results[0].family);
+      // Return format matching what the caller expects:
+      // undici 7+ (Node 23+) passes all:true and expects the array format;
+      // older versions expect (address, family). The cast is needed because
+      // undici's TS types define the single-address signature but the runtime
+      // actually passes all:true and expects the array back.
+      if (dnsOptions.all) {
+        (callback as Function)(null, results);
+      } else {
+        callback(null, results[0].address, results[0].family);
+      }
     },
   );
 }
