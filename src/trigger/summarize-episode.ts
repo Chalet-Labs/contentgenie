@@ -1,13 +1,13 @@
 import { task, retry, logger, metadata, AbortTaskRunError, wait } from "@trigger.dev/sdk";
 import { eq } from "drizzle-orm";
-import { getEpisodeById, getPodcastById } from "./helpers/podcastindex";
-import { fetchTranscript, extractTranscriptUrl, fetchTranscriptFromUrl } from "./helpers/transcript";
+import { getEpisodeById, getPodcastById } from "@/trigger/helpers/podcastindex";
+import { fetchTranscript, extractTranscriptUrl, fetchTranscriptFromUrl } from "@/trigger/helpers/transcript";
 import { generateEpisodeSummary, type SummaryResult } from "@/trigger/helpers/ai-summary";
-import { trackEpisodeRun, persistEpisodeSummary, updateEpisodeStatus } from "./helpers/database";
+import { trackEpisodeRun, persistEpisodeSummary, updateEpisodeStatus } from "@/trigger/helpers/database";
 import { db } from "@/db";
 import { episodes } from "@/db/schema";
 import type { PodcastIndexEpisode, PodcastIndexPodcast } from "@/lib/podcastindex";
-import { submitTranscriptionAsync, getTranscriptionStatus } from "@/lib/assemblyai";
+import { submitTranscriptionAsync } from "@/lib/assemblyai";
 
 export type SummarizeEpisodePayload = {
   episodeId: number;
@@ -174,25 +174,31 @@ export const summarizeEpisode = task({
         const transcriptId = await submitTranscriptionAsync(episode.enclosureUrl, token.url);
         logger.info("Submitted audio for async transcription", { transcriptId });
 
-        const result = await wait.forToken<{ transcript_id: string; status: string }>(token);
+        const result = await wait.forToken<{
+          transcript_id: string;
+          status: "completed" | "error";
+          text: string | null;
+          error: string | null;
+        }>(token);
 
         if (result.ok && result.output.status === "completed") {
-          const fullResult = await getTranscriptionStatus(result.output.transcript_id);
-          if (fullResult.status === "completed" && fullResult.text) {
-            transcript = fullResult.text;
+          if (result.output.text) {
+            transcript = result.output.text;
             transcriptSource = "assemblyai";
             logger.info("Audio transcribed successfully", { length: transcript.length });
           } else {
-            logger.warn("AssemblyAI transcript fetch returned no text", {
-              status: fullResult.status,
-              error: fullResult.error,
+            logger.warn("AssemblyAI transcript completed but returned no text", {
+              status: result.output.status,
+              error: result.output.error,
             });
           }
-        } else {
-          logger.warn("AssemblyAI transcription failed or timed out", {
-            ok: result.ok,
-            status: result.ok ? result.output.status : "timeout",
+        } else if (result.ok) {
+          logger.warn("AssemblyAI transcription failed", {
+            status: result.output.status,
+            error: result.output.error,
           });
+        } else {
+          logger.warn("AssemblyAI transcription wait timed out");
         }
       } catch (error) {
         logger.warn("AssemblyAI transcription unavailable, proceeding without it", {

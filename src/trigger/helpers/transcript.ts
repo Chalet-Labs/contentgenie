@@ -1,3 +1,4 @@
+import he from "he";
 import type { PodcastIndexEpisode } from "@/lib/podcastindex";
 import { safeFetch } from "@/lib/security";
 
@@ -55,16 +56,9 @@ export async function fetchTranscript(
 export function extractTranscriptUrl(description: string): string | null {
   if (!description) return null;
 
-  // Strip HTML tags
+  // Strip HTML tags and decode all HTML entities
   const text = description.replace(/<[^>]+>/g, " ");
-
-  // Decode common HTML entities
-  const decoded = text
-    .replace(/&amp;/g, "&")
-    .replace(/&#39;/g, "'")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"');
+  const decoded = he.decode(text);
 
   // Match transcript URL patterns
   const match = decoded.match(
@@ -84,8 +78,10 @@ export function extractTranscriptUrl(description: string): string | null {
 export async function fetchTranscriptFromUrl(
   url: string
 ): Promise<string | undefined> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   try {
-    let content = await safeFetch(url);
+    let content = await safeFetch(url, { signal: controller.signal });
 
     // Strip HTML if content appears to be an HTML page
     if (/<html[\s>]/i.test(content) || /<!doctype\s+html/i.test(content)) {
@@ -103,5 +99,7 @@ export async function fetchTranscriptFromUrl(
     return content;
   } catch {
     return undefined;
+  } finally {
+    clearTimeout(timeout);
   }
 }
