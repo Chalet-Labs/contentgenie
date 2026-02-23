@@ -1,4 +1,5 @@
 import type { PodcastIndexEpisode } from "@/lib/podcastindex";
+import { safeFetch } from "@/lib/security";
 
 const MAX_TRANSCRIPT_LENGTH = 50000;
 const FETCH_TIMEOUT_MS = 30000;
@@ -45,4 +46,62 @@ export async function fetchTranscript(
   }
 
   return transcript;
+}
+
+/**
+ * Extracts a transcript URL from an episode description.
+ * Looks for patterns like "Transcript: https://..." in the text.
+ */
+export function extractTranscriptUrl(description: string): string | null {
+  if (!description) return null;
+
+  // Strip HTML tags
+  const text = description.replace(/<[^>]+>/g, " ");
+
+  // Decode common HTML entities
+  const decoded = text
+    .replace(/&amp;/g, "&")
+    .replace(/&#39;/g, "'")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"');
+
+  // Match transcript URL patterns
+  const match = decoded.match(
+    /(?:full\s+)?transcripts?(?:\s+available)?[\s:]+\n?\s*(https?:\/\/\S+)/i
+  );
+
+  if (!match?.[1]) return null;
+
+  // Clean trailing punctuation from URL
+  return match[1].replace(/[).,;:]+$/, "");
+}
+
+/**
+ * Fetches transcript content from a URL using SSRF-safe fetching.
+ * Returns undefined on any error (non-fatal fallback).
+ */
+export async function fetchTranscriptFromUrl(
+  url: string
+): Promise<string | undefined> {
+  try {
+    let content = await safeFetch(url);
+
+    // Strip HTML if content appears to be an HTML page
+    if (/<html[\s>]/i.test(content) || /<!doctype\s+html/i.test(content)) {
+      content = content.replace(/<[^>]+>/g, " ");
+    }
+
+    content = content.trim();
+    if (!content) return undefined;
+
+    if (content.length > MAX_TRANSCRIPT_LENGTH) {
+      content =
+        content.slice(0, MAX_TRANSCRIPT_LENGTH) + "\n\n[Transcript truncated...]";
+    }
+
+    return content;
+  } catch {
+    return undefined;
+  }
 }

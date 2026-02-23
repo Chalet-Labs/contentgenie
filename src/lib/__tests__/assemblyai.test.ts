@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
   submitTranscription,
+  submitTranscriptionAsync,
   getTranscriptionStatus,
   transcribeAudio,
 } from "@/lib/assemblyai";
@@ -73,6 +74,81 @@ describe("submitTranscription", () => {
 
     await expect(
       submitTranscription("https://example.com/audio.mp3")
+    ).rejects.toThrow(
+      "AssemblyAI API error: submit response did not include a transcript ID"
+    );
+  });
+});
+
+describe("submitTranscriptionAsync", () => {
+  beforeEach(() => {
+    vi.stubGlobal("fetch", vi.fn());
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+    vi.resetModules();
+  });
+
+  it("sends webhook_url in request body and returns transcript ID", async () => {
+    vi.stubEnv("ASSEMBLYAI_API_KEY", "test-api-key");
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ id: "transcript-async-123", status: "queued" }),
+    });
+    vi.stubGlobal("fetch", mockFetch);
+
+    const result = await submitTranscriptionAsync(
+      "https://example.com/audio.mp3",
+      "https://hooks.trigger.dev/token/abc"
+    );
+
+    expect(result).toBe("transcript-async-123");
+    expect(mockFetch).toHaveBeenCalledOnce();
+    const [url, options] = mockFetch.mock.calls[0];
+    expect(url).toBe("https://api.assemblyai.com/v2/transcript");
+    expect(options.method).toBe("POST");
+    const body = JSON.parse(options.body);
+    expect(body.audio_url).toBe("https://example.com/audio.mp3");
+    expect(body.webhook_url).toBe("https://hooks.trigger.dev/token/abc");
+  });
+
+  it("throws on non-ok response", async () => {
+    vi.stubEnv("ASSEMBLYAI_API_KEY", "test-api-key");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 500,
+        text: () => Promise.resolve("Internal Server Error"),
+      })
+    );
+
+    await expect(
+      submitTranscriptionAsync(
+        "https://example.com/audio.mp3",
+        "https://hooks.trigger.dev/token/abc"
+      )
+    ).rejects.toThrow("AssemblyAI API error: 500 - Internal Server Error");
+  });
+
+  it("throws when response is missing transcript ID", async () => {
+    vi.stubEnv("ASSEMBLYAI_API_KEY", "test-api-key");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ status: "queued" }),
+      })
+    );
+
+    await expect(
+      submitTranscriptionAsync(
+        "https://example.com/audio.mp3",
+        "https://hooks.trigger.dev/token/abc"
+      )
     ).rejects.toThrow(
       "AssemblyAI API error: submit response did not include a transcript ID"
     );
