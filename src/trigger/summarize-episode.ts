@@ -170,7 +170,7 @@ export const summarizeEpisode = task({
       }
 
       try {
-        const token = await wait.createToken({ timeout: "2h" });
+        const token = await wait.createToken({ timeout: "1h30m" });
         const transcriptId = await submitTranscriptionAsync(episode.enclosureUrl, token.url);
         logger.info("Submitted audio for async transcription", { transcriptId });
 

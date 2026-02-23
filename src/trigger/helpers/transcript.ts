@@ -23,20 +23,12 @@ export async function fetchTranscript(
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 
-  let response: Response;
+  let transcript: string;
   try {
-    response = await fetch(transcriptEntry.url, { signal: controller.signal });
+    transcript = await safeFetch(transcriptEntry.url, { signal: controller.signal });
   } finally {
     clearTimeout(timeout);
   }
-
-  if (!response.ok) {
-    throw new Error(
-      `Transcript fetch failed: ${response.status} ${response.statusText}`
-    );
-  }
-
-  let transcript = await response.text();
   transcript = transcript.trim();
   if (!transcript) {
     return undefined;
@@ -55,6 +47,15 @@ export async function fetchTranscript(
  */
 export function extractTranscriptUrl(description: string): string | null {
   if (!description) return null;
+
+  // Extract URLs from anchor tags where the link text mentions "transcript" — must run
+  // before HTML stripping, which would otherwise destroy the href attribute value.
+  const anchorMatch = description.match(
+    /<a\s[^>]*href=["']?(https?:\/\/[^"'\s>]+)["']?[^>]*>[^<]*transcripts?[^<]*<\/a>/i
+  );
+  if (anchorMatch?.[1]) {
+    return anchorMatch[1].replace(/[).,;:]+$/, "");
+  }
 
   // Strip HTML tags and decode all HTML entities
   const text = description.replace(/<[^>]+>/g, " ");
