@@ -11,7 +11,7 @@
 **Action:** When adding aggregate queries, always ensure the filtered columns have appropriate indexes, especially foreign keys in join or junction tables.
 
 ## 2026-02-13 - Selective Column Fetching for Large Text Fields
-**Learning:** Drizzle ORM's relational query API (`db.query`) fetches all columns by default. When related entities (like `episodes`) contain large text fields (like `transcription` or `summary`), fetching a list of these entities can result in massive database payloads (megabytes) even if only the title and ID are displayed. Using the `columns` property to explicitly select only needed fields significantly reduces database I/O, network bandwidth, and application memory usage.
+**Learning:** Drizzle ORM's relational query API (`db.query`) fetches all columns by default. When related entities (like `episodes`) contain large text fields (like `transcription` or `summary`), fetching a list of these episodes can result in massive database payloads (megabytes) even if only the title and ID are displayed. Using the `columns` property to explicitly select only needed fields significantly reduces database I/O, network bandwidth, and application memory usage.
 **Action:** Always use selective column fetching (`columns`) when querying lists of entities that contain high-volume data fields that are not displayed in the list.
 
 ## 2026-02-14 - JOIN for Existence Checks
@@ -21,3 +21,7 @@
 ## 2026-02-15 - Prefer Column Exclusion for Maintainability
 **Learning:** When using Drizzle's relational query API (`db.query`), optimizing for large text fields can be done via whitelisting (`columns: { title: true, ... }`) or blacklisting (`columns: { transcription: false }`). Blacklisting is more maintainable as it ensures new metadata fields added to the schema automatically flow through to the application without breaking consumers that expect a full object, while still providing the performance benefit of skipping high-volume data.
 **Action:** Use column exclusion (`fieldName: false`) instead of whitelisting for better schema maintainability when optimizing for large fields.
+
+## 2026-02-16 - Join for Relational Sorting and Optimization
+**Learning:** Drizzle's Relational API (`db.query`) is limited when it comes to ordering by fields in a related table (e.g., sorting subscriptions by podcast update date). Switching to `db.select()` with `innerJoin()` not only allows this relational sorting but also provides precise control over column selection, reducing payload size by excluding large text fields (like `description`) that aren't used in dashboard or list views.
+**Action:** Use `db.select().innerJoin()` instead of `db.query` when you need to sort results by a field in a related table or when extreme selective column fetching across multiple tables is required for performance.
