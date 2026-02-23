@@ -62,7 +62,7 @@ export function Sidebar() {
               elements: {
                 rootBox: "w-full",
                 organizationSwitcherTrigger:
-                  "w-full justify-start px-3 py-2 text-sm rounded-md border border-border hover:bg-accent transition-colors",
+                  "w-full justify-start px-3 py-2 text-sm font-medium rounded-md border border-border text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors",
               },
             }}
           />
