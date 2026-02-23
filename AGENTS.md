@@ -164,21 +164,11 @@ Tables: `users`, `podcasts`, `episodes`, `user_subscriptions`, `collections`, `u
 
 Secrets are managed via **Doppler** (not `.env` files). Run `doppler setup` after cloning.
 
-Available environment variables:
-- `CLERK_SECRET_KEY` — Clerk backend auth
-- `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` — Clerk frontend auth
-- `NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL` — Fallback redirect after sign-in (e.g. `/dashboard`); only used when no `redirect_url` query param is present
-- `NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL` — Fallback redirect after sign-up (e.g. `/dashboard`); only used when no `redirect_url` query param is present
-- `NEXT_PUBLIC_CLERK_SIGN_IN_URL` — Clerk sign-in page URL (e.g. `/sign-in`)
-- `NEXT_PUBLIC_CLERK_SIGN_UP_URL` — Clerk sign-up page URL (e.g. `/sign-up`)
-- `DATABASE_URL` — Neon Postgres connection string
-- `OPENROUTER_API_KEY` — OpenRouter AI API
-- `PODCASTINDEX_API_KEY` — PodcastIndex API key
-- `PODCASTINDEX_API_SECRET` — PodcastIndex API secret
-- `NEXT_PUBLIC_APP_URL` — Application URL (inlined at build time)
-- `TRIGGER_SECRET_KEY` — Trigger.dev secret key (background jobs)
-- `ZAI_API_KEY` — Z.AI GLM API key
-- `ASSEMBLYAI_API_KEY` — AssemblyAI transcription API key
+See [docs/secrets-management.md](docs/secrets-management.md) for the full list of managed secrets, their types (Server vs Public), and per-environment setup instructions. Key points:
+
+- `NEXT_PUBLIC_*` variables are **inlined at build time** — rebuild after changing them in Doppler.
+- `doppler run --` is already wired into most `bun run` scripts; use `doppler run -- <cmd>` for ad-hoc commands.
+- Vercel environments are synced from Doppler automatically; Trigger.dev Prod secrets are set manually.
 
 ## Security
 
