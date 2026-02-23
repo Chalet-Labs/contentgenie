@@ -94,12 +94,12 @@ describe("fetchTranscriptFromUrl", () => {
     expect(result).toContain("[Transcript truncated...]");
   });
 
-  it("returns undefined on error", async () => {
+  it("throws on fetch error", async () => {
     vi.mocked(safeFetch).mockRejectedValue(new Error("Network error"));
 
-    const result = await fetchTranscriptFromUrl("https://example.com/t");
-
-    expect(result).toBeUndefined();
+    await expect(fetchTranscriptFromUrl("https://example.com/t")).rejects.toThrow(
+      "Network error"
+    );
   });
 
   it("returns undefined for empty response", async () => {

@@ -98,8 +98,6 @@ export async function fetchTranscriptFromUrl(
     }
 
     return content;
-  } catch {
-    return undefined;
   } finally {
     clearTimeout(timeout);
   }
