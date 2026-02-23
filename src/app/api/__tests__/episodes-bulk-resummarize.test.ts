@@ -78,9 +78,12 @@ function makeRequest(method: string, body: unknown) {
 }
 
 describe("POST /api/episodes/bulk-resummarize", () => {
+  const mockHas = vi.fn().mockReturnValue(false);
+
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(clerkAuth).mockResolvedValue({ userId: "user-1" } as never);
+    mockHas.mockReturnValue(false);
+    vi.mocked(clerkAuth).mockResolvedValue({ userId: "user-1", has: mockHas } as never);
     mockRateLimitFn.mockResolvedValue({ allowed: true });
     mockDbSelectWhere.mockResolvedValue([{ count: 10 }]);
     mockSubscriptionFindFirst.mockResolvedValue({ id: 1 });
@@ -191,6 +194,17 @@ describe("POST /api/episodes/bulk-resummarize", () => {
 
     expect(response.status).toBe(429);
     expect(data.error).toMatch(/rate limit/i);
+  });
+
+  it("skips rate limit for admins", async () => {
+    mockHas.mockReturnValue(true);
+    mockRateLimitFn.mockResolvedValue({ allowed: false, retryAfterMs: 3600000 });
+
+    const { POST } = await import("@/app/api/episodes/bulk-resummarize/route");
+    const response = await POST(makeRequest("POST", { all: true }));
+
+    expect(response.status).toBe(202);
+    expect(mockRateLimitFn).not.toHaveBeenCalled();
   });
 
   it("returns 202 with runId, publicAccessToken and estimatedEpisodes on success", async () => {

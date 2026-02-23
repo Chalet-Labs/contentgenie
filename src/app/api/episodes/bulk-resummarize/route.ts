@@ -16,7 +16,7 @@ const checkBulkRateLimit = createRateLimitChecker({
 
 export async function POST(request: NextRequest) {
   try {
-    const { userId } = await clerkAuth();
+    const { userId, has } = await clerkAuth();
     if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -91,13 +91,16 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Rate limit check
-    const rateLimit = await checkBulkRateLimit(userId);
-    if (!rateLimit.allowed) {
-      return NextResponse.json(
-        { error: "Rate limit exceeded. Only 1 bulk re-summarization per hour." },
-        { status: 429 }
-      );
+    // Rate limit check (admins are exempt)
+    const isAdmin = has({ role: "org:admin" });
+    if (!isAdmin) {
+      const rateLimit = await checkBulkRateLimit(userId);
+      if (!rateLimit.allowed) {
+        return NextResponse.json(
+          { error: "Rate limit exceeded. Only 1 bulk re-summarization per hour." },
+          { status: 429 }
+        );
+      }
     }
 
     // Count matching episodes for estimate
