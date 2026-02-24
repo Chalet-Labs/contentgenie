@@ -44,38 +44,46 @@ export async function addPodcastByRssUrl(
   try {
     const syntheticPodcastId = generatePodcastSyntheticId(trimmedUrl);
 
-    // Check if podcast already exists
-    const existingPodcast = await db.query.podcasts.findFirst({
-      where: eq(podcasts.podcastIndexId, syntheticPodcastId),
-      columns: { id: true, title: true },
-    });
+    // BOLT OPTIMIZATION: Check for both podcast and existing subscription in a single JOIN query.
+    // This replaces two sequential queries (find podcast, then check subscription).
+    // Expected impact: ~50% reduction in query latency for existing podcasts.
+    const [existing] = await db
+      .select({
+        id: podcasts.id,
+        title: podcasts.title,
+        subscriptionId: userSubscriptions.id,
+      })
+      .from(podcasts)
+      .leftJoin(
+        userSubscriptions,
+        and(
+          eq(userSubscriptions.podcastId, podcasts.id),
+          eq(userSubscriptions.userId, userId)
+        )
+      )
+      .where(eq(podcasts.podcastIndexId, syntheticPodcastId))
+      .limit(1);
 
-    if (existingPodcast) {
-      // Podcast exists — just ensure subscription
+    if (existing) {
+      // If already subscribed, return early
+      if (existing.subscriptionId) {
+        return {
+          success: true,
+          message: "Already subscribed",
+          podcastIndexId: syntheticPodcastId,
+          title: existing.title,
+        };
+      }
+
+      // If podcast exists but not subscribed, ensure user exists and create subscription
       await db
         .insert(users)
         .values({ id: userId, email: "" })
         .onConflictDoNothing();
 
-      const existingSub = await db.query.userSubscriptions.findFirst({
-        where: and(
-          eq(userSubscriptions.userId, userId),
-          eq(userSubscriptions.podcastId, existingPodcast.id),
-        ),
-      });
-
-      if (existingSub) {
-        return {
-          success: true,
-          message: "Already subscribed",
-          podcastIndexId: syntheticPodcastId,
-          title: existingPodcast.title,
-        };
-      }
-
       await db.insert(userSubscriptions).values({
         userId,
-        podcastId: existingPodcast.id,
+        podcastId: existing.id,
       });
 
       revalidatePath("/subscriptions");
@@ -85,7 +93,7 @@ export async function addPodcastByRssUrl(
         success: true,
         message: "Subscribed successfully",
         podcastIndexId: syntheticPodcastId,
-        title: existingPodcast.title,
+        title: existing.title,
       };
     }
 
@@ -272,23 +280,20 @@ export async function subscribeToPodcast(podcastData: PodcastData) {
       podcastId = newPodcast.id;
     }
 
-    // Check if already subscribed
-    const existingSubscription = await db.query.userSubscriptions.findFirst({
-      where: and(
-        eq(userSubscriptions.userId, userId),
-        eq(userSubscriptions.podcastId, podcastId)
-      ),
-    });
+    // BOLT OPTIMIZATION: Use onConflictDoNothing with returning to handle subscription existence and insertion in one round-trip.
+    // Expected impact: Eliminates one database round-trip for every new subscription.
+    const [subscription] = await db
+      .insert(userSubscriptions)
+      .values({
+        userId,
+        podcastId,
+      })
+      .onConflictDoNothing()
+      .returning({ id: userSubscriptions.id });
 
-    if (existingSubscription) {
+    if (!subscription) {
       return { success: true, message: "Already subscribed" };
     }
-
-    // Create subscription
-    await db.insert(userSubscriptions).values({
-      userId,
-      podcastId,
-    });
 
     revalidatePath("/subscriptions");
     revalidatePath(`/podcast/${podcastData.podcastIndexId}`);
@@ -397,13 +402,17 @@ export async function refreshPodcastFeed(podcastId: number) {
       };
     }
 
-    // Verify user is subscribed
-    const subscription = await db.query.userSubscriptions.findFirst({
-      where: and(
-        eq(userSubscriptions.userId, userId),
-        eq(userSubscriptions.podcastId, podcastId)
-      ),
-    });
+    // BOLT OPTIMIZATION: Use db.select().limit(1) for faster existence check.
+    const [subscription] = await db
+      .select({ id: userSubscriptions.id })
+      .from(userSubscriptions)
+      .where(
+        and(
+          eq(userSubscriptions.userId, userId),
+          eq(userSubscriptions.podcastId, podcastId)
+        )
+      )
+      .limit(1);
 
     if (!subscription) {
       return {

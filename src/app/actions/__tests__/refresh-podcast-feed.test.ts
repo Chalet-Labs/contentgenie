@@ -28,11 +28,13 @@ vi.mock("@/db", () => ({
         findMany: vi.fn().mockResolvedValue([]),
       },
     },
-    select: vi.fn().mockReturnValue({
-      from: (...args: unknown[]) => {
-        mockSelectFrom(...args);
-        return { where: (...wArgs: unknown[]) => mockSelectWhere(...wArgs) };
-      },
+    select: vi.fn().mockImplementation(() => {
+      const chain: any = {};
+      chain.from = vi.fn().mockReturnValue(chain);
+      chain.where = vi.fn().mockReturnValue(chain);
+      chain.limit = vi.fn().mockReturnValue(chain);
+      chain.then = (onfulfilled: any) => Promise.resolve(mockSelectWhere()).then(onfulfilled);
+      return chain;
     }),
     update: vi.fn().mockReturnValue({
       set: (...args: unknown[]) => {
@@ -96,6 +98,7 @@ describe("refreshPodcastFeed", () => {
     mockAuth.mockResolvedValue({ userId: "user_123" });
     mockBatchTrigger.mockResolvedValue({ id: "batch_default" });
     mockUpdateWhere.mockResolvedValue(undefined);
+    mockSelectWhere.mockResolvedValue([]);
   });
 
   afterEach(() => {

@@ -21,3 +21,11 @@
 ## 2026-02-15 - Prefer Column Exclusion for Maintainability
 **Learning:** When using Drizzle's relational query API (`db.query`), optimizing for large text fields can be done via whitelisting (`columns: { title: true, ... }`) or blacklisting (`columns: { transcription: false }`). Blacklisting is more maintainable as it ensures new metadata fields added to the schema automatically flow through to the application without breaking consumers that expect a full object, while still providing the performance benefit of skipping high-volume data.
 **Action:** Use column exclusion (`fieldName: false`) instead of whitelisting for better schema maintainability when optimizing for large fields.
+
+## 2026-02-16 - junction table upsert optimization
+**Learning:** For junction tables (like user_subscriptions or user_library) with unique constraints on the combined keys, using `.onConflictDoNothing().returning()` is significantly more efficient than a sequential `findFirst` followed by an `insert`. It collapses two database round-trips into one and simplifies the code logic.
+**Action:** Use `.onConflictDoNothing().returning()` for junction table insertions where existence check is the only reason for the initial query.
+
+## 2026-02-16 - checking existence with leftJoin
+**Learning:** When you need to check if an entity exists AND if a related record exists (e.g., checking if a podcast exists and if the user is already subscribed to it), a single `leftJoin` query is more efficient than two sequential `findFirst` calls. This is especially true in serverless environments where network latency between the app and the database is a major factor.
+**Action:** Replace sequential existence checks across related tables with a single `leftJoin` query.

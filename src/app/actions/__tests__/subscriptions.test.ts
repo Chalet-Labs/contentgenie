@@ -86,6 +86,19 @@ vi.mock("@/lib/security", () => ({
   isSafeUrl: (url: string) => mockIsSafeUrl(url),
 }));
 
+function mockSelectChain(resolvedValue: any[]) {
+  const mockLimit = vi.fn().mockResolvedValue(resolvedValue);
+  const mockWhere = vi.fn().mockReturnValue({ limit: mockLimit });
+  const mockInnerJoin = vi.fn().mockReturnValue({ where: mockWhere });
+  const mockLeftJoin = vi.fn().mockReturnValue({ where: mockWhere });
+  const mockFrom = vi.fn().mockReturnValue({
+    innerJoin: mockInnerJoin,
+    leftJoin: mockLeftJoin,
+    where: mockWhere
+  });
+  mockSelect.mockReturnValue({ from: mockFrom });
+}
+
 describe("addPodcastByRssUrl", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -96,6 +109,7 @@ describe("addPodcastByRssUrl", () => {
     mockFindFirstPodcast.mockResolvedValue(null);
     mockFindFirstSubscription.mockResolvedValue(null);
     mockReturning.mockReturnValue([{ id: 1 }]);
+    mockSelectChain([]);
   });
 
   afterEach(() => {
@@ -151,12 +165,11 @@ describe("addPodcastByRssUrl", () => {
   });
 
   it("returns already subscribed for existing podcast + subscription", async () => {
-    mockFindFirstPodcast.mockResolvedValue({
+    mockSelectChain([{
       id: 42,
       title: "Existing Podcast",
-      podcastIndexId: "rss-abc123",
-    });
-    mockFindFirstSubscription.mockResolvedValue({ id: 1 });
+      subscriptionId: 1
+    }]);
 
     const { addPodcastByRssUrl } = await import(
       "@/app/actions/subscriptions"
@@ -235,15 +248,8 @@ describe("isSubscribedToPodcast (optimized)", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockAuth.mockResolvedValue({ userId: "user_123" });
+    mockSelectChain([]);
   });
-
-  function mockSelectChain(resolvedValue: any[]) {
-    const mockLimit = vi.fn().mockResolvedValue(resolvedValue);
-    const mockWhere = vi.fn().mockReturnValue({ limit: mockLimit });
-    const mockInnerJoin = vi.fn().mockReturnValue({ where: mockWhere });
-    const mockFrom = vi.fn().mockReturnValue({ innerJoin: mockInnerJoin });
-    mockSelect.mockReturnValue({ from: mockFrom });
-  }
 
   it("returns true when subscription exists using optimized JOIN", async () => {
     mockSelectChain([{ id: 1 }]);
