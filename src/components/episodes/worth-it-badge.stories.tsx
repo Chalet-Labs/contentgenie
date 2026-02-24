@@ -4,6 +4,13 @@ import { WorthItBadge } from "./worth-it-badge";
 const meta: Meta<typeof WorthItBadge> = {
   title: "Episodes/WorthItBadge",
   component: WorthItBadge,
+  decorators: [
+    (Story) => (
+      <div className="flex items-center gap-4 p-6">
+        <Story />
+      </div>
+    ),
+  ],
 };
 
 export default meta;
