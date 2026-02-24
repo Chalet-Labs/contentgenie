@@ -45,8 +45,10 @@ export default function RootLayout({
             return undefined;
           }
         })(),
-        /^https:\/\/[a-z0-9-]+\.vercel\.app$/i,
-      ].filter((v): v is string | RegExp => Boolean(v))}
+        process.env.VERCEL_URL
+          ? `https://${process.env.VERCEL_URL}`
+          : undefined,
+      ].filter((v): v is string => Boolean(v))}
     >
       <html lang="en" suppressHydrationWarning>
         <body className={inter.className}>
