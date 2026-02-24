@@ -37,8 +37,8 @@ export default function RootLayout({
     <ClerkProvider
       allowedRedirectOrigins={[
         process.env.NEXT_PUBLIC_APP_URL,
-        "https://*.vercel.app",
-      ].filter(Boolean) as string[]}
+        /^https:\/\/[a-z0-9-]+\.vercel\.app$/i,
+      ].filter((v): v is string | RegExp => Boolean(v))}
     >
       <html lang="en" suppressHydrationWarning>
         <body className={inter.className}>
