@@ -11,6 +11,12 @@ import {
   type PodcastIndexPodcast,
 } from "@/lib/podcastindex";
 
+// Maximum episodes to include per podcast for variety in the dashboard feed
+const MAX_EPISODES_PER_PODCAST = 3;
+// Fetch more episodes than needed (5x) to account for the per-podcast variety cap.
+// In skewed cases (one very active podcast dominates), we may still return fewer than `limit` items.
+const BATCH_FETCH_MULTIPLIER = 5;
+
 // Get recent episodes from subscribed podcasts
 export async function getRecentEpisodesFromSubscriptions(limit: number = 10) {
   const { userId } = await auth();
@@ -28,9 +34,7 @@ export async function getRecentEpisodesFromSubscriptions(limit: number = 10) {
       with: {
         podcast: {
           columns: {
-            podcastIndexId: true,
-            title: true,
-            imageUrl: true,
+            description: false,
           },
         },
       },
@@ -50,16 +54,14 @@ export async function getRecentEpisodesFromSubscriptions(limit: number = 10) {
 
     const numericFeedIds = subscriptions
       .map((sub) => sub.podcast.podcastIndexId)
-      .filter((id) => !isNaN(parseInt(id, 10)));
+      .filter((id) => /^\d+$/.test(id));
 
     if (numericFeedIds.length === 0) {
       return { episodes: [], error: null };
     }
 
     // Fetch episodes from all podcasts in one batch
-    // We request more than needed (limit * 3) to allow for variety filtering (max 3 per podcast)
-    // while still having enough results to fill the final limit.
-    const batchResponse = await getEpisodesByFeedId(numericFeedIds.join(","), limit * 3);
+    const batchResponse = await getEpisodesByFeedId(numericFeedIds.join(","), limit * BATCH_FETCH_MULTIPLIER);
     const batchEpisodes = batchResponse.items || [];
 
     // Map back to our RecentEpisode type and group by feed to maintain variety (max 3 per podcast)
@@ -68,10 +70,13 @@ export async function getRecentEpisodesFromSubscriptions(limit: number = 10) {
     for (const ep of batchEpisodes) {
       const pIndexId = String(ep.feedId);
       const podcast = podcastMap.get(pIndexId);
-      if (!podcast) continue;
+      if (!podcast) {
+        console.debug(`Episode ${ep.id} has feedId ${pIndexId} not in subscribed podcasts`);
+        continue;
+      }
 
       const feedEpisodes = episodesByFeed.get(pIndexId) || [];
-      if (feedEpisodes.length < 3) {
+      if (feedEpisodes.length < MAX_EPISODES_PER_PODCAST) {
         feedEpisodes.push({
           ...ep,
           podcastTitle: podcast.title,
