@@ -8,7 +8,7 @@ Podcast discovery, AI-powered summarization, and library management app for busy
 - **Styling:** Tailwind CSS, shadcn/ui (Radix primitives)
 - **Auth:** Clerk (`@clerk/nextjs`)
 - **Database:** Neon (serverless Postgres) via Drizzle ORM
-- **AI:** OpenRouter API for episode summarization
+- **AI:** Provider abstraction (OpenRouter + Z.AI) for episode summarization, admin-selectable via Settings
 - **Podcast Data:** PodcastIndex API
 - **Background Jobs:** Trigger.dev (`@trigger.dev/sdk`)
 - **Notifications:** Sonner (toast)
@@ -29,7 +29,7 @@ Podcast discovery, AI-powered summarization, and library management app for busy
 - shadcn/ui components live in `src/components/ui/`. Add new ones with `bunx shadcn@latest add <component>`.
 - Server components are the default. Only add `"use client"` when you need browser APIs, hooks, or event handlers.
 - Server actions use `"use server"` and live in `src/app/actions/`. They handle all data mutations.
-- API routes in `src/app/api/` are for proxying external services only (PodcastIndex, OpenRouter).
+- API routes in `src/app/api/` are for proxying external services (PodcastIndex, OpenRouter) and orchestrating Trigger.dev background tasks that need multipart uploads or realtime access tokens (OPML import, batch summarization).
 
 ## Development commands
 
@@ -127,18 +127,21 @@ ADRs are stored in `docs/adr/`. Read them before designing changes that touch th
 - [ADR-003: Scheduled Feed Polling](docs/adr/003-scheduled-feed-polling.md)
 - [ADR-004: Audio Player State Management](docs/adr/004-audio-player-state-management.md)
 - [ADR-005: DNS-Pinning Fetch to Eliminate TOCTOU in SSRF Protection](docs/adr/005-dns-pinning-ssrf-agent.md)
+- [ADR-006: Bulk OPML Import via Trigger.dev Background Task](docs/adr/006-opml-import-via-trigger-dev.md)
+- [ADR-007: Bulk Re-Summarization via Trigger.dev Parent Task](docs/adr/007-bulk-resummarize-via-trigger-dev.md)
+- [ADR-008: AI Provider Abstraction Layer](docs/adr/008-ai-provider-abstraction.md)
 
 ## Architecture patterns
 
 - **App Router with route groups:** `(auth)` for sign-in/sign-up, `(app)` for authenticated pages with shared sidebar layout.
 - **Server actions** (`src/app/actions/`) for all data mutations — subscriptions, library management, collections.
-- **API routes** (`src/app/api/`) for proxying external services (PodcastIndex search, episode summarization).
+- **API routes** (`src/app/api/`) for proxying external services (PodcastIndex search, episode summarization) and orchestrating Trigger.dev background tasks (OPML import, batch summarization).
 - **Clerk middleware** protects all routes except `/`, `/sign-in`, `/sign-up`, and `/api/webhooks`.
 - **Component organization:** Feature folders (`dashboard/`, `podcasts/`, `episodes/`, `library/`) alongside shared `ui/` primitives.
 
 ## Database schema
 
-Tables: `users`, `podcasts`, `episodes`, `user_subscriptions`, `collections`, `user_library`, `bookmarks`
+Tables: `users`, `podcasts`, `episodes`, `user_subscriptions`, `collections`, `user_library`, `bookmarks`, `ai_config`
 
 - Users are synced from Clerk (text ID primary key).
 - Podcasts/episodes reference PodcastIndex IDs.
@@ -161,18 +164,11 @@ Tables: `users`, `podcasts`, `episodes`, `user_subscriptions`, `collections`, `u
 
 Secrets are managed via **Doppler** (not `.env` files). Run `doppler setup` after cloning.
 
-Available environment variables:
-- `CLERK_SECRET_KEY` — Clerk backend auth
-- `CLERK_SIGN_IN_FORCE_REDIRECT_URL` — Post-sign-in redirect URL (e.g. `/dashboard`)
-- `CLERK_SIGN_UP_FORCE_REDIRECT_URL` — Post-sign-up redirect URL (e.g. `/dashboard`)
-- `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` — Clerk frontend auth
-- `DATABASE_URL` — Neon Postgres connection string
-- `OPENROUTER_API_KEY` — OpenRouter AI API
-- `PODCASTINDEX_API_KEY` — PodcastIndex API key
-- `PODCASTINDEX_API_SECRET` — PodcastIndex API secret
-- `NEXT_PUBLIC_APP_URL` — Application URL (inlined at build time)
-- `TRIGGER_SECRET_KEY` — Trigger.dev secret key (background jobs)
-- `ASSEMBLYAI_API_KEY` — AssemblyAI transcription API key
+See [docs/secrets-management.md](docs/secrets-management.md) for the full list of managed secrets, their types (Server vs Public), and per-environment setup instructions. Key points:
+
+- `NEXT_PUBLIC_*` variables are **inlined at build time** — rebuild after changing them in Doppler.
+- `doppler run --` is already wired into most `bun run` scripts; use `doppler run -- <cmd>` for ad-hoc commands.
+- Vercel environments are synced from Doppler automatically; Trigger.dev Prod secrets are set manually.
 
 ## Security
 

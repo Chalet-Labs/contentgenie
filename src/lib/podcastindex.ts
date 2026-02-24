@@ -230,6 +230,15 @@ export async function searchByPerson(
   );
 }
 
+// Get podcast by feed URL
+export async function getPodcastByFeedUrl(
+  feedUrl: string
+): Promise<GetPodcastResponse> {
+  return fetchFromPodcastIndex<GetPodcastResponse>("/podcasts/byfeedurl", {
+    url: feedUrl,
+  });
+}
+
 // Get podcast by feed ID
 export async function getPodcastById(
   feedId: number

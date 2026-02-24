@@ -18,6 +18,7 @@ const mockInsert = vi.fn();
 const mockValues = vi.fn();
 const mockOnConflictDoNothing = vi.fn();
 const mockReturning = vi.fn();
+const mockSelect = vi.fn();
 
 vi.mock("@/db", () => ({
   db: {
@@ -27,6 +28,7 @@ vi.mock("@/db", () => ({
         findFirst: (...args: unknown[]) => mockFindFirstSubscription(...args),
       },
     },
+    select: (...args: unknown[]) => mockSelect(...args),
     insert: (...args: unknown[]) => {
       mockInsert(...args);
       return {
@@ -69,11 +71,13 @@ vi.mock("@/db/schema", () => ({
   userSubscriptions: { userId: "user_id", podcastId: "podcast_id" },
 }));
 
-// Mock drizzle-orm — just need eq, and, desc stubs
+// Mock drizzle-orm — just need eq, and, desc, sql stubs
 vi.mock("drizzle-orm", () => ({
   eq: vi.fn(),
   and: vi.fn(),
   desc: vi.fn(),
+  inArray: vi.fn(),
+  sql: (strings: TemplateStringsArray, ...values: unknown[]) => ({ strings, values }),
 }));
 
 // Mock SSRF security utility
@@ -224,5 +228,70 @@ describe("addPodcastByRssUrl", () => {
     expect(result.title).toBe("Test Podcast");
     expect(result.podcastIndexId).toMatch(/^rss-/);
     expect(result.episodeCount).toBe(2);
+  });
+});
+
+// Helper: mock select→from→innerJoin→where→limit chain for isSubscribedToPodcast
+function mockSelectChain(resolvedValue: unknown[]) {
+  const mockLimit = vi.fn().mockResolvedValue(resolvedValue);
+  const mockWhere = vi.fn().mockReturnValue({ limit: mockLimit });
+  const mockInnerJoin = vi.fn().mockReturnValue({ where: mockWhere });
+  const mockFrom = vi.fn().mockReturnValue({ innerJoin: mockInnerJoin });
+  mockSelect.mockReturnValue({ from: mockFrom });
+}
+
+describe("isSubscribedToPodcast", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockAuth.mockResolvedValue({ userId: "user_123" });
+  });
+
+  it("returns false when not authenticated", async () => {
+    mockAuth.mockResolvedValue({ userId: null });
+
+    const { isSubscribedToPodcast } = await import(
+      "@/app/actions/subscriptions"
+    );
+    const result = await isSubscribedToPodcast("12345");
+
+    expect(result).toBe(false);
+    expect(mockSelect).not.toHaveBeenCalled();
+  });
+
+  it("returns true when user is subscribed", async () => {
+    mockSelectChain([{ exists: 1 }]);
+
+    const { isSubscribedToPodcast } = await import(
+      "@/app/actions/subscriptions"
+    );
+    const result = await isSubscribedToPodcast("12345");
+
+    expect(result).toBe(true);
+    expect(mockSelect).toHaveBeenCalled();
+  });
+
+  it("returns false when user is not subscribed", async () => {
+    mockSelectChain([]);
+
+    const { isSubscribedToPodcast } = await import(
+      "@/app/actions/subscriptions"
+    );
+    const result = await isSubscribedToPodcast("12345");
+
+    expect(result).toBe(false);
+    expect(mockSelect).toHaveBeenCalled();
+  });
+
+  it("returns false on database error", async () => {
+    mockSelect.mockImplementation(() => {
+      throw new Error("DB connection failed");
+    });
+
+    const { isSubscribedToPodcast } = await import(
+      "@/app/actions/subscriptions"
+    );
+    const result = await isSubscribedToPodcast("12345");
+
+    expect(result).toBe(false);
   });
 });

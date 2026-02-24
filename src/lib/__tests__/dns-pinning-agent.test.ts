@@ -41,7 +41,7 @@ function mockDnsLookup(
   );
 }
 
-/** Promise wrapper around pinnedLookup for easier test assertions. */
+/** Promise wrapper around pinnedLookup for easier test assertions (single-address mode). */
 function lookupAsync(
   hostname: string,
 ): Promise<{ address: string; family: number }> {
@@ -51,6 +51,23 @@ function lookupAsync(
         reject(err);
       } else {
         resolve({ address, family });
+      }
+    });
+  });
+}
+
+/** Promise wrapper for the all:true path (undici 7+ / Node 23+). */
+function lookupAllAsync(
+  hostname: string,
+): Promise<{ address: string; family: number }[]> {
+  return new Promise((resolve, reject) => {
+    // Cast needed: TS types define single-address callback but undici 7+
+    // runtime passes all:true and expects the array-format callback.
+    (pinnedLookup as Function)(hostname, { all: true }, (err: NodeJS.ErrnoException | null, addresses: { address: string; family: number }[]) => {
+      if (err) {
+        reject(err);
+      } else {
+        resolve(addresses);
       }
     });
   });
@@ -140,6 +157,30 @@ describe("pinnedLookup", () => {
 
     await expect(lookupAsync("mapped.example.com")).rejects.toThrow(
       /private IP.*::ffff:127\.0\.0\.1/,
+    );
+  });
+
+  it("returns address array when dnsOptions.all is true (undici 7+)", async () => {
+    mockDnsLookup([
+      { address: "93.184.216.34", family: 4 },
+      { address: "93.184.216.35", family: 4 },
+    ]);
+
+    const results = await lookupAllAsync("example.com");
+    expect(results).toEqual([
+      { address: "93.184.216.34", family: 4 },
+      { address: "93.184.216.35", family: 4 },
+    ]);
+  });
+
+  it("rejects with array format when any IP is private (all:true)", async () => {
+    mockDnsLookup([
+      { address: "93.184.216.34", family: 4 },
+      { address: "10.0.0.1", family: 4 },
+    ]);
+
+    await expect(lookupAllAsync("mixed.example.com")).rejects.toThrow(
+      /private IP.*10\.0\.0\.1/,
     );
   });
 

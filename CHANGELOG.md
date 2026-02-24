@@ -7,6 +7,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Description-based transcript URL extraction in episode summarization pipeline
+- AssemblyAI async transcription via Trigger.dev webhook tokens (replaces blocking polling)
+- AI provider abstraction with support for OpenRouter and Z.AI, admin-selectable via Settings page (#139)
+- Dimensional worth-it scoring with uniqueness, actionability, and time-value sub-scores for AI episode summaries (#133)
+- Score breakdown progress bars in episode summary display (#133)
+- Bulk re-summarization via Trigger.dev with filters (podcast, date range, quality score), real-time progress tracking, and cancellation (#38)
+- Bulk OPML import: upload an OPML file from the Discover page to subscribe to multiple podcasts at once, with real-time progress tracking (#36)
 - DNS rebinding tests for `safeFetch` verifying TOCTOU protection via dns-pinning agent (#108)
 - ADR-005 listed in AGENTS.md Architecture Decision Records section
 - Share button on episode, podcast, and collection pages with Web Share API support and clipboard fallback (#83)
@@ -15,6 +22,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Episode artwork and title in the audio player bar now link to the episode detail page (`/episode/[id]`), with hover feedback, aria-label for accessibility, and touch feedback on mobile (#115)
 
 ### Fixed
+- Fixed Clerk hosted sign-in/sign-up not redirecting back to the app by replacing `CLERK_SIGN_IN_FORCE_REDIRECT_URL` / `CLERK_SIGN_UP_FORCE_REDIRECT_URL` with `NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL` / `NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL` (public-prefixed, fallback semantics so `auth.protect()` redirect takes precedence) and adding `NEXT_PUBLIC_CLERK_SIGN_IN_URL` / `NEXT_PUBLIC_CLERK_SIGN_UP_URL` for correct routing to embedded auth pages
 - Fixed non-deterministic SSRF redirect tests by using public-IP fixtures instead of hostname-based URLs
 - Fixed DNS rebinding TOCTOU vulnerability in SSRF-protected fetch by pinning validated DNS resolution to TCP connections via undici Agent (#80)
 - Cancel stale discover search requests when query changes, preventing outdated results from overwriting current results (#104)
@@ -32,8 +40,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - GitHub Actions Neon branch workflow (`.github/workflows/neon-branch.yml`) — replaced by `vercel-build` script to eliminate dual Neon branch problem
 
 ### Changed
+- Increased `summarize-episode` task `maxDuration` to 7200s (2 hours) for async transcription
+- AI summarization prompt rewritten with anti-inflation anchoring and structured summary sections (TL;DR, What You'll Learn, Notable Quotes, Action Items, Bottom Line) (#133)
+- Worth-it score labels recalibrated: "Exceptional" (8+), "Above Average" (6-7.9), "Average" (4-5.9), "Below Average" (2-3.9), "Skip" (<2) (#133)
 - ADR-005 (DNS-Pinning SSRF Agent) status updated from "Proposed" to "Accepted" with #108 cross-reference
 - Made entire subscription card clickable, consistent with podcast and episode cards (#84)
+- Optimized subscription existence check by consolidating two sequential queries into a single JOIN query in `isSubscribedToPodcast`
 - Consolidated `getEpisodeAverageRating` into a single JOIN query, reducing database round-trips from 2 to 1
 - Optimized dashboard stats retrieval by using SQL `COUNT(*)` aggregation instead of in-memory counting, significantly reducing memory and network overhead (#71)
 - Optimized collections sidebar loading by eliminating N+1 database queries in `getUserCollections` (single SQL aggregation via LEFT JOIN + GROUP BY)

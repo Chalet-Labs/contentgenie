@@ -108,6 +108,26 @@ describe("PodcastIndex API functions", () => {
     expect(url.searchParams.get("id")).toBe("123");
   });
 
+  it("getPodcastByFeedUrl calls correct endpoint with url param", async () => {
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: () =>
+        Promise.resolve({
+          status: "true",
+          feed: { id: 789, title: "Feed URL Podcast" },
+        }),
+    });
+    vi.stubGlobal("fetch", mockFetch);
+
+    const { getPodcastByFeedUrl } = await import("@/lib/podcastindex");
+    const result = await getPodcastByFeedUrl("https://example.com/feed.xml");
+
+    const url = new URL(mockFetch.mock.calls[0][0]);
+    expect(url.pathname).toBe("/api/1.0/podcasts/byfeedurl");
+    expect(url.searchParams.get("url")).toBe("https://example.com/feed.xml");
+    expect(result.feed.id).toBe(789);
+  });
+
   it("getPodcastById calls correct endpoint", async () => {
     const mockFetch = vi.fn().mockResolvedValue({
       ok: true,

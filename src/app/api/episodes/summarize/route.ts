@@ -50,6 +50,7 @@ export async function POST(request: NextRequest) {
           ? parseFloat(existingEpisode.worthItScore)
           : null,
         worthItReason: existingEpisode.worthItReason ?? undefined,
+        worthItDimensions: existingEpisode.worthItDimensions ?? null,
         cached: true,
       });
     }
@@ -162,6 +163,7 @@ export async function GET(request: NextRequest) {
           ? parseFloat(existingEpisode.worthItScore)
           : null,
         worthItReason: existingEpisode.worthItReason ?? undefined,
+        worthItDimensions: existingEpisode.worthItDimensions ?? null,
         processedAt: existingEpisode.processedAt,
       });
     }

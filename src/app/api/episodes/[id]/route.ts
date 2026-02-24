@@ -91,6 +91,7 @@ export async function GET(
             ? parseFloat(dbEpisode.worthItScore)
             : null,
           worthItReason: dbEpisode.worthItReason ?? undefined,
+          worthItDimensions: dbEpisode.worthItDimensions ?? null,
         };
       }
 
@@ -149,6 +150,7 @@ export async function GET(
           keyTakeaways: true,
           worthItScore: true,
           worthItReason: true,
+          worthItDimensions: true,
           processedAt: true,
         },
       });
@@ -161,6 +163,7 @@ export async function GET(
             ? parseFloat(cachedEpisode.worthItScore)
             : null,
           worthItReason: cachedEpisode.worthItReason ?? undefined,
+          worthItDimensions: cachedEpisode.worthItDimensions ?? null,
         };
       }
     } catch {

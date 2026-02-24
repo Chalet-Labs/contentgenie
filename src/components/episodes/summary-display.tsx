@@ -29,6 +29,11 @@ interface SummaryDisplayProps {
   keyTakeaways: string[] | null;
   worthItScore: number | null;
   worthItReason?: string;
+  worthItDimensions?: {
+    uniqueness: number;
+    actionability: number;
+    timeValue: number;
+  } | null;
   isLoading?: boolean;
   error?: string | null;
   currentStep?: SummarizationStep | null;
@@ -54,11 +59,53 @@ const STEP_ORDER: SummarizationStep[] = [
   "saving-results",
 ];
 
+const DIMENSION_LABELS: Record<string, string> = {
+  uniqueness: "Uniqueness",
+  actionability: "Actionability",
+  timeValue: "Time Value",
+};
+
+function parseStructuredSections(text: string) {
+  const sections = text.split(/^## /m);
+  return sections.map((section, index) => {
+    if (index === 0 && !text.startsWith("## ")) {
+      if (!section.trim()) return null;
+      return { heading: null, body: section.trim() };
+    }
+    const newlineIndex = section.indexOf("\n");
+    const heading = newlineIndex !== -1 ? section.slice(0, newlineIndex).trim() : section.trim();
+    const body = newlineIndex !== -1 ? section.slice(newlineIndex + 1).trim() : "";
+    if (!heading && !body) return null;
+    return { heading, body };
+  }).filter(Boolean) as { heading: string | null; body: string }[];
+}
+
+function renderSections(sections: { heading: string | null; body: string }[]): React.ReactNode[] {
+  return sections.map((section, index) => {
+    if (!section.heading) {
+      return (
+        <div key={index} className="whitespace-pre-wrap text-muted-foreground">
+          {section.body}
+        </div>
+      );
+    }
+    return (
+      <div key={index} className="space-y-1">
+        <h3 className="text-sm font-semibold text-foreground">{section.heading}</h3>
+        {section.body && (
+          <div className="whitespace-pre-wrap text-muted-foreground">{section.body}</div>
+        )}
+      </div>
+    );
+  });
+}
+
 export function SummaryDisplay({
   summary,
   keyTakeaways,
   worthItScore,
   worthItReason,
+  worthItDimensions,
   isLoading = false,
   error = null,
   currentStep = null,
@@ -175,12 +222,23 @@ export function SummaryDisplay({
   }
 
   // Display summary
-  const summaryLines = summary.split("\n").filter((line) => line.trim());
-  const isLongSummary = summaryLines.length > 5 || summary.length > 600;
+  const hasStructuredSections = summary.includes("## ");
+  const structuredSections = hasStructuredSections ? parseStructuredSections(summary) : [];
+  const isLongSummary = hasStructuredSections
+    ? structuredSections.length > 1
+    : summary.length > 600;
   const displaySummary =
     isLongSummary && !showFullSummary
       ? summary.slice(0, 600) + "..."
       : summary;
+  const normalizedDimensionEntries = worthItDimensions
+    ? Object.entries(worthItDimensions).reduce<[string, number][]>((acc, [key, raw]) => {
+        const num = typeof raw === "number" ? raw : typeof raw === "string" ? Number(raw) : NaN;
+        if (!Number.isFinite(num)) return acc;
+        acc.push([key, Math.min(10, Math.max(0, num))]);
+        return acc;
+      }, [])
+    : [];
 
   return (
     <div className="space-y-6">
@@ -212,7 +270,14 @@ export function SummaryDisplay({
               </div>
             </div>
             <div className="mt-4">
-              <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+              <div
+                className="h-2 w-full overflow-hidden rounded-full bg-muted"
+                role="progressbar"
+                aria-valuenow={worthItScore}
+                aria-valuemin={0}
+                aria-valuemax={10}
+                aria-label={`Worth-it score: ${worthItScore.toFixed(1)} out of 10`}
+              >
                 <div
                   className={`h-full ${getScoreColor(worthItScore)} transition-all`}
                   style={{ width: `${(worthItScore / 10) * 100}%` }}
@@ -224,6 +289,32 @@ export function SummaryDisplay({
                 <span>10</span>
               </div>
             </div>
+            {normalizedDimensionEntries.length > 0 && (
+              <div className="mt-4 space-y-3 border-t pt-4">
+                <p className="text-sm font-medium text-foreground">Score Breakdown</p>
+                {normalizedDimensionEntries.map(([key, value]) => (
+                  <div key={key} className="space-y-1">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-muted-foreground">{DIMENSION_LABELS[key] ?? key}</span>
+                      <span className="font-medium">{value.toFixed(1)}</span>
+                    </div>
+                    <div
+                      className="h-1.5 w-full overflow-hidden rounded-full bg-muted"
+                      role="progressbar"
+                      aria-valuenow={value}
+                      aria-valuemin={0}
+                      aria-valuemax={10}
+                      aria-label={`${DIMENSION_LABELS[key] ?? key}: ${value.toFixed(1)} out of 10`}
+                    >
+                      <div
+                        className={`h-full ${getScoreColor(value)} transition-all`}
+                        style={{ width: `${(value / 10) * 100}%` }}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
       )}
@@ -237,9 +328,17 @@ export function SummaryDisplay({
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="whitespace-pre-wrap text-muted-foreground">
-            {displaySummary}
-          </p>
+          {hasStructuredSections ? (
+            <div className="space-y-4">
+              {renderSections(
+                showFullSummary ? structuredSections : structuredSections.slice(0, 1)
+              )}
+            </div>
+          ) : (
+            <p className="whitespace-pre-wrap text-muted-foreground">
+              {displaySummary}
+            </p>
+          )}
           {isLongSummary && (
             <Button
               variant="ghost"
