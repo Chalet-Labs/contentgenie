@@ -36,7 +36,15 @@ export default function RootLayout({
   return (
     <ClerkProvider
       allowedRedirectOrigins={[
-        process.env.NEXT_PUBLIC_APP_URL,
+        (() => {
+          try {
+            return process.env.NEXT_PUBLIC_APP_URL
+              ? new URL(process.env.NEXT_PUBLIC_APP_URL).origin
+              : undefined;
+          } catch {
+            return undefined;
+          }
+        })(),
         /^https:\/\/[a-z0-9-]+\.vercel\.app$/i,
       ].filter((v): v is string | RegExp => Boolean(v))}
     >
