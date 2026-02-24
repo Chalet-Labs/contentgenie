@@ -48,25 +48,16 @@ vi.mock("@/db", () => ({
             onConflictDoNothing: () => {
               mockOnConflictDoNothing();
               return {
-                returning: () => {
-                  mockReturning();
-                  return mockReturning();
-                },
+                returning: () => mockReturning(),
               };
             },
             onConflictDoUpdate: () => {
               mockOnConflictDoUpdate();
               return {
-                returning: () => {
-                  mockReturning();
-                  return mockReturning();
-                },
+                returning: () => mockReturning(),
               };
             },
-            returning: () => {
-              mockReturning();
-              return mockReturning();
-            },
+            returning: () => mockReturning(),
           };
           return chain;
         },
@@ -205,14 +196,10 @@ describe("addPodcastByRssUrl", () => {
   });
 
   it("successfully imports a podcast and returns metadata", async () => {
-    // The returning() mock handler calls mockReturning twice per invocation
-    // (once as tracker, once for the value). Set up the sequence:
-    // calls 1-2: podcast insert returning → [{ id: 1 }]
-    // calls 3-4: episode batch insert returning → [{ id: 1 }, { id: 2 }]
+    // 1. podcast insert returning → [{ id: 1 }]
+    // 2. episode batch insert returning → [{ id: 1 }, { id: 2 }]
     mockReturning
       .mockReturnValueOnce([{ id: 1 }])
-      .mockReturnValueOnce([{ id: 1 }])
-      .mockReturnValueOnce([{ id: 1 }, { id: 2 }])
       .mockReturnValueOnce([{ id: 1 }, { id: 2 }]);
 
     mockParsePodcastFeed.mockResolvedValue({
@@ -271,12 +258,10 @@ describe("subscribeToPodcast", () => {
   });
 
   it("successfully subscribes to a new podcast", async () => {
-    // podcast insert -> returns [{id: 1}]
-    // subscription insert -> returns [{id: 2}]
+    // 1. podcast insert -> [{id: 1}]
+    // 2. subscription insert -> [{id: 2}]
     mockReturning
       .mockReturnValueOnce([{ id: 1 }])
-      .mockReturnValueOnce([{ id: 1 }])
-      .mockReturnValueOnce([{ id: 2 }])
       .mockReturnValueOnce([{ id: 2 }]);
 
     const { subscribeToPodcast } = await import(
@@ -294,12 +279,10 @@ describe("subscribeToPodcast", () => {
   });
 
   it("handles already subscribed case correctly", async () => {
-    // podcast insert -> returns [{id: 1}]
-    // subscription insert (onConflictDoNothing) -> returns []
+    // 1. podcast insert -> [{id: 1}]
+    // 2. subscription insert (onConflictDoNothing) -> []
     mockReturning
       .mockReturnValueOnce([{ id: 1 }])
-      .mockReturnValueOnce([{ id: 1 }])
-      .mockReturnValueOnce([])
       .mockReturnValueOnce([]);
 
     const { subscribeToPodcast } = await import(
