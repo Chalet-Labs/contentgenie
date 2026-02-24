@@ -34,25 +34,16 @@ vi.mock("@/db", () => ({
             onConflictDoNothing: () => {
               mockOnConflictDoNothing();
               return {
-                returning: () => {
-                  mockReturning();
-                  return mockReturning();
-                },
+                returning: () => mockReturning(),
               };
             },
             onConflictDoUpdate: () => {
               mockOnConflictDoUpdate();
               return {
-                returning: () => {
-                  mockReturning();
-                  return mockReturning();
-                },
+                returning: () => mockReturning(),
               };
             },
-            returning: () => {
-              mockReturning();
-              return mockReturning();
-            },
+            returning: () => mockReturning(),
           };
           return chain;
         },
@@ -91,15 +82,12 @@ describe("saveEpisodeToLibrary", () => {
   });
 
   it("successfully saves a new episode to library", async () => {
-    // 1. podcasts upsert -> calls 1-2 returns [{id: 10}]
-    // 2. episodes upsert -> calls 3-4 returns [{id: 100}]
-    // 3. library insert -> calls 5-6 returns [{id: 1000}]
+    // 1. podcasts upsert -> [{id: 10}]
+    // 2. episodes upsert -> [{id: 100}]
+    // 3. library insert -> [{id: 1000}]
     mockReturning
       .mockReturnValueOnce([{ id: 10 }])
-      .mockReturnValueOnce([{ id: 10 }])
       .mockReturnValueOnce([{ id: 100 }])
-      .mockReturnValueOnce([{ id: 100 }])
-      .mockReturnValueOnce([{ id: 1000 }])
       .mockReturnValueOnce([{ id: 1000 }]);
 
     const { saveEpisodeToLibrary } = await import("@/app/actions/library");
@@ -119,15 +107,12 @@ describe("saveEpisodeToLibrary", () => {
   });
 
   it("handles already saved episode", async () => {
-    // 1. podcasts upsert -> calls 1-2 returns [{id: 10}]
-    // 2. episodes upsert -> calls 3-4 returns [{id: 100}]
-    // 3. library insert (onConflictDoNothing) -> calls 5-6 returns []
+    // 1. podcasts upsert -> [{id: 10}]
+    // 2. episodes upsert -> [{id: 100}]
+    // 3. library insert (onConflictDoNothing) -> []
     mockReturning
       .mockReturnValueOnce([{ id: 10 }])
-      .mockReturnValueOnce([{ id: 10 }])
       .mockReturnValueOnce([{ id: 100 }])
-      .mockReturnValueOnce([{ id: 100 }])
-      .mockReturnValueOnce([])
       .mockReturnValueOnce([]);
 
     const { saveEpisodeToLibrary } = await import("@/app/actions/library");
