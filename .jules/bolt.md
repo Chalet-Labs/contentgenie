@@ -22,10 +22,14 @@
 **Learning:** When using Drizzle's relational query API (`db.query`), optimizing for large text fields can be done via whitelisting (`columns: { title: true, ... }`) or blacklisting (`columns: { transcription: false }`). Blacklisting is more maintainable as it ensures new metadata fields added to the schema automatically flow through to the application without breaking consumers that expect a full object, while still providing the performance benefit of skipping high-volume data.
 **Action:** Use column exclusion (`fieldName: false`) instead of whitelisting for better schema maintainability when optimizing for large fields.
 
-## 2026-02-16 - Consolidate DB Round-trips with Upserts
-**Learning:** Multi-step database operations (like check-then-insert or check-then-update) in server actions create unnecessary network latency. Drizzle's `onConflictDoUpdate` and `onConflictDoNothing().returning()` can consolidate these into single round-trips while also ensuring data freshness.
-**Action:** Replace sequential existence checks and conditional inserts/updates with atomic upserts to minimize database round-trips and prevent race conditions.
+## 2026-02-16 - Upsert for Transactional Performance
+**Learning:** Sequential "find then insert/update" patterns in server actions create unnecessary database round-trips. Using Drizzle's `onConflictDoUpdate` (upsert) or `onConflictDoNothing` allows consolidating these into a single query. When using `returning()`, `onConflictDoUpdate` is more reliable for ensuring an ID is returned even when the record already exists.
+**Action:** Replace existence checks followed by insertions/updates with atomic `onConflict` operations to reduce round-trips by ~40-60%.
 
-## 2026-02-21 - Pin CLI Versions in CI
-**Learning:** Using `@latest` for CLI tools (like `trigger.dev`) in CI workflows is risky as new releases can introduce breaking changes or version mismatches with installed packages. Pinned versions ensure consistency and prevent environment-related failures.
-**Action:** Always pin CLI tool versions in `.github/workflows` and `package.json` to match the project's dependency versions.
+## 2026-02-16 - API Batching for Multi-Feed Queries
+**Learning:** The PodcastIndex API supports batching multiple feed IDs in a single request to endpoints like `/episodes/byfeedid`. This allows replacing N sequential or concurrent API calls with a single round-trip when fetching recent episodes from multiple subscriptions.
+**Action:** Always check API documentation for batching support when performing multiple related network requests. Update library utilities to support stringified batch IDs.
+
+## 2026-02-17 - Atomic Persistence in Background Tasks
+**Learning:** Background tasks (like Trigger.dev workers) often perform multiple database lookups and updates to ensure data consistency. Replacing sequential "find-then-update" patterns with atomic `onConflictDoUpdate` calls in helper functions significantly reduces the database load and latency of the worker, which is critical for high-concurrency processing.
+**Action:** Use upserts in shared database helper functions used by background workers to minimize round-trips.

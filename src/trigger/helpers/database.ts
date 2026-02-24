@@ -12,18 +12,23 @@ async function ensurePodcast(
   feedId: number,
   podcast?: PodcastIndexPodcast
 ): Promise<number | null> {
-  let dbPodcast = await db.query.podcasts.findFirst({
-    where: eq(podcasts.podcastIndexId, feedId.toString()),
-  });
-
-  if (dbPodcast) return dbPodcast.id;
-  if (!podcast) return null;
+  // If we don't have podcast data to insert/update, just check for existence
+  if (!podcast) {
+    const dbPodcast = await db.query.podcasts.findFirst({
+      where: eq(podcasts.podcastIndexId, feedId.toString()),
+      columns: { id: true },
+    });
+    return dbPodcast?.id ?? null;
+  }
 
   const categories = podcast.categories
     ? Object.values(podcast.categories)
     : [];
 
-  const [inserted] = await db
+  // BOLT OPTIMIZATION: Use onConflictDoUpdate to consolidate find-and-insert into a single round-trip.
+  // This keeps metadata fresh and ensures we always get the ID back in one query.
+  // Expected impact: Reduces database round-trips from up to 3 down to 1 when podcast data is provided.
+  const [result] = await db
     .insert(podcasts)
     .values({
       podcastIndexId: feedId.toString(),
@@ -38,16 +43,25 @@ async function ensurePodcast(
         ? new Date(podcast.newestItemPubdate * 1000)
         : null,
     })
-    .onConflictDoNothing({ target: podcasts.podcastIndexId })
-    .returning();
+    .onConflictDoUpdate({
+      target: podcasts.podcastIndexId,
+      set: {
+        title: podcast.title,
+        description: podcast.description,
+        publisher: podcast.author || podcast.ownerName,
+        imageUrl: podcast.artwork || podcast.image,
+        rssFeedUrl: podcast.url,
+        categories,
+        totalEpisodes: podcast.episodeCount,
+        latestEpisodeDate: podcast.newestItemPubdate
+          ? new Date(podcast.newestItemPubdate * 1000)
+          : null,
+        updatedAt: new Date(),
+      },
+    })
+    .returning({ id: podcasts.id });
 
-  if (inserted) return inserted.id;
-
-  // Another process inserted first — re-fetch
-  dbPodcast = await db.query.podcasts.findFirst({
-    where: eq(podcasts.podcastIndexId, feedId.toString()),
-  });
-  return dbPodcast?.id ?? null;
+  return result?.id ?? null;
 }
 
 /**
@@ -62,38 +76,32 @@ export async function trackEpisodeRun(
   const podcastId = await ensurePodcast(episode.feedId, podcast);
   if (!podcastId) return;
 
-  const existingEp = await db.query.episodes.findFirst({
-    where: eq(episodes.podcastIndexId, episode.id.toString()),
-  });
-
-  if (existingEp) {
-    await db
-      .update(episodes)
-      .set({
+  // BOLT OPTIMIZATION: Use onConflictDoUpdate to consolidate find, insert, and update logic.
+  // Expected impact: Reduces database round-trips from 2 to 1 (excluding ensurePodcast).
+  await db
+    .insert(episodes)
+    .values({
+      podcastId,
+      podcastIndexId: episode.id.toString(),
+      title: episode.title,
+      description: episode.description,
+      audioUrl: episode.enclosureUrl,
+      duration: episode.duration,
+      publishDate: episode.datePublished
+        ? new Date(episode.datePublished * 1000)
+        : null,
+      summaryRunId: runId,
+      summaryStatus: "running",
+    })
+    .onConflictDoUpdate({
+      target: episodes.podcastIndexId,
+      set: {
         summaryRunId: runId,
         summaryStatus: "running",
         processingError: null,
         updatedAt: new Date(),
-      })
-      .where(eq(episodes.id, existingEp.id));
-  } else {
-    await db
-      .insert(episodes)
-      .values({
-        podcastId,
-        podcastIndexId: episode.id.toString(),
-        title: episode.title,
-        description: episode.description,
-        audioUrl: episode.enclosureUrl,
-        duration: episode.duration,
-        publishDate: episode.datePublished
-          ? new Date(episode.datePublished * 1000)
-          : null,
-        summaryRunId: runId,
-        summaryStatus: "running",
-      })
-      .onConflictDoNothing({ target: episodes.podcastIndexId });
-  }
+      },
+    });
 }
 
 /**
@@ -124,28 +132,11 @@ export async function persistEpisodeSummary(
     throw new Error("Could not find or create podcast in database");
   }
 
-  // Check for existing episode (may have been created by trackEpisodeRun)
-  const existingEpisode = await db.query.episodes.findFirst({
-    where: eq(episodes.podcastIndexId, episode.id.toString()),
-  });
-
-  if (existingEpisode) {
-    await db
-      .update(episodes)
-      .set({
-        summary: summary.summary,
-        keyTakeaways: summary.keyTakeaways,
-        worthItScore: summary.worthItScore.toFixed(2),
-        worthItReason: summary.worthItReason,
-        transcription: transcript,
-        processedAt: new Date(),
-        summaryStatus: "completed",
-        summaryRunId: null,
-        updatedAt: new Date(),
-      })
-      .where(eq(episodes.id, existingEpisode.id));
-  } else {
-    await db.insert(episodes).values({
+  // BOLT OPTIMIZATION: Use onConflictDoUpdate to consolidate find, insert, and update logic.
+  // Expected impact: Reduces database round-trips from 2 to 1 (excluding ensurePodcast).
+  await db
+    .insert(episodes)
+    .values({
       podcastId,
       podcastIndexId: episode.id.toString(),
       title: episode.title,
@@ -160,8 +151,23 @@ export async function persistEpisodeSummary(
       keyTakeaways: summary.keyTakeaways,
       worthItScore: summary.worthItScore.toFixed(2),
       worthItReason: summary.worthItReason,
+      worthItDimensions: summary.worthItDimensions ?? null,
       summaryStatus: "completed",
       processedAt: new Date(),
+    })
+    .onConflictDoUpdate({
+      target: episodes.podcastIndexId,
+      set: {
+        summary: summary.summary,
+        keyTakeaways: summary.keyTakeaways,
+        worthItScore: summary.worthItScore.toFixed(2),
+        worthItReason: summary.worthItReason,
+        worthItDimensions: summary.worthItDimensions ?? null,
+        transcription: transcript,
+        processedAt: new Date(),
+        summaryStatus: "completed",
+        summaryRunId: null,
+        updatedAt: new Date(),
+      },
     });
-  }
 }

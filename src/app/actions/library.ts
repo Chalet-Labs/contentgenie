@@ -44,13 +44,8 @@ export async function saveEpisodeToLibrary(episodeData: EpisodeData) {
       })
       .onConflictDoNothing();
 
-    // BOLT OPTIMIZATION: Consolidate multiple database round-trips for ensuring user, podcast,
-    // and episode exist, and for checking existing library entries.
-    // Use onConflictDoUpdate for podcasts and episodes to get their IDs and update data in a single query each.
-    // Use onConflictDoNothing().returning() for userLibrary to handle existence check and insertion in one query.
-    // Expected impact: Reduces database round-trips from 7 to 4.
-
-    // Ensure podcast exists in our database
+    // BOLT OPTIMIZATION: Use upsert (onConflictDoUpdate) to consolidate podcast lookup,
+    // insertion, and update into a single database round-trip.
     const [podcast] = await db
       .insert(podcasts)
       .values({
@@ -80,7 +75,8 @@ export async function saveEpisodeToLibrary(episodeData: EpisodeData) {
 
     const podcastId = podcast.id;
 
-    // Ensure episode exists in our database
+    // BOLT OPTIMIZATION: Use upsert (onConflictDoUpdate) for episodes to consolidate lookup
+    // and insertion into one round-trip.
     const [episode] = await db
       .insert(episodes)
       .values({
@@ -107,8 +103,9 @@ export async function saveEpisodeToLibrary(episodeData: EpisodeData) {
 
     const episodeId = episode.id;
 
-    // Add to library (onConflictDoNothing handles "already saved" check)
-    const [libraryEntry] = await db
+    // BOLT OPTIMIZATION: Use onConflictDoNothing to handle already saved case in one query.
+    // This replaces a separate existence check and reduces total round-trips significantly.
+    const libraryResult = await db
       .insert(userLibrary)
       .values({
         userId,
@@ -117,7 +114,7 @@ export async function saveEpisodeToLibrary(episodeData: EpisodeData) {
       .onConflictDoNothing()
       .returning({ id: userLibrary.id });
 
-    if (!libraryEntry) {
+    if (libraryResult.length === 0) {
       return { success: true, message: "Episode already in library" };
     }
 

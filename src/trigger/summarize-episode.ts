@@ -1,13 +1,13 @@
-import { task, retry, logger, metadata, AbortTaskRunError } from "@trigger.dev/sdk";
+import { task, retry, logger, metadata, AbortTaskRunError, wait } from "@trigger.dev/sdk";
 import { eq } from "drizzle-orm";
-import { getEpisodeById, getPodcastById } from "./helpers/podcastindex";
-import { fetchTranscript } from "./helpers/transcript";
-import { generateEpisodeSummary, type SummaryResult } from "./helpers/openrouter";
-import { trackEpisodeRun, persistEpisodeSummary, updateEpisodeStatus } from "./helpers/database";
+import { getEpisodeById, getPodcastById } from "@/trigger/helpers/podcastindex";
+import { fetchTranscript, extractTranscriptUrl, fetchTranscriptFromUrl } from "@/trigger/helpers/transcript";
+import { generateEpisodeSummary, type SummaryResult } from "@/trigger/helpers/ai-summary";
+import { trackEpisodeRun, persistEpisodeSummary, updateEpisodeStatus } from "@/trigger/helpers/database";
 import { db } from "@/db";
 import { episodes } from "@/db/schema";
 import type { PodcastIndexEpisode, PodcastIndexPodcast } from "@/lib/podcastindex";
-import { transcribeAudio } from "@/lib/assemblyai";
+import { submitTranscriptionAsync } from "@/lib/assemblyai";
 
 export type SummarizeEpisodePayload = {
   episodeId: number;
@@ -25,6 +25,7 @@ export const summarizeEpisode = task({
     name: "summarize-queue",
     concurrencyLimit: 3,
   },
+  maxDuration: 7200, // 2 hours — allows async AssemblyAI webhook wait
   onFailure: async (params: { payload: SummarizeEpisodePayload }) => {
     const { episodeId } = params.payload;
     logger.error("Summarization task failed permanently", { episodeId });
@@ -96,7 +97,7 @@ export const summarizeEpisode = task({
     logger.info("Checking for cached transcription");
 
     let transcript: string | undefined;
-    let transcriptSource: "cached" | "podcastindex" | "assemblyai" | "none" = "none";
+    let transcriptSource: "cached" | "podcastindex" | "description-url" | "assemblyai" | "none" = "none";
     try {
       const existing = await db.query.episodes.findFirst({
         where: eq(episodes.podcastIndexId, String(episodeId)),
@@ -134,10 +135,31 @@ export const summarizeEpisode = task({
       }
     }
 
-    // Step 3b: AssemblyAI transcription fallback (non-idempotent, no retry)
+    // Step 3b: Extract transcript URL from description
+    if (!transcript && episode.description) {
+      const transcriptUrl = extractTranscriptUrl(episode.description);
+      if (transcriptUrl) {
+        logger.info("Found transcript URL in description", { url: transcriptUrl });
+        try {
+          transcript = await fetchTranscriptFromUrl(transcriptUrl);
+          if (transcript) {
+            transcriptSource = "description-url";
+            logger.info("Transcript fetched from description URL", { length: transcript.length });
+          } else {
+            logger.info("Description transcript URL returned no content");
+          }
+        } catch (error) {
+          logger.warn("Description transcript URL fetch failed", {
+            url: transcriptUrl,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
+    }
+
+    // Step 3c: AssemblyAI async transcription via Trigger.dev token
     if (!transcript && episode.enclosureUrl) {
       metadata.set("step", "transcribing-audio");
-      logger.info("Transcribing audio via AssemblyAI", { audioUrl: episode.enclosureUrl });
 
       try {
         await updateEpisodeStatus(episodeId, "transcribing");
@@ -148,17 +170,35 @@ export const summarizeEpisode = task({
       }
 
       try {
-        const result = await transcribeAudio(episode.enclosureUrl, { maxWaitMs: 5 * 60 * 1000 });
+        const token = await wait.createToken({ timeout: "1h30m" });
+        const transcriptId = await submitTranscriptionAsync(episode.enclosureUrl, token.url);
+        logger.info("Submitted audio for async transcription", { transcriptId });
 
-        if (result.status === "completed" && result.text) {
-          transcript = result.text;
-          transcriptSource = "assemblyai";
-          logger.info("Audio transcribed successfully", { length: transcript.length });
-        } else {
+        const result = await wait.forToken<{
+          transcript_id: string;
+          status: "completed" | "error";
+          text: string | null;
+          error: string | null;
+        }>(token);
+
+        if (result.ok && result.output.status === "completed") {
+          if (result.output.text) {
+            transcript = result.output.text;
+            transcriptSource = "assemblyai";
+            logger.info("Audio transcribed successfully", { length: transcript.length });
+          } else {
+            logger.warn("AssemblyAI transcript completed but returned no text", {
+              status: result.output.status,
+              error: result.output.error,
+            });
+          }
+        } else if (result.ok) {
           logger.warn("AssemblyAI transcription failed", {
-            status: result.status,
-            error: result.error,
+            status: result.output.status,
+            error: result.output.error,
           });
+        } else {
+          logger.warn("AssemblyAI transcription wait timed out");
         }
       } catch (error) {
         logger.warn("AssemblyAI transcription unavailable, proceeding without it", {
@@ -180,9 +220,9 @@ export const summarizeEpisode = task({
       length: transcript?.length,
     });
 
-    // Step 4: Generate AI summary via OpenRouter
+    // Step 4: Generate AI summary
     metadata.set("step", "generating-summary");
-    logger.info("Generating AI summary via OpenRouter");
+    logger.info("Generating AI summary");
 
     try {
       await updateEpisodeStatus(episodeId, "summarizing");

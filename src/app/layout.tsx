@@ -34,7 +34,22 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <ClerkProvider>
+    <ClerkProvider
+      allowedRedirectOrigins={[
+        (() => {
+          try {
+            return process.env.NEXT_PUBLIC_APP_URL
+              ? new URL(process.env.NEXT_PUBLIC_APP_URL).origin
+              : undefined;
+          } catch {
+            return undefined;
+          }
+        })(),
+        process.env.VERCEL_URL
+          ? `https://${process.env.VERCEL_URL}`
+          : undefined,
+      ].filter((v): v is string => Boolean(v))}
+    >
       <html lang="en" suppressHydrationWarning>
         <body className={inter.className}>
           <ThemeProvider

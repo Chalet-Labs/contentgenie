@@ -1,0 +1,13 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "fileMatch": ["^\\.github/workflows/.*\\.ya?ml$"],
+      "matchStrings": ["bunx trigger\\.dev@(?<currentValue>[^\\s]+)"],
+      "depNameTemplate": "trigger.dev",
+      "datasourceTemplate": "npm"
+    }
+  ]
+}

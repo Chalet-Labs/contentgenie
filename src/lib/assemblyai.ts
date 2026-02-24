@@ -64,6 +64,33 @@ export async function submitTranscription(audioUrl: string): Promise<string> {
   return data.id;
 }
 
+// Submit an audio URL for transcription with a webhook callback, returns the transcript ID
+export async function submitTranscriptionAsync(
+  audioUrl: string,
+  webhookUrl: string
+): Promise<string> {
+  const response = await fetch(`${API_BASE_URL}/transcript`, {
+    method: "POST",
+    headers: getAuthHeaders(),
+    body: JSON.stringify({ audio_url: audioUrl, webhook_url: webhookUrl }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(
+      `AssemblyAI API error: ${response.status} - ${errorText}`
+    );
+  }
+
+  const data = await response.json();
+  if (typeof data?.id !== "string" || !data.id) {
+    throw new Error(
+      "AssemblyAI API error: submit response did not include a transcript ID"
+    );
+  }
+  return data.id;
+}
+
 // Get the current status of a transcription
 export async function getTranscriptionStatus(
   transcriptId: string
