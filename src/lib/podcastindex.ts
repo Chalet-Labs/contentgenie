@@ -258,14 +258,22 @@ export async function getPodcastByItunesId(
 }
 
 // Get episodes by feed ID
+// BOLT OPTIMIZATION: Supports the 'newest' parameter to return only the most recent episode.
 export async function getEpisodesByFeedId(
   feedId: number,
-  max: number = 20
+  max: number = 20,
+  newest: boolean = false
 ): Promise<GetEpisodesResponse> {
-  return fetchFromPodcastIndex<GetEpisodesResponse>("/episodes/byfeedid", {
+  const params: Record<string, string> = {
     id: feedId.toString(),
     max: max.toString(),
-  });
+  };
+
+  if (newest) {
+    params.newest = "true";
+  }
+
+  return fetchFromPodcastIndex<GetEpisodesResponse>("/episodes/byfeedid", params);
 }
 
 // Get episode by ID
