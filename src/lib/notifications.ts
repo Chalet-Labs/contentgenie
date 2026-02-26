@@ -24,14 +24,20 @@ function ensureVapidConfigured() {
   vapidConfigured = true;
 }
 
-async function getDigestPreference(
+async function getNotificationPrefs(
   userId: string
-): Promise<"realtime" | "daily" | "weekly"> {
+): Promise<{
+  digestFrequency: "realtime" | "daily" | "weekly";
+  pushEnabled: boolean;
+}> {
   const user = await db.query.users.findFirst({
     where: eq(users.id, userId),
     columns: { preferences: true },
   });
-  return user?.preferences?.digestFrequency ?? "realtime";
+  return {
+    digestFrequency: user?.preferences?.digestFrequency ?? "realtime",
+    pushEnabled: user?.preferences?.pushEnabled ?? false,
+  };
 }
 
 /**
@@ -101,10 +107,11 @@ export async function sendPushToUser(
             );
           }
         } else {
-          console.error(
-            `[notifications] Push failed for ${sub.endpoint}:`,
-            err
-          );
+          const endpointHint = `${sub.endpoint.slice(0, 20)}…${sub.endpoint.slice(-8)}`;
+          console.error("[notifications] Push failed", {
+            endpoint: endpointHint,
+            error: err instanceof Error ? err.message : String(err),
+          });
         }
       }
     })
@@ -132,8 +139,8 @@ export async function createNotification(params: {
 
   await db.insert(notifications).values(record);
 
-  const preference = await getDigestPreference(params.userId);
-  if (preference === "realtime") {
+  const preference = await getNotificationPrefs(params.userId);
+  if (preference.pushEnabled && preference.digestFrequency === "realtime") {
     await sendPushToUser(params.userId, {
       title: params.title,
       body: params.body,
@@ -177,8 +184,8 @@ export async function createBulkNotifications(
   const realtimeUsers = new Set<string>();
 
   for (const userId of userIds) {
-    const preference = await getDigestPreference(userId);
-    if (preference === "realtime") {
+    const preference = await getNotificationPrefs(userId);
+    if (preference.pushEnabled && preference.digestFrequency === "realtime") {
       realtimeUsers.add(userId);
     }
   }

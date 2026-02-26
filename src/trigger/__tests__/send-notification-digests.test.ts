@@ -109,6 +109,7 @@ describe("send-notification-digests", () => {
       id: "user-1",
       preferences: {
         digestFrequency: "daily",
+        pushEnabled: true,
         lastDigestSentAt: lastDigest.toISOString(),
       },
     };
@@ -135,6 +136,7 @@ describe("send-notification-digests", () => {
       id: "user-1",
       preferences: {
         digestFrequency: "daily",
+        pushEnabled: true,
         lastDigestSentAt: lastDigest.toISOString(),
       },
     };
@@ -155,6 +157,7 @@ describe("send-notification-digests", () => {
       id: "user-1",
       preferences: {
         digestFrequency: "daily",
+        pushEnabled: true,
         lastDigestSentAt: lastDigest.toISOString(),
       },
     };
@@ -172,6 +175,7 @@ describe("send-notification-digests", () => {
       id: "user-1",
       preferences: {
         digestFrequency: "weekly",
+        pushEnabled: true,
         lastDigestSentAt: lastDigest.toISOString(),
       },
     };
@@ -188,6 +192,7 @@ describe("send-notification-digests", () => {
       id: "user-1",
       preferences: {
         digestFrequency: "daily",
+        pushEnabled: true,
         lastDigestSentAt: null,
       },
     };
@@ -206,6 +211,7 @@ describe("send-notification-digests", () => {
       id: "user-1",
       preferences: {
         digestFrequency: "daily",
+        pushEnabled: true,
         lastDigestSentAt: lastDigest.toISOString(),
       },
     };
@@ -245,6 +251,25 @@ describe("send-notification-digests", () => {
     );
   });
 
+  it("skips user when pushEnabled is false even with digest frequency and unread notifications", async () => {
+    const lastDigest = new Date(Date.now() - 25 * 60 * 60 * 1000);
+    const digestUser = {
+      id: "user-1",
+      preferences: {
+        digestFrequency: "daily",
+        lastDigestSentAt: lastDigest.toISOString(),
+        pushEnabled: false,
+      },
+    };
+    setupSelectChain([digestUser], 5);
+
+    const result = await taskRunner.run();
+
+    expect(result.digestsSent).toBe(0);
+    expect(mockSendPushToUser).not.toHaveBeenCalled();
+    expect(mockUpdateSet).not.toHaveBeenCalled();
+  });
+
   it("processes multiple users independently and isolates errors", async () => {
     const lastDigest = new Date(Date.now() - 25 * 60 * 60 * 1000);
     const users = [
@@ -252,6 +277,7 @@ describe("send-notification-digests", () => {
         id: "user-1",
         preferences: {
           digestFrequency: "daily",
+          pushEnabled: true,
           lastDigestSentAt: lastDigest.toISOString(),
         },
       },
@@ -259,6 +285,7 @@ describe("send-notification-digests", () => {
         id: "user-2",
         preferences: {
           digestFrequency: "daily",
+          pushEnabled: true,
           lastDigestSentAt: lastDigest.toISOString(),
         },
       },

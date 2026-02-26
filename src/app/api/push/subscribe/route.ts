@@ -4,6 +4,21 @@ import { eq, and } from "drizzle-orm";
 import { db } from "@/db";
 import { pushSubscriptions } from "@/db/schema";
 
+const ALLOWED_PUSH_HOSTS = new Set([
+  "fcm.googleapis.com",
+  "updates.push.services.mozilla.com",
+  "web.push.apple.com",
+]);
+
+function isAllowedPushEndpoint(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && ALLOWED_PUSH_HOSTS.has(url.hostname);
+  } catch {
+    return false;
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const { userId } = await auth();
@@ -17,6 +32,7 @@ export async function POST(request: NextRequest) {
     if (
       !endpoint ||
       typeof endpoint !== "string" ||
+      !isAllowedPushEndpoint(endpoint) ||
       !keys?.p256dh ||
       typeof keys.p256dh !== "string" ||
       !keys?.auth ||

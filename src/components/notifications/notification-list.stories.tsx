@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react";
-import { NotificationList } from "./notification-list";
+import { NotificationList } from "@/components/notifications/notification-list";
 
 const meta: Meta<typeof NotificationList> = {
   title: "Notifications/NotificationList",

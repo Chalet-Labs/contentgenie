@@ -121,11 +121,15 @@ export function NotificationSettings() {
       if (subscription) {
         const serialized = JSON.parse(JSON.stringify(subscription));
 
-        await fetch("/api/push/subscribe", {
+        const deleteRes = await fetch("/api/push/subscribe", {
           method: "DELETE",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ endpoint: serialized.endpoint }),
         });
+
+        if (!deleteRes.ok) {
+          throw new Error("Failed to remove push subscription");
+        }
 
         await subscription.unsubscribe();
       }
@@ -144,6 +148,7 @@ export function NotificationSettings() {
   const handleDigestChange = async (
     value: "realtime" | "daily" | "weekly"
   ) => {
+    const prev = digestFrequency;
     setDigestFrequency(value);
     const result = await updateNotificationPreferences({
       digestFrequency: value,
@@ -151,6 +156,7 @@ export function NotificationSettings() {
     if (result.success) {
       toast.success("Notification frequency updated");
     } else {
+      setDigestFrequency(prev);
       toast.error("Failed to update notification frequency");
     }
   };

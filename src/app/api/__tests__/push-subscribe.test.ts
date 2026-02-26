@@ -41,7 +41,7 @@ describe("POST /api/push/subscribe", () => {
     const request = new NextRequest("http://localhost:3000/api/push/subscribe", {
       method: "POST",
       body: JSON.stringify({
-        endpoint: "https://push.example.com/1",
+        endpoint: "https://fcm.googleapis.com/fcm/send/test-sub-1",
         keys: { p256dh: "key", auth: "auth" },
       }),
     });
@@ -65,7 +65,7 @@ describe("POST /api/push/subscribe", () => {
     const { POST } = await import("@/app/api/push/subscribe/route");
     const request = new NextRequest("http://localhost:3000/api/push/subscribe", {
       method: "POST",
-      body: JSON.stringify({ endpoint: "https://push.example.com/1" }),
+      body: JSON.stringify({ endpoint: "https://fcm.googleapis.com/fcm/send/test-sub-1" }),
     });
 
     const response = await POST(request);
@@ -83,7 +83,7 @@ describe("POST /api/push/subscribe", () => {
     const request = new NextRequest("http://localhost:3000/api/push/subscribe", {
       method: "POST",
       body: JSON.stringify({
-        endpoint: "https://push.example.com/1",
+        endpoint: "https://fcm.googleapis.com/fcm/send/test-sub-1",
         keys: { p256dh: "key123", auth: "auth123" },
         userAgent: "TestBrowser/1.0",
       }),
@@ -107,7 +107,7 @@ describe("DELETE /api/push/subscribe", () => {
     const { DELETE } = await import("@/app/api/push/subscribe/route");
     const request = new NextRequest("http://localhost:3000/api/push/subscribe", {
       method: "DELETE",
-      body: JSON.stringify({ endpoint: "https://push.example.com/1" }),
+      body: JSON.stringify({ endpoint: "https://fcm.googleapis.com/fcm/send/test-sub-1" }),
     });
 
     const response = await DELETE(request);
@@ -132,7 +132,7 @@ describe("DELETE /api/push/subscribe", () => {
     const { DELETE } = await import("@/app/api/push/subscribe/route");
     const request = new NextRequest("http://localhost:3000/api/push/subscribe", {
       method: "DELETE",
-      body: JSON.stringify({ endpoint: "https://push.example.com/1" }),
+      body: JSON.stringify({ endpoint: "https://fcm.googleapis.com/fcm/send/test-sub-1" }),
     });
 
     const response = await DELETE(request);

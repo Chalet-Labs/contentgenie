@@ -55,7 +55,7 @@ describe("notification server actions", () => {
   describe("getUnreadCount", () => {
     it("returns 0 when not authenticated", async () => {
       mockAuth.mockResolvedValue({ userId: null });
-      const { getUnreadCount } = await import("../notifications");
+      const { getUnreadCount } = await import("@/app/actions/notifications");
       const count = await getUnreadCount();
       expect(count).toBe(0);
     });
@@ -66,7 +66,7 @@ describe("notification server actions", () => {
       });
       mockSelect.mockReturnValue({ from: mockFrom });
 
-      const { getUnreadCount } = await import("../notifications");
+      const { getUnreadCount } = await import("@/app/actions/notifications");
       const count = await getUnreadCount();
       expect(count).toBe(5);
     });
@@ -75,7 +75,7 @@ describe("notification server actions", () => {
   describe("markNotificationRead", () => {
     it("returns error when not authenticated", async () => {
       mockAuth.mockResolvedValue({ userId: null });
-      const { markNotificationRead } = await import("../notifications");
+      const { markNotificationRead } = await import("@/app/actions/notifications");
       const result = await markNotificationRead(1);
       expect(result.success).toBe(false);
       expect(result.error).toBe("You must be signed in");
@@ -87,7 +87,7 @@ describe("notification server actions", () => {
       const mockSet = vi.fn().mockReturnValue({ where: mockWhere });
       mockUpdate.mockReturnValue({ set: mockSet });
 
-      const { markNotificationRead } = await import("../notifications");
+      const { markNotificationRead } = await import("@/app/actions/notifications");
       const result = await markNotificationRead(1);
       expect(result.success).toBe(true);
     });
@@ -98,7 +98,7 @@ describe("notification server actions", () => {
       const mockSet = vi.fn().mockReturnValue({ where: mockWhere });
       mockUpdate.mockReturnValue({ set: mockSet });
 
-      const { markNotificationRead } = await import("../notifications");
+      const { markNotificationRead } = await import("@/app/actions/notifications");
       const result = await markNotificationRead(999);
       expect(result.success).toBe(false);
       expect(result.error).toBe("Notification not found");
@@ -108,7 +108,7 @@ describe("notification server actions", () => {
   describe("markAllNotificationsRead", () => {
     it("returns error when not authenticated", async () => {
       mockAuth.mockResolvedValue({ userId: null });
-      const { markAllNotificationsRead } = await import("../notifications");
+      const { markAllNotificationsRead } = await import("@/app/actions/notifications");
       const result = await markAllNotificationsRead();
       expect(result.success).toBe(false);
     });
@@ -118,7 +118,7 @@ describe("notification server actions", () => {
       const mockSet = vi.fn().mockReturnValue({ where: mockWhere });
       mockUpdate.mockReturnValue({ set: mockSet });
 
-      const { markAllNotificationsRead } = await import("../notifications");
+      const { markAllNotificationsRead } = await import("@/app/actions/notifications");
       const result = await markAllNotificationsRead();
       expect(result.success).toBe(true);
     });
@@ -169,7 +169,7 @@ describe("notification server actions", () => {
   describe("getNotifications", () => {
     it("returns empty array when not authenticated", async () => {
       mockAuth.mockResolvedValue({ userId: null });
-      const { getNotifications } = await import("../notifications");
+      const { getNotifications } = await import("@/app/actions/notifications");
       const result = await getNotifications();
       expect(result.notifications).toHaveLength(0);
       expect(result.error).toBe("You must be signed in");
@@ -199,7 +199,7 @@ describe("notification server actions", () => {
       const mockFrom = vi.fn().mockReturnValue({ leftJoin: mockLeftJoin1 });
       mockSelect.mockReturnValue({ from: mockFrom });
 
-      const { getNotifications } = await import("../notifications");
+      const { getNotifications } = await import("@/app/actions/notifications");
       const result = await getNotifications();
 
       expect(result.notifications).toHaveLength(1);
@@ -223,7 +223,7 @@ describe("notification server actions", () => {
       });
       mockSelect.mockReturnValue({ from: mockFrom });
 
-      const { getNotifications } = await import("../notifications");
+      const { getNotifications } = await import("@/app/actions/notifications");
       const result = await getNotifications();
 
       expect(result.notifications).toHaveLength(0);
@@ -234,7 +234,7 @@ describe("notification server actions", () => {
   describe("getNotificationPreferences", () => {
     it("returns defaults when not authenticated", async () => {
       mockAuth.mockResolvedValue({ userId: null });
-      const { getNotificationPreferences } = await import("../notifications");
+      const { getNotificationPreferences } = await import("@/app/actions/notifications");
       const result = await getNotificationPreferences();
       expect(result.digestFrequency).toBe("realtime");
       expect(result.pushEnabled).toBe(false);
@@ -245,7 +245,7 @@ describe("notification server actions", () => {
         preferences: { digestFrequency: "weekly", pushEnabled: true },
       });
 
-      const { getNotificationPreferences } = await import("../notifications");
+      const { getNotificationPreferences } = await import("@/app/actions/notifications");
       const result = await getNotificationPreferences();
       expect(result.digestFrequency).toBe("weekly");
       expect(result.pushEnabled).toBe(true);
@@ -254,7 +254,7 @@ describe("notification server actions", () => {
     it("returns realtime/false defaults when user has no preferences set", async () => {
       mockFindFirst.mockResolvedValue({ preferences: null });
 
-      const { getNotificationPreferences } = await import("../notifications");
+      const { getNotificationPreferences } = await import("@/app/actions/notifications");
       const result = await getNotificationPreferences();
       expect(result.digestFrequency).toBe("realtime");
       expect(result.pushEnabled).toBe(false);

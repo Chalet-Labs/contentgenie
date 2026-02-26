@@ -58,7 +58,8 @@ export function NotificationBell() {
   };
 
   const handleMarkAllRead = async () => {
-    await markAllNotificationsRead();
+    const result = await markAllNotificationsRead();
+    if (!result.success) return;
     setUnreadCount(0);
     setNotifications((prev) =>
       prev.map((n) => ({ ...n, isRead: true }))
@@ -67,8 +68,7 @@ export function NotificationBell() {
 
   const handleItemClick = () => {
     setIsOpen(false);
-    // Refresh unread count after navigation
-    setTimeout(fetchUnreadCount, 500);
+    fetchUnreadCount();
   };
 
   return (

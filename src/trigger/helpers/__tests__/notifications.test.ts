@@ -20,10 +20,12 @@ vi.mock("web-push", () => ({
   },
 }));
 
-// Mock DB
+// Mock DB — separate mocks per query type to avoid order-dependent fragility
 const mockInsert = vi.fn();
 const mockDelete = vi.fn();
-const mockFindMany = vi.fn();
+const mockPushSubsFindMany = vi.fn();
+const mockUserSubsFindMany = vi.fn();
+const mockUsersFindMany = vi.fn();
 const mockFindFirst = vi.fn();
 
 vi.mock("@/db", () => ({
@@ -32,12 +34,13 @@ vi.mock("@/db", () => ({
     delete: (...args: unknown[]) => mockDelete(...args),
     query: {
       pushSubscriptions: {
-        findMany: (...args: unknown[]) => mockFindMany(...args),
+        findMany: (...args: unknown[]) => mockPushSubsFindMany(...args),
       },
       userSubscriptions: {
-        findMany: (...args: unknown[]) => mockFindMany(...args),
+        findMany: (...args: unknown[]) => mockUserSubsFindMany(...args),
       },
       users: {
+        findMany: (...args: unknown[]) => mockUsersFindMany(...args),
         findFirst: (...args: unknown[]) => mockFindFirst(...args),
       },
       podcasts: {
@@ -61,6 +64,7 @@ vi.mock("@/db/schema", () => ({
 vi.mock("drizzle-orm", () => ({
   eq: vi.fn((...args: unknown[]) => args),
   and: vi.fn((...args: unknown[]) => args),
+  inArray: vi.fn((...args: unknown[]) => args),
 }));
 
 describe("trigger/helpers/notifications", () => {
@@ -115,19 +119,15 @@ describe("trigger/helpers/notifications", () => {
 
   describe("createNotificationsForSubscribers", () => {
     it("creates notifications for all subscribed users", async () => {
-      // findMany for userSubscriptions
-      mockFindMany.mockResolvedValueOnce([
+      mockUserSubsFindMany.mockResolvedValueOnce([
         { userId: "user-1" },
         { userId: "user-2" },
       ]);
-      // findFirst for each user's preferences (realtime)
-      mockFindFirst
-        .mockResolvedValueOnce({ id: "user-1", preferences: {} })
-        .mockResolvedValueOnce({ id: "user-2", preferences: {} });
-      // findMany for push subscriptions per user (empty — no push subs)
-      mockFindMany
-        .mockResolvedValueOnce([]) // user-1 push subs
-        .mockResolvedValueOnce([]); // user-2 push subs
+      // Bulk user preferences query (pushEnabled defaults to false — no push dispatched)
+      mockUsersFindMany.mockResolvedValueOnce([
+        { id: "user-1", preferences: {} },
+        { id: "user-2", preferences: {} },
+      ]);
 
       const mockValues = vi.fn().mockResolvedValue(undefined);
       mockInsert.mockReturnValue({ values: mockValues });
@@ -152,7 +152,7 @@ describe("trigger/helpers/notifications", () => {
     });
 
     it("does nothing when no subscribers have notifications enabled", async () => {
-      mockFindMany.mockResolvedValueOnce([]);
+      mockUserSubsFindMany.mockResolvedValueOnce([]);
 
       const { createNotificationsForSubscribers } = await import(
         "@/trigger/helpers/notifications"
@@ -169,21 +169,23 @@ describe("trigger/helpers/notifications", () => {
     });
 
     it("only dispatches push for realtime users, skips daily/weekly", async () => {
-      mockFindMany.mockResolvedValueOnce([
+      mockUserSubsFindMany.mockResolvedValueOnce([
         { userId: "user-realtime" },
         { userId: "user-daily" },
       ]);
-      mockFindFirst
-        .mockResolvedValueOnce({
+      // Bulk user preferences query
+      mockUsersFindMany.mockResolvedValueOnce([
+        {
           id: "user-realtime",
-          preferences: { digestFrequency: "realtime" },
-        })
-        .mockResolvedValueOnce({
+          preferences: { digestFrequency: "realtime", pushEnabled: true },
+        },
+        {
           id: "user-daily",
-          preferences: { digestFrequency: "daily" },
-        });
+          preferences: { digestFrequency: "daily", pushEnabled: true },
+        },
+      ]);
       // push subs for realtime user only
-      mockFindMany.mockResolvedValueOnce([
+      mockPushSubsFindMany.mockResolvedValueOnce([
         {
           endpoint: "https://push.example.com/1",
           p256dh: "key",
@@ -213,9 +215,11 @@ describe("trigger/helpers/notifications", () => {
     });
 
     it("handles null episodeId correctly", async () => {
-      mockFindMany.mockResolvedValueOnce([{ userId: "user-1" }]);
-      mockFindFirst.mockResolvedValueOnce({ id: "user-1", preferences: {} });
-      mockFindMany.mockResolvedValueOnce([]); // no push subs
+      mockUserSubsFindMany.mockResolvedValueOnce([{ userId: "user-1" }]);
+      // Bulk user preferences query (pushEnabled defaults to false — no push dispatched)
+      mockUsersFindMany.mockResolvedValueOnce([
+        { id: "user-1", preferences: {} },
+      ]);
 
       const mockValues = vi.fn().mockResolvedValue(undefined);
       mockInsert.mockReturnValue({ values: mockValues });
@@ -241,7 +245,7 @@ describe("trigger/helpers/notifications", () => {
 
   describe("sendPushToUser", () => {
     it("sends push notification to all user subscriptions", async () => {
-      mockFindMany.mockResolvedValue([
+      mockPushSubsFindMany.mockResolvedValue([
         {
           endpoint: "https://push.example.com/1",
           p256dh: "key1",
@@ -264,7 +268,7 @@ describe("trigger/helpers/notifications", () => {
     });
 
     it("deletes stale subscriptions on 404 response", async () => {
-      mockFindMany.mockResolvedValue([
+      mockPushSubsFindMany.mockResolvedValue([
         {
           endpoint: "https://push.example.com/stale",
           p256dh: "key",
@@ -283,7 +287,7 @@ describe("trigger/helpers/notifications", () => {
     });
 
     it("deletes stale subscriptions on 410 response", async () => {
-      mockFindMany.mockResolvedValue([
+      mockPushSubsFindMany.mockResolvedValue([
         {
           endpoint: "https://push.example.com/gone",
           p256dh: "key",
@@ -302,7 +306,7 @@ describe("trigger/helpers/notifications", () => {
     });
 
     it("does not throw on push send failure", async () => {
-      mockFindMany.mockResolvedValue([
+      mockPushSubsFindMany.mockResolvedValue([
         {
           endpoint: "https://push.example.com/fail",
           p256dh: "key",
@@ -320,7 +324,7 @@ describe("trigger/helpers/notifications", () => {
     });
 
     it("returns early when user has no push subscriptions", async () => {
-      mockFindMany.mockResolvedValue([]);
+      mockPushSubsFindMany.mockResolvedValue([]);
 
       const { sendPushToUser } = await import(
         "@/trigger/helpers/notifications"
@@ -339,7 +343,7 @@ describe("trigger/helpers/notifications", () => {
       );
       await sendPushToUser("user-1", { title: "Test", body: "Body" });
 
-      expect(mockFindMany).not.toHaveBeenCalled();
+      expect(mockPushSubsFindMany).not.toHaveBeenCalled();
       expect(mockSendNotification).not.toHaveBeenCalled();
     });
   });

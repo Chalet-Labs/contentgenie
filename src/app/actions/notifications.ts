@@ -11,6 +11,11 @@ export async function getNotifications(limit = 20, offset = 0) {
     return { notifications: [], error: "You must be signed in" };
   }
 
+  const safeLimit = Number.isInteger(limit)
+    ? Math.min(Math.max(limit, 1), 100)
+    : 20;
+  const safeOffset = Number.isInteger(offset) ? Math.max(offset, 0) : 0;
+
   try {
     const results = await db
       .select({
@@ -29,8 +34,8 @@ export async function getNotifications(limit = 20, offset = 0) {
       .leftJoin(podcasts, eq(episodes.podcastId, podcasts.id))
       .where(eq(notifications.userId, userId))
       .orderBy(desc(notifications.createdAt))
-      .limit(limit)
-      .offset(offset);
+      .limit(safeLimit)
+      .offset(safeOffset);
 
     return { notifications: results, error: null };
   } catch (error) {
@@ -127,6 +132,20 @@ export async function updateNotificationPreferences(prefs: {
   }
 
   try {
+    if (
+      prefs.digestFrequency !== undefined &&
+      !["realtime", "daily", "weekly"].includes(prefs.digestFrequency)
+    ) {
+      return { success: false, error: "Invalid digest frequency" };
+    }
+
+    if (
+      prefs.pushEnabled !== undefined &&
+      typeof prefs.pushEnabled !== "boolean"
+    ) {
+      return { success: false, error: "Invalid pushEnabled value" };
+    }
+
     // Read-modify-write to preserve existing preference fields
     const user = await db.query.users.findFirst({
       where: eq(users.id, userId),
