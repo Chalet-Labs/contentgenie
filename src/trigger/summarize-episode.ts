@@ -247,6 +247,19 @@ export const summarizeEpisode = task({
     metadata.set("step", "saving-results");
     logger.info("Persisting summary to database");
 
+    // Check if this is a first-time summarization (no prior summary)
+    // so we can skip the new_episode notification on re-summarizations.
+    let isNewEpisode = true;
+    try {
+      const priorEpisode = await db.query.episodes.findFirst({
+        where: eq(episodes.podcastIndexId, String(episodeId)),
+        columns: { summary: true },
+      });
+      isNewEpisode = !priorEpisode?.summary;
+    } catch {
+      // If lookup fails, default to treating as new episode
+    }
+
     await retry.onThrow(
       async () => persistEpisodeSummary(episode, podcast, summary, transcript),
       { maxAttempts: 3 }
@@ -264,15 +277,16 @@ export const summarizeEpisode = task({
         });
         const episodeDbId = dbEpisode?.id ?? null;
 
-        // new_episode notification (moved here from poll-new-episodes so
-        // the notification record has a real episodeId for click-through)
-        await createNotificationsForSubscribers(
-          podcastDbId,
-          episodeDbId,
-          "new_episode",
-          podcast?.title ?? episode.title,
-          `New episode: ${episode.title}`
-        );
+        // new_episode notification — only on first summarization, not re-runs
+        if (isNewEpisode) {
+          await createNotificationsForSubscribers(
+            podcastDbId,
+            episodeDbId,
+            "new_episode",
+            podcast?.title ?? episode.title,
+            `New episode: ${episode.title}`
+          );
+        }
 
         // summary_completed notification
         await createNotificationsForSubscribers(
