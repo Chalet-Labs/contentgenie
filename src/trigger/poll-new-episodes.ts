@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { podcasts, episodes, userSubscriptions } from "@/db/schema";
 import { getEpisodesByFeedId } from "./helpers/podcastindex";
 import { summarizeEpisode } from "./summarize-episode";
+import { createNotificationsForSubscribers } from "./helpers/notifications";
 
 /**
  * Queries podcasts that have at least one active subscriber and are sourced
@@ -94,6 +95,28 @@ export async function pollSingleFeed(podcast: typeof podcasts.$inferSelect) {
         feedId,
         count: newEpisodes.length,
       });
+
+      // Create new_episode notifications for subscribers
+      for (const ep of newEpisodes) {
+        try {
+          await createNotificationsForSubscribers(
+            podcast.id,
+            null, // Episode not yet in DB — summarize task will create it
+            "new_episode",
+            podcast.title,
+            `New episode: ${ep.title}`
+          );
+        } catch (notifErr) {
+          logger.warn("Failed to create new_episode notifications", {
+            feedId,
+            episodeTitle: ep.title,
+            error:
+              notifErr instanceof Error
+                ? notifErr.message
+                : String(notifErr),
+          });
+        }
+      }
     }
   }
 

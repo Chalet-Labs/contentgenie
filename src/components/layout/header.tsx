@@ -13,6 +13,7 @@ import {
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { Separator } from "@/components/ui/separator"
 import { Menu, Moon, Sun, Headphones } from "lucide-react"
+import { NotificationBell } from "@/components/notifications/notification-bell"
 
 const navLinks = [
   { href: "/dashboard", label: "Dashboard" },
@@ -118,6 +119,7 @@ export function Header() {
 
           {/* Auth */}
           <SignedIn>
+            <NotificationBell />
             <UserButton afterSignOutUrl="/" />
           </SignedIn>
           <SignedOut>

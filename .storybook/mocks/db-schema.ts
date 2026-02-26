@@ -6,3 +6,5 @@ export const userSubscriptions = {};
 export const collections = {};
 export const userLibrary = {};
 export const bookmarks = {};
+export const notifications = {};
+export const pushSubscriptions = {};

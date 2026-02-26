@@ -130,6 +130,7 @@ ADRs are stored in `docs/adr/`. Read them before designing changes that touch th
 - [ADR-006: Bulk OPML Import via Trigger.dev Background Task](docs/adr/006-opml-import-via-trigger-dev.md)
 - [ADR-007: Bulk Re-Summarization via Trigger.dev Parent Task](docs/adr/007-bulk-resummarize-via-trigger-dev.md)
 - [ADR-008: AI Provider Abstraction Layer](docs/adr/008-ai-provider-abstraction.md)
+- [ADR-009: In-App and PWA Push Notification System](docs/adr/009-notification-system-architecture.md)
 
 ## Architecture patterns
 
