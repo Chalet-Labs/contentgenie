@@ -23,6 +23,9 @@ export const users = pgTable("users", {
     notifications?: boolean;
     defaultView?: string;
     theme?: "light" | "dark" | "system";
+    digestFrequency?: "realtime" | "daily" | "weekly";
+    pushEnabled?: boolean;
+    lastDigestSentAt?: string; // ISO 8601
   }>(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -206,11 +209,64 @@ export const bookmarks = pgTable(
   (table) => [index("bookmarks_user_library_id_idx").on(table.userLibraryId)]
 );
 
+// Notifications table
+export const notifications = pgTable(
+  "notifications",
+  {
+    id: serial("id").primaryKey(),
+    userId: text("user_id")
+      .references(() => users.id, { onDelete: "cascade" })
+      .notNull(),
+    episodeId: integer("episode_id").references(() => episodes.id, {
+      onDelete: "cascade",
+    }),
+    type: text("type").$type<"new_episode" | "summary_completed">().notNull(),
+    title: text("title").notNull(),
+    body: text("body").notNull(),
+    isRead: boolean("is_read").default(false).notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("notifications_user_unread_idx").on(
+      table.userId,
+      table.isRead,
+      table.createdAt
+    ),
+    index("notifications_user_created_idx").on(
+      table.userId,
+      table.createdAt
+    ),
+    check(
+      "notification_type_enum",
+      sql`${table.type} IN ('new_episode', 'summary_completed')`
+    ),
+  ]
+);
+
+// Push Subscriptions table
+export const pushSubscriptions = pgTable(
+  "push_subscriptions",
+  {
+    id: serial("id").primaryKey(),
+    userId: text("user_id")
+      .references(() => users.id, { onDelete: "cascade" })
+      .notNull(),
+    endpoint: text("endpoint").notNull().unique(),
+    p256dh: text("p256dh").notNull(),
+    auth: text("auth").notNull(),
+    userAgent: text("user_agent"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [index("push_subscriptions_user_id_idx").on(table.userId)]
+);
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   subscriptions: many(userSubscriptions),
   library: many(userLibrary),
   collections: many(collections),
+  notifications: many(notifications),
+  pushSubscriptions: many(pushSubscriptions),
 }));
 
 export const podcastsRelations = relations(podcasts, ({ many }) => ({
@@ -224,6 +280,7 @@ export const episodesRelations = relations(episodes, ({ one, many }) => ({
     references: [podcasts.id],
   }),
   libraryEntries: many(userLibrary),
+  notifications: many(notifications),
 }));
 
 export const userSubscriptionsRelations = relations(
@@ -278,6 +335,27 @@ export const aiConfigRelations = relations(aiConfig, ({ one }) => ({
   }),
 }));
 
+export const notificationsRelations = relations(notifications, ({ one }) => ({
+  user: one(users, {
+    fields: [notifications.userId],
+    references: [users.id],
+  }),
+  episode: one(episodes, {
+    fields: [notifications.episodeId],
+    references: [episodes.id],
+  }),
+}));
+
+export const pushSubscriptionsRelations = relations(
+  pushSubscriptions,
+  ({ one }) => ({
+    user: one(users, {
+      fields: [pushSubscriptions.userId],
+      references: [users.id],
+    }),
+  })
+);
+
 // Type exports for use in the application
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
@@ -302,6 +380,12 @@ export type NewBookmark = typeof bookmarks.$inferInsert;
 
 export type AiConfigRow = typeof aiConfig.$inferSelect;
 export type NewAiConfigRow = typeof aiConfig.$inferInsert;
+
+export type Notification = typeof notifications.$inferSelect;
+export type NewNotification = typeof notifications.$inferInsert;
+
+export type PushSubscription = typeof pushSubscriptions.$inferSelect;
+export type NewPushSubscription = typeof pushSubscriptions.$inferInsert;
 
 export type SummaryStatus = NonNullable<Episode["summaryStatus"]>;
 

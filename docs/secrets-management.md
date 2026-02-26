@@ -72,6 +72,9 @@ Most `package.json` scripts are wrapped with `doppler run --`, which injects env
 | `TRIGGER_SECRET_KEY` | Server | Trigger.dev secret key (background jobs) |
 | `ZAI_API_KEY` | Server | Z.AI GLM API key (add to Doppler `dev`, `stg`, and `prd` configs) |
 | `ASSEMBLYAI_API_KEY` | Server | AssemblyAI transcription API key |
+| `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | Public | VAPID public key for Web Push (inlined at build time — rebuild after changing) |
+| `VAPID_PRIVATE_KEY` | Server | VAPID private key for Web Push |
+| `VAPID_SUBJECT` | Server | VAPID subject (`mailto:` URL) for Web Push |
 
 ## Vercel Integration
 
@@ -134,6 +137,9 @@ Set the following variables **manually** in the [Trigger.dev dashboard](https://
 | `OPENROUTER_API_KEY` | Doppler `prd` config |
 | `ZAI_API_KEY` | Doppler `prd` config |
 | `ASSEMBLYAI_API_KEY` | Doppler `prd` config |
+| `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | Doppler `prd` config |
+| `VAPID_PRIVATE_KEY` | Doppler `prd` config |
+| `VAPID_SUBJECT` | Doppler `prd` config |
 
 ### Updating secrets
 

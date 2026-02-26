@@ -4,6 +4,7 @@ import { getEpisodeById, getPodcastById } from "@/trigger/helpers/podcastindex";
 import { fetchTranscript, extractTranscriptUrl, fetchTranscriptFromUrl } from "@/trigger/helpers/transcript";
 import { generateEpisodeSummary, type SummaryResult } from "@/trigger/helpers/ai-summary";
 import { trackEpisodeRun, persistEpisodeSummary, updateEpisodeStatus } from "@/trigger/helpers/database";
+import { createNotificationsForSubscribers, resolvePodcastId } from "@/trigger/helpers/notifications";
 import { db } from "@/db";
 import { episodes } from "@/db/schema";
 import type { PodcastIndexEpisode, PodcastIndexPodcast } from "@/lib/podcastindex";
@@ -252,6 +253,32 @@ export const summarizeEpisode = task({
     );
 
     logger.info("Summary persisted successfully");
+
+    // Create summary_completed notifications for subscribers
+    try {
+      const podcastDbId = await resolvePodcastId(episode.feedId);
+      if (podcastDbId) {
+        // Look up internal episode ID
+        const dbEpisode = await db.query.episodes.findFirst({
+          where: eq(episodes.podcastIndexId, String(episodeId)),
+          columns: { id: true },
+        });
+        await createNotificationsForSubscribers(
+          podcastDbId,
+          dbEpisode?.id ?? null,
+          "summary_completed",
+          podcast?.title ?? episode.title,
+          `Summary ready: ${episode.title}`
+        );
+      }
+    } catch (notifErr) {
+      logger.warn("Failed to create summary_completed notifications", {
+        episodeId,
+        error:
+          notifErr instanceof Error ? notifErr.message : String(notifErr),
+      });
+    }
+
     metadata.set("step", "completed");
     metadata.root.increment("completed", 1);
 

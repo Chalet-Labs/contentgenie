@@ -1,7 +1,7 @@
 // ContentGenie Service Worker
 // Bump CACHE_VERSION when changing caching strategies or precached resources.
 // Old caches are automatically deleted on activation.
-const CACHE_VERSION = "contentgenie-v1";
+const CACHE_VERSION = "contentgenie-v2";
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -61,4 +61,54 @@ self.addEventListener("fetch", (event) => {
   }
 
   // All other requests: pass through to network
+});
+
+// Push notification handler
+self.addEventListener("push", (event) => {
+  if (!event.data) return;
+
+  let data;
+  try {
+    data = event.data.json();
+  } catch {
+    return;
+  }
+
+  const options = {
+    body: data.body || "",
+    icon: "/icon-192x192.png",
+    badge: "/icon-192x192.png",
+    tag: data.tag || undefined,
+    data: { url: data.data?.url || "/" },
+  };
+
+  event.waitUntil(
+    self.registration.showNotification(data.title || "ContentGenie", options)
+  );
+});
+
+// Notification click handler
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+
+  const url = event.notification.data?.url || "/";
+
+  event.waitUntil(
+    self.clients
+      .matchAll({ type: "window", includeUncontrolled: true })
+      .then((clientList) => {
+        // Focus an existing window and navigate to the URL
+        for (const client of clientList) {
+          if ("focus" in client) {
+            return client.focus().then((focused) => {
+              if ("navigate" in focused) {
+                return focused.navigate(url);
+              }
+            });
+          }
+        }
+        // No existing window — open a new one
+        return self.clients.openWindow(url);
+      })
+  );
 });

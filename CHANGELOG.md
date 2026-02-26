@@ -7,6 +7,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- In-app notification bell with unread badge, dropdown list, and mark-as-read functionality (#39)
+- PWA push notifications via Web Push Protocol with VAPID authentication (#39)
+- Notification settings page with push toggle, digest frequency selector (realtime/daily/weekly) (#39)
+- Automatic notifications on new episode discovery and AI summary completion (#39)
+- Scheduled digest notification task (hourly cron) for daily/weekly batched push notifications (#39)
+- `notifications` and `push_subscriptions` database tables with indexed queries (#39)
+- ADR-009: In-App and PWA Push Notification System architecture decision record (#39)
 - Description-based transcript URL extraction in episode summarization pipeline
 - AssemblyAI async transcription via Trigger.dev webhook tokens (replaces blocking polling)
 - AI provider abstraction with support for OpenRouter and Z.AI, admin-selectable via Settings page (#139)

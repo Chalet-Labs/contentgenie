@@ -29,6 +29,7 @@ import { toast } from "sonner"
 import { Sun, Moon, Monitor, Bell, Link2, Trash2, ExternalLink, Mail } from "lucide-react"
 import { AiProviderCard } from "@/components/settings/ai-provider-card"
 import { BulkResummarizeCard } from "@/components/settings/bulk-resummarize-card"
+import { NotificationSettings } from "@/components/notifications/notification-settings"
 
 export default function SettingsPage() {
   const { user, isLoaded: userLoaded } = useUser()
@@ -174,17 +175,7 @@ export default function SettingsPage() {
             </Button>
           </div>
           <Separator />
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <label className="text-sm font-medium">Push Notifications</label>
-              <p className="text-sm text-muted-foreground">
-                Get notified when new summaries are available.
-              </p>
-            </div>
-            <Button variant="outline" disabled>
-              Coming Soon
-            </Button>
-          </div>
+          <NotificationSettings />
         </CardContent>
       </Card>
 
