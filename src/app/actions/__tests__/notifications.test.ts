@@ -128,7 +128,7 @@ describe("notification server actions", () => {
     it("returns error when not authenticated", async () => {
       mockAuth.mockResolvedValue({ userId: null });
       const { updateNotificationPreferences } = await import(
-        "../notifications"
+        "@/app/actions/notifications"
       );
       const result = await updateNotificationPreferences({
         digestFrequency: "daily",
@@ -146,7 +146,7 @@ describe("notification server actions", () => {
       mockUpdate.mockReturnValue({ set: mockSet });
 
       const { updateNotificationPreferences } = await import(
-        "../notifications"
+        "@/app/actions/notifications"
       );
       const result = await updateNotificationPreferences({
         digestFrequency: "weekly",

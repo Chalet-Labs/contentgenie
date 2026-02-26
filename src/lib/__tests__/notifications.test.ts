@@ -14,6 +14,7 @@ const mockInsert = vi.fn();
 const mockDelete = vi.fn();
 const mockFindMany = vi.fn();
 const mockFindFirst = vi.fn();
+const mockUsersFindMany = vi.fn();
 
 vi.mock("@/db", () => ({
   db: {
@@ -21,7 +22,10 @@ vi.mock("@/db", () => ({
     delete: (...args: unknown[]) => mockDelete(...args),
     query: {
       pushSubscriptions: { findMany: (...args: unknown[]) => mockFindMany(...args) },
-      users: { findFirst: (...args: unknown[]) => mockFindFirst(...args) },
+      users: {
+        findFirst: (...args: unknown[]) => mockFindFirst(...args),
+        findMany: (...args: unknown[]) => mockUsersFindMany(...args),
+      },
     },
   },
 }));
@@ -35,6 +39,7 @@ vi.mock("@/db/schema", () => ({
 vi.mock("drizzle-orm", () => ({
   eq: vi.fn((...args: unknown[]) => args),
   and: vi.fn((...args: unknown[]) => args),
+  inArray: vi.fn((...args: unknown[]) => args),
 }));
 
 describe("notifications library", () => {
@@ -154,8 +159,11 @@ describe("notifications library", () => {
     it("inserts all notifications in a single batch", async () => {
       const mockValues = vi.fn().mockResolvedValue(undefined);
       mockInsert.mockReturnValue({ values: mockValues });
-      mockFindFirst.mockResolvedValue({ preferences: { pushEnabled: true } }); // defaults to realtime
-      mockFindMany.mockResolvedValue([]);
+      mockUsersFindMany.mockResolvedValue([
+        { id: "user-1", preferences: { pushEnabled: true, digestFrequency: "realtime" } },
+        { id: "user-2", preferences: { pushEnabled: true, digestFrequency: "realtime" } },
+      ]);
+      mockFindMany.mockResolvedValue([]); // empty push subscriptions
 
       const { createBulkNotifications } = await import("@/lib/notifications");
       await createBulkNotifications([
