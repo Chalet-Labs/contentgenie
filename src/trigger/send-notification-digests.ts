@@ -2,7 +2,7 @@ import { schedules, logger } from "@trigger.dev/sdk";
 import { eq, and, gt, count, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { users, notifications } from "@/db/schema";
-import { sendPushToUser } from "./helpers/notifications";
+import { sendPushToUser } from "@/trigger/helpers/notifications";
 
 // Digest thresholds (sub-period to avoid drift)
 const DAILY_THRESHOLD_MS = 23 * 60 * 60 * 1000; // 23 hours
@@ -79,12 +79,15 @@ export const sendNotificationDigests = schedules.task({
         if (unreadCount === 0) continue;
 
         // Send digest push
-        await sendPushToUser(user.id, {
+        const sent = await sendPushToUser(user.id, {
           title: "ContentGenie Digest",
           body: `You have ${unreadCount} new update${unreadCount === 1 ? "" : "s"}`,
           tag: "digest",
           data: { url: "/dashboard" },
         });
+
+        // Only advance digest state when at least one push was delivered
+        if (sent === 0) continue;
 
         // Update lastDigestSentAt using read-modify-write
         const currentPrefs = prefs ?? {};

@@ -58,7 +58,7 @@ const taskRunner = sendNotificationDigests as unknown as {
 describe("send-notification-digests", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockSendPushToUser.mockResolvedValue(undefined);
+    mockSendPushToUser.mockResolvedValue(1);
     mockUpdate.mockReturnValue({
       set: (...args: unknown[]) => {
         mockUpdateSet(...args);
@@ -270,6 +270,26 @@ describe("send-notification-digests", () => {
     expect(mockUpdateSet).not.toHaveBeenCalled();
   });
 
+  it("skips digest state update when sendPushToUser delivers zero pushes", async () => {
+    const lastDigest = new Date(Date.now() - 25 * 60 * 60 * 1000);
+    const digestUser = {
+      id: "user-1",
+      preferences: {
+        digestFrequency: "daily",
+        pushEnabled: true,
+        lastDigestSentAt: lastDigest.toISOString(),
+      },
+    };
+    setupSelectChain([digestUser], 3);
+    mockSendPushToUser.mockResolvedValueOnce(0); // No push subscriptions
+
+    const result = await taskRunner.run();
+
+    expect(result.digestsSent).toBe(0);
+    expect(mockSendPushToUser).toHaveBeenCalled();
+    expect(mockUpdateSet).not.toHaveBeenCalled();
+  });
+
   it("processes multiple users independently and isolates errors", async () => {
     const lastDigest = new Date(Date.now() - 25 * 60 * 60 * 1000);
     const users = [
@@ -314,7 +334,7 @@ describe("send-notification-digests", () => {
     // user-1 push fails, user-2 succeeds
     mockSendPushToUser
       .mockRejectedValueOnce(new Error("Push failed"))
-      .mockResolvedValueOnce(undefined);
+      .mockResolvedValueOnce(1);
 
     mockUpdateWhere.mockResolvedValue(undefined);
 

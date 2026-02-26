@@ -104,7 +104,8 @@ export async function pollSingleFeed(podcast: typeof podcasts.$inferSelect) {
             null, // Episode not yet in DB — summarize task will create it
             "new_episode",
             podcast.title,
-            `New episode: ${ep.title}`
+            `New episode: ${ep.title}`,
+            { pushTag: `new_episode-pi-${ep.id}` }
           );
         } catch (notifErr) {
           logger.warn("Failed to create new_episode notifications", {
