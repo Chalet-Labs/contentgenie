@@ -10,8 +10,18 @@ import {
   index,
   uniqueIndex,
   check,
+  varchar,
+  bigint,
 } from "drizzle-orm/pg-core";
 import { relations, sql } from "drizzle-orm";
+
+// Rate limits table (managed by rate-limiter-flexible, see ADR-001).
+// Defined here so drizzle-kit push doesn't try to drop it.
+export const rateLimits = pgTable("rate_limits", {
+  key: varchar("key", { length: 255 }).primaryKey(),
+  points: integer("points").notNull().default(0),
+  expire: bigint("expire", { mode: "number" }),
+});
 
 // Users table (synced from Clerk)
 export const users = pgTable("users", {
