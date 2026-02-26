@@ -6,7 +6,7 @@ import {
   users,
   type NewNotification,
 } from "@/db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 
 let vapidConfigured = false;
 
@@ -184,14 +184,22 @@ export async function createBulkNotifications(
 
   await db.insert(notifications).values(records);
 
-  // Gather unique user IDs and check their digest preferences
+  // Gather unique user IDs and batch-fetch their digest preferences (single query)
   const userIds = Array.from(new Set(items.map((i) => i.userId)));
   const realtimeUsers = new Set<string>();
 
-  for (const userId of userIds) {
-    const preference = await getNotificationPrefs(userId);
-    if (preference.pushEnabled && preference.digestFrequency === "realtime") {
-      realtimeUsers.add(userId);
+  if (userIds.length > 0) {
+    const usersWithPrefs = await db.query.users.findMany({
+      where: inArray(users.id, userIds),
+      columns: { id: true, preferences: true },
+    });
+
+    for (const user of usersWithPrefs) {
+      const pushEnabled = user.preferences?.pushEnabled ?? false;
+      const digestFrequency = user.preferences?.digestFrequency ?? "realtime";
+      if (pushEnabled && digestFrequency === "realtime") {
+        realtimeUsers.add(user.id);
+      }
     }
   }
 
