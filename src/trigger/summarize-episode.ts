@@ -254,25 +254,37 @@ export const summarizeEpisode = task({
 
     logger.info("Summary persisted successfully");
 
-    // Create summary_completed notifications for subscribers
+    // Create notifications for subscribers (episode row now exists in DB)
     try {
       const podcastDbId = await resolvePodcastId(episode.feedId);
       if (podcastDbId) {
-        // Look up internal episode ID
         const dbEpisode = await db.query.episodes.findFirst({
           where: eq(episodes.podcastIndexId, String(episodeId)),
           columns: { id: true },
         });
+        const episodeDbId = dbEpisode?.id ?? null;
+
+        // new_episode notification (moved here from poll-new-episodes so
+        // the notification record has a real episodeId for click-through)
         await createNotificationsForSubscribers(
           podcastDbId,
-          dbEpisode?.id ?? null,
+          episodeDbId,
+          "new_episode",
+          podcast?.title ?? episode.title,
+          `New episode: ${episode.title}`
+        );
+
+        // summary_completed notification
+        await createNotificationsForSubscribers(
+          podcastDbId,
+          episodeDbId,
           "summary_completed",
           podcast?.title ?? episode.title,
           `Summary ready: ${episode.title}`
         );
       }
     } catch (notifErr) {
-      logger.warn("Failed to create summary_completed notifications", {
+      logger.warn("Failed to create notifications", {
         episodeId,
         error:
           notifErr instanceof Error ? notifErr.message : String(notifErr),
