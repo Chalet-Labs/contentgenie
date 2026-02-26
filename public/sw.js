@@ -63,6 +63,19 @@ self.addEventListener("fetch", (event) => {
   // All other requests: pass through to network
 });
 
+// Validate notification URLs — same-origin only, reject dangerous schemes
+function sanitizeNotificationUrl(rawUrl) {
+  if (typeof rawUrl !== "string") return "/";
+  try {
+    const parsed = new URL(rawUrl, self.location.origin);
+    if (parsed.origin !== self.location.origin) return "/";
+    if (parsed.protocol !== "https:" && parsed.protocol !== "http:") return "/";
+    return `${parsed.pathname}${parsed.search}${parsed.hash}` || "/";
+  } catch {
+    return "/";
+  }
+}
+
 // Push notification handler
 self.addEventListener("push", (event) => {
   if (!event.data) return;
@@ -79,7 +92,7 @@ self.addEventListener("push", (event) => {
     icon: "/icon-192x192.png",
     badge: "/icon-192x192.png",
     tag: data.tag || undefined,
-    data: { url: data.data?.url || "/" },
+    data: { url: sanitizeNotificationUrl(data.data?.url) },
   };
 
   event.waitUntil(
@@ -91,7 +104,7 @@ self.addEventListener("push", (event) => {
 self.addEventListener("notificationclick", (event) => {
   event.notification.close();
 
-  const url = event.notification.data?.url || "/";
+  const url = sanitizeNotificationUrl(event.notification.data?.url);
 
   event.waitUntil(
     self.clients

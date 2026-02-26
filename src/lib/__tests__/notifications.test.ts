@@ -112,7 +112,7 @@ describe("notifications library", () => {
   describe("createNotification", () => {
     it("inserts notification and dispatches push for realtime users", async () => {
       mockInsert.mockReturnValue({ values: vi.fn().mockResolvedValue(undefined) });
-      mockFindFirst.mockResolvedValue({ preferences: { digestFrequency: "realtime" } });
+      mockFindFirst.mockResolvedValue({ preferences: { digestFrequency: "realtime", pushEnabled: true } });
       mockFindMany.mockResolvedValue([]);
 
       const { createNotification } = await import("@/lib/notifications");
@@ -150,7 +150,7 @@ describe("notifications library", () => {
     it("inserts all notifications in a single batch", async () => {
       const mockValues = vi.fn().mockResolvedValue(undefined);
       mockInsert.mockReturnValue({ values: mockValues });
-      mockFindFirst.mockResolvedValue({ preferences: {} }); // defaults to realtime
+      mockFindFirst.mockResolvedValue({ preferences: { pushEnabled: true } }); // defaults to realtime
       mockFindMany.mockResolvedValue([]);
 
       const { createBulkNotifications } = await import("@/lib/notifications");

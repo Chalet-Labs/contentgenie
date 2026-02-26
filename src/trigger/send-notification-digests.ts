@@ -30,7 +30,8 @@ export const sendNotificationDigests = schedules.task({
       })
       .from(users)
       .where(
-        sql`${users.preferences}->>'digestFrequency' IN ('daily', 'weekly')`
+        sql`${users.preferences}->>'digestFrequency' IN ('daily', 'weekly')
+            AND COALESCE(${users.preferences}->>'pushEnabled', 'false') = 'true'`
       );
 
     logger.info("Found users with digest preferences", {
@@ -47,6 +48,7 @@ export const sendNotificationDigests = schedules.task({
     for (const user of digestUsers) {
       try {
         const prefs = user.preferences;
+        if (prefs?.pushEnabled !== true) continue;
         const frequency = prefs?.digestFrequency;
         const lastDigest = prefs?.lastDigestSentAt
           ? new Date(prefs.lastDigestSentAt)

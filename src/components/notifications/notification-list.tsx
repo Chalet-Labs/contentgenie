@@ -60,9 +60,13 @@ export function NotificationList({
 
   const handleClick = async (notification: NotificationItem) => {
     if (!notification.isRead) {
-      await markNotificationRead(notification.id);
+      try {
+        await markNotificationRead(notification.id);
+      } catch {
+        // Keep UX responsive even if marking read fails
+      }
     }
-    if (notification.episodeId) {
+    if (notification.episodeId !== null) {
       router.push(`/episode/${notification.episodeId}`);
     }
     onItemClick?.();

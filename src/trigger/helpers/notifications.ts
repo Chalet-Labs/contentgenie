@@ -1,6 +1,6 @@
 import webpush from "web-push";
 import { logger } from "@trigger.dev/sdk";
-import { eq, and } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import {
   notifications,
@@ -165,23 +165,18 @@ export async function createNotificationsForSubscribers(
 
   // Determine which users want realtime push
   const userIds = subscribers.map((s) => s.userId);
-  const usersWithPrefs = await Promise.all(
-    userIds.map(async (userId) => {
-      const user = await db.query.users.findFirst({
-        where: eq(users.id, userId),
-        columns: { id: true, preferences: true },
-      });
-      return user;
-    })
-  );
+  const usersWithPrefs = await db.query.users.findMany({
+    where: inArray(users.id, userIds),
+    columns: { id: true, preferences: true },
+  });
 
   const realtimeUserIds = usersWithPrefs
     .filter((u) => {
-      if (!u) return false;
       const freq = u.preferences?.digestFrequency ?? "realtime";
-      return freq === "realtime";
+      const pushEnabled = u.preferences?.pushEnabled ?? false;
+      return pushEnabled && freq === "realtime";
     })
-    .map((u) => u!.id);
+    .map((u) => u.id);
 
   // Dispatch push for realtime users
   if (realtimeUserIds.length > 0) {
