@@ -39,14 +39,14 @@ export async function sendPushToUser(
     tag?: string;
     data?: { url?: string };
   }
-): Promise<void> {
+): Promise<number> {
   try {
     ensureVapidConfigured();
   } catch (err) {
     logger.warn("VAPID not configured, skipping push", {
       error: err instanceof Error ? err.message : String(err),
     });
-    return;
+    return 0;
   }
 
   let subs;
@@ -59,14 +59,14 @@ export async function sendPushToUser(
       userId,
       error: err instanceof Error ? err.message : String(err),
     });
-    return;
+    return 0;
   }
 
-  if (subs.length === 0) return;
+  if (subs.length === 0) return 0;
 
   const payloadStr = JSON.stringify(payload);
 
-  await Promise.allSettled(
+  const results = await Promise.allSettled(
     subs.map(async (sub) => {
       try {
         await webpush.sendNotification(
@@ -108,9 +108,12 @@ export async function sendPushToUser(
             error: err instanceof Error ? err.message : String(err),
           });
         }
+        throw err;
       }
     })
   );
+
+  return results.filter((r) => r.status === "fulfilled").length;
 }
 
 /**
@@ -129,7 +132,8 @@ export async function createNotificationsForSubscribers(
   episodeId: number | null,
   type: "new_episode" | "summary_completed",
   title: string,
-  body: string
+  body: string,
+  options?: { pushTag?: string }
 ): Promise<void> {
   // Find subscribers with notifications enabled
   const subscribers = await db.query.userSubscriptions.findMany({
@@ -185,7 +189,7 @@ export async function createNotificationsForSubscribers(
         sendPushToUser(userId, {
           title,
           body,
-          tag: episodeId ? `${type}-${episodeId}` : type,
+          tag: options?.pushTag ?? (episodeId ? `${type}-${episodeId}` : type),
           data: {
             url: episodeId ? `/episode/${episodeId}` : "/dashboard",
           },

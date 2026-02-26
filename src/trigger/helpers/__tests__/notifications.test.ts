@@ -244,7 +244,7 @@ describe("trigger/helpers/notifications", () => {
   });
 
   describe("sendPushToUser", () => {
-    it("sends push notification to all user subscriptions", async () => {
+    it("sends push notification to all user subscriptions and returns count", async () => {
       mockPushSubsFindMany.mockResolvedValue([
         {
           endpoint: "https://push.example.com/1",
@@ -262,9 +262,13 @@ describe("trigger/helpers/notifications", () => {
       const { sendPushToUser } = await import(
         "@/trigger/helpers/notifications"
       );
-      await sendPushToUser("user-1", { title: "Test", body: "Body" });
+      const sent = await sendPushToUser("user-1", {
+        title: "Test",
+        body: "Body",
+      });
 
       expect(mockSendNotification).toHaveBeenCalledTimes(2);
+      expect(sent).toBe(2);
     });
 
     it("deletes stale subscriptions on 404 response", async () => {
@@ -305,7 +309,7 @@ describe("trigger/helpers/notifications", () => {
       expect(mockDelete).toHaveBeenCalled();
     });
 
-    it("does not throw on push send failure", async () => {
+    it("does not throw on push send failure and returns zero sent", async () => {
       mockPushSubsFindMany.mockResolvedValue([
         {
           endpoint: "https://push.example.com/fail",
@@ -318,31 +322,41 @@ describe("trigger/helpers/notifications", () => {
       const { sendPushToUser } = await import(
         "@/trigger/helpers/notifications"
       );
-      await expect(
-        sendPushToUser("user-1", { title: "Test", body: "Body" })
-      ).resolves.toBeUndefined();
+      const sent = await sendPushToUser("user-1", {
+        title: "Test",
+        body: "Body",
+      });
+      expect(sent).toBe(0);
     });
 
-    it("returns early when user has no push subscriptions", async () => {
+    it("returns zero when user has no push subscriptions", async () => {
       mockPushSubsFindMany.mockResolvedValue([]);
 
       const { sendPushToUser } = await import(
         "@/trigger/helpers/notifications"
       );
-      await sendPushToUser("user-no-subs", { title: "Test", body: "Body" });
+      const sent = await sendPushToUser("user-no-subs", {
+        title: "Test",
+        body: "Body",
+      });
 
+      expect(sent).toBe(0);
       expect(mockSendNotification).not.toHaveBeenCalled();
     });
 
-    it("returns early when VAPID keys are not configured", async () => {
+    it("returns zero when VAPID keys are not configured", async () => {
       vi.unstubAllEnvs();
       // No VAPID env vars set
 
       const { sendPushToUser } = await import(
         "@/trigger/helpers/notifications"
       );
-      await sendPushToUser("user-1", { title: "Test", body: "Body" });
+      const sent = await sendPushToUser("user-1", {
+        title: "Test",
+        body: "Body",
+      });
 
+      expect(sent).toBe(0);
       expect(mockPushSubsFindMany).not.toHaveBeenCalled();
       expect(mockSendNotification).not.toHaveBeenCalled();
     });
