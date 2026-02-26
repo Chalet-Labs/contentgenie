@@ -113,7 +113,10 @@ describe("notifications library", () => {
     it("inserts notification and dispatches push for realtime users", async () => {
       mockInsert.mockReturnValue({ values: vi.fn().mockResolvedValue(undefined) });
       mockFindFirst.mockResolvedValue({ preferences: { digestFrequency: "realtime", pushEnabled: true } });
-      mockFindMany.mockResolvedValue([]);
+      mockFindMany.mockResolvedValue([
+        { endpoint: "https://push.example.com/1", p256dh: "k", auth: "a" },
+      ]);
+      mockSendNotification.mockResolvedValue({});
 
       const { createNotification } = await import("@/lib/notifications");
       await createNotification({
@@ -125,6 +128,7 @@ describe("notifications library", () => {
       });
 
       expect(mockInsert).toHaveBeenCalled();
+      expect(mockSendNotification).toHaveBeenCalledTimes(1);
     });
 
     it("skips push for users with daily digest preference", async () => {

@@ -71,6 +71,9 @@ export async function markNotificationRead(notificationId: number) {
   if (!userId) {
     return { success: false, error: "You must be signed in" };
   }
+  if (!Number.isInteger(notificationId) || notificationId <= 0) {
+    return { success: false, error: "Invalid notification id" };
+  }
 
   try {
     const result = await db

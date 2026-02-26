@@ -30,14 +30,19 @@ async function getNotificationPrefs(
   digestFrequency: "realtime" | "daily" | "weekly";
   pushEnabled: boolean;
 }> {
-  const user = await db.query.users.findFirst({
-    where: eq(users.id, userId),
-    columns: { preferences: true },
-  });
-  return {
-    digestFrequency: user?.preferences?.digestFrequency ?? "realtime",
-    pushEnabled: user?.preferences?.pushEnabled ?? false,
-  };
+  try {
+    const user = await db.query.users.findFirst({
+      where: eq(users.id, userId),
+      columns: { preferences: true },
+    });
+    return {
+      digestFrequency: user?.preferences?.digestFrequency ?? "realtime",
+      pushEnabled: user?.preferences?.pushEnabled ?? false,
+    };
+  } catch {
+    // Fail closed: keep notification write successful, skip push decision
+    return { digestFrequency: "realtime", pushEnabled: false };
+  }
 }
 
 /**
