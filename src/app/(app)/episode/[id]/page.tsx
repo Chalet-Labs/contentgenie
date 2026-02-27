@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { toast } from "sonner";
+import { useAuth } from "@clerk/nextjs";
 import { useRealtimeRun } from "@trigger.dev/react-hooks";
 import {
   ArrowLeft,
@@ -30,6 +31,9 @@ import { ShareButton } from "@/components/ui/share-button";
 import { WorthItBadge } from "@/components/episodes/worth-it-badge";
 import { CommunityRating } from "@/components/episodes/community-rating";
 import { isEpisodeSaved } from "@/app/actions/library";
+import { useOnlineStatus } from "@/hooks/use-online-status";
+import { OfflineBanner } from "@/components/ui/offline-banner";
+import { cacheEpisode, getCachedEpisode } from "@/lib/offline-cache";
 import { IN_PROGRESS_STATUSES } from "@/db/schema";
 import type { summarizeEpisode } from "@/trigger/summarize-episode";
 
@@ -100,6 +104,8 @@ function formatPublishDate(timestamp: number): string {
 
 export default function EpisodePage({ params }: EpisodePageProps) {
   const episodeId = params.id;
+  const { userId } = useAuth();
+  const isOnline = useOnlineStatus();
   const playerState = useAudioPlayerState();
   const playerAPI = useAudioPlayerAPI();
 
@@ -113,6 +119,7 @@ export default function EpisodePage({ params }: EpisodePageProps) {
   const [isSaved, setIsSaved] = useState(false);
   const [runId, setRunId] = useState<string | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [isFromCache, setIsFromCache] = useState(false);
 
   // Realtime subscription to the Trigger.dev run
   const { run } = useRealtimeRun<typeof summarizeEpisode>(runId ?? "", {
@@ -149,78 +156,128 @@ export default function EpisodePage({ params }: EpisodePageProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only react to status transitions, not every metadata update
   }, [run?.status]);
 
-  // Fetch episode and podcast data
-  useEffect(() => {
-    async function fetchEpisodeData() {
-      setIsLoadingEpisode(true);
-      setEpisodeError(null);
+  // Fetch episode and podcast data from server
+  const fetchEpisodeData = useCallback(async () => {
+    setIsLoadingEpisode(true);
+    setEpisodeError(null);
 
-      try {
-        // Fetch episode from PodcastIndex via API
-        const response = await fetch(
-          `/api/episodes/${episodeId}`
-        );
-        const data = await response.json();
+    try {
+      // Fetch episode from PodcastIndex via API
+      const response = await fetch(
+        `/api/episodes/${episodeId}`
+      );
+      const data = await response.json();
 
-        if (!response.ok) {
-          throw new Error(data.error || "Failed to fetch episode");
-        }
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to fetch episode");
+      }
 
-        setEpisode(data.episode);
-        setPodcast(data.podcast);
+      setEpisode(data.episode);
+      setPodcast(data.podcast);
+      setIsFromCache(false);
 
-        // Check if summary exists
-        if (data.summary) {
-          setSummaryData({
+      // Cache episode data for offline use
+      if (userId) {
+        void cacheEpisode(userId, episodeId, {
+          episode: data.episode,
+          podcast: data.podcast,
+          summary: data.summary ? {
             summary: data.summary.summary,
             keyTakeaways: data.summary.keyTakeaways || [],
             worthItScore: data.summary.worthItScore,
             worthItReason: data.summary.worthItReason,
             worthItDimensions: data.summary.worthItDimensions ?? null,
             cached: true,
-          });
-        } else {
-          // Check for in-progress or failed summarization run
-          try {
-            const statusResponse = await fetch(
-              `/api/episodes/summarize?episodeId=${episodeId}`
-            );
-            const statusData = await statusResponse.json();
-            if (
-              statusData.runId &&
-              statusData.publicAccessToken &&
-              IN_PROGRESS_STATUSES.includes(statusData.status)
-            ) {
-              setRunId(statusData.runId);
-              setAccessToken(statusData.publicAccessToken);
-              setIsLoadingSummary(true);
-            } else if (statusData.status === "failed") {
-              setSummaryError(
-                statusData.processingError ||
-                  "Summary generation failed. Please try again."
-              );
-              setIsLoadingSummary(false);
-            }
-          } catch (error) {
-            console.warn("Failed to check for in-progress summary run:", error);
-          }
-        }
-
-        // Check if episode is saved to library
-        const saved = await isEpisodeSaved(String(data.episode.id));
-        setIsSaved(saved);
-      } catch (error) {
-        console.error("Error fetching episode:", error);
-        setEpisodeError(
-          error instanceof Error ? error.message : "Failed to load episode"
-        );
-      } finally {
-        setIsLoadingEpisode(false);
+          } : null,
+        });
       }
+
+      // Check if summary exists
+      if (data.summary) {
+        setSummaryData({
+          summary: data.summary.summary,
+          keyTakeaways: data.summary.keyTakeaways || [],
+          worthItScore: data.summary.worthItScore,
+          worthItReason: data.summary.worthItReason,
+          worthItDimensions: data.summary.worthItDimensions ?? null,
+          cached: true,
+        });
+      } else {
+        // Check for in-progress or failed summarization run
+        try {
+          const statusResponse = await fetch(
+            `/api/episodes/summarize?episodeId=${episodeId}`
+          );
+          const statusData = await statusResponse.json();
+          if (
+            statusData.runId &&
+            statusData.publicAccessToken &&
+            IN_PROGRESS_STATUSES.includes(statusData.status)
+          ) {
+            setRunId(statusData.runId);
+            setAccessToken(statusData.publicAccessToken);
+            setIsLoadingSummary(true);
+          } else if (statusData.status === "failed") {
+            setSummaryError(
+              statusData.processingError ||
+                "Summary generation failed. Please try again."
+            );
+            setIsLoadingSummary(false);
+          }
+        } catch (error) {
+          console.warn("Failed to check for in-progress summary run:", error);
+        }
+      }
+
+      // Check if episode is saved to library
+      const saved = await isEpisodeSaved(String(data.episode.id));
+      setIsSaved(saved);
+    } catch (error) {
+      console.error("Error fetching episode:", error);
+      setEpisodeError(
+        error instanceof Error ? error.message : "Failed to load episode"
+      );
+    } finally {
+      setIsLoadingEpisode(false);
+    }
+  }, [episodeId, userId]);
+
+  // Load episode data from cache
+  const loadFromCache = useCallback(async () => {
+    if (!userId) {
+      setIsLoadingEpisode(false);
+      setEpisodeError("This episode hasn't been cached for offline viewing. Visit it while online first.");
+      return;
     }
 
-    fetchEpisodeData();
-  }, [episodeId]);
+    setIsLoadingEpisode(true);
+    setEpisodeError(null);
+
+    const cached = await getCachedEpisode(userId, episodeId);
+    if (cached) {
+      setEpisode(cached.episode);
+      setPodcast(cached.podcast);
+      if (cached.summary) {
+        setSummaryData(cached.summary);
+      }
+      setIsFromCache(true);
+    } else {
+      setEpisodeError("This episode hasn't been cached for offline viewing. Visit it while online first.");
+    }
+
+    setIsLoadingEpisode(false);
+  }, [userId, episodeId]);
+
+  // Load data: online fetches from server, offline from cache.
+  // Also handles stale-while-revalidate on reconnection since
+  // isOnline changing from false to true re-triggers this effect.
+  useEffect(() => {
+    if (isOnline) {
+      fetchEpisodeData();
+    } else {
+      loadFromCache();
+    }
+  }, [isOnline, fetchEpisodeData, loadFromCache]);
 
   // Generate summary — triggers a background task and subscribes to realtime updates
   const generateSummary = useCallback(async () => {
@@ -306,6 +363,7 @@ export default function EpisodePage({ params }: EpisodePageProps) {
   if (episodeError || !episode) {
     return (
       <div className="space-y-4">
+        {!isOnline && <OfflineBanner isOffline={true} />}
         <Link
           href="/discover"
           className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
@@ -346,6 +404,8 @@ export default function EpisodePage({ params }: EpisodePageProps) {
 
   return (
     <div className="space-y-8">
+      <OfflineBanner isOffline={!isOnline} />
+
       {/* Back navigation */}
       <Link
         href={podcast ? `/podcast/${podcast.id}` : "/discover"}
@@ -433,14 +493,16 @@ export default function EpisodePage({ params }: EpisodePageProps) {
           </div>
 
           {/* Community Rating */}
-          <div>
-            <span className="mr-2 text-sm text-muted-foreground">Community Rating:</span>
-            <CommunityRating episodePodcastIndexId={episodeId} size="md" showCount={true} />
-          </div>
+          {isOnline && (
+            <div>
+              <span className="mr-2 text-sm text-muted-foreground">Community Rating:</span>
+              <CommunityRating episodePodcastIndexId={episodeId} size="md" showCount={true} />
+            </div>
+          )}
 
-          {/* Actions */}
+          {/* Actions - hide network-dependent actions when offline */}
           <div className="flex flex-wrap gap-3">
-            {episode.enclosureUrl && (
+            {isOnline && episode.enclosureUrl && (
               <Button size="lg" onClick={handleListenClick}>
                 {isPlayingThis ? (
                   <>
@@ -460,27 +522,29 @@ export default function EpisodePage({ params }: EpisodePageProps) {
                 )}
               </Button>
             )}
-            <SaveButton
-              episodeData={{
-                podcastIndexId: String(episode.id),
-                title: episode.title,
-                description: episode.description,
-                audioUrl: episode.enclosureUrl,
-                duration: episode.duration,
-                publishDate: episode.datePublished ? new Date(episode.datePublished * 1000) : undefined,
-                podcast: {
-                  podcastIndexId: String(podcast?.id || episode.feedId),
-                  title: podcast?.title || "",
-                  description: undefined,
-                  publisher: podcast?.author || podcast?.ownerName,
-                  imageUrl: podcast?.artwork || podcast?.image,
-                  categories: categories,
-                },
-              }}
-              initialSaved={isSaved}
-              size="lg"
-            />
-            {episode.link && (
+            {isOnline && (
+              <SaveButton
+                episodeData={{
+                  podcastIndexId: String(episode.id),
+                  title: episode.title,
+                  description: episode.description,
+                  audioUrl: episode.enclosureUrl,
+                  duration: episode.duration,
+                  publishDate: episode.datePublished ? new Date(episode.datePublished * 1000) : undefined,
+                  podcast: {
+                    podcastIndexId: String(podcast?.id || episode.feedId),
+                    title: podcast?.title || "",
+                    description: undefined,
+                    publisher: podcast?.author || podcast?.ownerName,
+                    imageUrl: podcast?.artwork || podcast?.image,
+                    categories: categories,
+                  },
+                }}
+                initialSaved={isSaved}
+                size="lg"
+              />
+            )}
+            {isOnline && episode.link && (
               <Button variant="outline" size="lg" asChild>
                 <a
                   href={episode.link}
@@ -492,7 +556,7 @@ export default function EpisodePage({ params }: EpisodePageProps) {
                 </a>
               </Button>
             )}
-            {process.env.NEXT_PUBLIC_APP_URL && (
+            {isOnline && process.env.NEXT_PUBLIC_APP_URL && (
               <ShareButton
                 title={episode.title}
                 text={`Check out this episode of ${podcast?.title || "a podcast"} on ContentGenie`}
@@ -530,7 +594,7 @@ export default function EpisodePage({ params }: EpisodePageProps) {
           currentStep={
             (run?.metadata?.step as SummarizationStep | undefined) ?? null
           }
-          onGenerateSummary={generateSummary}
+          onGenerateSummary={isOnline ? generateSummary : undefined}
         />
       </div>
     </div>

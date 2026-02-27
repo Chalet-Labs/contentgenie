@@ -41,10 +41,11 @@ interface SavedEpisodeCardProps {
   };
   onRemoved?: () => void;
   onCollectionChanged?: () => void;
+  isOffline?: boolean;
 }
 
 
-export function SavedEpisodeCard({ item, onRemoved, onCollectionChanged }: SavedEpisodeCardProps) {
+export function SavedEpisodeCard({ item, onRemoved, onCollectionChanged, isOffline }: SavedEpisodeCardProps) {
   const [isRemoving, setIsRemoving] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [isExpanded, setIsExpanded] = useState(false);
@@ -186,17 +187,20 @@ export function SavedEpisodeCard({ item, onRemoved, onCollectionChanged }: Saved
                       </span>
                     </Button>
                   </CollapsibleTrigger>
-                  <MoveToCollection
-                    libraryEntryId={item.id}
-                    currentCollectionId={item.collectionId}
-                    onMoved={onCollectionChanged}
-                  />
+                  {!isOffline && (
+                    <MoveToCollection
+                      libraryEntryId={item.id}
+                      currentCollectionId={item.collectionId}
+                      onMoved={onCollectionChanged}
+                    />
+                  )}
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={handleRemove}
-                    disabled={isPending || isRemoving}
+                    disabled={isPending || isRemoving || isOffline}
                     className="h-8 px-2 text-muted-foreground hover:text-destructive"
+                    title={isOffline ? "Unavailable offline" : undefined}
                   >
                     {isPending || isRemoving ? (
                       <Loader2 className="h-4 w-4 animate-spin" />

@@ -107,7 +107,10 @@ src/
 ├── db/
 │   ├── index.ts              # Neon connection (drizzle + neon serverless)
 │   └── schema.ts             # Drizzle schema & relations
+├── hooks/
+│   └── use-online-status.ts  # React hook for navigator.onLine via useSyncExternalStore
 ├── lib/
+│   ├── offline-cache.ts      # IndexedDB cache service for offline reading (idb-keyval)
 │   ├── openrouter.ts         # OpenRouter API client
 │   ├── podcastindex.ts       # PodcastIndex API client
 │   ├── prompts.ts            # AI prompt templates
@@ -132,6 +135,7 @@ ADRs are stored in `docs/adr/`. Read them before designing changes that touch th
 - [ADR-008: AI Provider Abstraction Layer](docs/adr/008-ai-provider-abstraction.md)
 - [ADR-009: In-App and PWA Push Notification System](docs/adr/009-notification-system-architecture.md)
 - [ADR-010: Per-User Daily Summarization Rate Limit](docs/adr/010-per-user-daily-summarization-limit.md)
+- [ADR-011: Offline Reading via IndexedDB Cache](docs/adr/011-offline-reading-cache.md)
 
 ## Architecture patterns
 
