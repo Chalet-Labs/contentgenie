@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
-import { Bookmark, Search, ArrowUpDown, Star, Calendar, Clock, Type } from "lucide-react";
+import { useAuth } from "@clerk/nextjs";
+import { Bookmark, Search, ArrowUpDown, Star, Calendar, Clock, Type, WifiOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -14,6 +15,9 @@ import {
 } from "@/components/ui/select";
 import { SavedEpisodeCard } from "@/components/library/saved-episode-card";
 import { getUserLibrary, type LibrarySortOption, type SortDirection } from "@/app/actions/library";
+import { useOnlineStatus } from "@/hooks/use-online-status";
+import { OfflineBanner } from "@/components/ui/offline-banner";
+import { cacheLibrary, getCachedLibrary } from "@/lib/offline-cache";
 import type { Episode, Podcast, UserLibraryEntry, Collection } from "@/db/schema";
 
 type LibraryItem = UserLibraryEntry & {
@@ -24,11 +28,15 @@ type LibraryItem = UserLibraryEntry & {
 };
 
 export default function LibraryPage() {
+  const { userId } = useAuth();
+  const isOnline = useOnlineStatus();
+
   const [items, setItems] = useState<LibraryItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<LibrarySortOption>("savedAt");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
+  const [isFromCache, setIsFromCache] = useState(false);
 
   const loadLibrary = useCallback(async () => {
     setIsLoading(true);
@@ -39,15 +47,47 @@ export default function LibraryPage() {
     if (result.error) {
       setError(result.error);
     } else {
-      setItems(result.items as LibraryItem[]);
+      const libraryItems = result.items as LibraryItem[];
+      setItems(libraryItems);
+      setIsFromCache(false);
+
+      // Cache library data for offline use
+      if (userId) {
+        void cacheLibrary(userId, libraryItems);
+      }
     }
 
     setIsLoading(false);
-  }, [sortBy, sortDirection]);
+  }, [sortBy, sortDirection, userId]);
 
+  const loadFromCache = useCallback(async () => {
+    if (!userId) return;
+
+    setIsLoading(true);
+    setError(null);
+
+    const cached = await getCachedLibrary(userId);
+    if (cached) {
+      setItems(cached as LibraryItem[]);
+      setIsFromCache(true);
+    } else {
+      setItems([]);
+      setIsFromCache(true);
+    }
+
+    setIsLoading(false);
+  }, [userId]);
+
+  // Load data: online fetches from server, offline from cache.
+  // Also handles stale-while-revalidate on reconnection since
+  // isOnline changing from false to true re-triggers this effect.
   useEffect(() => {
-    loadLibrary();
-  }, [loadLibrary]);
+    if (isOnline) {
+      loadLibrary();
+    } else {
+      loadFromCache();
+    }
+  }, [isOnline, loadLibrary, loadFromCache]);
 
   const handleRemoved = () => {
     loadLibrary();
@@ -63,6 +103,8 @@ export default function LibraryPage() {
 
   return (
     <div className="space-y-6">
+      <OfflineBanner isOffline={!isOnline} />
+
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Library</h1>
@@ -76,8 +118,8 @@ export default function LibraryPage() {
         </div>
       </div>
 
-      {/* Sorting controls - only show when there are items */}
-      {!isLoading && !error && items.length > 0 && (
+      {/* Sorting controls - only show when there are items and online */}
+      {!isLoading && !error && items.length > 0 && isOnline && (
         <div className="flex items-center gap-2">
           <span className="text-sm text-muted-foreground">Sort by:</span>
           <Select value={sortBy} onValueChange={(value) => setSortBy(value as LibrarySortOption)}>
@@ -155,8 +197,21 @@ export default function LibraryPage() {
         </div>
       )}
 
-      {/* Empty state */}
-      {!isLoading && !error && items.length === 0 && (
+      {/* Empty state - offline with no cache */}
+      {!isLoading && !error && items.length === 0 && !isOnline && isFromCache && (
+        <div className="flex flex-col items-center justify-center rounded-lg border bg-card p-12 text-center">
+          <div className="mb-4 rounded-full bg-muted p-4">
+            <WifiOff className="h-8 w-8 text-muted-foreground" />
+          </div>
+          <h2 className="text-lg font-semibold">No cached data available</h2>
+          <p className="mt-2 max-w-sm text-sm text-muted-foreground">
+            Visit your library while online to enable offline access.
+          </p>
+        </div>
+      )}
+
+      {/* Empty state - online */}
+      {!isLoading && !error && items.length === 0 && (isOnline || !isFromCache) && (
         <div className="flex flex-col items-center justify-center rounded-lg border bg-card p-12 text-center">
           <div className="mb-4 rounded-full bg-muted p-4">
             <Bookmark className="h-8 w-8 text-muted-foreground" />
@@ -182,8 +237,9 @@ export default function LibraryPage() {
             <SavedEpisodeCard
               key={item.id}
               item={item}
-              onRemoved={handleRemoved}
-              onCollectionChanged={handleCollectionChanged}
+              onRemoved={isOnline ? handleRemoved : undefined}
+              onCollectionChanged={isOnline ? handleCollectionChanged : undefined}
+              isOffline={!isOnline}
             />
           ))}
         </div>
