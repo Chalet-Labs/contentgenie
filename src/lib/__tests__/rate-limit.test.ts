@@ -67,3 +67,54 @@ describe("checkRateLimit", () => {
     await expect(checkRateLimit("user-4")).rejects.toThrow("connection failed");
   });
 });
+
+describe("checkDailyLimit", () => {
+  beforeEach(() => {
+    vi.resetModules();
+    vi.stubEnv("DATABASE_URL", "postgres://test:test@localhost/test");
+    mockConsume.mockReset();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+    vi.resetModules();
+  });
+
+  it("returns allowed: true when under daily limit", async () => {
+    mockConsume.mockResolvedValue({ remainingPoints: 4 });
+    const { checkDailyLimit } = await import("@/lib/rate-limit");
+
+    const result = await checkDailyLimit("user-1");
+
+    expect(result).toEqual({ allowed: true });
+    expect(mockConsume).toHaveBeenCalledWith("user-1", 1);
+  });
+
+  it("returns allowed: false with retryAfterMs when daily limit exceeded", async () => {
+    mockConsume.mockRejectedValue({ msBeforeNext: 43200000 });
+    const { checkDailyLimit } = await import("@/lib/rate-limit");
+
+    const result = await checkDailyLimit("user-2");
+
+    expect(result).toEqual({ allowed: false, retryAfterMs: 43200000 });
+  });
+
+  it("supports custom points for batch consumption", async () => {
+    mockConsume.mockResolvedValue({ remainingPoints: 1 });
+    const { checkDailyLimit } = await import("@/lib/rate-limit");
+
+    const result = await checkDailyLimit("user-3", 4);
+
+    expect(result).toEqual({ allowed: true });
+    expect(mockConsume).toHaveBeenCalledWith("user-3", 4);
+  });
+
+  it("re-throws unexpected errors", async () => {
+    mockConsume.mockRejectedValue(new Error("db unreachable"));
+    const { checkDailyLimit } = await import("@/lib/rate-limit");
+
+    await expect(checkDailyLimit("user-4")).rejects.toThrow("db unreachable");
+  });
+});

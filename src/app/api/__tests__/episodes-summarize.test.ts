@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { NextRequest } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { db } from "@/db";
-import { checkRateLimit } from "@/lib/rate-limit";
+import { checkRateLimit, checkDailyLimit, DAILY_SUMMARIZE_LIMIT } from "@/lib/rate-limit";
 import { POST, GET } from "@/app/api/episodes/summarize/route";
 
 vi.mock("@clerk/nextjs/server", () => ({
@@ -11,6 +11,8 @@ vi.mock("@clerk/nextjs/server", () => ({
 
 vi.mock("@/lib/rate-limit", () => ({
   checkRateLimit: vi.fn().mockResolvedValue({ allowed: true }),
+  checkDailyLimit: vi.fn().mockResolvedValue({ allowed: true }),
+  DAILY_SUMMARIZE_LIMIT: 5,
 }));
 
 vi.mock("@/db", () => ({
@@ -47,6 +49,7 @@ describe("POST /api/episodes/summarize", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(checkRateLimit).mockResolvedValue({ allowed: true });
+    vi.mocked(checkDailyLimit).mockResolvedValue({ allowed: true });
   });
 
   afterEach(() => {
@@ -144,8 +147,9 @@ describe("POST /api/episodes/summarize", () => {
     );
   });
 
-  it("returns 429 when rate limit is exceeded", async () => {
+  it("returns 429 when hourly rate limit is exceeded", async () => {
     vi.mocked(auth).mockResolvedValue({ userId: "user-1" } as never);
+    vi.mocked(db.query.episodes.findFirst).mockResolvedValue(null as never);
     vi.mocked(checkRateLimit).mockResolvedValue({ allowed: false, retryAfterMs: 3600000 });
 
     const request = new NextRequest(
@@ -160,6 +164,51 @@ describe("POST /api/episodes/summarize", () => {
 
     expect(response.status).toBe(429);
     expect(data.error).toBe("Rate limit exceeded. Please try again later.");
+  });
+
+  it("returns 429 with daily limit info when daily limit is exceeded", async () => {
+    vi.mocked(auth).mockResolvedValue({ userId: "user-1" } as never);
+    vi.mocked(db.query.episodes.findFirst).mockResolvedValue(null as never);
+    vi.mocked(checkDailyLimit).mockResolvedValue({ allowed: false, retryAfterMs: 43200000 });
+
+    const request = new NextRequest(
+      "http://localhost:3000/api/episodes/summarize",
+      {
+        method: "POST",
+        body: JSON.stringify({ episodeId: "123" }),
+      }
+    );
+    const response = await POST(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(429);
+    expect(data.error).toBe("Daily summarization limit reached. Please try again tomorrow.");
+    expect(data.dailyLimit).toBe(DAILY_SUMMARIZE_LIMIT);
+    expect(data.retryAfterMs).toBe(43200000);
+  });
+
+  it("does not consume rate limit for cached summaries", async () => {
+    vi.mocked(auth).mockResolvedValue({ userId: "user-1" } as never);
+
+    vi.mocked(db.query.episodes.findFirst).mockResolvedValue({
+      summary: "Cached summary",
+      keyTakeaways: ["Point 1"],
+      worthItScore: "8.00",
+      processedAt: new Date(),
+    } as never);
+
+    const request = new NextRequest(
+      "http://localhost:3000/api/episodes/summarize",
+      {
+        method: "POST",
+        body: JSON.stringify({ episodeId: "123" }),
+      }
+    );
+    const response = await POST(request);
+
+    expect(response.status).toBe(200);
+    expect(checkRateLimit).not.toHaveBeenCalled();
+    expect(checkDailyLimit).not.toHaveBeenCalled();
   });
 
   it("returns 202 for existing in-progress run", async () => {

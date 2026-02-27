@@ -131,6 +131,7 @@ ADRs are stored in `docs/adr/`. Read them before designing changes that touch th
 - [ADR-007: Bulk Re-Summarization via Trigger.dev Parent Task](docs/adr/007-bulk-resummarize-via-trigger-dev.md)
 - [ADR-008: AI Provider Abstraction Layer](docs/adr/008-ai-provider-abstraction.md)
 - [ADR-009: In-App and PWA Push Notification System](docs/adr/009-notification-system-architecture.md)
+- [ADR-010: Per-User Daily Summarization Rate Limit](docs/adr/010-per-user-daily-summarization-limit.md)
 
 ## Architecture patterns
 

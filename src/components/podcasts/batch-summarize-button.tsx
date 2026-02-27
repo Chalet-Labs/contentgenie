@@ -107,7 +107,11 @@ export function BatchSummarizeButton({
 
       if (res.status === 429) {
         setState("error");
-        setErrorMessage("Rate limit exceeded. Please try again later.");
+        setErrorMessage(
+          data.dailyLimit
+            ? `Daily limit reached. You can summarize up to ${data.dailyLimit} episodes per day.`
+            : "Rate limit exceeded. Please try again later."
+        );
         return;
       }
 

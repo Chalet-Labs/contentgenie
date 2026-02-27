@@ -75,6 +75,7 @@ Most `package.json` scripts are wrapped with `doppler run --`, which injects env
 | `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | Public | VAPID public key for Web Push (inlined at build time — rebuild after changing) |
 | `VAPID_PRIVATE_KEY` | Server | VAPID private key for Web Push |
 | `VAPID_SUBJECT` | Server | VAPID subject (`mailto:` URL) for Web Push |
+| `DAILY_SUMMARIZE_LIMIT` | Server | Per-user daily summarization limit (default: 5) |
 
 ## Vercel Integration
 

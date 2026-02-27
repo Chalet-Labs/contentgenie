@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Per-user daily summarization limit (configurable via `DAILY_SUMMARIZE_LIMIT` env var, default 5) with 24-hour rolling window enforcement on both single and batch summarize routes (#64)
 - In-app notification bell with unread badge, dropdown list, and mark-as-read functionality (#39)
 - PWA push notifications via Web Push Protocol with VAPID authentication (#39)
 - Notification settings page with push toggle, digest frequency selector (realtime/daily/weekly) (#39)
@@ -32,6 +33,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Optimized `saveEpisodeToLibrary` and `subscribeToPodcast` to use atomic upserts (`onConflictDoUpdate`/`onConflictDoNothing`), reducing DB round-trips from 7→4 and 5→3. `getUserSubscriptions` now excludes `description` column (~25% payload reduction).
 
 ### Fixed
+- Cached summaries no longer consume hourly rate limit points in single summarize route (#64)
 - Fixed Clerk hosted sign-in/sign-up not redirecting back to the app by replacing `CLERK_SIGN_IN_FORCE_REDIRECT_URL` / `CLERK_SIGN_UP_FORCE_REDIRECT_URL` with `NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL` / `NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL` (public-prefixed, fallback semantics so `auth.protect()` redirect takes precedence) and adding `NEXT_PUBLIC_CLERK_SIGN_IN_URL` / `NEXT_PUBLIC_CLERK_SIGN_UP_URL` for correct routing to embedded auth pages
 - Fixed non-deterministic SSRF redirect tests by using public-IP fixtures instead of hostname-based URLs
 - Fixed DNS rebinding TOCTOU vulnerability in SSRF-protected fetch by pinning validated DNS resolution to TCP connections via undici Agent (#80)

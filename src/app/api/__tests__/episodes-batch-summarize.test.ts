@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { NextRequest } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { db } from "@/db";
-import { checkRateLimit } from "@/lib/rate-limit";
+import { checkRateLimit, checkDailyLimit, DAILY_SUMMARIZE_LIMIT } from "@/lib/rate-limit";
 import { POST } from "@/app/api/episodes/batch-summarize/route";
 
 vi.mock("@clerk/nextjs/server", () => ({
@@ -11,6 +11,8 @@ vi.mock("@clerk/nextjs/server", () => ({
 
 vi.mock("@/lib/rate-limit", () => ({
   checkRateLimit: vi.fn().mockResolvedValue({ allowed: true }),
+  checkDailyLimit: vi.fn().mockResolvedValue({ allowed: true }),
+  DAILY_SUMMARIZE_LIMIT: 5,
 }));
 
 vi.mock("@/db", () => ({
@@ -194,7 +196,7 @@ describe("POST /api/episodes/batch-summarize", () => {
     );
   });
 
-  it("returns 429 when rate limit is exceeded", async () => {
+  it("returns 429 when hourly rate limit is exceeded", async () => {
     vi.mocked(auth).mockResolvedValue({ userId: "rate-limit-user" } as never);
     vi.mocked(db.query.episodes.findMany).mockResolvedValue([] as never);
     vi.mocked(checkRateLimit).mockResolvedValue({ allowed: false, retryAfterMs: 3600000 });
@@ -204,6 +206,21 @@ describe("POST /api/episodes/batch-summarize", () => {
 
     expect(response.status).toBe(429);
     expect(data.error).toBe("Rate limit exceeded. Please try again later.");
+  });
+
+  it("returns 429 with daily limit info when daily limit is exceeded", async () => {
+    vi.mocked(auth).mockResolvedValue({ userId: "user-1" } as never);
+    vi.mocked(db.query.episodes.findMany).mockResolvedValue([] as never);
+    vi.mocked(checkDailyLimit).mockResolvedValue({ allowed: false, retryAfterMs: 43200000 });
+
+    const response = await POST(makeRequest({ episodeIds: [1, 2, 3] }));
+    const data = await response.json();
+
+    expect(response.status).toBe(429);
+    expect(data.error).toBe("Daily summarization limit reached. Please try again tomorrow.");
+    expect(data.dailyLimit).toBe(DAILY_SUMMARIZE_LIMIT);
+    expect(data.retryAfterMs).toBe(43200000);
+    expect(checkDailyLimit).toHaveBeenCalledWith("user-1", 3);
   });
 
   it("accepts exactly 20 episodes (the maximum)", async () => {

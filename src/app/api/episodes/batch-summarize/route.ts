@@ -4,7 +4,7 @@ import { tasks, auth } from "@trigger.dev/sdk";
 import { inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { episodes } from "@/db/schema";
-import { checkRateLimit } from "@/lib/rate-limit";
+import { checkRateLimit, checkDailyLimit, DAILY_SUMMARIZE_LIMIT } from "@/lib/rate-limit";
 import type { batchSummarizeEpisodes } from "@/trigger/batch-summarize-episodes";
 
 export async function POST(request: NextRequest) {
@@ -77,7 +77,20 @@ export async function POST(request: NextRequest) {
       (id: number) => !cachedIds.has(id)
     );
 
-    // Rate limit check (only count uncached episodes against quota)
+    // Daily rate limit check (only count uncached episodes against quota)
+    const dailyLimit = await checkDailyLimit(userId, uncachedIds.length);
+    if (!dailyLimit.allowed) {
+      return NextResponse.json(
+        {
+          error: "Daily summarization limit reached. Please try again tomorrow.",
+          retryAfterMs: dailyLimit.retryAfterMs,
+          dailyLimit: DAILY_SUMMARIZE_LIMIT,
+        },
+        { status: 429 }
+      );
+    }
+
+    // Hourly rate limit check (only count uncached episodes against quota)
     const rateLimit = await checkRateLimit(userId, uncachedIds.length);
     if (!rateLimit.allowed) {
       return NextResponse.json(
