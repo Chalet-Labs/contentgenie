@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 import { tasks, auth } from "@trigger.dev/sdk";
 import { db } from "@/db";
 import { episodes, IN_PROGRESS_STATUSES } from "@/db/schema";
-import { checkRateLimit } from "@/lib/rate-limit";
+import { checkRateLimit, checkDailyLimit, DAILY_SUMMARIZE_LIMIT } from "@/lib/rate-limit";
 import type { summarizeEpisode } from "@/trigger/summarize-episode";
 
 export async function POST(request: NextRequest) {
@@ -27,22 +27,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Rate limit check
-    const rateLimit = await checkRateLimit(userId);
-    if (!rateLimit.allowed) {
-      return NextResponse.json(
-        { error: "Rate limit exceeded. Please try again later." },
-        { status: 429 }
-      );
-    }
-
     // Check if we already have a cached summary in the database
     const existingEpisode = await db.query.episodes.findFirst({
       where: eq(episodes.podcastIndexId, episodeId.toString()),
     });
 
     if (existingEpisode?.summary && existingEpisode?.processedAt) {
-      // Return cached summary
+      // Return cached summary (no rate limit consumed)
       return NextResponse.json({
         summary: existingEpisode.summary,
         keyTakeaways: existingEpisode.keyTakeaways || [],
@@ -78,6 +69,28 @@ export async function POST(request: NextRequest) {
           status: existingEpisode.summaryStatus,
         },
         { status: 202 }
+      );
+    }
+
+    // Daily rate limit check
+    const dailyLimit = await checkDailyLimit(userId);
+    if (!dailyLimit.allowed) {
+      return NextResponse.json(
+        {
+          error: "Daily summarization limit reached. Please try again tomorrow.",
+          retryAfterMs: dailyLimit.retryAfterMs,
+          dailyLimit: DAILY_SUMMARIZE_LIMIT,
+        },
+        { status: 429 }
+      );
+    }
+
+    // Hourly rate limit check
+    const rateLimit = await checkRateLimit(userId);
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: "Rate limit exceeded. Please try again later." },
+        { status: 429 }
       );
     }
 
