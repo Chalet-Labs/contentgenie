@@ -1,18 +1,6 @@
 # ContentGenie
 
-Podcast discovery, AI-powered summarization, and library management app for busy professionals.
-
-## Tech Stack
-
-- **Framework:** Next.js 14 (App Router), React 18, TypeScript
-- **Styling:** Tailwind CSS, shadcn/ui (Radix primitives)
-- **Auth:** Clerk (`@clerk/nextjs`)
-- **Database:** Neon (serverless Postgres) via Drizzle ORM
-- **AI:** Provider abstraction (OpenRouter + Z.AI) for episode summarization, admin-selectable via Settings
-- **Podcast Data:** PodcastIndex API
-- **Background Jobs:** Trigger.dev (`@trigger.dev/sdk`)
-- **Notifications:** Sonner (toast)
-- **Theme:** next-themes (light/dark/system)
+Podcast discovery, AI-powered summarization, and library management for busy professionals. Stack: Next.js 14 App Router, TypeScript, Tailwind/shadcn-ui, Clerk, Neon + Drizzle, OpenRouter, PodcastIndex, Trigger.dev.
 
 ## Workflow
 
@@ -29,7 +17,7 @@ Podcast discovery, AI-powered summarization, and library management app for busy
 - shadcn/ui components live in `src/components/ui/`. Add new ones with `bunx shadcn@latest add <component>`.
 - Server components are the default. Only add `"use client"` when you need browser APIs, hooks, or event handlers.
 - Server actions use `"use server"` and live in `src/app/actions/`. They handle all data mutations.
-- API routes in `src/app/api/` are for proxying external services (PodcastIndex, OpenRouter) and orchestrating Trigger.dev background tasks that need multipart uploads or realtime access tokens (OPML import, batch summarization).
+- API routes in `src/app/api/` are for proxying external services and orchestrating Trigger.dev background tasks.
 
 ## Development commands
 
@@ -53,132 +41,40 @@ bun run trigger:deploy # Deploy tasks to Trigger.dev Cloud
 
 - **Test framework:** Vitest with React Testing Library. Config: `vitest.config.ts`, setup: `src/test/setup.ts`.
 - **Component stories:** Storybook 8 (`@storybook/react-vite`). Config: `.storybook/main.ts`.
-- CI is defined in `.github/workflows/ci.yml` — it runs lint, tests, Storybook build, and Next.js build on every PR to `main`.
 - Always run `bun run lint`, `bun run test`, and `bun run build` before committing.
-- Unit tests live in `__tests__/` directories co-located with source (`src/lib/__tests__/`, `src/components/__tests__/`, `src/app/api/__tests__/`).
-- Stories live alongside components as `*.stories.tsx` files.
-- After changing imports or moving files, run `bun run lint` to catch broken references.
-- The pre-commit hook automatically runs lint and tests when a `test` script exists.
+- Unit tests live in `__tests__/` directories co-located with source. Stories live alongside components as `*.stories.tsx` files.
+- The pre-commit hook (Husky) automatically runs lint and tests on commit.
+- ADRs live in `docs/adr/` — read the relevant ADR before modifying areas it covers.
 
 ## PR and commit instructions
 
 - Commit message format: `type: Description` (e.g. `feat:`, `fix:`, `chore:`, `refactor:`, `test:`, `docs:`).
-- Keep commit messages concise (1-2 sentences) and focused on the "why".
-- PR title: same format as commits, under 70 characters.
-- PR body: include a `## Summary` with bullet points and a `## Test plan` checklist.
+- Keep commit messages concise (1-2 sentences) focused on the "why".
+- PR title: same format as commits, under 70 characters. PR body: `## Summary` bullets + `## Test plan` checklist.
 - Always run lint and build before pushing. The CI must pass.
 - Update `CHANGELOG.md` under the `[Unreleased]` section when adding features, fixing bugs, or making breaking changes. Use the appropriate subsection: `Added`, `Changed`, `Fixed`, or `Removed`.
 
-## Project structure
-
-```
-src/
-├── app/
-│   ├── layout.tsx            # Root layout (ClerkProvider, ThemeProvider, Toaster)
-│   ├── page.tsx              # Landing page (public)
-│   ├── globals.css
-│   ├── actions/              # Server actions (mutations)
-│   │   ├── collections.ts
-│   │   ├── dashboard.ts
-│   │   ├── library.ts
-│   │   └── subscriptions.ts
-│   ├── api/                  # API routes (external service calls)
-│   │   ├── episodes/[id]/route.ts
-│   │   ├── episodes/summarize/route.ts
-│   │   └── podcasts/search/route.ts
-│   ├── (app)/                # Authenticated app routes
-│   │   ├── layout.tsx        # App shell with sidebar
-│   │   ├── dashboard/
-│   │   ├── discover/
-│   │   ├── episode/
-│   │   ├── library/
-│   │   ├── podcast/
-│   │   ├── settings/
-│   │   └── subscriptions/
-│   └── (auth)/               # Auth routes (sign-in, sign-up)
-├── components/
-│   ├── ui/                   # shadcn/ui primitives (button, card, dialog, etc.)
-│   ├── layout/               # Header, sidebar
-│   ├── dashboard/            # Stats cards, recommendations, recent episodes
-│   ├── podcasts/             # Podcast/episode cards, search results, subscribe
-│   ├── episodes/             # Summary display, ratings, save button
-│   ├── library/              # Saved episodes, collections, bookmarks, notes
-│   └── theme-provider.tsx
-├── db/
-│   ├── index.ts              # Neon connection (drizzle + neon serverless)
-│   └── schema.ts             # Drizzle schema & relations
-├── hooks/
-│   └── use-online-status.ts  # React hook for navigator.onLine via useSyncExternalStore
-├── lib/
-│   ├── offline-cache.ts      # IndexedDB cache service for offline reading (idb-keyval)
-│   ├── openrouter.ts         # OpenRouter API client
-│   ├── podcastindex.ts       # PodcastIndex API client
-│   ├── prompts.ts            # AI prompt templates
-│   └── utils.ts              # cn() utility (clsx + tailwind-merge)
-├── middleware.ts              # Clerk auth middleware (protects non-public routes)
-└── trigger/
-    ├── summarize-episode.ts  # Durable summarization task (Trigger.dev)
-    └── helpers/              # Shared helpers for trigger tasks
-```
-
-## Architecture Decision Records
-
-ADRs are stored in `docs/adr/`. Read them before designing changes that touch the same areas:
-
-- [ADR-001: Distributed Rate Limiting](docs/adr/001-distributed-rate-limiting.md)
-- [ADR-002: Preview Database Migrations](docs/adr/002-preview-database-migrations.md)
-- [ADR-003: Scheduled Feed Polling](docs/adr/003-scheduled-feed-polling.md)
-- [ADR-004: Audio Player State Management](docs/adr/004-audio-player-state-management.md)
-- [ADR-005: DNS-Pinning Fetch to Eliminate TOCTOU in SSRF Protection](docs/adr/005-dns-pinning-ssrf-agent.md)
-- [ADR-006: Bulk OPML Import via Trigger.dev Background Task](docs/adr/006-opml-import-via-trigger-dev.md)
-- [ADR-007: Bulk Re-Summarization via Trigger.dev Parent Task](docs/adr/007-bulk-resummarize-via-trigger-dev.md)
-- [ADR-008: AI Provider Abstraction Layer](docs/adr/008-ai-provider-abstraction.md)
-- [ADR-009: In-App and PWA Push Notification System](docs/adr/009-notification-system-architecture.md)
-- [ADR-010: Per-User Daily Summarization Rate Limit](docs/adr/010-per-user-daily-summarization-limit.md)
-- [ADR-011: Offline Reading via IndexedDB Cache](docs/adr/011-offline-reading-cache.md)
-
-## Architecture patterns
-
-- **App Router with route groups:** `(auth)` for sign-in/sign-up, `(app)` for authenticated pages with shared sidebar layout.
-- **Server actions** (`src/app/actions/`) for all data mutations — subscriptions, library management, collections.
-- **API routes** (`src/app/api/`) for proxying external services (PodcastIndex search, episode summarization) and orchestrating Trigger.dev background tasks (OPML import, batch summarization).
-- **Clerk middleware** protects all routes except `/`, `/sign-in`, `/sign-up`, and `/api/webhooks`.
-- **Component organization:** Feature folders (`dashboard/`, `podcasts/`, `episodes/`, `library/`) alongside shared `ui/` primitives.
-
-## Database schema
-
-Tables: `users`, `podcasts`, `episodes`, `user_subscriptions`, `collections`, `user_library`, `bookmarks`, `ai_config`
-
-- Users are synced from Clerk (text ID primary key).
-- Podcasts/episodes reference PodcastIndex IDs.
-- Episodes have AI-generated fields: `summary`, `key_takeaways`, `worth_it_score`.
-- Type exports available: `User`, `Podcast`, `Episode`, `UserSubscription`, `Collection`, `UserLibraryEntry`, `Bookmark` (and `New*` variants).
-- Schema is defined in `src/db/schema.ts`. After changes, run `bun run db:generate` then `bun run db:push`.
-- Preview deployments run `drizzle-kit push --force` automatically via the `vercel-build` script before `next build`. Production migrations remain manual.
-
 ## Code style
 
-- TypeScript strict mode.
-- Functional React components (no classes).
-- Server components by default; `"use client"` only when needed.
-- `"use server"` directive for server actions.
-- Imports use `@/` path alias.
-- shadcn/ui components in `src/components/ui/`.
+- TypeScript strict mode; functional React components (no classes).
+- `"use client"` only when required; `"use server"` for all server actions.
+- `@/` path alias for all imports — never use relative `./` or `../`.
 - Tailwind for all styling (no CSS modules).
 
 ## Environment & secrets
 
 Secrets are managed via **Doppler** (not `.env` files). Run `doppler setup` after cloning.
 
-See [docs/secrets-management.md](docs/secrets-management.md) for the full list of managed secrets, their types (Server vs Public), and per-environment setup instructions. Key points:
-
-- `NEXT_PUBLIC_*` variables are **inlined at build time** — rebuild after changing them in Doppler.
-- `doppler run --` is already wired into most `bun run` scripts; use `doppler run -- <cmd>` for ad-hoc commands.
-- Vercel environments are synced from Doppler automatically; Trigger.dev Prod secrets are set manually.
+See [docs/secrets-management.md](docs/secrets-management.md) for the full variable reference and per-environment setup. Key points:
+- `NEXT_PUBLIC_*` variables are inlined at build time — rebuild after changing them in Doppler.
+- Vercel environments sync from Doppler automatically; Trigger.dev Prod secrets are set manually.
 
 ## Security
 
 - All non-public routes protected by Clerk middleware.
 - No `.env` files committed — Doppler handles secrets injection.
-- Server actions validate `auth()` before mutations.
-- API routes verify authentication before processing.
+- Server actions validate `auth()` before mutations. API routes verify authentication before processing.
+
+## Project structure & architecture
+
+See [docs/project-structure.md](docs/project-structure.md) for the directory layout, database schema, architecture patterns, and ADR index.
