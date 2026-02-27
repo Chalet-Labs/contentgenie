@@ -77,4 +77,4 @@ See [docs/secrets-management.md](docs/secrets-management.md) for the full variab
 
 ## Project structure & architecture
 
-See [docs/project-structure.md](docs/project-structure.md) for the directory layout, database schema, architecture patterns, and ADR index.
+See `project-structure.md` in project memory for directory layout, database schema, architecture patterns, and ADR index.
