@@ -131,14 +131,22 @@ export default function EpisodePage({ params }: EpisodePageProps) {
     if (!run) return;
 
     if (run.status === "COMPLETED" && run.output) {
-      setSummaryData({
+      const completedSummary = {
         summary: run.output.summary,
         keyTakeaways: run.output.keyTakeaways || [],
         worthItScore: run.output.worthItScore,
         worthItReason: run.output.worthItReason,
         worthItDimensions: run.output.worthItDimensions ?? null,
         cached: false,
-      });
+      };
+      setSummaryData(completedSummary);
+      if (userId && episode && podcast) {
+        void cacheEpisode(userId, episodeId, {
+          episode,
+          podcast,
+          summary: { ...completedSummary, cached: true },
+        });
+      }
       setIsLoadingSummary(false);
       setRunId(null);
       setAccessToken(null);
@@ -233,6 +241,15 @@ export default function EpisodePage({ params }: EpisodePageProps) {
       setIsSaved(saved);
     } catch (error) {
       console.error("Error fetching episode:", error);
+      if (userId) {
+        const cached = await getCachedEpisode(userId, episodeId);
+        if (cached) {
+          setEpisode(cached.episode);
+          setPodcast(cached.podcast);
+          setSummaryData(cached.summary ?? null);
+          return;
+        }
+      }
       setEpisodeError(
         error instanceof Error ? error.message : "Failed to load episode"
       );
@@ -378,6 +395,15 @@ export default function EpisodePage({ params }: EpisodePageProps) {
   }
 
   const artworkUrl = episode.image || episode.feedImage || podcast?.artwork || podcast?.image;
+  const safeEpisodeLink = (() => {
+    if (!episode.link) return null;
+    try {
+      const parsed = new URL(episode.link);
+      return parsed.protocol === "http:" || parsed.protocol === "https:" ? parsed.toString() : null;
+    } catch {
+      return null;
+    }
+  })();
   const categories = podcast?.categories ? Object.values(podcast.categories) : [];
 
   const isCurrentEpisode = playerState.currentEpisode?.id === String(episode.id);
@@ -541,10 +567,10 @@ export default function EpisodePage({ params }: EpisodePageProps) {
                 size="lg"
               />
             )}
-            {isOnline && episode.link && (
+            {isOnline && safeEpisodeLink && (
               <Button variant="outline" size="lg" asChild>
                 <a
-                  href={episode.link}
+                  href={safeEpisodeLink}
                   target="_blank"
                   rel="noopener noreferrer"
                 >
