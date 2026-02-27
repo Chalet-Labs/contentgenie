@@ -345,8 +345,13 @@ describe("trigger/helpers/notifications", () => {
     });
 
     it("returns zero when VAPID keys are not configured", async () => {
-      vi.unstubAllEnvs();
-      // No VAPID env vars set
+      // Explicitly stub to empty strings rather than calling vi.unstubAllEnvs(),
+      // which restores the original process.env values (Doppler injects real VAPID
+      // keys locally, causing the function to proceed past the VAPID check).
+      vi.stubEnv("VAPID_PRIVATE_KEY", "");
+      vi.stubEnv("NEXT_PUBLIC_VAPID_PUBLIC_KEY", "");
+      vi.stubEnv("VAPID_SUBJECT", "");
+      vi.resetModules();
 
       const { sendPushToUser } = await import(
         "@/trigger/helpers/notifications"

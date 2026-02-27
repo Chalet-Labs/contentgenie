@@ -1,6 +1,19 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { parseJsonResponse, generateCompletion } from "@/lib/openrouter";
 
+// generateCompletion routes through @/lib/ai which calls getActiveAiConfig() → DB.
+// Mock the config module so tests never touch the database.
+vi.mock("@/lib/ai/config", () => ({
+  getActiveAiConfig: vi.fn().mockResolvedValue({
+    provider: "openrouter",
+    model: "google/gemini-2.0-flash-001",
+  }),
+  DEFAULT_AI_CONFIG: {
+    provider: "openrouter",
+    model: "google/gemini-2.0-flash-001",
+  },
+}));
+
 describe("parseJsonResponse", () => {
   it("parses plain JSON", () => {
     const result = parseJsonResponse<{ foo: string }>(
