@@ -16,7 +16,7 @@ const store = createStore("contentgenie-offline", "episode-cache");
 
 export interface CachedEpisodeData {
   episode: EpisodeData;
-  podcast: PodcastData;
+  podcast: PodcastData | null;
   summary: SummaryData | null;
   cachedAt: number;
 }
@@ -57,7 +57,7 @@ export interface PodcastData {
 export interface SummaryData {
   summary: string;
   keyTakeaways: string[];
-  worthItScore: number;
+  worthItScore: number | null;
   worthItReason?: string;
   worthItDimensions?: {
     uniqueness: number;

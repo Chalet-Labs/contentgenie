@@ -72,7 +72,7 @@ interface PodcastData {
 interface SummaryData {
   summary: string;
   keyTakeaways: string[];
-  worthItScore: number;
+  worthItScore: number | null;
   worthItReason?: string;
   worthItDimensions?: {
     uniqueness: number;
@@ -119,7 +119,6 @@ export default function EpisodePage({ params }: EpisodePageProps) {
   const [isSaved, setIsSaved] = useState(false);
   const [runId, setRunId] = useState<string | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
-  const [isFromCache, setIsFromCache] = useState(false);
 
   // Realtime subscription to the Trigger.dev run
   const { run } = useRealtimeRun<typeof summarizeEpisode>(runId ?? "", {
@@ -174,7 +173,6 @@ export default function EpisodePage({ params }: EpisodePageProps) {
 
       setEpisode(data.episode);
       setPodcast(data.podcast);
-      setIsFromCache(false);
 
       // Cache episode data for offline use
       if (userId) {
@@ -260,7 +258,6 @@ export default function EpisodePage({ params }: EpisodePageProps) {
       if (cached.summary) {
         setSummaryData(cached.summary);
       }
-      setIsFromCache(true);
     } else {
       setEpisodeError("This episode hasn't been cached for offline viewing. Visit it while online first.");
     }

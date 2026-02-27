@@ -25,9 +25,9 @@ describe("OfflineBanner", () => {
     expect(svg).toBeInTheDocument();
   });
 
-  it("has appropriate role for accessibility", () => {
+  it("has aria-live polite for screen reader announcements", () => {
     render(<OfflineBanner isOffline={true} />);
     const banner = screen.getByRole("status");
-    expect(banner.getAttribute("role")).toBe("status");
+    expect(banner.getAttribute("aria-live")).toBe("polite");
   });
 });
