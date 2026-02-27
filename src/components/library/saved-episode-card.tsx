@@ -216,26 +216,30 @@ export function SavedEpisodeCard({ item, onRemoved, onCollectionChanged, isOffli
           {/* Expandable notes, rating, and bookmarks section */}
           <CollapsibleContent>
             <div className="mt-4 space-y-4 border-t pt-4">
-              {/* Your Rating */}
-              <div>
-                <h4 className="mb-2 text-sm font-medium">Your Rating</h4>
-                <RatingInput
-                  initialRating={item.rating}
-                  onRatingChange={async (rating) => {
-                    return await updateLibraryRating(episode.podcastIndexId, rating);
-                  }}
-                  size="md"
-                  showLabel={true}
-                />
-              </div>
-              <NotesEditor
-                episodePodcastIndexId={episode.podcastIndexId}
-                initialNotes={item.notes || ""}
-              />
-              <BookmarksList
-                libraryEntryId={item.id}
-                episodeDuration={episode.duration}
-              />
+              {!isOffline && (
+                <>
+                  {/* Your Rating */}
+                  <div>
+                    <h4 className="mb-2 text-sm font-medium">Your Rating</h4>
+                    <RatingInput
+                      initialRating={item.rating}
+                      onRatingChange={async (rating) => {
+                        return await updateLibraryRating(episode.podcastIndexId, rating);
+                      }}
+                      size="md"
+                      showLabel={true}
+                    />
+                  </div>
+                  <NotesEditor
+                    episodePodcastIndexId={episode.podcastIndexId}
+                    initialNotes={item.notes || ""}
+                  />
+                  <BookmarksList
+                    libraryEntryId={item.id}
+                    episodeDuration={episode.duration}
+                  />
+                </>
+              )}
             </div>
           </CollapsibleContent>
         </CardContent>

@@ -61,7 +61,12 @@ export default function LibraryPage() {
   }, [sortBy, sortDirection, userId]);
 
   const loadFromCache = useCallback(async () => {
-    if (!userId) return;
+    if (!userId) {
+      setItems([]);
+      setIsFromCache(true);
+      setIsLoading(false);
+      return;
+    }
 
     setIsLoading(true);
     setError(null);
