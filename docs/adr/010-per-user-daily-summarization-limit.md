@@ -104,7 +104,7 @@ When the daily limit is hit, return:
 
 ```json
 {
-  "error": "Daily summarization limit reached. You can summarize up to 5 episodes per day.",
+  "error": "Daily summarization limit reached. Please try again tomorrow.",
   "retryAfterMs": 43200000,
   "dailyLimit": 5
 }

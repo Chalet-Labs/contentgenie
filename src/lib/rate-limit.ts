@@ -7,7 +7,8 @@ import {
 const RATE_LIMIT_POINTS = 10;
 const RATE_LIMIT_DURATION = 3600; // 1 hour in seconds
 
-export const DAILY_SUMMARIZE_LIMIT = Number(process.env.DAILY_SUMMARIZE_LIMIT) || 5;
+const parsedLimit = Number(process.env.DAILY_SUMMARIZE_LIMIT);
+export const DAILY_SUMMARIZE_LIMIT = parsedLimit > 0 ? parsedLimit : 5;
 const DAILY_SUMMARIZE_DURATION = 86400; // 24 hours in seconds
 
 let limiterPromise: Promise<RateLimiterPostgres> | null = null;
