@@ -94,7 +94,10 @@ export async function POST(request: NextRequest) {
     const rateLimit = await checkRateLimit(userId, uncachedIds.length);
     if (!rateLimit.allowed) {
       return NextResponse.json(
-        { error: "Rate limit exceeded. Please try again later." },
+        {
+          error: "Rate limit exceeded. Please try again later.",
+          retryAfterMs: rateLimit.retryAfterMs,
+        },
         { status: 429 }
       );
     }
