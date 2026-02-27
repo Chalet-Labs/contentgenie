@@ -367,6 +367,9 @@ export const pushSubscriptionsRelations = relations(
 );
 
 // Type exports for use in the application
+export type RateLimit = typeof rateLimits.$inferSelect;
+export type NewRateLimit = typeof rateLimits.$inferInsert;
+
 export type User = typeof users.$inferSelect;
 export type NewUser = typeof users.$inferInsert;
 
