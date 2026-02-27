@@ -6,6 +6,7 @@ const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 const MAX_STORAGE_BYTES = 50 * 1024 * 1024; // 50 MB
 const MAX_ENTRIES = 500;
 const PROBE_KEY = "__probe";
+const LIBRARY_CACHE_VERSION = 1;
 
 // ─── Custom Store ─────────────────────────────────────────────────────────────
 
@@ -23,6 +24,7 @@ export interface CachedEpisodeData {
 export interface CachedLibraryData {
   items: LibraryItem[];
   cachedAt: number;
+  cacheVersion?: number;
 }
 
 // Lightweight types matching the shapes used by the pages
@@ -66,7 +68,32 @@ export interface SummaryData {
 }
 
 export interface LibraryItem {
-  [key: string]: unknown;
+  id: number;
+  userId: string;
+  episodeId: number;
+  savedAt: Date;
+  rating: number | null;
+  notes: string | null;
+  collectionId: number | null;
+  episode: {
+    id: number;
+    podcastIndexId: string;
+    title: string;
+    description: string | null;
+    duration: number | null;
+    publishDate: Date | null;
+    worthItScore: string | null;
+    podcast: {
+      id: number;
+      podcastIndexId: string;
+      title: string;
+      imageUrl: string | null;
+    };
+  };
+  collection?: {
+    id: number;
+    name: string;
+  } | null;
 }
 
 // ─── Internal state ───────────────────────────────────────────────────────────
@@ -151,7 +178,7 @@ export async function cacheLibrary(
 
     await enforceStorageBudget();
 
-    const data: CachedLibraryData = { items, cachedAt: Date.now() };
+    const data: CachedLibraryData = { items, cachedAt: Date.now(), cacheVersion: LIBRARY_CACHE_VERSION };
     await safeSet(`library:${userId}`, data);
 
     await requestPersistentStorage();
@@ -168,6 +195,11 @@ export async function getCachedLibrary(
 
     const data = await get<CachedLibraryData>(`library:${userId}`, store);
     if (!data) return undefined;
+
+    if (data.cacheVersion !== LIBRARY_CACHE_VERSION) {
+      void del(`library:${userId}`, store);
+      return undefined;
+    }
 
     if (Date.now() - data.cachedAt > CACHE_TTL_MS) {
       void del(`library:${userId}`, store);
@@ -291,9 +323,8 @@ export async function enforceStorageBudget(): Promise<void> {
 
     if (!shouldEvict) return;
 
-    // Sort by cachedAt ascending (oldest first)
+    // Sort by cachedAt ascending (oldest first); entries missing cachedAt sort first (treated as oldest)
     const sorted = allEntries
-      .filter(([, value]) => value?.cachedAt != null)
       .sort((a, b) => (a[1].cachedAt ?? 0) - (b[1].cachedAt ?? 0));
 
     // Evict oldest 10% (minimum 1)

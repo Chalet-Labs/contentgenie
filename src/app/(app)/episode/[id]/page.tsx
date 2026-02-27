@@ -269,7 +269,7 @@ export default function EpisodePage({ params }: EpisodePageProps) {
   }, [userId, episodeId]);
 
   // Load data: online fetches from server, offline from cache.
-  // Also handles stale-while-revalidate on reconnection since
+  // Automatically refreshes data when connectivity returns since
   // isOnline changing from false to true re-triggers this effect.
   useEffect(() => {
     if (isOnline) {

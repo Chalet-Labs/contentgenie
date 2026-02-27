@@ -27,6 +27,7 @@ describe("OfflineBanner", () => {
 
   it("has appropriate role for accessibility", () => {
     render(<OfflineBanner isOffline={true} />);
-    expect(screen.getByRole("status")).toBeInTheDocument();
+    const banner = screen.getByRole("status");
+    expect(banner.getAttribute("role")).toBe("status");
   });
 });
