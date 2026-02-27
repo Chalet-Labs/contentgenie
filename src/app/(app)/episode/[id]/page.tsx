@@ -201,6 +201,7 @@ export default function EpisodePage({ params }: EpisodePageProps) {
           cached: true,
         });
       } else {
+        setSummaryData(null);
         // Check for in-progress or failed summarization run
         try {
           const statusResponse = await fetch(
@@ -255,10 +256,9 @@ export default function EpisodePage({ params }: EpisodePageProps) {
     if (cached) {
       setEpisode(cached.episode);
       setPodcast(cached.podcast);
-      if (cached.summary) {
-        setSummaryData(cached.summary);
-      }
+      setSummaryData(cached.summary ?? null);
     } else {
+      setSummaryData(null);
       setEpisodeError("This episode hasn't been cached for offline viewing. Visit it while online first.");
     }
 
