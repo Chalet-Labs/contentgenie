@@ -74,7 +74,3 @@ See [docs/secrets-management.md](docs/secrets-management.md) for the full variab
 - All non-public routes protected by Clerk middleware.
 - No `.env` files committed — Doppler handles secrets injection.
 - Server actions validate `auth()` before mutations. API routes verify authentication before processing.
-
-## Project structure & architecture
-
-See `project-structure.md` in project memory for directory layout, database schema, architecture patterns, and ADR index.
