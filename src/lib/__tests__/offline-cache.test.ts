@@ -266,7 +266,6 @@ describe("enforceStorageBudget entry count limit", () => {
   it("evicts oldest 10% of entries when at MAX_ENTRIES (500)", async () => {
     // Seed the store with 500 entries at staggered timestamps
     // We use unique user IDs to avoid TTL collisions in getCachedLibrary
-    const baseTime = Date.now();
     for (let i = 0; i < 500; i++) {
       // Use vi.spyOn on Date.now is not needed here — each write gets a real timestamp.
       // Instead, we manually set cachedAt by writing raw library data via cacheLibrary.
