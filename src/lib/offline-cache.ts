@@ -19,11 +19,13 @@ export interface CachedEpisodeData {
   podcast: PodcastData | null;
   summary: SummaryData | null;
   cachedAt: number;
+  lastAccessedAt: number;
 }
 
 export interface CachedLibraryData {
   items: LibraryItem[];
   cachedAt: number;
+  lastAccessedAt: number;
   cacheVersion?: number;
 }
 
@@ -150,16 +152,16 @@ async function safeSet(key: string, value: unknown): Promise<void> {
 // ─── Evict single oldest entry ────────────────────────────────────────────────
 
 async function evictOldestEntry(): Promise<void> {
-  const allEntries = await entries<string, { cachedAt?: number }>(store);
+  const allEntries = await entries<string, { cachedAt?: number; lastAccessedAt?: number }>(store);
   if (allEntries.length === 0) return;
 
   let oldestKey = allEntries[0][0];
-  let oldestTime = allEntries[0][1]?.cachedAt ?? Infinity;
+  let oldestTime = allEntries[0][1]?.lastAccessedAt ?? allEntries[0][1]?.cachedAt ?? Infinity;
 
   for (const [key, value] of allEntries) {
-    const cachedAt = value?.cachedAt ?? Infinity;
-    if (cachedAt < oldestTime) {
-      oldestTime = cachedAt;
+    const accessTime = value?.lastAccessedAt ?? value?.cachedAt ?? Infinity;
+    if (accessTime < oldestTime) {
+      oldestTime = accessTime;
       oldestKey = key;
     }
   }
@@ -178,7 +180,8 @@ export async function cacheLibrary(
 
     await enforceStorageBudget();
 
-    const data: CachedLibraryData = { items, cachedAt: Date.now(), cacheVersion: LIBRARY_CACHE_VERSION };
+    const now = Date.now();
+    const data: CachedLibraryData = { items, cachedAt: now, lastAccessedAt: now, cacheVersion: LIBRARY_CACHE_VERSION };
     await safeSet(`library:${userId}`, data);
 
     await requestPersistentStorage();
@@ -206,6 +209,7 @@ export async function getCachedLibrary(
       return undefined;
     }
 
+    void safeSet(`library:${userId}`, { ...data, lastAccessedAt: Date.now() });
     return data.items;
   } catch {
     return undefined;
@@ -217,14 +221,15 @@ export async function getCachedLibrary(
 export async function cacheEpisode(
   userId: string,
   podcastIndexId: string,
-  data: Omit<CachedEpisodeData, "cachedAt">,
+  data: Omit<CachedEpisodeData, "cachedAt" | "lastAccessedAt">,
 ): Promise<void> {
   try {
     if (!(await isIdbAvailable())) return;
 
     await enforceStorageBudget();
 
-    const cached: CachedEpisodeData = { ...data, cachedAt: Date.now() };
+    const now = Date.now();
+    const cached: CachedEpisodeData = { ...data, cachedAt: now, lastAccessedAt: now };
     await safeSet(`episode:${userId}:${podcastIndexId}`, cached);
 
     await requestPersistentStorage();
@@ -251,6 +256,7 @@ export async function getCachedEpisode(
       return undefined;
     }
 
+    void safeSet(`episode:${userId}:${podcastIndexId}`, { ...data, lastAccessedAt: Date.now() });
     return data;
   } catch {
     return undefined;
@@ -305,7 +311,7 @@ export async function enforceStorageBudget(): Promise<void> {
     if (!(await isIdbAvailable())) return;
 
     // Check entry count first (works everywhere)
-    const allEntries = await entries<string, { cachedAt?: number }>(store);
+    const allEntries = await entries<string, { cachedAt?: number; lastAccessedAt?: number }>(store);
 
     let shouldEvict = allEntries.length >= MAX_ENTRIES;
 
@@ -323,9 +329,12 @@ export async function enforceStorageBudget(): Promise<void> {
 
     if (!shouldEvict) return;
 
-    // Sort by cachedAt ascending (oldest first); entries missing cachedAt sort first (treated as oldest)
+    // Sort by lastAccessedAt (falling back to cachedAt) ascending — LRU entries evicted first
     const sorted = allEntries
-      .sort((a, b) => (a[1].cachedAt ?? 0) - (b[1].cachedAt ?? 0));
+      .sort((a, b) =>
+        (a[1].lastAccessedAt ?? a[1].cachedAt ?? 0) -
+        (b[1].lastAccessedAt ?? b[1].cachedAt ?? 0),
+      );
 
     // Evict oldest 10% (minimum 1)
     const evictCount = Math.max(1, Math.floor(sorted.length * 0.1));
