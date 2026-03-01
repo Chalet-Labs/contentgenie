@@ -11,6 +11,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
     }
 
+    const contentType = request.headers.get("content-type")?.toLowerCase() ?? "";
+    if (!contentType.includes("application/json")) {
+      return NextResponse.json(
+        { success: false, error: "Unsupported Media Type" },
+        { status: 415 },
+      );
+    }
+
     let body: Record<string, unknown>;
     try {
       body = await request.json();
@@ -19,6 +27,33 @@ export async function POST(request: NextRequest) {
         { success: false, error: "Invalid JSON body" },
         { status: 400 },
       );
+    }
+
+    const allowedKeys = new Set([
+      "podcastIndexId",
+      "title",
+      "description",
+      "audioUrl",
+      "duration",
+      "publishDate",
+      "podcast",
+    ]);
+    if (Object.keys(body).some((k) => !allowedKeys.has(k))) {
+      return NextResponse.json({ success: false, error: "Invalid episode data" }, { status: 400 });
+    }
+
+    const isOptionalString = (v: unknown): v is string | undefined =>
+      v === undefined || v === null || typeof v === "string";
+    const isOptionalNumber = (v: unknown): v is number | undefined =>
+      v === undefined || v === null || (typeof v === "number" && Number.isFinite(v));
+
+    if (
+      !isOptionalString(body.description) ||
+      !isOptionalString(body.audioUrl) ||
+      !isOptionalNumber(body.duration) ||
+      (body.publishDate !== undefined && body.publishDate !== null && typeof body.publishDate !== "string")
+    ) {
+      return NextResponse.json({ success: false, error: "Invalid episode data" }, { status: 400 });
     }
 
     const podcastIndexId = body.podcastIndexId;
