@@ -19,6 +19,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const accept = request.headers.get("accept")?.toLowerCase() ?? "*/*";
+    if (!accept.includes("application/json") && !accept.includes("*/*")) {
+      return NextResponse.json(
+        { success: false, error: "Not Acceptable" },
+        { status: 406 },
+      );
+    }
+
     let body: Record<string, unknown>;
     try {
       body = await request.json();
@@ -43,9 +51,9 @@ export async function POST(request: NextRequest) {
     }
 
     const isOptionalString = (v: unknown): v is string | undefined =>
-      v === undefined || v === null || typeof v === "string";
+      v === undefined || typeof v === "string";
     const isOptionalNumber = (v: unknown): v is number | undefined =>
-      v === undefined || v === null || (typeof v === "number" && Number.isFinite(v));
+      v === undefined || (typeof v === "number" && Number.isFinite(v));
 
     if (
       !isOptionalString(body.description) ||
