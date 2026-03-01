@@ -29,7 +29,14 @@ export async function POST(request: NextRequest) {
 
     let body: Record<string, unknown>;
     try {
-      body = await request.json();
+      const parsed: unknown = await request.json();
+      if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+        return NextResponse.json(
+          { success: false, error: "Invalid JSON body" },
+          { status: 400 },
+        );
+      }
+      body = parsed as Record<string, unknown>;
     } catch {
       return NextResponse.json(
         { success: false, error: "Invalid JSON body" },
@@ -96,6 +103,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const podcastDescription = typeof podcast.description === "string" ? podcast.description : undefined;
+    const podcastPublisher = typeof podcast.publisher === "string" ? podcast.publisher : undefined;
+    const podcastImageUrl = typeof podcast.imageUrl === "string" ? podcast.imageUrl : undefined;
+    const podcastRssFeedUrl = typeof podcast.rssFeedUrl === "string" ? podcast.rssFeedUrl : undefined;
+    const podcastTotalEpisodes =
+      typeof podcast.totalEpisodes === "number" && Number.isFinite(podcast.totalEpisodes)
+        ? podcast.totalEpisodes
+        : undefined;
+    const podcastCategories =
+      Array.isArray(podcast.categories) && podcast.categories.every((c) => typeof c === "string")
+        ? (podcast.categories as string[])
+        : undefined;
+
     // Ensure user exists
     await db
       .insert(users)
@@ -106,31 +126,25 @@ export async function POST(request: NextRequest) {
     const [podcastRecord] = await db
       .insert(podcasts)
       .values({
-        podcastIndexId: podcast.podcastIndexId as string,
-        title: podcast.title as string,
-        description: podcast.description as string | undefined,
-        publisher: podcast.publisher as string | undefined,
-        imageUrl: podcast.imageUrl as string | undefined,
-        rssFeedUrl: podcast.rssFeedUrl as string | undefined,
-        categories:
-          Array.isArray(podcast.categories) && podcast.categories.every((c) => typeof c === "string")
-            ? (podcast.categories as string[])
-            : undefined,
-        totalEpisodes: podcast.totalEpisodes as number | undefined,
+        podcastIndexId: podcast.podcastIndexId,
+        title: podcast.title,
+        description: podcastDescription,
+        publisher: podcastPublisher,
+        imageUrl: podcastImageUrl,
+        rssFeedUrl: podcastRssFeedUrl,
+        categories: podcastCategories,
+        totalEpisodes: podcastTotalEpisodes,
       })
       .onConflictDoUpdate({
         target: podcasts.podcastIndexId,
         set: {
-          title: podcast.title as string,
-          description: podcast.description as string | undefined,
-          publisher: podcast.publisher as string | undefined,
-          imageUrl: podcast.imageUrl as string | undefined,
-          rssFeedUrl: podcast.rssFeedUrl as string | undefined,
-          categories:
-            Array.isArray(podcast.categories) && podcast.categories.every((c) => typeof c === "string")
-              ? (podcast.categories as string[])
-              : undefined,
-          totalEpisodes: podcast.totalEpisodes as number | undefined,
+          title: podcast.title,
+          description: podcastDescription,
+          publisher: podcastPublisher,
+          imageUrl: podcastImageUrl,
+          rssFeedUrl: podcastRssFeedUrl,
+          categories: podcastCategories,
+          totalEpisodes: podcastTotalEpisodes,
           updatedAt: new Date(),
         },
       })
