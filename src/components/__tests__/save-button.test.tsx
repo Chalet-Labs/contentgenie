@@ -3,9 +3,17 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { SaveButton } from "@/components/episodes/save-button";
 
-vi.mock("@/app/actions/library", () => ({
-  saveEpisodeToLibrary: vi.fn(),
-  removeEpisodeFromLibrary: vi.fn(),
+vi.mock("@/lib/offline-actions", () => ({
+  offlineSaveEpisode: vi.fn(),
+  offlineUnsaveEpisode: vi.fn(),
+}));
+
+vi.mock("@/hooks/use-sync-queue", () => ({
+  useSyncQueue: () => ({ hasPending: () => false }),
+}));
+
+vi.mock("@/hooks/use-online-status", () => ({
+  useOnlineStatus: () => true,
 }));
 
 const mockEpisodeData = {
@@ -40,9 +48,9 @@ describe("SaveButton", () => {
     expect(screen.getByText("Saved")).toBeInTheDocument();
   });
 
-  it("calls saveEpisodeToLibrary on click", async () => {
-    const { saveEpisodeToLibrary } = await import("@/app/actions/library");
-    vi.mocked(saveEpisodeToLibrary).mockResolvedValue({
+  it("calls offlineSaveEpisode on click", async () => {
+    const { offlineSaveEpisode } = await import("@/lib/offline-actions");
+    vi.mocked(offlineSaveEpisode).mockResolvedValue({
       success: true,
       message: "Saved",
     });
@@ -51,12 +59,12 @@ describe("SaveButton", () => {
     render(<SaveButton episodeData={mockEpisodeData} />);
 
     await user.click(screen.getByRole("button"));
-    expect(saveEpisodeToLibrary).toHaveBeenCalledWith(mockEpisodeData);
+    expect(offlineSaveEpisode).toHaveBeenCalledWith(mockEpisodeData, true);
   });
 
-  it("calls removeEpisodeFromLibrary when already saved", async () => {
-    const { removeEpisodeFromLibrary } = await import("@/app/actions/library");
-    vi.mocked(removeEpisodeFromLibrary).mockResolvedValue({
+  it("calls offlineUnsaveEpisode when already saved", async () => {
+    const { offlineUnsaveEpisode } = await import("@/lib/offline-actions");
+    vi.mocked(offlineUnsaveEpisode).mockResolvedValue({
       success: true,
       message: "Removed",
     });
@@ -65,12 +73,12 @@ describe("SaveButton", () => {
     render(<SaveButton episodeData={mockEpisodeData} initialSaved={true} />);
 
     await user.click(screen.getByRole("button"));
-    expect(removeEpisodeFromLibrary).toHaveBeenCalledWith("123");
+    expect(offlineUnsaveEpisode).toHaveBeenCalledWith("123", true);
   });
 
   it("shows error toast on failure", async () => {
-    const { saveEpisodeToLibrary } = await import("@/app/actions/library");
-    vi.mocked(saveEpisodeToLibrary).mockResolvedValue({
+    const { offlineSaveEpisode } = await import("@/lib/offline-actions");
+    vi.mocked(offlineSaveEpisode).mockResolvedValue({
       success: false,
       error: "Network error",
     });

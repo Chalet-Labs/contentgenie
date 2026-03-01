@@ -3,9 +3,17 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { SubscribeButton } from "@/components/podcasts/subscribe-button";
 
-vi.mock("@/app/actions/subscriptions", () => ({
-  subscribeToPodcast: vi.fn(),
-  unsubscribeFromPodcast: vi.fn(),
+vi.mock("@/lib/offline-actions", () => ({
+  offlineSubscribe: vi.fn(),
+  offlineUnsubscribe: vi.fn(),
+}));
+
+vi.mock("@/hooks/use-sync-queue", () => ({
+  useSyncQueue: () => ({ hasPending: () => false }),
+}));
+
+vi.mock("@/hooks/use-online-status", () => ({
+  useOnlineStatus: () => true,
 }));
 
 const defaultProps = {
@@ -36,9 +44,9 @@ describe("SubscribeButton", () => {
     expect(screen.getByText("Subscribed")).toBeInTheDocument();
   });
 
-  it("calls subscribeToPodcast on click", async () => {
-    const { subscribeToPodcast } = await import("@/app/actions/subscriptions");
-    vi.mocked(subscribeToPodcast).mockResolvedValue({
+  it("calls offlineSubscribe on click", async () => {
+    const { offlineSubscribe } = await import("@/lib/offline-actions");
+    vi.mocked(offlineSubscribe).mockResolvedValue({
       success: true,
       message: "Subscribed",
     });
@@ -47,14 +55,12 @@ describe("SubscribeButton", () => {
     render(<SubscribeButton {...defaultProps} />);
 
     await user.click(screen.getByRole("button"));
-    expect(subscribeToPodcast).toHaveBeenCalled();
+    expect(offlineSubscribe).toHaveBeenCalled();
   });
 
-  it("calls unsubscribeFromPodcast when already subscribed", async () => {
-    const { unsubscribeFromPodcast } = await import(
-      "@/app/actions/subscriptions"
-    );
-    vi.mocked(unsubscribeFromPodcast).mockResolvedValue({
+  it("calls offlineUnsubscribe when already subscribed", async () => {
+    const { offlineUnsubscribe } = await import("@/lib/offline-actions");
+    vi.mocked(offlineUnsubscribe).mockResolvedValue({
       success: true,
       message: "Unsubscribed",
     });
@@ -63,6 +69,6 @@ describe("SubscribeButton", () => {
     render(<SubscribeButton {...defaultProps} initialSubscribed={true} />);
 
     await user.click(screen.getByRole("button"));
-    expect(unsubscribeFromPodcast).toHaveBeenCalledWith("123");
+    expect(offlineUnsubscribe).toHaveBeenCalledWith("123", true);
   });
 });

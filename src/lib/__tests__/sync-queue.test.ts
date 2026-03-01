@@ -265,12 +265,13 @@ describe("IDB graceful degradation", () => {
   });
 
   it("getPending returns empty array if IDB errors", async () => {
-    // This is a structural test — the function should never throw
-    await expect(getPending()).resolves.not.toThrow();
+    const pending = await getPending();
+    expect(Array.isArray(pending)).toBe(true);
   });
 
   it("getQueueCount returns 0 without throwing on IDB error", async () => {
-    await expect(getQueueCount()).resolves.not.toThrow();
-    expect(await getQueueCount()).toBeGreaterThanOrEqual(0);
+    const count = await getQueueCount();
+    expect(typeof count).toBe("number");
+    expect(count).toBeGreaterThanOrEqual(0);
   });
 });

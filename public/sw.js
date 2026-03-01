@@ -9,12 +9,12 @@ const SYNC_STORE_NAME = "actions";
 const SYNC_TAG = "sync-offline-actions";
 const MAX_RETRY_ATTEMPTS = 3;
 
-const ACTION_ROUTES = {
-  "save-episode": "/api/library/save",
-  "unsave-episode": "/api/library/unsave",
-  subscribe: "/api/subscriptions/subscribe",
-  unsubscribe: "/api/subscriptions/unsubscribe",
-};
+const ACTION_ROUTES = new Map([
+  ["save-episode", "/api/library/save"],
+  ["unsave-episode", "/api/library/unsave"],
+  ["subscribe", "/api/subscriptions/subscribe"],
+  ["unsubscribe", "/api/subscriptions/unsubscribe"],
+]);
 
 // ─── Raw IndexedDB helpers ───────────────────────────────────────────────────
 
@@ -201,6 +201,21 @@ self.addEventListener("notificationclick", (event) => {
   );
 });
 
+// ─── Sync helpers ────────────────────────────────────────────────────────────
+
+async function handleFailedAttempt(db, item, key, lastChance, reason) {
+  item.attempts = (item.attempts || 0) + 1;
+  if (item.attempts >= MAX_RETRY_ATTEMPTS || lastChance) {
+    item.status = "failed";
+    await idbPut(db, key, item);
+    return { id: item.id, status: "failed", reason };
+  } else {
+    item.status = "pending";
+    await idbPut(db, key, item);
+    return { id: item.id, status: "retry", attempts: item.attempts };
+  }
+}
+
 // ─── Background Sync handler ─────────────────────────────────────────────────
 
 self.addEventListener("sync", (event) => {
@@ -229,7 +244,7 @@ async function handleSync(lastChance = false) {
     for (const entry of pendingItems) {
       const item = entry.value;
       const key = entry.key;
-      const route = ACTION_ROUTES[item.action];
+      const route = ACTION_ROUTES.get(item.action);
 
       if (!route) {
         // Unknown action — remove from queue
@@ -259,29 +274,11 @@ async function handleSync(lastChance = false) {
           results.push({ id: item.id, status: "drained", reason: "unauthorized" });
         } else {
           // Server error — increment attempts
-          item.attempts = (item.attempts || 0) + 1;
-          if (item.attempts >= MAX_RETRY_ATTEMPTS || lastChance) {
-            item.status = "failed";
-            await idbPut(db, key, item);
-            results.push({ id: item.id, status: "failed", reason: "max-retries" });
-          } else {
-            item.status = "pending";
-            await idbPut(db, key, item);
-            results.push({ id: item.id, status: "retry", attempts: item.attempts });
-          }
+          results.push(await handleFailedAttempt(db, item, key, lastChance, "max-retries"));
         }
       } catch {
         // Network error during fetch
-        item.attempts = (item.attempts || 0) + 1;
-        if (item.attempts >= MAX_RETRY_ATTEMPTS || lastChance) {
-          item.status = "failed";
-          await idbPut(db, key, item);
-          results.push({ id: item.id, status: "failed", reason: "network-error" });
-        } else {
-          item.status = "pending";
-          await idbPut(db, key, item);
-          results.push({ id: item.id, status: "retry", attempts: item.attempts });
-        }
+        results.push(await handleFailedAttempt(db, item, key, lastChance, "network-error"));
       }
     }
   } finally {

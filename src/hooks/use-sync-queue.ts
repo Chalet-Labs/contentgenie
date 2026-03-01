@@ -39,6 +39,14 @@ export function useSyncQueue() {
     setPendingCount(items.length);
   }, []);
 
+  // Shared retry/fail handler for failed replay attempts
+  const handleRetryOrFail = useCallback(async (item: SyncQueueItem) => {
+    await incrementAttempts(item.id);
+    if (item.attempts + 1 >= MAX_RETRY_ATTEMPTS) {
+      await markFailed(item.id);
+    }
+  }, []);
+
   // Replay all pending queue items via API routes
   const replayAll = useCallback(async () => {
     if (isSyncingRef.current) return;
@@ -66,17 +74,11 @@ export function useSyncQueue() {
             // Session expired — drain immediately, don't retry
             await dequeue(item.id);
           } else {
-            await incrementAttempts(item.id);
-            if (item.attempts + 1 >= MAX_RETRY_ATTEMPTS) {
-              await markFailed(item.id);
-            }
+            await handleRetryOrFail(item);
           }
         } catch {
           // Network error during replay
-          await incrementAttempts(item.id);
-          if (item.attempts + 1 >= MAX_RETRY_ATTEMPTS) {
-            await markFailed(item.id);
-          }
+          await handleRetryOrFail(item);
         }
       }
     } finally {
@@ -84,7 +86,7 @@ export function useSyncQueue() {
       setIsSyncing(false);
       await refreshQueue();
     }
-  }, [refreshQueue]);
+  }, [refreshQueue, handleRetryOrFail]);
 
   // Per-entity pending check
   const hasPending = useCallback(
