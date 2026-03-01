@@ -1,13 +1,15 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { Rss, Check, Loader2 } from "lucide-react";
+import { useState } from "react";
+import { Rss, Check, Loader2, Clock } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { useOnlineStatus } from "@/hooks/use-online-status";
+import { useSyncQueue } from "@/hooks/use-sync-queue";
 import {
-  subscribeToPodcast,
-  unsubscribeFromPodcast,
-} from "@/app/actions/subscriptions";
+  offlineSubscribe,
+  offlineUnsubscribe,
+} from "@/lib/offline-actions";
 
 interface SubscribeButtonProps {
   podcastIndexId: string;
@@ -37,48 +39,65 @@ export function SubscribeButton({
   size = "lg",
 }: SubscribeButtonProps) {
   const [isSubscribed, setIsSubscribed] = useState(initialSubscribed);
-  const [isPending, startTransition] = useTransition();
+  const [isLoading, setIsLoading] = useState(false);
+  const isOnline = useOnlineStatus();
+  const { hasPending } = useSyncQueue();
 
-  const handleToggleSubscription = () => {
-    startTransition(async () => {
+  const entityKey = `podcast:${podcastIndexId}`;
+  const isPendingSync = hasPending(entityKey);
+
+  const handleToggleSubscription = async () => {
+    setIsLoading(true);
+    try {
       if (isSubscribed) {
-        const result = await unsubscribeFromPodcast(podcastIndexId);
+        const result = await offlineUnsubscribe(podcastIndexId, isOnline);
         if (result.success) {
           setIsSubscribed(false);
-          toast.success("Unsubscribed", {
-            description: `You've unsubscribed from ${title}`,
-          });
+          toast.success(
+            result.queued
+              ? "Unsubscribed (will sync when online)"
+              : "Unsubscribed",
+            { description: `You've unsubscribed from ${title}` },
+          );
         } else {
           toast.error("Failed to unsubscribe", {
             description: result.error || "Please try again",
           });
         }
       } else {
-        const result = await subscribeToPodcast({
-          podcastIndexId,
-          title,
-          description,
-          publisher,
-          imageUrl,
-          rssFeedUrl,
-          categories,
-          totalEpisodes,
-          latestEpisodeDate: latestEpisodeDate
-            ? new Date(latestEpisodeDate * 1000)
-            : undefined,
-        });
+        const result = await offlineSubscribe(
+          {
+            podcastIndexId,
+            title,
+            description,
+            publisher,
+            imageUrl,
+            rssFeedUrl,
+            categories,
+            totalEpisodes,
+            latestEpisodeDate: latestEpisodeDate
+              ? new Date(latestEpisodeDate * 1000)
+              : undefined,
+          },
+          isOnline,
+        );
         if (result.success) {
           setIsSubscribed(true);
-          toast.success("Subscribed!", {
-            description: `You're now subscribed to ${title}`,
-          });
+          toast.success(
+            result.queued
+              ? "Subscribed (will sync when online)"
+              : "Subscribed!",
+            { description: `You're now subscribed to ${title}` },
+          );
         } else {
           toast.error("Failed to subscribe", {
             description: result.error || "Please try again",
           });
         }
       }
-    });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   if (isSubscribed) {
@@ -87,26 +106,32 @@ export function SubscribeButton({
         variant="outline"
         size={size}
         onClick={handleToggleSubscription}
-        disabled={isPending}
+        disabled={isLoading}
       >
-        {isPending ? (
+        {isLoading ? (
           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
         ) : (
           <Check className="mr-2 h-4 w-4" />
         )}
         Subscribed
+        {isPendingSync && (
+          <Clock className="ml-1 h-3 w-3 text-muted-foreground" />
+        )}
       </Button>
     );
   }
 
   return (
-    <Button size={size} onClick={handleToggleSubscription} disabled={isPending}>
-      {isPending ? (
+    <Button size={size} onClick={handleToggleSubscription} disabled={isLoading}>
+      {isLoading ? (
         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
       ) : (
         <Rss className="mr-2 h-4 w-4" />
       )}
       Subscribe
+      {isPendingSync && (
+        <Clock className="ml-1 h-3 w-3 text-muted-foreground" />
+      )}
     </Button>
   );
 }
