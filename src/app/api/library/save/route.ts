@@ -66,10 +66,10 @@ export async function POST(request: NextRequest) {
 
     const podcastIndexId = body.podcastIndexId;
     const title = body.title;
-    const description = body.description as string | undefined;
-    const audioUrl = body.audioUrl as string | undefined;
-    const duration = body.duration as number | undefined;
-    const publishDate = body.publishDate as string | undefined;
+    const description = typeof body.description === "string" ? body.description : undefined;
+    const audioUrl = typeof body.audioUrl === "string" ? body.audioUrl : undefined;
+    const duration = typeof body.duration === "number" ? body.duration : undefined;
+    const publishDate = typeof body.publishDate === "string" ? body.publishDate : undefined;
     let publishDateValue: Date | undefined;
     if (publishDate != null) {
       const d = new Date(publishDate);

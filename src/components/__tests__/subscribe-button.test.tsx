@@ -55,7 +55,10 @@ describe("SubscribeButton", () => {
     render(<SubscribeButton {...defaultProps} />);
 
     await user.click(screen.getByRole("button"));
-    expect(offlineSubscribe).toHaveBeenCalled();
+    expect(offlineSubscribe).toHaveBeenCalledWith(
+      expect.objectContaining({ podcastIndexId: "123", title: "Test Podcast" }),
+      true,
+    );
   });
 
   it("calls offlineUnsubscribe when already subscribed", async () => {

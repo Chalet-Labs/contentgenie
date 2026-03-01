@@ -169,7 +169,7 @@ describe("useSyncQueue — online event triggers replayAll", () => {
     });
 
     // getPending should have been called again as part of replayAll
-    expect(mockGetPending.mock.calls.length).toBeGreaterThanOrEqual(callsBefore);
+    expect(mockGetPending.mock.calls.length).toBeGreaterThan(callsBefore);
   });
 });
 
