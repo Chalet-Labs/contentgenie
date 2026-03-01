@@ -27,6 +27,13 @@ export async function POST(request: NextRequest) {
     const audioUrl = body.audioUrl as string | undefined;
     const duration = body.duration as number | undefined;
     const publishDate = body.publishDate as string | undefined;
+    let publishDateValue: Date | undefined;
+    if (publishDate != null) {
+      const d = new Date(publishDate);
+      if (!isNaN(d.getTime())) {
+        publishDateValue = d;
+      }
+    }
     const podcast = body.podcast as Record<string, unknown> | undefined;
 
     if (
@@ -96,7 +103,7 @@ export async function POST(request: NextRequest) {
         description,
         audioUrl,
         duration,
-        publishDate: publishDate ? new Date(publishDate) : undefined,
+        publishDate: publishDateValue,
       })
       .onConflictDoUpdate({
         target: episodes.podcastIndexId,
@@ -105,7 +112,7 @@ export async function POST(request: NextRequest) {
           description,
           audioUrl,
           duration,
-          publishDate: publishDate ? new Date(publishDate) : undefined,
+          publishDate: publishDateValue,
           updatedAt: new Date(),
         },
       })
