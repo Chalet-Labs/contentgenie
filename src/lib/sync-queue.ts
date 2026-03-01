@@ -3,6 +3,7 @@ import { get, set, del, entries, clear, createStore } from "idb-keyval";
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const MAX_QUEUE_SIZE = 100;
+export const SYNC_TAG = "sync-offline-actions";
 
 // ─── Custom Store ─────────────────────────────────────────────────────────────
 // SEPARATE database from contentgenie-offline (idb-keyval cannot share DB names)
@@ -49,6 +50,34 @@ async function isIdbAvailable(): Promise<boolean> {
   }
 
   return _idbAvailable;
+}
+
+// ─── Private helpers ──────────────────────────────────────────────────────────
+
+/** Returns all store entries, or [] when IDB is unavailable. */
+async function getEntries(): Promise<[string, SyncQueueItem][]> {
+  if (!(await isIdbAvailable())) return [];
+  return entries<string, SyncQueueItem>(store);
+}
+
+/** Read-modify-write a single item. No-op if item not found or IDB unavailable. */
+async function updateItem(
+  id: string,
+  patch: Partial<SyncQueueItem> | ((item: SyncQueueItem) => Partial<SyncQueueItem>),
+): Promise<void> {
+  if (!(await isIdbAvailable())) return;
+  const item = await get<SyncQueueItem>(id, store);
+  if (!item) return;
+  const update = typeof patch === "function" ? patch(item) : patch;
+  await set(id, { ...item, ...update }, store);
+}
+
+/** Delete all entries matching predicate. */
+async function deleteWhere(predicate: (item: SyncQueueItem) => boolean): Promise<void> {
+  const allEntries = await getEntries();
+  for (const [key, value] of allEntries) {
+    if (predicate(value)) await del(key, store);
+  }
 }
 
 // ─── Queue CRUD ───────────────────────────────────────────────────────────────
@@ -111,20 +140,11 @@ export async function dequeue(id: string): Promise<void> {
 }
 
 export async function dequeueByEntityKey(entityKey: string): Promise<void> {
-  if (!(await isIdbAvailable())) return;
-
-  const allEntries = await entries<string, SyncQueueItem>(store);
-  for (const [key, value] of allEntries) {
-    if (value.entityKey === entityKey) {
-      await del(key, store);
-    }
-  }
+  await deleteWhere((item) => item.entityKey === entityKey);
 }
 
 export async function getPending(): Promise<SyncQueueItem[]> {
-  if (!(await isIdbAvailable())) return [];
-
-  const allEntries = await entries<string, SyncQueueItem>(store);
+  const allEntries = await getEntries();
   return allEntries
     .map(([, value]) => value)
     .filter((item) => item.status === "pending")
@@ -132,57 +152,31 @@ export async function getPending(): Promise<SyncQueueItem[]> {
 }
 
 export async function markInFlight(id: string): Promise<void> {
-  if (!(await isIdbAvailable())) return;
-
-  const item = await get<SyncQueueItem>(id, store);
-  if (!item) return;
-
-  await set(id, { ...item, status: "in-flight" as const }, store);
+  await updateItem(id, { status: "in-flight" });
 }
 
 export async function markFailed(id: string): Promise<void> {
-  if (!(await isIdbAvailable())) return;
-
-  const item = await get<SyncQueueItem>(id, store);
-  if (!item) return;
-
-  await set(id, { ...item, status: "failed" as const }, store);
+  await updateItem(id, { status: "failed" });
 }
 
 export async function incrementAttempts(id: string): Promise<void> {
-  if (!(await isIdbAvailable())) return;
-
-  const item = await get<SyncQueueItem>(id, store);
-  if (!item) return;
-
-  await set(id, { ...item, attempts: item.attempts + 1, status: "pending" as const }, store);
+  await updateItem(id, (item) => ({ attempts: item.attempts + 1, status: "pending" }));
 }
 
 export async function getQueueCount(): Promise<number> {
-  if (!(await isIdbAvailable())) return 0;
-
-  const allEntries = await entries<string, SyncQueueItem>(store);
+  const allEntries = await getEntries();
   return allEntries.filter(([, v]) => v.status === "pending" || v.status === "in-flight").length;
 }
 
 export async function hasPendingAction(entityKey: string): Promise<boolean> {
-  if (!(await isIdbAvailable())) return false;
-
-  const allEntries = await entries<string, SyncQueueItem>(store);
+  const allEntries = await getEntries();
   return allEntries.some(
     ([, v]) => v.entityKey === entityKey && (v.status === "pending" || v.status === "in-flight"),
   );
 }
 
 export async function clearFailed(): Promise<void> {
-  if (!(await isIdbAvailable())) return;
-
-  const allEntries = await entries<string, SyncQueueItem>(store);
-  for (const [key, value] of allEntries) {
-    if (value.status === "failed") {
-      await del(key, store);
-    }
-  }
+  await deleteWhere((item) => item.status === "failed");
 }
 
 // ─── Testing helpers ──────────────────────────────────────────────────────────
