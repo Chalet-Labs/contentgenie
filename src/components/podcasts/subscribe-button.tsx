@@ -75,7 +75,7 @@ export function SubscribeButton({
             rssFeedUrl,
             categories,
             totalEpisodes,
-            latestEpisodeDate: latestEpisodeDate
+            latestEpisodeDate: latestEpisodeDate != null
               ? new Date(latestEpisodeDate * 1000)
               : undefined,
           },
@@ -95,6 +95,10 @@ export function SubscribeButton({
           });
         }
       }
+    } catch (error) {
+      toast.error(isSubscribed ? "Failed to unsubscribe" : "Failed to subscribe", {
+        description: error instanceof Error ? error.message : "Please try again",
+      });
     } finally {
       setIsLoading(false);
     }

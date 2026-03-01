@@ -52,7 +52,7 @@ Option A. A client-side queue with explicit enqueue/dequeue gives us full contro
 
 - **Separate IDB database:** `createStore("contentgenie-offline-queue", "actions")` to avoid conflicts with the existing `contentgenie-offline` database.
 - **Dedicated API routes** (not a single batch replay endpoint): `POST /api/library/save`, `POST /api/library/unsave`, `POST /api/subscriptions/subscribe`, `POST /api/subscriptions/unsubscribe`. Each route mirrors the logic of its corresponding server action but returns JSON.
-- **Module service worker:** `public/sw.js` migrated to module type, enabling `import` of `idb-keyval` for queue access.
+- **Module service worker:** `public/sw.js` migrated to module type (`{ type: "module" }`). The SW accesses the queue via raw IndexedDB helpers (`openSyncDB`, `idbGetAll`, `idbPut`, `idbDelete`) — `idb-keyval` is not imported in the SW due to ESM compatibility constraints in module workers.
 - **Queue deduplication:** Uses `entityKey` (e.g., `episode:{podcastIndexId}` or `podcast:{podcastIndexId}`) as dedup key. A save + unsave for the same entity cancels both.
 - **Optimistic cache persistence:** On enqueue, also update the IDB offline-cache (`cacheLibrary()` pattern) so optimistic UI survives page reloads before sync completes.
 - **401 handling:** Expired Clerk session (401 from replay) drains the queue item rather than retrying — the user will re-authenticate naturally.
@@ -63,5 +63,5 @@ Option A. A client-side queue with explicit enqueue/dequeue gives us full contro
 - **Modified files:** `public/sw.js` (module migration + sync event handler), `src/components/episodes/save-button.tsx`, `src/components/podcasts/subscribe-button.tsx` (offline-aware toggle), `src/components/pwa/service-worker-registrar.tsx` (module registration + expose registration ref).
 - **No schema changes** — offline queue is entirely client-side (IndexedDB).
 - **No new dependencies** — uses existing `idb-keyval`.
-- **Retry policy:** 3 attempts with exponential backoff (1s, 4s, 9s). After 3 failures, the item is marked `failed` and a toast notifies the user. 401 responses are drained immediately (no retry).
+- **Retry policy:** 3 attempts. Failed items are retried on the next sync trigger (Background Sync event or `online` event — no explicit delay is added by application code; the browser's Background Sync API may impose its own scheduling). After 3 failures, the item is marked `failed`. 401 responses are drained immediately (no retry).
 - **Browser support:** Chromium (Background Sync + module SW), Safari 16.4+/Firefox (online event fallback + module SW). Module SW minimum: Chrome 91, Edge 91, Safari 16.4.

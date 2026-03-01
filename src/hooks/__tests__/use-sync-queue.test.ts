@@ -39,6 +39,7 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 describe("useSyncQueue — pendingCount", () => {
@@ -198,7 +199,9 @@ describe("useSyncQueue — SW message handling", () => {
     const handlers = swListeners.get("message");
     if (handlers) {
       const event = new MessageEvent("message", { data });
-      handlers.forEach((handler) => handler(event));
+      handlers.forEach((handler) => {
+        handler(event);
+      });
     }
   }
 

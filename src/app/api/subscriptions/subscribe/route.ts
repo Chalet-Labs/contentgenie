@@ -40,11 +40,18 @@ export async function POST(request: NextRequest) {
     const publisher = typeof body.publisher === "string" ? body.publisher : undefined;
     const imageUrl = typeof body.imageUrl === "string" ? body.imageUrl : undefined;
     const rssFeedUrl = typeof body.rssFeedUrl === "string" ? body.rssFeedUrl : undefined;
-    const categories = Array.isArray(body.categories) ? body.categories as string[] : undefined;
+    const categories =
+      Array.isArray(body.categories) && body.categories.every((c) => typeof c === "string")
+        ? (body.categories as string[])
+        : undefined;
     const totalEpisodes = typeof body.totalEpisodes === "number" ? body.totalEpisodes : undefined;
-    const latestEpisodeDate = body.latestEpisodeDate
-      ? new Date(body.latestEpisodeDate as string | number)
-      : undefined;
+    let latestEpisodeDate: Date | undefined;
+    if (body.latestEpisodeDate != null) {
+      const d = new Date(body.latestEpisodeDate as string | number);
+      if (!isNaN(d.getTime())) {
+        latestEpisodeDate = d;
+      }
+    }
 
     // Ensure user exists
     await db

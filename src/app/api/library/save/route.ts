@@ -62,7 +62,10 @@ export async function POST(request: NextRequest) {
         publisher: podcast.publisher as string | undefined,
         imageUrl: podcast.imageUrl as string | undefined,
         rssFeedUrl: podcast.rssFeedUrl as string | undefined,
-        categories: podcast.categories as string[] | undefined,
+        categories:
+          Array.isArray(podcast.categories) && podcast.categories.every((c) => typeof c === "string")
+            ? (podcast.categories as string[])
+            : undefined,
         totalEpisodes: podcast.totalEpisodes as number | undefined,
       })
       .onConflictDoUpdate({
@@ -73,7 +76,10 @@ export async function POST(request: NextRequest) {
           publisher: podcast.publisher as string | undefined,
           imageUrl: podcast.imageUrl as string | undefined,
           rssFeedUrl: podcast.rssFeedUrl as string | undefined,
-          categories: podcast.categories as string[] | undefined,
+          categories:
+            Array.isArray(podcast.categories) && podcast.categories.every((c) => typeof c === "string")
+              ? (podcast.categories as string[])
+              : undefined,
           totalEpisodes: podcast.totalEpisodes as number | undefined,
           updatedAt: new Date(),
         },
