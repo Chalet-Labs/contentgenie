@@ -34,7 +34,7 @@ describe("ServiceWorkerRegistrar", () => {
 
     render(<ServiceWorkerRegistrar />);
 
-    expect(registerMock).toHaveBeenCalledWith("/sw.js", { scope: "/" });
+    expect(registerMock).toHaveBeenCalledWith("/sw.js", { scope: "/", type: "module" });
   });
 
   it("does not register when NODE_ENV is not production", () => {
