@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook, act, waitFor } from "@testing-library/react";
 
 // Mock sync-queue before importing the hook
-const mockGetQueueCount = vi.fn();
 const mockGetPending = vi.fn();
 const mockDequeue = vi.fn();
 const mockMarkFailed = vi.fn();
@@ -10,7 +9,6 @@ const mockIncrementAttempts = vi.fn();
 const mockMarkInFlight = vi.fn();
 
 vi.mock("@/lib/sync-queue", () => ({
-  getQueueCount: () => mockGetQueueCount(),
   getPending: () => mockGetPending(),
   dequeue: (...args: unknown[]) => mockDequeue(...args),
   markFailed: (...args: unknown[]) => mockMarkFailed(...args),
@@ -20,7 +18,6 @@ vi.mock("@/lib/sync-queue", () => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockGetQueueCount.mockResolvedValue(0);
   mockGetPending.mockResolvedValue([]);
   mockDequeue.mockResolvedValue(undefined);
   mockMarkFailed.mockResolvedValue(undefined);
@@ -46,8 +43,6 @@ afterEach(() => {
 
 describe("useSyncQueue — pendingCount", () => {
   it("initializes pendingCount to 0", async () => {
-    mockGetQueueCount.mockResolvedValue(0);
-
     const { useSyncQueue } = await import("@/hooks/use-sync-queue");
     const { result } = renderHook(() => useSyncQueue());
 
@@ -56,7 +51,6 @@ describe("useSyncQueue — pendingCount", () => {
   });
 
   it("updates pendingCount from queue after mount", async () => {
-    mockGetQueueCount.mockResolvedValue(3);
     mockGetPending.mockResolvedValue([
       { id: "a", action: "save-episode", entityKey: "episode:1", payload: {}, createdAt: 1, attempts: 0, status: "pending" as const },
       { id: "b", action: "subscribe", entityKey: "podcast:2", payload: {}, createdAt: 2, attempts: 0, status: "pending" as const },
@@ -74,14 +68,10 @@ describe("useSyncQueue — pendingCount", () => {
 
 describe("useSyncQueue — hasPending", () => {
   it("hasPending returns false when queue is empty", async () => {
-    mockGetQueueCount.mockResolvedValue(0);
-    mockGetPending.mockResolvedValue([]);
-
     const { useSyncQueue } = await import("@/hooks/use-sync-queue");
     const { result } = renderHook(() => useSyncQueue());
 
     await waitFor(() => {
-      // After initial load, pendingCount is 0 so pendingItems is []
       expect(result.current.hasPending("episode:xyz")).toBe(false);
     });
   });
@@ -96,7 +86,6 @@ describe("useSyncQueue — hasPending", () => {
       attempts: 0,
       status: "pending" as const,
     };
-    mockGetQueueCount.mockResolvedValue(1);
     mockGetPending.mockResolvedValue([pendingItem]);
 
     const { useSyncQueue } = await import("@/hooks/use-sync-queue");
@@ -120,7 +109,6 @@ describe("useSyncQueue — hasPending", () => {
       attempts: 0,
       status: "pending" as const,
     };
-    mockGetQueueCount.mockResolvedValue(1);
     mockGetPending.mockResolvedValue([pendingItem]);
 
     const { useSyncQueue } = await import("@/hooks/use-sync-queue");
@@ -128,7 +116,6 @@ describe("useSyncQueue — hasPending", () => {
 
     await waitFor(
       () => {
-        // pendingItems loaded, entity:123 present but 999 not
         expect(result.current.pendingCount).toBe(1);
       },
       { timeout: 3000 }
@@ -147,8 +134,6 @@ describe("useSyncQueue — isSyncing state", () => {
   });
 
   it("sets isSyncing to true during replayAll and false after", async () => {
-    mockGetPending.mockResolvedValue([]);
-
     const { useSyncQueue } = await import("@/hooks/use-sync-queue");
     const { result } = renderHook(() => useSyncQueue());
 
@@ -162,8 +147,6 @@ describe("useSyncQueue — isSyncing state", () => {
 
 describe("useSyncQueue — online event triggers replayAll", () => {
   it("calls getPending when online event fires", async () => {
-    mockGetQueueCount.mockResolvedValue(0);
-    mockGetPending.mockResolvedValue([]);
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(JSON.stringify({ success: true }), { status: 200 })
     );
@@ -221,7 +204,6 @@ describe("useSyncQueue — SW message handling", () => {
 
   it("calls refreshQueue when sync-complete message received", async () => {
     setupMockServiceWorker();
-    mockGetQueueCount.mockResolvedValue(0);
 
     const { useSyncQueue } = await import("@/hooks/use-sync-queue");
     renderHook(() => useSyncQueue());
@@ -231,20 +213,19 @@ describe("useSyncQueue — SW message handling", () => {
       await new Promise((r) => setTimeout(r, 0));
     });
 
-    const callsBefore = mockGetQueueCount.mock.calls.length;
+    const callsBefore = mockGetPending.mock.calls.length;
 
     await act(async () => {
       dispatchSWMessage({ type: "sync-complete", results: [] });
       await new Promise((r) => setTimeout(r, 10));
     });
 
-    // getQueueCount should have been called again from refreshQueue
-    expect(mockGetQueueCount.mock.calls.length).toBeGreaterThan(callsBefore);
+    // getPending should have been called again from refreshQueue
+    expect(mockGetPending.mock.calls.length).toBeGreaterThan(callsBefore);
   });
 
   it("does not call refreshQueue for unrelated messages", async () => {
     setupMockServiceWorker();
-    mockGetQueueCount.mockResolvedValue(0);
 
     const { useSyncQueue } = await import("@/hooks/use-sync-queue");
     renderHook(() => useSyncQueue());
@@ -253,15 +234,15 @@ describe("useSyncQueue — SW message handling", () => {
       await new Promise((r) => setTimeout(r, 0));
     });
 
-    const callsBefore = mockGetQueueCount.mock.calls.length;
+    const callsBefore = mockGetPending.mock.calls.length;
 
     await act(async () => {
       dispatchSWMessage({ type: "other-message" });
       await new Promise((r) => setTimeout(r, 10));
     });
 
-    // Should NOT have triggered another getQueueCount call
-    expect(mockGetQueueCount.mock.calls.length).toBe(callsBefore);
+    // Should NOT have triggered another getPending call
+    expect(mockGetPending.mock.calls.length).toBe(callsBefore);
   });
 });
 
@@ -278,7 +259,6 @@ describe("useSyncQueue — 401 drain on replayAll", () => {
     };
 
     mockGetPending.mockResolvedValue([pendingItem]);
-    mockGetQueueCount.mockResolvedValue(0);
 
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(null, { status: 401 })
@@ -308,7 +288,6 @@ describe("useSyncQueue — 401 drain on replayAll", () => {
     };
 
     mockGetPending.mockResolvedValue([pendingItem]);
-    mockGetQueueCount.mockResolvedValue(0);
 
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(JSON.stringify({ success: true }), { status: 200 })
@@ -338,7 +317,6 @@ describe("useSyncQueue — 401 drain on replayAll", () => {
     };
 
     mockGetPending.mockResolvedValue([pendingItem]);
-    mockGetQueueCount.mockResolvedValue(0);
 
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(null, { status: 500 })

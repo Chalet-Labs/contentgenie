@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback, useRef } from "react";
 import {
-  getQueueCount,
   getPending,
   dequeue,
   markFailed,
@@ -33,16 +32,11 @@ export function useSyncQueue() {
   const [pendingItems, setPendingItems] = useState<SyncQueueItem[]>([]);
   const isSyncingRef = useRef(false);
 
-  // Refresh counts and pending items from IDB
+  // Refresh counts and pending items from IDB (single scan)
   const refreshQueue = useCallback(async () => {
-    const count = await getQueueCount();
-    setPendingCount(count);
-    if (count > 0) {
-      const items = await getPending();
-      setPendingItems(items);
-    } else {
-      setPendingItems([]);
-    }
+    const items = await getPending();
+    setPendingItems(items);
+    setPendingCount(items.length);
   }, []);
 
   // Replay all pending queue items via API routes

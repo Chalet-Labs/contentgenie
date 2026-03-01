@@ -1,4 +1,4 @@
-import { enqueue } from "@/lib/sync-queue";
+import { enqueue, SYNC_TAG } from "@/lib/sync-queue";
 import { saveEpisodeToLibrary, removeEpisodeFromLibrary } from "@/app/actions/library";
 import { subscribeToPodcast, unsubscribeFromPodcast } from "@/app/actions/subscriptions";
 
@@ -49,7 +49,7 @@ async function tryRegisterSync(): Promise<void> {
     if (navigator?.serviceWorker) {
       const reg = await navigator.serviceWorker.ready;
       if ("sync" in reg) {
-        await (reg as unknown as { sync: { register: (tag: string) => Promise<void> } }).sync.register("sync-offline-actions");
+        await (reg as unknown as { sync: { register: (tag: string) => Promise<void> } }).sync.register(SYNC_TAG);
       }
     }
   } catch {

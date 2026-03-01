@@ -5,6 +5,7 @@ const mockEnqueue = vi.fn();
 
 vi.mock("@/lib/sync-queue", () => ({
   enqueue: (...args: unknown[]) => mockEnqueue(...args),
+  SYNC_TAG: "sync-offline-actions",
 }));
 
 // Mock server actions
@@ -136,7 +137,8 @@ describe("offlineSaveEpisode", () => {
 
       // Give fire-and-forget (void tryRegisterSync()) a tick to run
       await new Promise((r) => setTimeout(r, 10));
-      expect(mockRegister).toHaveBeenCalledWith("sync-offline-actions");
+      const { SYNC_TAG } = await import("@/lib/sync-queue");
+      expect(mockRegister).toHaveBeenCalledWith(SYNC_TAG);
     });
 
     it("does not throw when serviceWorker is not available", async () => {
