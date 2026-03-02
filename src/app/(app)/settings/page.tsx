@@ -29,6 +29,7 @@ import { toast } from "sonner"
 import { Sun, Moon, Monitor, Bell, Link2, Trash2, ExternalLink, Mail } from "lucide-react"
 import { AiProviderCard } from "@/components/settings/ai-provider-card"
 import { BulkResummarizeCard } from "@/components/settings/bulk-resummarize-card"
+import { InstallAppCard } from "@/components/settings/install-app-card"
 import { NotificationSettings } from "@/components/notifications/notification-settings"
 
 export default function SettingsPage() {
@@ -178,6 +179,9 @@ export default function SettingsPage() {
           <NotificationSettings />
         </CardContent>
       </Card>
+
+      {/* Install App */}
+      <InstallAppCard />
 
       {/* AI Provider (admin only) */}
       <AiProviderCard />
