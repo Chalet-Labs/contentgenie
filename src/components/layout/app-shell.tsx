@@ -4,6 +4,7 @@ import { AudioPlayerProvider, useAudioPlayerState } from "@/contexts/audio-playe
 import { Header } from "@/components/layout/header"
 import { Sidebar } from "@/components/layout/sidebar"
 import { PlayerBar } from "@/components/audio-player/player-bar"
+import { InstallBanner } from "@/components/pwa/install-banner"
 
 function AppShellInner({ children }: { children: React.ReactNode }) {
   const { isVisible } = useAudioPlayerState()
@@ -20,6 +21,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
         </main>
       </div>
       <PlayerBar />
+      <InstallBanner />
     </div>
   )
 }
