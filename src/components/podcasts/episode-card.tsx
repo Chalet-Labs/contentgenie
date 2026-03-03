@@ -9,11 +9,13 @@ import { formatDuration, formatPublishDate } from "@/lib/podcastindex";
 import { ProcessingStatus } from "@/components/episodes/processing-status";
 import { cn, stripHtml } from "@/lib/utils";
 import type { SummaryStatus } from "@/db/schema";
+import { AddToQueueButton } from "@/components/audio-player/add-to-queue-button";
 
 interface EpisodeCardProps {
   episode: PodcastIndexEpisode;
   summaryStatus?: SummaryStatus | null;
   worthItScore?: string | null;
+  showQueueAction?: boolean;
 }
 
 function getScoreColor(score: number): string {
@@ -33,60 +35,79 @@ function ScoreIndicator({ value }: { value: string }) {
   );
 }
 
-export function EpisodeCard({ episode, summaryStatus, worthItScore }: EpisodeCardProps) {
+export function EpisodeCard({ episode, summaryStatus, worthItScore, showQueueAction = false }: EpisodeCardProps) {
+  const hasAudio = Boolean(episode.enclosureUrl);
+
   return (
-    <Link href={`/episode/${episode.id}`}>
-      <Card className={cn("group transition-colors hover:bg-accent", summaryStatus === "completed" && "border-l-2 border-primary")}>
-        <CardContent className="p-4">
-          <div className="flex flex-col gap-3">
-            <div className="flex items-start justify-between gap-4">
-              <div className="min-w-0 flex-1">
-                <h3 className="line-clamp-2 font-semibold group-hover:text-primary">
-                  {episode.title}
-                </h3>
+    <Card className={cn("group transition-colors hover:bg-accent", summaryStatus === "completed" && "border-l-2 border-primary")}>
+      <CardContent className="p-4">
+        <div className="flex gap-2">
+          <Link href={`/episode/${episode.id}`} className="min-w-0 flex-1">
+            <div className="flex flex-col gap-3">
+              <div className="flex items-start justify-between gap-4">
+                <div className="min-w-0 flex-1">
+                  <h3 className="line-clamp-2 font-semibold group-hover:text-primary">
+                    {episode.title}
+                  </h3>
+                </div>
+                <div className="flex shrink-0 items-center gap-1.5">
+                  {episode.episodeType && episode.episodeType !== "full" && (
+                    <Badge variant="secondary" className="text-xs">
+                      {episode.episodeType}
+                    </Badge>
+                  )}
+                  <ProcessingStatus status={summaryStatus ?? null} className="text-xs" />
+                </div>
               </div>
-              <div className="flex shrink-0 items-center gap-1.5">
-                {episode.episodeType && episode.episodeType !== "full" && (
-                  <Badge variant="secondary" className="text-xs">
-                    {episode.episodeType}
-                  </Badge>
+
+              <p className="line-clamp-2 text-sm text-muted-foreground">
+                {episode.description
+                  ? stripHtml(episode.description)
+                  : "No description available"}
+              </p>
+
+              <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
+                <div className="flex items-center gap-1">
+                  <Calendar className="h-3 w-3" />
+                  <span>{formatPublishDate(episode.datePublished)}</span>
+                </div>
+                {episode.duration > 0 && (
+                  <div className="flex items-center gap-1">
+                    <Clock className="h-3 w-3" />
+                    <span>{formatDuration(episode.duration)}</span>
+                  </div>
                 )}
-                <ProcessingStatus status={summaryStatus ?? null} className="text-xs" />
+                {episode.episode !== null && (
+                  <div className="flex items-center gap-1">
+                    <Mic className="h-3 w-3" />
+                    <span>Episode {episode.episode}</span>
+                  </div>
+                )}
+                {episode.season > 0 && (
+                  <span>Season {episode.season}</span>
+                )}
+                {worthItScore != null && <ScoreIndicator value={worthItScore} />}
               </div>
             </div>
+          </Link>
 
-            <p className="line-clamp-2 text-sm text-muted-foreground">
-              {episode.description
-                ? stripHtml(episode.description)
-                : "No description available"}
-            </p>
-
-            <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
-              <div className="flex items-center gap-1">
-                <Calendar className="h-3 w-3" />
-                <span>{formatPublishDate(episode.datePublished)}</span>
-              </div>
-              {episode.duration > 0 && (
-                <div className="flex items-center gap-1">
-                  <Clock className="h-3 w-3" />
-                  <span>{formatDuration(episode.duration)}</span>
-                </div>
-              )}
-              {episode.episode !== null && (
-                <div className="flex items-center gap-1">
-                  <Mic className="h-3 w-3" />
-                  <span>Episode {episode.episode}</span>
-                </div>
-              )}
-              {episode.season > 0 && (
-                <span>Season {episode.season}</span>
-              )}
-              {worthItScore != null && <ScoreIndicator value={worthItScore} />}
+          {showQueueAction && hasAudio && (
+            <div className="flex shrink-0 items-center self-center opacity-0 transition-opacity group-hover:opacity-100 md:opacity-0 max-md:opacity-100">
+              <AddToQueueButton
+                episode={{
+                  id: String(episode.id),
+                  title: episode.title,
+                  podcastTitle: episode.feedTitle ?? "Podcast",
+                  audioUrl: episode.enclosureUrl,
+                  duration: episode.duration,
+                }}
+                variant="icon"
+              />
             </div>
-          </div>
-        </CardContent>
-      </Card>
-    </Link>
+          )}
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 

@@ -1,6 +1,13 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { EpisodeCard } from "./episode-card";
 import type { PodcastIndexEpisode } from "@/lib/podcastindex";
+import {
+  AudioPlayerAPIContext,
+  AudioPlayerStateContext,
+  AudioPlayerProgressContext,
+  type AudioPlayerState,
+  type AudioPlayerAPI,
+} from "@/contexts/audio-player-context";
 
 const baseEpisode: PodcastIndexEpisode = {
   id: 789,
@@ -91,4 +98,53 @@ export const NoSummaryData: Story = {
   args: {
     episode: baseEpisode,
   },
+};
+
+const noopAPI: AudioPlayerAPI = {
+  playEpisode: () => {},
+  togglePlay: () => {},
+  seek: () => {},
+  skipForward: () => {},
+  skipBack: () => {},
+  setVolume: () => {},
+  setPlaybackSpeed: () => {},
+  closePlayer: () => {},
+  addToQueue: () => {},
+  removeFromQueue: () => {},
+  reorderQueue: () => {},
+  clearQueue: () => {},
+  playNext: () => {},
+};
+
+const mockPlayerState: AudioPlayerState = {
+  currentEpisode: null,
+  isPlaying: false,
+  isBuffering: false,
+  isVisible: false,
+  duration: 0,
+  volume: 1,
+  playbackSpeed: 1,
+  hasError: false,
+  errorMessage: null,
+  queue: [],
+};
+
+export const WithQueueAction: Story = {
+  args: {
+    episode: { ...baseEpisode, feedTitle: "Tech Talk Daily" },
+    showQueueAction: true,
+  },
+  decorators: [
+    (Story) => (
+      <AudioPlayerAPIContext.Provider value={noopAPI}>
+        <AudioPlayerStateContext.Provider value={mockPlayerState}>
+          <AudioPlayerProgressContext.Provider
+            value={{ currentTime: 0, buffered: 0 }}
+          >
+            <Story />
+          </AudioPlayerProgressContext.Provider>
+        </AudioPlayerStateContext.Provider>
+      </AudioPlayerAPIContext.Provider>
+    ),
+  ],
 };

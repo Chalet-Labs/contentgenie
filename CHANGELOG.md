@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Episode queue with drag-and-drop reorder, auto-play next with countdown toast, and queue persistence in localStorage (#94)
 - Custom PWA install banner with engagement threshold (visiting 2 distinct pages or 30s on-site), 7-day dismissal cooldown, iOS manual install instructions on settings page (#92)
 - Offline reading of saved episode summaries and key takeaways via IndexedDB cache with 7-day TTL, user-scoped storage, and automatic stale-while-revalidate refresh on reconnection (#89)
 - Per-user daily summarization limit (configurable via `DAILY_SUMMARIZE_LIMIT` env var, default 5) with 24-hour rolling window enforcement on both single and batch summarize routes (#64)

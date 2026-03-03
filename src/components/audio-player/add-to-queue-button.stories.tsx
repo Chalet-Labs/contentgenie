@@ -6,8 +6,26 @@ import {
   AudioPlayerProgressContext,
   type AudioPlayerState,
   type AudioPlayerAPI,
+  type AudioEpisode,
 } from "@/contexts/audio-player-context"
-import { VolumeControl } from "./volume-control"
+import { AddToQueueButton } from "./add-to-queue-button"
+
+const testEpisode: AudioEpisode = {
+  id: "ep-1",
+  title: "How to Build Better Products",
+  podcastTitle: "Design Matters",
+  audioUrl: "https://example.com/audio.mp3",
+  artwork: "https://picsum.photos/seed/podcast/300/300",
+  duration: 2400,
+}
+
+const playingEpisode: AudioEpisode = {
+  id: "ep-playing",
+  title: "Currently Playing Episode",
+  podcastTitle: "Some Podcast",
+  audioUrl: "https://example.com/playing.mp3",
+  duration: 1800,
+}
 
 const noopAPI: AudioPlayerAPI = {
   playEpisode: () => {},
@@ -26,11 +44,11 @@ const noopAPI: AudioPlayerAPI = {
 }
 
 const baseState: AudioPlayerState = {
-  currentEpisode: null,
-  isPlaying: false,
+  currentEpisode: playingEpisode,
+  isPlaying: true,
   isBuffering: false,
-  isVisible: false,
-  duration: 0,
+  isVisible: true,
+  duration: 1800,
   volume: 1,
   playbackSpeed: 1,
   hasError: false,
@@ -58,57 +76,65 @@ function MockProvider({
   )
 }
 
-const meta: Meta<typeof VolumeControl> = {
-  title: "AudioPlayer/VolumeControl",
-  component: VolumeControl,
+const meta: Meta<typeof AddToQueueButton> = {
+  title: "AudioPlayer/AddToQueueButton",
+  component: AddToQueueButton,
 }
 
 export default meta
-type Story = StoryObj<typeof VolumeControl>
+type Story = StoryObj<typeof AddToQueueButton>
 
 export const Default: Story = {
+  args: {
+    episode: testEpisode,
+    variant: "full",
+  },
   decorators: [
     (Story) => (
-      <MockProvider state={{ ...baseState, volume: 1 }}>
-        <div className="p-4">
-          <Story />
-        </div>
+      <MockProvider state={baseState}>
+        <Story />
       </MockProvider>
     ),
   ],
 }
 
-export const Muted: Story = {
+export const IconVariant: Story = {
+  args: {
+    episode: testEpisode,
+    variant: "icon",
+  },
   decorators: [
     (Story) => (
-      <MockProvider state={{ ...baseState, volume: 0 }}>
-        <div className="p-4">
-          <Story />
-        </div>
+      <MockProvider state={baseState}>
+        <Story />
       </MockProvider>
     ),
   ],
 }
 
-export const HalfVolume: Story = {
+export const AlreadyInQueue: Story = {
+  args: {
+    episode: testEpisode,
+    variant: "full",
+  },
   decorators: [
     (Story) => (
-      <MockProvider state={{ ...baseState, volume: 0.5 }}>
-        <div className="p-4">
-          <Story />
-        </div>
+      <MockProvider state={{ ...baseState, queue: [testEpisode] }}>
+        <Story />
       </MockProvider>
     ),
   ],
 }
 
-export const MaxVolume: Story = {
+export const NowPlaying: Story = {
+  args: {
+    episode: playingEpisode,
+    variant: "full",
+  },
   decorators: [
     (Story) => (
-      <MockProvider state={{ ...baseState, volume: 1 }}>
-        <div className="p-4">
-          <Story />
-        </div>
+      <MockProvider state={baseState}>
+        <Story />
       </MockProvider>
     ),
   ],

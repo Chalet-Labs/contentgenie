@@ -29,6 +29,7 @@ export function setupMediaSessionHandlers(handlers: {
   onSeekBackward: () => void
   onSeekForward: () => void
   onStop: () => void
+  onNextTrack?: (() => void) | null
 }): void {
   if (typeof navigator === "undefined" || !("mediaSession" in navigator)) return
 
@@ -37,6 +38,7 @@ export function setupMediaSessionHandlers(handlers: {
   navigator.mediaSession.setActionHandler("seekbackward", handlers.onSeekBackward)
   navigator.mediaSession.setActionHandler("seekforward", handlers.onSeekForward)
   navigator.mediaSession.setActionHandler("stop", handlers.onStop)
+  navigator.mediaSession.setActionHandler("nexttrack", handlers.onNextTrack ?? null)
 }
 
 export function updateMediaSessionPosition(
@@ -66,4 +68,5 @@ export function clearMediaSession(): void {
   navigator.mediaSession.setActionHandler("seekbackward", null)
   navigator.mediaSession.setActionHandler("seekforward", null)
   navigator.mediaSession.setActionHandler("stop", null)
+  navigator.mediaSession.setActionHandler("nexttrack", null)
 }

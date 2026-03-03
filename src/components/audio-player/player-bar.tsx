@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import {
@@ -10,6 +11,7 @@ import {
   X,
   Loader2,
   Rss,
+  ListMusic,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -19,12 +21,14 @@ import {
 import { SeekBar } from "@/components/audio-player/seek-bar"
 import { PlaybackSpeed } from "@/components/audio-player/playback-speed"
 import { VolumeControl } from "@/components/audio-player/volume-control"
+import { QueuePanel } from "@/components/audio-player/queue-panel"
 
 export function PlayerBar() {
-  const { currentEpisode, isPlaying, isBuffering, isVisible } =
+  const { currentEpisode, isPlaying, isBuffering, isVisible, queue } =
     useAudioPlayerState()
   const { togglePlay, skipBack, skipForward, closePlayer } =
     useAudioPlayerAPI()
+  const [queueOpen, setQueueOpen] = useState(false)
 
   if (!isVisible || !currentEpisode) return null
 
@@ -117,9 +121,28 @@ export function PlayerBar() {
           <SeekBar />
         </div>
 
-        {/* Volume/Speed/Close (right) */}
+        {/* Queue/Speed/Volume/Close (right) */}
         <div className="flex flex-1 items-center justify-end gap-2">
           <PlaybackSpeed />
+          <QueuePanel
+            open={queueOpen}
+            onOpenChange={setQueueOpen}
+            trigger={
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label="Queue"
+                className="relative h-8 w-8"
+              >
+                <ListMusic className="h-4 w-4" />
+                {queue.length > 0 && (
+                  <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] font-medium text-primary-foreground">
+                    {queue.length}
+                  </span>
+                )}
+              </Button>
+            }
+          />
           <VolumeControl />
           <Button
             variant="ghost"
@@ -188,6 +211,25 @@ export function PlayerBar() {
               <Play className="h-4 w-4" />
             )}
           </Button>
+          <QueuePanel
+            open={queueOpen}
+            onOpenChange={setQueueOpen}
+            trigger={
+              <Button
+                variant="ghost"
+                size="icon"
+                aria-label="Queue"
+                className="relative h-8 w-8 shrink-0"
+              >
+                <ListMusic className="h-4 w-4" />
+                {queue.length > 0 && (
+                  <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] font-medium text-primary-foreground">
+                    {queue.length}
+                  </span>
+                )}
+              </Button>
+            }
+          />
           <Button
             variant="ghost"
             size="icon"

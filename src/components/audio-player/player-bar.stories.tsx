@@ -19,6 +19,11 @@ const noopAPI: AudioPlayerAPI = {
   setVolume: () => {},
   setPlaybackSpeed: () => {},
   closePlayer: () => {},
+  addToQueue: () => {},
+  removeFromQueue: () => {},
+  reorderQueue: () => {},
+  clearQueue: () => {},
+  playNext: () => {},
 }
 
 const defaultProgress: AudioPlayerProgress = {
@@ -36,6 +41,7 @@ const baseState: AudioPlayerState = {
   playbackSpeed: 1,
   hasError: false,
   errorMessage: null,
+  queue: [],
 }
 
 const testEpisode = {
@@ -175,6 +181,45 @@ export const Buffering: Story = {
           duration: 2400,
         }}
         progress={{ currentTime: 45, buffered: 50 }}
+      >
+        <div className="min-h-[200px]">
+          <Story />
+        </div>
+      </MockProvider>
+    ),
+  ],
+}
+
+export const WithQueue: Story = {
+  decorators: [
+    (Story) => (
+      <MockProvider
+        state={{
+          ...baseState,
+          currentEpisode: testEpisode,
+          isPlaying: true,
+          isVisible: true,
+          duration: 2400,
+          queue: [
+            {
+              id: "ep-3",
+              title: "The Future of Web Development",
+              podcastTitle: "Frontend First",
+              audioUrl: "https://example.com/audio3.mp3",
+              artwork: "https://picsum.photos/seed/podcast3/300/300",
+              duration: 1800,
+            },
+            {
+              id: "ep-4",
+              title: "Understanding TypeScript Generics",
+              podcastTitle: "TypeScript Weekly",
+              audioUrl: "https://example.com/audio4.mp3",
+              artwork: "https://picsum.photos/seed/podcast4/300/300",
+              duration: 3600,
+            },
+          ],
+        }}
+        progress={{ currentTime: 340, buffered: 800 }}
       >
         <div className="min-h-[200px]">
           <Story />
