@@ -45,7 +45,6 @@ export function usePwaInstall(): UsePwaInstallReturn {
   const [isInstalled, setIsInstalled] = useState(false);
   const [engaged, setEngaged] = useState(false);
   const [dismissed, setDismissed] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
 
   const visitedPaths = useRef<Set<string>>(new Set());
   const pathname = usePathname();
@@ -114,19 +113,6 @@ export function usePwaInstall(): UsePwaInstallReturn {
     setDismissed(isDismissed());
   }, []);
 
-  // --- Mobile viewport detection ---
-  useEffect(() => {
-    const mql = window.matchMedia("(max-width: 767px)");
-    setIsMobile(mql.matches);
-
-    function handleChange(e: MediaQueryListEvent) {
-      setIsMobile(e.matches);
-    }
-
-    mql.addEventListener("change", handleChange);
-    return () => mql.removeEventListener("change", handleChange);
-  }, []);
-
   // --- promptInstall ---
   const promptInstall = useCallback(async (): Promise<boolean> => {
     const prompt = deferredPrompt.current;
@@ -150,7 +136,7 @@ export function usePwaInstall(): UsePwaInstallReturn {
   }, []);
 
   const canInstall =
-    promptAvailable && engaged && !dismissed && !isInstalled && isMobile;
+    promptAvailable && engaged && !dismissed && !isInstalled;
 
   return { canInstall, isInstalled, promptInstall, dismiss };
 }

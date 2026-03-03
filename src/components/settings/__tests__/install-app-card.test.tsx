@@ -6,6 +6,9 @@ import { InstallAppCard } from "@/components/settings/install-app-card";
 const mockPromptInstall = vi.fn().mockResolvedValue(true);
 const mockDismiss = vi.fn();
 
+const originalMaxTouchPoints = navigator.maxTouchPoints;
+const originalPlatform = navigator.platform;
+
 let hookReturn = {
   canInstall: false,
   isInstalled: false,
@@ -29,6 +32,14 @@ beforeEach(() => {
 afterEach(() => {
   vi.clearAllMocks();
   vi.restoreAllMocks();
+  Object.defineProperty(navigator, "maxTouchPoints", {
+    value: originalMaxTouchPoints,
+    configurable: true,
+  });
+  Object.defineProperty(navigator, "platform", {
+    value: originalPlatform,
+    configurable: true,
+  });
 });
 
 describe("InstallAppCard", () => {
@@ -58,27 +69,20 @@ describe("InstallAppCard", () => {
   });
 
   it("renders iOS instructions when UA contains iPhone", () => {
-    Object.defineProperty(navigator, "userAgent", {
-      value: "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)",
-      configurable: true,
-    });
+    vi.spyOn(navigator, "userAgent", "get").mockReturnValue(
+      "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X)",
+    );
 
     render(<InstallAppCard />);
 
     expect(screen.getByText(/Share/)).toBeInTheDocument();
     expect(screen.getByText(/Add to Home Screen/)).toBeInTheDocument();
-
-    Object.defineProperty(navigator, "userAgent", {
-      value: "",
-      configurable: true,
-    });
   });
 
   it("renders iOS instructions when platform is MacIntel with touch", () => {
-    Object.defineProperty(navigator, "userAgent", {
-      value: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)",
-      configurable: true,
-    });
+    vi.spyOn(navigator, "userAgent", "get").mockReturnValue(
+      "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)",
+    );
     Object.defineProperty(navigator, "platform", {
       value: "MacIntel",
       configurable: true,
@@ -92,22 +96,12 @@ describe("InstallAppCard", () => {
 
     expect(screen.getByText(/Share/)).toBeInTheDocument();
     expect(screen.getByText(/Add to Home Screen/)).toBeInTheDocument();
-
-    Object.defineProperty(navigator, "platform", {
-      value: "",
-      configurable: true,
-    });
-    Object.defineProperty(navigator, "maxTouchPoints", {
-      value: 0,
-      configurable: true,
-    });
   });
 
   it("renders 'not available' message on other browsers", () => {
-    Object.defineProperty(navigator, "userAgent", {
-      value: "Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/115.0",
-      configurable: true,
-    });
+    vi.spyOn(navigator, "userAgent", "get").mockReturnValue(
+      "Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 Firefox/115.0",
+    );
     Object.defineProperty(navigator, "platform", {
       value: "Linux x86_64",
       configurable: true,
@@ -122,10 +116,5 @@ describe("InstallAppCard", () => {
     expect(
       screen.getByText("Install is not available on this browser."),
     ).toBeInTheDocument();
-
-    Object.defineProperty(navigator, "userAgent", {
-      value: "",
-      configurable: true,
-    });
   });
 });

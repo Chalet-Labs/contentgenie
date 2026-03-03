@@ -116,14 +116,16 @@ describe("usePwaInstall", () => {
       writable: true,
     });
 
-    const { result } = renderHook(() => usePwaInstall());
-    expect(result.current.isInstalled).toBe(true);
-
-    Object.defineProperty(navigator, "standalone", {
-      value: undefined,
-      configurable: true,
-      writable: true,
-    });
+    try {
+      const { result } = renderHook(() => usePwaInstall());
+      expect(result.current.isInstalled).toBe(true);
+    } finally {
+      Object.defineProperty(navigator, "standalone", {
+        value: undefined,
+        configurable: true,
+        writable: true,
+      });
+    }
   });
 
   it("returns isInstalled: true reactively when appinstalled fires", () => {
@@ -278,7 +280,7 @@ describe("usePwaInstall", () => {
     expect(result.current).toBeDefined();
   });
 
-  it("returns canInstall: false on non-mobile viewport", () => {
+  it("returns canInstall: true regardless of viewport (presentation handled by components)", () => {
     window.matchMedia = createMockMatchMedia({
       "(max-width: 767px)": false,
       "(display-mode: standalone)": false,
@@ -293,7 +295,7 @@ describe("usePwaInstall", () => {
       vi.advanceTimersByTime(30_000);
     });
 
-    expect(result.current.canInstall).toBe(false);
+    expect(result.current.canInstall).toBe(true);
   });
 
   it("cleans up event listeners on unmount", () => {
