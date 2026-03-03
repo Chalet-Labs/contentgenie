@@ -35,6 +35,22 @@ export function PlayerBar() {
   const episodeHref = `/episode/${currentEpisode.id}`
   const episodeAriaLabel = `View episode: ${currentEpisode.title} - ${currentEpisode.podcastTitle}`
 
+  const queueTrigger = (
+    <Button
+      variant="ghost"
+      size="icon"
+      aria-label="Queue"
+      className="relative h-8 w-8 shrink-0"
+    >
+      <ListMusic className="h-4 w-4" />
+      {queue.length > 0 && (
+        <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] font-medium text-primary-foreground">
+          {queue.length}
+        </span>
+      )}
+    </Button>
+  )
+
   return (
     <div
       role="region"
@@ -127,21 +143,7 @@ export function PlayerBar() {
           <QueuePanel
             open={queueOpen}
             onOpenChange={setQueueOpen}
-            trigger={
-              <Button
-                variant="ghost"
-                size="icon"
-                aria-label="Queue"
-                className="relative h-8 w-8"
-              >
-                <ListMusic className="h-4 w-4" />
-                {queue.length > 0 && (
-                  <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] font-medium text-primary-foreground">
-                    {queue.length}
-                  </span>
-                )}
-              </Button>
-            }
+            trigger={queueTrigger}
           />
           <VolumeControl />
           <Button
@@ -214,21 +216,7 @@ export function PlayerBar() {
           <QueuePanel
             open={queueOpen}
             onOpenChange={setQueueOpen}
-            trigger={
-              <Button
-                variant="ghost"
-                size="icon"
-                aria-label="Queue"
-                className="relative h-8 w-8 shrink-0"
-              >
-                <ListMusic className="h-4 w-4" />
-                {queue.length > 0 && (
-                  <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] font-medium text-primary-foreground">
-                    {queue.length}
-                  </span>
-                )}
-              </Button>
-            }
+            trigger={queueTrigger}
           />
           <Button
             variant="ghost"
