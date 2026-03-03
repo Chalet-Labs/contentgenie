@@ -8,6 +8,7 @@ const mockDismiss = vi.fn();
 
 let usePwaInstallMock = {
   canInstall: false,
+  isInstallable: false,
   isInstalled: false,
   promptInstall: mockPromptInstall,
   dismiss: mockDismiss,
@@ -20,6 +21,7 @@ vi.mock("@/hooks/use-pwa-install", () => ({
 beforeEach(() => {
   usePwaInstallMock = {
     canInstall: false,
+    isInstallable: false,
     isInstalled: false,
     promptInstall: mockPromptInstall,
     dismiss: mockDismiss,

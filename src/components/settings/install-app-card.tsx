@@ -20,7 +20,7 @@ function isIos(): boolean {
 }
 
 export function InstallAppCard() {
-  const { canInstall, isInstalled, promptInstall } = usePwaInstall();
+  const { isInstallable, isInstalled, promptInstall } = usePwaInstall();
 
   return (
     <Card>
@@ -41,7 +41,7 @@ export function InstallAppCard() {
               Installed
             </span>
           </div>
-        ) : canInstall ? (
+        ) : isInstallable ? (
           <Button onClick={() => void promptInstall()}>Install</Button>
         ) : isIos() ? (
           <ol className="space-y-3 text-sm">

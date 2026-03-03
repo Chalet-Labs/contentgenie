@@ -14,7 +14,7 @@ The `beforeinstallprompt` event (Chrome, Edge, Samsung Internet, Opera) allows d
 
 1. **`beforeinstallprompt` is Chromium-only.** Safari and Firefox do not fire it. On iOS, the only install path is the manual "Add to Home Screen" flow, so the settings page needs iOS-specific instructions.
 2. **Standalone detection.** Once installed, the banner must never appear. CSS media query `(display-mode: standalone)` and `navigator.standalone` (Safari) detect this.
-3. **Engagement gating.** Showing install prompts immediately is counterproductive. A threshold of 2 page navigations OR 30 seconds on-site ensures the user has demonstrated interest.
+3. **Engagement gating.** Showing install prompts immediately is counterproductive. A threshold of visiting 2 distinct pages (including the initial page load) OR 30 seconds on-site ensures the user has demonstrated interest. Because the initial load counts as the first page, engagement is reached after a single navigation.
 4. **Dismissal cooldown.** If the user closes the banner, it should not reappear for 7 days. localStorage is sufficient for this — no IndexedDB needed.
 5. **Mobile-only.** The banner targets mobile viewport widths only (the CSS `md:` breakpoint hides it on tablet/desktop).
 

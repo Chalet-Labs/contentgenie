@@ -167,7 +167,7 @@ describe("usePwaInstall", () => {
     expect(result.current.canInstall).toBe(false);
   });
 
-  it("returns canInstall: true after 2 navigations", () => {
+  it("returns canInstall: true after visiting 2 unique paths", () => {
     mockPathname = "/page1";
     const { result, rerender } = renderHook(() => usePwaInstall());
 
