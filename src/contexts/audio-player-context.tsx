@@ -11,6 +11,7 @@ import {
   type ReactNode,
 } from "react"
 import { toast } from "sonner"
+import { arrayMove } from "@dnd-kit/sortable"
 import {
   updateMediaSessionMetadata,
   setupMediaSessionHandlers,
@@ -88,15 +89,7 @@ type Action =
   | { type: "REMOVE_FROM_QUEUE"; episodeId: string }
   | { type: "REORDER_QUEUE"; oldIndex: number; newIndex: number }
   | { type: "CLEAR_QUEUE" }
-  | { type: "PLAY_NEXT" }
   | { type: "INIT_QUEUE"; queue: AudioEpisode[] }
-
-function arrayMove<T>(arr: T[], from: number, to: number): T[] {
-  const copy = [...arr]
-  const [item] = copy.splice(from, 1)
-  copy.splice(to, 0, item)
-  return copy
-}
 
 function reducer(state: AudioPlayerState, action: Action): AudioPlayerState {
   switch (action.type) {
@@ -170,21 +163,6 @@ function reducer(state: AudioPlayerState, action: Action): AudioPlayerState {
     }
     case "CLEAR_QUEUE":
       return { ...state, queue: [] }
-    case "PLAY_NEXT": {
-      if (state.queue.length === 0) return state
-      const [next, ...rest] = state.queue
-      return {
-        ...state,
-        currentEpisode: next,
-        isPlaying: true,
-        isBuffering: true,
-        isVisible: true,
-        hasError: false,
-        errorMessage: null,
-        duration: next.duration ?? 0,
-        queue: rest,
-      }
-    }
     case "INIT_QUEUE":
       return { ...state, queue: action.queue }
     default:
@@ -415,9 +393,8 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
           api.playEpisode(episode)
           return
         }
-        // Don't add if already in queue or currently playing
+        // Don't add if currently playing (queue dedup handled by reducer)
         if (current.currentEpisode.id === episode.id) return
-        if (current.queue.some((ep) => ep.id === episode.id)) return
         dispatch({ type: "ADD_TO_QUEUE", episode })
       },
 
@@ -447,6 +424,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
   )
 
   // ---- Media Session handlers ----
+  const hasQueueItems = state.queue.length > 0
   useEffect(() => {
     setupMediaSessionHandlers({
       onPlay: api.togglePlay,
@@ -454,10 +432,10 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       onSeekBackward: () => api.skipBack(),
       onSeekForward: () => api.skipForward(),
       onStop: api.closePlayer,
-      onNextTrack: state.queue.length > 0 ? api.playNext : null,
+      onNextTrack: hasQueueItems ? api.playNext : null,
     })
     return () => clearMediaSession()
-  }, [api, state.queue.length])
+  }, [api, hasQueueItems])
 
   // ---- Audio event listeners ----
   useEffect(() => {

@@ -37,15 +37,15 @@ import {
 import { useMediaQuery } from "@/hooks/use-media-query"
 import { QueueItem } from "@/components/audio-player/queue-item"
 
+const TOUCH_SENSOR_OPTIONS = { activationConstraint: { delay: 250, tolerance: 5 } }
+
 function QueueList() {
   const { queue } = useAudioPlayerState()
   const { removeFromQueue, reorderQueue, clearQueue, playEpisode } =
     useAudioPlayerAPI()
 
   const mouseSensor = useSensor(MouseSensor)
-  const touchSensor = useSensor(TouchSensor, {
-    activationConstraint: { delay: 250, tolerance: 5 },
-  })
+  const touchSensor = useSensor(TouchSensor, TOUCH_SENSOR_OPTIONS)
   const keyboardSensor = useSensor(KeyboardSensor, {
     coordinateGetter: sortableKeyboardCoordinates,
   })
