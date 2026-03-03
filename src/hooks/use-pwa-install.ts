@@ -5,12 +5,14 @@ import { usePathname } from "next/navigation";
 
 const DISMISS_KEY = "pwa-install-dismissed";
 const DISMISS_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
-const ENGAGEMENT_NAV_COUNT = 2;
+const ENGAGEMENT_PAGE_COUNT = 2;
 const ENGAGEMENT_TIME_MS = 30_000; // 30 seconds
 
 export interface UsePwaInstallReturn {
-  /** True when the install banner should be shown */
+  /** True when the install banner should be shown (engagement + not dismissed) */
   canInstall: boolean;
+  /** True when the native install prompt is available (ignores engagement/dismissal) */
+  isInstallable: boolean;
   /** True when running in standalone/installed mode */
   isInstalled: boolean;
   /** Trigger the native install prompt. Returns true if user accepted. */
@@ -95,7 +97,7 @@ export function usePwaInstall(): UsePwaInstallReturn {
   // --- Engagement: navigation count ---
   useEffect(() => {
     visitedPaths.current.add(pathname);
-    if (visitedPaths.current.size >= ENGAGEMENT_NAV_COUNT) {
+    if (visitedPaths.current.size >= ENGAGEMENT_PAGE_COUNT) {
       setEngaged(true);
     }
   }, [pathname]);
@@ -138,5 +140,7 @@ export function usePwaInstall(): UsePwaInstallReturn {
   const canInstall =
     promptAvailable && engaged && !dismissed && !isInstalled;
 
-  return { canInstall, isInstalled, promptInstall, dismiss };
+  const isInstallable = promptAvailable && !isInstalled;
+
+  return { canInstall, isInstallable, isInstalled, promptInstall, dismiss };
 }

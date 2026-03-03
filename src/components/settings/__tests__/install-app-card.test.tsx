@@ -11,6 +11,7 @@ const originalPlatform = navigator.platform;
 
 let hookReturn = {
   canInstall: false,
+  isInstallable: false,
   isInstalled: false,
   promptInstall: mockPromptInstall,
   dismiss: mockDismiss,
@@ -23,6 +24,7 @@ vi.mock("@/hooks/use-pwa-install", () => ({
 beforeEach(() => {
   hookReturn = {
     canInstall: false,
+    isInstallable: false,
     isInstalled: false,
     promptInstall: mockPromptInstall,
     dismiss: mockDismiss,
@@ -50,8 +52,8 @@ describe("InstallAppCard", () => {
     expect(screen.getByText("Installed")).toBeInTheDocument();
   });
 
-  it("renders Install button when canInstall is true", () => {
-    hookReturn.canInstall = true;
+  it("renders Install button when isInstallable is true", () => {
+    hookReturn.isInstallable = true;
     render(<InstallAppCard />);
 
     expect(
@@ -60,7 +62,7 @@ describe("InstallAppCard", () => {
   });
 
   it("Install button calls promptInstall", async () => {
-    hookReturn.canInstall = true;
+    hookReturn.isInstallable = true;
     const user = userEvent.setup();
     render(<InstallAppCard />);
 
