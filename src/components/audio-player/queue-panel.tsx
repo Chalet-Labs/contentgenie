@@ -15,7 +15,8 @@ import {
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable"
-import { ListMusic, Trash2 } from "lucide-react"
+import { ListMusic, Trash2, Volume2, Rss } from "lucide-react"
+import Image from "next/image"
 import { Button } from "@/components/ui/button"
 import {
   Popover,
@@ -38,6 +39,49 @@ import { useMediaQuery } from "@/hooks/use-media-query"
 import { QueueItem } from "@/components/audio-player/queue-item"
 
 const TOUCH_SENSOR_OPTIONS = { activationConstraint: { delay: 250, tolerance: 5 } }
+
+function NowPlaying() {
+  const { currentEpisode } = useAudioPlayerState()
+
+  if (!currentEpisode) return null
+
+  return (
+    <div className="border-b pb-3">
+      <div className="flex items-center gap-2 pb-2">
+        <Volume2 className="h-3.5 w-3.5 text-primary" />
+        <span className="text-sm font-medium">Now Playing</span>
+      </div>
+      <div className="flex items-center gap-2 rounded-md bg-primary/5 p-2">
+        <div className="relative h-9 w-9 shrink-0 overflow-hidden rounded bg-muted">
+          {currentEpisode.artwork ? (
+            <Image
+              src={currentEpisode.artwork}
+              alt=""
+              fill
+              className="object-cover"
+              sizes="36px"
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center text-muted-foreground">
+              <Rss className="h-3.5 w-3.5" />
+            </div>
+          )}
+        </div>
+        <div className="min-w-0">
+          <p className="truncate text-sm font-medium" title={currentEpisode.title}>
+            {currentEpisode.title}
+          </p>
+          <p
+            className="truncate text-xs text-muted-foreground"
+            title={currentEpisode.podcastTitle}
+          >
+            {currentEpisode.podcastTitle}
+          </p>
+        </div>
+      </div>
+    </div>
+  )
+}
 
 function QueueList() {
   const { queue } = useAudioPlayerState()
@@ -64,21 +108,25 @@ function QueueList() {
 
   if (queue.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center py-8 text-center">
-        <ListMusic className="mb-3 h-10 w-10 text-muted-foreground/50" />
-        <p className="text-sm font-medium text-muted-foreground">
-          Your queue is empty
-        </p>
-        <p className="mt-1 text-xs text-muted-foreground/70">
-          Add episodes from episode pages or cards
-        </p>
+      <div className="flex flex-col">
+        <NowPlaying />
+        <div className="flex flex-col items-center justify-center py-8 text-center">
+          <ListMusic className="mb-3 h-10 w-10 text-muted-foreground/50" />
+          <p className="text-sm font-medium text-muted-foreground">
+            Your queue is empty
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground/70">
+            Add episodes from episode pages or cards
+          </p>
+        </div>
       </div>
     )
   }
 
   return (
     <div className="flex flex-col">
-      <div className="flex items-center justify-between pb-2">
+      <NowPlaying />
+      <div className="flex items-center justify-between pb-2 pt-3">
         <div className="flex items-center gap-2">
           <span className="text-sm font-medium">Up Next</span>
           <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
