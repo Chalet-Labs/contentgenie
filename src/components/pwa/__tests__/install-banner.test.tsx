@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { InstallBanner } from "@/components/pwa/install-banner";
@@ -6,31 +6,38 @@ import { InstallBanner } from "@/components/pwa/install-banner";
 const mockPromptInstall = vi.fn().mockResolvedValue(true);
 const mockDismiss = vi.fn();
 
+let usePwaInstallMock = {
+  canInstall: false,
+  isInstalled: false,
+  promptInstall: mockPromptInstall,
+  dismiss: mockDismiss,
+};
+
 vi.mock("@/hooks/use-pwa-install", () => ({
-  usePwaInstall: () => ({
-    canInstall: mockCanInstall,
+  usePwaInstall: () => usePwaInstallMock,
+}));
+
+beforeEach(() => {
+  usePwaInstallMock = {
+    canInstall: false,
     isInstalled: false,
     promptInstall: mockPromptInstall,
     dismiss: mockDismiss,
-  }),
-}));
-
-let mockCanInstall = false;
+  };
+});
 
 afterEach(() => {
   vi.clearAllMocks();
-  mockCanInstall = false;
 });
 
 describe("InstallBanner", () => {
   it("renders nothing when canInstall is false", () => {
-    mockCanInstall = false;
     const { container } = render(<InstallBanner />);
     expect(container.innerHTML).toBe("");
   });
 
   it("renders banner when canInstall is true", () => {
-    mockCanInstall = true;
+    usePwaInstallMock.canInstall = true;
     render(<InstallBanner />);
 
     expect(screen.getByText("Install ContentGenie")).toBeInTheDocument();
@@ -40,7 +47,7 @@ describe("InstallBanner", () => {
   });
 
   it("calls promptInstall when Install button is clicked", async () => {
-    mockCanInstall = true;
+    usePwaInstallMock.canInstall = true;
     const user = userEvent.setup();
     render(<InstallBanner />);
 
@@ -49,7 +56,7 @@ describe("InstallBanner", () => {
   });
 
   it("calls dismiss when X button is clicked", async () => {
-    mockCanInstall = true;
+    usePwaInstallMock.canInstall = true;
     const user = userEvent.setup();
     render(<InstallBanner />);
 
@@ -60,7 +67,7 @@ describe("InstallBanner", () => {
   });
 
   it("has correct ARIA attributes", () => {
-    mockCanInstall = true;
+    usePwaInstallMock.canInstall = true;
     render(<InstallBanner />);
 
     const banner = screen.getByRole("complementary");
@@ -68,7 +75,7 @@ describe("InstallBanner", () => {
   });
 
   it("has md:hidden class for desktop hiding", () => {
-    mockCanInstall = true;
+    usePwaInstallMock.canInstall = true;
     render(<InstallBanner />);
 
     const banner = screen.getByRole("complementary");
