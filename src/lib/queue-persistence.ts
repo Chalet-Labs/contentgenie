@@ -16,9 +16,21 @@ const REQUIRED_FIELDS: (keyof AudioEpisode)[] = [
 function isValidQueueItem(item: unknown): item is AudioEpisode {
   if (typeof item !== "object" || item === null) return false
   const obj = item as Record<string, unknown>
-  return REQUIRED_FIELDS.every(
-    (field) => typeof obj[field] === "string" && obj[field] !== ""
-  )
+  if (
+    !REQUIRED_FIELDS.every(
+      (field) => typeof obj[field] === "string" && obj[field] !== ""
+    )
+  ) {
+    return false
+  }
+  // Validate optional fields from untrusted localStorage
+  if ("artwork" in obj && obj.artwork !== undefined) {
+    if (typeof obj.artwork !== "string" || obj.artwork === "") return false
+  }
+  if ("duration" in obj && obj.duration !== undefined) {
+    if (typeof obj.duration !== "number" || !Number.isFinite(obj.duration) || obj.duration < 0) return false
+  }
+  return true
 }
 
 export function loadQueue(): AudioEpisode[] {
@@ -31,7 +43,14 @@ export function loadQueue(): AudioEpisode[] {
     const parsed: unknown = JSON.parse(raw)
     if (!Array.isArray(parsed)) return []
 
-    return parsed.filter(isValidQueueItem)
+    const validItems = parsed.filter(isValidQueueItem)
+    // De-duplicate by ID (keep first occurrence) to prevent dnd-kit key conflicts
+    const seen = new Set<string>()
+    return validItems.filter((item) => {
+      if (seen.has(item.id)) return false
+      seen.add(item.id)
+      return true
+    })
   } catch {
     return []
   }

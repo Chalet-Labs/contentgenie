@@ -1,6 +1,6 @@
 # ADR-015: Use @dnd-kit for Queue Drag-and-Drop Reorder
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-03-03
 **Issue:** [#94](https://github.com/Chalet-Labs/contentgenie/issues/94)
 

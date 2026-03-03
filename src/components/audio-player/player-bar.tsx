@@ -22,6 +22,7 @@ import { SeekBar } from "@/components/audio-player/seek-bar"
 import { PlaybackSpeed } from "@/components/audio-player/playback-speed"
 import { VolumeControl } from "@/components/audio-player/volume-control"
 import { QueuePanel } from "@/components/audio-player/queue-panel"
+import { useMediaQuery } from "@/hooks/use-media-query"
 
 export function PlayerBar() {
   const { currentEpisode, isPlaying, isBuffering, isVisible, queue } =
@@ -29,6 +30,7 @@ export function PlayerBar() {
   const { togglePlay, skipBack, skipForward, closePlayer } =
     useAudioPlayerAPI()
   const [queueOpen, setQueueOpen] = useState(false)
+  const isDesktop = useMediaQuery("(min-width: 768px)")
 
   if (!isVisible || !currentEpisode) return null
 
@@ -140,11 +142,13 @@ export function PlayerBar() {
         {/* Queue/Speed/Volume/Close (right) */}
         <div className="flex flex-1 items-center justify-end gap-2">
           <PlaybackSpeed />
-          <QueuePanel
-            open={queueOpen}
-            onOpenChange={setQueueOpen}
-            trigger={queueTrigger}
-          />
+          {isDesktop && (
+            <QueuePanel
+              open={queueOpen}
+              onOpenChange={setQueueOpen}
+              trigger={queueTrigger}
+            />
+          )}
           <VolumeControl />
           <Button
             variant="ghost"
@@ -213,11 +217,13 @@ export function PlayerBar() {
               <Play className="h-4 w-4" />
             )}
           </Button>
-          <QueuePanel
-            open={queueOpen}
-            onOpenChange={setQueueOpen}
-            trigger={queueTrigger}
-          />
+          {!isDesktop && (
+            <QueuePanel
+              open={queueOpen}
+              onOpenChange={setQueueOpen}
+              trigger={queueTrigger}
+            />
+          )}
           <Button
             variant="ghost"
             size="icon"

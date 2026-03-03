@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from "@storybook/react"
 import { DndContext } from "@dnd-kit/core"
 import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable"
 import type { AudioEpisode } from "@/contexts/audio-player-context"
-import { QueueItem } from "./queue-item"
+import { QueueItem } from "@/components/audio-player/queue-item"
 
 const testEpisode: AudioEpisode = {
   id: "ep-1",

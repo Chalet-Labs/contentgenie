@@ -332,6 +332,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
         const audio = audioRef.current
         if (!audio || !audio.src) return
         if (audio.paused) {
+          clearAutoPlayTimer()
           audio.play().catch(() => {
             dispatch({ type: "SET_PLAYING", isPlaying: false })
           })
@@ -424,7 +425,6 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
   )
 
   // ---- Media Session handlers ----
-  const hasQueueItems = state.queue.length > 0
   useEffect(() => {
     setupMediaSessionHandlers({
       onPlay: api.togglePlay,
@@ -432,10 +432,12 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       onSeekBackward: () => api.skipBack(),
       onSeekForward: () => api.skipForward(),
       onStop: api.closePlayer,
-      onNextTrack: hasQueueItems ? api.playNext : null,
+      onNextTrack: () => {
+        if (stateRef.current.queue.length > 0) api.playNext()
+      },
     })
     return () => clearMediaSession()
-  }, [api, hasQueueItems])
+  }, [api])
 
   // ---- Audio event listeners ----
   useEffect(() => {
@@ -487,6 +489,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
     }
 
     const onPlaying = () => {
+      clearAutoPlayTimer()
       dispatch({ type: "SET_PLAYING", isPlaying: true })
       dispatch({ type: "SET_BUFFERING", isBuffering: false })
       dispatch({ type: "CLEAR_ERROR" })

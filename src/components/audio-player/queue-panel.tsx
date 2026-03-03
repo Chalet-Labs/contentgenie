@@ -151,7 +151,7 @@ export function QueuePanel({ open, onOpenChange, trigger }: QueuePanelProps) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetTrigger asChild>{trigger}</SheetTrigger>
-      <SheetContent side="bottom" className="h-[80vh]">
+      <SheetContent side="bottom" className="h-[100dvh]">
         <SheetHeader>
           <SheetTitle>Queue</SheetTitle>
           <SheetDescription className="sr-only">

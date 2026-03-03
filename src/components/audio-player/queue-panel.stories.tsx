@@ -10,7 +10,7 @@ import {
   type AudioEpisode,
 } from "@/contexts/audio-player-context"
 import { Button } from "@/components/ui/button"
-import { QueuePanel } from "./queue-panel"
+import { QueuePanel } from "@/components/audio-player/queue-panel"
 
 const noopAPI: AudioPlayerAPI = {
   playEpisode: () => {},

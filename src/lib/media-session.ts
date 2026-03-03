@@ -38,7 +38,11 @@ export function setupMediaSessionHandlers(handlers: {
   navigator.mediaSession.setActionHandler("seekbackward", handlers.onSeekBackward)
   navigator.mediaSession.setActionHandler("seekforward", handlers.onSeekForward)
   navigator.mediaSession.setActionHandler("stop", handlers.onStop)
-  navigator.mediaSession.setActionHandler("nexttrack", handlers.onNextTrack ?? null)
+  try {
+    navigator.mediaSession.setActionHandler("nexttrack", handlers.onNextTrack ?? null)
+  } catch {
+    // "nexttrack" may not be supported on all platforms
+  }
 }
 
 export function updateMediaSessionPosition(
@@ -68,5 +72,9 @@ export function clearMediaSession(): void {
   navigator.mediaSession.setActionHandler("seekbackward", null)
   navigator.mediaSession.setActionHandler("seekforward", null)
   navigator.mediaSession.setActionHandler("stop", null)
-  navigator.mediaSession.setActionHandler("nexttrack", null)
+  try {
+    navigator.mediaSession.setActionHandler("nexttrack", null)
+  } catch {
+    // "nexttrack" may not be supported on all platforms
+  }
 }

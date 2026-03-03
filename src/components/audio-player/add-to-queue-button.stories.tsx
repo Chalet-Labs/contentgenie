@@ -8,7 +8,7 @@ import {
   type AudioPlayerAPI,
   type AudioEpisode,
 } from "@/contexts/audio-player-context"
-import { AddToQueueButton } from "./add-to-queue-button"
+import { AddToQueueButton } from "@/components/audio-player/add-to-queue-button"
 
 const testEpisode: AudioEpisode = {
   id: "ep-1",

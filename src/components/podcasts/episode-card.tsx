@@ -92,7 +92,7 @@ export function EpisodeCard({ episode, summaryStatus, worthItScore, showQueueAct
           </Link>
 
           {showQueueAction && hasAudio && (
-            <div className="flex shrink-0 items-center self-center opacity-0 transition-opacity group-hover:opacity-100 md:opacity-0 max-md:opacity-100">
+            <div className="flex shrink-0 items-center self-center invisible opacity-0 transition-all group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100 max-md:visible max-md:opacity-100">
               <AddToQueueButton
                 episode={{
                   id: String(episode.id),
