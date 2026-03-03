@@ -482,18 +482,35 @@ describe("Queue state management", () => {
 
   it("addToQueue does not add currently playing episode", async () => {
     const user = userEvent.setup()
+    function CurrentEpisodeQueueConsumer() {
+      const state = useAudioPlayerState()
+      const api = useAudioPlayerAPI()
+      return (
+        <div>
+          <span data-testid="queueLength">{state.queue.length}</span>
+          <span data-testid="episodeTitle">{state.currentEpisode?.title ?? ""}</span>
+          <button onClick={() => api.playEpisode(mockEpisode)}>Play Episode</button>
+          <button onClick={() => api.addToQueue(mockEpisode)}>Add Playing To Queue</button>
+          <button onClick={() => api.addToQueue(queueEpisode1)}>Add Q1</button>
+        </div>
+      )
+    }
     render(
       <AudioPlayerProvider>
-        <TestConsumer />
+        <CurrentEpisodeQueueConsumer />
       </AudioPlayerProvider>
     )
 
     await user.click(screen.getByText("Play Episode"))
-    // mockEpisode is playing — try to add it to queue (same ID check in addToQueue)
-    // We need a button that adds mockEpisode to queue, but our buttons add q-1, q-2, q-3
-    // This test checks that addToQueue(currentlyPlaying) is a no-op
-    // The addToQueue method checks currentEpisode.id === episode.id
+    expect(screen.getByTestId("episodeTitle")).toHaveTextContent("Test Episode")
+
+    // Try to add the currently playing episode to queue — should be a no-op
+    await user.click(screen.getByText("Add Playing To Queue"))
     expect(screen.getByTestId("queueLength")).toHaveTextContent("0")
+
+    // Adding a different episode should work
+    await user.click(screen.getByText("Add Q1"))
+    expect(screen.getByTestId("queueLength")).toHaveTextContent("1")
   })
 
   it("removeFromQueue removes by ID", async () => {
@@ -865,28 +882,7 @@ describe("Media Session nexttrack handler", () => {
     vi.restoreAllMocks()
   })
 
-  it("sets nexttrack handler when queue has items", async () => {
-    const { setupMediaSessionHandlers } = await import("@/lib/media-session")
-    const mockSetup = vi.mocked(setupMediaSessionHandlers)
-
-    const user = userEvent.setup()
-    render(
-      <AudioPlayerProvider>
-        <TestConsumer />
-      </AudioPlayerProvider>
-    )
-
-    await user.click(screen.getByText("Play Episode"))
-    await user.click(screen.getByText("Add Q1"))
-
-    // Find the most recent call where onNextTrack is non-null
-    const calls = mockSetup.mock.calls
-    const callWithHandler = calls.find((call) => call[0].onNextTrack != null)
-    expect(callWithHandler).toBeDefined()
-    expect(callWithHandler![0].onNextTrack).toBeTypeOf("function")
-  })
-
-  it("sets nexttrack handler to null when queue is empty", async () => {
+  it("sets nexttrack handler on mount", async () => {
     const { setupMediaSessionHandlers } = await import("@/lib/media-session")
     const mockSetup = vi.mocked(setupMediaSessionHandlers)
 
@@ -896,11 +892,11 @@ describe("Media Session nexttrack handler", () => {
       </AudioPlayerProvider>
     )
 
-    // No queue items — most recent call should have null nexttrack
+    // Handler is always set (checks queue at call-time)
     const calls = mockSetup.mock.calls
     expect(calls.length).toBeGreaterThan(0)
     const lastCall = calls[calls.length - 1]
-    expect(lastCall[0].onNextTrack == null).toBe(true)
+    expect(lastCall[0].onNextTrack).toBeTypeOf("function")
   })
 })
 

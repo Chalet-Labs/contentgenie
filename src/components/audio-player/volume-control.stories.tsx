@@ -7,7 +7,7 @@ import {
   type AudioPlayerState,
   type AudioPlayerAPI,
 } from "@/contexts/audio-player-context"
-import { VolumeControl } from "./volume-control"
+import { VolumeControl } from "@/components/audio-player/volume-control"
 
 const noopAPI: AudioPlayerAPI = {
   playEpisode: () => {},

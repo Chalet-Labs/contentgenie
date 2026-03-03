@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from "vitest"
+import { describe, it, expect, beforeEach } from "vitest"
 import { loadQueue, saveQueue } from "@/lib/queue-persistence"
 import type { AudioEpisode } from "@/contexts/audio-player-context"
 
@@ -116,10 +116,13 @@ describe("loadQueue", () => {
 
   it("returns empty array in SSR environment", () => {
     const originalWindow = globalThis.window
-    // @ts-expect-error -- simulating SSR
-    delete globalThis.window
-    expect(loadQueue()).toEqual([])
-    globalThis.window = originalWindow
+    try {
+      // @ts-expect-error -- simulating SSR
+      delete globalThis.window
+      expect(loadQueue()).toEqual([])
+    } finally {
+      globalThis.window = originalWindow
+    }
   })
 })
 
@@ -162,9 +165,12 @@ describe("saveQueue", () => {
 
   it("does nothing in SSR environment", () => {
     const originalWindow = globalThis.window
-    // @ts-expect-error -- simulating SSR
-    delete globalThis.window
-    expect(() => saveQueue([validEpisode])).not.toThrow()
-    globalThis.window = originalWindow
+    try {
+      // @ts-expect-error -- simulating SSR
+      delete globalThis.window
+      expect(() => saveQueue([validEpisode])).not.toThrow()
+    } finally {
+      globalThis.window = originalWindow
+    }
   })
 })
