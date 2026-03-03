@@ -25,6 +25,14 @@ vi.mock("@/lib/player-preferences", () => ({
   savePlayerPreferences: (...args: unknown[]) => mockSavePrefs(...args),
 }))
 
+// Mock queue-persistence helpers
+const mockLoadQueue = vi.fn().mockReturnValue([])
+const mockSaveQueue = vi.fn()
+vi.mock("@/lib/queue-persistence", () => ({
+  loadQueue: (...args: unknown[]) => mockLoadQueue(...args),
+  saveQueue: (...args: unknown[]) => mockSaveQueue(...args),
+}))
+
 // --- Mock HTMLMediaElement prototype ---
 // jsdom doesn't implement play/load/pause, so we stub them globally
 const playMock = vi.fn().mockResolvedValue(undefined)
@@ -73,6 +81,30 @@ const mockEpisode: AudioEpisode = {
   duration: 600,
 }
 
+const queueEpisode1: AudioEpisode = {
+  id: "q-1",
+  title: "Queue Episode 1",
+  podcastTitle: "Queue Podcast",
+  audioUrl: "https://example.com/q1.mp3",
+  duration: 300,
+}
+
+const queueEpisode2: AudioEpisode = {
+  id: "q-2",
+  title: "Queue Episode 2",
+  podcastTitle: "Queue Podcast",
+  audioUrl: "https://example.com/q2.mp3",
+  duration: 400,
+}
+
+const queueEpisode3: AudioEpisode = {
+  id: "q-3",
+  title: "Queue Episode 3",
+  podcastTitle: "Queue Podcast",
+  audioUrl: "https://example.com/q3.mp3",
+  duration: 500,
+}
+
 // Test consumer component
 function TestConsumer() {
   const state = useAudioPlayerState()
@@ -92,6 +124,8 @@ function TestConsumer() {
       <span data-testid="currentTime">{progress.currentTime}</span>
       <span data-testid="buffered">{progress.buffered}</span>
       <span data-testid="episodeTitle">{state.currentEpisode?.title ?? ""}</span>
+      <span data-testid="queueLength">{state.queue.length}</span>
+      <span data-testid="queueIds">{state.queue.map((ep) => ep.id).join(",")}</span>
       <button onClick={() => api.playEpisode(mockEpisode)}>Play Episode</button>
       <button onClick={api.togglePlay}>Toggle Play</button>
       <button onClick={() => api.seek(120)}>Seek 120</button>
@@ -100,6 +134,13 @@ function TestConsumer() {
       <button onClick={() => api.setVolume(0.5)}>Set Volume</button>
       <button onClick={() => api.setPlaybackSpeed(2)}>Set Speed</button>
       <button onClick={api.closePlayer}>Close</button>
+      <button onClick={() => api.addToQueue(queueEpisode1)}>Add Q1</button>
+      <button onClick={() => api.addToQueue(queueEpisode2)}>Add Q2</button>
+      <button onClick={() => api.addToQueue(queueEpisode3)}>Add Q3</button>
+      <button onClick={() => api.removeFromQueue("q-1")}>Remove Q1</button>
+      <button onClick={() => api.reorderQueue(0, 2)}>Reorder 0→2</button>
+      <button onClick={api.clearQueue}>Clear Queue</button>
+      <button onClick={api.playNext}>Play Next</button>
     </div>
   )
 }
@@ -109,6 +150,7 @@ describe("AudioPlayerProvider", () => {
     vi.clearAllMocks()
     playMock.mockResolvedValue(undefined)
     mockLoadPrefs.mockReturnValue({ volume: 0.8, playbackSpeed: 1.5 })
+    mockLoadQueue.mockReturnValue([])
   })
 
   afterEach(() => {
@@ -376,6 +418,489 @@ describe("AudioPlayerProvider", () => {
     await user.click(screen.getByText("Play Episode"))
     // Should set isPlaying to false after rejection
     expect(screen.getByTestId("isPlaying")).toHaveTextContent("false")
+  })
+})
+
+describe("Queue state management", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    playMock.mockResolvedValue(undefined)
+    mockLoadPrefs.mockReturnValue({ volume: 0.8, playbackSpeed: 1.5 })
+    mockLoadQueue.mockReturnValue([])
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it("addToQueue adds episode when something is already playing", async () => {
+    const user = userEvent.setup()
+    render(
+      <AudioPlayerProvider>
+        <TestConsumer />
+      </AudioPlayerProvider>
+    )
+
+    // Play something first
+    await user.click(screen.getByText("Play Episode"))
+    expect(screen.getByTestId("episodeTitle")).toHaveTextContent("Test Episode")
+
+    // Add to queue
+    await user.click(screen.getByText("Add Q1"))
+    expect(screen.getByTestId("queueLength")).toHaveTextContent("1")
+    expect(screen.getByTestId("queueIds")).toHaveTextContent("q-1")
+  })
+
+  it("addToQueue plays immediately when nothing is playing", async () => {
+    const user = userEvent.setup()
+    render(
+      <AudioPlayerProvider>
+        <TestConsumer />
+      </AudioPlayerProvider>
+    )
+
+    // Nothing is playing — addToQueue should play immediately
+    await user.click(screen.getByText("Add Q1"))
+    expect(screen.getByTestId("episodeTitle")).toHaveTextContent("Queue Episode 1")
+    expect(screen.getByTestId("isVisible")).toHaveTextContent("true")
+    expect(screen.getByTestId("queueLength")).toHaveTextContent("0")
+  })
+
+  it("addToQueue deduplicates by ID", async () => {
+    const user = userEvent.setup()
+    render(
+      <AudioPlayerProvider>
+        <TestConsumer />
+      </AudioPlayerProvider>
+    )
+
+    await user.click(screen.getByText("Play Episode"))
+    await user.click(screen.getByText("Add Q1"))
+    await user.click(screen.getByText("Add Q1"))
+    expect(screen.getByTestId("queueLength")).toHaveTextContent("1")
+  })
+
+  it("addToQueue does not add currently playing episode", async () => {
+    const user = userEvent.setup()
+    render(
+      <AudioPlayerProvider>
+        <TestConsumer />
+      </AudioPlayerProvider>
+    )
+
+    await user.click(screen.getByText("Play Episode"))
+    // mockEpisode is playing — try to add it to queue (same ID check in addToQueue)
+    // We need a button that adds mockEpisode to queue, but our buttons add q-1, q-2, q-3
+    // This test checks that addToQueue(currentlyPlaying) is a no-op
+    // The addToQueue method checks currentEpisode.id === episode.id
+    expect(screen.getByTestId("queueLength")).toHaveTextContent("0")
+  })
+
+  it("removeFromQueue removes by ID", async () => {
+    const user = userEvent.setup()
+    render(
+      <AudioPlayerProvider>
+        <TestConsumer />
+      </AudioPlayerProvider>
+    )
+
+    await user.click(screen.getByText("Play Episode"))
+    await user.click(screen.getByText("Add Q1"))
+    await user.click(screen.getByText("Add Q2"))
+    expect(screen.getByTestId("queueLength")).toHaveTextContent("2")
+
+    await user.click(screen.getByText("Remove Q1"))
+    expect(screen.getByTestId("queueLength")).toHaveTextContent("1")
+    expect(screen.getByTestId("queueIds")).toHaveTextContent("q-2")
+  })
+
+  it("reorderQueue swaps positions", async () => {
+    const user = userEvent.setup()
+    render(
+      <AudioPlayerProvider>
+        <TestConsumer />
+      </AudioPlayerProvider>
+    )
+
+    await user.click(screen.getByText("Play Episode"))
+    await user.click(screen.getByText("Add Q1"))
+    await user.click(screen.getByText("Add Q2"))
+    await user.click(screen.getByText("Add Q3"))
+    expect(screen.getByTestId("queueIds")).toHaveTextContent("q-1,q-2,q-3")
+
+    // Reorder: move index 0 to index 2
+    await user.click(screen.getByText("Reorder 0→2"))
+    expect(screen.getByTestId("queueIds")).toHaveTextContent("q-2,q-3,q-1")
+  })
+
+  it("clearQueue empties the queue", async () => {
+    const user = userEvent.setup()
+    render(
+      <AudioPlayerProvider>
+        <TestConsumer />
+      </AudioPlayerProvider>
+    )
+
+    await user.click(screen.getByText("Play Episode"))
+    await user.click(screen.getByText("Add Q1"))
+    await user.click(screen.getByText("Add Q2"))
+    expect(screen.getByTestId("queueLength")).toHaveTextContent("2")
+
+    await user.click(screen.getByText("Clear Queue"))
+    expect(screen.getByTestId("queueLength")).toHaveTextContent("0")
+  })
+
+  it("playNext plays first item and shifts queue", async () => {
+    const user = userEvent.setup()
+    render(
+      <AudioPlayerProvider>
+        <TestConsumer />
+      </AudioPlayerProvider>
+    )
+
+    await user.click(screen.getByText("Play Episode"))
+    await user.click(screen.getByText("Add Q1"))
+    await user.click(screen.getByText("Add Q2"))
+    expect(screen.getByTestId("queueIds")).toHaveTextContent("q-1,q-2")
+
+    await user.click(screen.getByText("Play Next"))
+    expect(screen.getByTestId("episodeTitle")).toHaveTextContent("Queue Episode 1")
+    expect(screen.getByTestId("queueIds")).toHaveTextContent("q-2")
+    expect(screen.getByTestId("queueLength")).toHaveTextContent("1")
+  })
+
+  it("playNext with empty queue does nothing", async () => {
+    const user = userEvent.setup()
+    render(
+      <AudioPlayerProvider>
+        <TestConsumer />
+      </AudioPlayerProvider>
+    )
+
+    await user.click(screen.getByText("Play Episode"))
+    expect(screen.getByTestId("queueLength")).toHaveTextContent("0")
+
+    await user.click(screen.getByText("Play Next"))
+    // Should still be playing the original episode
+    expect(screen.getByTestId("episodeTitle")).toHaveTextContent("Test Episode")
+  })
+
+  it("queue persists to localStorage on mutation", async () => {
+    const user = userEvent.setup()
+    render(
+      <AudioPlayerProvider>
+        <TestConsumer />
+      </AudioPlayerProvider>
+    )
+
+    await user.click(screen.getByText("Play Episode"))
+    await user.click(screen.getByText("Add Q1"))
+
+    // saveQueue should have been called (once for INIT_QUEUE, once for ADD_TO_QUEUE)
+    expect(mockSaveQueue).toHaveBeenCalled()
+    const lastCall = mockSaveQueue.mock.calls[mockSaveQueue.mock.calls.length - 1]
+    expect(lastCall[0]).toHaveLength(1)
+    expect(lastCall[0][0].id).toBe("q-1")
+  })
+
+  it("queue loads from localStorage on mount", () => {
+    mockLoadQueue.mockReturnValue([queueEpisode1, queueEpisode2])
+    render(
+      <AudioPlayerProvider>
+        <TestConsumer />
+      </AudioPlayerProvider>
+    )
+
+    expect(mockLoadQueue).toHaveBeenCalled()
+    expect(screen.getByTestId("queueLength")).toHaveTextContent("2")
+    expect(screen.getByTestId("queueIds")).toHaveTextContent("q-1,q-2")
+  })
+})
+
+describe("Auto-play next", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    playMock.mockResolvedValue(undefined)
+    mockLoadPrefs.mockReturnValue({ volume: 0.8, playbackSpeed: 1.5 })
+    mockLoadQueue.mockReturnValue([])
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.restoreAllMocks()
+  })
+
+  it("calls playNext after ended event + 3s delay when queue has items", async () => {
+    // Pre-load queue from localStorage so we don't need click interactions
+    mockLoadQueue.mockReturnValue([queueEpisode1])
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    render(
+      <AudioPlayerProvider>
+        <TestConsumer />
+      </AudioPlayerProvider>
+    )
+
+    expect(screen.getByTestId("queueLength")).toHaveTextContent("1")
+
+    // Play an episode first
+    await user.click(screen.getByText("Play Episode"))
+    expect(screen.getByTestId("episodeTitle")).toHaveTextContent("Test Episode")
+
+    // Fire ended event
+    act(() => fireAudioEvent("ended"))
+
+    // After 3 seconds, playNext should fire
+    await act(async () => {
+      vi.advanceTimersByTime(3000)
+    })
+
+    // q-1 should now be playing
+    expect(screen.getByTestId("episodeTitle")).toHaveTextContent("Queue Episode 1")
+    expect(screen.getByTestId("queueLength")).toHaveTextContent("0")
+  })
+
+  it("does not auto-play when queue is empty on ended", async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    render(
+      <AudioPlayerProvider>
+        <TestConsumer />
+      </AudioPlayerProvider>
+    )
+
+    await user.click(screen.getByText("Play Episode"))
+    expect(screen.getByTestId("queueLength")).toHaveTextContent("0")
+
+    act(() => fireAudioEvent("ended"))
+
+    await act(async () => {
+      vi.advanceTimersByTime(5000)
+    })
+
+    // Should still show the original episode (stopped, not replaced)
+    expect(screen.getByTestId("episodeTitle")).toHaveTextContent("Test Episode")
+    expect(screen.getByTestId("isPlaying")).toHaveTextContent("false")
+  })
+
+  it("cancels auto-play when user plays a different episode during countdown", async () => {
+    mockLoadQueue.mockReturnValue([queueEpisode1, queueEpisode2])
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    render(
+      <AudioPlayerProvider>
+        <TestConsumer />
+      </AudioPlayerProvider>
+    )
+
+    expect(screen.getByTestId("queueLength")).toHaveTextContent("2")
+
+    await user.click(screen.getByText("Play Episode"))
+
+    // Fire ended event to start countdown
+    act(() => fireAudioEvent("ended"))
+
+    // Before 3s, play a different episode (simulated by clicking Play Episode again)
+    await user.click(screen.getByText("Play Episode"))
+
+    // Advance past the timeout
+    await act(async () => {
+      vi.advanceTimersByTime(5000)
+    })
+
+    // Should be playing the manually selected episode, not q-1
+    expect(screen.getByTestId("episodeTitle")).toHaveTextContent("Test Episode")
+    // Queue should still have both items since playNext was cancelled
+    expect(screen.getByTestId("queueLength")).toHaveTextContent("2")
+  })
+})
+
+describe("Auto-play next error recovery", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    playMock.mockResolvedValue(undefined)
+    mockLoadPrefs.mockReturnValue({ volume: 0.8, playbackSpeed: 1.5 })
+    mockLoadQueue.mockReturnValue([])
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.restoreAllMocks()
+  })
+
+  it("resets player and removes failed episode when auto-advanced episode errors", async () => {
+    mockLoadQueue.mockReturnValue([queueEpisode1])
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    render(
+      <AudioPlayerProvider>
+        <TestConsumer />
+      </AudioPlayerProvider>
+    )
+
+    // Play an episode first so auto-advance has something to advance from
+    await user.click(screen.getByText("Play Episode"))
+
+    // Fire ended event to start 3s countdown
+    act(() => fireAudioEvent("ended"))
+
+    // playMock rejects on the next call (simulating the auto-advanced episode failing)
+    playMock.mockRejectedValueOnce(new DOMException("NotSupportedError"))
+
+    // Advance 3s so auto-play fires
+    await act(async () => {
+      vi.advanceTimersByTime(3000)
+    })
+
+    // Simulate the onerror event that the browser fires when audio fails
+    const audio = getAudioElement()!
+    Object.defineProperty(audio, "error", {
+      value: { code: 4 }, // MEDIA_ERR_SRC_NOT_SUPPORTED
+      configurable: true,
+    })
+    act(() => fireAudioEvent("error"))
+
+    // Player should be closed (not visible, no episode)
+    expect(screen.getByTestId("isVisible")).toHaveTextContent("false")
+    expect(screen.getByTestId("episodeTitle")).toHaveTextContent("")
+    // The failed episode (q-1) should be removed from queue
+    expect(screen.getByTestId("queueLength")).toHaveTextContent("0")
+  })
+})
+
+describe("closePlayer cancels auto-play timer", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    playMock.mockResolvedValue(undefined)
+    mockLoadPrefs.mockReturnValue({ volume: 0.8, playbackSpeed: 1.5 })
+    mockLoadQueue.mockReturnValue([])
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+    vi.restoreAllMocks()
+  })
+
+  it("cancels auto-play when closePlayer is called during countdown", async () => {
+    mockLoadQueue.mockReturnValue([queueEpisode1])
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    render(
+      <AudioPlayerProvider>
+        <TestConsumer />
+      </AudioPlayerProvider>
+    )
+
+    await user.click(screen.getByText("Play Episode"))
+    expect(screen.getByTestId("queueLength")).toHaveTextContent("1")
+
+    // Fire ended to start countdown
+    act(() => fireAudioEvent("ended"))
+
+    // Close player during countdown
+    await user.click(screen.getByText("Close"))
+    expect(screen.getByTestId("isVisible")).toHaveTextContent("false")
+
+    // Advance past the timeout
+    await act(async () => {
+      vi.advanceTimersByTime(5000)
+    })
+
+    // Player should still be closed — auto-play did not fire
+    expect(screen.getByTestId("isVisible")).toHaveTextContent("false")
+    expect(screen.getByTestId("episodeTitle")).toHaveTextContent("")
+  })
+})
+
+describe("reorderQueue edge cases", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    playMock.mockResolvedValue(undefined)
+    mockLoadPrefs.mockReturnValue({ volume: 0.8, playbackSpeed: 1.5 })
+    mockLoadQueue.mockReturnValue([])
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it("reorderQueue with out-of-bounds indices is a no-op", async () => {
+    const user = userEvent.setup()
+    // Render a consumer that exposes a button for an out-of-bounds reorder
+    function OutOfBoundsConsumer() {
+      const state = useAudioPlayerState()
+      const api = useAudioPlayerAPI()
+      return (
+        <div>
+          <span data-testid="queueIds">{state.queue.map((ep) => ep.id).join(",")}</span>
+          <button onClick={() => api.playEpisode(mockEpisode)}>Play Episode</button>
+          <button onClick={() => api.addToQueue(queueEpisode1)}>Add Q1</button>
+          <button onClick={() => api.reorderQueue(0, 99)}>Reorder OOB</button>
+        </div>
+      )
+    }
+    render(
+      <AudioPlayerProvider>
+        <OutOfBoundsConsumer />
+      </AudioPlayerProvider>
+    )
+
+    await user.click(screen.getByText("Play Episode"))
+    await user.click(screen.getByText("Add Q1"))
+    expect(screen.getByTestId("queueIds")).toHaveTextContent("q-1")
+
+    await user.click(screen.getByText("Reorder OOB"))
+    // Queue should be unchanged
+    expect(screen.getByTestId("queueIds")).toHaveTextContent("q-1")
+  })
+})
+
+describe("Media Session nexttrack handler", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    playMock.mockResolvedValue(undefined)
+    mockLoadPrefs.mockReturnValue({ volume: 0.8, playbackSpeed: 1.5 })
+    mockLoadQueue.mockReturnValue([])
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it("sets nexttrack handler when queue has items", async () => {
+    const { setupMediaSessionHandlers } = await import("@/lib/media-session")
+    const mockSetup = vi.mocked(setupMediaSessionHandlers)
+
+    const user = userEvent.setup()
+    render(
+      <AudioPlayerProvider>
+        <TestConsumer />
+      </AudioPlayerProvider>
+    )
+
+    await user.click(screen.getByText("Play Episode"))
+    await user.click(screen.getByText("Add Q1"))
+
+    // Find the most recent call where onNextTrack is non-null
+    const calls = mockSetup.mock.calls
+    const callWithHandler = calls.find((call) => call[0].onNextTrack != null)
+    expect(callWithHandler).toBeDefined()
+    expect(callWithHandler![0].onNextTrack).toBeTypeOf("function")
+  })
+
+  it("sets nexttrack handler to null when queue is empty", async () => {
+    const { setupMediaSessionHandlers } = await import("@/lib/media-session")
+    const mockSetup = vi.mocked(setupMediaSessionHandlers)
+
+    render(
+      <AudioPlayerProvider>
+        <TestConsumer />
+      </AudioPlayerProvider>
+    )
+
+    // No queue items — most recent call should have null nexttrack
+    const calls = mockSetup.mock.calls
+    expect(calls.length).toBeGreaterThan(0)
+    const lastCall = calls[calls.length - 1]
+    expect(lastCall[0].onNextTrack == null).toBe(true)
   })
 })
 

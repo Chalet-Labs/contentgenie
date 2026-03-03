@@ -21,6 +21,7 @@ import {
   loadPlayerPreferences,
   savePlayerPreferences,
 } from "@/lib/player-preferences"
+import { loadQueue, saveQueue } from "@/lib/queue-persistence"
 
 // ---------------------------------------------------------------------------
 // Types
@@ -45,6 +46,7 @@ export interface AudioPlayerState {
   playbackSpeed: number
   hasError: boolean
   errorMessage: string | null
+  queue: AudioEpisode[]
 }
 
 export interface AudioPlayerProgress {
@@ -61,6 +63,11 @@ export interface AudioPlayerAPI {
   setVolume: (volume: number) => void
   setPlaybackSpeed: (speed: number) => void
   closePlayer: () => void
+  addToQueue: (episode: AudioEpisode) => void
+  removeFromQueue: (episodeId: string) => void
+  reorderQueue: (oldIndex: number, newIndex: number) => void
+  clearQueue: () => void
+  playNext: () => void
 }
 
 // ---------------------------------------------------------------------------
@@ -77,6 +84,19 @@ type Action =
   | { type: "SET_ERROR"; message: string }
   | { type: "CLEAR_ERROR" }
   | { type: "CLOSE" }
+  | { type: "ADD_TO_QUEUE"; episode: AudioEpisode }
+  | { type: "REMOVE_FROM_QUEUE"; episodeId: string }
+  | { type: "REORDER_QUEUE"; oldIndex: number; newIndex: number }
+  | { type: "CLEAR_QUEUE" }
+  | { type: "PLAY_NEXT" }
+  | { type: "INIT_QUEUE"; queue: AudioEpisode[] }
+
+function arrayMove<T>(arr: T[], from: number, to: number): T[] {
+  const copy = [...arr]
+  const [item] = copy.splice(from, 1)
+  copy.splice(to, 0, item)
+  return copy
+}
 
 function reducer(state: AudioPlayerState, action: Action): AudioPlayerState {
   switch (action.type) {
@@ -122,6 +142,51 @@ function reducer(state: AudioPlayerState, action: Action): AudioPlayerState {
         errorMessage: null,
         duration: 0,
       }
+    case "ADD_TO_QUEUE": {
+      const alreadyQueued = state.queue.some(
+        (ep) => ep.id === action.episode.id
+      )
+      if (alreadyQueued) return state
+      return { ...state, queue: [...state.queue, action.episode] }
+    }
+    case "REMOVE_FROM_QUEUE":
+      return {
+        ...state,
+        queue: state.queue.filter((ep) => ep.id !== action.episodeId),
+      }
+    case "REORDER_QUEUE": {
+      if (
+        action.oldIndex < 0 ||
+        action.oldIndex >= state.queue.length ||
+        action.newIndex < 0 ||
+        action.newIndex >= state.queue.length
+      ) {
+        return state
+      }
+      return {
+        ...state,
+        queue: arrayMove(state.queue, action.oldIndex, action.newIndex),
+      }
+    }
+    case "CLEAR_QUEUE":
+      return { ...state, queue: [] }
+    case "PLAY_NEXT": {
+      if (state.queue.length === 0) return state
+      const [next, ...rest] = state.queue
+      return {
+        ...state,
+        currentEpisode: next,
+        isPlaying: true,
+        isBuffering: true,
+        isVisible: true,
+        hasError: false,
+        errorMessage: null,
+        duration: next.duration ?? 0,
+        queue: rest,
+      }
+    }
+    case "INIT_QUEUE":
+      return { ...state, queue: action.queue }
     default:
       return state
   }
@@ -177,12 +242,16 @@ const initialState: AudioPlayerState = {
   playbackSpeed: 1,
   hasError: false,
   errorMessage: null,
+  queue: [],
 }
 
 export function AudioPlayerProvider({ children }: { children: ReactNode }) {
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const stallTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const ariaTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const autoPlayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const isAutoAdvancing = useRef(false)
+  const isQueueHydrated = useRef(false)
 
   const [state, dispatch] = useReducer(reducer, initialState)
 
@@ -204,6 +273,19 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
     dispatch({ type: "SET_VOLUME", volume: prefs.volume })
     dispatch({ type: "SET_PLAYBACK_SPEED", speed: prefs.playbackSpeed })
   }, [])
+
+  // ---- Hydrate queue from localStorage on mount ----
+  useEffect(() => {
+    const persisted = loadQueue()
+    dispatch({ type: "INIT_QUEUE", queue: persisted })
+    isQueueHydrated.current = true
+  }, [])
+
+  // ---- Persist queue to localStorage on changes ----
+  useEffect(() => {
+    if (!isQueueHydrated.current) return
+    saveQueue(state.queue)
+  }, [state.queue])
 
   // ---- Sync volume & speed to audio element ----
   useEffect(() => {
@@ -235,12 +317,25 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
     }, STALL_TIMEOUT_MS)
   }, [clearStallTimer])
 
+  // ---- Ref to always have latest state in callbacks ----
+  const stateRef = useRef(state)
+  stateRef.current = state
+
+  // ---- Clear auto-play timer helper ----
+  const clearAutoPlayTimer = useCallback(() => {
+    if (autoPlayTimerRef.current) {
+      clearTimeout(autoPlayTimerRef.current)
+      autoPlayTimerRef.current = null
+    }
+  }, [])
+
   // ---- API (stable reference) ----
   const api = useMemo<AudioPlayerAPI>(
     () => ({
       playEpisode: (episode: AudioEpisode) => {
         const audio = audioRef.current
         if (!audio) return
+        clearAutoPlayTimer()
         dispatch({ type: "PLAY_EPISODE", episode })
         audio.src = episode.audioUrl
         audio.load()
@@ -306,10 +401,45 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
           audio.removeAttribute("src")
           audio.load()
         }
+        clearAutoPlayTimer()
         dispatch({ type: "CLOSE" })
         setProgress({ currentTime: 0, buffered: 0 })
         clearMediaSession()
         clearStallTimer()
+      },
+
+      addToQueue: (episode: AudioEpisode) => {
+        const current = stateRef.current
+        // If nothing is playing, play immediately instead of enqueuing
+        if (!current.currentEpisode) {
+          api.playEpisode(episode)
+          return
+        }
+        // Don't add if already in queue or currently playing
+        if (current.currentEpisode.id === episode.id) return
+        if (current.queue.some((ep) => ep.id === episode.id)) return
+        dispatch({ type: "ADD_TO_QUEUE", episode })
+      },
+
+      removeFromQueue: (episodeId: string) => {
+        dispatch({ type: "REMOVE_FROM_QUEUE", episodeId })
+      },
+
+      reorderQueue: (oldIndex: number, newIndex: number) => {
+        dispatch({ type: "REORDER_QUEUE", oldIndex, newIndex })
+      },
+
+      clearQueue: () => {
+        dispatch({ type: "CLEAR_QUEUE" })
+      },
+
+      playNext: () => {
+        const current = stateRef.current
+        if (current.queue.length === 0) return
+        const next = current.queue[0]
+        isAutoAdvancing.current = true
+        api.playEpisode(next)
+        dispatch({ type: "REMOVE_FROM_QUEUE", episodeId: next.id })
       },
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally stable: actions close over refs
@@ -324,9 +454,10 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       onSeekBackward: () => api.skipBack(),
       onSeekForward: () => api.skipForward(),
       onStop: api.closePlayer,
+      onNextTrack: state.queue.length > 0 ? api.playNext : null,
     })
     return () => clearMediaSession()
-  }, [api])
+  }, [api, state.queue.length])
 
   // ---- Audio event listeners ----
   useEffect(() => {
@@ -381,6 +512,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       dispatch({ type: "SET_PLAYING", isPlaying: true })
       dispatch({ type: "SET_BUFFERING", isBuffering: false })
       dispatch({ type: "CLEAR_ERROR" })
+      isAutoAdvancing.current = false
       clearStallTimer()
     }
 
@@ -402,14 +534,46 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
     const onEnded = () => {
       dispatch({ type: "SET_PLAYING", isPlaying: false })
       clearStallTimer()
+
+      const currentQueue = stateRef.current.queue
+      if (currentQueue.length > 0) {
+        const nextEpisode = currentQueue[0]
+        toast(`Playing next: ${nextEpisode.title}`, {
+          duration: 3000,
+          action: {
+            label: "Cancel",
+            onClick: () => {
+              clearAutoPlayTimer()
+            },
+          },
+        })
+
+        autoPlayTimerRef.current = setTimeout(() => {
+          autoPlayTimerRef.current = null
+          api.playNext()
+        }, 3000)
+      }
     }
 
     const onError = () => {
       const errorCode = audio.error?.code ?? 0
       const message = getMediaErrorMessage(errorCode)
+      clearStallTimer()
+
+      if (isAutoAdvancing.current) {
+        // Error during auto-advance — stop the chain
+        const failedEpisode = stateRef.current.currentEpisode
+        isAutoAdvancing.current = false
+        api.closePlayer()
+        if (failedEpisode) {
+          dispatch({ type: "REMOVE_FROM_QUEUE", episodeId: failedEpisode.id })
+          toast.error(`Couldn't play ${failedEpisode.title} \u2014 removed from queue`)
+        }
+        return
+      }
+
       dispatch({ type: "SET_ERROR", message })
       toast.error("Playback error", { description: message })
-      clearStallTimer()
     }
 
     audio.addEventListener("timeupdate", onTimeUpdate)
@@ -433,11 +597,12 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       audio.removeEventListener("ended", onEnded)
       audio.removeEventListener("error", onError)
       clearStallTimer()
+      clearAutoPlayTimer()
       if (ariaTimerRef.current) {
         clearTimeout(ariaTimerRef.current)
       }
     }
-  }, [clearStallTimer, startStallTimer])
+  }, [clearStallTimer, startStallTimer, clearAutoPlayTimer, api])
 
   return (
     <AudioPlayerAPIContext.Provider value={api}>

@@ -28,6 +28,7 @@ import {
 } from "@/components/episodes/summary-display";
 import { SaveButton } from "@/components/episodes/save-button";
 import { ShareButton } from "@/components/ui/share-button";
+import { AddToQueueButton } from "@/components/audio-player/add-to-queue-button";
 import { WorthItBadge } from "@/components/episodes/worth-it-badge";
 import { CommunityRating } from "@/components/episodes/community-rating";
 import { isEpisodeSaved } from "@/app/actions/library";
@@ -544,6 +545,19 @@ export default function EpisodePage({ params }: EpisodePageProps) {
                   </>
                 )}
               </Button>
+            )}
+            {isOnline && episode.enclosureUrl && (
+              <AddToQueueButton
+                episode={{
+                  id: String(episode.id),
+                  title: episode.title,
+                  podcastTitle: podcast?.title || "",
+                  audioUrl: episode.enclosureUrl,
+                  artwork: artworkUrl,
+                  duration: episode.duration,
+                }}
+                variant="full"
+              />
             )}
             {isOnline && (
               <SaveButton

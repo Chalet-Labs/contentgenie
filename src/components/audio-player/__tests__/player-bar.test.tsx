@@ -11,6 +11,21 @@ class MockResizeObserver {
 }
 globalThis.ResizeObserver = MockResizeObserver as unknown as typeof ResizeObserver
 
+// jsdom doesn't provide matchMedia — stub it for the useMediaQuery hook
+Object.defineProperty(window, "matchMedia", {
+  writable: true,
+  value: vi.fn().mockImplementation((query: string) => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    dispatchEvent: vi.fn(),
+  })),
+})
+
 // --- Mock the context hooks ---
 const mockState = {
   currentEpisode: null as {
@@ -29,6 +44,7 @@ const mockState = {
   playbackSpeed: 1,
   hasError: false,
   errorMessage: null as string | null,
+  queue: [] as { id: string; title: string; podcastTitle: string; audioUrl: string; artwork?: string; duration?: number }[],
 }
 
 const mockAPI = {
@@ -40,6 +56,11 @@ const mockAPI = {
   setVolume: vi.fn(),
   setPlaybackSpeed: vi.fn(),
   closePlayer: vi.fn(),
+  addToQueue: vi.fn(),
+  removeFromQueue: vi.fn(),
+  reorderQueue: vi.fn(),
+  clearQueue: vi.fn(),
+  playNext: vi.fn(),
 }
 
 const mockProgress = {
@@ -75,6 +96,7 @@ describe("PlayerBar", () => {
       playbackSpeed: 1,
       hasError: false,
       errorMessage: null,
+      queue: [],
     })
   })
 

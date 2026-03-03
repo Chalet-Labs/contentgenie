@@ -18,6 +18,11 @@ const noopAPI: AudioPlayerAPI = {
   setVolume: () => {},
   setPlaybackSpeed: () => {},
   closePlayer: () => {},
+  addToQueue: () => {},
+  removeFromQueue: () => {},
+  reorderQueue: () => {},
+  clearQueue: () => {},
+  playNext: () => {},
 }
 
 const baseState: AudioPlayerState = {
@@ -30,6 +35,7 @@ const baseState: AudioPlayerState = {
   playbackSpeed: 1,
   hasError: false,
   errorMessage: null,
+  queue: [],
 }
 
 function MockProvider({
