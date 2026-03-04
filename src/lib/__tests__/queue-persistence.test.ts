@@ -62,6 +62,22 @@ describe("loadQueue", () => {
     expect(result[1].id).toBe("ep-2")
   })
 
+  it("deduplicates items with the same ID", () => {
+    const duplicate: AudioEpisode = {
+      ...validEpisode,
+      title: "Duplicate of ep-1",
+    }
+    window.localStorage.setItem(
+      "contentgenie-player-queue",
+      JSON.stringify([validEpisode, duplicate, validEpisode2])
+    )
+    const result = loadQueue()
+    expect(result).toHaveLength(2)
+    expect(result[0].id).toBe("ep-1")
+    expect(result[0].title).toBe("Test Episode") // keeps first occurrence
+    expect(result[1].id).toBe("ep-2")
+  })
+
   it("returns empty array for corrupted JSON", () => {
     window.localStorage.setItem(
       "contentgenie-player-queue",
