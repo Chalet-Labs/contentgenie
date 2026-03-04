@@ -184,6 +184,35 @@ describe("parseChapters", () => {
     expect(result).toEqual([{ startTime: 0, title: "Test" }]);
   });
 
+  it("strips img and url with non-http(s) protocols", () => {
+    const input = {
+      chapters: [
+        {
+          startTime: 0,
+          title: "XSS attempt",
+          img: "javascript:alert(1)",
+          url: "data:text/html,<script>alert(1)</script>",
+        },
+        {
+          startTime: 60,
+          title: "Safe",
+          img: "https://example.com/img.jpg",
+          url: "http://example.com",
+        },
+      ],
+    };
+
+    const result = parseChapters(input);
+
+    expect(result[0]).toEqual({ startTime: 0, title: "XSS attempt" });
+    expect(result[1]).toEqual({
+      startTime: 60,
+      title: "Safe",
+      img: "https://example.com/img.jpg",
+      url: "http://example.com",
+    });
+  });
+
   it("skips non-object entries in chapters array", () => {
     const input = {
       chapters: [

@@ -19,6 +19,15 @@ export interface Chapter {
  * - Sorts by `startTime` ascending
  * - Returns an empty array for any malformed input
  */
+function isHttpUrl(value: string): boolean {
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === "http:" || parsed.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
 export function parseChapters(json: unknown): Chapter[] {
   if (
     typeof json !== "object" ||
@@ -58,11 +67,11 @@ export function parseChapters(json: unknown): Chapter[] {
           : `Chapter ${chapters.length + 1}`,
     };
 
-    if (typeof record.img === "string" && record.img.trim() !== "") {
+    if (typeof record.img === "string" && record.img.trim() !== "" && isHttpUrl(record.img)) {
       chapter.img = record.img;
     }
 
-    if (typeof record.url === "string" && record.url.trim() !== "") {
+    if (typeof record.url === "string" && record.url.trim() !== "" && isHttpUrl(record.url)) {
       chapter.url = record.url;
     }
 
