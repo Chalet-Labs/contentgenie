@@ -67,6 +67,24 @@ describe("parseChapters", () => {
     expect(result).toEqual([{ startTime: 5, title: "Valid" }]);
   });
 
+  it("skips entries with negative startTime", () => {
+    const input = {
+      chapters: [
+        { startTime: -10, title: "Negative" },
+        { startTime: -0.5, title: "Slightly negative" },
+        { startTime: 0, title: "Zero" },
+        { startTime: 5, title: "Positive" },
+      ],
+    };
+
+    const result = parseChapters(input);
+
+    expect(result).toEqual([
+      { startTime: 0, title: "Zero" },
+      { startTime: 5, title: "Positive" },
+    ]);
+  });
+
   it("filters out chapters with toc: false", () => {
     const input = {
       chapters: [

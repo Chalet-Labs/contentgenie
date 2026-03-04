@@ -22,7 +22,7 @@ export function SeekBar() {
   const chapterTicks = useMemo(() => {
     if (!chapters || duration <= 0) return null
     return chapters
-      .filter((ch) => ch.startTime > 0)
+      .filter((ch) => ch.startTime > 0 && ch.startTime < duration)
       .map((ch) => ({ startTime: ch.startTime, title: ch.title, left: (ch.startTime / duration) * 100 }))
   }, [chapters, duration])
 

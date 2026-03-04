@@ -40,7 +40,11 @@ export function parseChapters(json: unknown): Chapter[] {
 
     const record = entry as Record<string, unknown>;
 
-    if (typeof record.startTime !== "number" || !isFinite(record.startTime)) {
+    if (
+      typeof record.startTime !== "number" ||
+      !Number.isFinite(record.startTime) ||
+      record.startTime < 0
+    ) {
       continue;
     }
 

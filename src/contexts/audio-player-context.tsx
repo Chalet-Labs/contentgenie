@@ -359,7 +359,8 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
         if (episode.chaptersUrl) {
           const controller = new AbortController()
           chaptersFetchController.current = controller
-          chaptersTimeoutRef.current = setTimeout(() => controller.abort(), 5000)
+          const timeoutId = setTimeout(() => controller.abort(), 5000)
+          chaptersTimeoutRef.current = timeoutId
 
           fetch(
             `/api/chapters?url=${encodeURIComponent(episode.chaptersUrl)}`,
@@ -367,19 +368,25 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
           )
             .then((res) => (res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`))))
             .then((data: { chapters: Chapter[] }) => {
-              if (!controller.signal.aborted) {
+              if (
+                chaptersFetchController.current === controller &&
+                !controller.signal.aborted
+              ) {
                 dispatch({ type: "SET_CHAPTERS", chapters: data.chapters })
               }
             })
             .catch(() => {
-              if (!controller.signal.aborted) {
+              if (chaptersFetchController.current === controller) {
                 dispatch({ type: "CLEAR_CHAPTERS" })
               }
             })
             .finally(() => {
-              if (chaptersTimeoutRef.current) {
-                clearTimeout(chaptersTimeoutRef.current)
+              clearTimeout(timeoutId)
+              if (chaptersTimeoutRef.current === timeoutId) {
                 chaptersTimeoutRef.current = null
+              }
+              if (chaptersFetchController.current === controller) {
+                chaptersFetchController.current = null
               }
             })
         }
