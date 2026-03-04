@@ -58,6 +58,7 @@ interface EpisodeData {
   feedImage: string;
   image: string;
   link: string;
+  chaptersUrl?: string | null;
 }
 
 interface PodcastData {
@@ -422,6 +423,7 @@ export default function EpisodePage({ params }: EpisodePageProps) {
         audioUrl: episode.enclosureUrl,
         artwork: artworkUrl,
         duration: episode.duration,
+        chaptersUrl: episode.chaptersUrl ?? undefined,
       });
     }
   };
@@ -555,6 +557,10 @@ export default function EpisodePage({ params }: EpisodePageProps) {
                   audioUrl: episode.enclosureUrl,
                   artwork: artworkUrl,
                   duration: episode.duration,
+                  // Known v1 limitation: queue items persisted before this feature
+                  // won't carry chaptersUrl. Chapters silently won't load for
+                  // queue-initiated playback of older queue entries.
+                  chaptersUrl: episode.chaptersUrl ?? undefined,
                 }}
                 variant="full"
               />

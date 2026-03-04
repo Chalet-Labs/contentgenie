@@ -42,6 +42,8 @@ const baseState: AudioPlayerState = {
   hasError: false,
   errorMessage: null,
   queue: [],
+  chapters: null,
+  chaptersLoading: false,
 }
 
 const testEpisode = {
@@ -243,6 +245,82 @@ export const MobileViewport: Story = {
           isPlaying: true,
           isVisible: true,
           duration: 2400,
+        }}
+        progress={{ currentTime: 340, buffered: 800 }}
+      >
+        <div className="min-h-[200px]">
+          <Story />
+        </div>
+      </MockProvider>
+    ),
+  ],
+}
+
+const sampleChapters = [
+  { startTime: 0, title: "Introduction" },
+  { startTime: 300, title: "Guest Interview" },
+  { startTime: 900, title: "Deep Dive" },
+  { startTime: 1800, title: "Q&A" },
+]
+
+export const WithChapters: Story = {
+  decorators: [
+    (Story) => (
+      <MockProvider
+        state={{
+          ...baseState,
+          currentEpisode: testEpisode,
+          isPlaying: true,
+          isVisible: true,
+          duration: 2400,
+          chapters: sampleChapters,
+          chaptersLoading: false,
+        }}
+        progress={{ currentTime: 600, buffered: 900 }}
+      >
+        <div className="min-h-[200px]">
+          <Story />
+        </div>
+      </MockProvider>
+    ),
+  ],
+}
+
+export const WithoutChapters: Story = {
+  decorators: [
+    (Story) => (
+      <MockProvider
+        state={{
+          ...baseState,
+          currentEpisode: testEpisode,
+          isPlaying: true,
+          isVisible: true,
+          duration: 2400,
+          chapters: null,
+          chaptersLoading: false,
+        }}
+        progress={{ currentTime: 340, buffered: 800 }}
+      >
+        <div className="min-h-[200px]">
+          <Story />
+        </div>
+      </MockProvider>
+    ),
+  ],
+}
+
+export const ChaptersLoading: Story = {
+  decorators: [
+    (Story) => (
+      <MockProvider
+        state={{
+          ...baseState,
+          currentEpisode: testEpisode,
+          isPlaying: true,
+          isVisible: true,
+          duration: 2400,
+          chapters: null,
+          chaptersLoading: true,
         }}
         progress={{ currentTime: 340, buffered: 800 }}
       >

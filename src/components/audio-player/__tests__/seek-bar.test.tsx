@@ -20,6 +20,8 @@ const mockState = {
   playbackSpeed: 1,
   hasError: false,
   errorMessage: null,
+  chapters: null as { startTime: number; title: string }[] | null,
+  chaptersLoading: false,
 }
 
 const mockProgress = {
@@ -50,6 +52,7 @@ describe("SeekBar", () => {
     mockProgress.currentTime = 65
     mockProgress.buffered = 150
     mockState.duration = 300
+    mockState.chapters = null
   })
 
   afterEach(() => {
@@ -85,5 +88,57 @@ describe("SeekBar", () => {
     const bufferedDiv = container.querySelector("[style]")
     expect(bufferedDiv).toBeTruthy()
     expect(bufferedDiv?.getAttribute("style")).toContain("50%")
+  })
+
+  it("renders no chapter tick marks when chapters is null", () => {
+    mockState.chapters = null
+    const { container } = render(<SeekBar />)
+    expect(container.querySelectorAll("[data-testid='chapter-tick']")).toHaveLength(0)
+  })
+
+  it("renders no chapter tick marks when chapters is an empty array", () => {
+    mockState.chapters = []
+    const { container } = render(<SeekBar />)
+    expect(container.querySelectorAll("[data-testid='chapter-tick']")).toHaveLength(0)
+  })
+
+  it("renders tick marks for chapters with startTime > 0", () => {
+    mockState.chapters = [
+      { startTime: 0, title: "Intro" },
+      { startTime: 60, title: "Main" },
+      { startTime: 180, title: "Outro" },
+    ]
+    const { container } = render(<SeekBar />)
+    // First chapter at time 0 should be skipped
+    const ticks = container.querySelectorAll("[data-testid='chapter-tick']")
+    expect(ticks).toHaveLength(2)
+  })
+
+  it("positions chapter ticks at correct percentage of duration", () => {
+    mockState.chapters = [
+      { startTime: 0, title: "Intro" },
+      { startTime: 150, title: "Midpoint" }, // 150/300 = 50%
+    ]
+    const { container } = render(<SeekBar />)
+    const ticks = container.querySelectorAll("[data-testid='chapter-tick']")
+    expect(ticks).toHaveLength(1)
+    expect((ticks[0] as HTMLElement).style.left).toBe("50%")
+  })
+
+  it("includes chapter title as tooltip on tick marks", () => {
+    mockState.chapters = [
+      { startTime: 0, title: "Intro" },
+      { startTime: 60, title: "Main Topic" },
+    ]
+    const { container } = render(<SeekBar />)
+    const ticks = container.querySelectorAll("[data-testid='chapter-tick']")
+    expect(ticks[0]).toHaveAttribute("title", "Main Topic")
+  })
+
+  it("renders no tick marks when duration is 0", () => {
+    mockState.duration = 0
+    mockState.chapters = [{ startTime: 0, title: "Intro" }, { startTime: 60, title: "Main" }]
+    const { container } = render(<SeekBar />)
+    expect(container.querySelectorAll("[data-testid='chapter-tick']")).toHaveLength(0)
   })
 })

@@ -940,3 +940,206 @@ describe("hooks throw outside provider", () => {
     )
   })
 })
+
+// ---------------------------------------------------------------------------
+// Chapter state (T3)
+// ---------------------------------------------------------------------------
+
+function ChapterConsumer() {
+  const state = useAudioPlayerState()
+  const api = useAudioPlayerAPI()
+  return (
+    <div>
+      <span data-testid="chapters">{state.chapters ? JSON.stringify(state.chapters) : "null"}</span>
+      <span data-testid="chaptersLoading">{String(state.chaptersLoading)}</span>
+      <span data-testid="episodeTitle">{state.currentEpisode?.title ?? ""}</span>
+      <button onClick={() => api.playEpisode(mockEpisode)}>Play Episode</button>
+      <button
+        onClick={() =>
+          api.playEpisode({
+            ...mockEpisode,
+            id: "ep-with-chapters",
+            chaptersUrl: "https://example.com/chapters.json",
+          })
+        }
+      >
+        Play Episode With Chapters
+      </button>
+      <button onClick={api.closePlayer}>Close</button>
+    </div>
+  )
+}
+
+describe("Chapter state management", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    playMock.mockResolvedValue(undefined)
+    mockLoadPrefs.mockReturnValue({ volume: 0.8, playbackSpeed: 1.5 })
+    mockLoadQueue.mockReturnValue([])
+    vi.stubGlobal("fetch", vi.fn())
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+    vi.unstubAllGlobals()
+  })
+
+  it("initial chapter state is null and not loading", () => {
+    render(
+      <AudioPlayerProvider>
+        <ChapterConsumer />
+      </AudioPlayerProvider>
+    )
+    expect(screen.getByTestId("chapters")).toHaveTextContent("null")
+    expect(screen.getByTestId("chaptersLoading")).toHaveTextContent("false")
+  })
+
+  it("chapters and chaptersLoading reset to null/false on PLAY_EPISODE", async () => {
+    const user = userEvent.setup()
+    // Mock fetch to never resolve — so chapters stay loading
+    vi.mocked(fetch).mockReturnValue(new Promise(() => {}))
+
+    render(
+      <AudioPlayerProvider>
+        <ChapterConsumer />
+      </AudioPlayerProvider>
+    )
+
+    // Play episode with chapters first to trigger fetch
+    await user.click(screen.getByText("Play Episode With Chapters"))
+    expect(screen.getByTestId("chaptersLoading")).toHaveTextContent("true")
+
+    // Now play a different episode without chaptersUrl
+    await user.click(screen.getByText("Play Episode"))
+    expect(screen.getByTestId("chapters")).toHaveTextContent("null")
+    expect(screen.getByTestId("chaptersLoading")).toHaveTextContent("false")
+  })
+
+  it("does not trigger chapter fetch when episode has no chaptersUrl", async () => {
+    const user = userEvent.setup()
+    render(
+      <AudioPlayerProvider>
+        <ChapterConsumer />
+      </AudioPlayerProvider>
+    )
+
+    await user.click(screen.getByText("Play Episode"))
+    expect(fetch).not.toHaveBeenCalled()
+    expect(screen.getByTestId("chaptersLoading")).toHaveTextContent("false")
+    expect(screen.getByTestId("chapters")).toHaveTextContent("null")
+  })
+
+  it("dispatches SET_CHAPTERS_LOADING when episode has chaptersUrl", async () => {
+    const user = userEvent.setup()
+    vi.mocked(fetch).mockReturnValue(new Promise(() => {})) // never resolves
+
+    render(
+      <AudioPlayerProvider>
+        <ChapterConsumer />
+      </AudioPlayerProvider>
+    )
+
+    await user.click(screen.getByText("Play Episode With Chapters"))
+    expect(screen.getByTestId("chaptersLoading")).toHaveTextContent("true")
+    expect(fetch).toHaveBeenCalledWith(
+      expect.stringContaining("/api/chapters?url="),
+      expect.objectContaining({ signal: expect.any(AbortSignal) })
+    )
+  })
+
+  it("dispatches SET_CHAPTERS on successful chapter fetch", async () => {
+    const user = userEvent.setup()
+    const mockChapters = [
+      { startTime: 0, title: "Intro" },
+      { startTime: 60, title: "Main" },
+    ]
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ chapters: mockChapters }),
+    } as Response)
+
+    render(
+      <AudioPlayerProvider>
+        <ChapterConsumer />
+      </AudioPlayerProvider>
+    )
+
+    await user.click(screen.getByText("Play Episode With Chapters"))
+
+    // Wait for async fetch to resolve
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 50))
+    })
+
+    expect(screen.getByTestId("chaptersLoading")).toHaveTextContent("false")
+    expect(screen.getByTestId("chapters")).toHaveTextContent(JSON.stringify(mockChapters))
+  })
+
+  it("dispatches CLEAR_CHAPTERS on failed chapter fetch", async () => {
+    const user = userEvent.setup()
+    vi.mocked(fetch).mockRejectedValue(new Error("Network error"))
+
+    render(
+      <AudioPlayerProvider>
+        <ChapterConsumer />
+      </AudioPlayerProvider>
+    )
+
+    await user.click(screen.getByText("Play Episode With Chapters"))
+
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 50))
+    })
+
+    expect(screen.getByTestId("chaptersLoading")).toHaveTextContent("false")
+    expect(screen.getByTestId("chapters")).toHaveTextContent("null")
+  })
+
+  it("dispatches CLEAR_CHAPTERS when fetch returns non-ok status", async () => {
+    const user = userEvent.setup()
+    vi.mocked(fetch).mockResolvedValue({
+      ok: false,
+      status: 502,
+    } as Response)
+
+    render(
+      <AudioPlayerProvider>
+        <ChapterConsumer />
+      </AudioPlayerProvider>
+    )
+
+    await user.click(screen.getByText("Play Episode With Chapters"))
+
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 50))
+    })
+
+    expect(screen.getByTestId("chaptersLoading")).toHaveTextContent("false")
+    expect(screen.getByTestId("chapters")).toHaveTextContent("null")
+  })
+
+  it("closePlayer clears chapters state", async () => {
+    const user = userEvent.setup()
+    const mockChapters = [{ startTime: 0, title: "Intro" }]
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      json: () => Promise.resolve({ chapters: mockChapters }),
+    } as Response)
+
+    render(
+      <AudioPlayerProvider>
+        <ChapterConsumer />
+      </AudioPlayerProvider>
+    )
+
+    await user.click(screen.getByText("Play Episode With Chapters"))
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 50))
+    })
+    expect(screen.getByTestId("chapters")).not.toHaveTextContent("null")
+
+    await user.click(screen.getByText("Close"))
+    expect(screen.getByTestId("chapters")).toHaveTextContent("null")
+    expect(screen.getByTestId("chaptersLoading")).toHaveTextContent("false")
+  })
+})

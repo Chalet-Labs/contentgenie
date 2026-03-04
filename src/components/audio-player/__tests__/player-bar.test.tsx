@@ -45,6 +45,8 @@ const mockState = {
   hasError: false,
   errorMessage: null as string | null,
   queue: [] as { id: string; title: string; podcastTitle: string; audioUrl: string; artwork?: string; duration?: number }[],
+  chapters: null as { startTime: number; title: string; img?: string; url?: string }[] | null,
+  chaptersLoading: false,
 }
 
 const mockAPI = {
@@ -74,6 +76,10 @@ vi.mock("@/contexts/audio-player-context", () => ({
   useAudioPlayerProgress: () => mockProgress,
 }))
 
+vi.mock("@/hooks/use-current-chapter", () => ({
+  useCurrentChapter: () => null,
+}))
+
 const testEpisode = {
   id: "ep-1",
   title: "A Test Episode Title",
@@ -97,6 +103,8 @@ describe("PlayerBar", () => {
       hasError: false,
       errorMessage: null,
       queue: [],
+      chapters: null,
+      chaptersLoading: false,
     })
   })
 
@@ -228,5 +236,27 @@ describe("PlayerBar", () => {
       "A Very Long Episode Title That Should Be Truncated In The UI"
     )
     expect(titleElements.length).toBeGreaterThan(0)
+  })
+
+  it("hides chapters button when no chapters", () => {
+    mockState.isVisible = true
+    mockState.currentEpisode = testEpisode
+    mockState.chapters = null
+    render(<PlayerBar />)
+
+    expect(screen.queryByRole("button", { name: "Chapters" })).not.toBeInTheDocument()
+  })
+
+  it("shows chapters button when chapters are available", () => {
+    mockState.isVisible = true
+    mockState.currentEpisode = testEpisode
+    mockState.chapters = [
+      { startTime: 0, title: "Intro" },
+      { startTime: 60, title: "Main" },
+    ]
+    render(<PlayerBar />)
+
+    const chaptersButtons = screen.getAllByRole("button", { name: "Chapters" })
+    expect(chaptersButtons.length).toBeGreaterThan(0)
   })
 })

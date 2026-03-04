@@ -13,7 +13,7 @@ function formatTime(seconds: number): string {
 
 export function SeekBar() {
   const { currentTime, buffered } = useAudioPlayerProgress()
-  const { duration } = useAudioPlayerState()
+  const { duration, chapters } = useAudioPlayerState()
   const { seek } = useAudioPlayerAPI()
 
   const handleSeek = useCallback(
@@ -40,6 +40,22 @@ export function SeekBar() {
             />
           </div>
         </div>
+        {/* Chapter boundary markers */}
+        {chapters && duration > 0 && (
+          <div className="pointer-events-none absolute inset-0 flex items-center">
+            {chapters.map((chapter) =>
+              chapter.startTime > 0 ? (
+                <div
+                  key={chapter.startTime}
+                  className="absolute h-2.5 w-0.5 rounded-full bg-foreground/40"
+                  style={{ left: `${(chapter.startTime / duration) * 100}%` }}
+                  title={chapter.title}
+                  data-testid="chapter-tick"
+                />
+              ) : null
+            )}
+          </div>
+        )}
         <Slider
           aria-label="Seek"
           min={0}
