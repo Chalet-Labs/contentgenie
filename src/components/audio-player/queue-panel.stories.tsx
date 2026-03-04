@@ -74,6 +74,8 @@ const baseState: AudioPlayerState = {
   hasError: false,
   errorMessage: null,
   queue: [],
+  chapters: null,
+  chaptersLoading: false,
 }
 
 function MockProvider({

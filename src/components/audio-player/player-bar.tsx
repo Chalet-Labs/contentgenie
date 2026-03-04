@@ -12,6 +12,7 @@ import {
   Loader2,
   Rss,
   ListMusic,
+  BookMarked,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import {
@@ -22,15 +23,21 @@ import { SeekBar } from "@/components/audio-player/seek-bar"
 import { PlaybackSpeed } from "@/components/audio-player/playback-speed"
 import { VolumeControl } from "@/components/audio-player/volume-control"
 import { QueuePanel } from "@/components/audio-player/queue-panel"
+import { ChapterPanel } from "@/components/audio-player/chapter-panel"
+import { useCurrentChapter } from "@/hooks/use-current-chapter"
 import { useMediaQuery } from "@/hooks/use-media-query"
 
 export function PlayerBar() {
-  const { currentEpisode, isPlaying, isBuffering, isVisible, queue } =
+  const { currentEpisode, isPlaying, isBuffering, isVisible, queue, chapters, chaptersLoading } =
     useAudioPlayerState()
   const { togglePlay, skipBack, skipForward, closePlayer } =
     useAudioPlayerAPI()
   const [queueOpen, setQueueOpen] = useState(false)
+  const [chaptersOpen, setChaptersOpen] = useState(false)
+  const currentChapter = useCurrentChapter()
   const isDesktop = useMediaQuery("(min-width: 768px)")
+
+  const hasChapters = chapters && chapters.length > 0
 
   if (!isVisible || !currentEpisode) return null
 
@@ -49,6 +56,21 @@ export function PlayerBar() {
         <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] font-medium text-primary-foreground">
           {queue.length}
         </span>
+      )}
+    </Button>
+  )
+
+  const chaptersTrigger = (
+    <Button
+      variant="ghost"
+      size="icon"
+      aria-label="Chapters"
+      className="h-8 w-8 shrink-0"
+    >
+      {chaptersLoading ? (
+        <Loader2 className="h-4 w-4 animate-spin" />
+      ) : (
+        <BookMarked className="h-4 w-4" />
       )}
     </Button>
   )
@@ -96,6 +118,11 @@ export function PlayerBar() {
             >
               {currentEpisode.podcastTitle}
             </p>
+            {currentChapter && (
+              <p className="truncate text-xs text-muted-foreground" data-testid="current-chapter-title">
+                {currentChapter.title}
+              </p>
+            )}
           </div>
         </Link>
 
@@ -139,9 +166,16 @@ export function PlayerBar() {
           <SeekBar />
         </div>
 
-        {/* Queue/Speed/Volume/Close (right) */}
+        {/* Chapters/Queue/Speed/Volume/Close (right) */}
         <div className="flex flex-1 items-center justify-end gap-2">
           <PlaybackSpeed />
+          {(hasChapters || chaptersLoading) && (
+            <ChapterPanel
+              open={chaptersOpen}
+              onOpenChange={setChaptersOpen}
+              trigger={chaptersTrigger}
+            />
+          )}
           {isDesktop && (
             <QueuePanel
               open={queueOpen}
@@ -200,6 +234,11 @@ export function PlayerBar() {
               >
                 {currentEpisode.podcastTitle}
               </p>
+              {currentChapter && (
+                <p className="truncate text-xs text-muted-foreground" data-testid="current-chapter-title">
+                  {currentChapter.title}
+                </p>
+              )}
             </div>
           </Link>
           <Button
@@ -217,6 +256,13 @@ export function PlayerBar() {
               <Play className="h-4 w-4" />
             )}
           </Button>
+          {(hasChapters || chaptersLoading) && (
+            <ChapterPanel
+              open={chaptersOpen}
+              onOpenChange={setChaptersOpen}
+              trigger={chaptersTrigger}
+            />
+          )}
           {!isDesktop && (
             <QueuePanel
               open={queueOpen}

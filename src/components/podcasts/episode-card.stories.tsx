@@ -127,6 +127,8 @@ const mockPlayerState: AudioPlayerState = {
   hasError: false,
   errorMessage: null,
   queue: [],
+  chapters: null,
+  chaptersLoading: false,
 };
 
 export const WithQueueAction: Story = {

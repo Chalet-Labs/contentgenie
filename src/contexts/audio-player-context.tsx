@@ -23,6 +23,7 @@ import {
   savePlayerPreferences,
 } from "@/lib/player-preferences"
 import { loadQueue, saveQueue } from "@/lib/queue-persistence"
+import type { Chapter } from "@/lib/chapters"
 
 // ---------------------------------------------------------------------------
 // Types
@@ -35,6 +36,7 @@ export interface AudioEpisode {
   audioUrl: string
   artwork?: string
   duration?: number
+  chaptersUrl?: string
 }
 
 export interface AudioPlayerState {
@@ -48,6 +50,8 @@ export interface AudioPlayerState {
   hasError: boolean
   errorMessage: string | null
   queue: AudioEpisode[]
+  chapters: Chapter[] | null
+  chaptersLoading: boolean
 }
 
 export interface AudioPlayerProgress {
@@ -90,6 +94,8 @@ type Action =
   | { type: "REORDER_QUEUE"; oldIndex: number; newIndex: number }
   | { type: "CLEAR_QUEUE" }
   | { type: "INIT_QUEUE"; queue: AudioEpisode[] }
+  | { type: "SET_CHAPTERS"; chapters: Chapter[] }
+  | { type: "CLEAR_CHAPTERS" }
 
 function reducer(state: AudioPlayerState, action: Action): AudioPlayerState {
   switch (action.type) {
@@ -103,6 +109,8 @@ function reducer(state: AudioPlayerState, action: Action): AudioPlayerState {
         hasError: false,
         errorMessage: null,
         duration: action.episode.duration ?? 0,
+        chapters: null,
+        chaptersLoading: !!action.episode.chaptersUrl,
       }
     case "SET_PLAYING":
       return { ...state, isPlaying: action.isPlaying }
@@ -134,6 +142,8 @@ function reducer(state: AudioPlayerState, action: Action): AudioPlayerState {
         hasError: false,
         errorMessage: null,
         duration: 0,
+        chapters: null,
+        chaptersLoading: false,
       }
     case "ADD_TO_QUEUE": {
       const alreadyQueued = state.queue.some(
@@ -165,6 +175,10 @@ function reducer(state: AudioPlayerState, action: Action): AudioPlayerState {
       return { ...state, queue: [] }
     case "INIT_QUEUE":
       return { ...state, queue: action.queue }
+    case "SET_CHAPTERS":
+      return { ...state, chapters: action.chapters, chaptersLoading: false }
+    case "CLEAR_CHAPTERS":
+      return { ...state, chapters: null, chaptersLoading: false }
     default:
       return state
   }
@@ -221,6 +235,8 @@ const initialState: AudioPlayerState = {
   hasError: false,
   errorMessage: null,
   queue: [],
+  chapters: null,
+  chaptersLoading: false,
 }
 
 export function AudioPlayerProvider({ children }: { children: ReactNode }) {
@@ -230,6 +246,8 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
   const autoPlayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const isAutoAdvancing = useRef(false)
   const isQueueHydrated = useRef(false)
+  const chaptersFetchController = useRef<AbortController | null>(null)
+  const chaptersTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const [state, dispatch] = useReducer(reducer, initialState)
 
@@ -314,6 +332,15 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
         const audio = audioRef.current
         if (!audio) return
         clearAutoPlayTimer()
+
+        // Abort any in-flight chapter fetch from the previous episode
+        chaptersFetchController.current?.abort()
+        chaptersFetchController.current = null
+        if (chaptersTimeoutRef.current) {
+          clearTimeout(chaptersTimeoutRef.current)
+          chaptersTimeoutRef.current = null
+        }
+
         dispatch({ type: "PLAY_EPISODE", episode })
         audio.src = episode.audioUrl
         audio.load()
@@ -327,6 +354,42 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
           artist: episode.podcastTitle,
           artwork: episode.artwork,
         })
+
+        // Non-blocking chapter fetch when chaptersUrl is present
+        if (episode.chaptersUrl) {
+          const controller = new AbortController()
+          chaptersFetchController.current = controller
+          const timeoutId = setTimeout(() => controller.abort(), 5000)
+          chaptersTimeoutRef.current = timeoutId
+
+          fetch(
+            `/api/chapters?url=${encodeURIComponent(episode.chaptersUrl)}`,
+            { signal: controller.signal }
+          )
+            .then((res) => (res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`))))
+            .then((data: { chapters: Chapter[] }) => {
+              if (
+                chaptersFetchController.current === controller &&
+                !controller.signal.aborted
+              ) {
+                dispatch({ type: "SET_CHAPTERS", chapters: data.chapters })
+              }
+            })
+            .catch(() => {
+              if (chaptersFetchController.current === controller) {
+                dispatch({ type: "CLEAR_CHAPTERS" })
+              }
+            })
+            .finally(() => {
+              clearTimeout(timeoutId)
+              if (chaptersTimeoutRef.current === timeoutId) {
+                chaptersTimeoutRef.current = null
+              }
+              if (chaptersFetchController.current === controller) {
+                chaptersFetchController.current = null
+              }
+            })
+        }
       },
 
       togglePlay: () => {
@@ -382,6 +445,12 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
           audio.load()
         }
         clearAutoPlayTimer()
+        chaptersFetchController.current?.abort()
+        chaptersFetchController.current = null
+        if (chaptersTimeoutRef.current) {
+          clearTimeout(chaptersTimeoutRef.current)
+          chaptersTimeoutRef.current = null
+        }
         dispatch({ type: "CLOSE" })
         setProgress({ currentTime: 0, buffered: 0 })
         clearMediaSession()
@@ -424,6 +493,16 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally stable: actions close over refs
     []
   )
+
+  // ---- Abort in-flight chapter fetch on unmount ----
+  useEffect(() => {
+    return () => {
+      chaptersFetchController.current?.abort()
+      if (chaptersTimeoutRef.current) {
+        clearTimeout(chaptersTimeoutRef.current)
+      }
+    }
+  }, [])
 
   // ---- Media Session handlers ----
   useEffect(() => {

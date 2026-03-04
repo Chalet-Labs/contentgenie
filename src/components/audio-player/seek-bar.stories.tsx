@@ -37,6 +37,8 @@ const baseState: AudioPlayerState = {
   hasError: false,
   errorMessage: null,
   queue: [],
+  chapters: null,
+  chaptersLoading: false,
 }
 
 function MockProvider({
@@ -133,6 +135,46 @@ export const ZeroDuration: Story = {
       <MockProvider
         state={{ ...baseState, duration: 0 }}
         progress={{ currentTime: 0, buffered: 0 }}
+      >
+        <div className="mx-auto max-w-lg p-4">
+          <Story />
+        </div>
+      </MockProvider>
+    ),
+  ],
+}
+
+export const WithChapterMarkers: Story = {
+  decorators: [
+    (Story) => (
+      <MockProvider
+        state={{
+          ...baseState,
+          duration: 3600,
+          chapters: [
+            { startTime: 0, title: "Introduction" },
+            { startTime: 300, title: "Guest Interview" },
+            { startTime: 900, title: "Deep Dive" },
+            { startTime: 1800, title: "Q&A" },
+            { startTime: 3000, title: "Outro" },
+          ],
+        }}
+        progress={{ currentTime: 600, buffered: 1200 }}
+      >
+        <div className="mx-auto max-w-lg p-4">
+          <Story />
+        </div>
+      </MockProvider>
+    ),
+  ],
+}
+
+export const NoChapterMarkers: Story = {
+  decorators: [
+    (Story) => (
+      <MockProvider
+        state={{ ...baseState, duration: 3600, chapters: null }}
+        progress={{ currentTime: 600, buffered: 1200 }}
       >
         <div className="mx-auto max-w-lg p-4">
           <Story />
