@@ -174,7 +174,7 @@ function QueueList() {
 interface QueuePanelProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  trigger: React.ReactNode
+  trigger: React.ReactElement
 }
 
 export function QueuePanel({ open, onOpenChange, trigger }: QueuePanelProps) {

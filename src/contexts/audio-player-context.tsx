@@ -318,8 +318,9 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
         audio.src = episode.audioUrl
         audio.load()
         audio.play().catch(() => {
-          // Autoplay blocked — user will see "play" button
+          // Play failed — keep player state consistent
           dispatch({ type: "SET_PLAYING", isPlaying: false })
+          dispatch({ type: "SET_BUFFERING", isBuffering: false })
         })
         updateMediaSessionMetadata({
           title: episode.title,
@@ -529,6 +530,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
           },
         })
 
+        clearAutoPlayTimer()
         autoPlayTimerRef.current = setTimeout(() => {
           autoPlayTimerRef.current = null
           api.playNext()
