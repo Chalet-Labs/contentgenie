@@ -23,7 +23,7 @@ export function parseChapters(json: unknown): Chapter[] {
   if (
     typeof json !== "object" ||
     json === null ||
-    !("chapters" in json) ||
+    !Object.hasOwn(json as object, "chapters") ||
     !Array.isArray((json as Record<string, unknown>).chapters)
   ) {
     return [];

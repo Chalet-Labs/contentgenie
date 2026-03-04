@@ -169,7 +169,7 @@ export function PlayerBar() {
         {/* Chapters/Queue/Speed/Volume/Close (right) */}
         <div className="flex flex-1 items-center justify-end gap-2">
           <PlaybackSpeed />
-          {(hasChapters || chaptersLoading) && isDesktop && (
+          {(hasChapters || chaptersLoading) && (
             <ChapterPanel
               open={chaptersOpen}
               onOpenChange={setChaptersOpen}
@@ -256,7 +256,7 @@ export function PlayerBar() {
               <Play className="h-4 w-4" />
             )}
           </Button>
-          {(hasChapters || chaptersLoading) && !isDesktop && (
+          {(hasChapters || chaptersLoading) && (
             <ChapterPanel
               open={chaptersOpen}
               onOpenChange={setChaptersOpen}

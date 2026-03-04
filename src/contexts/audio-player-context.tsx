@@ -96,7 +96,6 @@ type Action =
   | { type: "INIT_QUEUE"; queue: AudioEpisode[] }
   | { type: "SET_CHAPTERS"; chapters: Chapter[] }
   | { type: "CLEAR_CHAPTERS" }
-  | { type: "SET_CHAPTERS_LOADING" }
 
 function reducer(state: AudioPlayerState, action: Action): AudioPlayerState {
   switch (action.type) {
@@ -111,7 +110,7 @@ function reducer(state: AudioPlayerState, action: Action): AudioPlayerState {
         errorMessage: null,
         duration: action.episode.duration ?? 0,
         chapters: null,
-        chaptersLoading: false,
+        chaptersLoading: !!action.episode.chaptersUrl,
       }
     case "SET_PLAYING":
       return { ...state, isPlaying: action.isPlaying }
@@ -180,8 +179,6 @@ function reducer(state: AudioPlayerState, action: Action): AudioPlayerState {
       return { ...state, chapters: action.chapters, chaptersLoading: false }
     case "CLEAR_CHAPTERS":
       return { ...state, chapters: null, chaptersLoading: false }
-    case "SET_CHAPTERS_LOADING":
-      return { ...state, chaptersLoading: true }
     default:
       return state
   }
@@ -250,6 +247,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
   const isAutoAdvancing = useRef(false)
   const isQueueHydrated = useRef(false)
   const chaptersFetchController = useRef<AbortController | null>(null)
+  const chaptersTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const [state, dispatch] = useReducer(reducer, initialState)
 
@@ -338,6 +336,10 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
         // Abort any in-flight chapter fetch from the previous episode
         chaptersFetchController.current?.abort()
         chaptersFetchController.current = null
+        if (chaptersTimeoutRef.current) {
+          clearTimeout(chaptersTimeoutRef.current)
+          chaptersTimeoutRef.current = null
+        }
 
         dispatch({ type: "PLAY_EPISODE", episode })
         audio.src = episode.audioUrl
@@ -355,10 +357,9 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
 
         // Non-blocking chapter fetch when chaptersUrl is present
         if (episode.chaptersUrl) {
-          dispatch({ type: "SET_CHAPTERS_LOADING" })
           const controller = new AbortController()
           chaptersFetchController.current = controller
-          const timeoutId = setTimeout(() => controller.abort(), 5000)
+          chaptersTimeoutRef.current = setTimeout(() => controller.abort(), 5000)
 
           fetch(
             `/api/chapters?url=${encodeURIComponent(episode.chaptersUrl)}`,
@@ -375,7 +376,12 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
                 dispatch({ type: "CLEAR_CHAPTERS" })
               }
             })
-            .finally(() => clearTimeout(timeoutId))
+            .finally(() => {
+              if (chaptersTimeoutRef.current) {
+                clearTimeout(chaptersTimeoutRef.current)
+                chaptersTimeoutRef.current = null
+              }
+            })
         }
       },
 
@@ -434,6 +440,10 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
         clearAutoPlayTimer()
         chaptersFetchController.current?.abort()
         chaptersFetchController.current = null
+        if (chaptersTimeoutRef.current) {
+          clearTimeout(chaptersTimeoutRef.current)
+          chaptersTimeoutRef.current = null
+        }
         dispatch({ type: "CLOSE" })
         setProgress({ currentTime: 0, buffered: 0 })
         clearMediaSession()
@@ -476,6 +486,16 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally stable: actions close over refs
     []
   )
+
+  // ---- Abort in-flight chapter fetch on unmount ----
+  useEffect(() => {
+    return () => {
+      chaptersFetchController.current?.abort()
+      if (chaptersTimeoutRef.current) {
+        clearTimeout(chaptersTimeoutRef.current)
+      }
+    }
+  }, [])
 
   // ---- Media Session handlers ----
   useEffect(() => {

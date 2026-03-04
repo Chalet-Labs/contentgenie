@@ -3,14 +3,10 @@
 import { useEffect, useRef } from "react"
 import Image from "next/image"
 import { BookMarked, Volume2 } from "lucide-react"
+import { cn } from "@/lib/utils"
+import { formatTime } from "@/lib/format-time"
 import { useAudioPlayerState, useAudioPlayerAPI } from "@/contexts/audio-player-context"
 import { useCurrentChapter } from "@/hooks/use-current-chapter"
-
-function formatTime(seconds: number): string {
-  const mins = Math.floor(seconds / 60)
-  const secs = Math.floor(seconds % 60)
-  return `${mins}:${secs.toString().padStart(2, "0")}`
-}
 
 export function ChapterList() {
   const { chapters } = useAudioPlayerState()
@@ -42,7 +38,7 @@ export function ChapterList() {
   return (
     <div className="max-h-[50vh] overflow-y-auto">
       {chapters.map((chapter, index) => {
-        const isActive = currentChapter?.startTime === chapter.startTime
+        const isActive = currentChapter === chapter
 
         return (
           <button
@@ -50,9 +46,10 @@ export function ChapterList() {
             ref={isActive ? activeRef : undefined}
             type="button"
             onClick={() => seek(chapter.startTime)}
-            className={`flex w-full items-center gap-3 rounded-md px-2 py-2 text-left transition-colors hover:bg-accent ${
-              isActive ? "bg-primary/10" : ""
-            }`}
+            className={cn(
+              "flex w-full items-center gap-3 rounded-md px-2 py-2 text-left transition-colors hover:bg-accent",
+              isActive && "bg-primary/10"
+            )}
           >
             {chapter.img ? (
               <div className="relative h-8 w-8 shrink-0 overflow-hidden rounded bg-muted">

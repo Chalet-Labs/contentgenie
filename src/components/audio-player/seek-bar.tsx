@@ -1,15 +1,9 @@
 "use client"
 
-import { useCallback } from "react"
+import { useCallback, useMemo } from "react"
 import { Slider } from "@/components/ui/slider"
 import { useAudioPlayerProgress, useAudioPlayerAPI, useAudioPlayerState } from "@/contexts/audio-player-context"
-
-function formatTime(seconds: number): string {
-  if (!seconds || !isFinite(seconds)) return "0:00"
-  const mins = Math.floor(seconds / 60)
-  const secs = Math.floor(seconds % 60)
-  return `${mins}:${secs.toString().padStart(2, "0")}`
-}
+import { formatTime } from "@/lib/format-time"
 
 export function SeekBar() {
   const { currentTime, buffered } = useAudioPlayerProgress()
@@ -24,6 +18,13 @@ export function SeekBar() {
   )
 
   const bufferedPercent = duration > 0 ? (buffered / duration) * 100 : 0
+
+  const chapterTicks = useMemo(() => {
+    if (!chapters || duration <= 0) return null
+    return chapters
+      .filter((ch) => ch.startTime > 0)
+      .map((ch) => ({ startTime: ch.startTime, title: ch.title, left: (ch.startTime / duration) * 100 }))
+  }, [chapters, duration])
 
   return (
     <div className="flex w-full items-center gap-2">
@@ -41,19 +42,17 @@ export function SeekBar() {
           </div>
         </div>
         {/* Chapter boundary markers */}
-        {chapters && duration > 0 && (
+        {chapterTicks && (
           <div className="pointer-events-none absolute inset-0 flex items-center">
-            {chapters.map((chapter) =>
-              chapter.startTime > 0 ? (
-                <div
-                  key={chapter.startTime}
-                  className="absolute h-2.5 w-0.5 rounded-full bg-foreground/40"
-                  style={{ left: `${(chapter.startTime / duration) * 100}%` }}
-                  title={chapter.title}
-                  data-testid="chapter-tick"
-                />
-              ) : null
-            )}
+            {chapterTicks.map((tick) => (
+              <div
+                key={tick.startTime}
+                className="absolute h-2.5 w-0.5 rounded-full bg-foreground/40"
+                style={{ left: `${tick.left}%` }}
+                title={tick.title}
+                data-testid="chapter-tick"
+              />
+            ))}
           </div>
         )}
         <Slider

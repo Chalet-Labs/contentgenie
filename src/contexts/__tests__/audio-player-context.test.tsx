@@ -1029,7 +1029,7 @@ describe("Chapter state management", () => {
     expect(screen.getByTestId("chapters")).toHaveTextContent("null")
   })
 
-  it("dispatches SET_CHAPTERS_LOADING when episode has chaptersUrl", async () => {
+  it("sets chaptersLoading when episode has chaptersUrl", async () => {
     const user = userEvent.setup()
     vi.mocked(fetch).mockReturnValue(new Promise(() => {})) // never resolves
 

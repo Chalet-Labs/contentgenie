@@ -46,28 +46,30 @@ describe("GET /api/chapters", () => {
     expect(await response.json()).toEqual({ error: "Missing url parameter" });
   });
 
-  it("returns 400 for an invalid URL", async () => {
+  it("returns 403 for an invalid URL", async () => {
     vi.mocked(auth).mockResolvedValue({ userId: "user_123" } as never);
+    vi.mocked(isSafeUrl).mockResolvedValue(false);
 
     const request = new NextRequest(
       "http://localhost:3000/api/chapters?url=not-a-url"
     );
     const response = await GET(request);
 
-    expect(response.status).toBe(400);
-    expect(await response.json()).toEqual({ error: "Invalid url parameter" });
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({ error: "URL not allowed" });
   });
 
-  it("returns 400 for non-http(s) protocols", async () => {
+  it("returns 403 for non-http(s) protocols", async () => {
     vi.mocked(auth).mockResolvedValue({ userId: "user_123" } as never);
+    vi.mocked(isSafeUrl).mockResolvedValue(false);
 
     const request = new NextRequest(
       "http://localhost:3000/api/chapters?url=ftp://example.com/chapters.json"
     );
     const response = await GET(request);
 
-    expect(response.status).toBe(400);
-    expect(await response.json()).toEqual({ error: "Invalid url parameter" });
+    expect(response.status).toBe(403);
+    expect(await response.json()).toEqual({ error: "URL not allowed" });
   });
 
   it("returns 403 when URL is not safe (SSRF)", async () => {

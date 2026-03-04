@@ -17,23 +17,6 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  let parsedUrl: URL;
-  try {
-    parsedUrl = new URL(url);
-  } catch {
-    return NextResponse.json(
-      { error: "Invalid url parameter" },
-      { status: 400 }
-    );
-  }
-
-  if (parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:") {
-    return NextResponse.json(
-      { error: "Invalid url parameter" },
-      { status: 400 }
-    );
-  }
-
   const safe = await isSafeUrl(url);
   if (!safe) {
     return NextResponse.json({ error: "URL not allowed" }, { status: 403 });
@@ -60,5 +43,8 @@ export async function GET(request: NextRequest) {
   }
 
   const chapters = parseChapters(json);
-  return NextResponse.json({ chapters });
+  return NextResponse.json(
+    { chapters },
+    { headers: { "Cache-Control": "public, max-age=300, stale-while-revalidate=3600" } }
+  );
 }
