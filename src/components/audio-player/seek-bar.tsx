@@ -1,14 +1,23 @@
 "use client"
 
-import { useCallback, useMemo } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { Slider } from "@/components/ui/slider"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import { useAudioPlayerProgress, useAudioPlayerAPI, useAudioPlayerState } from "@/contexts/audio-player-context"
 import { formatTime } from "@/lib/format-time"
+import { getLibraryEntryByEpisodeId, getBookmarks } from "@/app/actions/library"
+import type { Bookmark } from "@/db/schema"
 
 export function SeekBar() {
   const { currentTime, buffered } = useAudioPlayerProgress()
-  const { duration, chapters } = useAudioPlayerState()
+  const { duration, chapters, currentEpisode } = useAudioPlayerState()
   const { seek } = useAudioPlayerAPI()
+  const [bookmarks, setBookmarks] = useState<Bookmark[]>([])
 
   const handleSeek = useCallback(
     (value: number[]) => {
@@ -25,6 +34,63 @@ export function SeekBar() {
       .filter((ch) => ch.startTime > 0 && ch.startTime < duration)
       .map((ch) => ({ startTime: ch.startTime, title: ch.title, left: (ch.startTime / duration) * 100 }))
   }, [chapters, duration])
+
+  // Fetch bookmarks for the current episode
+  useEffect(() => {
+    if (!currentEpisode) {
+      setBookmarks([])
+      return
+    }
+
+    let cancelled = false
+
+    async function fetchBookmarks() {
+      const entry = await getLibraryEntryByEpisodeId(currentEpisode!.id)
+      if (cancelled || !entry) {
+        if (!cancelled) setBookmarks([])
+        return
+      }
+      const result = await getBookmarks(entry.libraryEntryId)
+      if (!cancelled) {
+        setBookmarks(result.bookmarks)
+      }
+    }
+
+    fetchBookmarks()
+
+    return () => {
+      cancelled = true
+    }
+  }, [currentEpisode?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Listen for bookmark-changed events to refetch
+  useEffect(() => {
+    if (!currentEpisode) return
+
+    const handleBookmarkChanged = () => {
+      getLibraryEntryByEpisodeId(currentEpisode.id).then((entry) => {
+        if (!entry) return
+        getBookmarks(entry.libraryEntryId).then((result) => {
+          setBookmarks(result.bookmarks)
+        })
+      })
+    }
+
+    window.addEventListener("bookmark-changed", handleBookmarkChanged)
+    return () => {
+      window.removeEventListener("bookmark-changed", handleBookmarkChanged)
+    }
+  }, [currentEpisode?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const bookmarkDots = useMemo(() => {
+    if (bookmarks.length === 0 || duration <= 0) return null
+    return bookmarks.map((bm) => ({
+      id: bm.id,
+      timestamp: bm.timestamp,
+      note: bm.note,
+      left: (bm.timestamp / duration) * 100,
+    }))
+  }, [bookmarks, duration])
 
   return (
     <div className="flex w-full items-center gap-2">
@@ -54,6 +120,33 @@ export function SeekBar() {
               />
             ))}
           </div>
+        )}
+        {/* Bookmark dot indicators */}
+        {bookmarkDots && (
+          <TooltipProvider delayDuration={0}>
+            <div className="absolute inset-0 z-10 flex items-center">
+              {bookmarkDots.map((dot) => (
+                <Tooltip key={dot.id}>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      className="absolute h-2 w-2 rounded-full bg-primary/60 transition-transform hover:scale-150"
+                      style={{ left: `${dot.left}%`, transform: `translateX(-50%)` }}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        seek(dot.timestamp)
+                      }}
+                      aria-label={`Bookmark at ${formatTime(dot.timestamp)}`}
+                      data-testid="bookmark-dot"
+                    />
+                  </TooltipTrigger>
+                  <TooltipContent side="top">
+                    {dot.note || `Bookmark at ${formatTime(dot.timestamp)}`}
+                  </TooltipContent>
+                </Tooltip>
+              ))}
+            </div>
+          </TooltipProvider>
         )}
         <Slider
           aria-label="Seek"

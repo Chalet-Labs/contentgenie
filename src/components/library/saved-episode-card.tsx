@@ -237,6 +237,14 @@ export function SavedEpisodeCard({ item, onRemoved, onCollectionChanged, isOffli
                   <BookmarksList
                     libraryEntryId={item.id}
                     episodeDuration={episode.duration}
+                    episodeAudioData={{
+                      podcastIndexId: episode.podcastIndexId,
+                      title: episode.title,
+                      podcastTitle: podcast.title,
+                      audioUrl: episode.audioUrl || "",
+                      artwork: podcast.imageUrl || undefined,
+                      duration: episode.duration || undefined,
+                    }}
                   />
                 </>
               )}

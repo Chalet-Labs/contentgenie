@@ -70,7 +70,7 @@ export interface AudioPlayerProgress {
 }
 
 export interface AudioPlayerAPI {
-  playEpisode: (episode: AudioEpisode) => void
+  playEpisode: (episode: AudioEpisode, options?: { startAt?: number }) => void
   togglePlay: () => void
   seek: (time: number) => void
   skipForward: (seconds?: number) => void
@@ -273,6 +273,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
   const chaptersTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const sleepTimerIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const fadeCleanupRef = useRef<(() => void) | null>(null)
+  const pendingSeekRef = useRef<number | null>(null)
 
   const [state, dispatch] = useReducer(reducer, initialState)
 
@@ -420,7 +421,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
   // ---- API (stable reference) ----
   const api = useMemo<AudioPlayerAPI>(
     () => ({
-      playEpisode: (episode: AudioEpisode) => {
+      playEpisode: (episode: AudioEpisode, options?: { startAt?: number }) => {
         const audio = audioRef.current
         if (!audio) return
         clearAutoPlayTimer()
@@ -432,6 +433,9 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
           clearTimeout(chaptersTimeoutRef.current)
           chaptersTimeoutRef.current = null
         }
+
+        // Store pending seek position if startAt is provided
+        pendingSeekRef.current = options?.startAt ?? null
 
         dispatch({ type: "PLAY_EPISODE", episode })
         audio.src = episode.audioUrl
@@ -536,6 +540,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
           audio.removeAttribute("src")
           audio.load()
         }
+        pendingSeekRef.current = null
         clearAutoPlayTimer()
         clearSleepTimerInterval()
         cancelFade()
@@ -692,6 +697,15 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
 
     const onDurationChange = () => {
       dispatch({ type: "SET_DURATION", duration: audio.duration || 0 })
+      // Apply pending seek when the audio element reports a valid duration
+      if (
+        pendingSeekRef.current !== null &&
+        audio.duration > 0 &&
+        !isNaN(audio.duration)
+      ) {
+        audio.currentTime = pendingSeekRef.current
+        pendingSeekRef.current = null
+      }
     }
 
     const onPlaying = () => {

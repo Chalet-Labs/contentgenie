@@ -20,11 +20,25 @@ import {
   deleteBookmark,
   getBookmarks,
 } from "@/app/actions/library";
+import {
+  useAudioPlayerState,
+  useAudioPlayerAPI,
+  type AudioEpisode,
+} from "@/contexts/audio-player-context";
 import type { Bookmark as BookmarkType } from "@/db/schema";
 
 interface BookmarksListProps {
   libraryEntryId: number;
   episodeDuration?: number | null;
+  episodeAudioData?: {
+    podcastIndexId: string;
+    title: string;
+    podcastTitle: string;
+    audioUrl: string;
+    artwork?: string;
+    duration?: number;
+    chaptersUrl?: string;
+  };
 }
 
 function formatTimestamp(seconds: number): string {
@@ -59,7 +73,10 @@ function parseTimestamp(input: string): number | null {
 export function BookmarksList({
   libraryEntryId,
   episodeDuration,
+  episodeAudioData,
 }: BookmarksListProps) {
+  const { currentEpisode } = useAudioPlayerState();
+  const api = useAudioPlayerAPI();
   const [bookmarks, setBookmarks] = useState<BookmarkType[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -120,12 +137,31 @@ export function BookmarksList({
     });
   };
 
+  const handleSeekToBookmark = (timestamp: number) => {
+    if (!episodeAudioData) return;
+    if (currentEpisode?.id === episodeAudioData.podcastIndexId) {
+      api.seek(timestamp);
+    } else {
+      const episode: AudioEpisode = {
+        id: episodeAudioData.podcastIndexId,
+        title: episodeAudioData.title,
+        podcastTitle: episodeAudioData.podcastTitle,
+        audioUrl: episodeAudioData.audioUrl,
+        artwork: episodeAudioData.artwork,
+        duration: episodeAudioData.duration,
+        chaptersUrl: episodeAudioData.chaptersUrl,
+      };
+      api.playEpisode(episode, { startAt: timestamp });
+    }
+  };
+
   const handleDeleteBookmark = (bookmarkId: number) => {
     startTransition(async () => {
       const result = await deleteBookmark(bookmarkId);
       if (result.success) {
         loadBookmarks();
         toast.success("Bookmark deleted");
+        window.dispatchEvent(new CustomEvent("bookmark-changed"));
       } else {
         toast.error("Failed to delete bookmark");
       }
@@ -233,10 +269,22 @@ export function BookmarksList({
               key={bookmark.id}
               className="group flex items-start gap-3 rounded-lg border bg-card p-3"
             >
-              <div className="flex shrink-0 items-center gap-1 rounded bg-muted px-2 py-1 text-sm font-mono">
-                <Clock className="h-3 w-3" />
-                {formatTimestamp(bookmark.timestamp)}
-              </div>
+              {episodeAudioData ? (
+                <button
+                  type="button"
+                  onClick={() => handleSeekToBookmark(bookmark.timestamp)}
+                  aria-label={`Seek to ${formatTimestamp(bookmark.timestamp)}`}
+                  className="flex shrink-0 items-center gap-1 rounded bg-muted px-2 py-1 text-sm font-mono hover:bg-primary/20 transition-colors cursor-pointer"
+                >
+                  <Clock className="h-3 w-3" />
+                  {formatTimestamp(bookmark.timestamp)}
+                </button>
+              ) : (
+                <div className="flex shrink-0 items-center gap-1 rounded bg-muted px-2 py-1 text-sm font-mono">
+                  <Clock className="h-3 w-3" />
+                  {formatTimestamp(bookmark.timestamp)}
+                </div>
+              )}
               <div className="min-w-0 flex-1">
                 {bookmark.note ? (
                   <p className="text-sm">{bookmark.note}</p>

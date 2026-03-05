@@ -25,6 +25,7 @@ import { VolumeControl } from "@/components/audio-player/volume-control"
 import { QueuePanel } from "@/components/audio-player/queue-panel"
 import { ChapterPanel } from "@/components/audio-player/chapter-panel"
 import { SleepTimerMenu } from "@/components/audio-player/sleep-timer-menu"
+import { BookmarkButton } from "@/components/audio-player/bookmark-button"
 import { useCurrentChapter } from "@/hooks/use-current-chapter"
 import { useMediaQuery } from "@/hooks/use-media-query"
 
@@ -171,6 +172,7 @@ export function PlayerBar() {
         <div className="flex flex-1 items-center justify-end gap-2">
           <PlaybackSpeed />
           <SleepTimerMenu />
+          <BookmarkButton />
           {(hasChapters || chaptersLoading) && (
             <ChapterPanel
               open={chaptersOpen}
@@ -308,6 +310,7 @@ export function PlayerBar() {
           </Button>
           <PlaybackSpeed />
           <SleepTimerMenu />
+          <BookmarkButton />
         </div>
       </div>
     </div>
