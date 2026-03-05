@@ -135,12 +135,12 @@ export function BookmarkButton() {
       if (result.success) {
         toast.success("Note saved")
         window.dispatchEvent(new CustomEvent(BOOKMARK_CHANGED_EVENT))
+        setNoteOpen(false)
+        setNoteText("")
+        setLastBookmarkId(null)
       } else {
         toast.error("Failed to save note")
       }
-      setNoteOpen(false)
-      setNoteText("")
-      setLastBookmarkId(null)
     })
   }
 

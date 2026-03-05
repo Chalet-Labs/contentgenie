@@ -45,20 +45,22 @@ export function SeekBar() {
     }
 
     let cancelled = false
+    let requestSeq = 0
 
     const fetchAndSetBookmarks = async () => {
+      const seq = ++requestSeq
       try {
         const entry = await getLibraryEntryByEpisodeId(episodeId)
         if (cancelled || !entry) {
-          if (!cancelled) setBookmarks([])
+          if (!cancelled && seq === requestSeq) setBookmarks([])
           return
         }
         const result = await getBookmarks(entry.libraryEntryId)
-        if (!cancelled) {
+        if (!cancelled && seq === requestSeq) {
           setBookmarks(result.bookmarks ?? [])
         }
       } catch {
-        if (!cancelled) setBookmarks([])
+        if (!cancelled && seq === requestSeq) setBookmarks([])
       }
     }
 
