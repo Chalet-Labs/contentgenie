@@ -47,6 +47,10 @@ const mockState = {
   queue: [] as { id: string; title: string; podcastTitle: string; audioUrl: string; artwork?: string; duration?: number }[],
   chapters: null as { startTime: number; title: string; img?: string; url?: string }[] | null,
   chaptersLoading: false,
+  sleepTimer: null as {
+    endTime: number | null
+    type: "duration" | "end-of-episode"
+  } | null,
 }
 
 const mockAPI = {
@@ -63,6 +67,8 @@ const mockAPI = {
   reorderQueue: vi.fn(),
   clearQueue: vi.fn(),
   playNext: vi.fn(),
+  setSleepTimer: vi.fn(),
+  cancelSleepTimer: vi.fn(),
 }
 
 const mockProgress = {
@@ -105,6 +111,7 @@ describe("PlayerBar", () => {
       queue: [],
       chapters: null,
       chaptersLoading: false,
+      sleepTimer: null,
     })
   })
 
@@ -245,6 +252,15 @@ describe("PlayerBar", () => {
     render(<PlayerBar />)
 
     expect(screen.queryByRole("button", { name: "Chapters" })).not.toBeInTheDocument()
+  })
+
+  it("shows sleep timer button when player is visible", () => {
+    mockState.isVisible = true
+    mockState.currentEpisode = testEpisode
+    render(<PlayerBar />)
+
+    const sleepTimerButtons = screen.getAllByRole("button", { name: "Sleep timer" })
+    expect(sleepTimerButtons.length).toBeGreaterThan(0)
   })
 
   it("shows chapters button when chapters are available", () => {

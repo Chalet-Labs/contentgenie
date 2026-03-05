@@ -24,6 +24,8 @@ const noopAPI: AudioPlayerAPI = {
   reorderQueue: () => {},
   clearQueue: () => {},
   playNext: () => {},
+  setSleepTimer: () => {},
+  cancelSleepTimer: () => {},
 }
 
 const defaultProgress: AudioPlayerProgress = {
@@ -44,6 +46,7 @@ const baseState: AudioPlayerState = {
   queue: [],
   chapters: null,
   chaptersLoading: false,
+  sleepTimer: null,
 }
 
 const testEpisode = {

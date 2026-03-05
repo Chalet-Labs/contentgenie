@@ -114,6 +114,8 @@ const noopAPI: AudioPlayerAPI = {
   reorderQueue: () => {},
   clearQueue: () => {},
   playNext: () => {},
+  setSleepTimer: () => {},
+  cancelSleepTimer: () => {},
 };
 
 const mockPlayerState: AudioPlayerState = {
@@ -129,6 +131,7 @@ const mockPlayerState: AudioPlayerState = {
   queue: [],
   chapters: null,
   chaptersLoading: false,
+  sleepTimer: null,
 };
 
 export const WithQueueAction: Story = {

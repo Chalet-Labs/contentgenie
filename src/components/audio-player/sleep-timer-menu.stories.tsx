@@ -7,7 +7,7 @@ import {
   type AudioPlayerState,
   type AudioPlayerAPI,
 } from "@/contexts/audio-player-context"
-import { VolumeControl } from "@/components/audio-player/volume-control"
+import { SleepTimerMenu } from "@/components/audio-player/sleep-timer-menu"
 
 const noopAPI: AudioPlayerAPI = {
   playEpisode: () => {},
@@ -63,58 +63,52 @@ function MockProvider({
   )
 }
 
-const meta: Meta<typeof VolumeControl> = {
-  title: "AudioPlayer/VolumeControl",
-  component: VolumeControl,
+const meta: Meta<typeof SleepTimerMenu> = {
+  title: "AudioPlayer/SleepTimerMenu",
+  component: SleepTimerMenu,
 }
 
 export default meta
-type Story = StoryObj<typeof VolumeControl>
+type Story = StoryObj<typeof SleepTimerMenu>
+
+function withMockedLayout(state: AudioPlayerState) {
+  return function MockedLayout(Story: () => ReactNode) {
+    return (
+      <MockProvider state={state}>
+        <div className="flex items-end justify-end p-4" style={{ minHeight: 400 }}>
+          <Story />
+        </div>
+      </MockProvider>
+    )
+  }
+}
 
 export const Default: Story = {
+  decorators: [withMockedLayout(baseState)],
+}
+
+export const ActiveDurationTimer: Story = {
+  name: "Active Duration Timer (25:30 remaining)",
   decorators: [
-    (Story) => (
-      <MockProvider state={{ ...baseState, volume: 1 }}>
-        <div className="p-4">
-          <Story />
-        </div>
-      </MockProvider>
-    ),
+    withMockedLayout({
+      ...baseState,
+      sleepTimer: {
+        endTime: Date.now() + 1530_000,
+        type: "duration",
+      },
+    }),
   ],
 }
 
-export const Muted: Story = {
+export const ActiveEndOfEpisode: Story = {
+  name: "Active End-of-Episode Timer",
   decorators: [
-    (Story) => (
-      <MockProvider state={{ ...baseState, volume: 0 }}>
-        <div className="p-4">
-          <Story />
-        </div>
-      </MockProvider>
-    ),
-  ],
-}
-
-export const HalfVolume: Story = {
-  decorators: [
-    (Story) => (
-      <MockProvider state={{ ...baseState, volume: 0.5 }}>
-        <div className="p-4">
-          <Story />
-        </div>
-      </MockProvider>
-    ),
-  ],
-}
-
-export const MaxVolume: Story = {
-  decorators: [
-    (Story) => (
-      <MockProvider state={{ ...baseState, volume: 1 }}>
-        <div className="p-4">
-          <Story />
-        </div>
-      </MockProvider>
-    ),
+    withMockedLayout({
+      ...baseState,
+      sleepTimer: {
+        endTime: null,
+        type: "end-of-episode",
+      },
+    }),
   ],
 }
