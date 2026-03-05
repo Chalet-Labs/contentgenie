@@ -537,6 +537,36 @@ export async function getEpisodeAverageRating(episodePodcastIndexId: string) {
   }
 }
 
+// Resolve a PodcastIndex episode ID to the user's library entry ID
+export async function getLibraryEntryByEpisodeId(
+  episodePodcastIndexId: string
+): Promise<{ libraryEntryId: number; episodeId: number } | null> {
+  const { userId } = await auth();
+
+  if (!userId) {
+    return null;
+  }
+
+  try {
+    const result = await db
+      .select({ libraryEntryId: userLibrary.id, episodeId: episodes.id })
+      .from(userLibrary)
+      .innerJoin(episodes, eq(userLibrary.episodeId, episodes.id))
+      .where(
+        and(
+          eq(userLibrary.userId, userId),
+          eq(episodes.podcastIndexId, episodePodcastIndexId)
+        )
+      )
+      .limit(1);
+
+    return result.length > 0 ? result[0] : null;
+  } catch (error) {
+    console.error("Error resolving library entry by episode ID:", error);
+    return null;
+  }
+}
+
 // Get bookmarks for a library entry
 export async function getBookmarks(libraryEntryId: number) {
   const { userId } = await auth();

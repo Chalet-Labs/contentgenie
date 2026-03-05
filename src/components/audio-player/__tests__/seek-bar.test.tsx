@@ -12,7 +12,7 @@ globalThis.ResizeObserver = MockResizeObserver as unknown as typeof ResizeObserv
 
 const mockState = {
   duration: 300,
-  currentEpisode: null,
+  currentEpisode: { id: "ep-123", title: "Test", podcastTitle: "Pod", audioUrl: "http://example.com/a.mp3" },
   isPlaying: false,
   isBuffering: false,
   isVisible: true,
@@ -22,6 +22,8 @@ const mockState = {
   errorMessage: null,
   chapters: null as { startTime: number; title: string }[] | null,
   chaptersLoading: false,
+  queue: [],
+  sleepTimer: null,
 }
 
 const mockProgress = {
@@ -38,12 +40,24 @@ const mockAPI = {
   setVolume: vi.fn(),
   setPlaybackSpeed: vi.fn(),
   closePlayer: vi.fn(),
+  addToQueue: vi.fn(),
+  removeFromQueue: vi.fn(),
+  reorderQueue: vi.fn(),
+  clearQueue: vi.fn(),
+  playNext: vi.fn(),
+  setSleepTimer: vi.fn(),
+  cancelSleepTimer: vi.fn(),
 }
 
 vi.mock("@/contexts/audio-player-context", () => ({
   useAudioPlayerState: () => mockState,
   useAudioPlayerProgress: () => mockProgress,
   useAudioPlayerAPI: () => mockAPI,
+}))
+
+vi.mock("@/app/actions/library", () => ({
+  getLibraryEntryByEpisodeId: vi.fn().mockResolvedValue(null),
+  getBookmarks: vi.fn().mockResolvedValue({ bookmarks: [], error: null }),
 }))
 
 describe("SeekBar", () => {
@@ -140,5 +154,53 @@ describe("SeekBar", () => {
     mockState.chapters = [{ startTime: 0, title: "Intro" }, { startTime: 60, title: "Main" }]
     const { container } = render(<SeekBar />)
     expect(container.querySelectorAll("[data-testid='chapter-tick']")).toHaveLength(0)
+  })
+
+  describe("bookmark indicators", () => {
+    it("renders no bookmark dots when episode is not in library", async () => {
+      const { getLibraryEntryByEpisodeId } = await import("@/app/actions/library")
+      vi.mocked(getLibraryEntryByEpisodeId).mockResolvedValue(null)
+
+      const { container } = render(<SeekBar />)
+      // Allow async effects to settle
+      await vi.waitFor(() => {
+        expect(container.querySelectorAll("[data-testid='bookmark-dot']")).toHaveLength(0)
+      })
+    })
+
+    it("renders bookmark dots when episode has bookmarks", async () => {
+      const { getLibraryEntryByEpisodeId, getBookmarks } = await import("@/app/actions/library")
+      vi.mocked(getLibraryEntryByEpisodeId).mockResolvedValue({ libraryEntryId: 1, episodeId: 10 })
+      vi.mocked(getBookmarks).mockResolvedValue({
+        bookmarks: [
+          { id: 1, userLibraryId: 1, timestamp: 60, note: "Good point", createdAt: new Date() },
+          { id: 2, userLibraryId: 1, timestamp: 150, note: null, createdAt: new Date() },
+        ],
+        error: null,
+      })
+
+      const { container } = render(<SeekBar />)
+      await vi.waitFor(() => {
+        expect(container.querySelectorAll("[data-testid='bookmark-dot']")).toHaveLength(2)
+      })
+    })
+
+    it("positions bookmark dots at correct percentage", async () => {
+      const { getLibraryEntryByEpisodeId, getBookmarks } = await import("@/app/actions/library")
+      vi.mocked(getLibraryEntryByEpisodeId).mockResolvedValue({ libraryEntryId: 1, episodeId: 10 })
+      vi.mocked(getBookmarks).mockResolvedValue({
+        bookmarks: [
+          { id: 1, userLibraryId: 1, timestamp: 150, note: null, createdAt: new Date() }, // 150/300 = 50%
+        ],
+        error: null,
+      })
+
+      const { container } = render(<SeekBar />)
+      await vi.waitFor(() => {
+        const dots = container.querySelectorAll("[data-testid='bookmark-dot']")
+        expect(dots).toHaveLength(1)
+        expect((dots[0] as HTMLElement).style.left).toBe("50%")
+      })
+    })
   })
 })
