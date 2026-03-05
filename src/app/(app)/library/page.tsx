@@ -40,7 +40,7 @@ export default function LibraryPage() {
     if (result.error) {
       setError(result.error);
     } else {
-      const libraryItems = result.items as SavedItemDTO[];
+      const libraryItems = result.items;
       setItems(libraryItems);
       setIsFromCache(false);
 
@@ -66,7 +66,7 @@ export default function LibraryPage() {
 
     const cached = await getCachedLibrary(userId);
     if (cached) {
-      setItems(cached as SavedItemDTO[]);
+      setItems(cached);
       setIsFromCache(true);
     } else {
       setItems([]);

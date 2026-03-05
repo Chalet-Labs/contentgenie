@@ -9,6 +9,7 @@ import {
   LIBRARY_ENTRY_COLUMNS,
   EPISODE_LIST_COLUMNS,
   PODCAST_LIST_COLUMNS,
+  COLLECTION_LIST_COLUMNS,
 } from "@/db/library-columns";
 
 // Create a new collection
@@ -212,6 +213,9 @@ export async function getCollection(collectionId: number) {
               columns: PODCAST_LIST_COLUMNS,
             },
           },
+        },
+        collection: {
+          columns: COLLECTION_LIST_COLUMNS,
         },
       },
       orderBy: [desc(userLibrary.savedAt)],

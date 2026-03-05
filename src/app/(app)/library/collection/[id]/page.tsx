@@ -52,12 +52,7 @@ export default function CollectionDetailPage() {
       setError(result.error);
     } else {
       setCollection(result.collection);
-      // Add collection reference to items for display
-      const itemsWithCollection = result.items.map((item) => ({
-        ...item,
-        collection: result.collection,
-      }));
-      setItems(itemsWithCollection as SavedItemDTO[]);
+      setItems(result.items);
     }
 
     setIsLoading(false);
