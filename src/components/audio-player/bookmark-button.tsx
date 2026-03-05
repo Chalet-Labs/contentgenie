@@ -22,6 +22,7 @@ import {
 import { formatTime } from "@/lib/format-time"
 
 const AUTO_DISMISS_MS = 5000
+const MAX_NOTE_LENGTH = 500
 
 export function BookmarkButton() {
   const { currentEpisode } = useAudioPlayerState()
@@ -38,19 +39,40 @@ export function BookmarkButton() {
 
   // Resolve library entry ID when episode changes
   useEffect(() => {
+    // Reset transient bookmark-note UI when episode context changes
+    if (dismissTimerRef.current) {
+      clearTimeout(dismissTimerRef.current)
+      dismissTimerRef.current = null
+    }
+    setNoteOpen(false)
+    setNoteText("")
+    setLastBookmarkId(null)
+
     if (!currentEpisode) {
       setLibraryEntryId(null)
+      setIsResolving(false)
       return
     }
 
     let cancelled = false
+    setLibraryEntryId(null)
     setIsResolving(true)
-    getLibraryEntryByEpisodeId(currentEpisode.id).then((result) => {
-      if (!cancelled) {
-        setLibraryEntryId(result?.libraryEntryId ?? null)
-        setIsResolving(false)
-      }
-    })
+    getLibraryEntryByEpisodeId(currentEpisode.id)
+      .then((result) => {
+        if (!cancelled) {
+          setLibraryEntryId(result?.libraryEntryId ?? null)
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setLibraryEntryId(null)
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setIsResolving(false)
+        }
+      })
 
     return () => {
       cancelled = true
@@ -98,13 +120,20 @@ export function BookmarkButton() {
   }
 
   const handleNoteSubmit = () => {
-    if (!lastBookmarkId || !noteText.trim()) return
+    const normalizedNote = noteText.normalize("NFKC").trim()
+    if (!lastBookmarkId || !normalizedNote) return
+
+    if (normalizedNote.length > MAX_NOTE_LENGTH) {
+      toast.error(`Note is too long (max ${MAX_NOTE_LENGTH} characters)`)
+      return
+    }
 
     clearDismissTimer()
     startTransition(async () => {
-      const result = await updateBookmark(lastBookmarkId, noteText.trim())
+      const result = await updateBookmark(lastBookmarkId, normalizedNote)
       if (result.success) {
         toast.success("Note saved")
+        window.dispatchEvent(new CustomEvent("bookmark-changed"))
       } else {
         toast.error("Failed to save note")
       }
@@ -163,6 +192,7 @@ export function BookmarkButton() {
             value={noteText}
             onChange={(e) => setNoteText(e.target.value)}
             onKeyDown={handleNoteKeyDown}
+            maxLength={MAX_NOTE_LENGTH}
             autoFocus
           />
           <div className="flex justify-end">

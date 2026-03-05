@@ -35,7 +35,7 @@ export function SeekBar() {
       .map((ch) => ({ startTime: ch.startTime, title: ch.title, left: (ch.startTime / duration) * 100 }))
   }, [chapters, duration])
 
-  // Fetch bookmarks for the current episode
+  // Fetch bookmarks for the current episode and refetch on changes
   useEffect(() => {
     if (!currentEpisode) {
       setBookmarks([])
@@ -44,8 +44,8 @@ export function SeekBar() {
 
     let cancelled = false
 
-    async function fetchBookmarks() {
-      const entry = await getLibraryEntryByEpisodeId(currentEpisode!.id)
+    const fetchAndSetBookmarks = async () => {
+      const entry = await getLibraryEntryByEpisodeId(currentEpisode.id)
       if (cancelled || !entry) {
         if (!cancelled) setBookmarks([])
         return
@@ -56,29 +56,13 @@ export function SeekBar() {
       }
     }
 
-    fetchBookmarks()
+    fetchAndSetBookmarks()
+
+    window.addEventListener("bookmark-changed", fetchAndSetBookmarks)
 
     return () => {
       cancelled = true
-    }
-  }, [currentEpisode?.id]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Listen for bookmark-changed events to refetch
-  useEffect(() => {
-    if (!currentEpisode) return
-
-    const handleBookmarkChanged = () => {
-      getLibraryEntryByEpisodeId(currentEpisode.id).then((entry) => {
-        if (!entry) return
-        getBookmarks(entry.libraryEntryId).then((result) => {
-          setBookmarks(result.bookmarks)
-        })
-      })
-    }
-
-    window.addEventListener("bookmark-changed", handleBookmarkChanged)
-    return () => {
-      window.removeEventListener("bookmark-changed", handleBookmarkChanged)
+      window.removeEventListener("bookmark-changed", fetchAndSetBookmarks)
     }
   }, [currentEpisode?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -124,13 +108,13 @@ export function SeekBar() {
         {/* Bookmark dot indicators */}
         {bookmarkDots && (
           <TooltipProvider delayDuration={0}>
-            <div className="absolute inset-0 z-10 flex items-center">
+            <div className="pointer-events-none absolute inset-0 z-10 flex items-center">
               {bookmarkDots.map((dot) => (
                 <Tooltip key={dot.id}>
                   <TooltipTrigger asChild>
                     <button
                       type="button"
-                      className="absolute h-2 w-2 rounded-full bg-primary/60 transition-transform hover:scale-150"
+                      className="pointer-events-auto absolute h-2 w-2 rounded-full bg-primary/60 transition-transform hover:scale-150"
                       style={{ left: `${dot.left}%`, transform: `translateX(-50%)` }}
                       onClick={(e) => {
                         e.stopPropagation()

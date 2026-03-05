@@ -434,8 +434,12 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
           chaptersTimeoutRef.current = null
         }
 
-        // Store pending seek position if startAt is provided
-        pendingSeekRef.current = options?.startAt ?? null
+        // Store pending seek position if startAt is provided and valid
+        const requestedStartAt = options?.startAt
+        pendingSeekRef.current =
+          typeof requestedStartAt === "number" && Number.isFinite(requestedStartAt)
+            ? Math.max(0, requestedStartAt)
+            : null
 
         dispatch({ type: "PLAY_EPISODE", episode })
         audio.src = episode.audioUrl
@@ -703,7 +707,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
         audio.duration > 0 &&
         !isNaN(audio.duration)
       ) {
-        audio.currentTime = pendingSeekRef.current
+        audio.currentTime = Math.min(pendingSeekRef.current, audio.duration)
         pendingSeekRef.current = null
       }
     }

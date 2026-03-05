@@ -75,7 +75,7 @@ export function BookmarksList({
   episodeDuration,
   episodeAudioData,
 }: BookmarksListProps) {
-  const { currentEpisode } = useAudioPlayerState();
+  const { currentEpisode, isPlaying } = useAudioPlayerState();
   const api = useAudioPlayerAPI();
   const [bookmarks, setBookmarks] = useState<BookmarkType[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -141,6 +141,9 @@ export function BookmarksList({
     if (!episodeAudioData) return;
     if (currentEpisode?.id === episodeAudioData.podcastIndexId) {
       api.seek(timestamp);
+      if (!isPlaying) {
+        api.togglePlay();
+      }
     } else {
       const episode: AudioEpisode = {
         id: episodeAudioData.podcastIndexId,

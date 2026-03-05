@@ -18,4 +18,4 @@ export const subscribeToPodcast = noop;
 export const unsubscribeFromPodcast = noop;
 export const getUserLibrary = async () => ({ items: [], error: null });
 export const isEpisodeSaved = async () => false;
-export const getLibraryEntryByEpisodeId = async () => ({ libraryEntryId: 42, episodeId: 10 });
+export const getLibraryEntryByEpisodeId = async (_episodePodcastIndexId: string) => ({ libraryEntryId: 42, episodeId: 10 });

@@ -21,7 +21,7 @@ The audio player context stores `currentEpisode.id` as the PodcastIndex episode 
 
 ### Option A: New server action that resolves episode ID to library entry ID (chosen)
 
-Add a `getLibraryEntryByEpisodeId(episodePodcastIndexId: string)` server action that returns `{ libraryEntryId: number } | null`. The bookmark button component calls this action to resolve the mapping, then uses existing `addBookmark`/`getBookmarks` actions. The action also implicitly validates that the episode is in the user's library.
+Add a `getLibraryEntryByEpisodeId(episodePodcastIndexId: string)` server action that returns `{ libraryEntryId: number; episodeId: number } | null`. The bookmark button component calls this action to resolve the mapping, then uses existing `addBookmark`/`getBookmarks` actions. The action also implicitly validates that the episode is in the user's library.
 
 - **Pros:** Minimal new surface area — one new server action, reuses all existing bookmark actions. Clean separation: the player UI doesn't need to know about database internals. The resolution call doubles as a library membership check.
 - **Cons:** Extra server round-trip to resolve the ID. But bookmarking is a low-frequency user action (not on the hot path), so the latency is acceptable.
@@ -46,7 +46,7 @@ Modify `addBookmark` to accept an episode PodcastIndex ID instead of a library e
 
 ## Rationale
 
-- **Preserves existing API contracts.** `addBookmark`, `getBookmarks`, `deleteBookmark` continue to work as-is. `BookmarksList` and `saved-episode-card.tsx` are unaffected.
+- **Preserves existing API contracts.** `addBookmark`, `getBookmarks`, `deleteBookmark` continue to work as-is. `BookmarksList` gains click-to-seek behavior via the audio player API, and `saved-episode-card.tsx` passes `episodeAudioData` to `BookmarksList` to enable seek/play from the library view.
 - **Clean boundary.** The audio player context stays focused on playback state. Bookmark awareness lives in a dedicated component that composes the player hooks with server actions.
 - **Library-gating is desirable.** The bookmark button naturally shows only when the episode is in the user's library — the resolution action returns null otherwise. This matches the business logic: bookmarks are a library feature.
 
