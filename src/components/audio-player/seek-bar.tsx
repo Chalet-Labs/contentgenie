@@ -12,6 +12,7 @@ import { useAudioPlayerProgress, useAudioPlayerAPI, useAudioPlayerState } from "
 import { formatTime } from "@/lib/format-time"
 import { getLibraryEntryByEpisodeId, getBookmarks } from "@/app/actions/library"
 import type { Bookmark } from "@/db/schema"
+import { BOOKMARK_CHANGED_EVENT } from "@/lib/events"
 
 export function SeekBar() {
   const { currentTime, buffered } = useAudioPlayerProgress()
@@ -36,8 +37,9 @@ export function SeekBar() {
   }, [chapters, duration])
 
   // Fetch bookmarks for the current episode and refetch on changes
+  const episodeId = currentEpisode?.id
   useEffect(() => {
-    if (!currentEpisode) {
+    if (!episodeId) {
       setBookmarks([])
       return
     }
@@ -45,35 +47,41 @@ export function SeekBar() {
     let cancelled = false
 
     const fetchAndSetBookmarks = async () => {
-      const entry = await getLibraryEntryByEpisodeId(currentEpisode.id)
-      if (cancelled || !entry) {
+      try {
+        const entry = await getLibraryEntryByEpisodeId(episodeId)
+        if (cancelled || !entry) {
+          if (!cancelled) setBookmarks([])
+          return
+        }
+        const result = await getBookmarks(entry.libraryEntryId)
+        if (!cancelled) {
+          setBookmarks(result.bookmarks ?? [])
+        }
+      } catch {
         if (!cancelled) setBookmarks([])
-        return
-      }
-      const result = await getBookmarks(entry.libraryEntryId)
-      if (!cancelled) {
-        setBookmarks(result.bookmarks ?? [])
       }
     }
 
     fetchAndSetBookmarks()
 
-    window.addEventListener("bookmark-changed", fetchAndSetBookmarks)
+    window.addEventListener(BOOKMARK_CHANGED_EVENT, fetchAndSetBookmarks)
 
     return () => {
       cancelled = true
-      window.removeEventListener("bookmark-changed", fetchAndSetBookmarks)
+      window.removeEventListener(BOOKMARK_CHANGED_EVENT, fetchAndSetBookmarks)
     }
-  }, [currentEpisode?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [episodeId])
 
   const bookmarkDots = useMemo(() => {
     if (bookmarks.length === 0 || duration <= 0) return null
-    return bookmarks.map((bm) => ({
-      id: bm.id,
-      timestamp: bm.timestamp,
-      note: bm.note,
-      left: (bm.timestamp / duration) * 100,
-    }))
+    return bookmarks
+      .filter((bm) => Number.isFinite(bm.timestamp) && bm.timestamp >= 0 && bm.timestamp <= duration)
+      .map((bm) => ({
+        id: bm.id,
+        timestamp: bm.timestamp,
+        note: bm.note,
+        left: Math.min(100, Math.max(0, (bm.timestamp / duration) * 100)),
+      }))
   }, [bookmarks, duration])
 
   return (
@@ -114,8 +122,8 @@ export function SeekBar() {
                   <TooltipTrigger asChild>
                     <button
                       type="button"
-                      className="pointer-events-auto absolute h-2 w-2 rounded-full bg-primary/60 transition-transform hover:scale-150"
-                      style={{ left: `${dot.left}%`, transform: `translateX(-50%)` }}
+                      className="pointer-events-auto absolute h-2 w-2 -translate-x-1/2 rounded-full bg-primary/60 transition-transform hover:scale-150"
+                      style={{ left: `${dot.left}%` }}
                       onClick={(e) => {
                         e.stopPropagation()
                         seek(dot.timestamp)

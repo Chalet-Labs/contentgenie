@@ -1,6 +1,6 @@
 # ADR-017: Bookmark-Player Integration Architecture
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-03-05
 **Issue:** [#95](https://github.com/Chalet-Labs/contentgenie/issues/95)
 

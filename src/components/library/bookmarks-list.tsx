@@ -26,6 +26,7 @@ import {
   type AudioEpisode,
 } from "@/contexts/audio-player-context";
 import type { Bookmark as BookmarkType } from "@/db/schema";
+import { BOOKMARK_CHANGED_EVENT } from "@/lib/events";
 
 interface BookmarksListProps {
   libraryEntryId: number;
@@ -128,6 +129,7 @@ export function BookmarksList({
         setNewNote("");
         setIsDialogOpen(false);
         loadBookmarks();
+        window.dispatchEvent(new CustomEvent(BOOKMARK_CHANGED_EVENT));
         toast.success("Bookmark added", {
           description: `Bookmark at ${formatTimestamp(timestamp)} created`,
         });
@@ -164,7 +166,7 @@ export function BookmarksList({
       if (result.success) {
         loadBookmarks();
         toast.success("Bookmark deleted");
-        window.dispatchEvent(new CustomEvent("bookmark-changed"));
+        window.dispatchEvent(new CustomEvent(BOOKMARK_CHANGED_EVENT));
       } else {
         toast.error("Failed to delete bookmark");
       }

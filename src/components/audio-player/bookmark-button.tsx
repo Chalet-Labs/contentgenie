@@ -20,6 +20,7 @@ import {
   updateBookmark,
 } from "@/app/actions/library"
 import { formatTime } from "@/lib/format-time"
+import { BOOKMARK_CHANGED_EVENT } from "@/lib/events"
 
 const AUTO_DISMISS_MS = 5000
 const MAX_NOTE_LENGTH = 500
@@ -112,7 +113,7 @@ export function BookmarkButton() {
         setLastBookmarkId(result.bookmark.id)
         setNoteOpen(true)
         startDismissTimer()
-        window.dispatchEvent(new CustomEvent("bookmark-changed"))
+        window.dispatchEvent(new CustomEvent(BOOKMARK_CHANGED_EVENT))
       } else {
         toast.error(result.error || "Failed to add bookmark")
       }
@@ -133,7 +134,7 @@ export function BookmarkButton() {
       const result = await updateBookmark(lastBookmarkId, normalizedNote)
       if (result.success) {
         toast.success("Note saved")
-        window.dispatchEvent(new CustomEvent("bookmark-changed"))
+        window.dispatchEvent(new CustomEvent(BOOKMARK_CHANGED_EVENT))
       } else {
         toast.error("Failed to save note")
       }
