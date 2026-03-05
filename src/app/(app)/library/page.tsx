@@ -18,20 +18,13 @@ import { getUserLibrary, type LibrarySortOption, type SortDirection } from "@/ap
 import { useOnlineStatus } from "@/hooks/use-online-status";
 import { OfflineBanner } from "@/components/ui/offline-banner";
 import { cacheLibrary, getCachedLibrary } from "@/lib/offline-cache";
-import type { Episode, Podcast, UserLibraryEntry, Collection } from "@/db/schema";
-
-type LibraryItem = UserLibraryEntry & {
-  episode: Episode & {
-    podcast: Podcast;
-  };
-  collection?: Collection | null;
-};
+import type { SavedItemDTO } from "@/db/library-columns";
 
 export default function LibraryPage() {
   const { userId } = useAuth();
   const isOnline = useOnlineStatus();
 
-  const [items, setItems] = useState<LibraryItem[]>([]);
+  const [items, setItems] = useState<SavedItemDTO[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<LibrarySortOption>("savedAt");
@@ -47,7 +40,7 @@ export default function LibraryPage() {
     if (result.error) {
       setError(result.error);
     } else {
-      const libraryItems = result.items as LibraryItem[];
+      const libraryItems = result.items as SavedItemDTO[];
       setItems(libraryItems);
       setIsFromCache(false);
 
@@ -73,7 +66,7 @@ export default function LibraryPage() {
 
     const cached = await getCachedLibrary(userId);
     if (cached) {
-      setItems(cached as LibraryItem[]);
+      setItems(cached as SavedItemDTO[]);
       setIsFromCache(true);
     } else {
       setItems([]);

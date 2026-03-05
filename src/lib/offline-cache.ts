@@ -1,4 +1,5 @@
 import { get, set, del, keys, entries, delMany, createStore } from "idb-keyval";
+import type { SavedItemDTO } from "@/db/library-columns";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -69,34 +70,7 @@ export interface SummaryData {
   cached: boolean;
 }
 
-export interface LibraryItem {
-  id: number;
-  userId: string;
-  episodeId: number;
-  savedAt: Date;
-  rating: number | null;
-  notes: string | null;
-  collectionId: number | null;
-  episode: {
-    id: number;
-    podcastIndexId: string;
-    title: string;
-    description: string | null;
-    duration: number | null;
-    publishDate: Date | null;
-    worthItScore: string | null;
-    podcast: {
-      id: number;
-      podcastIndexId: string;
-      title: string;
-      imageUrl: string | null;
-    };
-  };
-  collection?: {
-    id: number;
-    name: string;
-  } | null;
-}
+export type LibraryItem = SavedItemDTO;
 
 // ─── Internal state ───────────────────────────────────────────────────────────
 
