@@ -2,12 +2,13 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { render, screen } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { SleepTimerMenu } from "@/components/audio-player/sleep-timer-menu"
+import type {
+  AudioPlayerState,
+  AudioPlayerAPI,
+} from "@/contexts/audio-player-context"
 
-const mockState = {
-  sleepTimer: null as {
-    endTime: number | null
-    type: "duration" | "end-of-episode"
-  } | null,
+const mockState: AudioPlayerState = {
+  sleepTimer: null,
   currentEpisode: null,
   isPlaying: false,
   isBuffering: false,
@@ -22,7 +23,7 @@ const mockState = {
   chaptersLoading: false,
 }
 
-const mockAPI = {
+const mockAPI: AudioPlayerAPI = {
   playEpisode: vi.fn(),
   togglePlay: vi.fn(),
   seek: vi.fn(),

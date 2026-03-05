@@ -242,6 +242,8 @@ export const AudioPlayerProgressContext = createContext<AudioPlayerProgress | nu
 
 const SKIP_SECONDS = 15
 const STALL_TIMEOUT_MS = 10_000
+const SLEEP_FADE_DURATION_MS = 3000
+const MS_PER_MINUTE = 60_000
 const SLEEP_TIMER_TOAST = "Sleep timer — playback paused"
 
 const initialState: AudioPlayerState = {
@@ -376,7 +378,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       return
     }
 
-    fadeCleanupRef.current = fadeOutAudio(audio, 3000, () => {
+    fadeCleanupRef.current = fadeOutAudio(audio, SLEEP_FADE_DURATION_MS, () => {
       fadeCleanupRef.current = null
       dispatch({ type: "SET_PLAYING", isPlaying: false })
       dispatch({ type: "CLEAR_SLEEP_TIMER" })
@@ -576,13 +578,17 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
         clearSleepTimerInterval()
         cancelFade()
 
+        if (typeof option === "number" && (!Number.isFinite(option) || option <= 0)) {
+          return
+        }
+
         if (option === "end-of-episode") {
           dispatch({
             type: "SET_SLEEP_TIMER",
             sleepTimer: { endTime: null, type: "end-of-episode" },
           })
         } else {
-          const durationMs = option * 60_000
+          const durationMs = option * MS_PER_MINUTE
           const endTime = Date.now() + durationMs
           dispatch({
             type: "SET_SLEEP_TIMER",

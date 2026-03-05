@@ -46,9 +46,12 @@ export function SleepTimerMenu() {
     ? Math.max(0, Math.ceil((sleepTimer.endTime - Date.now()) / 1000))
     : 0
 
+  const minutesRemaining = Math.max(0, Math.ceil(remainingSeconds / 60))
+  const minuteUnit = minutesRemaining === 1 ? "minute" : "minutes"
+
   const ariaLabel = isActive
     ? isDuration
-      ? `Sleep timer — ${Math.ceil(remainingSeconds / 60)} minutes remaining`
+      ? `Sleep timer — ${minutesRemaining} ${minuteUnit} remaining`
       : "Sleep timer — end of episode"
     : "Sleep timer"
 

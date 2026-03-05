@@ -117,8 +117,6 @@ describe("fadeOutAudio", () => {
   it("volume never goes below zero", () => {
     const audio = createMockAudio(0.5);
     const onComplete = vi.fn();
-    const originalVolumeSetter = Object.getOwnPropertyDescriptor(audio, "volume")?.set;
-
     let minVolume = 0.5;
     const volumeValues: number[] = [];
 
