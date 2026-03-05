@@ -93,7 +93,6 @@ export const ActiveDurationTimer: Story = {
           sleepTimer: {
             endTime: Date.now() + 1530_000,
             type: "duration",
-            remainingSeconds: 1530,
           },
         }}
       >
@@ -115,7 +114,6 @@ export const ActiveEndOfEpisode: Story = {
           sleepTimer: {
             endTime: null,
             type: "end-of-episode",
-            remainingSeconds: 0,
           },
         }}
       >

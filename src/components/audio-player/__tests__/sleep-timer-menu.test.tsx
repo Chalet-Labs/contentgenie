@@ -7,7 +7,6 @@ const mockState = {
   sleepTimer: null as {
     endTime: number | null
     type: "duration" | "end-of-episode"
-    remainingSeconds: number
   } | null,
   currentEpisode: null,
   isPlaying: false,
@@ -110,7 +109,6 @@ describe("SleepTimerMenu", () => {
     mockState.sleepTimer = {
       endTime: Date.now() + 1800_000,
       type: "duration",
-      remainingSeconds: 1800,
     }
     const user = userEvent.setup()
     render(<SleepTimerMenu />)
@@ -126,7 +124,6 @@ describe("SleepTimerMenu", () => {
     mockState.sleepTimer = {
       endTime: Date.now() + 900_000,
       type: "duration",
-      remainingSeconds: 900,
     }
     const user = userEvent.setup()
     render(<SleepTimerMenu />)
@@ -143,7 +140,6 @@ describe("SleepTimerMenu", () => {
     mockState.sleepTimer = {
       endTime: Date.now() + 1500_000,
       type: "duration",
-      remainingSeconds: 1500,
     }
     render(<SleepTimerMenu />)
 
@@ -155,7 +151,6 @@ describe("SleepTimerMenu", () => {
     mockState.sleepTimer = {
       endTime: null,
       type: "end-of-episode",
-      remainingSeconds: 0,
     }
     render(<SleepTimerMenu />)
 
@@ -166,7 +161,6 @@ describe("SleepTimerMenu", () => {
     mockState.sleepTimer = {
       endTime: Date.now() + 1800_000,
       type: "duration",
-      remainingSeconds: 1800,
     }
     render(<SleepTimerMenu />)
 
@@ -181,7 +175,6 @@ describe("SleepTimerMenu", () => {
     mockState.sleepTimer = {
       endTime: null,
       type: "end-of-episode",
-      remainingSeconds: 0,
     }
     render(<SleepTimerMenu />)
 
@@ -196,7 +189,6 @@ describe("SleepTimerMenu", () => {
     mockState.sleepTimer = {
       endTime: null,
       type: "end-of-episode",
-      remainingSeconds: 0,
     }
     const user = userEvent.setup()
     render(<SleepTimerMenu />)
@@ -215,7 +207,6 @@ describe("SleepTimerMenu", () => {
     mockState.sleepTimer = {
       endTime: Date.now() + 1800_000,
       type: "duration",
-      remainingSeconds: 1800,
     }
     const user = userEvent.setup()
     render(<SleepTimerMenu />)

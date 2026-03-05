@@ -50,7 +50,6 @@ const mockState = {
   sleepTimer: null as {
     endTime: number | null
     type: "duration" | "end-of-episode"
-    remainingSeconds: number
   } | null,
 }
 
