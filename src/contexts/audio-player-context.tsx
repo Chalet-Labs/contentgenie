@@ -364,6 +364,10 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
     if (fadeCleanupRef.current) {
       fadeCleanupRef.current()
       fadeCleanupRef.current = null
+      // Re-sync volume — the fade cleanup restores the pre-fade volume,
+      // but the user may have adjusted volume during the fade
+      const audio = audioRef.current
+      if (audio) audio.volume = stateRef.current.volume
     }
   }, [])
 
@@ -372,9 +376,11 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
     if (!audio) return
     clearSleepTimerInterval()
     cancelFade()
+    clearAutoPlayTimer()
 
     if (audio.paused) {
       // Already paused — skip fade, just clear timer and notify
+      dispatch({ type: "SET_BUFFERING", isBuffering: false })
       dispatch({ type: "CLEAR_SLEEP_TIMER" })
       toast(SLEEP_TIMER_TOAST)
       return
@@ -383,10 +389,13 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
     fadeCleanupRef.current = fadeOutAudio(audio, SLEEP_FADE_DURATION_MS, () => {
       fadeCleanupRef.current = null
       dispatch({ type: "SET_PLAYING", isPlaying: false })
+      dispatch({ type: "SET_BUFFERING", isBuffering: false })
       dispatch({ type: "CLEAR_SLEEP_TIMER" })
+      // Re-sync volume in case user adjusted it during the fade
+      audio.volume = stateRef.current.volume
       toast(SLEEP_TIMER_TOAST)
     })
-  }, [clearSleepTimerInterval, cancelFade])
+  }, [clearSleepTimerInterval, cancelFade, clearAutoPlayTimer])
 
   // Ref for stable access in intervals/event handlers without dependency churn
   const triggerSleepTimerExpiryRef = useRef(triggerSleepTimerExpiry)
