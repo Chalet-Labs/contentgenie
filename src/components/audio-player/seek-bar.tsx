@@ -52,7 +52,7 @@ export function SeekBar() {
       }
       const result = await getBookmarks(entry.libraryEntryId)
       if (!cancelled) {
-        setBookmarks(result.bookmarks)
+        setBookmarks(result.bookmarks ?? [])
       }
     }
 
