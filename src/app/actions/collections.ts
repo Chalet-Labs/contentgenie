@@ -5,6 +5,11 @@ import { revalidatePath } from "next/cache";
 import { eq, and, desc, count, getTableColumns } from "drizzle-orm";
 import { db } from "@/db";
 import { users, collections, userLibrary } from "@/db/schema";
+import {
+  LIBRARY_ENTRY_COLUMNS,
+  EPISODE_LIST_COLUMNS,
+  PODCAST_LIST_COLUMNS,
+} from "@/db/library-columns";
 
 // Create a new collection
 export async function createCollection(name: string, description?: string) {
@@ -198,34 +203,13 @@ export async function getCollection(collectionId: number) {
         eq(userLibrary.userId, userId),
         eq(userLibrary.collectionId, collectionId)
       ),
-      columns: {
-        id: true,
-        userId: true,
-        episodeId: true,
-        savedAt: true,
-        notes: true,
-        rating: true,
-        collectionId: true,
-      },
+      columns: LIBRARY_ENTRY_COLUMNS,
       with: {
         episode: {
-          columns: {
-            id: true,
-            podcastIndexId: true,
-            title: true,
-            description: true,
-            duration: true,
-            publishDate: true,
-            worthItScore: true,
-          },
+          columns: EPISODE_LIST_COLUMNS,
           with: {
             podcast: {
-              columns: {
-                id: true,
-                podcastIndexId: true,
-                title: true,
-                imageUrl: true,
-              },
+              columns: PODCAST_LIST_COLUMNS,
             },
           },
         },
