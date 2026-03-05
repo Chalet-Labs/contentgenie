@@ -24,6 +24,8 @@ const noopAPI: AudioPlayerAPI = {
   reorderQueue: () => {},
   clearQueue: () => {},
   playNext: () => {},
+  setSleepTimer: () => {},
+  cancelSleepTimer: () => {},
 }
 
 function makeState(chapters: Chapter[] | null): AudioPlayerState {
@@ -45,6 +47,7 @@ function makeState(chapters: Chapter[] | null): AudioPlayerState {
     queue: [],
     chapters,
     chaptersLoading: false,
+    sleepTimer: null,
   }
 }
 

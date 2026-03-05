@@ -23,11 +23,22 @@ import {
   savePlayerPreferences,
 } from "@/lib/player-preferences"
 import { loadQueue, saveQueue } from "@/lib/queue-persistence"
+import { fadeOutAudio } from "@/lib/audio-fade"
 import type { Chapter } from "@/lib/chapters"
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
+
+export type SleepTimerType = "duration" | "end-of-episode"
+
+export interface SleepTimerState {
+  /** Absolute time (Date.now() ms) when the timer expires. Null for end-of-episode. */
+  endTime: number | null
+  type: SleepTimerType
+  /** Remaining seconds — updated every second by the countdown interval */
+  remainingSeconds: number
+}
 
 export interface AudioEpisode {
   id: string
@@ -52,6 +63,7 @@ export interface AudioPlayerState {
   queue: AudioEpisode[]
   chapters: Chapter[] | null
   chaptersLoading: boolean
+  sleepTimer: SleepTimerState | null
 }
 
 export interface AudioPlayerProgress {
@@ -73,6 +85,8 @@ export interface AudioPlayerAPI {
   reorderQueue: (oldIndex: number, newIndex: number) => void
   clearQueue: () => void
   playNext: () => void
+  setSleepTimer: (option: number | "end-of-episode") => void
+  cancelSleepTimer: () => void
 }
 
 // ---------------------------------------------------------------------------
@@ -96,6 +110,9 @@ type Action =
   | { type: "INIT_QUEUE"; queue: AudioEpisode[] }
   | { type: "SET_CHAPTERS"; chapters: Chapter[] }
   | { type: "CLEAR_CHAPTERS" }
+  | { type: "SET_SLEEP_TIMER"; sleepTimer: SleepTimerState }
+  | { type: "CLEAR_SLEEP_TIMER" }
+  | { type: "TICK_SLEEP_TIMER"; remainingSeconds: number }
 
 function reducer(state: AudioPlayerState, action: Action): AudioPlayerState {
   switch (action.type) {
@@ -144,6 +161,7 @@ function reducer(state: AudioPlayerState, action: Action): AudioPlayerState {
         duration: 0,
         chapters: null,
         chaptersLoading: false,
+        sleepTimer: null,
       }
     case "ADD_TO_QUEUE": {
       const alreadyQueued = state.queue.some(
@@ -179,6 +197,19 @@ function reducer(state: AudioPlayerState, action: Action): AudioPlayerState {
       return { ...state, chapters: action.chapters, chaptersLoading: false }
     case "CLEAR_CHAPTERS":
       return { ...state, chapters: null, chaptersLoading: false }
+    case "SET_SLEEP_TIMER":
+      return { ...state, sleepTimer: action.sleepTimer }
+    case "CLEAR_SLEEP_TIMER":
+      return { ...state, sleepTimer: null }
+    case "TICK_SLEEP_TIMER":
+      if (!state.sleepTimer) return state
+      return {
+        ...state,
+        sleepTimer: {
+          ...state.sleepTimer,
+          remainingSeconds: action.remainingSeconds,
+        },
+      }
     default:
       return state
   }
@@ -237,6 +268,7 @@ const initialState: AudioPlayerState = {
   queue: [],
   chapters: null,
   chaptersLoading: false,
+  sleepTimer: null,
 }
 
 export function AudioPlayerProvider({ children }: { children: ReactNode }) {
@@ -248,6 +280,8 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
   const isQueueHydrated = useRef(false)
   const chaptersFetchController = useRef<AbortController | null>(null)
   const chaptersTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const sleepTimerIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const fadeCleanupRef = useRef<(() => void) | null>(null)
 
   const [state, dispatch] = useReducer(reducer, initialState)
 
@@ -324,6 +358,59 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       autoPlayTimerRef.current = null
     }
   }, [])
+
+  // ---- Sleep timer helpers ----
+  const clearSleepTimerInterval = useCallback(() => {
+    if (sleepTimerIntervalRef.current) {
+      clearInterval(sleepTimerIntervalRef.current)
+      sleepTimerIntervalRef.current = null
+    }
+  }, [])
+
+  const cancelFade = useCallback(() => {
+    if (fadeCleanupRef.current) {
+      fadeCleanupRef.current()
+      fadeCleanupRef.current = null
+    }
+  }, [])
+
+  const triggerSleepTimerExpiry = useCallback(() => {
+    const audio = audioRef.current
+    if (!audio) return
+    clearSleepTimerInterval()
+
+    if (audio.paused) {
+      // Already paused — skip fade, just clear timer and notify
+      dispatch({ type: "CLEAR_SLEEP_TIMER" })
+      toast("Sleep timer — playback paused")
+      return
+    }
+
+    const cleanup = fadeOutAudio(audio, 3000, () => {
+      fadeCleanupRef.current = null
+      dispatch({ type: "SET_PLAYING", isPlaying: false })
+      dispatch({ type: "CLEAR_SLEEP_TIMER" })
+      toast("Sleep timer — playback paused")
+    })
+    fadeCleanupRef.current = cleanup
+  }, [clearSleepTimerInterval])
+
+  const startSleepTimerCountdown = useCallback(
+    (endTime: number) => {
+      clearSleepTimerInterval()
+      sleepTimerIntervalRef.current = setInterval(() => {
+        const remaining = Math.max(
+          0,
+          Math.ceil((endTime - Date.now()) / 1000)
+        )
+        dispatch({ type: "TICK_SLEEP_TIMER", remainingSeconds: remaining })
+        if (remaining <= 0) {
+          triggerSleepTimerExpiry()
+        }
+      }, 1000)
+    },
+    [clearSleepTimerInterval, triggerSleepTimerExpiry]
+  )
 
   // ---- API (stable reference) ----
   const api = useMemo<AudioPlayerAPI>(
@@ -445,6 +532,8 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
           audio.load()
         }
         clearAutoPlayTimer()
+        clearSleepTimerInterval()
+        cancelFade()
         chaptersFetchController.current?.abort()
         chaptersFetchController.current = null
         if (chaptersTimeoutRef.current) {
@@ -488,6 +577,42 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
         isAutoAdvancing.current = true
         api.playEpisode(next)
         dispatch({ type: "REMOVE_FROM_QUEUE", episodeId: next.id })
+      },
+
+      setSleepTimer: (option: number | "end-of-episode") => {
+        // Cancel any existing timer first
+        clearSleepTimerInterval()
+        cancelFade()
+
+        if (option === "end-of-episode") {
+          dispatch({
+            type: "SET_SLEEP_TIMER",
+            sleepTimer: {
+              endTime: null,
+              type: "end-of-episode",
+              remainingSeconds: 0,
+            },
+          })
+        } else {
+          const durationMs = option * 60_000
+          const endTime = Date.now() + durationMs
+          const remainingSeconds = option * 60
+          dispatch({
+            type: "SET_SLEEP_TIMER",
+            sleepTimer: {
+              endTime,
+              type: "duration",
+              remainingSeconds,
+            },
+          })
+          startSleepTimerCountdown(endTime)
+        }
+      },
+
+      cancelSleepTimer: () => {
+        clearSleepTimerInterval()
+        cancelFade()
+        dispatch({ type: "CLEAR_SLEEP_TIMER" })
       },
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally stable: actions close over refs
@@ -596,6 +721,12 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       dispatch({ type: "SET_PLAYING", isPlaying: false })
       clearStallTimer()
 
+      // End-of-episode sleep timer: fade out and skip auto-play-next
+      if (stateRef.current.sleepTimer?.type === "end-of-episode") {
+        triggerSleepTimerExpiry()
+        return
+      }
+
       const currentQueue = stateRef.current.queue
       if (currentQueue.length > 0) {
         const nextEpisode = currentQueue[0]
@@ -664,7 +795,36 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
         clearTimeout(ariaTimerRef.current)
       }
     }
-  }, [clearStallTimer, startStallTimer, clearAutoPlayTimer, api])
+  }, [clearStallTimer, startStallTimer, clearAutoPlayTimer, api, triggerSleepTimerExpiry])
+
+  // ---- Snap sleep timer countdown on tab visibility change ----
+  useEffect(() => {
+    const onVisibilityChange = () => {
+      if (document.visibilityState !== "visible") return
+      const timer = stateRef.current.sleepTimer
+      if (!timer || timer.type !== "duration" || timer.endTime === null) return
+      const remaining = Math.max(
+        0,
+        Math.ceil((timer.endTime - Date.now()) / 1000)
+      )
+      dispatch({ type: "TICK_SLEEP_TIMER", remainingSeconds: remaining })
+      if (remaining <= 0) {
+        triggerSleepTimerExpiry()
+      }
+    }
+    document.addEventListener("visibilitychange", onVisibilityChange)
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibilityChange)
+    }
+  }, [triggerSleepTimerExpiry])
+
+  // ---- Clean up sleep timer on unmount ----
+  useEffect(() => {
+    return () => {
+      clearSleepTimerInterval()
+      cancelFade()
+    }
+  }, [clearSleepTimerInterval, cancelFade])
 
   return (
     <AudioPlayerAPIContext.Provider value={api}>

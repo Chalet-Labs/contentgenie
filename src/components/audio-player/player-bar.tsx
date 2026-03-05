@@ -24,6 +24,7 @@ import { PlaybackSpeed } from "@/components/audio-player/playback-speed"
 import { VolumeControl } from "@/components/audio-player/volume-control"
 import { QueuePanel } from "@/components/audio-player/queue-panel"
 import { ChapterPanel } from "@/components/audio-player/chapter-panel"
+import { SleepTimerMenu } from "@/components/audio-player/sleep-timer-menu"
 import { useCurrentChapter } from "@/hooks/use-current-chapter"
 import { useMediaQuery } from "@/hooks/use-media-query"
 
@@ -169,6 +170,7 @@ export function PlayerBar() {
         {/* Chapters/Queue/Speed/Volume/Close (right) */}
         <div className="flex flex-1 items-center justify-end gap-2">
           <PlaybackSpeed />
+          <SleepTimerMenu />
           {(hasChapters || chaptersLoading) && (
             <ChapterPanel
               open={chaptersOpen}
@@ -305,6 +307,7 @@ export function PlayerBar() {
             <SkipForward className="h-3.5 w-3.5" />
           </Button>
           <PlaybackSpeed />
+          <SleepTimerMenu />
         </div>
       </div>
     </div>
