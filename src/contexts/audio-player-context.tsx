@@ -312,6 +312,8 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const audio = audioRef.current
     if (!audio) return
+    // Skip direct volume writes while a sleep fade is ramping down
+    if (fadeCleanupRef.current) return
     audio.volume = state.volume
   }, [state.volume])
 
@@ -579,6 +581,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
         cancelFade()
 
         if (typeof option === "number" && (!Number.isFinite(option) || option <= 0)) {
+          dispatch({ type: "CLEAR_SLEEP_TIMER" })
           return
         }
 
