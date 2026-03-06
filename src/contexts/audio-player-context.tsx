@@ -525,6 +525,42 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  // ---- Shared player teardown ----
+  // Resets the audio element and all player state. Only clears the persisted
+  // session when the user explicitly closes the player (not on auto-advance errors).
+  const teardownPlayer = useCallback(
+    (options?: { clearSession?: boolean }) => {
+      const audio = audioRef.current
+      if (audio) {
+        audio.pause()
+        audio.removeAttribute("src")
+        audio.load()
+      }
+      pendingSeekRef.current = null
+      clearAutoPlayTimer()
+      clearSleepTimerInterval()
+      cancelFade()
+      if (options?.clearSession) {
+        clearPlayerSession()
+      }
+      if (sessionSaveTimerRef.current) {
+        clearTimeout(sessionSaveTimerRef.current)
+        sessionSaveTimerRef.current = null
+      }
+      chaptersFetchController.current?.abort()
+      chaptersFetchController.current = null
+      if (chaptersTimeoutRef.current) {
+        clearTimeout(chaptersTimeoutRef.current)
+        chaptersTimeoutRef.current = null
+      }
+      dispatch({ type: "CLOSE" })
+      setProgress({ currentTime: 0, buffered: 0 })
+      clearMediaSession()
+      clearStallTimer()
+    },
+    [clearAutoPlayTimer, clearSleepTimerInterval, cancelFade, clearStallTimer]
+  )
+
   // ---- API (stable reference) ----
   const api = useMemo<AudioPlayerAPI>(
     () => ({
@@ -582,31 +618,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       },
 
       closePlayer: () => {
-        const audio = audioRef.current
-        if (audio) {
-          audio.pause()
-          audio.removeAttribute("src")
-          audio.load()
-        }
-        pendingSeekRef.current = null
-        clearAutoPlayTimer()
-        clearSleepTimerInterval()
-        cancelFade()
-        clearPlayerSession()
-        if (sessionSaveTimerRef.current) {
-          clearTimeout(sessionSaveTimerRef.current)
-          sessionSaveTimerRef.current = null
-        }
-        chaptersFetchController.current?.abort()
-        chaptersFetchController.current = null
-        if (chaptersTimeoutRef.current) {
-          clearTimeout(chaptersTimeoutRef.current)
-          chaptersTimeoutRef.current = null
-        }
-        dispatch({ type: "CLOSE" })
-        setProgress({ currentTime: 0, buffered: 0 })
-        clearMediaSession()
-        clearStallTimer()
+        teardownPlayer({ clearSession: true })
       },
 
       addToQueue: (episode: AudioEpisode) => {
@@ -846,10 +858,11 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       clearStallTimer()
 
       if (isAutoAdvancing.current) {
-        // Error during auto-advance — stop the chain
+        // Error during auto-advance — stop the chain but preserve the saved
+        // session so the user can resume the previous episode on refresh
         const failedEpisode = stateRef.current.currentEpisode
         isAutoAdvancing.current = false
-        api.closePlayer()
+        teardownPlayer()
         if (failedEpisode) {
           dispatch({ type: "REMOVE_FROM_QUEUE", episodeId: failedEpisode.id })
           toast.error(`Couldn't play ${failedEpisode.title} \u2014 removed from queue`)
@@ -891,7 +904,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
         sessionSaveTimerRef.current = null
       }
     }
-  }, [clearStallTimer, startStallTimer, clearAutoPlayTimer, api, cancelFade])
+  }, [clearStallTimer, startStallTimer, clearAutoPlayTimer, api, cancelFade, teardownPlayer])
 
   // ---- Save session on tab close ----
   useEffect(() => {
