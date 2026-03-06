@@ -23,6 +23,11 @@ import {
   savePlayerPreferences,
 } from "@/lib/player-preferences"
 import { loadQueue, saveQueue } from "@/lib/queue-persistence"
+import {
+  loadPlayerSession,
+  savePlayerSession,
+  clearPlayerSession,
+} from "@/lib/player-session"
 import { fadeOutAudio } from "@/lib/audio-fade"
 import type { Chapter } from "@/lib/chapters"
 
@@ -274,6 +279,8 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
   const sleepTimerIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const fadeCleanupRef = useRef<(() => void) | null>(null)
   const pendingSeekRef = useRef<number | null>(null)
+  const sessionSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const isSessionRestored = useRef(false)
 
   const [state, dispatch] = useReducer(reducer, initialState)
 
@@ -301,6 +308,40 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
     const persisted = loadQueue()
     dispatch({ type: "INIT_QUEUE", queue: persisted })
     isQueueHydrated.current = true
+  }, [])
+
+  // ---- Restore session from localStorage on mount ----
+  useEffect(() => {
+    const session = loadPlayerSession()
+    if (!session) {
+      isSessionRestored.current = true
+      return
+    }
+
+    const audio = audioRef.current
+    if (!audio) {
+      isSessionRestored.current = true
+      return
+    }
+
+    // Set pending seek so onDurationChange applies it
+    pendingSeekRef.current = session.currentTime
+
+    // Dispatch PLAY_EPISODE to populate state, then immediately pause
+    dispatch({ type: "PLAY_EPISODE", episode: session.episode })
+    audio.src = session.episode.audioUrl
+    audio.load()
+    // Do NOT call audio.play() — restore in paused state
+    dispatch({ type: "SET_PLAYING", isPlaying: false })
+    dispatch({ type: "SET_BUFFERING", isBuffering: false })
+
+    updateMediaSessionMetadata({
+      title: session.episode.title,
+      artist: session.episode.podcastTitle,
+      artwork: session.episode.artwork,
+    })
+
+    isSessionRestored.current = true
   }, [])
 
   // ---- Persist queue to localStorage on changes ----
@@ -548,6 +589,11 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
         clearAutoPlayTimer()
         clearSleepTimerInterval()
         cancelFade()
+        clearPlayerSession()
+        if (sessionSaveTimerRef.current) {
+          clearTimeout(sessionSaveTimerRef.current)
+          sessionSaveTimerRef.current = null
+        }
         chaptersFetchController.current?.abort()
         chaptersFetchController.current = null
         if (chaptersTimeoutRef.current) {
@@ -676,6 +722,21 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
         audio.playbackRate
       )
 
+      // Throttled session save (~5s) — skip until session restore is complete
+      if (
+        isSessionRestored.current &&
+        !sessionSaveTimerRef.current &&
+        stateRef.current.currentEpisode
+      ) {
+        sessionSaveTimerRef.current = setTimeout(() => {
+          sessionSaveTimerRef.current = null
+          const ep = stateRef.current.currentEpisode
+          if (ep) {
+            savePlayerSession(ep, audio.currentTime)
+          }
+        }, 5000)
+      }
+
       // Debounced ARIA announcement (every 15s)
       if (!ariaTimerRef.current) {
         ariaTimerRef.current = setTimeout(() => {
@@ -729,6 +790,10 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
     const onPause = () => {
       dispatch({ type: "SET_PLAYING", isPlaying: false })
       clearStallTimer()
+      // Save exact pause position immediately
+      if (isSessionRestored.current && stateRef.current.currentEpisode) {
+        savePlayerSession(stateRef.current.currentEpisode, audio.currentTime)
+      }
     }
 
     const onWaiting = () => {
@@ -818,8 +883,25 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       if (ariaTimerRef.current) {
         clearTimeout(ariaTimerRef.current)
       }
+      if (sessionSaveTimerRef.current) {
+        clearTimeout(sessionSaveTimerRef.current)
+        sessionSaveTimerRef.current = null
+      }
     }
   }, [clearStallTimer, startStallTimer, clearAutoPlayTimer, api, cancelFade])
+
+  // ---- Save session on tab close ----
+  useEffect(() => {
+    const onBeforeUnload = () => {
+      const ep = stateRef.current.currentEpisode
+      const audio = audioRef.current
+      if (ep && audio && isSessionRestored.current) {
+        savePlayerSession(ep, audio.currentTime)
+      }
+    }
+    window.addEventListener("beforeunload", onBeforeUnload)
+    return () => window.removeEventListener("beforeunload", onBeforeUnload)
+  }, [])
 
   // ---- Check sleep timer expiry on tab visibility change ----
   useEffect(() => {
