@@ -10,6 +10,7 @@ import {
   EPISODE_LIST_COLUMNS,
   PODCAST_LIST_COLUMNS,
   COLLECTION_LIST_COLUMNS,
+  type SavedItemDTO,
 } from "@/db/library-columns";
 
 interface EpisodeData {
@@ -211,7 +212,7 @@ export type SortDirection = "asc" | "desc";
 export async function getUserLibrary(
   sortBy: LibrarySortOption = "savedAt",
   sortDirection: SortDirection = "desc"
-) {
+): Promise<{ items: SavedItemDTO[]; error: string | null }> {
   const { userId } = await auth();
 
   if (!userId) {

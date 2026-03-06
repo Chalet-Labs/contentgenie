@@ -4,12 +4,13 @@ import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 import { eq, and, desc, count, getTableColumns } from "drizzle-orm";
 import { db } from "@/db";
-import { users, collections, userLibrary } from "@/db/schema";
+import { users, collections, userLibrary, type Collection } from "@/db/schema";
 import {
   LIBRARY_ENTRY_COLUMNS,
   EPISODE_LIST_COLUMNS,
   PODCAST_LIST_COLUMNS,
   COLLECTION_LIST_COLUMNS,
+  type SavedItemDTO,
 } from "@/db/library-columns";
 
 // Create a new collection
@@ -177,7 +178,7 @@ export async function getUserCollections() {
 }
 
 // Get a single collection with its episodes
-export async function getCollection(collectionId: number) {
+export async function getCollection(collectionId: number): Promise<{ collection: Collection | null; items: SavedItemDTO[]; error: string | null }> {
   const { userId } = await auth();
 
   if (!userId) {
