@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from "vitest"
+import { describe, it, expect, beforeEach } from "vitest"
 import {
   loadPlayerSession,
   savePlayerSession,
@@ -152,7 +152,7 @@ describe("loadPlayerSession", () => {
     expect(loadPlayerSession()).toBeNull()
   })
 
-  it("returns null when currentTime is NaN", () => {
+  it("returns null when currentTime is null (NaN serializes to null via JSON)", () => {
     window.localStorage.setItem(
       STORAGE_KEY,
       JSON.stringify({
@@ -249,7 +249,7 @@ describe("loadPlayerSession", () => {
     expect(loadPlayerSession()).toBeNull()
   })
 
-  it("returns null when duration is NaN", () => {
+  it("returns null when duration is null (NaN serializes to null via JSON)", () => {
     window.localStorage.setItem(
       STORAGE_KEY,
       JSON.stringify({

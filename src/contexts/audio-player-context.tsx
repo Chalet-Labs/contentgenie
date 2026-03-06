@@ -313,34 +313,12 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
   // ---- Restore session from localStorage on mount ----
   useEffect(() => {
     const session = loadPlayerSession()
-    if (!session) {
-      isSessionRestored.current = true
-      return
+    if (session) {
+      loadEpisodeIntoPlayer(session.episode, {
+        andPlay: false,
+        startAt: session.currentTime,
+      })
     }
-
-    const audio = audioRef.current
-    if (!audio) {
-      isSessionRestored.current = true
-      return
-    }
-
-    // Set pending seek so onDurationChange applies it
-    pendingSeekRef.current = session.currentTime
-
-    // Dispatch PLAY_EPISODE to populate state, then immediately pause
-    dispatch({ type: "PLAY_EPISODE", episode: session.episode })
-    audio.src = session.episode.audioUrl
-    audio.load()
-    // Do NOT call audio.play() — restore in paused state
-    dispatch({ type: "SET_PLAYING", isPlaying: false })
-    dispatch({ type: "SET_BUFFERING", isBuffering: false })
-
-    updateMediaSessionMetadata({
-      title: session.episode.title,
-      artist: session.episode.podcastTitle,
-      artwork: session.episode.artwork,
-    })
-
     isSessionRestored.current = true
   }, [])
 
@@ -459,78 +437,103 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
     [clearSleepTimerInterval]
   )
 
+  // ---- Shared episode loading logic ----
+  // Only accesses refs and dispatch (all stable), so safe to close over in
+  // both the useMemo API and mount-time effects.
+  const loadEpisodeIntoPlayer = (
+    episode: AudioEpisode,
+    options?: { andPlay?: boolean; startAt?: number }
+  ) => {
+    const audio = audioRef.current
+    if (!audio) return
+
+    const shouldPlay = options?.andPlay ?? true
+
+    // Abort any in-flight chapter fetch from the previous episode
+    chaptersFetchController.current?.abort()
+    chaptersFetchController.current = null
+    if (chaptersTimeoutRef.current) {
+      clearTimeout(chaptersTimeoutRef.current)
+      chaptersTimeoutRef.current = null
+    }
+
+    // Store pending seek position if startAt is provided and valid
+    const requestedStartAt = options?.startAt
+    pendingSeekRef.current =
+      typeof requestedStartAt === "number" && Number.isFinite(requestedStartAt)
+        ? Math.max(0, requestedStartAt)
+        : null
+
+    dispatch({ type: "PLAY_EPISODE", episode })
+    audio.src = episode.audioUrl
+    audio.load()
+
+    if (shouldPlay) {
+      audio.play().catch(() => {
+        dispatch({ type: "SET_PLAYING", isPlaying: false })
+        dispatch({ type: "SET_BUFFERING", isBuffering: false })
+      })
+    } else {
+      dispatch({ type: "SET_PLAYING", isPlaying: false })
+      dispatch({ type: "SET_BUFFERING", isBuffering: false })
+    }
+
+    updateMediaSessionMetadata({
+      title: episode.title,
+      artist: episode.podcastTitle,
+      artwork: episode.artwork,
+    })
+
+    // Non-blocking chapter fetch when chaptersUrl is present
+    if (episode.chaptersUrl) {
+      const controller = new AbortController()
+      chaptersFetchController.current = controller
+      const timeoutId = setTimeout(() => controller.abort(), 5000)
+      chaptersTimeoutRef.current = timeoutId
+
+      fetch(
+        `/api/chapters?url=${encodeURIComponent(episode.chaptersUrl)}`,
+        { signal: controller.signal }
+      )
+        .then((res) =>
+          res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`))
+        )
+        .then((data: { chapters: Chapter[] }) => {
+          if (
+            chaptersFetchController.current === controller &&
+            !controller.signal.aborted
+          ) {
+            dispatch({ type: "SET_CHAPTERS", chapters: data.chapters })
+          }
+        })
+        .catch(() => {
+          if (chaptersFetchController.current === controller) {
+            dispatch({ type: "CLEAR_CHAPTERS" })
+          }
+        })
+        .finally(() => {
+          clearTimeout(timeoutId)
+          if (chaptersTimeoutRef.current === timeoutId) {
+            chaptersTimeoutRef.current = null
+          }
+          if (chaptersFetchController.current === controller) {
+            chaptersFetchController.current = null
+          }
+        })
+    } else {
+      dispatch({ type: "CLEAR_CHAPTERS" })
+    }
+  }
+
   // ---- API (stable reference) ----
   const api = useMemo<AudioPlayerAPI>(
     () => ({
       playEpisode: (episode: AudioEpisode, options?: { startAt?: number }) => {
-        const audio = audioRef.current
-        if (!audio) return
         clearAutoPlayTimer()
-
-        // Abort any in-flight chapter fetch from the previous episode
-        chaptersFetchController.current?.abort()
-        chaptersFetchController.current = null
-        if (chaptersTimeoutRef.current) {
-          clearTimeout(chaptersTimeoutRef.current)
-          chaptersTimeoutRef.current = null
-        }
-
-        // Store pending seek position if startAt is provided and valid
-        const requestedStartAt = options?.startAt
-        pendingSeekRef.current =
-          typeof requestedStartAt === "number" && Number.isFinite(requestedStartAt)
-            ? Math.max(0, requestedStartAt)
-            : null
-
-        dispatch({ type: "PLAY_EPISODE", episode })
-        audio.src = episode.audioUrl
-        audio.load()
-        audio.play().catch(() => {
-          // Play failed — keep player state consistent
-          dispatch({ type: "SET_PLAYING", isPlaying: false })
-          dispatch({ type: "SET_BUFFERING", isBuffering: false })
+        loadEpisodeIntoPlayer(episode, {
+          andPlay: true,
+          startAt: options?.startAt,
         })
-        updateMediaSessionMetadata({
-          title: episode.title,
-          artist: episode.podcastTitle,
-          artwork: episode.artwork,
-        })
-
-        // Non-blocking chapter fetch when chaptersUrl is present
-        if (episode.chaptersUrl) {
-          const controller = new AbortController()
-          chaptersFetchController.current = controller
-          const timeoutId = setTimeout(() => controller.abort(), 5000)
-          chaptersTimeoutRef.current = timeoutId
-
-          fetch(
-            `/api/chapters?url=${encodeURIComponent(episode.chaptersUrl)}`,
-            { signal: controller.signal }
-          )
-            .then((res) => (res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`))))
-            .then((data: { chapters: Chapter[] }) => {
-              if (
-                chaptersFetchController.current === controller &&
-                !controller.signal.aborted
-              ) {
-                dispatch({ type: "SET_CHAPTERS", chapters: data.chapters })
-              }
-            })
-            .catch(() => {
-              if (chaptersFetchController.current === controller) {
-                dispatch({ type: "CLEAR_CHAPTERS" })
-              }
-            })
-            .finally(() => {
-              clearTimeout(timeoutId)
-              if (chaptersTimeoutRef.current === timeoutId) {
-                chaptersTimeoutRef.current = null
-              }
-              if (chaptersFetchController.current === controller) {
-                chaptersFetchController.current = null
-              }
-            })
-        }
       },
 
       togglePlay: () => {
