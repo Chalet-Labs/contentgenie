@@ -5,6 +5,13 @@ import { revalidatePath } from "next/cache";
 import { eq, and, desc, asc, isNotNull, avg, count } from "drizzle-orm";
 import { db } from "@/db";
 import { users, podcasts, episodes, userLibrary, bookmarks } from "@/db/schema";
+import {
+  LIBRARY_ENTRY_COLUMNS,
+  EPISODE_LIST_COLUMNS,
+  PODCAST_LIST_COLUMNS,
+  COLLECTION_LIST_COLUMNS,
+  type SavedItemDTO,
+} from "@/db/library-columns";
 
 interface EpisodeData {
   podcastIndexId: string;
@@ -205,7 +212,7 @@ export type SortDirection = "asc" | "desc";
 export async function getUserLibrary(
   sortBy: LibrarySortOption = "savedAt",
   sortDirection: SortDirection = "desc"
-) {
+): Promise<{ items: SavedItemDTO[]; error: string | null }> {
   const { userId } = await auth();
 
   if (!userId) {
@@ -218,42 +225,18 @@ export async function getUserLibrary(
     // Expected impact: Significant reduction in memory usage and network latency for large libraries.
     const items = await db.query.userLibrary.findMany({
       where: eq(userLibrary.userId, userId),
-      columns: {
-        id: true,
-        userId: true,
-        episodeId: true,
-        savedAt: true,
-        notes: true,
-        rating: true,
-        collectionId: true,
-      },
+      columns: LIBRARY_ENTRY_COLUMNS,
       with: {
         episode: {
-          columns: {
-            id: true,
-            podcastIndexId: true,
-            title: true,
-            description: true,
-            duration: true,
-            publishDate: true,
-            worthItScore: true,
-          },
+          columns: EPISODE_LIST_COLUMNS,
           with: {
             podcast: {
-              columns: {
-                id: true,
-                podcastIndexId: true,
-                title: true,
-                imageUrl: true,
-              },
+              columns: PODCAST_LIST_COLUMNS,
             },
           },
         },
         collection: {
-          columns: {
-            id: true,
-            name: true,
-          },
+          columns: COLLECTION_LIST_COLUMNS,
         },
       },
       orderBy: [desc(userLibrary.savedAt)], // Default order from DB

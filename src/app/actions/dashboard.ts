@@ -5,6 +5,11 @@ import { eq, desc } from "drizzle-orm";
 import { db } from "@/db";
 import { userSubscriptions, userLibrary } from "@/db/schema";
 import {
+  LIBRARY_ENTRY_COLUMNS,
+  EPISODE_LIST_COLUMNS,
+  PODCAST_LIST_COLUMNS,
+} from "@/db/library-columns";
+import {
   getEpisodesByFeedId,
   getTrendingPodcasts,
   type PodcastIndexEpisode,
@@ -115,34 +120,13 @@ export async function getRecentlySavedItems(limit: number = 5) {
     // Expected impact: Reduces DB data transfer by ~95% per item when transcripts are present.
     const items = await db.query.userLibrary.findMany({
       where: eq(userLibrary.userId, userId),
-      columns: {
-        id: true,
-        userId: true,
-        episodeId: true,
-        savedAt: true,
-        notes: true,
-        rating: true,
-        collectionId: true,
-      },
+      columns: LIBRARY_ENTRY_COLUMNS,
       with: {
         episode: {
-          columns: {
-            id: true,
-            podcastIndexId: true,
-            title: true,
-            description: true,
-            publishDate: true,
-            duration: true,
-            worthItScore: true,
-          },
+          columns: EPISODE_LIST_COLUMNS,
           with: {
             podcast: {
-              columns: {
-                id: true,
-                podcastIndexId: true,
-                title: true,
-                imageUrl: true,
-              },
+              columns: PODCAST_LIST_COLUMNS,
             },
           },
         },

@@ -30,15 +30,10 @@ import { NotesEditor } from "./notes-editor";
 import { BookmarksList } from "./bookmarks-list";
 import { RatingInput } from "@/components/episodes/rating-input";
 import { stripHtml, formatDate, formatDuration } from "@/lib/utils";
-import type { Episode, Podcast, UserLibraryEntry, Collection } from "@/db/schema";
+import type { SavedItemDTO } from "@/db/library-columns";
 
 interface SavedEpisodeCardProps {
-  item: UserLibraryEntry & {
-    episode: Episode & {
-      podcast: Podcast;
-    };
-    collection?: Collection | null;
-  };
+  item: SavedItemDTO;
   onRemoved?: () => void;
   onCollectionChanged?: () => void;
   isOffline?: boolean;

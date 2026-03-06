@@ -22,21 +22,15 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { getCollection, deleteCollection } from "@/app/actions/collections";
-import type { Episode, Podcast, UserLibraryEntry, Collection } from "@/db/schema";
-
-type LibraryItem = UserLibraryEntry & {
-  episode: Episode & {
-    podcast: Podcast;
-  };
-  collection?: Collection | null;
-};
+import type { SavedItemDTO } from "@/db/library-columns";
+import type { Collection } from "@/db/schema";
 
 export default function CollectionDetailPage() {
   const params = useParams();
   const collectionId = parseInt(params.id as string, 10);
 
   const [collection, setCollection] = useState<Collection | null>(null);
-  const [items, setItems] = useState<LibraryItem[]>([]);
+  const [items, setItems] = useState<SavedItemDTO[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showEditDialog, setShowEditDialog] = useState(false);
@@ -58,12 +52,7 @@ export default function CollectionDetailPage() {
       setError(result.error);
     } else {
       setCollection(result.collection);
-      // Add collection reference to items for display
-      const itemsWithCollection = result.items.map((item) => ({
-        ...item,
-        collection: result.collection,
-      }));
-      setItems(itemsWithCollection as LibraryItem[]);
+      setItems(result.items);
     }
 
     setIsLoading(false);
