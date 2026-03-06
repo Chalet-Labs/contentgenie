@@ -280,6 +280,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
   const fadeCleanupRef = useRef<(() => void) | null>(null)
   const pendingSeekRef = useRef<number | null>(null)
   const sessionSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const isRestoringSession = useRef(false)
   const isSessionRestored = useRef(false)
 
   const [state, dispatch] = useReducer(reducer, initialState)
@@ -314,10 +315,14 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const session = loadPlayerSession()
     if (session) {
+      isRestoringSession.current = true
       loadEpisodeIntoPlayer(session.episode, {
         andPlay: false,
         startAt: session.currentTime,
       })
+      // isSessionRestored is set in onDurationChange after the seek is applied,
+      // preventing beforeunload from saving currentTime: 0 during the gap.
+      return
     }
     isSessionRestored.current = true
   }, [])
@@ -448,6 +453,12 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
     if (!audio) return
 
     const shouldPlay = options?.andPlay ?? true
+
+    // Cancel any pending session-save timer from the previous episode
+    if (sessionSaveTimerRef.current) {
+      clearTimeout(sessionSaveTimerRef.current)
+      sessionSaveTimerRef.current = null
+    }
 
     // Abort any in-flight chapter fetch from the previous episode
     chaptersFetchController.current?.abort()
@@ -785,6 +796,11 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       ) {
         audio.currentTime = Math.min(pendingSeekRef.current, audio.duration)
         pendingSeekRef.current = null
+      }
+      // Mark session restoration complete once the seek has been applied
+      if (isRestoringSession.current && pendingSeekRef.current === null) {
+        isRestoringSession.current = false
+        isSessionRestored.current = true
       }
     }
 
