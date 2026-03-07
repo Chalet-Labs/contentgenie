@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { db } from "@/db";
-import { users, podcasts, episodes, userLibrary } from "@/db/schema";
+import { users, episodes, userLibrary } from "@/db/schema";
+import { upsertPodcast } from "@/db/helpers";
 import { revalidatePath } from "next/cache";
 
 export async function POST(request: NextRequest) {
@@ -123,32 +124,18 @@ export async function POST(request: NextRequest) {
       .onConflictDoNothing();
 
     // Upsert podcast
-    const [podcastRecord] = await db
-      .insert(podcasts)
-      .values({
-        podcastIndexId: podcast.podcastIndexId,
-        title: podcast.title,
+    const podcastRecord = {
+      id: await upsertPodcast({
+        podcastIndexId: podcast.podcastIndexId as string,
+        title: podcast.title as string,
         description: podcastDescription,
         publisher: podcastPublisher,
         imageUrl: podcastImageUrl,
         rssFeedUrl: podcastRssFeedUrl,
         categories: podcastCategories,
         totalEpisodes: podcastTotalEpisodes,
-      })
-      .onConflictDoUpdate({
-        target: podcasts.podcastIndexId,
-        set: {
-          title: podcast.title,
-          description: podcastDescription,
-          publisher: podcastPublisher,
-          imageUrl: podcastImageUrl,
-          rssFeedUrl: podcastRssFeedUrl,
-          categories: podcastCategories,
-          totalEpisodes: podcastTotalEpisodes,
-          updatedAt: new Date(),
-        },
-      })
-      .returning({ id: podcasts.id });
+      }),
+    };
 
     // Upsert episode
     const [episodeRecord] = await db

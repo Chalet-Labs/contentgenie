@@ -1,31 +1,24 @@
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { episodes, podcasts } from "@/db/schema";
+import { upsertPodcast } from "@/db/helpers";
 import type { SummaryResult } from "@/lib/openrouter";
 import type { PodcastIndexPodcast, PodcastIndexEpisode } from "@/lib/podcastindex";
 
 /**
  * Ensures a podcast exists in the database, creating it if necessary.
- * Uses ON CONFLICT DO NOTHING to handle concurrent inserts gracefully.
+ * Delegates to the shared upsertPodcast helper when podcast data is available.
  */
 async function ensurePodcast(
   feedId: number,
   podcast?: PodcastIndexPodcast
 ): Promise<number | null> {
-  let dbPodcast = await db.query.podcasts.findFirst({
-    where: eq(podcasts.podcastIndexId, feedId.toString()),
-  });
+  if (podcast) {
+    const categories = podcast.categories
+      ? Object.values(podcast.categories)
+      : [];
 
-  if (dbPodcast) return dbPodcast.id;
-  if (!podcast) return null;
-
-  const categories = podcast.categories
-    ? Object.values(podcast.categories)
-    : [];
-
-  const [inserted] = await db
-    .insert(podcasts)
-    .values({
+    return upsertPodcast({
       podcastIndexId: feedId.toString(),
       title: podcast.title,
       description: podcast.description,
@@ -37,14 +30,10 @@ async function ensurePodcast(
       latestEpisodeDate: podcast.newestItemPubdate
         ? new Date(podcast.newestItemPubdate * 1000)
         : null,
-    })
-    .onConflictDoNothing({ target: podcasts.podcastIndexId })
-    .returning();
+    });
+  }
 
-  if (inserted) return inserted.id;
-
-  // Another process inserted first — re-fetch
-  dbPodcast = await db.query.podcasts.findFirst({
+  const dbPodcast = await db.query.podcasts.findFirst({
     where: eq(podcasts.podcastIndexId, feedId.toString()),
   });
   return dbPodcast?.id ?? null;

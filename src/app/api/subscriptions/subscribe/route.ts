@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { db } from "@/db";
-import { users, podcasts, userSubscriptions } from "@/db/schema";
+import { users, userSubscriptions } from "@/db/schema";
+import { upsertPodcast } from "@/db/helpers";
 import { revalidatePath } from "next/cache";
 
 export async function POST(request: NextRequest) {
@@ -60,9 +61,8 @@ export async function POST(request: NextRequest) {
       .onConflictDoNothing();
 
     // Upsert podcast
-    const [podcast] = await db
-      .insert(podcasts)
-      .values({
+    const podcast = {
+      id: await upsertPodcast({
         podcastIndexId,
         title,
         description,
@@ -72,22 +72,8 @@ export async function POST(request: NextRequest) {
         categories,
         totalEpisodes,
         latestEpisodeDate,
-      })
-      .onConflictDoUpdate({
-        target: podcasts.podcastIndexId,
-        set: {
-          title,
-          description,
-          publisher,
-          imageUrl,
-          rssFeedUrl,
-          categories,
-          totalEpisodes,
-          latestEpisodeDate,
-          updatedAt: new Date(),
-        },
-      })
-      .returning({ id: podcasts.id });
+      }),
+    };
 
     // Insert subscription (idempotent)
     const subResult = await db
