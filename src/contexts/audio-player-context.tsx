@@ -23,6 +23,11 @@ import {
   savePlayerPreferences,
 } from "@/lib/player-preferences"
 import { loadQueue, saveQueue } from "@/lib/queue-persistence"
+import {
+  loadPlayerSession,
+  savePlayerSession,
+  clearPlayerSession,
+} from "@/lib/player-session"
 import { fadeOutAudio } from "@/lib/audio-fade"
 import type { Chapter } from "@/lib/chapters"
 
@@ -274,6 +279,9 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
   const sleepTimerIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const fadeCleanupRef = useRef<(() => void) | null>(null)
   const pendingSeekRef = useRef<number | null>(null)
+  const sessionSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const isRestoringSession = useRef(false)
+  const isSessionRestored = useRef(false)
 
   const [state, dispatch] = useReducer(reducer, initialState)
 
@@ -301,6 +309,22 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
     const persisted = loadQueue()
     dispatch({ type: "INIT_QUEUE", queue: persisted })
     isQueueHydrated.current = true
+  }, [])
+
+  // ---- Restore session from localStorage on mount ----
+  useEffect(() => {
+    const session = loadPlayerSession()
+    if (session) {
+      isRestoringSession.current = true
+      loadEpisodeIntoPlayer(session.episode, {
+        andPlay: false,
+        startAt: session.currentTime,
+      })
+      // isSessionRestored is set in onDurationChange after the seek is applied,
+      // preventing beforeunload from saving currentTime: 0 during the gap.
+      return
+    }
+    isSessionRestored.current = true
   }, [])
 
   // ---- Persist queue to localStorage on changes ----
@@ -418,78 +442,145 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
     [clearSleepTimerInterval]
   )
 
+  // ---- Shared episode loading logic ----
+  // Only accesses refs and dispatch (all stable), so safe to close over in
+  // both the useMemo API and mount-time effects.
+  const loadEpisodeIntoPlayer = (
+    episode: AudioEpisode,
+    options?: { andPlay?: boolean; startAt?: number }
+  ) => {
+    const audio = audioRef.current
+    if (!audio) return
+
+    const shouldPlay = options?.andPlay ?? true
+
+    // Cancel any pending session-save timer from the previous episode
+    if (sessionSaveTimerRef.current) {
+      clearTimeout(sessionSaveTimerRef.current)
+      sessionSaveTimerRef.current = null
+    }
+
+    // Abort any in-flight chapter fetch from the previous episode
+    chaptersFetchController.current?.abort()
+    chaptersFetchController.current = null
+    if (chaptersTimeoutRef.current) {
+      clearTimeout(chaptersTimeoutRef.current)
+      chaptersTimeoutRef.current = null
+    }
+
+    // Store pending seek position if startAt is provided and valid
+    const requestedStartAt = options?.startAt
+    pendingSeekRef.current =
+      typeof requestedStartAt === "number" && Number.isFinite(requestedStartAt)
+        ? Math.max(0, requestedStartAt)
+        : null
+
+    dispatch({ type: "PLAY_EPISODE", episode })
+    audio.src = episode.audioUrl
+    audio.load()
+
+    if (shouldPlay) {
+      audio.play().catch(() => {
+        dispatch({ type: "SET_PLAYING", isPlaying: false })
+        dispatch({ type: "SET_BUFFERING", isBuffering: false })
+      })
+    } else {
+      dispatch({ type: "SET_PLAYING", isPlaying: false })
+      dispatch({ type: "SET_BUFFERING", isBuffering: false })
+    }
+
+    updateMediaSessionMetadata({
+      title: episode.title,
+      artist: episode.podcastTitle,
+      artwork: episode.artwork,
+    })
+
+    // Non-blocking chapter fetch when chaptersUrl is present
+    if (episode.chaptersUrl) {
+      const controller = new AbortController()
+      chaptersFetchController.current = controller
+      const timeoutId = setTimeout(() => controller.abort(), 5000)
+      chaptersTimeoutRef.current = timeoutId
+
+      fetch(
+        `/api/chapters?url=${encodeURIComponent(episode.chaptersUrl)}`,
+        { signal: controller.signal }
+      )
+        .then((res) =>
+          res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`))
+        )
+        .then((data: { chapters: Chapter[] }) => {
+          if (
+            chaptersFetchController.current === controller &&
+            !controller.signal.aborted
+          ) {
+            dispatch({ type: "SET_CHAPTERS", chapters: data.chapters })
+          }
+        })
+        .catch(() => {
+          if (chaptersFetchController.current === controller) {
+            dispatch({ type: "CLEAR_CHAPTERS" })
+          }
+        })
+        .finally(() => {
+          clearTimeout(timeoutId)
+          if (chaptersTimeoutRef.current === timeoutId) {
+            chaptersTimeoutRef.current = null
+          }
+          if (chaptersFetchController.current === controller) {
+            chaptersFetchController.current = null
+          }
+        })
+    } else {
+      dispatch({ type: "CLEAR_CHAPTERS" })
+    }
+  }
+
+  // ---- Shared player teardown ----
+  // Resets the audio element and all player state. Only clears the persisted
+  // session when the user explicitly closes the player (not on auto-advance errors).
+  const teardownPlayer = useCallback(
+    (options?: { clearSession?: boolean }) => {
+      const audio = audioRef.current
+      if (audio) {
+        audio.pause()
+        audio.removeAttribute("src")
+        audio.load()
+      }
+      pendingSeekRef.current = null
+      clearAutoPlayTimer()
+      clearSleepTimerInterval()
+      cancelFade()
+      if (options?.clearSession) {
+        clearPlayerSession()
+      }
+      if (sessionSaveTimerRef.current) {
+        clearTimeout(sessionSaveTimerRef.current)
+        sessionSaveTimerRef.current = null
+      }
+      chaptersFetchController.current?.abort()
+      chaptersFetchController.current = null
+      if (chaptersTimeoutRef.current) {
+        clearTimeout(chaptersTimeoutRef.current)
+        chaptersTimeoutRef.current = null
+      }
+      dispatch({ type: "CLOSE" })
+      setProgress({ currentTime: 0, buffered: 0 })
+      clearMediaSession()
+      clearStallTimer()
+    },
+    [clearAutoPlayTimer, clearSleepTimerInterval, cancelFade, clearStallTimer]
+  )
+
   // ---- API (stable reference) ----
   const api = useMemo<AudioPlayerAPI>(
     () => ({
       playEpisode: (episode: AudioEpisode, options?: { startAt?: number }) => {
-        const audio = audioRef.current
-        if (!audio) return
         clearAutoPlayTimer()
-
-        // Abort any in-flight chapter fetch from the previous episode
-        chaptersFetchController.current?.abort()
-        chaptersFetchController.current = null
-        if (chaptersTimeoutRef.current) {
-          clearTimeout(chaptersTimeoutRef.current)
-          chaptersTimeoutRef.current = null
-        }
-
-        // Store pending seek position if startAt is provided and valid
-        const requestedStartAt = options?.startAt
-        pendingSeekRef.current =
-          typeof requestedStartAt === "number" && Number.isFinite(requestedStartAt)
-            ? Math.max(0, requestedStartAt)
-            : null
-
-        dispatch({ type: "PLAY_EPISODE", episode })
-        audio.src = episode.audioUrl
-        audio.load()
-        audio.play().catch(() => {
-          // Play failed — keep player state consistent
-          dispatch({ type: "SET_PLAYING", isPlaying: false })
-          dispatch({ type: "SET_BUFFERING", isBuffering: false })
+        loadEpisodeIntoPlayer(episode, {
+          andPlay: true,
+          startAt: options?.startAt,
         })
-        updateMediaSessionMetadata({
-          title: episode.title,
-          artist: episode.podcastTitle,
-          artwork: episode.artwork,
-        })
-
-        // Non-blocking chapter fetch when chaptersUrl is present
-        if (episode.chaptersUrl) {
-          const controller = new AbortController()
-          chaptersFetchController.current = controller
-          const timeoutId = setTimeout(() => controller.abort(), 5000)
-          chaptersTimeoutRef.current = timeoutId
-
-          fetch(
-            `/api/chapters?url=${encodeURIComponent(episode.chaptersUrl)}`,
-            { signal: controller.signal }
-          )
-            .then((res) => (res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`))))
-            .then((data: { chapters: Chapter[] }) => {
-              if (
-                chaptersFetchController.current === controller &&
-                !controller.signal.aborted
-              ) {
-                dispatch({ type: "SET_CHAPTERS", chapters: data.chapters })
-              }
-            })
-            .catch(() => {
-              if (chaptersFetchController.current === controller) {
-                dispatch({ type: "CLEAR_CHAPTERS" })
-              }
-            })
-            .finally(() => {
-              clearTimeout(timeoutId)
-              if (chaptersTimeoutRef.current === timeoutId) {
-                chaptersTimeoutRef.current = null
-              }
-              if (chaptersFetchController.current === controller) {
-                chaptersFetchController.current = null
-              }
-            })
-        }
       },
 
       togglePlay: () => {
@@ -538,26 +629,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       },
 
       closePlayer: () => {
-        const audio = audioRef.current
-        if (audio) {
-          audio.pause()
-          audio.removeAttribute("src")
-          audio.load()
-        }
-        pendingSeekRef.current = null
-        clearAutoPlayTimer()
-        clearSleepTimerInterval()
-        cancelFade()
-        chaptersFetchController.current?.abort()
-        chaptersFetchController.current = null
-        if (chaptersTimeoutRef.current) {
-          clearTimeout(chaptersTimeoutRef.current)
-          chaptersTimeoutRef.current = null
-        }
-        dispatch({ type: "CLOSE" })
-        setProgress({ currentTime: 0, buffered: 0 })
-        clearMediaSession()
-        clearStallTimer()
+        teardownPlayer({ clearSession: true })
       },
 
       addToQueue: (episode: AudioEpisode) => {
@@ -676,6 +748,21 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
         audio.playbackRate
       )
 
+      // Throttled session save (~5s) — skip until session restore is complete
+      if (
+        isSessionRestored.current &&
+        !sessionSaveTimerRef.current &&
+        stateRef.current.currentEpisode
+      ) {
+        sessionSaveTimerRef.current = setTimeout(() => {
+          sessionSaveTimerRef.current = null
+          const ep = stateRef.current.currentEpisode
+          if (ep) {
+            savePlayerSession(ep, audio.currentTime)
+          }
+        }, 5000)
+      }
+
       // Debounced ARIA announcement (every 15s)
       if (!ariaTimerRef.current) {
         ariaTimerRef.current = setTimeout(() => {
@@ -710,6 +797,11 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
         audio.currentTime = Math.min(pendingSeekRef.current, audio.duration)
         pendingSeekRef.current = null
       }
+      // Mark session restoration complete once the seek has been applied
+      if (isRestoringSession.current && pendingSeekRef.current === null) {
+        isRestoringSession.current = false
+        isSessionRestored.current = true
+      }
     }
 
     const onPlaying = () => {
@@ -729,6 +821,10 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
     const onPause = () => {
       dispatch({ type: "SET_PLAYING", isPlaying: false })
       clearStallTimer()
+      // Save exact pause position immediately
+      if (isSessionRestored.current && stateRef.current.currentEpisode) {
+        savePlayerSession(stateRef.current.currentEpisode, audio.currentTime)
+      }
     }
 
     const onWaiting = () => {
@@ -778,10 +874,11 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       clearStallTimer()
 
       if (isAutoAdvancing.current) {
-        // Error during auto-advance — stop the chain
+        // Error during auto-advance — stop the chain but preserve the saved
+        // session so the user can resume the previous episode on refresh
         const failedEpisode = stateRef.current.currentEpisode
         isAutoAdvancing.current = false
-        api.closePlayer()
+        teardownPlayer()
         if (failedEpisode) {
           dispatch({ type: "REMOVE_FROM_QUEUE", episodeId: failedEpisode.id })
           toast.error(`Couldn't play ${failedEpisode.title} \u2014 removed from queue`)
@@ -818,8 +915,25 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       if (ariaTimerRef.current) {
         clearTimeout(ariaTimerRef.current)
       }
+      if (sessionSaveTimerRef.current) {
+        clearTimeout(sessionSaveTimerRef.current)
+        sessionSaveTimerRef.current = null
+      }
     }
-  }, [clearStallTimer, startStallTimer, clearAutoPlayTimer, api, cancelFade])
+  }, [clearStallTimer, startStallTimer, clearAutoPlayTimer, api, cancelFade, teardownPlayer])
+
+  // ---- Save session on tab close ----
+  useEffect(() => {
+    const onBeforeUnload = () => {
+      const ep = stateRef.current.currentEpisode
+      const audio = audioRef.current
+      if (ep && audio && isSessionRestored.current) {
+        savePlayerSession(ep, audio.currentTime)
+      }
+    }
+    window.addEventListener("beforeunload", onBeforeUnload)
+    return () => window.removeEventListener("beforeunload", onBeforeUnload)
+  }, [])
 
   // ---- Check sleep timer expiry on tab visibility change ----
   useEffect(() => {

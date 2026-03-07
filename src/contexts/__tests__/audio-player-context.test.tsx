@@ -33,6 +33,16 @@ vi.mock("@/lib/queue-persistence", () => ({
   saveQueue: (...args: unknown[]) => mockSaveQueue(...args),
 }))
 
+// Mock player-session helpers
+const mockLoadSession = vi.fn().mockReturnValue(null)
+const mockSaveSession = vi.fn()
+const mockClearSession = vi.fn()
+vi.mock("@/lib/player-session", () => ({
+  loadPlayerSession: (...args: unknown[]) => mockLoadSession(...args),
+  savePlayerSession: (...args: unknown[]) => mockSaveSession(...args),
+  clearPlayerSession: (...args: unknown[]) => mockClearSession(...args),
+}))
+
 // --- Mock HTMLMediaElement prototype ---
 // jsdom doesn't implement play/load/pause, so we stub them globally
 const playMock = vi.fn().mockResolvedValue(undefined)
