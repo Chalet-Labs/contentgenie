@@ -73,6 +73,68 @@ describe("notifications library", () => {
       expect(mockSendNotification).toHaveBeenCalledTimes(2);
     });
 
+    it("passes topic to sendNotification when tag is provided", async () => {
+      mockFindMany.mockResolvedValue([
+        { endpoint: "https://push.example.com/1", p256dh: "key1", auth: "auth1" },
+      ]);
+      mockSendNotification.mockResolvedValue({});
+
+      const { sendPushToUser } = await import("@/lib/notifications");
+      await sendPushToUser("user-1", { title: "Test", body: "Body", tag: "new_episode-42" });
+
+      expect(mockSendNotification).toHaveBeenCalledWith(
+        expect.any(Object),
+        expect.any(String),
+        expect.objectContaining({ topic: "new_episode-42" })
+      );
+    });
+
+    it("omits topic from sendNotification when no tag is provided", async () => {
+      mockFindMany.mockResolvedValue([
+        { endpoint: "https://push.example.com/1", p256dh: "key1", auth: "auth1" },
+      ]);
+      mockSendNotification.mockResolvedValue({});
+
+      const { sendPushToUser } = await import("@/lib/notifications");
+      await sendPushToUser("user-1", { title: "Test", body: "Body" });
+
+      const options = mockSendNotification.mock.calls[0][2];
+      expect(options).not.toHaveProperty("topic");
+    });
+
+    it("truncates topic to TOPIC_MAX_LENGTH characters per RFC 8030", async () => {
+      mockFindMany.mockResolvedValue([
+        { endpoint: "https://push.example.com/1", p256dh: "key1", auth: "auth1" },
+      ]);
+      mockSendNotification.mockResolvedValue({});
+
+      const { sendPushToUser, TOPIC_MAX_LENGTH } = await import("@/lib/notifications");
+      const longTag = "a".repeat(TOPIC_MAX_LENGTH + 18);
+      await sendPushToUser("user-1", { title: "Test", body: "Body", tag: longTag });
+
+      expect(mockSendNotification).toHaveBeenCalledWith(
+        expect.any(Object),
+        expect.any(String),
+        expect.objectContaining({ topic: "a".repeat(TOPIC_MAX_LENGTH) })
+      );
+    });
+
+    it("strips non-URL-safe-base64 characters from topic per RFC 8030", async () => {
+      mockFindMany.mockResolvedValue([
+        { endpoint: "https://push.example.com/1", p256dh: "key1", auth: "auth1" },
+      ]);
+      mockSendNotification.mockResolvedValue({});
+
+      const { sendPushToUser } = await import("@/lib/notifications");
+      await sendPushToUser("user-1", { title: "Test", body: "Body", tag: "tag:with/invalid chars!" });
+
+      expect(mockSendNotification).toHaveBeenCalledWith(
+        expect.any(Object),
+        expect.any(String),
+        expect.objectContaining({ topic: "tagwithinvalidchars" })
+      );
+    });
+
     it("deletes stale subscriptions on 404 response", async () => {
       mockFindMany.mockResolvedValue([
         { endpoint: "https://push.example.com/stale", p256dh: "key", auth: "auth" },

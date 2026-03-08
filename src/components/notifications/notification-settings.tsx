@@ -16,6 +16,11 @@ import {
   getNotificationPreferences,
 } from "@/app/actions/notifications";
 
+const PUSH_API_HEADERS = {
+  "Content-Type": "application/json",
+  "X-Requested-With": "fetch",
+} as const;
+
 function urlBase64ToUint8Array(base64String: string): Uint8Array {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
   const base64 = (base64String + padding)
@@ -89,7 +94,7 @@ export function NotificationSettings() {
 
       const response = await fetch("/api/push/subscribe", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: PUSH_API_HEADERS,
         body: JSON.stringify({
           endpoint: serialized.endpoint,
           keys: serialized.keys,
@@ -123,7 +128,7 @@ export function NotificationSettings() {
 
         const deleteRes = await fetch("/api/push/subscribe", {
           method: "DELETE",
-          headers: { "Content-Type": "application/json" },
+          headers: PUSH_API_HEADERS,
           body: JSON.stringify({ endpoint: serialized.endpoint }),
         });
 

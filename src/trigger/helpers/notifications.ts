@@ -2,6 +2,7 @@ import webpush from "web-push";
 import { logger } from "@trigger.dev/sdk";
 import { eq, and, inArray } from "drizzle-orm";
 import { db } from "@/db";
+import { sanitizeTopic } from "@/lib/notifications";
 import {
   notifications,
   pushSubscriptions,
@@ -65,6 +66,7 @@ export async function sendPushToUser(
   if (subs.length === 0) return 0;
 
   const payloadStr = JSON.stringify(payload);
+  const topic = payload.tag ? sanitizeTopic(payload.tag) : undefined;
 
   const results = await Promise.allSettled(
     subs.map(async (sub) => {
@@ -75,7 +77,10 @@ export async function sendPushToUser(
             keys: { p256dh: sub.p256dh, auth: sub.auth },
           },
           payloadStr,
-          { TTL: 86400 }
+          {
+            TTL: 86400,
+            ...(topic ? { topic } : {}),
+          }
         );
       } catch (err: unknown) {
         const statusCode =
