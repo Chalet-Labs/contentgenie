@@ -239,7 +239,7 @@ export async function subscribeToPodcast(podcastData: PodcastData) {
       categories: podcastData.categories,
       totalEpisodes: podcastData.totalEpisodes,
       latestEpisodeDate: podcastData.latestEpisodeDate,
-    });
+    }, { updateOnConflict: false });
 
     // BOLT OPTIMIZATION: Use onConflictDoNothing to handle already subscribed case in one query.
     // This replaces a separate existence check and reduces total round-trips from ~5 to 3.

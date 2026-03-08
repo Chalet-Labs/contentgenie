@@ -102,8 +102,8 @@ describe("saveEpisodeToLibrary", () => {
 
     expect(result.success).toBe(true);
     expect(result.message).toMatch(/saved to library/i);
-    expect(mockOnConflictDoUpdate).toHaveBeenCalledTimes(2); // podcast and episode
-    expect(mockOnConflictDoNothing).toHaveBeenCalledTimes(2); // user and library
+    expect(mockOnConflictDoUpdate).toHaveBeenCalledTimes(1); // episode only
+    expect(mockOnConflictDoNothing).toHaveBeenCalledTimes(3); // user, podcast, and library
   });
 
   it("handles already saved episode", async () => {

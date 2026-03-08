@@ -16,7 +16,7 @@ async function ensurePodcast(
   if (podcast) {
     const categories = podcast.categories
       ? Object.values(podcast.categories)
-      : [];
+      : undefined;
 
     return upsertPodcast({
       podcastIndexId: feedId.toString(),
@@ -29,7 +29,7 @@ async function ensurePodcast(
       totalEpisodes: podcast.episodeCount,
       latestEpisodeDate: podcast.newestItemPubdate
         ? new Date(podcast.newestItemPubdate * 1000)
-        : null,
+        : undefined,
     });
   }
 

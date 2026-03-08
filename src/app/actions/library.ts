@@ -61,7 +61,7 @@ export async function saveEpisodeToLibrary(episodeData: EpisodeData) {
       rssFeedUrl: episodeData.podcast.rssFeedUrl,
       categories: episodeData.podcast.categories,
       totalEpisodes: episodeData.podcast.totalEpisodes,
-    });
+    }, { updateOnConflict: false });
 
     // BOLT OPTIMIZATION: Use upsert (onConflictDoUpdate) for episodes to consolidate lookup
     // and insertion into one round-trip.

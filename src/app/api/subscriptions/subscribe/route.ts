@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
         categories,
         totalEpisodes,
         latestEpisodeDate,
-      }),
+      }, { updateOnConflict: false }),
     };
 
     // Insert subscription (idempotent)
