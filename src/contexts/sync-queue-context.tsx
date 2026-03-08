@@ -10,8 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import {
-  getActive,
-  getFailed,
+  getActiveAndFailed,
   getPending,
   dequeue,
   markFailed,
@@ -57,9 +56,9 @@ export function SyncQueueProvider({ children }: { children: ReactNode }) {
   const [failedItems, setFailedItems] = useState<SyncQueueItem[]>([]);
   const isSyncingRef = useRef(false);
 
-  // Refresh counts, active items, and failed items from IDB
+  // Refresh counts, active items, and failed items from IDB (single-pass)
   const refreshQueue = useCallback(async () => {
-    const [active, failed] = await Promise.all([getActive(), getFailed()]);
+    const { active, failed } = await getActiveAndFailed();
     setActiveItems(active);
     setFailedItems(failed);
     setPendingCount(active.filter((i) => i.status === "pending").length);
@@ -91,7 +90,10 @@ export function SyncQueueProvider({ children }: { children: ReactNode }) {
           try {
             const response = await fetch(route, {
               method: "POST",
-              headers: { "Content-Type": "application/json" },
+              headers: {
+                "Content-Type": "application/json",
+                Accept: "application/json",
+              },
               credentials: "include",
               body: JSON.stringify(item.payload),
             });
