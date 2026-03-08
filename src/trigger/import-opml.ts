@@ -143,7 +143,7 @@ async function importSingleFeed(userId: string, feed: OpmlFeed): Promise<void> {
         publisher: piFeed.author,
         imageUrl: piFeed.artwork || piFeed.image,
         rssFeedUrl: piFeed.url || piFeed.originalUrl || feedUrl,
-        categories: piFeed.categories
+        categories: piFeed.categories && Object.keys(piFeed.categories).length > 0
           ? Object.values(piFeed.categories)
           : undefined,
         totalEpisodes: piFeed.episodeCount,

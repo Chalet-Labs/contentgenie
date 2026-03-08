@@ -72,8 +72,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: "Invalid episode data" }, { status: 400 });
     }
 
-    const podcastIndexId = body.podcastIndexId;
-    const title = body.title;
+    const podcastIndexId = typeof body.podcastIndexId === "string" ? body.podcastIndexId.trim() : body.podcastIndexId;
+    const title = typeof body.title === "string" ? body.title.trim() : body.title;
     const description = typeof body.description === "string" ? body.description : undefined;
     const audioUrl = typeof body.audioUrl === "string" ? body.audioUrl : undefined;
     const duration = typeof body.duration === "number" ? body.duration : undefined;
