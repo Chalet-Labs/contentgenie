@@ -89,7 +89,10 @@ export function NotificationSettings() {
 
       const response = await fetch("/api/push/subscribe", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "X-Requested-With": "fetch",
+        },
         body: JSON.stringify({
           endpoint: serialized.endpoint,
           keys: serialized.keys,
@@ -123,7 +126,10 @@ export function NotificationSettings() {
 
         const deleteRes = await fetch("/api/push/subscribe", {
           method: "DELETE",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "X-Requested-With": "fetch",
+          },
           body: JSON.stringify({ endpoint: serialized.endpoint }),
         });
 

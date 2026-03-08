@@ -50,10 +50,29 @@ describe("POST /api/push/subscribe", () => {
     expect(response.status).toBe(401);
   });
 
+  it("returns 403 when X-Requested-With header is missing", async () => {
+    const { POST } = await import("@/app/api/push/subscribe/route");
+    const request = new NextRequest("http://localhost:3000/api/push/subscribe", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        endpoint: "https://fcm.googleapis.com/fcm/send/test-sub-1",
+        keys: { p256dh: "key", auth: "auth" },
+      }),
+    });
+
+    const response = await POST(request);
+    expect(response.status).toBe(403);
+  });
+
   it("returns 400 for missing endpoint", async () => {
     const { POST } = await import("@/app/api/push/subscribe/route");
     const request = new NextRequest("http://localhost:3000/api/push/subscribe", {
       method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Requested-With": "fetch",
+      },
       body: JSON.stringify({ keys: { p256dh: "key", auth: "auth" } }),
     });
 
@@ -65,6 +84,10 @@ describe("POST /api/push/subscribe", () => {
     const { POST } = await import("@/app/api/push/subscribe/route");
     const request = new NextRequest("http://localhost:3000/api/push/subscribe", {
       method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Requested-With": "fetch",
+      },
       body: JSON.stringify({ endpoint: "https://fcm.googleapis.com/fcm/send/test-sub-1" }),
     });
 
@@ -82,6 +105,10 @@ describe("POST /api/push/subscribe", () => {
     const { POST } = await import("@/app/api/push/subscribe/route");
     const request = new NextRequest("http://localhost:3000/api/push/subscribe", {
       method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Requested-With": "fetch",
+      },
       body: JSON.stringify({
         endpoint: "https://fcm.googleapis.com/fcm/send/test-sub-1",
         keys: { p256dh: "key123", auth: "auth123" },
@@ -114,10 +141,26 @@ describe("DELETE /api/push/subscribe", () => {
     expect(response.status).toBe(401);
   });
 
+  it("returns 403 when X-Requested-With header is missing", async () => {
+    const { DELETE } = await import("@/app/api/push/subscribe/route");
+    const request = new NextRequest("http://localhost:3000/api/push/subscribe", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ endpoint: "https://fcm.googleapis.com/fcm/send/test-sub-1" }),
+    });
+
+    const response = await DELETE(request);
+    expect(response.status).toBe(403);
+  });
+
   it("returns 400 for missing endpoint", async () => {
     const { DELETE } = await import("@/app/api/push/subscribe/route");
     const request = new NextRequest("http://localhost:3000/api/push/subscribe", {
       method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Requested-With": "fetch",
+      },
       body: JSON.stringify({}),
     });
 
@@ -132,6 +175,10 @@ describe("DELETE /api/push/subscribe", () => {
     const { DELETE } = await import("@/app/api/push/subscribe/route");
     const request = new NextRequest("http://localhost:3000/api/push/subscribe", {
       method: "DELETE",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Requested-With": "fetch",
+      },
       body: JSON.stringify({ endpoint: "https://fcm.googleapis.com/fcm/send/test-sub-1" }),
     });
 

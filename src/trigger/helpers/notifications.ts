@@ -75,7 +75,10 @@ export async function sendPushToUser(
             keys: { p256dh: sub.p256dh, auth: sub.auth },
           },
           payloadStr,
-          { TTL: 86400 }
+          {
+            TTL: 86400,
+            ...(payload.tag ? { topic: payload.tag } : {}),
+          }
         );
       } catch (err: unknown) {
         const statusCode =

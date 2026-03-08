@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Security
+- Push notification topic header: `webpush.sendNotification()` now includes RFC 8030 `Topic` header derived from the notification tag, enabling push service message coalescing for offline devices (#159)
+- CSRF custom header check on push subscribe/unsubscribe API route: requires `X-Requested-With: fetch` header, returning 403 Forbidden when missing (#159)
+- ADR-018: Push Notification Hardening architecture decision record (#159)
+
 ### Added
 - Chapter markers: display and navigate podcast chapters with seek bar markers and chapter list panel. Chapters are fetched asynchronously via a server-side proxy when an episode with a `chaptersUrl` starts playing. Includes binary-search current chapter tracking and responsive Popover/Sheet chapter panel (#97)
 - Episode queue with drag-and-drop reorder, auto-play next with countdown toast, and queue persistence in localStorage (#94)
