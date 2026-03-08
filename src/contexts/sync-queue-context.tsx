@@ -61,7 +61,7 @@ export function SyncQueueProvider({ children }: { children: ReactNode }) {
     const { active, failed } = await getActiveAndFailed();
     setActiveItems(active);
     setFailedItems(failed);
-    setPendingCount(active.filter((i) => i.status === "pending").length);
+    setPendingCount(active.length);
   }, []);
 
   // Shared retry/fail handler for failed replay attempts

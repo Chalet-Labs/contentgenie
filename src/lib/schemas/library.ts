@@ -39,7 +39,8 @@ export const unsaveEpisodeSchema = z
 export const subscribeSchema = podcastSchema
   .extend({
     latestEpisodeDate: z.iso.datetime({ offset: true }).optional(),
-  });
+  })
+  .strip();
 
 export const unsubscribeSchema = z
   .object({
