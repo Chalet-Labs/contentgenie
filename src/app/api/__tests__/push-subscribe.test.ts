@@ -28,6 +28,28 @@ vi.mock("@/db", () => ({
   },
 }));
 
+const SUBSCRIBE_URL = "http://localhost:3000/api/push/subscribe";
+const TEST_ENDPOINT = "https://fcm.googleapis.com/fcm/send/test-sub-1";
+
+function createSubscribeRequest(
+  method: "POST" | "DELETE",
+  body: object,
+  { includeCsrfHeader = true }: { includeCsrfHeader?: boolean } = {}
+) {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  if (includeCsrfHeader) {
+    headers["X-Requested-With"] = "fetch";
+  }
+
+  return new NextRequest(SUBSCRIBE_URL, {
+    method,
+    headers,
+    body: JSON.stringify(body),
+  });
+}
+
 describe("POST /api/push/subscribe", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -38,13 +60,11 @@ describe("POST /api/push/subscribe", () => {
     mockAuth.mockResolvedValue({ userId: null });
 
     const { POST } = await import("@/app/api/push/subscribe/route");
-    const request = new NextRequest("http://localhost:3000/api/push/subscribe", {
-      method: "POST",
-      body: JSON.stringify({
-        endpoint: "https://fcm.googleapis.com/fcm/send/test-sub-1",
-        keys: { p256dh: "key", auth: "auth" },
-      }),
-    });
+    const request = createSubscribeRequest(
+      "POST",
+      { endpoint: TEST_ENDPOINT, keys: { p256dh: "key", auth: "auth" } },
+      { includeCsrfHeader: false }
+    );
 
     const response = await POST(request);
     expect(response.status).toBe(401);
@@ -52,28 +72,34 @@ describe("POST /api/push/subscribe", () => {
 
   it("returns 403 when X-Requested-With header is missing", async () => {
     const { POST } = await import("@/app/api/push/subscribe/route");
-    const request = new NextRequest("http://localhost:3000/api/push/subscribe", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        endpoint: "https://fcm.googleapis.com/fcm/send/test-sub-1",
-        keys: { p256dh: "key", auth: "auth" },
-      }),
-    });
+    const request = createSubscribeRequest(
+      "POST",
+      { endpoint: TEST_ENDPOINT, keys: { p256dh: "key", auth: "auth" } },
+      { includeCsrfHeader: false }
+    );
 
     const response = await POST(request);
     expect(response.status).toBe(403);
   });
 
+  it("returns 401 (not 403) when unauthenticated and CSRF header is missing", async () => {
+    mockAuth.mockResolvedValue({ userId: null });
+
+    const { POST } = await import("@/app/api/push/subscribe/route");
+    const request = createSubscribeRequest(
+      "POST",
+      { endpoint: TEST_ENDPOINT, keys: { p256dh: "key", auth: "auth" } },
+      { includeCsrfHeader: false }
+    );
+
+    const response = await POST(request);
+    expect(response.status).toBe(401);
+  });
+
   it("returns 400 for missing endpoint", async () => {
     const { POST } = await import("@/app/api/push/subscribe/route");
-    const request = new NextRequest("http://localhost:3000/api/push/subscribe", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Requested-With": "fetch",
-      },
-      body: JSON.stringify({ keys: { p256dh: "key", auth: "auth" } }),
+    const request = createSubscribeRequest("POST", {
+      keys: { p256dh: "key", auth: "auth" },
     });
 
     const response = await POST(request);
@@ -82,13 +108,8 @@ describe("POST /api/push/subscribe", () => {
 
   it("returns 400 for missing keys", async () => {
     const { POST } = await import("@/app/api/push/subscribe/route");
-    const request = new NextRequest("http://localhost:3000/api/push/subscribe", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Requested-With": "fetch",
-      },
-      body: JSON.stringify({ endpoint: "https://fcm.googleapis.com/fcm/send/test-sub-1" }),
+    const request = createSubscribeRequest("POST", {
+      endpoint: TEST_ENDPOINT,
     });
 
     const response = await POST(request);
@@ -103,17 +124,10 @@ describe("POST /api/push/subscribe", () => {
     mockInsert.mockReturnValue({ values: mockValues });
 
     const { POST } = await import("@/app/api/push/subscribe/route");
-    const request = new NextRequest("http://localhost:3000/api/push/subscribe", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Requested-With": "fetch",
-      },
-      body: JSON.stringify({
-        endpoint: "https://fcm.googleapis.com/fcm/send/test-sub-1",
-        keys: { p256dh: "key123", auth: "auth123" },
-        userAgent: "TestBrowser/1.0",
-      }),
+    const request = createSubscribeRequest("POST", {
+      endpoint: TEST_ENDPOINT,
+      keys: { p256dh: "key123", auth: "auth123" },
+      userAgent: "TestBrowser/1.0",
     });
 
     const response = await POST(request);
@@ -132,10 +146,11 @@ describe("DELETE /api/push/subscribe", () => {
     mockAuth.mockResolvedValue({ userId: null });
 
     const { DELETE } = await import("@/app/api/push/subscribe/route");
-    const request = new NextRequest("http://localhost:3000/api/push/subscribe", {
-      method: "DELETE",
-      body: JSON.stringify({ endpoint: "https://fcm.googleapis.com/fcm/send/test-sub-1" }),
-    });
+    const request = createSubscribeRequest(
+      "DELETE",
+      { endpoint: TEST_ENDPOINT },
+      { includeCsrfHeader: false }
+    );
 
     const response = await DELETE(request);
     expect(response.status).toBe(401);
@@ -143,11 +158,11 @@ describe("DELETE /api/push/subscribe", () => {
 
   it("returns 403 when X-Requested-With header is missing", async () => {
     const { DELETE } = await import("@/app/api/push/subscribe/route");
-    const request = new NextRequest("http://localhost:3000/api/push/subscribe", {
-      method: "DELETE",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ endpoint: "https://fcm.googleapis.com/fcm/send/test-sub-1" }),
-    });
+    const request = createSubscribeRequest(
+      "DELETE",
+      { endpoint: TEST_ENDPOINT },
+      { includeCsrfHeader: false }
+    );
 
     const response = await DELETE(request);
     expect(response.status).toBe(403);
@@ -155,14 +170,7 @@ describe("DELETE /api/push/subscribe", () => {
 
   it("returns 400 for missing endpoint", async () => {
     const { DELETE } = await import("@/app/api/push/subscribe/route");
-    const request = new NextRequest("http://localhost:3000/api/push/subscribe", {
-      method: "DELETE",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Requested-With": "fetch",
-      },
-      body: JSON.stringify({}),
-    });
+    const request = createSubscribeRequest("DELETE", {});
 
     const response = await DELETE(request);
     expect(response.status).toBe(400);
@@ -173,13 +181,8 @@ describe("DELETE /api/push/subscribe", () => {
     mockDelete.mockReturnValue({ where: mockWhere });
 
     const { DELETE } = await import("@/app/api/push/subscribe/route");
-    const request = new NextRequest("http://localhost:3000/api/push/subscribe", {
-      method: "DELETE",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Requested-With": "fetch",
-      },
-      body: JSON.stringify({ endpoint: "https://fcm.googleapis.com/fcm/send/test-sub-1" }),
+    const request = createSubscribeRequest("DELETE", {
+      endpoint: TEST_ENDPOINT,
     });
 
     const response = await DELETE(request);

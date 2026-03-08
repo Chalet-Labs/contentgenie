@@ -89,7 +89,7 @@ export async function sendPushToUser(
           payloadStr,
           {
             TTL: 86400,
-            ...(payload.tag ? { topic: payload.tag } : {}),
+            ...(payload.tag ? { topic: payload.tag.substring(0, 32) } : {}),
           }
         );
       } catch (err: unknown) {

@@ -24,7 +24,7 @@ The system already has three dedup mechanisms:
 ### Existing CSRF Mitigations
 
 - `SameSite` cookie attribute on Clerk's `__session` cookie (blocks cross-site POST in modern browsers)
-- `Content-Type: application/json` via `request.json()` (triggers CORS preflight for cross-origin requests)
+- `Content-Type: application/json` header set by client-side `fetch()` calls (triggers CORS preflight for cross-origin requests; not enforced server-side)
 - No `Access-Control-Allow-Origin` headers returned (browser blocks cross-origin preflight)
 - Push endpoint allowlist validation
 - 60-second JWT expiry
@@ -77,4 +77,4 @@ The system already has three dedup mechanisms:
 - The push subscribe API route gains an explicit CSRF check. Any existing client code that calls this route without the custom header will receive a 403. Currently, only `notification-settings.tsx` calls this route — it is updated in the same change.
 - The service worker's background sync does NOT call the push subscribe route, so no changes are needed in `sw.js`.
 - Existing tests for the push subscribe route need the `X-Requested-With` header added to their request construction.
-- No new dependencies. No schema changes. No Doppler changes.
+- No new dependencies, schema changes, or Doppler changes.
