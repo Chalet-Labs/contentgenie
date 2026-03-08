@@ -34,13 +34,13 @@ const TEST_ENDPOINT = "https://fcm.googleapis.com/fcm/send/test-sub-1";
 function createSubscribeRequest(
   method: "POST" | "DELETE",
   body: object,
-  { includeCsrfHeader = true }: { includeCsrfHeader?: boolean } = {}
+  { csrfHeader = "fetch" }: { csrfHeader?: string | null } = {}
 ) {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
   };
-  if (includeCsrfHeader) {
-    headers["X-Requested-With"] = "fetch";
+  if (csrfHeader !== null) {
+    headers["X-Requested-With"] = csrfHeader;
   }
 
   return new NextRequest(SUBSCRIBE_URL, {
@@ -63,7 +63,7 @@ describe("POST /api/push/subscribe", () => {
     const request = createSubscribeRequest(
       "POST",
       { endpoint: TEST_ENDPOINT, keys: { p256dh: "key", auth: "auth" } },
-      { includeCsrfHeader: false }
+      { csrfHeader: null }
     );
 
     const response = await POST(request);
@@ -71,11 +71,25 @@ describe("POST /api/push/subscribe", () => {
   });
 
   it("returns 403 when X-Requested-With header is missing", async () => {
+    mockAuth.mockResolvedValue({ userId: "user-1" });
     const { POST } = await import("@/app/api/push/subscribe/route");
     const request = createSubscribeRequest(
       "POST",
       { endpoint: TEST_ENDPOINT, keys: { p256dh: "key", auth: "auth" } },
-      { includeCsrfHeader: false }
+      { csrfHeader: null }
+    );
+
+    const response = await POST(request);
+    expect(response.status).toBe(403);
+  });
+
+  it("returns 403 when X-Requested-With header has wrong value", async () => {
+    mockAuth.mockResolvedValue({ userId: "user-1" });
+    const { POST } = await import("@/app/api/push/subscribe/route");
+    const request = createSubscribeRequest(
+      "POST",
+      { endpoint: TEST_ENDPOINT, keys: { p256dh: "key", auth: "auth" } },
+      { csrfHeader: "XMLHttpRequest" }
     );
 
     const response = await POST(request);
@@ -89,7 +103,7 @@ describe("POST /api/push/subscribe", () => {
     const request = createSubscribeRequest(
       "POST",
       { endpoint: TEST_ENDPOINT, keys: { p256dh: "key", auth: "auth" } },
-      { includeCsrfHeader: true }
+      { csrfHeader: "fetch" }
     );
 
     const response = await POST(request);
@@ -149,7 +163,7 @@ describe("DELETE /api/push/subscribe", () => {
     const request = createSubscribeRequest(
       "DELETE",
       { endpoint: TEST_ENDPOINT },
-      { includeCsrfHeader: false }
+      { csrfHeader: null }
     );
 
     const response = await DELETE(request);
@@ -157,11 +171,25 @@ describe("DELETE /api/push/subscribe", () => {
   });
 
   it("returns 403 when X-Requested-With header is missing", async () => {
+    mockAuth.mockResolvedValue({ userId: "user-1" });
     const { DELETE } = await import("@/app/api/push/subscribe/route");
     const request = createSubscribeRequest(
       "DELETE",
       { endpoint: TEST_ENDPOINT },
-      { includeCsrfHeader: false }
+      { csrfHeader: null }
+    );
+
+    const response = await DELETE(request);
+    expect(response.status).toBe(403);
+  });
+
+  it("returns 403 when X-Requested-With header has wrong value", async () => {
+    mockAuth.mockResolvedValue({ userId: "user-1" });
+    const { DELETE } = await import("@/app/api/push/subscribe/route");
+    const request = createSubscribeRequest(
+      "DELETE",
+      { endpoint: TEST_ENDPOINT },
+      { csrfHeader: "XMLHttpRequest" }
     );
 
     const response = await DELETE(request);
@@ -175,7 +203,7 @@ describe("DELETE /api/push/subscribe", () => {
     const request = createSubscribeRequest(
       "DELETE",
       { endpoint: TEST_ENDPOINT },
-      { includeCsrfHeader: true }
+      { csrfHeader: "fetch" }
     );
 
     const response = await DELETE(request);
