@@ -11,7 +11,7 @@ export interface UpsertPodcastData {
   rssFeedUrl?: string;
   categories?: string[];
   totalEpisodes?: number;
-  latestEpisodeDate?: Date | null;
+  latestEpisodeDate?: Date;
   source?: "podcastindex" | "rss";
 }
 
@@ -59,24 +59,21 @@ export async function upsertPodcast(
   };
 
   if (options?.updateOnConflict === false) {
-    const [inserted] = await db
+    // No-op touch so RETURNING works on conflicts (avoids a second SELECT)
+    const [row] = await db
       .insert(podcasts)
       .values(values)
-      .onConflictDoNothing()
+      .onConflictDoUpdate({
+        target: podcasts.podcastIndexId,
+        set: { podcastIndexId: podcasts.podcastIndexId },
+      })
       .returning({ id: podcasts.id });
 
-    if (inserted) return inserted.id;
-
-    const existing = await db.query.podcasts.findFirst({
-      where: eq(podcasts.podcastIndexId, podcastIndexId),
-      columns: { id: true },
-    });
-
-    if (!existing) {
-      throw new Error(`Failed to find existing podcast: ${podcastIndexId}`);
+    if (!row) {
+      throw new Error(`Failed to upsert podcast: ${podcastIndexId}`);
     }
 
-    return existing.id;
+    return row.id;
   }
 
   // Build set with only defined values — explicit filtering instead of
@@ -95,7 +92,7 @@ export async function upsertPodcast(
 
   const set = {
     ...Object.fromEntries(
-      Object.entries(updateFields).filter(([, v]) => v !== undefined)
+      Object.entries(updateFields).filter(([, v]) => v != null)
     ),
     updatedAt: new Date(),
   };

@@ -22,15 +22,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const podcastIndexId = body.podcastIndexId;
-    const title = body.title;
-
     if (
-      !podcastIndexId ||
-      typeof podcastIndexId !== "string" ||
-      !title ||
-      typeof title !== "string"
+      typeof body.podcastIndexId !== "string" ||
+      typeof body.title !== "string"
     ) {
+      return NextResponse.json(
+        { success: false, error: "Invalid podcast data" },
+        { status: 400 },
+      );
+    }
+
+    const podcastIndexId = body.podcastIndexId.trim();
+    const title = body.title.trim();
+
+    if (!podcastIndexId || !title) {
       return NextResponse.json(
         { success: false, error: "Invalid podcast data" },
         { status: 400 },

@@ -14,9 +14,10 @@ async function ensurePodcast(
   podcast?: PodcastIndexPodcast
 ): Promise<number | null> {
   if (podcast) {
-    const categories = podcast.categories
+    const categoryValues = podcast.categories
       ? Object.values(podcast.categories)
-      : undefined;
+      : [];
+    const categories = categoryValues.length > 0 ? categoryValues : undefined;
 
     return upsertPodcast({
       podcastIndexId: feedId.toString(),

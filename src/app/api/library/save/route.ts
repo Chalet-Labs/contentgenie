@@ -123,11 +123,22 @@ export async function POST(request: NextRequest) {
       .values({ id: userId, email: "", name: null })
       .onConflictDoNothing();
 
+    // Trim and validate nested podcast fields before upsert
+    const trimmedPodcastIndexId = (podcast.podcastIndexId as string).trim();
+    const trimmedPodcastTitle = (podcast.title as string).trim();
+
+    if (!trimmedPodcastIndexId || !trimmedPodcastTitle) {
+      return NextResponse.json(
+        { success: false, error: "Invalid episode data" },
+        { status: 400 },
+      );
+    }
+
     // Upsert podcast
     const podcastRecord = {
       id: await upsertPodcast({
-        podcastIndexId: podcast.podcastIndexId as string,
-        title: podcast.title as string,
+        podcastIndexId: trimmedPodcastIndexId,
+        title: trimmedPodcastTitle,
         description: podcastDescription,
         publisher: podcastPublisher,
         imageUrl: podcastImageUrl,

@@ -60,10 +60,10 @@ function setupInsertChains({
           values: vi.fn().mockReturnThis(),
           onConflictDoNothing: vi.fn().mockResolvedValue(undefined),
         };
-      case 2: // podcasts (updateOnConflict: false → onConflictDoNothing)
+      case 2: // podcasts (updateOnConflict: false → no-op touch via onConflictDoUpdate)
         return {
           values: vi.fn().mockReturnThis(),
-          onConflictDoNothing: vi.fn().mockReturnValue({
+          onConflictDoUpdate: vi.fn().mockReturnValue({
             returning: vi.fn().mockResolvedValue([{ id: podcastId }]),
           }),
         };
@@ -158,7 +158,7 @@ describe("POST /api/subscriptions/subscribe", () => {
       }
       return {
         values: vi.fn().mockReturnThis(),
-        onConflictDoNothing: vi.fn().mockReturnValue({
+        onConflictDoUpdate: vi.fn().mockReturnValue({
           returning: vi.fn().mockRejectedValue(new Error("DB error")),
         }),
       };

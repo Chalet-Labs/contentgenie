@@ -52,9 +52,16 @@ export async function saveEpisodeToLibrary(episodeData: EpisodeData) {
       })
       .onConflictDoNothing();
 
+    const trimmedPodcastIndexId = episodeData.podcast.podcastIndexId.trim();
+    const trimmedPodcastTitle = episodeData.podcast.title.trim();
+
+    if (!trimmedPodcastIndexId || !trimmedPodcastTitle) {
+      return { success: false, error: "Podcast ID and title are required" };
+    }
+
     const podcastId = await upsertPodcast({
-      podcastIndexId: episodeData.podcast.podcastIndexId,
-      title: episodeData.podcast.title,
+      podcastIndexId: trimmedPodcastIndexId,
+      title: trimmedPodcastTitle,
       description: episodeData.podcast.description,
       publisher: episodeData.podcast.publisher,
       imageUrl: episodeData.podcast.imageUrl,

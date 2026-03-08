@@ -229,9 +229,16 @@ export async function subscribeToPodcast(podcastData: PodcastData) {
       })
       .onConflictDoNothing();
 
+    const trimmedPodcastIndexId = podcastData.podcastIndexId.trim();
+    const trimmedPodcastTitle = podcastData.title.trim();
+
+    if (!trimmedPodcastIndexId || !trimmedPodcastTitle) {
+      return { success: false, error: "Podcast ID and title are required" };
+    }
+
     const podcastId = await upsertPodcast({
-      podcastIndexId: podcastData.podcastIndexId,
-      title: podcastData.title,
+      podcastIndexId: trimmedPodcastIndexId,
+      title: trimmedPodcastTitle,
       description: podcastData.description,
       publisher: podcastData.publisher,
       imageUrl: podcastData.imageUrl,
