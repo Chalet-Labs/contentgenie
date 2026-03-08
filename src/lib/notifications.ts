@@ -8,6 +8,9 @@ import {
 } from "@/db/schema";
 import { eq, and, inArray } from "drizzle-orm";
 
+/** RFC 8030 §5.4: Topic header max length (32 URL-safe base64 characters). */
+export const TOPIC_MAX_LENGTH = 32;
+
 let vapidConfigured = false;
 
 function ensureVapidConfigured() {
@@ -89,7 +92,7 @@ export async function sendPushToUser(
           payloadStr,
           {
             TTL: 86400,
-            ...(payload.tag ? { topic: payload.tag.substring(0, 32) } : {}),
+            ...(payload.tag ? { topic: payload.tag.substring(0, TOPIC_MAX_LENGTH) } : {}),
           }
         );
       } catch (err: unknown) {

@@ -2,6 +2,7 @@ import webpush from "web-push";
 import { logger } from "@trigger.dev/sdk";
 import { eq, and, inArray } from "drizzle-orm";
 import { db } from "@/db";
+import { TOPIC_MAX_LENGTH } from "@/lib/notifications";
 import {
   notifications,
   pushSubscriptions,
@@ -77,7 +78,7 @@ export async function sendPushToUser(
           payloadStr,
           {
             TTL: 86400,
-            ...(payload.tag ? { topic: payload.tag.substring(0, 32) } : {}),
+            ...(payload.tag ? { topic: payload.tag.substring(0, TOPIC_MAX_LENGTH) } : {}),
           }
         );
       } catch (err: unknown) {

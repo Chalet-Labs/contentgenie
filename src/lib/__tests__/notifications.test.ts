@@ -102,20 +102,20 @@ describe("notifications library", () => {
       expect(options).not.toHaveProperty("topic");
     });
 
-    it("truncates topic to 32 characters per RFC 8030", async () => {
+    it("truncates topic to TOPIC_MAX_LENGTH characters per RFC 8030", async () => {
       mockFindMany.mockResolvedValue([
         { endpoint: "https://push.example.com/1", p256dh: "key1", auth: "auth1" },
       ]);
       mockSendNotification.mockResolvedValue({});
 
-      const longTag = "a".repeat(50);
-      const { sendPushToUser } = await import("@/lib/notifications");
+      const { sendPushToUser, TOPIC_MAX_LENGTH } = await import("@/lib/notifications");
+      const longTag = "a".repeat(TOPIC_MAX_LENGTH + 18);
       await sendPushToUser("user-1", { title: "Test", body: "Body", tag: longTag });
 
       expect(mockSendNotification).toHaveBeenCalledWith(
         expect.any(Object),
         expect.any(String),
-        expect.objectContaining({ topic: "a".repeat(32) })
+        expect.objectContaining({ topic: "a".repeat(TOPIC_MAX_LENGTH) })
       );
     });
 
