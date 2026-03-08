@@ -82,14 +82,14 @@ describe("POST /api/push/subscribe", () => {
     expect(response.status).toBe(403);
   });
 
-  it("returns 401 (not 403) when unauthenticated and CSRF header is missing", async () => {
+  it("returns 401 (not 403) when unauthenticated even if CSRF header is present", async () => {
     mockAuth.mockResolvedValue({ userId: null });
 
     const { POST } = await import("@/app/api/push/subscribe/route");
     const request = createSubscribeRequest(
       "POST",
       { endpoint: TEST_ENDPOINT, keys: { p256dh: "key", auth: "auth" } },
-      { includeCsrfHeader: false }
+      { includeCsrfHeader: true }
     );
 
     const response = await POST(request);

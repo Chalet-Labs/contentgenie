@@ -344,6 +344,32 @@ describe("trigger/helpers/notifications", () => {
       );
     });
 
+    it("strips non-URL-safe-base64 characters from topic per RFC 8030", async () => {
+      mockPushSubsFindMany.mockResolvedValue([
+        {
+          endpoint: "https://push.example.com/1",
+          p256dh: "key1",
+          auth: "auth1",
+        },
+      ]);
+      mockSendNotification.mockResolvedValue({});
+
+      const { sendPushToUser } = await import(
+        "@/trigger/helpers/notifications"
+      );
+      await sendPushToUser("user-1", {
+        title: "Test",
+        body: "Body",
+        tag: "tag:with/invalid chars!",
+      });
+
+      expect(mockSendNotification).toHaveBeenCalledWith(
+        expect.any(Object),
+        expect.any(String),
+        expect.objectContaining({ topic: "tagwithinvalidchars" })
+      );
+    });
+
     it("deletes stale subscriptions on 404 response", async () => {
       mockPushSubsFindMany.mockResolvedValue([
         {
