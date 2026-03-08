@@ -65,6 +65,8 @@ The system already has three dedup mechanisms:
 
 **CSRF:** Option E — Add a custom `X-Requested-With: fetch` header check to the push subscribe/unsubscribe API route. The client (`notification-settings.tsx`) adds the header to its `fetch()` calls. The server rejects requests missing the header with a `403 Forbidden` response.
 
+> **Policy exception:** The CodeGuard guideline (`codeguard-0-client-side-web-security.instructions.md`) recommends framework-native synchronizer tokens on all state-changing requests. This ADR records an approved exception for the push subscribe route: Next.js App Router provides no built-in CSRF token mechanism, and the layered mitigations already in place (`SameSite` cookies, JSON `Content-Type` CORS preflight, no `Access-Control-Allow-*` headers, push endpoint allowlist, 60-second JWT expiry) make a custom header check equivalent in practice for same-origin SPA API calls. The same guideline also endorses custom headers for API mutations in SPA token models, which is the pattern applied here.
+
 ### Design Details
 
 **Topic derivation:** The `tag` field is already URL-safe and descriptive (e.g., `new_episode-42`, `summary_completed-15`). Since `topic` has a 32-character limit and must be URL-safe base64, the tag value is used directly when it fits (most tags are well under 32 chars). No encoding or hashing is needed.
