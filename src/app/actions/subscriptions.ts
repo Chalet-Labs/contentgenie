@@ -4,9 +4,8 @@ import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 import { eq, and, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { users, podcasts, episodes, userSubscriptions } from "@/db/schema";
-import { upsertPodcast } from "@/db/helpers";
-import { getClerkEmail } from "@/lib/clerk-helpers";
+import { podcasts, episodes, userSubscriptions } from "@/db/schema";
+import { upsertPodcast, ensureUserExists } from "@/db/helpers";
 import {
   parsePodcastFeed,
   generatePodcastSyntheticId,
@@ -46,6 +45,8 @@ export async function addPodcastByRssUrl(
   try {
     const syntheticPodcastId = generatePodcastSyntheticId(trimmedUrl);
 
+    await ensureUserExists(userId);
+
     // Check if podcast already exists
     const existingPodcast = await db.query.podcasts.findFirst({
       where: eq(podcasts.podcastIndexId, syntheticPodcastId),
@@ -53,20 +54,6 @@ export async function addPodcastByRssUrl(
     });
 
     if (existingPodcast) {
-      // Podcast exists — just ensure subscription (backfill blank emails)
-      const email = await getClerkEmail(userId);
-      if (email) {
-        await db
-          .insert(users)
-          .values({ id: userId, email })
-          .onConflictDoUpdate({ target: users.id, set: { email } });
-      } else {
-        await db
-          .insert(users)
-          .values({ id: userId, email })
-          .onConflictDoNothing();
-      }
-
       const existingSub = await db.query.userSubscriptions.findFirst({
         where: and(
           eq(userSubscriptions.userId, userId),
@@ -109,20 +96,6 @@ export async function addPodcastByRssUrl(
         error:
           "Could not parse the RSS feed. Check the URL and try again.",
       };
-    }
-
-    // Ensure user exists (backfill blank emails)
-    const email = await getClerkEmail(userId);
-    if (email) {
-      await db
-        .insert(users)
-        .values({ id: userId, email })
-        .onConflictDoUpdate({ target: users.id, set: { email } });
-    } else {
-      await db
-        .insert(users)
-        .values({ id: userId, email })
-        .onConflictDoNothing();
     }
 
     // Insert podcast (onConflictDoNothing handles race conditions)
@@ -243,19 +216,7 @@ export async function subscribeToPodcast(podcastData: PodcastData) {
       return { success: false, error: "Podcast ID and title are required" };
     }
 
-    // Ensure user exists in our database (backfill blank emails)
-    const email = await getClerkEmail(userId);
-    if (email) {
-      await db
-        .insert(users)
-        .values({ id: userId, email, name: null })
-        .onConflictDoUpdate({ target: users.id, set: { email } });
-    } else {
-      await db
-        .insert(users)
-        .values({ id: userId, email, name: null })
-        .onConflictDoNothing();
-    }
+    await ensureUserExists(userId);
 
     const podcastId = await upsertPodcast({
       podcastIndexId: trimmedPodcastIndexId,

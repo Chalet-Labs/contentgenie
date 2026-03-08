@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { db } from "@/db";
-import { users, userSubscriptions } from "@/db/schema";
-import { upsertPodcast } from "@/db/helpers";
+import { userSubscriptions } from "@/db/schema";
+import { upsertPodcast, ensureUserExists } from "@/db/helpers";
 import { revalidatePath } from "next/cache";
-import { getClerkEmail } from "@/lib/clerk-helpers";
-import { subscribeSchema } from "@/lib/schemas/library";
+import { subscribeSchema, safeParseDate } from "@/lib/schemas/library";
 
 export async function POST(request: NextRequest) {
   try {
@@ -53,27 +52,9 @@ export async function POST(request: NextRequest) {
       imageUrl, rssFeedUrl, categories, totalEpisodes, latestEpisodeDate,
     } = result.data;
 
-    let latestEpisodeDateValue: Date | undefined;
-    if (latestEpisodeDate != null) {
-      const d = new Date(latestEpisodeDate);
-      if (!isNaN(d.getTime())) {
-        latestEpisodeDateValue = d;
-      }
-    }
+    const latestEpisodeDateValue = safeParseDate(latestEpisodeDate);
 
-    // Ensure user exists (backfill blank emails on conflict)
-    const email = await getClerkEmail(userId);
-    if (email) {
-      await db
-        .insert(users)
-        .values({ id: userId, email, name: null })
-        .onConflictDoUpdate({ target: users.id, set: { email } });
-    } else {
-      await db
-        .insert(users)
-        .values({ id: userId, email, name: null })
-        .onConflictDoNothing();
-    }
+    await ensureUserExists(userId);
 
     // Upsert podcast
     const podcast = {

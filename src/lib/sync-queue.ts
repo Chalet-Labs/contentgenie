@@ -187,6 +187,26 @@ export async function getActive(): Promise<SyncQueueItem[]> {
     .sort((a, b) => a.createdAt - b.createdAt);
 }
 
+/** Single-pass retrieval of active and failed items (avoids double IDB read). */
+export async function getActiveAndFailed(): Promise<{
+  active: SyncQueueItem[];
+  failed: SyncQueueItem[];
+}> {
+  const allEntries = await getEntries();
+  const active: SyncQueueItem[] = [];
+  const failed: SyncQueueItem[] = [];
+  for (const [, item] of allEntries) {
+    if (item.status === "pending" || item.status === "in-flight") {
+      active.push(item);
+    } else if (item.status === "failed") {
+      failed.push(item);
+    }
+  }
+  active.sort((a, b) => a.createdAt - b.createdAt);
+  failed.sort((a, b) => a.createdAt - b.createdAt);
+  return { active, failed };
+}
+
 export async function resetStaleInFlight(): Promise<void> {
   const allEntries = await getEntries();
   await Promise.all(

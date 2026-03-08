@@ -5,6 +5,7 @@ import React from "react";
 // Mock sync-queue before importing the hook
 const mockGetPending = vi.fn();
 const mockGetActive = vi.fn();
+const mockGetActiveAndFailed = vi.fn();
 const mockDequeue = vi.fn();
 const mockMarkFailed = vi.fn();
 const mockIncrementAttempts = vi.fn();
@@ -15,6 +16,7 @@ const mockGetFailed = vi.fn();
 vi.mock("@/lib/sync-queue", () => ({
   getPending: () => mockGetPending(),
   getActive: () => mockGetActive(),
+  getActiveAndFailed: () => mockGetActiveAndFailed(),
   getFailed: () => mockGetFailed(),
   dequeue: (...args: unknown[]) => mockDequeue(...args),
   markFailed: (...args: unknown[]) => mockMarkFailed(...args),
@@ -30,6 +32,7 @@ beforeEach(async () => {
   vi.clearAllMocks();
   mockGetPending.mockResolvedValue([]);
   mockGetActive.mockResolvedValue([]);
+  mockGetActiveAndFailed.mockResolvedValue({ active: [], failed: [] });
   mockDequeue.mockResolvedValue(undefined);
   mockMarkFailed.mockResolvedValue(undefined);
   mockIncrementAttempts.mockResolvedValue(undefined);
@@ -83,6 +86,7 @@ describe("useSyncQueue — pendingCount", () => {
     ];
     mockGetPending.mockResolvedValue(items);
     mockGetActive.mockResolvedValue(items);
+    mockGetActiveAndFailed.mockResolvedValue({ active: items, failed: [] });
 
     const { useSyncQueue } = await import("@/hooks/use-sync-queue");
     const { result } = renderHook(() => useSyncQueue(), { wrapper });
@@ -115,6 +119,7 @@ describe("useSyncQueue — hasPending", () => {
     };
     mockGetPending.mockResolvedValue([pendingItem]);
     mockGetActive.mockResolvedValue([pendingItem]);
+    mockGetActiveAndFailed.mockResolvedValue({ active: [pendingItem], failed: [] });
 
     const { useSyncQueue } = await import("@/hooks/use-sync-queue");
     const { result } = renderHook(() => useSyncQueue(), { wrapper });
@@ -139,6 +144,7 @@ describe("useSyncQueue — hasPending", () => {
     };
     mockGetPending.mockResolvedValue([pendingItem]);
     mockGetActive.mockResolvedValue([pendingItem]);
+    mockGetActiveAndFailed.mockResolvedValue({ active: [pendingItem], failed: [] });
 
     const { useSyncQueue } = await import("@/hooks/use-sync-queue");
     const { result } = renderHook(() => useSyncQueue(), { wrapper });
@@ -244,15 +250,15 @@ describe("useSyncQueue — SW message handling", () => {
       await new Promise((r) => setTimeout(r, 0));
     });
 
-    const callsBefore = mockGetActive.mock.calls.length;
+    const callsBefore = mockGetActiveAndFailed.mock.calls.length;
 
     await act(async () => {
       dispatchSWMessage({ type: "sync-complete", results: [] });
       await new Promise((r) => setTimeout(r, 10));
     });
 
-    // getActive should have been called again from refreshQueue
-    expect(mockGetActive.mock.calls.length).toBeGreaterThan(callsBefore);
+    // getActiveAndFailed should have been called again from refreshQueue
+    expect(mockGetActiveAndFailed.mock.calls.length).toBeGreaterThan(callsBefore);
   });
 
   it("does not call refreshQueue for unrelated messages", async () => {
@@ -265,15 +271,15 @@ describe("useSyncQueue — SW message handling", () => {
       await new Promise((r) => setTimeout(r, 0));
     });
 
-    const callsBefore = mockGetActive.mock.calls.length;
+    const callsBefore = mockGetActiveAndFailed.mock.calls.length;
 
     await act(async () => {
       dispatchSWMessage({ type: "other-message" });
       await new Promise((r) => setTimeout(r, 10));
     });
 
-    // Should NOT have triggered another getActive call
-    expect(mockGetActive.mock.calls.length).toBe(callsBefore);
+    // Should NOT have triggered another getActiveAndFailed call
+    expect(mockGetActiveAndFailed.mock.calls.length).toBe(callsBefore);
   });
 });
 

@@ -36,22 +36,20 @@ export const unsaveEpisodeSchema = z
   })
   .strip();
 
-export const subscribeSchema = z
-  .object({
-    podcastIndexId: trimmedNonEmpty,
-    title: trimmedNonEmpty,
-    description: optionalText,
-    publisher: optionalShortText,
-    imageUrl: optionalUrl,
-    rssFeedUrl: optionalUrl,
-    categories: z.array(z.string().max(100)).max(50).optional(),
-    totalEpisodes: z.number().int().nonnegative().finite().optional(),
+export const subscribeSchema = podcastSchema
+  .extend({
     latestEpisodeDate: z.iso.datetime({ offset: true }).optional(),
-  })
-  .strip();
+  });
 
 export const unsubscribeSchema = z
   .object({
     podcastIndexId: trimmedNonEmpty,
   })
   .strip();
+
+/** Parse an ISO datetime string into a Date, returning undefined on invalid input. */
+export function safeParseDate(value: string | null | undefined): Date | undefined {
+  if (value == null) return undefined;
+  const d = new Date(value);
+  return isNaN(d.getTime()) ? undefined : d;
+}
