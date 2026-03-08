@@ -2,7 +2,7 @@ import webpush from "web-push";
 import { logger } from "@trigger.dev/sdk";
 import { eq, and, inArray } from "drizzle-orm";
 import { db } from "@/db";
-import { TOPIC_MAX_LENGTH, sanitizeTopic } from "@/lib/notifications";
+import { sanitizeTopic } from "@/lib/notifications";
 import {
   notifications,
   pushSubscriptions,

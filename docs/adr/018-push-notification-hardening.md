@@ -1,6 +1,6 @@
 # ADR-018: Push Notification Hardening — Topic Header and CSRF Custom Header Check
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-03-08
 **Issue:** [#159](https://github.com/Chalet-Labs/contentgenie/issues/159) (PR review findings from #158)
 
@@ -23,7 +23,7 @@ The system already has three dedup mechanisms:
 
 ### Existing CSRF Mitigations
 
-- `SameSite` cookie attribute on Clerk's `__session` cookie (blocks cross-site POST in modern browsers)
+- `SameSite=Lax` cookie attribute on Clerk's `__session` cookie (blocks cross-site POST/DELETE in modern browsers; cookies are only sent on same-site requests or top-level GET navigations)
 - `Content-Type: application/json` header set by client-side `fetch()` calls (triggers CORS preflight for cross-origin requests; not enforced server-side)
 - No `Access-Control-Allow-Origin` headers returned (browser blocks cross-origin preflight)
 - Push endpoint allowlist validation
@@ -49,7 +49,7 @@ The system already has three dedup mechanisms:
 
 #### Option D: Full CSRF token validation (synchronizer token pattern)
 - **Pro:** Maximum protection. Standard OWASP recommendation.
-- **Con:** Requires server-side token generation, storage, and validation. Adds complexity to every request cycle. The existing mitigations (`SameSite`, JSON content type, no CORS headers) already block cross-site requests in practice. No other API routes in the codebase use CSRF tokens.
+- **Con:** Requires server-side token generation, storage, and validation. Adds complexity to every request cycle. Next.js App Router provides no built-in synchronizer token mechanism. For the push subscribe route specifically, the layered mitigations (`SameSite=Lax` cookies, JSON `Content-Type` triggering CORS preflight, no `Access-Control-Allow-*` headers, push endpoint allowlist, 60-second JWT expiry) already block cross-site requests in practice. If a codebase-wide CSRF token policy is adopted in the future, this route should be updated.
 
 #### Option E: Custom header check (`X-Requested-With`) (chosen)
 - **Pro:** OWASP-recommended lightweight defense-in-depth. A custom header cannot be set on cross-origin "simple" requests — it triggers a CORS preflight. Since the server returns no `Access-Control-Allow-*` headers, the preflight fails and the browser blocks the request. One-line check on the server, one-line header addition on the client. Consistent with the existing `Content-Type` check pattern in `api/library/save/route.ts`.
@@ -69,7 +69,7 @@ The system already has three dedup mechanisms:
 
 ### Design Details
 
-**Topic derivation:** The `tag` field is already URL-safe and descriptive (e.g., `new_episode-42`, `summary_completed-15`). Since `topic` has a 32-character limit and must be URL-safe base64, the tag value is used directly when it fits (most tags are well under 32 chars). No encoding or hashing is needed.
+**Topic derivation:** The `tag` field is already URL-safe and descriptive (e.g., `new_episode-42`, `summary_completed-15`). RFC 8030 requires the topic to be URL-safe base64 with a 32-character limit. Since our existing tag format is already URL-safe and alphanumeric, it satisfies this requirement without additional encoding. A shared `sanitizeTopic()` helper strips any non-URL-safe characters and truncates to `TOPIC_MAX_LENGTH` (32 chars); most tags are well under this limit.
 
 **Custom header check:** The `X-Requested-With` check is inlined directly in the POST and DELETE handlers of the push subscribe route. Since only one route needs this check, extracting a shared helper would be premature abstraction. If other routes adopt this pattern in the future, a helper can be extracted then.
 

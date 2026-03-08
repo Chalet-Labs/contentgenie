@@ -168,6 +168,20 @@ describe("DELETE /api/push/subscribe", () => {
     expect(response.status).toBe(403);
   });
 
+  it("returns 401 (not 403) when unauthenticated even if CSRF header is present", async () => {
+    mockAuth.mockResolvedValue({ userId: null });
+
+    const { DELETE } = await import("@/app/api/push/subscribe/route");
+    const request = createSubscribeRequest(
+      "DELETE",
+      { endpoint: TEST_ENDPOINT },
+      { includeCsrfHeader: true }
+    );
+
+    const response = await DELETE(request);
+    expect(response.status).toBe(401);
+  });
+
   it("returns 400 for missing endpoint", async () => {
     const { DELETE } = await import("@/app/api/push/subscribe/route");
     const request = createSubscribeRequest("DELETE", {});
