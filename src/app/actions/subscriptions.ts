@@ -6,6 +6,7 @@ import { eq, and, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { users, podcasts, episodes, userSubscriptions } from "@/db/schema";
 import { upsertPodcast } from "@/db/helpers";
+import { getClerkEmail } from "@/lib/clerk-helpers";
 import {
   parsePodcastFeed,
   generatePodcastSyntheticId,
@@ -53,9 +54,10 @@ export async function addPodcastByRssUrl(
 
     if (existingPodcast) {
       // Podcast exists — just ensure subscription
+      const email = await getClerkEmail(userId);
       await db
         .insert(users)
-        .values({ id: userId, email: "" })
+        .values({ id: userId, email })
         .onConflictDoNothing();
 
       const existingSub = await db.query.userSubscriptions.findFirst({
@@ -103,9 +105,10 @@ export async function addPodcastByRssUrl(
     }
 
     // Ensure user exists
+    const email = await getClerkEmail(userId);
     await db
       .insert(users)
-      .values({ id: userId, email: "" })
+      .values({ id: userId, email })
       .onConflictDoNothing();
 
     // Insert podcast (onConflictDoNothing handles race conditions)
@@ -220,11 +223,12 @@ export async function subscribeToPodcast(podcastData: PodcastData) {
 
   try {
     // Ensure user exists in our database
+    const email = await getClerkEmail(userId);
     await db
       .insert(users)
       .values({
         id: userId,
-        email: "", // Will be updated by webhook or next sync
+        email,
         name: null,
       })
       .onConflictDoNothing();

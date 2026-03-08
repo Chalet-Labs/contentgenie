@@ -6,6 +6,7 @@ import { eq, and, desc, asc, isNotNull, avg, count } from "drizzle-orm";
 import { db } from "@/db";
 import { users, episodes, userLibrary, bookmarks } from "@/db/schema";
 import { upsertPodcast } from "@/db/helpers";
+import { getClerkEmail } from "@/lib/clerk-helpers";
 import {
   LIBRARY_ENTRY_COLUMNS,
   EPISODE_LIST_COLUMNS,
@@ -43,11 +44,12 @@ export async function saveEpisodeToLibrary(episodeData: EpisodeData) {
 
   try {
     // Ensure user exists in our database
+    const email = await getClerkEmail(userId);
     await db
       .insert(users)
       .values({
         id: userId,
-        email: "",
+        email,
         name: null,
       })
       .onConflictDoNothing();

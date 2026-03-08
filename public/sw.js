@@ -8,6 +8,7 @@ const SYNC_DB_NAME = "contentgenie-offline-queue";
 const SYNC_STORE_NAME = "actions";
 const SYNC_TAG = "sync-offline-actions";
 const MAX_RETRY_ATTEMPTS = 3;
+const SYNC_REPLAY_LOCK = "contentgenie-sync-replay";
 
 const ACTION_ROUTES = new Map([
   ["save-episode", "/api/library/save"],
@@ -85,16 +86,41 @@ self.addEventListener("install", (event) => {
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(
-        keys
-          .filter((key) => key !== CACHE_VERSION)
-          .map((key) => caches.delete(key))
-      )
-    )
+    Promise.all([
+      // Clean old caches
+      caches.keys().then((keys) =>
+        Promise.all(
+          keys
+            .filter((key) => key !== CACHE_VERSION)
+            .map((key) => caches.delete(key))
+        )
+      ),
+      // Reset stale in-flight items to pending (SW restart recovery)
+      resetStaleInFlightItems(),
+    ])
   );
   self.clients.claim();
 });
+
+async function resetStaleInFlightItems() {
+  let db;
+  try {
+    db = await openSyncDB();
+  } catch {
+    return;
+  }
+  try {
+    const allEntries = await idbGetAll(db);
+    for (const entry of allEntries) {
+      if (entry.value && entry.value.status === "in-flight") {
+        entry.value.status = "pending";
+        await idbPut(db, entry.key, entry.value);
+      }
+    }
+  } finally {
+    db.close();
+  }
+}
 
 self.addEventListener("fetch", (event) => {
   const { request } = event;
@@ -225,6 +251,22 @@ self.addEventListener("sync", (event) => {
 });
 
 async function handleSync(lastChance = false) {
+  // Use navigator.locks to prevent concurrent replay from SW and client
+  if (typeof navigator !== "undefined" && navigator.locks) {
+    return navigator.locks.request(
+      SYNC_REPLAY_LOCK,
+      { ifAvailable: true },
+      async (lock) => {
+        if (!lock) return; // Another replay is in progress
+        return handleSyncInner(lastChance);
+      }
+    );
+  }
+  // Fallback: proceed without lock (older browsers)
+  return handleSyncInner(lastChance);
+}
+
+async function handleSyncInner(lastChance = false) {
   const results = [];
 
   let db;

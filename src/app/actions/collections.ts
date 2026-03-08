@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { eq, and, desc, count, getTableColumns } from "drizzle-orm";
 import { db } from "@/db";
 import { users, collections, userLibrary, type Collection } from "@/db/schema";
+import { getClerkEmail } from "@/lib/clerk-helpers";
 import {
   LIBRARY_ENTRY_COLUMNS,
   EPISODE_LIST_COLUMNS,
@@ -27,11 +28,12 @@ export async function createCollection(name: string, description?: string) {
 
   try {
     // Ensure user exists in our database
+    const email = await getClerkEmail(userId);
     await db
       .insert(users)
       .values({
         id: userId,
-        email: "",
+        email,
         name: null,
       })
       .onConflictDoNothing();

@@ -9,6 +9,14 @@ vi.mock("@/app/actions/subscriptions", () => ({
   unsubscribeFromPodcast: vi.fn().mockResolvedValue({ success: true }),
 }));
 
+vi.mock("@/hooks/use-sync-queue", () => ({
+  useSyncQueue: () => ({ hasPending: () => false, hasFailed: () => false }),
+}));
+
+vi.mock("@/hooks/use-online-status", () => ({
+  useOnlineStatus: () => true,
+}));
+
 const mockPodcast: Podcast = {
   id: 1,
   podcastIndexId: "12345",

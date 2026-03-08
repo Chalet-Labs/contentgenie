@@ -9,7 +9,7 @@ vi.mock("@/lib/offline-actions", () => ({
 }));
 
 vi.mock("@/hooks/use-sync-queue", () => ({
-  useSyncQueue: () => ({ hasPending: () => false }),
+  useSyncQueue: () => ({ hasPending: () => false, hasFailed: () => false }),
 }));
 
 vi.mock("@/hooks/use-online-status", () => ({

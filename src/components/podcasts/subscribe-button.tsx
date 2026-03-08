@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Rss, Check, Loader2, Clock } from "lucide-react";
+import { Rss, Check, Loader2, Clock, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { useOnlineStatus } from "@/hooks/use-online-status";
@@ -39,12 +39,14 @@ export function SubscribeButton({
   size = "lg",
 }: SubscribeButtonProps) {
   const [isSubscribed, setIsSubscribed] = useState(initialSubscribed);
+  // useState for isLoading (useTransition not viable on React 18)
   const [isLoading, setIsLoading] = useState(false);
   const isOnline = useOnlineStatus();
-  const { hasPending } = useSyncQueue();
+  const { hasPending, hasFailed } = useSyncQueue();
 
   const entityKey = `podcast:${podcastIndexId}`;
   const isPendingSync = hasPending(entityKey);
+  const isFailedSync = hasFailed(entityKey);
 
   const handleToggleSubscription = async () => {
     setIsLoading(true);
@@ -118,9 +120,11 @@ export function SubscribeButton({
           <Check className="mr-2 h-4 w-4" />
         )}
         Subscribed
-        {isPendingSync && (
+        {isFailedSync ? (
+          <span title="Sync failed"><AlertCircle className="ml-1 h-3 w-3 text-destructive" /></span>
+        ) : isPendingSync ? (
           <Clock className="ml-1 h-3 w-3 text-muted-foreground" />
-        )}
+        ) : null}
       </Button>
     );
   }
@@ -133,9 +137,11 @@ export function SubscribeButton({
         <Rss className="mr-2 h-4 w-4" />
       )}
       Subscribe
-      {isPendingSync && (
+      {isFailedSync ? (
+        <span title="Sync failed"><AlertCircle className="ml-1 h-3 w-3 text-destructive" /></span>
+      ) : isPendingSync ? (
         <Clock className="ml-1 h-3 w-3 text-muted-foreground" />
-      )}
+      ) : null}
     </Button>
   );
 }

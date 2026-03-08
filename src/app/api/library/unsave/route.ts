@@ -4,6 +4,7 @@ import { eq, and } from "drizzle-orm";
 import { db } from "@/db";
 import { episodes, userLibrary } from "@/db/schema";
 import { revalidatePath } from "next/cache";
+import { unsaveEpisodeSchema } from "@/lib/schemas/library";
 
 export async function POST(request: NextRequest) {
   try {
@@ -12,7 +13,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
     }
 
-    let body: Record<string, unknown>;
+    let body: unknown;
     try {
       body = await request.json();
     } catch {
@@ -21,14 +22,16 @@ export async function POST(request: NextRequest) {
         { status: 400 },
       );
     }
-    const { podcastIndexId } = body;
 
-    if (!podcastIndexId || typeof podcastIndexId !== "string") {
+    const result = unsaveEpisodeSchema.safeParse(body);
+    if (!result.success) {
       return NextResponse.json(
         { success: false, error: "Invalid episode data: podcastIndexId is required" },
         { status: 400 },
       );
     }
+
+    const { podcastIndexId } = result.data;
 
     const episode = await db.query.episodes.findFirst({
       where: eq(episodes.podcastIndexId, podcastIndexId),

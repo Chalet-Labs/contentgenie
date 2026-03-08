@@ -175,6 +175,23 @@ export async function hasPendingAction(entityKey: string): Promise<boolean> {
   );
 }
 
+export async function getActive(): Promise<SyncQueueItem[]> {
+  const allEntries = await getEntries();
+  return allEntries
+    .map(([, value]) => value)
+    .filter((item) => item.status === "pending" || item.status === "in-flight")
+    .sort((a, b) => a.createdAt - b.createdAt);
+}
+
+export async function resetStaleInFlight(): Promise<void> {
+  const allEntries = await getEntries();
+  for (const [key, value] of allEntries) {
+    if (value.status === "in-flight") {
+      await set(key, { ...value, status: "pending" }, store);
+    }
+  }
+}
+
 export async function clearFailed(): Promise<void> {
   await deleteWhere((item) => item.status === "failed");
 }
