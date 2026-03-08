@@ -10,10 +10,12 @@ const mockMarkFailed = vi.fn();
 const mockIncrementAttempts = vi.fn();
 const mockMarkInFlight = vi.fn();
 const mockResetStaleInFlight = vi.fn();
+const mockGetFailed = vi.fn();
 
 vi.mock("@/lib/sync-queue", () => ({
   getPending: () => mockGetPending(),
   getActive: () => mockGetActive(),
+  getFailed: () => mockGetFailed(),
   dequeue: (...args: unknown[]) => mockDequeue(...args),
   markFailed: (...args: unknown[]) => mockMarkFailed(...args),
   incrementAttempts: (...args: unknown[]) => mockIncrementAttempts(...args),
@@ -33,6 +35,7 @@ beforeEach(async () => {
   mockIncrementAttempts.mockResolvedValue(undefined);
   mockMarkInFlight.mockResolvedValue(undefined);
   mockResetStaleInFlight.mockResolvedValue(undefined);
+  mockGetFailed.mockResolvedValue([]);
 
   Object.defineProperty(navigator, "serviceWorker", {
     value: undefined,

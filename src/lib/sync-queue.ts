@@ -192,6 +192,14 @@ export async function resetStaleInFlight(): Promise<void> {
   }
 }
 
+export async function getFailed(): Promise<SyncQueueItem[]> {
+  const allEntries = await getEntries();
+  return allEntries
+    .map(([, value]) => value)
+    .filter((item) => item.status === "failed")
+    .sort((a, b) => a.createdAt - b.createdAt);
+}
+
 export async function clearFailed(): Promise<void> {
   await deleteWhere((item) => item.status === "failed");
 }

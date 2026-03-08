@@ -11,6 +11,7 @@ import {
 } from "react";
 import {
   getActive,
+  getFailed,
   getPending,
   dequeue,
   markFailed,
@@ -53,13 +54,15 @@ export function SyncQueueProvider({ children }: { children: ReactNode }) {
   const [pendingCount, setPendingCount] = useState(0);
   const [isSyncing, setIsSyncing] = useState(false);
   const [activeItems, setActiveItems] = useState<SyncQueueItem[]>([]);
+  const [failedItems, setFailedItems] = useState<SyncQueueItem[]>([]);
   const isSyncingRef = useRef(false);
 
-  // Refresh counts and active items from IDB (single scan)
+  // Refresh counts, active items, and failed items from IDB
   const refreshQueue = useCallback(async () => {
-    const items = await getActive();
-    setActiveItems(items);
-    setPendingCount(items.filter((i) => i.status === "pending").length);
+    const [active, failed] = await Promise.all([getActive(), getFailed()]);
+    setActiveItems(active);
+    setFailedItems(failed);
+    setPendingCount(active.filter((i) => i.status === "pending").length);
   }, []);
 
   // Shared retry/fail handler for failed replay attempts
@@ -143,11 +146,11 @@ export function SyncQueueProvider({ children }: { children: ReactNode }) {
   // Per-entity failed check
   const hasFailed = useCallback(
     (entityKey: string): boolean => {
-      return activeItems.some(
-        (item) => item.entityKey === entityKey && item.status === "failed",
+      return failedItems.some(
+        (item) => item.entityKey === entityKey,
       );
     },
-    [activeItems],
+    [failedItems],
   );
 
   // Initial load: reset stale in-flight items + event listeners
