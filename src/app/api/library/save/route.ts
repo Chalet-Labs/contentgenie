@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { db } from "@/db";
-import { users, podcasts, episodes, userLibrary } from "@/db/schema";
+import { users, episodes, userLibrary } from "@/db/schema";
+import { upsertPodcast } from "@/db/helpers";
 import { revalidatePath } from "next/cache";
 
 export async function POST(request: NextRequest) {
@@ -71,8 +72,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: "Invalid episode data" }, { status: 400 });
     }
 
-    const podcastIndexId = body.podcastIndexId;
-    const title = body.title;
+    const podcastIndexId = typeof body.podcastIndexId === "string" ? body.podcastIndexId.trim() : body.podcastIndexId;
+    const title = typeof body.title === "string" ? body.title.trim() : body.title;
     const description = typeof body.description === "string" ? body.description : undefined;
     const audioUrl = typeof body.audioUrl === "string" ? body.audioUrl : undefined;
     const duration = typeof body.duration === "number" ? body.duration : undefined;
@@ -122,33 +123,30 @@ export async function POST(request: NextRequest) {
       .values({ id: userId, email: "", name: null })
       .onConflictDoNothing();
 
+    // Trim and validate nested podcast fields before upsert
+    const trimmedPodcastIndexId = (podcast.podcastIndexId as string).trim();
+    const trimmedPodcastTitle = (podcast.title as string).trim();
+
+    if (!trimmedPodcastIndexId || !trimmedPodcastTitle) {
+      return NextResponse.json(
+        { success: false, error: "Invalid episode data" },
+        { status: 400 },
+      );
+    }
+
     // Upsert podcast
-    const [podcastRecord] = await db
-      .insert(podcasts)
-      .values({
-        podcastIndexId: podcast.podcastIndexId,
-        title: podcast.title,
+    const podcastRecord = {
+      id: await upsertPodcast({
+        podcastIndexId: trimmedPodcastIndexId,
+        title: trimmedPodcastTitle,
         description: podcastDescription,
         publisher: podcastPublisher,
         imageUrl: podcastImageUrl,
         rssFeedUrl: podcastRssFeedUrl,
         categories: podcastCategories,
         totalEpisodes: podcastTotalEpisodes,
-      })
-      .onConflictDoUpdate({
-        target: podcasts.podcastIndexId,
-        set: {
-          title: podcast.title,
-          description: podcastDescription,
-          publisher: podcastPublisher,
-          imageUrl: podcastImageUrl,
-          rssFeedUrl: podcastRssFeedUrl,
-          categories: podcastCategories,
-          totalEpisodes: podcastTotalEpisodes,
-          updatedAt: new Date(),
-        },
-      })
-      .returning({ id: podcasts.id });
+      }, { updateOnConflict: false }),
+    };
 
     // Upsert episode
     const [episodeRecord] = await db

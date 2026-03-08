@@ -4,7 +4,8 @@ import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 import { eq, and, desc, asc, isNotNull, avg, count } from "drizzle-orm";
 import { db } from "@/db";
-import { users, podcasts, episodes, userLibrary, bookmarks } from "@/db/schema";
+import { users, episodes, userLibrary, bookmarks } from "@/db/schema";
+import { upsertPodcast } from "@/db/helpers";
 import {
   LIBRARY_ENTRY_COLUMNS,
   EPISODE_LIST_COLUMNS,
@@ -51,36 +52,23 @@ export async function saveEpisodeToLibrary(episodeData: EpisodeData) {
       })
       .onConflictDoNothing();
 
-    // BOLT OPTIMIZATION: Use upsert (onConflictDoUpdate) to consolidate podcast lookup,
-    // insertion, and update into a single database round-trip.
-    const [podcast] = await db
-      .insert(podcasts)
-      .values({
-        podcastIndexId: episodeData.podcast.podcastIndexId,
-        title: episodeData.podcast.title,
-        description: episodeData.podcast.description,
-        publisher: episodeData.podcast.publisher,
-        imageUrl: episodeData.podcast.imageUrl,
-        rssFeedUrl: episodeData.podcast.rssFeedUrl,
-        categories: episodeData.podcast.categories,
-        totalEpisodes: episodeData.podcast.totalEpisodes,
-      })
-      .onConflictDoUpdate({
-        target: podcasts.podcastIndexId,
-        set: {
-          title: episodeData.podcast.title,
-          description: episodeData.podcast.description,
-          publisher: episodeData.podcast.publisher,
-          imageUrl: episodeData.podcast.imageUrl,
-          rssFeedUrl: episodeData.podcast.rssFeedUrl,
-          categories: episodeData.podcast.categories,
-          totalEpisodes: episodeData.podcast.totalEpisodes,
-          updatedAt: new Date(),
-        },
-      })
-      .returning({ id: podcasts.id });
+    const trimmedPodcastIndexId = episodeData.podcast.podcastIndexId.trim();
+    const trimmedPodcastTitle = episodeData.podcast.title.trim();
 
-    const podcastId = podcast.id;
+    if (!trimmedPodcastIndexId || !trimmedPodcastTitle) {
+      return { success: false, error: "Podcast ID and title are required" };
+    }
+
+    const podcastId = await upsertPodcast({
+      podcastIndexId: trimmedPodcastIndexId,
+      title: trimmedPodcastTitle,
+      description: episodeData.podcast.description,
+      publisher: episodeData.podcast.publisher,
+      imageUrl: episodeData.podcast.imageUrl,
+      rssFeedUrl: episodeData.podcast.rssFeedUrl,
+      categories: episodeData.podcast.categories,
+      totalEpisodes: episodeData.podcast.totalEpisodes,
+    }, { updateOnConflict: false });
 
     // BOLT OPTIMIZATION: Use upsert (onConflictDoUpdate) for episodes to consolidate lookup
     // and insertion into one round-trip.

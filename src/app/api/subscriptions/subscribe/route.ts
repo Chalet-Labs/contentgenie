@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { db } from "@/db";
-import { users, podcasts, userSubscriptions } from "@/db/schema";
+import { users, userSubscriptions } from "@/db/schema";
+import { upsertPodcast } from "@/db/helpers";
 import { revalidatePath } from "next/cache";
 
 export async function POST(request: NextRequest) {
@@ -13,7 +14,14 @@ export async function POST(request: NextRequest) {
 
     let body: Record<string, unknown>;
     try {
-      body = await request.json();
+      const parsed: unknown = await request.json();
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+        return NextResponse.json(
+          { success: false, error: "Invalid JSON body" },
+          { status: 400 },
+        );
+      }
+      body = parsed as Record<string, unknown>;
     } catch {
       return NextResponse.json(
         { success: false, error: "Invalid JSON body" },
@@ -21,15 +29,20 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const podcastIndexId = body.podcastIndexId;
-    const title = body.title;
-
     if (
-      !podcastIndexId ||
-      typeof podcastIndexId !== "string" ||
-      !title ||
-      typeof title !== "string"
+      typeof body.podcastIndexId !== "string" ||
+      typeof body.title !== "string"
     ) {
+      return NextResponse.json(
+        { success: false, error: "Invalid podcast data" },
+        { status: 400 },
+      );
+    }
+
+    const podcastIndexId = body.podcastIndexId.trim();
+    const title = body.title.trim();
+
+    if (!podcastIndexId || !title) {
       return NextResponse.json(
         { success: false, error: "Invalid podcast data" },
         { status: 400 },
@@ -60,9 +73,8 @@ export async function POST(request: NextRequest) {
       .onConflictDoNothing();
 
     // Upsert podcast
-    const [podcast] = await db
-      .insert(podcasts)
-      .values({
+    const podcast = {
+      id: await upsertPodcast({
         podcastIndexId,
         title,
         description,
@@ -72,22 +84,8 @@ export async function POST(request: NextRequest) {
         categories,
         totalEpisodes,
         latestEpisodeDate,
-      })
-      .onConflictDoUpdate({
-        target: podcasts.podcastIndexId,
-        set: {
-          title,
-          description,
-          publisher,
-          imageUrl,
-          rssFeedUrl,
-          categories,
-          totalEpisodes,
-          latestEpisodeDate,
-          updatedAt: new Date(),
-        },
-      })
-      .returning({ id: podcasts.id });
+      }, { updateOnConflict: false }),
+    };
 
     // Insert subscription (idempotent)
     const subResult = await db

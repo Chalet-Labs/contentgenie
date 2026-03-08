@@ -2,10 +2,10 @@ import { task, retry, logger, metadata } from "@trigger.dev/sdk";
 import { db } from "@/db";
 import {
   users,
-  podcasts,
   episodes,
   userSubscriptions,
 } from "@/db/schema";
+import { upsertPodcast } from "@/db/helpers";
 import { getPodcastByFeedUrl } from "@/trigger/helpers/podcastindex";
 import {
   parsePodcastFeed,
@@ -143,7 +143,7 @@ async function importSingleFeed(userId: string, feed: OpmlFeed): Promise<void> {
         publisher: piFeed.author,
         imageUrl: piFeed.artwork || piFeed.image,
         rssFeedUrl: piFeed.url || piFeed.originalUrl || feedUrl,
-        categories: piFeed.categories
+        categories: piFeed.categories && Object.keys(piFeed.categories).length > 0
           ? Object.values(piFeed.categories)
           : undefined,
         totalEpisodes: piFeed.episodeCount,
@@ -222,54 +222,4 @@ async function importSingleFeed(userId: string, feed: OpmlFeed): Promise<void> {
     title: parsedFeed.title,
     episodesImported: episodesToInsert.length,
   });
-}
-
-/**
- * Upsert a podcast and return its database ID.
- */
-async function upsertPodcast(data: {
-  podcastIndexId: string;
-  title: string;
-  description?: string;
-  publisher?: string;
-  imageUrl?: string;
-  rssFeedUrl?: string;
-  categories?: string[];
-  totalEpisodes?: number;
-  source: "podcastindex" | "rss";
-}): Promise<number> {
-  const [result] = await db
-    .insert(podcasts)
-    .values({
-      podcastIndexId: data.podcastIndexId,
-      title: data.title,
-      description: data.description,
-      publisher: data.publisher,
-      imageUrl: data.imageUrl,
-      rssFeedUrl: data.rssFeedUrl,
-      categories: data.categories,
-      totalEpisodes: data.totalEpisodes,
-      source: data.source,
-    })
-    .onConflictDoUpdate({
-      target: podcasts.podcastIndexId,
-      set: {
-        title: data.title,
-        description: data.description,
-        publisher: data.publisher,
-        imageUrl: data.imageUrl,
-        rssFeedUrl: data.rssFeedUrl,
-        categories: data.categories,
-        totalEpisodes: data.totalEpisodes,
-        source: data.source,
-        updatedAt: new Date(),
-      },
-    })
-    .returning({ id: podcasts.id });
-
-  if (!result) {
-    throw new Error(`Failed to upsert podcast: ${data.podcastIndexId}`);
-  }
-
-  return result.id;
 }

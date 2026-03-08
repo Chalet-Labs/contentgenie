@@ -102,7 +102,7 @@ describe("saveEpisodeToLibrary", () => {
 
     expect(result.success).toBe(true);
     expect(result.message).toMatch(/saved to library/i);
-    expect(mockOnConflictDoUpdate).toHaveBeenCalledTimes(2); // podcast and episode
+    expect(mockOnConflictDoUpdate).toHaveBeenCalledTimes(2); // podcast (no-op touch) and episode
     expect(mockOnConflictDoNothing).toHaveBeenCalledTimes(2); // user and library
   });
 

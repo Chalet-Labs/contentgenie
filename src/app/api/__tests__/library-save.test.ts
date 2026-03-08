@@ -70,7 +70,7 @@ function setupInsertChains({
           values: vi.fn().mockReturnThis(),
           onConflictDoNothing: vi.fn().mockResolvedValue(undefined),
         };
-      case 2: // podcasts
+      case 2: // podcasts (updateOnConflict: false → no-op touch via onConflictDoUpdate)
         return {
           values: vi.fn().mockReturnThis(),
           onConflictDoUpdate: vi.fn().mockReturnValue({

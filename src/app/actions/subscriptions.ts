@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { eq, and, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { users, podcasts, episodes, userSubscriptions } from "@/db/schema";
+import { upsertPodcast } from "@/db/helpers";
 import {
   parsePodcastFeed,
   generatePodcastSyntheticId,
@@ -228,38 +229,24 @@ export async function subscribeToPodcast(podcastData: PodcastData) {
       })
       .onConflictDoNothing();
 
-    // BOLT OPTIMIZATION: Use upsert (onConflictDoUpdate) to consolidate podcast lookup,
-    // insertion, and update into a single database round-trip.
-    const [podcast] = await db
-      .insert(podcasts)
-      .values({
-        podcastIndexId: podcastData.podcastIndexId,
-        title: podcastData.title,
-        description: podcastData.description,
-        publisher: podcastData.publisher,
-        imageUrl: podcastData.imageUrl,
-        rssFeedUrl: podcastData.rssFeedUrl,
-        categories: podcastData.categories,
-        totalEpisodes: podcastData.totalEpisodes,
-        latestEpisodeDate: podcastData.latestEpisodeDate,
-      })
-      .onConflictDoUpdate({
-        target: podcasts.podcastIndexId,
-        set: {
-          title: podcastData.title,
-          description: podcastData.description,
-          publisher: podcastData.publisher,
-          imageUrl: podcastData.imageUrl,
-          rssFeedUrl: podcastData.rssFeedUrl,
-          categories: podcastData.categories,
-          totalEpisodes: podcastData.totalEpisodes,
-          latestEpisodeDate: podcastData.latestEpisodeDate,
-          updatedAt: new Date(),
-        },
-      })
-      .returning({ id: podcasts.id });
+    const trimmedPodcastIndexId = podcastData.podcastIndexId.trim();
+    const trimmedPodcastTitle = podcastData.title.trim();
 
-    const podcastId = podcast.id;
+    if (!trimmedPodcastIndexId || !trimmedPodcastTitle) {
+      return { success: false, error: "Podcast ID and title are required" };
+    }
+
+    const podcastId = await upsertPodcast({
+      podcastIndexId: trimmedPodcastIndexId,
+      title: trimmedPodcastTitle,
+      description: podcastData.description,
+      publisher: podcastData.publisher,
+      imageUrl: podcastData.imageUrl,
+      rssFeedUrl: podcastData.rssFeedUrl,
+      categories: podcastData.categories,
+      totalEpisodes: podcastData.totalEpisodes,
+      latestEpisodeDate: podcastData.latestEpisodeDate,
+    }, { updateOnConflict: false });
 
     // BOLT OPTIMIZATION: Use onConflictDoNothing to handle already subscribed case in one query.
     // This replaces a separate existence check and reduces total round-trips from ~5 to 3.

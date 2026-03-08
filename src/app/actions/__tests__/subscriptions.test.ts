@@ -274,8 +274,8 @@ describe("subscribeToPodcast", () => {
 
     expect(result.success).toBe(true);
     expect(result.message).toMatch(/subscribed successfully/i);
-    expect(mockOnConflictDoUpdate).toHaveBeenCalled();
-    expect(mockOnConflictDoNothing).toHaveBeenCalled();
+    expect(mockOnConflictDoUpdate).toHaveBeenCalledTimes(1); // podcast (no-op touch)
+    expect(mockOnConflictDoNothing).toHaveBeenCalledTimes(2); // user and subscription
   });
 
   it("handles already subscribed case correctly", async () => {
