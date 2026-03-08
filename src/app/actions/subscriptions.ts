@@ -53,12 +53,19 @@ export async function addPodcastByRssUrl(
     });
 
     if (existingPodcast) {
-      // Podcast exists — just ensure subscription
+      // Podcast exists — just ensure subscription (backfill blank emails)
       const email = await getClerkEmail(userId);
-      await db
-        .insert(users)
-        .values({ id: userId, email })
-        .onConflictDoNothing();
+      if (email) {
+        await db
+          .insert(users)
+          .values({ id: userId, email })
+          .onConflictDoUpdate({ target: users.id, set: { email } });
+      } else {
+        await db
+          .insert(users)
+          .values({ id: userId, email })
+          .onConflictDoNothing();
+      }
 
       const existingSub = await db.query.userSubscriptions.findFirst({
         where: and(
@@ -104,12 +111,19 @@ export async function addPodcastByRssUrl(
       };
     }
 
-    // Ensure user exists
+    // Ensure user exists (backfill blank emails)
     const email = await getClerkEmail(userId);
-    await db
-      .insert(users)
-      .values({ id: userId, email })
-      .onConflictDoNothing();
+    if (email) {
+      await db
+        .insert(users)
+        .values({ id: userId, email })
+        .onConflictDoUpdate({ target: users.id, set: { email } });
+    } else {
+      await db
+        .insert(users)
+        .values({ id: userId, email })
+        .onConflictDoNothing();
+    }
 
     // Insert podcast (onConflictDoNothing handles race conditions)
     const insertResult = await db
@@ -222,22 +236,25 @@ export async function subscribeToPodcast(podcastData: PodcastData) {
   }
 
   try {
-    // Ensure user exists in our database
-    const email = await getClerkEmail(userId);
-    await db
-      .insert(users)
-      .values({
-        id: userId,
-        email,
-        name: null,
-      })
-      .onConflictDoNothing();
-
     const trimmedPodcastIndexId = podcastData.podcastIndexId.trim();
     const trimmedPodcastTitle = podcastData.title.trim();
 
     if (!trimmedPodcastIndexId || !trimmedPodcastTitle) {
       return { success: false, error: "Podcast ID and title are required" };
+    }
+
+    // Ensure user exists in our database (backfill blank emails)
+    const email = await getClerkEmail(userId);
+    if (email) {
+      await db
+        .insert(users)
+        .values({ id: userId, email, name: null })
+        .onConflictDoUpdate({ target: users.id, set: { email } });
+    } else {
+      await db
+        .insert(users)
+        .values({ id: userId, email, name: null })
+        .onConflictDoNothing();
     }
 
     const podcastId = await upsertPodcast({

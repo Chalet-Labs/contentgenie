@@ -115,12 +115,20 @@ describe("saveEpisodeSchema", () => {
     expect(result.success).toBe(false);
   });
 
-  it("accepts string publishDate", () => {
+  it("accepts ISO datetime publishDate", () => {
     const result = saveEpisodeSchema.safeParse({
       ...validPayload,
-      publishDate: "2024-06-01",
+      publishDate: "2024-06-01T00:00:00Z",
     });
     expect(result.success).toBe(true);
+  });
+
+  it("rejects malformed publishDate", () => {
+    const result = saveEpisodeSchema.safeParse({
+      ...validPayload,
+      publishDate: "not-a-date",
+    });
+    expect(result.success).toBe(false);
   });
 
   it("requires duration to be a finite number", () => {
@@ -238,9 +246,17 @@ describe("subscribeSchema", () => {
       rssFeedUrl: "https://example.com/feed.xml",
       categories: ["Tech"],
       totalEpisodes: 50,
-      latestEpisodeDate: "2024-06-01",
+      latestEpisodeDate: "2024-06-01T00:00:00Z",
     });
     expect(result.success).toBe(true);
+  });
+
+  it("rejects malformed latestEpisodeDate", () => {
+    const result = subscribeSchema.safeParse({
+      ...validPayload,
+      latestEpisodeDate: "not-a-date",
+    });
+    expect(result.success).toBe(false);
   });
 
   it("trims podcastIndexId and title", () => {

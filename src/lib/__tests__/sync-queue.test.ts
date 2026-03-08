@@ -12,6 +12,7 @@ import {
   getQueueCount,
   hasPendingAction,
   clearFailed,
+  getFailed,
   resetStaleInFlight,
   _resetForTesting,
   type SyncQueueItem,
@@ -332,6 +333,10 @@ describe("resetStaleInFlight", () => {
     // Failed item should still be failed, not reset to pending
     const pending = await getPending();
     expect(pending).toHaveLength(0);
+    const failed = await getFailed();
+    expect(failed).toHaveLength(1);
+    expect(failed[0].id).toBe(id);
+    expect(failed[0].status).toBe("failed");
   });
 });
 

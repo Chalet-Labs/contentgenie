@@ -13,6 +13,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
     }
 
+    const contentType = request.headers.get("content-type")?.toLowerCase() ?? "";
+    if (!contentType.includes("application/json")) {
+      return NextResponse.json(
+        { success: false, error: "Unsupported Media Type" },
+        { status: 415 },
+      );
+    }
+
+    const accept = request.headers.get("accept")?.toLowerCase() ?? "*/*";
+    if (!accept.includes("application/json") && !accept.includes("*/*")) {
+      return NextResponse.json(
+        { success: false, error: "Not Acceptable" },
+        { status: 406 },
+      );
+    }
+
     let body: unknown;
     try {
       body = await request.json();

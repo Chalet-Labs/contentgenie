@@ -27,16 +27,19 @@ export async function createCollection(name: string, description?: string) {
   }
 
   try {
-    // Ensure user exists in our database
+    // Ensure user exists in our database (backfill blank emails on conflict)
     const email = await getClerkEmail(userId);
-    await db
-      .insert(users)
-      .values({
-        id: userId,
-        email,
-        name: null,
-      })
-      .onConflictDoNothing();
+    if (email) {
+      await db
+        .insert(users)
+        .values({ id: userId, email, name: null })
+        .onConflictDoUpdate({ target: users.id, set: { email } });
+    } else {
+      await db
+        .insert(users)
+        .values({ id: userId, email, name: null })
+        .onConflictDoNothing();
+    }
 
     const [newCollection] = await db
       .insert(collections)

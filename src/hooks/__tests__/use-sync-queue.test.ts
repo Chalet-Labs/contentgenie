@@ -371,10 +371,11 @@ describe("useSyncQueue — navigator.locks coordination", () => {
     // Mock navigator.locks where lock is unavailable (ifAvailable: true returns null)
     Object.defineProperty(navigator, "locks", {
       value: {
-        request: vi.fn(
-          (_name: string, _options: { ifAvailable: boolean }, callback: (lock: null) => Promise<void>) =>
-            callback(null)
-        ),
+        request: vi.fn((...args: unknown[]) => {
+          // Support both 2-arg (name, callback) and 3-arg (name, options, callback) forms
+          const callback = (args.length === 3 ? args[2] : args[1]) as (lock: unknown) => Promise<void>;
+          return callback(null);
+        }),
       },
       configurable: true,
       writable: true,
@@ -412,10 +413,11 @@ describe("useSyncQueue — navigator.locks coordination", () => {
     // Mock navigator.locks where lock IS available
     Object.defineProperty(navigator, "locks", {
       value: {
-        request: vi.fn(
-          (_name: string, _options: { ifAvailable: boolean }, callback: (lock: object) => Promise<void>) =>
-            callback({}) // non-null lock = acquired
-        ),
+        request: vi.fn((...args: unknown[]) => {
+          // Support both 2-arg (name, callback) and 3-arg (name, options, callback) forms
+          const callback = (args.length === 3 ? args[2] : args[1]) as (lock: unknown) => Promise<void>;
+          return callback({}); // non-null lock = acquired
+        }),
       },
       configurable: true,
       writable: true,

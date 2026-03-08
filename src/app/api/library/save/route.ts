@@ -58,12 +58,19 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Ensure user exists
+    // Ensure user exists (backfill blank emails on conflict)
     const email = await getClerkEmail(userId);
-    await db
-      .insert(users)
-      .values({ id: userId, email, name: null })
-      .onConflictDoNothing();
+    if (email) {
+      await db
+        .insert(users)
+        .values({ id: userId, email, name: null })
+        .onConflictDoUpdate({ target: users.id, set: { email } });
+    } else {
+      await db
+        .insert(users)
+        .values({ id: userId, email, name: null })
+        .onConflictDoNothing();
+    }
 
     // Upsert podcast
     const podcastRecord = {

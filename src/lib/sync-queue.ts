@@ -75,9 +75,11 @@ async function updateItem(
 /** Delete all entries matching predicate. */
 async function deleteWhere(predicate: (item: SyncQueueItem) => boolean): Promise<void> {
   const allEntries = await getEntries();
-  for (const [key, value] of allEntries) {
-    if (predicate(value)) await del(key, store);
-  }
+  await Promise.all(
+    allEntries
+      .filter(([, value]) => predicate(value))
+      .map(([key]) => del(key, store)),
+  );
 }
 
 // ─── Queue CRUD ───────────────────────────────────────────────────────────────
@@ -96,14 +98,16 @@ export async function enqueue(
   const allEntries = await entries<string, SyncQueueItem>(store);
 
   for (const [key, value] of allEntries) {
-    if (
-      value.entityKey === item.entityKey &&
-      value.action === opposite &&
-      value.status === "pending"
-    ) {
-      // Cancel opposite action — net zero
-      await del(key, store);
-      return null;
+    if (value.entityKey === item.entityKey) {
+      if (value.action === opposite && value.status === "pending") {
+        // Cancel opposite action — net zero
+        await del(key, store);
+        return null;
+      }
+      if (value.status === "failed") {
+        // Clear stale failed items — new action supersedes old failure
+        await del(key, store);
+      }
     }
   }
 
@@ -185,11 +189,11 @@ export async function getActive(): Promise<SyncQueueItem[]> {
 
 export async function resetStaleInFlight(): Promise<void> {
   const allEntries = await getEntries();
-  for (const [key, value] of allEntries) {
-    if (value.status === "in-flight") {
-      await set(key, { ...value, status: "pending" }, store);
-    }
-  }
+  await Promise.all(
+    allEntries
+      .filter(([, value]) => value.status === "in-flight")
+      .map(([key, value]) => set(key, { ...value, status: "pending" }, store)),
+  );
 }
 
 export async function getFailed(): Promise<SyncQueueItem[]> {

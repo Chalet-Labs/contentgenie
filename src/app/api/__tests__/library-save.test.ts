@@ -70,10 +70,11 @@ function setupInsertChains({
   mockInsert.mockImplementation(() => {
     callCount++;
     switch (callCount) {
-      case 1: // users
+      case 1: // users (onConflictDoUpdate when email non-empty, onConflictDoNothing otherwise)
         return {
           values: vi.fn().mockReturnThis(),
           onConflictDoNothing: vi.fn().mockResolvedValue(undefined),
+          onConflictDoUpdate: vi.fn().mockResolvedValue(undefined),
         };
       case 2: // podcasts (updateOnConflict: false → no-op touch via onConflictDoUpdate)
         return {
@@ -190,6 +191,7 @@ describe("POST /api/library/save", () => {
         return {
           values: vi.fn().mockReturnThis(),
           onConflictDoNothing: vi.fn().mockResolvedValue(undefined),
+          onConflictDoUpdate: vi.fn().mockResolvedValue(undefined),
         };
       }
       // podcasts insert — throws

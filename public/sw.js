@@ -96,7 +96,10 @@ self.addEventListener("activate", (event) => {
         )
       ),
       // Reset stale in-flight items to pending (SW restart recovery)
-      resetStaleInFlightItems(),
+      // Acquire replay lock to prevent racing with an in-progress replay
+      navigator.locks
+        ? navigator.locks.request(SYNC_REPLAY_LOCK, () => resetStaleInFlightItems())
+        : resetStaleInFlightItems(),
     ])
   );
   self.clients.claim();

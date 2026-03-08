@@ -155,7 +155,18 @@ export function SyncQueueProvider({ children }: { children: ReactNode }) {
 
   // Initial load: reset stale in-flight items + event listeners
   useEffect(() => {
-    void resetStaleInFlight().then(() => refreshQueue());
+    // Acquire replay lock before resetting to avoid racing with an in-progress replay
+    const doReset = async () => {
+      if (typeof navigator !== "undefined" && navigator.locks) {
+        await navigator.locks.request(SYNC_REPLAY_LOCK, async () => {
+          await resetStaleInFlight();
+        });
+      } else {
+        await resetStaleInFlight();
+      }
+      await refreshQueue();
+    };
+    void doReset();
 
     // Online event: fallback replay for Safari/Firefox
     const handleOnline = () => {
