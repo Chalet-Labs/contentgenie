@@ -178,6 +178,24 @@ describe("saveEpisodeSchema", () => {
     }
   });
 
+  it("treats empty-string URLs as undefined (RSS feed compat)", () => {
+    const result = saveEpisodeSchema.safeParse({
+      ...validPayload,
+      audioUrl: "",
+      podcast: {
+        ...validPayload.podcast,
+        imageUrl: "",
+        rssFeedUrl: "",
+      },
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.audioUrl).toBeUndefined();
+      expect(result.data.podcast.imageUrl).toBeUndefined();
+      expect(result.data.podcast.rssFeedUrl).toBeUndefined();
+    }
+  });
+
   it("requires totalEpisodes to be a finite number in podcast", () => {
     const result = saveEpisodeSchema.safeParse({
       ...validPayload,

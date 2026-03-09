@@ -106,6 +106,8 @@ self.addEventListener("activate", (event) => {
 });
 
 async function resetStaleInFlightItems() {
+  const IN_FLIGHT_LEASE_MS = 30000; // must match src/lib/sync-queue.ts
+  const now = Date.now();
   let db;
   try {
     db = await openSyncDB();
@@ -116,8 +118,11 @@ async function resetStaleInFlightItems() {
     const allEntries = await idbGetAll(db);
     for (const entry of allEntries) {
       if (entry.value && entry.value.status === "in-flight") {
-        entry.value.status = "pending";
-        await idbPut(db, entry.key, entry.value);
+        // Only reset items whose lease has expired (missing inFlightAt = legacy, treat as expired)
+        if (!entry.value.inFlightAt || now - entry.value.inFlightAt >= IN_FLIGHT_LEASE_MS) {
+          entry.value.status = "pending";
+          await idbPut(db, entry.key, entry.value);
+        }
       }
     }
   } finally {

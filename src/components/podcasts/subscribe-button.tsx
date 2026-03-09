@@ -121,7 +121,10 @@ export function SubscribeButton({
         )}
         Subscribed
         {isFailedSync ? (
-          <span title="Sync failed"><AlertCircle className="ml-1 h-3 w-3 text-destructive" /></span>
+          <>
+            <span className="sr-only">Sync failed</span>
+            <AlertCircle aria-hidden="true" className="ml-1 h-3 w-3 text-destructive" />
+          </>
         ) : isPendingSync ? (
           <Clock className="ml-1 h-3 w-3 text-muted-foreground" />
         ) : null}
@@ -138,7 +141,10 @@ export function SubscribeButton({
       )}
       Subscribe
       {isFailedSync ? (
-        <span title="Sync failed"><AlertCircle className="ml-1 h-3 w-3 text-destructive" /></span>
+        <>
+          <span className="sr-only">Sync failed</span>
+          <AlertCircle aria-hidden="true" className="ml-1 h-3 w-3 text-destructive" />
+        </>
       ) : isPendingSync ? (
         <Clock className="ml-1 h-3 w-3 text-muted-foreground" />
       ) : null}

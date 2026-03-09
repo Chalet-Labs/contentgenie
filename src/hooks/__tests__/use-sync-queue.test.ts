@@ -97,6 +97,61 @@ describe("useSyncQueue — pendingCount", () => {
   });
 });
 
+describe("useSyncQueue — in-flight items in pendingCount", () => {
+  it("includes in-flight items in pendingCount", async () => {
+    const pendingItems = [
+      { id: "a", action: "save-episode" as const, entityKey: "episode:1", payload: {}, createdAt: 1, attempts: 0, status: "pending" as const },
+      { id: "b", action: "subscribe" as const, entityKey: "podcast:2", payload: {}, createdAt: 2, attempts: 0, status: "pending" as const },
+    ];
+    const inFlightItem = { id: "c", action: "save-episode" as const, entityKey: "episode:3", payload: {}, createdAt: 3, attempts: 0, status: "in-flight" as const, inFlightAt: Date.now() };
+    const allActive = [...pendingItems, inFlightItem];
+
+    mockGetPending.mockResolvedValue(pendingItems);
+    mockGetActive.mockResolvedValue(allActive);
+    mockGetActiveAndFailed.mockResolvedValue({ active: allActive, failed: [] });
+
+    const { useSyncQueue } = await import("@/hooks/use-sync-queue");
+    const { result } = renderHook(() => useSyncQueue(), { wrapper });
+
+    await waitFor(() => {
+      expect(result.current.pendingCount).toBe(3); // 2 pending + 1 in-flight
+    });
+    expect(result.current.hasPending("episode:3")).toBe(true); // in-flight counts as pending
+  });
+});
+
+describe("useSyncQueue — hasFailed", () => {
+  it("hasFailed returns true when entity has a failed item", async () => {
+    const failedItem = {
+      id: "f1",
+      action: "save-episode" as const,
+      entityKey: "episode:fail-1",
+      payload: {},
+      createdAt: Date.now(),
+      attempts: 3,
+      status: "failed" as const,
+    };
+    mockGetActiveAndFailed.mockResolvedValue({ active: [], failed: [failedItem] });
+    mockGetFailed.mockResolvedValue([failedItem]);
+
+    const { useSyncQueue } = await import("@/hooks/use-sync-queue");
+    const { result } = renderHook(() => useSyncQueue(), { wrapper });
+
+    await waitFor(() => {
+      expect(result.current.hasFailed("episode:fail-1")).toBe(true);
+    });
+  });
+
+  it("hasFailed returns false when entity has no failed items", async () => {
+    const { useSyncQueue } = await import("@/hooks/use-sync-queue");
+    const { result } = renderHook(() => useSyncQueue(), { wrapper });
+
+    await waitFor(() => {
+      expect(result.current.hasFailed("episode:none")).toBe(false);
+    });
+  });
+});
+
 describe("useSyncQueue — hasPending", () => {
   it("hasPending returns false when queue is empty", async () => {
     const { useSyncQueue } = await import("@/hooks/use-sync-queue");
@@ -374,13 +429,18 @@ describe("useSyncQueue — 401 drain on replayAll", () => {
 
 describe("useSyncQueue — navigator.locks coordination", () => {
   it("skips replay when navigator.locks.request cannot acquire lock", async () => {
-    // Mock navigator.locks where lock is unavailable (ifAvailable: true returns null)
+    // Mock navigator.locks — handles both 2-arg (reset) and 3-arg (replay) forms
     Object.defineProperty(navigator, "locks", {
       value: {
         request: vi.fn((...args: unknown[]) => {
-          // Support both 2-arg (name, callback) and 3-arg (name, options, callback) forms
-          const callback = (args.length === 3 ? args[2] : args[1]) as (lock: unknown) => Promise<void>;
-          return callback(null);
+          if (args.length === 3) {
+            // Replay: assert lock contract
+            expect(args[0]).toBe("contentgenie-sync-replay");
+            expect(args[1]).toEqual({ ifAvailable: true });
+            return (args[2] as (lock: unknown) => Promise<void>)(null);
+          }
+          // Mount-time reset: 2-arg form
+          return (args[1] as () => Promise<void>)();
         }),
       },
       configurable: true,
@@ -416,13 +476,18 @@ describe("useSyncQueue — navigator.locks coordination", () => {
   });
 
   it("proceeds with replay when navigator.locks.request acquires lock", async () => {
-    // Mock navigator.locks where lock IS available
+    // Mock navigator.locks — handles both 2-arg (reset) and 3-arg (replay) forms
     Object.defineProperty(navigator, "locks", {
       value: {
         request: vi.fn((...args: unknown[]) => {
-          // Support both 2-arg (name, callback) and 3-arg (name, options, callback) forms
-          const callback = (args.length === 3 ? args[2] : args[1]) as (lock: unknown) => Promise<void>;
-          return callback({}); // non-null lock = acquired
+          if (args.length === 3) {
+            // Replay: assert lock contract
+            expect(args[0]).toBe("contentgenie-sync-replay");
+            expect(args[1]).toEqual({ ifAvailable: true });
+            return (args[2] as (lock: unknown) => Promise<void>)({}); // non-null = acquired
+          }
+          // Mount-time reset: 2-arg form
+          return (args[1] as () => Promise<void>)();
         }),
       },
       configurable: true,
