@@ -311,7 +311,10 @@ async function handleSyncInner(lastChance = false) {
       try {
         const response = await fetch(route, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
           credentials: "include",
           body: JSON.stringify(item.payload),
         });
