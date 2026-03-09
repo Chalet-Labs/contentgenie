@@ -1,3 +1,4 @@
+import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { users, podcasts } from "@/db/schema";
 import { getClerkEmail } from "@/lib/clerk-helpers";
@@ -7,6 +8,13 @@ import { getClerkEmail } from "@/lib/clerk-helpers";
  * Safe to call on every mutation — uses INSERT ON CONFLICT.
  */
 export async function ensureUserExists(userId: string): Promise<void> {
+  // Fast path: skip Clerk lookup if user already exists with a non-empty email
+  const existing = await db.query.users.findFirst({
+    where: eq(users.id, userId),
+    columns: { email: true },
+  });
+  if (existing?.email) return;
+
   const email = await getClerkEmail(userId);
   if (email) {
     await db

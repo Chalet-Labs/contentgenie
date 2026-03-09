@@ -25,6 +25,9 @@ const mockInsert = vi.fn();
 
 vi.mock("@/db", () => ({
   db: {
+    query: {
+      users: { findFirst: vi.fn() },
+    },
     insert: (...args: unknown[]) => mockInsert(...args),
   },
 }));

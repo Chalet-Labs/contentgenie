@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import "fake-indexeddb/auto";
 import {
   enqueue,
@@ -301,7 +301,7 @@ describe("getActive", () => {
 });
 
 describe("resetStaleInFlight", () => {
-  it("resets all in-flight items to pending", async () => {
+  it("resets expired in-flight items to pending", async () => {
     const id1 = await enqueue({ action: "save-episode", entityKey: "episode:1", payload: {} });
     const id2 = await enqueue({ action: "subscribe", entityKey: "podcast:2", payload: {} });
     expect(id1).not.toBeNull();
@@ -309,11 +309,31 @@ describe("resetStaleInFlight", () => {
     await markInFlight(id1 as string);
     await markInFlight(id2 as string);
 
+    // Advance time past the 30s lease
+    const now = Date.now();
+    vi.spyOn(Date, "now").mockReturnValue(now + 31_000);
+
     await resetStaleInFlight();
 
     const pending = await getPending();
     expect(pending).toHaveLength(2);
     expect(pending.every((i: SyncQueueItem) => i.status === "pending")).toBe(true);
+    vi.restoreAllMocks();
+  });
+
+  it("does not reset fresh in-flight items", async () => {
+    const id = await enqueue({ action: "save-episode", entityKey: "episode:1", payload: {} });
+    expect(id).not.toBeNull();
+    await markInFlight(id as string);
+
+    // No time advance — item is within lease
+    await resetStaleInFlight();
+
+    const pending = await getPending();
+    expect(pending).toHaveLength(0);
+    const active = await getActive();
+    expect(active).toHaveLength(1);
+    expect(active[0].status).toBe("in-flight");
   });
 
   it("does not touch pending items", async () => {

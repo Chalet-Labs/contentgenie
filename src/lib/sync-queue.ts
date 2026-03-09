@@ -3,6 +3,7 @@ import { get, set, del, entries, clear, createStore } from "idb-keyval";
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const MAX_QUEUE_SIZE = 100;
+const IN_FLIGHT_LEASE_MS = 30_000; // 30s — items in-flight longer than this are considered stale
 export const SYNC_TAG = "sync-offline-actions";
 
 // ─── Custom Store ─────────────────────────────────────────────────────────────
@@ -20,6 +21,7 @@ export interface SyncQueueItem {
   createdAt: number;
   attempts: number;
   status: "pending" | "in-flight" | "failed";
+  inFlightAt?: number; // timestamp when item entered in-flight status
 }
 
 type SyncAction = SyncQueueItem["action"];
@@ -156,7 +158,7 @@ export async function getPending(): Promise<SyncQueueItem[]> {
 }
 
 export async function markInFlight(id: string): Promise<void> {
-  await updateItem(id, { status: "in-flight" });
+  await updateItem(id, { status: "in-flight", inFlightAt: Date.now() });
 }
 
 export async function markFailed(id: string): Promise<void> {
@@ -208,10 +210,15 @@ export async function getActiveAndFailed(): Promise<{
 }
 
 export async function resetStaleInFlight(): Promise<void> {
+  const now = Date.now();
   const allEntries = await getEntries();
   await Promise.all(
     allEntries
-      .filter(([, value]) => value.status === "in-flight")
+      .filter(([, value]) => {
+        if (value.status !== "in-flight") return false;
+        // Missing inFlightAt means legacy entry — treat as expired
+        return !value.inFlightAt || now - value.inFlightAt >= IN_FLIGHT_LEASE_MS;
+      })
       .map(([key, value]) => set(key, { ...value, status: "pending" }, store)),
   );
 }

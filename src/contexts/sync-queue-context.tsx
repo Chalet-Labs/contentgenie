@@ -167,6 +167,10 @@ export function SyncQueueProvider({ children }: { children: ReactNode }) {
         await resetStaleInFlight();
       }
       await refreshQueue();
+      // Replay immediately if already online — no "online" event will fire
+      if (typeof navigator !== "undefined" && navigator.onLine) {
+        void replayAll();
+      }
     };
     void doReset();
 
