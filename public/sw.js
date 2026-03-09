@@ -305,6 +305,7 @@ async function handleSyncInner(lastChance = false) {
 
       // Mark in-flight
       item.status = "in-flight";
+      item.inFlightAt = Date.now();
       await idbPut(db, key, item);
 
       try {
