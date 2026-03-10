@@ -261,12 +261,19 @@ self.addEventListener("sync", (event) => {
 async function handleSync(lastChance = false) {
   // Use navigator.locks to prevent concurrent replay from SW and client
   if (typeof navigator !== "undefined" && navigator.locks) {
+    // On lastChance (browser's final sync attempt), wait for the lock instead
+    // of skipping — otherwise pending items are stranded until app reopens.
+    if (lastChance) {
+      return navigator.locks.request(SYNC_REPLAY_LOCK, () =>
+        handleSyncInner(true)
+      );
+    }
     return navigator.locks.request(
       SYNC_REPLAY_LOCK,
       { ifAvailable: true },
       async (lock) => {
         if (!lock) return; // Another replay is in progress
-        return handleSyncInner(lastChance);
+        return handleSyncInner(false);
       }
     );
   }
