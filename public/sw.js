@@ -8,6 +8,7 @@ const SYNC_DB_NAME = "contentgenie-offline-queue";
 const SYNC_STORE_NAME = "actions";
 const SYNC_TAG = "sync-offline-actions";
 const MAX_RETRY_ATTEMPTS = 3;
+const SYNC_REPLAY_LOCK = "contentgenie-sync-replay";
 
 const ACTION_ROUTES = new Map([
   ["save-episode", "/api/library/save"],
@@ -85,16 +86,49 @@ self.addEventListener("install", (event) => {
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(
-        keys
-          .filter((key) => key !== CACHE_VERSION)
-          .map((key) => caches.delete(key))
-      )
-    )
+    Promise.all([
+      // Clean old caches
+      caches.keys().then((keys) =>
+        Promise.all(
+          keys
+            .filter((key) => key !== CACHE_VERSION)
+            .map((key) => caches.delete(key))
+        )
+      ),
+      // Reset stale in-flight items to pending (SW restart recovery)
+      // Acquire replay lock to prevent racing with an in-progress replay
+      navigator.locks
+        ? navigator.locks.request(SYNC_REPLAY_LOCK, () => resetStaleInFlightItems())
+        : resetStaleInFlightItems(),
+    ])
   );
   self.clients.claim();
 });
+
+async function resetStaleInFlightItems() {
+  const IN_FLIGHT_LEASE_MS = 30000; // must match src/lib/sync-queue.ts
+  const now = Date.now();
+  let db;
+  try {
+    db = await openSyncDB();
+  } catch {
+    return;
+  }
+  try {
+    const allEntries = await idbGetAll(db);
+    for (const entry of allEntries) {
+      if (entry.value && entry.value.status === "in-flight") {
+        // Only reset items whose lease has expired (missing inFlightAt = legacy, treat as expired)
+        if (!entry.value.inFlightAt || now - entry.value.inFlightAt >= IN_FLIGHT_LEASE_MS) {
+          entry.value.status = "pending";
+          await idbPut(db, entry.key, entry.value);
+        }
+      }
+    }
+  } finally {
+    db.close();
+  }
+}
 
 self.addEventListener("fetch", (event) => {
   const { request } = event;
@@ -225,6 +259,29 @@ self.addEventListener("sync", (event) => {
 });
 
 async function handleSync(lastChance = false) {
+  // Use navigator.locks to prevent concurrent replay from SW and client
+  if (typeof navigator !== "undefined" && navigator.locks) {
+    // On lastChance (browser's final sync attempt), wait for the lock instead
+    // of skipping — otherwise pending items are stranded until app reopens.
+    if (lastChance) {
+      return navigator.locks.request(SYNC_REPLAY_LOCK, () =>
+        handleSyncInner(true)
+      );
+    }
+    return navigator.locks.request(
+      SYNC_REPLAY_LOCK,
+      { ifAvailable: true },
+      async (lock) => {
+        if (!lock) return; // Another replay is in progress
+        return handleSyncInner(false);
+      }
+    );
+  }
+  // Fallback: proceed without lock (older browsers)
+  return handleSyncInner(lastChance);
+}
+
+async function handleSyncInner(lastChance = false) {
   const results = [];
 
   let db;
@@ -255,12 +312,16 @@ async function handleSync(lastChance = false) {
 
       // Mark in-flight
       item.status = "in-flight";
+      item.inFlightAt = Date.now();
       await idbPut(db, key, item);
 
       try {
         const response = await fetch(route, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            Accept: "application/json",
+          },
           credentials: "include",
           body: JSON.stringify(item.payload),
         });

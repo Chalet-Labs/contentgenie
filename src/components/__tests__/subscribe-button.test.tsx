@@ -8,8 +8,11 @@ vi.mock("@/lib/offline-actions", () => ({
   offlineUnsubscribe: vi.fn(),
 }));
 
+const mockHasPending = vi.fn(() => false);
+const mockHasFailed = vi.fn(() => false);
+
 vi.mock("@/hooks/use-sync-queue", () => ({
-  useSyncQueue: () => ({ hasPending: () => false }),
+  useSyncQueue: () => ({ hasPending: mockHasPending, hasFailed: mockHasFailed }),
 }));
 
 vi.mock("@/hooks/use-online-status", () => ({
@@ -59,6 +62,19 @@ describe("SubscribeButton", () => {
       expect.objectContaining({ podcastIndexId: "123", title: "Test Podcast" }),
       true,
     );
+  });
+
+  it("shows failed-sync indicator when hasFailed returns true", () => {
+    mockHasFailed.mockReturnValue(true);
+    render(<SubscribeButton {...defaultProps} />);
+    expect(screen.getByText("Sync failed")).toBeInTheDocument();
+  });
+
+  it("failed-sync takes precedence over pending", () => {
+    mockHasFailed.mockReturnValue(true);
+    mockHasPending.mockReturnValue(true);
+    render(<SubscribeButton {...defaultProps} />);
+    expect(screen.getByText("Sync failed")).toBeInTheDocument();
   });
 
   it("calls offlineUnsubscribe when already subscribed", async () => {

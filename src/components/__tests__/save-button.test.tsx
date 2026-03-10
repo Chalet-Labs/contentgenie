@@ -8,8 +8,11 @@ vi.mock("@/lib/offline-actions", () => ({
   offlineUnsaveEpisode: vi.fn(),
 }));
 
+const mockHasPending = vi.fn(() => false);
+const mockHasFailed = vi.fn(() => false);
+
 vi.mock("@/hooks/use-sync-queue", () => ({
-  useSyncQueue: () => ({ hasPending: () => false }),
+  useSyncQueue: () => ({ hasPending: mockHasPending, hasFailed: mockHasFailed }),
 }));
 
 vi.mock("@/hooks/use-online-status", () => ({
@@ -74,6 +77,19 @@ describe("SaveButton", () => {
 
     await user.click(screen.getByRole("button"));
     expect(offlineUnsaveEpisode).toHaveBeenCalledWith("123", true);
+  });
+
+  it("shows failed-sync indicator when hasFailed returns true", () => {
+    mockHasFailed.mockReturnValue(true);
+    render(<SaveButton episodeData={mockEpisodeData} />);
+    expect(screen.getByText("Sync failed")).toBeInTheDocument();
+  });
+
+  it("failed-sync takes precedence over pending", () => {
+    mockHasFailed.mockReturnValue(true);
+    mockHasPending.mockReturnValue(true);
+    render(<SaveButton episodeData={mockEpisodeData} />);
+    expect(screen.getByText("Sync failed")).toBeInTheDocument();
   });
 
   it("shows error toast on failure", async () => {

@@ -3,6 +3,7 @@ import { get, set, del, entries, clear, createStore } from "idb-keyval";
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const MAX_QUEUE_SIZE = 100;
+const IN_FLIGHT_LEASE_MS = 30_000; // 30s — items in-flight longer than this are considered stale
 export const SYNC_TAG = "sync-offline-actions";
 
 // ─── Custom Store ─────────────────────────────────────────────────────────────
@@ -20,6 +21,7 @@ export interface SyncQueueItem {
   createdAt: number;
   attempts: number;
   status: "pending" | "in-flight" | "failed";
+  inFlightAt?: number; // timestamp when item entered in-flight status
 }
 
 type SyncAction = SyncQueueItem["action"];
@@ -75,9 +77,11 @@ async function updateItem(
 /** Delete all entries matching predicate. */
 async function deleteWhere(predicate: (item: SyncQueueItem) => boolean): Promise<void> {
   const allEntries = await getEntries();
-  for (const [key, value] of allEntries) {
-    if (predicate(value)) await del(key, store);
-  }
+  await Promise.all(
+    allEntries
+      .filter(([, value]) => predicate(value))
+      .map(([key]) => del(key, store)),
+  );
 }
 
 // ─── Queue CRUD ───────────────────────────────────────────────────────────────
@@ -96,14 +100,16 @@ export async function enqueue(
   const allEntries = await entries<string, SyncQueueItem>(store);
 
   for (const [key, value] of allEntries) {
-    if (
-      value.entityKey === item.entityKey &&
-      value.action === opposite &&
-      value.status === "pending"
-    ) {
-      // Cancel opposite action — net zero
-      await del(key, store);
-      return null;
+    if (value.entityKey === item.entityKey) {
+      if (value.action === opposite && value.status === "pending") {
+        // Cancel opposite action — net zero
+        await del(key, store);
+        return null;
+      }
+      if (value.status === "failed") {
+        // Clear stale failed items — new action supersedes old failure
+        await del(key, store);
+      }
     }
   }
 
@@ -152,7 +158,7 @@ export async function getPending(): Promise<SyncQueueItem[]> {
 }
 
 export async function markInFlight(id: string): Promise<void> {
-  await updateItem(id, { status: "in-flight" });
+  await updateItem(id, { status: "in-flight", inFlightAt: Date.now() });
 }
 
 export async function markFailed(id: string): Promise<void> {
@@ -173,6 +179,56 @@ export async function hasPendingAction(entityKey: string): Promise<boolean> {
   return allEntries.some(
     ([, v]) => v.entityKey === entityKey && (v.status === "pending" || v.status === "in-flight"),
   );
+}
+
+export async function getActive(): Promise<SyncQueueItem[]> {
+  const allEntries = await getEntries();
+  return allEntries
+    .map(([, value]) => value)
+    .filter((item) => item.status === "pending" || item.status === "in-flight")
+    .sort((a, b) => a.createdAt - b.createdAt);
+}
+
+/** Single-pass retrieval of active and failed items (avoids double IDB read). */
+export async function getActiveAndFailed(): Promise<{
+  active: SyncQueueItem[];
+  failed: SyncQueueItem[];
+}> {
+  const allEntries = await getEntries();
+  const active: SyncQueueItem[] = [];
+  const failed: SyncQueueItem[] = [];
+  for (const [, item] of allEntries) {
+    if (item.status === "pending" || item.status === "in-flight") {
+      active.push(item);
+    } else if (item.status === "failed") {
+      failed.push(item);
+    }
+  }
+  active.sort((a, b) => a.createdAt - b.createdAt);
+  failed.sort((a, b) => a.createdAt - b.createdAt);
+  return { active, failed };
+}
+
+export async function resetStaleInFlight(): Promise<void> {
+  const now = Date.now();
+  const allEntries = await getEntries();
+  await Promise.all(
+    allEntries
+      .filter(([, value]) => {
+        if (value.status !== "in-flight") return false;
+        // Missing inFlightAt means legacy entry — treat as expired
+        return !value.inFlightAt || now - value.inFlightAt >= IN_FLIGHT_LEASE_MS;
+      })
+      .map(([key, value]) => set(key, { ...value, status: "pending" }, store)),
+  );
+}
+
+export async function getFailed(): Promise<SyncQueueItem[]> {
+  const allEntries = await getEntries();
+  return allEntries
+    .map(([, value]) => value)
+    .filter((item) => item.status === "failed")
+    .sort((a, b) => a.createdAt - b.createdAt);
 }
 
 export async function clearFailed(): Promise<void> {

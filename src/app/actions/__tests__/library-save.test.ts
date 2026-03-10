@@ -21,6 +21,7 @@ const mockReturning = vi.fn();
 vi.mock("@/db", () => ({
   db: {
     query: {
+      users: { findFirst: vi.fn() },
       podcasts: { findFirst: vi.fn() },
       episodes: { findFirst: vi.fn() },
       userLibrary: { findFirst: vi.fn() },

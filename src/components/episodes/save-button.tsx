@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Bookmark, BookmarkCheck, Loader2, Clock } from "lucide-react";
+import { Bookmark, BookmarkCheck, Loader2, Clock, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { useOnlineStatus } from "@/hooks/use-online-status";
@@ -46,10 +46,12 @@ export function SaveButton({
   const [isSaved, setIsSaved] = useState(initialSaved);
   const [isLoading, setIsLoading] = useState(false);
   const isOnline = useOnlineStatus();
-  const { hasPending } = useSyncQueue();
+  // useState for isLoading (useTransition not viable on React 18)
+  const { hasPending, hasFailed } = useSyncQueue();
 
   const entityKey = `episode:${episodeData.podcastIndexId}`;
   const isPendingSync = hasPending(entityKey);
+  const isFailedSync = hasFailed(entityKey);
 
   const handleToggle = async () => {
     setIsLoading(true);
@@ -84,6 +86,10 @@ export function SaveButton({
           });
         }
       }
+    } catch (error) {
+      toast.error(isSaved ? "Failed to remove" : "Failed to save", {
+        description: error instanceof Error ? error.message : "Please try again",
+      });
     } finally {
       setIsLoading(false);
     }
@@ -104,9 +110,14 @@ export function SaveButton({
         <Bookmark className="mr-2 h-4 w-4" />
       )}
       {isSaved ? "Saved" : "Save"}
-      {isPendingSync && (
+      {isFailedSync ? (
+        <>
+          <span className="sr-only">Sync failed</span>
+          <AlertCircle aria-hidden="true" className="ml-1 h-3 w-3 text-destructive" />
+        </>
+      ) : isPendingSync ? (
         <Clock className="ml-1 h-3 w-3 text-muted-foreground" />
-      )}
+      ) : null}
     </Button>
   );
 }

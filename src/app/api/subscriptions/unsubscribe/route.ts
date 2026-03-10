@@ -4,6 +4,7 @@ import { eq, and } from "drizzle-orm";
 import { db } from "@/db";
 import { podcasts, userSubscriptions } from "@/db/schema";
 import { revalidatePath } from "next/cache";
+import { unsubscribeSchema } from "@/lib/schemas/library";
 
 export async function POST(request: NextRequest) {
   try {
@@ -12,7 +13,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
     }
 
-    let body: Record<string, unknown>;
+    const contentType = request.headers.get("content-type")?.toLowerCase() ?? "";
+    if (!contentType.includes("application/json")) {
+      return NextResponse.json(
+        { success: false, error: "Unsupported Media Type" },
+        { status: 415 },
+      );
+    }
+
+    const accept = request.headers.get("accept")?.toLowerCase() ?? "*/*";
+    if (!accept.includes("application/json") && !accept.includes("*/*")) {
+      return NextResponse.json(
+        { success: false, error: "Not Acceptable" },
+        { status: 406 },
+      );
+    }
+
+    let body: unknown;
     try {
       body = await request.json();
     } catch {
@@ -21,14 +38,16 @@ export async function POST(request: NextRequest) {
         { status: 400 },
       );
     }
-    const { podcastIndexId } = body;
 
-    if (!podcastIndexId || typeof podcastIndexId !== "string") {
+    const result = unsubscribeSchema.safeParse(body);
+    if (!result.success) {
       return NextResponse.json(
         { success: false, error: "Invalid podcast data: podcastIndexId is required" },
         { status: 400 },
       );
     }
+
+    const { podcastIndexId } = result.data;
 
     const podcast = await db.query.podcasts.findFirst({
       where: eq(podcasts.podcastIndexId, podcastIndexId),

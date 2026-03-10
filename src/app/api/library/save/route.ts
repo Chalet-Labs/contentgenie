@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { db } from "@/db";
-import { users, episodes, userLibrary } from "@/db/schema";
-import { upsertPodcast } from "@/db/helpers";
+import { episodes, userLibrary } from "@/db/schema";
+import { upsertPodcast, ensureUserExists } from "@/db/helpers";
 import { revalidatePath } from "next/cache";
+import { saveEpisodeSchema, safeParseDate } from "@/lib/schemas/library";
 
 export async function POST(request: NextRequest) {
   try {
@@ -28,16 +29,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    let body: Record<string, unknown>;
+    let body: unknown;
     try {
-      const parsed: unknown = await request.json();
-      if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
-        return NextResponse.json(
-          { success: false, error: "Invalid JSON body" },
-          { status: 400 },
-        );
-      }
-      body = parsed as Record<string, unknown>;
+      body = await request.json();
     } catch {
       return NextResponse.json(
         { success: false, error: "Invalid JSON body" },
@@ -45,106 +39,31 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const allowedKeys = new Set([
-      "podcastIndexId",
-      "title",
-      "description",
-      "audioUrl",
-      "duration",
-      "publishDate",
-      "podcast",
-    ]);
-    if (Object.keys(body).some((k) => !allowedKeys.has(k))) {
-      return NextResponse.json({ success: false, error: "Invalid episode data" }, { status: 400 });
-    }
-
-    const isOptionalString = (v: unknown): v is string | undefined =>
-      v === undefined || typeof v === "string";
-    const isOptionalNumber = (v: unknown): v is number | undefined =>
-      v === undefined || (typeof v === "number" && Number.isFinite(v));
-
-    if (
-      !isOptionalString(body.description) ||
-      !isOptionalString(body.audioUrl) ||
-      !isOptionalNumber(body.duration) ||
-      (body.publishDate !== undefined && body.publishDate !== null && typeof body.publishDate !== "string")
-    ) {
-      return NextResponse.json({ success: false, error: "Invalid episode data" }, { status: 400 });
-    }
-
-    const podcastIndexId = typeof body.podcastIndexId === "string" ? body.podcastIndexId.trim() : body.podcastIndexId;
-    const title = typeof body.title === "string" ? body.title.trim() : body.title;
-    const description = typeof body.description === "string" ? body.description : undefined;
-    const audioUrl = typeof body.audioUrl === "string" ? body.audioUrl : undefined;
-    const duration = typeof body.duration === "number" ? body.duration : undefined;
-    const publishDate = typeof body.publishDate === "string" ? body.publishDate : undefined;
-    let publishDateValue: Date | undefined;
-    if (publishDate != null) {
-      const d = new Date(publishDate);
-      if (!isNaN(d.getTime())) {
-        publishDateValue = d;
-      }
-    }
-    const podcast = body.podcast as Record<string, unknown> | undefined;
-
-    if (
-      !podcastIndexId ||
-      typeof podcastIndexId !== "string" ||
-      !title ||
-      typeof title !== "string" ||
-      !podcast ||
-      !podcast.podcastIndexId ||
-      typeof podcast.podcastIndexId !== "string" ||
-      !podcast.title ||
-      typeof podcast.title !== "string"
-    ) {
+    const result = saveEpisodeSchema.safeParse(body);
+    if (!result.success) {
       return NextResponse.json(
         { success: false, error: "Invalid episode data" },
         { status: 400 },
       );
     }
 
-    const podcastDescription = typeof podcast.description === "string" ? podcast.description : undefined;
-    const podcastPublisher = typeof podcast.publisher === "string" ? podcast.publisher : undefined;
-    const podcastImageUrl = typeof podcast.imageUrl === "string" ? podcast.imageUrl : undefined;
-    const podcastRssFeedUrl = typeof podcast.rssFeedUrl === "string" ? podcast.rssFeedUrl : undefined;
-    const podcastTotalEpisodes =
-      typeof podcast.totalEpisodes === "number" && Number.isFinite(podcast.totalEpisodes)
-        ? podcast.totalEpisodes
-        : undefined;
-    const podcastCategories =
-      Array.isArray(podcast.categories) && podcast.categories.every((c) => typeof c === "string")
-        ? (podcast.categories as string[])
-        : undefined;
+    const { podcastIndexId, title, description, audioUrl, duration, publishDate, podcast } = result.data;
 
-    // Ensure user exists
-    await db
-      .insert(users)
-      .values({ id: userId, email: "", name: null })
-      .onConflictDoNothing();
+    const publishDateValue = safeParseDate(publishDate);
 
-    // Trim and validate nested podcast fields before upsert
-    const trimmedPodcastIndexId = (podcast.podcastIndexId as string).trim();
-    const trimmedPodcastTitle = (podcast.title as string).trim();
-
-    if (!trimmedPodcastIndexId || !trimmedPodcastTitle) {
-      return NextResponse.json(
-        { success: false, error: "Invalid episode data" },
-        { status: 400 },
-      );
-    }
+    await ensureUserExists(userId);
 
     // Upsert podcast
     const podcastRecord = {
       id: await upsertPodcast({
-        podcastIndexId: trimmedPodcastIndexId,
-        title: trimmedPodcastTitle,
-        description: podcastDescription,
-        publisher: podcastPublisher,
-        imageUrl: podcastImageUrl,
-        rssFeedUrl: podcastRssFeedUrl,
-        categories: podcastCategories,
-        totalEpisodes: podcastTotalEpisodes,
+        podcastIndexId: podcast.podcastIndexId,
+        title: podcast.title,
+        description: podcast.description,
+        publisher: podcast.publisher,
+        imageUrl: podcast.imageUrl,
+        rssFeedUrl: podcast.rssFeedUrl,
+        categories: podcast.categories,
+        totalEpisodes: podcast.totalEpisodes,
       }, { updateOnConflict: false }),
     };
 

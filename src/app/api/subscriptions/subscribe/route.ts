@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { db } from "@/db";
-import { users, userSubscriptions } from "@/db/schema";
-import { upsertPodcast } from "@/db/helpers";
+import { userSubscriptions } from "@/db/schema";
+import { upsertPodcast, ensureUserExists } from "@/db/helpers";
 import { revalidatePath } from "next/cache";
+import { subscribeSchema, safeParseDate } from "@/lib/schemas/library";
 
 export async function POST(request: NextRequest) {
   try {
@@ -12,16 +13,25 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
     }
 
-    let body: Record<string, unknown>;
+    const contentType = request.headers.get("content-type")?.toLowerCase() ?? "";
+    if (!contentType.includes("application/json")) {
+      return NextResponse.json(
+        { success: false, error: "Unsupported Media Type" },
+        { status: 415 },
+      );
+    }
+
+    const accept = request.headers.get("accept")?.toLowerCase() ?? "*/*";
+    if (!accept.includes("application/json") && !accept.includes("*/*")) {
+      return NextResponse.json(
+        { success: false, error: "Not Acceptable" },
+        { status: 406 },
+      );
+    }
+
+    let body: unknown;
     try {
-      const parsed: unknown = await request.json();
-      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-        return NextResponse.json(
-          { success: false, error: "Invalid JSON body" },
-          { status: 400 },
-        );
-      }
-      body = parsed as Record<string, unknown>;
+      body = await request.json();
     } catch {
       return NextResponse.json(
         { success: false, error: "Invalid JSON body" },
@@ -29,48 +39,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (
-      typeof body.podcastIndexId !== "string" ||
-      typeof body.title !== "string"
-    ) {
+    const result = subscribeSchema.safeParse(body);
+    if (!result.success) {
       return NextResponse.json(
         { success: false, error: "Invalid podcast data" },
         { status: 400 },
       );
     }
 
-    const podcastIndexId = body.podcastIndexId.trim();
-    const title = body.title.trim();
+    const {
+      podcastIndexId, title, description, publisher,
+      imageUrl, rssFeedUrl, categories, totalEpisodes, latestEpisodeDate,
+    } = result.data;
 
-    if (!podcastIndexId || !title) {
-      return NextResponse.json(
-        { success: false, error: "Invalid podcast data" },
-        { status: 400 },
-      );
-    }
+    const latestEpisodeDateValue = safeParseDate(latestEpisodeDate);
 
-    const description = typeof body.description === "string" ? body.description : undefined;
-    const publisher = typeof body.publisher === "string" ? body.publisher : undefined;
-    const imageUrl = typeof body.imageUrl === "string" ? body.imageUrl : undefined;
-    const rssFeedUrl = typeof body.rssFeedUrl === "string" ? body.rssFeedUrl : undefined;
-    const categories =
-      Array.isArray(body.categories) && body.categories.every((c) => typeof c === "string")
-        ? (body.categories as string[])
-        : undefined;
-    const totalEpisodes = typeof body.totalEpisodes === "number" ? body.totalEpisodes : undefined;
-    let latestEpisodeDate: Date | undefined;
-    if (body.latestEpisodeDate != null) {
-      const d = new Date(body.latestEpisodeDate as string | number);
-      if (!isNaN(d.getTime())) {
-        latestEpisodeDate = d;
-      }
-    }
-
-    // Ensure user exists
-    await db
-      .insert(users)
-      .values({ id: userId, email: "", name: null })
-      .onConflictDoNothing();
+    await ensureUserExists(userId);
 
     // Upsert podcast
     const podcast = {
@@ -83,7 +67,7 @@ export async function POST(request: NextRequest) {
         rssFeedUrl,
         categories,
         totalEpisodes,
-        latestEpisodeDate,
+        latestEpisodeDate: latestEpisodeDateValue,
       }, { updateOnConflict: false }),
     };
 

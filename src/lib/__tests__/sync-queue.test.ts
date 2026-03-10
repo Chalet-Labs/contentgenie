@@ -1,16 +1,19 @@
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import "fake-indexeddb/auto";
 import {
   enqueue,
   dequeue,
   dequeueByEntityKey,
   getPending,
+  getActive,
   markInFlight,
   markFailed,
   incrementAttempts,
   getQueueCount,
   hasPendingAction,
   clearFailed,
+  getFailed,
+  resetStaleInFlight,
   _resetForTesting,
   type SyncQueueItem,
 } from "@/lib/sync-queue";
@@ -254,6 +257,106 @@ describe("getPending", () => {
     await markFailed(id as string);
     const items = await getPending();
     expect(items.find((i: SyncQueueItem) => i.id === id)).toBeUndefined();
+  });
+});
+
+describe("getActive", () => {
+  it("returns items with status pending or in-flight", async () => {
+    const id1 = await enqueue({ action: "save-episode", entityKey: "episode:1", payload: {} });
+    const id2 = await enqueue({ action: "subscribe", entityKey: "podcast:2", payload: {} });
+    const id3 = await enqueue({ action: "save-episode", entityKey: "episode:3", payload: {} });
+    expect(id1).not.toBeNull();
+    expect(id2).not.toBeNull();
+    expect(id3).not.toBeNull();
+    await markInFlight(id1 as string);
+    await markFailed(id3 as string);
+
+    const active = await getActive();
+    expect(active).toHaveLength(2);
+    const activeIds = active.map((i: SyncQueueItem) => i.id);
+    expect(activeIds).toContain(id1); // in-flight
+    expect(activeIds).toContain(id2); // pending
+    expect(activeIds).not.toContain(id3); // failed — excluded
+  });
+
+  it("returns empty array when queue is empty", async () => {
+    const active = await getActive();
+    expect(active).toHaveLength(0);
+  });
+
+  it("returns items sorted by createdAt (oldest first)", async () => {
+    await enqueue({ action: "save-episode", entityKey: "episode:A", payload: {} });
+    await enqueue({ action: "subscribe", entityKey: "podcast:B", payload: {} });
+    const active = await getActive();
+    expect(active).toHaveLength(2);
+    // Both items present; order is by createdAt (may be equal at ms resolution)
+    const keys = active.map((i: SyncQueueItem) => i.entityKey);
+    expect(keys).toContain("episode:A");
+    expect(keys).toContain("podcast:B");
+    // If timestamps differ, first should have lower createdAt
+    if (active[0].createdAt !== active[1].createdAt) {
+      expect(active[0].createdAt).toBeLessThan(active[1].createdAt);
+    }
+  });
+});
+
+describe("resetStaleInFlight", () => {
+  it("resets expired in-flight items to pending", async () => {
+    const id1 = await enqueue({ action: "save-episode", entityKey: "episode:1", payload: {} });
+    const id2 = await enqueue({ action: "subscribe", entityKey: "podcast:2", payload: {} });
+    expect(id1).not.toBeNull();
+    expect(id2).not.toBeNull();
+    await markInFlight(id1 as string);
+    await markInFlight(id2 as string);
+
+    // Advance time past the 30s lease
+    const now = Date.now();
+    vi.spyOn(Date, "now").mockReturnValue(now + 31_000);
+
+    await resetStaleInFlight();
+
+    const pending = await getPending();
+    expect(pending).toHaveLength(2);
+    expect(pending.every((i: SyncQueueItem) => i.status === "pending")).toBe(true);
+    vi.restoreAllMocks();
+  });
+
+  it("does not reset fresh in-flight items", async () => {
+    const id = await enqueue({ action: "save-episode", entityKey: "episode:1", payload: {} });
+    expect(id).not.toBeNull();
+    await markInFlight(id as string);
+
+    // No time advance — item is within lease
+    await resetStaleInFlight();
+
+    const pending = await getPending();
+    expect(pending).toHaveLength(0);
+    const active = await getActive();
+    expect(active).toHaveLength(1);
+    expect(active[0].status).toBe("in-flight");
+  });
+
+  it("does not touch pending items", async () => {
+    await enqueue({ action: "save-episode", entityKey: "episode:1", payload: {} });
+    await resetStaleInFlight();
+    const pending = await getPending();
+    expect(pending).toHaveLength(1);
+    expect(pending[0].status).toBe("pending");
+  });
+
+  it("does not touch failed items", async () => {
+    const id = await enqueue({ action: "save-episode", entityKey: "episode:1", payload: {} });
+    expect(id).not.toBeNull();
+    await markFailed(id as string);
+    await resetStaleInFlight();
+
+    // Failed item should still be failed, not reset to pending
+    const pending = await getPending();
+    expect(pending).toHaveLength(0);
+    const failed = await getFailed();
+    expect(failed).toHaveLength(1);
+    expect(failed[0].id).toBe(id);
+    expect(failed[0].status).toBe("failed");
   });
 });
 

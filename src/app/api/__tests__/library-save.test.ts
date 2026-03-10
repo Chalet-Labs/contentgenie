@@ -6,6 +6,11 @@ vi.mock("@clerk/nextjs/server", () => ({
   auth: () => mockAuth(),
 }));
 
+const mockGetClerkEmail = vi.fn();
+vi.mock("@/lib/clerk-helpers", () => ({
+  getClerkEmail: (...args: unknown[]) => mockGetClerkEmail(...args),
+}));
+
 vi.mock("next/cache", () => ({
   revalidatePath: vi.fn(),
 }));
@@ -26,6 +31,9 @@ const mockInsert = vi.fn();
 
 vi.mock("@/db", () => ({
   db: {
+    query: {
+      users: { findFirst: vi.fn() },
+    },
     insert: (...args: unknown[]) => mockInsert(...args),
   },
 }));
@@ -65,10 +73,11 @@ function setupInsertChains({
   mockInsert.mockImplementation(() => {
     callCount++;
     switch (callCount) {
-      case 1: // users
+      case 1: // users (onConflictDoUpdate when email non-empty, onConflictDoNothing otherwise)
         return {
           values: vi.fn().mockReturnThis(),
           onConflictDoNothing: vi.fn().mockResolvedValue(undefined),
+          onConflictDoUpdate: vi.fn().mockResolvedValue(undefined),
         };
       case 2: // podcasts (updateOnConflict: false → no-op touch via onConflictDoUpdate)
         return {
@@ -100,6 +109,7 @@ describe("POST /api/library/save", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockAuth.mockResolvedValue({ userId: "user-1" });
+    mockGetClerkEmail.mockResolvedValue("");
     setupInsertChains();
   });
 
@@ -184,6 +194,7 @@ describe("POST /api/library/save", () => {
         return {
           values: vi.fn().mockReturnThis(),
           onConflictDoNothing: vi.fn().mockResolvedValue(undefined),
+          onConflictDoUpdate: vi.fn().mockResolvedValue(undefined),
         };
       }
       // podcasts insert — throws
@@ -202,5 +213,47 @@ describe("POST /api/library/save", () => {
     const data = await response.json();
     expect(data.success).toBe(false);
     expect(JSON.stringify(data)).not.toContain("DB connection failed");
+  });
+});
+
+describe("POST /api/library/save — Clerk email lookup", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockAuth.mockResolvedValue({ userId: "user-1" });
+    mockGetClerkEmail.mockResolvedValue("");
+    setupInsertChains();
+  });
+
+  it("uses email from Clerk when user has email addresses", async () => {
+    mockGetClerkEmail.mockResolvedValue("alice@example.com");
+
+    const { POST } = await import("@/app/api/library/save/route");
+    const response = await POST(makeRequest(validEpisodePayload));
+
+    expect(response.status).toBe(200);
+
+    // The first db.insert call is users — check the values passed
+    const usersInsertCall = mockInsert.mock.calls[0]; // first call = users table
+    expect(usersInsertCall).toBeDefined();
+
+    // The values call on the returned chain should include the email
+    const insertChain = mockInsert.mock.results[0].value;
+    const valuesCall = insertChain.values.mock.calls[0][0];
+    expect(valuesCall.email).toBe("alice@example.com");
+  });
+
+  it("falls back to empty string when Clerk getUser throws", async () => {
+    // getClerkEmail already handles the fallback internally, returns ""
+    mockGetClerkEmail.mockResolvedValue("");
+
+    const { POST } = await import("@/app/api/library/save/route");
+    const response = await POST(makeRequest(validEpisodePayload));
+
+    // Should still succeed — fallback to ""
+    expect(response.status).toBe(200);
+
+    const insertChain = mockInsert.mock.results[0].value;
+    const valuesCall = insertChain.values.mock.calls[0][0];
+    expect(valuesCall.email).toBe("");
   });
 });

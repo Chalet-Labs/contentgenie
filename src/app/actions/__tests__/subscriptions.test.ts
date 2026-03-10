@@ -25,6 +25,7 @@ const mockUpdate = vi.fn();
 vi.mock("@/db", () => ({
   db: {
     query: {
+      users: { findFirst: vi.fn() },
       podcasts: { findFirst: (...args: unknown[]) => mockFindFirstPodcast(...args) },
       userSubscriptions: {
         findFirst: (...args: unknown[]) => mockFindFirstSubscription(...args),

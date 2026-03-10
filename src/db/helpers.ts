@@ -1,5 +1,33 @@
+import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { podcasts } from "@/db/schema";
+import { users, podcasts } from "@/db/schema";
+import { getClerkEmail } from "@/lib/clerk-helpers";
+
+/**
+ * Ensure a user row exists, backfilling the email from Clerk on conflict.
+ * Safe to call on every mutation — uses INSERT ON CONFLICT.
+ */
+export async function ensureUserExists(userId: string): Promise<void> {
+  // Fast path: skip Clerk lookup if user already exists with a non-empty email
+  const existing = await db.query.users.findFirst({
+    where: eq(users.id, userId),
+    columns: { email: true },
+  });
+  if (existing?.email) return;
+
+  const email = await getClerkEmail(userId);
+  if (email) {
+    await db
+      .insert(users)
+      .values({ id: userId, email, name: null })
+      .onConflictDoUpdate({ target: users.id, set: { email } });
+  } else {
+    await db
+      .insert(users)
+      .values({ id: userId, email, name: null })
+      .onConflictDoNothing();
+  }
+}
 
 export interface UpsertPodcastData {
   podcastIndexId: string;

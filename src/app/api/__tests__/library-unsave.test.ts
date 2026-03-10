@@ -77,7 +77,7 @@ describe("POST /api/library/unsave", () => {
     expect(response.status).toBe(400);
   });
 
-  it("returns 400 for non-object body", async () => {
+  it("returns 415 for missing Content-Type", async () => {
     const { POST } = await import("@/app/api/library/unsave/route");
     const response = await POST(
       new NextRequest("http://localhost:3000/api/library/unsave", {
@@ -86,7 +86,7 @@ describe("POST /api/library/unsave", () => {
       })
     );
 
-    expect(response.status).toBe(400);
+    expect(response.status).toBe(415);
   });
 
   it("returns 404 when episode not found", async () => {

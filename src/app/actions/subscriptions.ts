@@ -4,8 +4,8 @@ import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
 import { eq, and, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { users, podcasts, episodes, userSubscriptions } from "@/db/schema";
-import { upsertPodcast } from "@/db/helpers";
+import { podcasts, episodes, userSubscriptions } from "@/db/schema";
+import { upsertPodcast, ensureUserExists } from "@/db/helpers";
 import {
   parsePodcastFeed,
   generatePodcastSyntheticId,
@@ -45,6 +45,8 @@ export async function addPodcastByRssUrl(
   try {
     const syntheticPodcastId = generatePodcastSyntheticId(trimmedUrl);
 
+    await ensureUserExists(userId);
+
     // Check if podcast already exists
     const existingPodcast = await db.query.podcasts.findFirst({
       where: eq(podcasts.podcastIndexId, syntheticPodcastId),
@@ -52,12 +54,6 @@ export async function addPodcastByRssUrl(
     });
 
     if (existingPodcast) {
-      // Podcast exists — just ensure subscription
-      await db
-        .insert(users)
-        .values({ id: userId, email: "" })
-        .onConflictDoNothing();
-
       const existingSub = await db.query.userSubscriptions.findFirst({
         where: and(
           eq(userSubscriptions.userId, userId),
@@ -101,12 +97,6 @@ export async function addPodcastByRssUrl(
           "Could not parse the RSS feed. Check the URL and try again.",
       };
     }
-
-    // Ensure user exists
-    await db
-      .insert(users)
-      .values({ id: userId, email: "" })
-      .onConflictDoNothing();
 
     // Insert podcast (onConflictDoNothing handles race conditions)
     const insertResult = await db
@@ -219,22 +209,14 @@ export async function subscribeToPodcast(podcastData: PodcastData) {
   }
 
   try {
-    // Ensure user exists in our database
-    await db
-      .insert(users)
-      .values({
-        id: userId,
-        email: "", // Will be updated by webhook or next sync
-        name: null,
-      })
-      .onConflictDoNothing();
-
     const trimmedPodcastIndexId = podcastData.podcastIndexId.trim();
     const trimmedPodcastTitle = podcastData.title.trim();
 
     if (!trimmedPodcastIndexId || !trimmedPodcastTitle) {
       return { success: false, error: "Podcast ID and title are required" };
     }
+
+    await ensureUserExists(userId);
 
     const podcastId = await upsertPodcast({
       podcastIndexId: trimmedPodcastIndexId,

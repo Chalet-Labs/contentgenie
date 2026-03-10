@@ -1,6 +1,7 @@
 "use client"
 
 import { AudioPlayerProvider, useAudioPlayerState } from "@/contexts/audio-player-context"
+import { SyncQueueProvider } from "@/contexts/sync-queue-context"
 import { Header } from "@/components/layout/header"
 import { Sidebar } from "@/components/layout/sidebar"
 import { PlayerBar } from "@/components/audio-player/player-bar"
@@ -28,8 +29,10 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   return (
-    <AudioPlayerProvider>
-      <AppShellInner>{children}</AppShellInner>
-    </AudioPlayerProvider>
+    <SyncQueueProvider>
+      <AudioPlayerProvider>
+        <AppShellInner>{children}</AppShellInner>
+      </AudioPlayerProvider>
+    </SyncQueueProvider>
   )
 }

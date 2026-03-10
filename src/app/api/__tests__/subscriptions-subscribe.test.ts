@@ -25,6 +25,9 @@ const mockInsert = vi.fn();
 
 vi.mock("@/db", () => ({
   db: {
+    query: {
+      users: { findFirst: vi.fn() },
+    },
     insert: (...args: unknown[]) => mockInsert(...args),
   },
 }));
@@ -55,10 +58,11 @@ function setupInsertChains({
   mockInsert.mockImplementation(() => {
     callCount++;
     switch (callCount) {
-      case 1: // users
+      case 1: // users (onConflictDoUpdate when email non-empty, onConflictDoNothing otherwise)
         return {
           values: vi.fn().mockReturnThis(),
           onConflictDoNothing: vi.fn().mockResolvedValue(undefined),
+          onConflictDoUpdate: vi.fn().mockResolvedValue(undefined),
         };
       case 2: // podcasts (updateOnConflict: false → no-op touch via onConflictDoUpdate)
         return {
@@ -113,7 +117,7 @@ describe("POST /api/subscriptions/subscribe", () => {
     expect(response.status).toBe(400);
   });
 
-  it("returns 400 for non-object body", async () => {
+  it("returns 415 for missing Content-Type", async () => {
     const { POST } = await import("@/app/api/subscriptions/subscribe/route");
     const response = await POST(
       new NextRequest("http://localhost:3000/api/subscriptions/subscribe", {
@@ -122,7 +126,7 @@ describe("POST /api/subscriptions/subscribe", () => {
       })
     );
 
-    expect(response.status).toBe(400);
+    expect(response.status).toBe(415);
   });
 
   it("returns 200 with success:true for valid payload", async () => {
@@ -154,6 +158,7 @@ describe("POST /api/subscriptions/subscribe", () => {
         return {
           values: vi.fn().mockReturnThis(),
           onConflictDoNothing: vi.fn().mockResolvedValue(undefined),
+          onConflictDoUpdate: vi.fn().mockResolvedValue(undefined),
         };
       }
       return {
