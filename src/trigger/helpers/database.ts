@@ -31,7 +31,7 @@ async function ensurePodcast(
       latestEpisodeDate: podcast.newestItemPubdate
         ? new Date(podcast.newestItemPubdate * 1000)
         : undefined,
-    });
+    }, { updateOnConflict: "full" });
   }
 
   const dbPodcast = await db.query.podcasts.findFirst({

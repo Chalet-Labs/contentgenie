@@ -64,7 +64,7 @@ export async function POST(request: NextRequest) {
         rssFeedUrl: podcast.rssFeedUrl,
         categories: podcast.categories,
         totalEpisodes: podcast.totalEpisodes,
-      }, { updateOnConflict: false }),
+      }, { updateOnConflict: "safe" }),
     };
 
     // Upsert episode

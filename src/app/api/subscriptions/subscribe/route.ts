@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
         categories,
         totalEpisodes,
         latestEpisodeDate: latestEpisodeDateValue,
-      }, { updateOnConflict: false }),
+      }, { updateOnConflict: "safe" }),
     };
 
     // Insert subscription (idempotent)

@@ -148,7 +148,7 @@ async function importSingleFeed(userId: string, feed: OpmlFeed): Promise<void> {
           : undefined,
         totalEpisodes: piFeed.episodeCount,
         source: "podcastindex",
-      });
+      }, { updateOnConflict: "full" });
 
       // Create subscription
       await db
@@ -183,7 +183,7 @@ async function importSingleFeed(userId: string, feed: OpmlFeed): Promise<void> {
     imageUrl: parsedFeed.imageUrl ?? undefined,
     rssFeedUrl: feedUrl,
     source: "rss",
-  });
+  }, { updateOnConflict: "full" });
 
   // Insert episodes (max 50, newest first)
   const sortedEpisodes = [...parsedFeed.episodes].sort((a, b) => {

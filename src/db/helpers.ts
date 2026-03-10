@@ -44,22 +44,30 @@ export interface UpsertPodcastData {
 
 interface UpsertPodcastOptions {
   /**
-   * When false, uses INSERT ... ON CONFLICT DO NOTHING instead of updating.
-   * Use for untrusted call sites where client-provided data should not
-   * overwrite existing podcast metadata. Defaults to true.
+   * Controls conflict-update behaviour:
+   * - `"full"` (default): updates all provided fields including `source`,
+   *   `rssFeedUrl`, and `lastPolledAt`. Use for trusted Trigger.dev call sites.
+   * - `"safe"`: updates only whitelisted display fields (`title`, `imageUrl`,
+   *   `description`, `publisher`, `categories`, `totalEpisodes`,
+   *   `latestEpisodeDate`, `updatedAt`). Protected fields (`source`,
+   *   `rssFeedUrl`, `lastPolledAt`) are never overwritten. Use for
+   *   client-facing server actions and API routes.
    */
-  updateOnConflict?: boolean;
+  updateOnConflict?: "full" | "safe";
 }
 
 /**
  * Upsert a podcast and return its database ID.
  *
  * Uses INSERT ... ON CONFLICT DO UPDATE targeting `podcasts.podcastIndexId`.
- * Only defined fields are included in the conflict update — `undefined` values
- * are explicitly filtered out rather than relying on Drizzle's internal handling.
  *
- * Pass `{ updateOnConflict: false }` from untrusted call sites (e.g. client-facing
- * server actions) to prevent metadata overwrites via INSERT ... ON CONFLICT DO NOTHING.
+ * Pass `{ updateOnConflict: "safe" }` from client-facing call sites to restrict
+ * conflict updates to safe display fields only (`title`, `imageUrl`, `description`,
+ * `publisher`, `categories`, `totalEpisodes`, `latestEpisodeDate`, `updatedAt`).
+ * Protected fields (`source`, `rssFeedUrl`, `lastPolledAt`) are never touched.
+ *
+ * Pass `{ updateOnConflict: "full" }` (or omit the option) from trusted Trigger.dev
+ * call sites to update all provided fields.
  */
 export async function upsertPodcast(
   data: UpsertPodcastData,
@@ -85,14 +93,32 @@ export async function upsertPodcast(
     source: data.source,
   };
 
-  if (options?.updateOnConflict === false) {
-    // No-op touch so RETURNING works on conflicts (avoids a second SELECT)
+  const safeDisplayFields = {
+    title,
+    imageUrl: data.imageUrl,
+    description: data.description,
+    publisher: data.publisher,
+    categories: data.categories,
+    totalEpisodes: data.totalEpisodes,
+    latestEpisodeDate: data.latestEpisodeDate,
+  };
+
+  if (options?.updateOnConflict === "safe") {
+    // Only update whitelisted display fields; protected fields (source,
+    // rssFeedUrl, lastPolledAt) are never overwritten from client paths.
+    const set = {
+      ...Object.fromEntries(
+        Object.entries(safeDisplayFields).filter(([, v]) => v != null)
+      ),
+      updatedAt: new Date(),
+    };
+
     const [row] = await db
       .insert(podcasts)
       .values(values)
       .onConflictDoUpdate({
         target: podcasts.podcastIndexId,
-        set: { podcastIndexId: podcasts.podcastIndexId },
+        set,
       })
       .returning({ id: podcasts.id });
 
@@ -103,8 +129,8 @@ export async function upsertPodcast(
     return row.id;
   }
 
-  // Build set with only defined values — explicit filtering instead of
-  // relying on Drizzle's internal undefined-skipping behavior.
+  // "full" mode (default): build set with only defined values — explicit
+  // filtering instead of relying on Drizzle's internal undefined-skipping.
   const updateFields = {
     title,
     description: data.description,
