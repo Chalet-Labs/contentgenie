@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import webpush from "web-push";
 import { db } from "@/db";
 import { pushSubscriptions } from "@/db/schema";
@@ -26,6 +27,11 @@ export const consolePushLogger: PushLogger = {
       ? console.error(`[push] ${msg}`, meta)
       : console.error(`[push] ${msg}`),
 };
+
+/** Produce a short deterministic hash of a value for safe logging. */
+function hashForLogs(value: string): string {
+  return createHash("sha256").update(value).digest("hex").slice(0, 12);
+}
 
 /** Redact a push endpoint for safe logging (preserves origin + first/last token chars). */
 function redactEndpoint(endpoint: string): string {
@@ -97,7 +103,7 @@ export async function sendPushToUser(
     });
   } catch (err) {
     logger.error("Failed to fetch push subscriptions", {
-      userId,
+      userIdHash: hashForLogs(userId),
       error: err instanceof Error ? err.message : String(err),
     });
     return { sent: 0, failed: 0 };

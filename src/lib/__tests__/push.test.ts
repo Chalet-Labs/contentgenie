@@ -249,9 +249,10 @@ describe("push module", () => {
       );
     });
 
-    it("calls custom logger.warn on push notification failure", async () => {
+    it("calls custom logger.warn on push notification failure with redacted endpoint", async () => {
+      const endpoint = "https://push.example.com/abcdefghijklmnopqrstuvwxyz123456";
       mockFindMany.mockResolvedValue([
-        { endpoint: "https://push.example.com/1", p256dh: "key", auth: "auth" },
+        { endpoint, p256dh: "key", auth: "auth" },
       ]);
       mockSendNotification.mockRejectedValue(new Error("Network error"));
 
@@ -260,7 +261,14 @@ describe("push module", () => {
       const { sendPushToUser } = await import("@/lib/push");
       await sendPushToUser("user-1", { title: "Test", body: "Body" }, mockLogger);
 
-      expect(mockLogger.warn).toHaveBeenCalled();
+      expect(mockLogger.warn).toHaveBeenCalledWith(
+        "Push notification failed",
+        expect.objectContaining({
+          endpoint: expect.stringContaining("…"),
+        })
+      );
+      const loggedMeta = mockLogger.warn.mock.calls[0]?.[1] as { endpoint?: string };
+      expect(loggedMeta.endpoint).not.toBe(endpoint);
     });
 
     it("calls custom logger.error on fetch subscriptions failure", async () => {
