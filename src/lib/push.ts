@@ -17,8 +17,14 @@ export interface PushLogger {
 }
 
 export const consolePushLogger: PushLogger = {
-  warn: (msg, meta) => console.warn(`[push] ${msg}`, meta ?? ""),
-  error: (msg, meta) => console.error(`[push] ${msg}`, meta ?? ""),
+  warn: (msg, meta) =>
+    meta !== undefined
+      ? console.warn(`[push] ${msg}`, meta)
+      : console.warn(`[push] ${msg}`),
+  error: (msg, meta) =>
+    meta !== undefined
+      ? console.error(`[push] ${msg}`, meta)
+      : console.error(`[push] ${msg}`),
 };
 
 /** Redact a push endpoint for safe logging (preserves origin + first/last token chars). */
