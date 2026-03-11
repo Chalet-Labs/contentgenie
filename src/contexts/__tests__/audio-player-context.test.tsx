@@ -1193,7 +1193,7 @@ describe("Listen history recording", () => {
     expect(mockRecordListenEvent).not.toHaveBeenCalled()
   })
 
-  it("calls recordListenEvent with started:true when currentTime crosses 30s", async () => {
+  it("calls recordListenEvent when currentTime crosses 30s", async () => {
     const user = userEvent.setup()
     render(
       <AudioPlayerProvider>

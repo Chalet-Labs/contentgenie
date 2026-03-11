@@ -45,12 +45,12 @@ Accumulate events in memory and flush on `beforeunload` or `visibilitychange`.
 
 - **Matches issue scope.** The issue asks for `startedAt`, `completedAt`, and `listenDurationSeconds` — a binary started/completed model, not continuous progress.
 - **Minimal server load.** At most 2 server calls per episode play (start + complete). Fire-and-forget with `void` — never blocks playback.
-- **Follows existing patterns.** The player context already uses ref-based timers and guards. Adding a `listenHistoryFiredRef` (Set) and `listenHistoryTimerRef` (timeout) is consistent with `sessionSaveTimerRef`, `ariaTimerRef`, etc.
+- **Follows existing patterns.** The player context already uses ref-based timers and guards. Adding a `listenHistoryFiredRef` (Set) is consistent with `sessionSaveTimerRef`, `ariaTimerRef`, etc.
 - **No overlap with session restore.** Session restore (localStorage) handles "resume where I left off." Listen history (database) handles "what have I listened to." Separate concerns, separate mechanisms.
 
 ## Schema Design
 
-```
+```text
 listen_history
 ├── id: serial PK
 ├── userId: text FK → users.id (CASCADE) NOT NULL
@@ -73,6 +73,6 @@ The composite unique constraint on `(userId, episodeId)` means one row per user-
 - The `listen_history` table is added to `src/db/schema.ts` alongside existing tables.
 - Relations are added to both `usersRelations` and `episodesRelations` (v1 `relations()` API).
 - A new server action file `src/app/actions/listen-history.ts` keeps the action separate from the existing `library.ts` (single responsibility).
-- The audio player context gains two new refs but no new reducer actions or state fields — listen history is entirely side-effect-driven.
+- The audio player context gains one new ref (`listenHistoryFiredRef`) but no new reducer actions or state fields — listen history is entirely side-effect-driven.
 - Dashboard queries can JOIN on `listen_history` to show recently listened episodes.
 - Migration: `bun run db:generate && bun run db:push` after schema change. Preview deploys auto-migrate; production requires manual push (per existing workflow).

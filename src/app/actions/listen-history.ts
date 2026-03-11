@@ -15,8 +15,13 @@ export async function recordListenEvent(input: {
   if (!userId) return { success: false }
 
   const { podcastIndexEpisodeId, completed, durationSeconds } = input
+  const trimmedPodcastIndexEpisodeId = podcastIndexEpisodeId?.trim()
 
-  if (!podcastIndexEpisodeId || typeof podcastIndexEpisodeId !== "string") {
+  if (
+    typeof trimmedPodcastIndexEpisodeId !== "string" ||
+    trimmedPodcastIndexEpisodeId.length === 0 ||
+    (completed !== undefined && typeof completed !== "boolean")
+  ) {
     return { success: false }
   }
 
@@ -31,7 +36,7 @@ export async function recordListenEvent(input: {
     await ensureUserExists(userId)
     const episode = await db.query.episodes.findFirst({
       columns: { id: true },
-      where: eq(episodes.podcastIndexId, podcastIndexEpisodeId),
+      where: eq(episodes.podcastIndexId, trimmedPodcastIndexEpisodeId),
     })
 
     if (!episode) {
@@ -46,7 +51,7 @@ export async function recordListenEvent(input: {
       .values({
         userId,
         episodeId,
-        podcastIndexEpisodeId,
+        podcastIndexEpisodeId: trimmedPodcastIndexEpisodeId,
         startedAt: now,
         completedAt: completed ? now : null,
         listenDurationSeconds: durationSeconds ?? null,
@@ -56,7 +61,7 @@ export async function recordListenEvent(input: {
       .onConflictDoUpdate({
         target: [listenHistory.userId, listenHistory.episodeId],
         set: {
-          // Preserve the first listen time; only set if currently null
+          // Preserve the first listen time (startedAt is NOT NULL, so COALESCE fallback is a safety net only)
           startedAt: sql`COALESCE(${listenHistory.startedAt}, ${now})`,
           // Update completedAt when this is a completion event
           completedAt: completed
