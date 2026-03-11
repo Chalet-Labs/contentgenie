@@ -30,6 +30,7 @@ import {
 } from "@/lib/player-session"
 import { fadeOutAudio } from "@/lib/audio-fade"
 import type { Chapter } from "@/lib/chapters"
+import { recordListenEvent } from "@/app/actions/listen-history"
 
 // ---------------------------------------------------------------------------
 // Types
@@ -282,6 +283,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
   const sessionSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const isRestoringSession = useRef(false)
   const isSessionRestored = useRef(false)
+  const listenHistoryFiredRef = useRef<Set<string>>(new Set())
 
   const [state, dispatch] = useReducer(reducer, initialState)
 
@@ -763,6 +765,21 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
         }, 5000)
       }
 
+      // Fire listen history "started" event once at 30s threshold
+      if (
+        audio.currentTime >= 30 &&
+        stateRef.current.currentEpisode &&
+        !listenHistoryFiredRef.current.has(stateRef.current.currentEpisode.id)
+      ) {
+        const ep = stateRef.current.currentEpisode
+        listenHistoryFiredRef.current.add(ep.id)
+        void recordListenEvent({
+          episodeId: Number(ep.id),
+          podcastIndexEpisodeId: Number(ep.id),
+          started: true,
+        })
+      }
+
       // Debounced ARIA announcement (every 15s)
       if (!ariaTimerRef.current) {
         ariaTimerRef.current = setTimeout(() => {
@@ -840,6 +857,18 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
     const onEnded = () => {
       dispatch({ type: "SET_PLAYING", isPlaying: false })
       clearStallTimer()
+
+      // Record listen history completion
+      if (stateRef.current.currentEpisode) {
+        const ep = stateRef.current.currentEpisode
+        listenHistoryFiredRef.current.add(ep.id) // ensure no double-fire on started
+        void recordListenEvent({
+          episodeId: Number(ep.id),
+          podcastIndexEpisodeId: Number(ep.id),
+          completed: true,
+          durationSeconds: Math.floor(audio.duration || 0),
+        })
+      }
 
       // End-of-episode sleep timer: fade out and skip auto-play-next
       if (stateRef.current.sleepTimer?.type === "end-of-episode") {
