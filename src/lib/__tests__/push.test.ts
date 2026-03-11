@@ -224,11 +224,14 @@ describe("push module", () => {
       const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
       const { sendPushToUser } = await import("@/lib/push");
-      // Should not throw even with console logger
       await expect(
         sendPushToUser("user-1", { title: "Test", body: "Body" })
       ).resolves.toBeDefined();
 
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining("[push]"),
+        expect.any(Object)
+      );
       consoleSpy.mockRestore();
     });
 
@@ -271,7 +274,7 @@ describe("push module", () => {
       expect(loggedMeta.endpoint).not.toBe(endpoint);
     });
 
-    it("calls custom logger.error on fetch subscriptions failure", async () => {
+    it("calls custom logger.error on fetch subscriptions failure with hashed userId", async () => {
       mockFindMany.mockRejectedValue(new Error("DB error"));
 
       const mockLogger = { warn: vi.fn(), error: vi.fn() };
@@ -280,7 +283,13 @@ describe("push module", () => {
       const result = await sendPushToUser("user-1", { title: "Test", body: "Body" }, mockLogger);
 
       expect(result).toEqual({ sent: 0, failed: 0 });
-      expect(mockLogger.error).toHaveBeenCalled();
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        "Failed to fetch push subscriptions",
+        expect.objectContaining({ userIdHash: expect.any(String) })
+      );
+      const loggedMeta = mockLogger.error.mock.calls[0]?.[1] as Record<string, unknown>;
+      expect(loggedMeta).not.toHaveProperty("userId");
+      expect(loggedMeta.userIdHash).not.toBe("user-1");
     });
 
     it("mixes sent and failed correctly across multiple subscriptions", async () => {
