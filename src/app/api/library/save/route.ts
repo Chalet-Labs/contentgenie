@@ -81,13 +81,7 @@ export async function POST(request: NextRequest) {
       })
       .onConflictDoUpdate({
         target: episodes.podcastIndexId,
-        set: {
-          title,
-          description,
-          duration,
-          publishDate: publishDateValue,
-          updatedAt: new Date(),
-        },
+        set: { updatedAt: new Date() },
       })
       .returning({ id: episodes.id });
 

@@ -83,13 +83,7 @@ export async function saveEpisodeToLibrary(episodeData: EpisodeData) {
       })
       .onConflictDoUpdate({
         target: episodes.podcastIndexId,
-        set: {
-          title: parsed.data.title,
-          description: parsed.data.description,
-          duration: parsed.data.duration,
-          publishDate,
-          updatedAt: new Date(),
-        },
+        set: { updatedAt: new Date() },
       })
       .returning({ id: episodes.id });
 

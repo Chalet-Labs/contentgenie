@@ -2,6 +2,7 @@
 
 **Status:** Accepted
 **Date:** 2026-03-10
+**Updated:** 2026-03-11
 
 ## Context
 
@@ -11,38 +12,31 @@
 
 This meant client paths never refreshed podcast metadata (title, artwork, description, publisher, episode count). Metadata stayed stale until a background job ran. The original rationale was security: prevent client-provided data from overwriting existing podcast records.
 
+An initial revision introduced a `"safe"` mode that updated whitelisted display fields from client paths. During review, we concluded that client paths have no legitimate reason to update any metadata — all metadata is owned by background jobs. Allowing client-relayed data to update shared records is an unnecessary attack surface for marginal freshness.
+
 ## Decision
 
 Replace the boolean with a `"full" | "safe"` string union:
 - `"full"`: updates all provided fields (trusted background tasks)
-- `"safe"`: updates only whitelisted display fields (client-facing paths)
+- `"safe"`: **no metadata updates on conflict** — only bumps `updatedAt` so RETURNING yields the row ID. Protected fields (`rssFeedUrl`, `source`) are also stripped from INSERT values so client paths cannot seed them for new records. Use for all client-facing server actions and API routes.
 
-### Field Classification
-
-**Safe (updated from client paths):** `title`, `imageUrl`, `description`, `publisher`, `categories`, `totalEpisodes`, `latestEpisodeDate`
-
-**Protected (never updated from client paths):**
-- `source` — trust classification, owned by background jobs
-- `lastPolledAt` — owned by Trigger.dev polling scheduler
-- `rssFeedUrl` — structural, affects RSS polling
+The same principle applies to episode upserts in client-facing paths: on conflict, only `updatedAt` is bumped. Fields like `audioUrl` are never overwritten by client data.
 
 ### Trust Model
 
-Safe fields are user-controlled display data. The server does not re-verify values against PodcastIndex. Risk is accepted because:
+Client paths are untrusted for metadata. Background jobs (Trigger.dev) are the sole authoritative source for all podcast and episode metadata. Client paths only create records (INSERT) and establish user relationships (subscriptions, library entries).
 
-1. All rendering is escaped (no raw HTML injection)
-2. API routes enforce format/length bounds via Zod schemas
-3. Server actions now also validate via Zod (gap closed in this PR)
-4. Metadata is shared (not user-specific), so content injection affects display only
+Zod validation is applied at all client entry points (server actions and API routes) for input sanitization, but validated data is still not used to update existing records.
 
-### Zod Validation Gap
+### Zod Validation
 
-The two server action call sites (`src/app/actions/library.ts`, `src/app/actions/subscriptions.ts`) previously lacked Zod validation for podcast fields. This PR adds validation matching the API route schemas, closing the gap before enabling safe-field updates.
+Both server action call sites (`src/app/actions/library.ts`, `src/app/actions/subscriptions.ts`) now validate input via Zod schemas matching the API route schemas.
 
 ## Consequences
 
-- Client-initiated actions (subscribe, save episode) now refresh display metadata, reducing staleness
-- Protected fields remain immutable from client paths
-- The old boolean `false` mode (no-op touch) is removed as dead code
-- Background job metadata refresh remains the authoritative source for all fields
-- If new fields are added to the podcasts table, they must be explicitly classified as safe or protected
+- Client-initiated actions (subscribe, save episode) create new records but never update existing metadata
+- All metadata updates flow exclusively through Trigger.dev background jobs
+- Protected fields (`rssFeedUrl`, `source`) are stripped from client INSERT values
+- Episode `audioUrl` is never overwritten from client paths
+- Metadata staleness is addressed by background job scheduling, not client-side refreshes
+- A future "refresh" button could trigger a background job to re-fetch metadata on demand

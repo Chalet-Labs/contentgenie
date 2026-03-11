@@ -47,11 +47,10 @@ interface UpsertPodcastOptions {
    * Controls conflict-update behaviour:
    * - `"full"` (default): updates all provided fields including `source`,
    *   `rssFeedUrl`, and `lastPolledAt`. Use for trusted Trigger.dev call sites.
-   * - `"safe"`: updates only whitelisted display fields (`title`, `imageUrl`,
-   *   `description`, `publisher`, `categories`, `totalEpisodes`,
-   *   `latestEpisodeDate`, `updatedAt`). Protected fields (`source`,
-   *   `rssFeedUrl`, `lastPolledAt`) are never overwritten. Use for
-   *   client-facing server actions and API routes.
+   * - `"safe"`: no metadata updates on conflict — only bumps `updatedAt` so
+   *   RETURNING works. Protected fields (`source`, `rssFeedUrl`) are also
+   *   stripped from the INSERT values. Use for client-facing server actions
+   *   and API routes where metadata is owned by background jobs.
    */
   updateOnConflict?: "full" | "safe";
 }
@@ -61,10 +60,9 @@ interface UpsertPodcastOptions {
  *
  * Uses INSERT ... ON CONFLICT DO UPDATE targeting `podcasts.podcastIndexId`.
  *
- * Pass `{ updateOnConflict: "safe" }` from client-facing call sites to restrict
- * conflict updates to safe display fields only (`title`, `imageUrl`, `description`,
- * `publisher`, `categories`, `totalEpisodes`, `latestEpisodeDate`, `updatedAt`).
- * Protected fields (`source`, `rssFeedUrl`, `lastPolledAt`) are never touched.
+ * Pass `{ updateOnConflict: "safe" }` from client-facing call sites. No metadata
+ * is updated on conflict — the row is only touched so RETURNING yields the ID.
+ * Protected fields (`source`, `rssFeedUrl`) are stripped from INSERT values too.
  *
  * Pass `{ updateOnConflict: "full" }` (or omit the option) from trusted Trigger.dev
  * call sites to update all provided fields.
@@ -93,31 +91,10 @@ export async function upsertPodcast(
     source: data.source,
   };
 
-  const safeDisplayFields = {
-    title,
-    imageUrl: data.imageUrl,
-    description: data.description,
-    publisher: data.publisher,
-    categories: data.categories,
-    totalEpisodes: data.totalEpisodes,
-    latestEpisodeDate: data.latestEpisodeDate,
-  };
-
   if (options?.updateOnConflict === "safe") {
-    // Only update whitelisted display fields; protected fields (source,
-    // rssFeedUrl, lastPolledAt) are never overwritten from client paths.
-    const set = {
-      ...Object.fromEntries(
-        Object.entries(safeDisplayFields).filter(([, v]) => {
-          if (Array.isArray(v)) return v.length > 0;
-          return v != null;
-        })
-      ),
-      updatedAt: new Date(),
-    };
-
-    // Strip protected fields from INSERT values too — client paths should
-    // never seed rssFeedUrl or source, even for brand-new records.
+    // Client paths: no metadata updates on conflict. Only bump updatedAt so
+    // the ON CONFLICT DO UPDATE clause fires and RETURNING yields the row ID.
+    // Protected fields (rssFeedUrl, source) are stripped from INSERT too.
     const { rssFeedUrl: _url, source: _src, ...safeValues } = values;
 
     const [row] = await db
@@ -125,7 +102,7 @@ export async function upsertPodcast(
       .values(safeValues)
       .onConflictDoUpdate({
         target: podcasts.podcastIndexId,
-        set,
+        set: { updatedAt: new Date() },
       })
       .returning({ id: podcasts.id });
 

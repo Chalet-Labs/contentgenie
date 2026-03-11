@@ -46,8 +46,7 @@ describe("upsertPodcast — safe mode", () => {
     setupInsertChain(42);
   });
 
-  it("set contains all safe display fields when all are provided", async () => {
-    const latestEpisodeDate = new Date("2025-01-01");
+  it("set contains only updatedAt — no metadata updates on conflict", async () => {
     await upsertPodcast(
       {
         podcastIndexId: "pod-1",
@@ -57,7 +56,7 @@ describe("upsertPodcast — safe mode", () => {
         publisher: "Acme Corp",
         categories: ["tech", "science"],
         totalEpisodes: 100,
-        latestEpisodeDate,
+        latestEpisodeDate: new Date("2025-01-01"),
         rssFeedUrl: "https://example.com/feed.rss",
         source: "podcastindex",
       },
@@ -65,19 +64,10 @@ describe("upsertPodcast — safe mode", () => {
     );
 
     const [{ set }] = mockOnConflictDoUpdate.mock.calls[0];
-    expect(set).toMatchObject({
-      title: "Test Podcast",
-      imageUrl: "https://example.com/art.jpg",
-      description: "A great show",
-      publisher: "Acme Corp",
-      categories: ["tech", "science"],
-      totalEpisodes: 100,
-      latestEpisodeDate,
-    });
-    expect(Object.hasOwn(set, "updatedAt")).toBe(true);
+    expect(Object.keys(set)).toEqual(["updatedAt"]);
   });
 
-  it("set does NOT contain source, rssFeedUrl, or lastPolledAt", async () => {
+  it("strips rssFeedUrl and source from INSERT values", async () => {
     await upsertPodcast(
       {
         podcastIndexId: "pod-1",
@@ -88,50 +78,10 @@ describe("upsertPodcast — safe mode", () => {
       { updateOnConflict: "safe" }
     );
 
-    const [{ set }] = mockOnConflictDoUpdate.mock.calls[0];
-    expect(Object.hasOwn(set, "source")).toBe(false);
-    expect(Object.hasOwn(set, "rssFeedUrl")).toBe(false);
-    expect(Object.hasOwn(set, "lastPolledAt")).toBe(false);
-  });
-
-  it("filters null/undefined optional fields from set", async () => {
-    await upsertPodcast(
-      {
-        podcastIndexId: "pod-1",
-        title: "Test Podcast",
-        imageUrl: "https://example.com/art.jpg",
-        // description, publisher, categories, totalEpisodes, latestEpisodeDate all absent
-      },
-      { updateOnConflict: "safe" }
-    );
-
-    const [{ set }] = mockOnConflictDoUpdate.mock.calls[0];
-    expect(Object.hasOwn(set, "description")).toBe(false);
-    expect(Object.hasOwn(set, "publisher")).toBe(false);
-    expect(Object.hasOwn(set, "categories")).toBe(false);
-    expect(Object.hasOwn(set, "totalEpisodes")).toBe(false);
-    expect(Object.hasOwn(set, "latestEpisodeDate")).toBe(false);
-    // title and imageUrl are provided, so they should be present
-    expect(set.title).toBe("Test Podcast");
-    expect(set.imageUrl).toBe("https://example.com/art.jpg");
-  });
-
-  it("set contains only updatedAt when all optional fields are undefined", async () => {
-    await upsertPodcast(
-      {
-        podcastIndexId: "pod-1",
-        title: "Minimal Podcast",
-        // no optional fields
-      },
-      { updateOnConflict: "safe" }
-    );
-
-    const [{ set }] = mockOnConflictDoUpdate.mock.calls[0];
-    // title is always in safeDisplayFields — it's required and always present
-    // Only updatedAt should appear alongside title
-    const keys = Object.keys(set);
-    expect(keys).toEqual(expect.arrayContaining(["title", "updatedAt"]));
-    expect(keys.filter((k) => !["title", "updatedAt"].includes(k))).toHaveLength(0);
+    const insertValues = mockInsert.mock.results[0].value.values.mock.calls[0][0];
+    expect(Object.hasOwn(insertValues, "rssFeedUrl")).toBe(false);
+    expect(Object.hasOwn(insertValues, "source")).toBe(false);
+    expect(insertValues.title).toBe("Test Podcast");
   });
 
   it("returns the podcast id from the DB row", async () => {
