@@ -9,21 +9,14 @@ vi.mock("@trigger.dev/sdk", () => ({
   },
 }));
 
-// Mock web-push
-const mockSendNotification = vi.fn();
-const mockSetVapidDetails = vi.fn();
-
-vi.mock("web-push", () => ({
-  default: {
-    setVapidDetails: (...args: unknown[]) => mockSetVapidDetails(...args),
-    sendNotification: (...args: unknown[]) => mockSendNotification(...args),
-  },
+// Mock sendPushToUser from the shared push module
+const mockSendPushToUser = vi.fn();
+vi.mock("@/lib/push", () => ({
+  sendPushToUser: (...args: unknown[]) => mockSendPushToUser(...args),
 }));
 
 // Mock DB — separate mocks per query type to avoid order-dependent fragility
 const mockInsert = vi.fn();
-const mockDelete = vi.fn();
-const mockPushSubsFindMany = vi.fn();
 const mockUserSubsFindMany = vi.fn();
 const mockUsersFindMany = vi.fn();
 const mockFindFirst = vi.fn();
@@ -31,11 +24,7 @@ const mockFindFirst = vi.fn();
 vi.mock("@/db", () => ({
   db: {
     insert: (...args: unknown[]) => mockInsert(...args),
-    delete: (...args: unknown[]) => mockDelete(...args),
     query: {
-      pushSubscriptions: {
-        findMany: (...args: unknown[]) => mockPushSubsFindMany(...args),
-      },
       userSubscriptions: {
         findMany: (...args: unknown[]) => mockUserSubsFindMany(...args),
       },
@@ -70,15 +59,12 @@ vi.mock("drizzle-orm", () => ({
 describe("trigger/helpers/notifications", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.stubEnv("NEXT_PUBLIC_VAPID_PUBLIC_KEY", "test-public-key");
-    vi.stubEnv("VAPID_PRIVATE_KEY", "test-private-key");
-    vi.stubEnv("VAPID_SUBJECT", "mailto:test@example.com");
+    mockSendPushToUser.mockResolvedValue({ sent: 1, failed: 0 });
     vi.resetModules();
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
-    vi.unstubAllEnvs();
     vi.resetModules();
   });
 
@@ -184,16 +170,7 @@ describe("trigger/helpers/notifications", () => {
           preferences: { digestFrequency: "daily", pushEnabled: true },
         },
       ]);
-      // push subs for realtime user only
-      mockPushSubsFindMany.mockResolvedValueOnce([
-        {
-          endpoint: "https://push.example.com/1",
-          p256dh: "key",
-          auth: "auth",
-        },
-      ]);
 
-      mockSendNotification.mockResolvedValue({});
       const mockValues = vi.fn().mockResolvedValue(undefined);
       mockInsert.mockReturnValue({ values: mockValues });
 
@@ -211,7 +188,39 @@ describe("trigger/helpers/notifications", () => {
       // Bulk insert was called
       expect(mockInsert).toHaveBeenCalled();
       // Push was sent only once (for realtime user)
-      expect(mockSendNotification).toHaveBeenCalledTimes(1);
+      expect(mockSendPushToUser).toHaveBeenCalledTimes(1);
+    });
+
+    it("passes logger as third arg to sendPushToUser", async () => {
+      const { logger } = await import("@trigger.dev/sdk");
+
+      mockUserSubsFindMany.mockResolvedValueOnce([{ userId: "user-realtime" }]);
+      mockUsersFindMany.mockResolvedValueOnce([
+        {
+          id: "user-realtime",
+          preferences: { digestFrequency: "realtime", pushEnabled: true },
+        },
+      ]);
+
+      const mockValues = vi.fn().mockResolvedValue(undefined);
+      mockInsert.mockReturnValue({ values: mockValues });
+
+      const { createNotificationsForSubscribers } = await import(
+        "@/trigger/helpers/notifications"
+      );
+      await createNotificationsForSubscribers(
+        1,
+        100,
+        "new_episode",
+        "Test Podcast",
+        "New episode"
+      );
+
+      expect(mockSendPushToUser).toHaveBeenCalledWith(
+        "user-realtime",
+        expect.any(Object),
+        logger
+      );
     });
 
     it("handles null episodeId correctly", async () => {
@@ -240,229 +249,6 @@ describe("trigger/helpers/notifications", () => {
           expect.objectContaining({ episodeId: null }),
         ])
       );
-    });
-  });
-
-  describe("sendPushToUser", () => {
-    it("sends push notification to all user subscriptions and returns count", async () => {
-      mockPushSubsFindMany.mockResolvedValue([
-        {
-          endpoint: "https://push.example.com/1",
-          p256dh: "key1",
-          auth: "auth1",
-        },
-        {
-          endpoint: "https://push.example.com/2",
-          p256dh: "key2",
-          auth: "auth2",
-        },
-      ]);
-      mockSendNotification.mockResolvedValue({});
-
-      const { sendPushToUser } = await import(
-        "@/trigger/helpers/notifications"
-      );
-      const sent = await sendPushToUser("user-1", {
-        title: "Test",
-        body: "Body",
-      });
-
-      expect(mockSendNotification).toHaveBeenCalledTimes(2);
-      expect(sent).toBe(2);
-    });
-
-    it("passes topic to sendNotification when tag is provided", async () => {
-      mockPushSubsFindMany.mockResolvedValue([
-        {
-          endpoint: "https://push.example.com/1",
-          p256dh: "key1",
-          auth: "auth1",
-        },
-      ]);
-      mockSendNotification.mockResolvedValue({});
-
-      const { sendPushToUser } = await import(
-        "@/trigger/helpers/notifications"
-      );
-      await sendPushToUser("user-1", {
-        title: "Test",
-        body: "Body",
-        tag: "new_episode-42",
-      });
-
-      expect(mockSendNotification).toHaveBeenCalledWith(
-        expect.any(Object),
-        expect.any(String),
-        expect.objectContaining({ topic: "new_episode-42" })
-      );
-    });
-
-    it("omits topic from sendNotification when no tag is provided", async () => {
-      mockPushSubsFindMany.mockResolvedValue([
-        {
-          endpoint: "https://push.example.com/1",
-          p256dh: "key1",
-          auth: "auth1",
-        },
-      ]);
-      mockSendNotification.mockResolvedValue({});
-
-      const { sendPushToUser } = await import(
-        "@/trigger/helpers/notifications"
-      );
-      await sendPushToUser("user-1", { title: "Test", body: "Body" });
-
-      const options = mockSendNotification.mock.calls[0][2];
-      expect(options).not.toHaveProperty("topic");
-    });
-
-    it("truncates topic to TOPIC_MAX_LENGTH characters per RFC 8030", async () => {
-      mockPushSubsFindMany.mockResolvedValue([
-        {
-          endpoint: "https://push.example.com/1",
-          p256dh: "key1",
-          auth: "auth1",
-        },
-      ]);
-      mockSendNotification.mockResolvedValue({});
-
-      const { TOPIC_MAX_LENGTH } = await import("@/lib/notifications");
-      const longTag = "a".repeat(TOPIC_MAX_LENGTH + 18);
-      const { sendPushToUser } = await import(
-        "@/trigger/helpers/notifications"
-      );
-      await sendPushToUser("user-1", {
-        title: "Test",
-        body: "Body",
-        tag: longTag,
-      });
-
-      expect(mockSendNotification).toHaveBeenCalledWith(
-        expect.any(Object),
-        expect.any(String),
-        expect.objectContaining({ topic: "a".repeat(TOPIC_MAX_LENGTH) })
-      );
-    });
-
-    it("strips non-URL-safe-base64 characters from topic per RFC 8030", async () => {
-      mockPushSubsFindMany.mockResolvedValue([
-        {
-          endpoint: "https://push.example.com/1",
-          p256dh: "key1",
-          auth: "auth1",
-        },
-      ]);
-      mockSendNotification.mockResolvedValue({});
-
-      const { sendPushToUser } = await import(
-        "@/trigger/helpers/notifications"
-      );
-      await sendPushToUser("user-1", {
-        title: "Test",
-        body: "Body",
-        tag: "tag:with/invalid chars!",
-      });
-
-      expect(mockSendNotification).toHaveBeenCalledWith(
-        expect.any(Object),
-        expect.any(String),
-        expect.objectContaining({ topic: "tagwithinvalidchars" })
-      );
-    });
-
-    it("deletes stale subscriptions on 404 response", async () => {
-      mockPushSubsFindMany.mockResolvedValue([
-        {
-          endpoint: "https://push.example.com/stale",
-          p256dh: "key",
-          auth: "auth",
-        },
-      ]);
-      mockSendNotification.mockRejectedValue({ statusCode: 404 });
-      mockDelete.mockReturnValue({ where: vi.fn() });
-
-      const { sendPushToUser } = await import(
-        "@/trigger/helpers/notifications"
-      );
-      await sendPushToUser("user-1", { title: "Test", body: "Body" });
-
-      expect(mockDelete).toHaveBeenCalled();
-    });
-
-    it("deletes stale subscriptions on 410 response", async () => {
-      mockPushSubsFindMany.mockResolvedValue([
-        {
-          endpoint: "https://push.example.com/gone",
-          p256dh: "key",
-          auth: "auth",
-        },
-      ]);
-      mockSendNotification.mockRejectedValue({ statusCode: 410 });
-      mockDelete.mockReturnValue({ where: vi.fn() });
-
-      const { sendPushToUser } = await import(
-        "@/trigger/helpers/notifications"
-      );
-      await sendPushToUser("user-1", { title: "Test", body: "Body" });
-
-      expect(mockDelete).toHaveBeenCalled();
-    });
-
-    it("does not throw on push send failure and returns zero sent", async () => {
-      mockPushSubsFindMany.mockResolvedValue([
-        {
-          endpoint: "https://push.example.com/fail",
-          p256dh: "key",
-          auth: "auth",
-        },
-      ]);
-      mockSendNotification.mockRejectedValue(new Error("Network error"));
-
-      const { sendPushToUser } = await import(
-        "@/trigger/helpers/notifications"
-      );
-      const sent = await sendPushToUser("user-1", {
-        title: "Test",
-        body: "Body",
-      });
-      expect(sent).toBe(0);
-    });
-
-    it("returns zero when user has no push subscriptions", async () => {
-      mockPushSubsFindMany.mockResolvedValue([]);
-
-      const { sendPushToUser } = await import(
-        "@/trigger/helpers/notifications"
-      );
-      const sent = await sendPushToUser("user-no-subs", {
-        title: "Test",
-        body: "Body",
-      });
-
-      expect(sent).toBe(0);
-      expect(mockSendNotification).not.toHaveBeenCalled();
-    });
-
-    it("returns zero when VAPID keys are not configured", async () => {
-      // Explicitly stub to empty strings rather than calling vi.unstubAllEnvs(),
-      // which restores the original process.env values (Doppler injects real VAPID
-      // keys locally, causing the function to proceed past the VAPID check).
-      vi.stubEnv("VAPID_PRIVATE_KEY", "");
-      vi.stubEnv("NEXT_PUBLIC_VAPID_PUBLIC_KEY", "");
-      vi.stubEnv("VAPID_SUBJECT", "");
-      vi.resetModules();
-
-      const { sendPushToUser } = await import(
-        "@/trigger/helpers/notifications"
-      );
-      const sent = await sendPushToUser("user-1", {
-        title: "Test",
-        body: "Body",
-      });
-
-      expect(sent).toBe(0);
-      expect(mockPushSubsFindMany).not.toHaveBeenCalled();
-      expect(mockSendNotification).not.toHaveBeenCalled();
     });
   });
 });

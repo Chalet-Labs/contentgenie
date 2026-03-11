@@ -1,36 +1,11 @@
-import webpush from "web-push";
 import { db } from "@/db";
 import {
   notifications,
-  pushSubscriptions,
   users,
   type NewNotification,
 } from "@/db/schema";
-import { eq, and, inArray } from "drizzle-orm";
-
-/** RFC 8030 §5.4: Topic header max length (32 URL-safe base64 characters). */
-export const TOPIC_MAX_LENGTH = 32;
-
-/** Sanitize a tag for use as an RFC 8030 Topic header: strip non-URL-safe-base64 chars and truncate. */
-export function sanitizeTopic(tag: string): string {
-  return tag.replace(/[^A-Za-z0-9\-_]/g, "").substring(0, TOPIC_MAX_LENGTH);
-}
-
-let vapidConfigured = false;
-
-function ensureVapidConfigured() {
-  if (vapidConfigured) return;
-  const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
-  const privateKey = process.env.VAPID_PRIVATE_KEY;
-  const subject = process.env.VAPID_SUBJECT;
-  if (!publicKey || !privateKey || !subject) {
-    throw new Error(
-      "VAPID keys not configured. Set NEXT_PUBLIC_VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, and VAPID_SUBJECT."
-    );
-  }
-  webpush.setVapidDetails(subject, publicKey, privateKey);
-  vapidConfigured = true;
-}
+import { eq, inArray } from "drizzle-orm";
+import { sendPushToUser, consolePushLogger } from "@/lib/push";
 
 async function getNotificationPrefs(
   userId: string
@@ -51,88 +26,6 @@ async function getNotificationPrefs(
     // Fail closed: keep notification write successful, skip push decision
     return { digestFrequency: "realtime", pushEnabled: false };
   }
-}
-
-/**
- * Send a push notification to all of a user's push subscriptions.
- * Fire-and-forget: logs errors but never throws.
- * Automatically deletes stale subscriptions (404/410).
- */
-export async function sendPushToUser(
-  userId: string,
-  payload: {
-    title: string;
-    body: string;
-    tag?: string;
-    data?: { url?: string };
-  }
-): Promise<void> {
-  try {
-    ensureVapidConfigured();
-  } catch (err) {
-    console.error("[notifications] VAPID not configured:", err);
-    return;
-  }
-
-  let subs;
-  try {
-    subs = await db.query.pushSubscriptions.findMany({
-      where: eq(pushSubscriptions.userId, userId),
-    });
-  } catch (err) {
-    console.error("[notifications] Failed to fetch push subscriptions:", err);
-    return;
-  }
-
-  const payloadStr = JSON.stringify(payload);
-  const topic = payload.tag ? sanitizeTopic(payload.tag) : undefined;
-
-  await Promise.allSettled(
-    subs.map(async (sub) => {
-      try {
-        await webpush.sendNotification(
-          {
-            endpoint: sub.endpoint,
-            keys: { p256dh: sub.p256dh, auth: sub.auth },
-          },
-          payloadStr,
-          {
-            TTL: 86400,
-            ...(topic ? { topic } : {}),
-          }
-        );
-      } catch (err: unknown) {
-        const statusCode =
-          err instanceof Object && "statusCode" in err
-            ? (err as { statusCode: number }).statusCode
-            : undefined;
-        if (statusCode === 404 || statusCode === 410) {
-          // Subscription expired — clean up
-          try {
-            await db
-              .delete(pushSubscriptions)
-              .where(
-                and(
-                  eq(pushSubscriptions.userId, userId),
-                  eq(pushSubscriptions.endpoint, sub.endpoint)
-                )
-              );
-          } catch (deleteErr) {
-            console.error(
-              "[notifications] Failed to delete stale subscription:",
-              deleteErr
-            );
-          }
-        } else {
-          const endpointHint = `${sub.endpoint.slice(0, 20)}…${sub.endpoint.slice(-8)}`;
-          console.error("[notifications] Push failed", {
-            endpoint: endpointHint,
-            error: err instanceof Error ? err.message : String(err),
-          });
-        }
-      }
-    })
-  );
 }
 
 /**
@@ -158,16 +51,20 @@ export async function createNotification(params: {
 
   const preference = await getNotificationPrefs(params.userId);
   if (preference.pushEnabled && preference.digestFrequency === "realtime") {
-    await sendPushToUser(params.userId, {
-      title: params.title,
-      body: params.body,
-      tag: params.episodeId
-        ? `${params.type}-${params.episodeId}`
-        : params.type,
-      data: {
-        url: params.episodeId ? `/episode/${params.episodeId}` : "/dashboard",
+    await sendPushToUser(
+      params.userId,
+      {
+        title: params.title,
+        body: params.body,
+        tag: params.episodeId
+          ? `${params.type}-${params.episodeId}`
+          : params.type,
+        data: {
+          url: params.episodeId ? `/episode/${params.episodeId}` : "/dashboard",
+        },
       },
-    });
+      consolePushLogger
+    );
   }
 }
 
@@ -220,18 +117,22 @@ export async function createBulkNotifications(
     items
       .filter((item) => realtimeUsers.has(item.userId))
       .map((item) =>
-        sendPushToUser(item.userId, {
-          title: item.title,
-          body: item.body,
-          tag: item.episodeId
-            ? `${item.type}-${item.episodeId}`
-            : item.type,
-          data: {
-            url: item.episodeId
-              ? `/episode/${item.episodeId}`
-              : "/dashboard",
+        sendPushToUser(
+          item.userId,
+          {
+            title: item.title,
+            body: item.body,
+            tag: item.episodeId
+              ? `${item.type}-${item.episodeId}`
+              : item.type,
+            data: {
+              url: item.episodeId
+                ? `/episode/${item.episodeId}`
+                : "/dashboard",
+            },
           },
-        })
+          consolePushLogger
+        )
       )
   );
 }

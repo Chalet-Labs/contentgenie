@@ -1,27 +1,23 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
-const mockSendNotification = vi.fn();
-const mockSetVapidDetails = vi.fn();
-
-vi.mock("web-push", () => ({
-  default: {
-    setVapidDetails: (...args: unknown[]) => mockSetVapidDetails(...args),
-    sendNotification: (...args: unknown[]) => mockSendNotification(...args),
+// Mock sendPushToUser from the shared push module
+const mockSendPushToUser = vi.fn();
+vi.mock("@/lib/push", () => ({
+  sendPushToUser: (...args: unknown[]) => mockSendPushToUser(...args),
+  consolePushLogger: {
+    warn: () => {},
+    error: () => {},
   },
 }));
 
 const mockInsert = vi.fn();
-const mockDelete = vi.fn();
-const mockFindMany = vi.fn();
 const mockFindFirst = vi.fn();
 const mockUsersFindMany = vi.fn();
 
 vi.mock("@/db", () => ({
   db: {
     insert: (...args: unknown[]) => mockInsert(...args),
-    delete: (...args: unknown[]) => mockDelete(...args),
     query: {
-      pushSubscriptions: { findMany: (...args: unknown[]) => mockFindMany(...args) },
       users: {
         findFirst: (...args: unknown[]) => mockFindFirst(...args),
         findMany: (...args: unknown[]) => mockUsersFindMany(...args),
@@ -32,7 +28,6 @@ vi.mock("@/db", () => ({
 
 vi.mock("@/db/schema", () => ({
   notifications: { userId: "userId" },
-  pushSubscriptions: { userId: "userId", endpoint: "endpoint" },
   users: { id: "id" },
 }));
 
@@ -45,145 +40,19 @@ vi.mock("drizzle-orm", () => ({
 describe("notifications library", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.stubEnv("NEXT_PUBLIC_VAPID_PUBLIC_KEY", "test-public-key");
-    vi.stubEnv("VAPID_PRIVATE_KEY", "test-private-key");
-    vi.stubEnv("VAPID_SUBJECT", "mailto:test@example.com");
-
-    // Reset module cache to reset vapidConfigured flag
+    mockSendPushToUser.mockResolvedValue({ sent: 1, failed: 0 });
     vi.resetModules();
   });
 
   afterEach(() => {
     vi.restoreAllMocks();
-    vi.unstubAllEnvs();
     vi.resetModules();
-  });
-
-  describe("sendPushToUser", () => {
-    it("sends push to all user subscriptions", async () => {
-      mockFindMany.mockResolvedValue([
-        { endpoint: "https://push.example.com/1", p256dh: "key1", auth: "auth1" },
-        { endpoint: "https://push.example.com/2", p256dh: "key2", auth: "auth2" },
-      ]);
-      mockSendNotification.mockResolvedValue({});
-
-      const { sendPushToUser } = await import("@/lib/notifications");
-      await sendPushToUser("user-1", { title: "Test", body: "Body" });
-
-      expect(mockSendNotification).toHaveBeenCalledTimes(2);
-    });
-
-    it("passes topic to sendNotification when tag is provided", async () => {
-      mockFindMany.mockResolvedValue([
-        { endpoint: "https://push.example.com/1", p256dh: "key1", auth: "auth1" },
-      ]);
-      mockSendNotification.mockResolvedValue({});
-
-      const { sendPushToUser } = await import("@/lib/notifications");
-      await sendPushToUser("user-1", { title: "Test", body: "Body", tag: "new_episode-42" });
-
-      expect(mockSendNotification).toHaveBeenCalledWith(
-        expect.any(Object),
-        expect.any(String),
-        expect.objectContaining({ topic: "new_episode-42" })
-      );
-    });
-
-    it("omits topic from sendNotification when no tag is provided", async () => {
-      mockFindMany.mockResolvedValue([
-        { endpoint: "https://push.example.com/1", p256dh: "key1", auth: "auth1" },
-      ]);
-      mockSendNotification.mockResolvedValue({});
-
-      const { sendPushToUser } = await import("@/lib/notifications");
-      await sendPushToUser("user-1", { title: "Test", body: "Body" });
-
-      const options = mockSendNotification.mock.calls[0][2];
-      expect(options).not.toHaveProperty("topic");
-    });
-
-    it("truncates topic to TOPIC_MAX_LENGTH characters per RFC 8030", async () => {
-      mockFindMany.mockResolvedValue([
-        { endpoint: "https://push.example.com/1", p256dh: "key1", auth: "auth1" },
-      ]);
-      mockSendNotification.mockResolvedValue({});
-
-      const { sendPushToUser, TOPIC_MAX_LENGTH } = await import("@/lib/notifications");
-      const longTag = "a".repeat(TOPIC_MAX_LENGTH + 18);
-      await sendPushToUser("user-1", { title: "Test", body: "Body", tag: longTag });
-
-      expect(mockSendNotification).toHaveBeenCalledWith(
-        expect.any(Object),
-        expect.any(String),
-        expect.objectContaining({ topic: "a".repeat(TOPIC_MAX_LENGTH) })
-      );
-    });
-
-    it("strips non-URL-safe-base64 characters from topic per RFC 8030", async () => {
-      mockFindMany.mockResolvedValue([
-        { endpoint: "https://push.example.com/1", p256dh: "key1", auth: "auth1" },
-      ]);
-      mockSendNotification.mockResolvedValue({});
-
-      const { sendPushToUser } = await import("@/lib/notifications");
-      await sendPushToUser("user-1", { title: "Test", body: "Body", tag: "tag:with/invalid chars!" });
-
-      expect(mockSendNotification).toHaveBeenCalledWith(
-        expect.any(Object),
-        expect.any(String),
-        expect.objectContaining({ topic: "tagwithinvalidchars" })
-      );
-    });
-
-    it("deletes stale subscriptions on 404 response", async () => {
-      mockFindMany.mockResolvedValue([
-        { endpoint: "https://push.example.com/stale", p256dh: "key", auth: "auth" },
-      ]);
-      mockSendNotification.mockRejectedValue({ statusCode: 404 });
-      mockDelete.mockReturnValue({ where: vi.fn() });
-
-      const { sendPushToUser } = await import("@/lib/notifications");
-      await sendPushToUser("user-1", { title: "Test", body: "Body" });
-
-      expect(mockDelete).toHaveBeenCalled();
-    });
-
-    it("deletes stale subscriptions on 410 response", async () => {
-      mockFindMany.mockResolvedValue([
-        { endpoint: "https://push.example.com/gone", p256dh: "key", auth: "auth" },
-      ]);
-      mockSendNotification.mockRejectedValue({ statusCode: 410 });
-      mockDelete.mockReturnValue({ where: vi.fn() });
-
-      const { sendPushToUser } = await import("@/lib/notifications");
-      await sendPushToUser("user-1", { title: "Test", body: "Body" });
-
-      expect(mockDelete).toHaveBeenCalled();
-    });
-
-    it("logs error but does not throw on push failure", async () => {
-      mockFindMany.mockResolvedValue([
-        { endpoint: "https://push.example.com/fail", p256dh: "key", auth: "auth" },
-      ]);
-      mockSendNotification.mockRejectedValue(new Error("Network error"));
-
-      const { sendPushToUser } = await import("@/lib/notifications");
-
-      // Should not throw
-      await expect(
-        sendPushToUser("user-1", { title: "Test", body: "Body" })
-      ).resolves.toBeUndefined();
-    });
   });
 
   describe("createNotification", () => {
     it("inserts notification and dispatches push for realtime users", async () => {
       mockInsert.mockReturnValue({ values: vi.fn().mockResolvedValue(undefined) });
       mockFindFirst.mockResolvedValue({ preferences: { digestFrequency: "realtime", pushEnabled: true } });
-      mockFindMany.mockResolvedValue([
-        { endpoint: "https://push.example.com/1", p256dh: "k", auth: "a" },
-      ]);
-      mockSendNotification.mockResolvedValue({});
 
       const { createNotification } = await import("@/lib/notifications");
       await createNotification({
@@ -195,7 +64,12 @@ describe("notifications library", () => {
       });
 
       expect(mockInsert).toHaveBeenCalled();
-      expect(mockSendNotification).toHaveBeenCalledTimes(1);
+      expect(mockSendPushToUser).toHaveBeenCalledTimes(1);
+      expect(mockSendPushToUser).toHaveBeenCalledWith(
+        "user-1",
+        expect.objectContaining({ title: "Test Podcast", body: "New episode: Test" }),
+        expect.any(Object)
+      );
     });
 
     it("skips push for users with daily digest preference", async () => {
@@ -212,8 +86,7 @@ describe("notifications library", () => {
       });
 
       expect(mockInsert).toHaveBeenCalled();
-      // sendPushToUser should NOT have been called (no findMany for push subs)
-      expect(mockFindMany).not.toHaveBeenCalled();
+      expect(mockSendPushToUser).not.toHaveBeenCalled();
     });
   });
 
@@ -225,7 +98,6 @@ describe("notifications library", () => {
         { id: "user-1", preferences: { pushEnabled: true, digestFrequency: "realtime" } },
         { id: "user-2", preferences: { pushEnabled: true, digestFrequency: "realtime" } },
       ]);
-      mockFindMany.mockResolvedValue([]); // empty push subscriptions
 
       const { createBulkNotifications } = await import("@/lib/notifications");
       await createBulkNotifications([
@@ -238,6 +110,28 @@ describe("notifications library", () => {
           expect.objectContaining({ userId: "user-1" }),
           expect.objectContaining({ userId: "user-2" }),
         ])
+      );
+    });
+
+    it("dispatches push to realtime users only", async () => {
+      const mockValues = vi.fn().mockResolvedValue(undefined);
+      mockInsert.mockReturnValue({ values: mockValues });
+      mockUsersFindMany.mockResolvedValue([
+        { id: "user-1", preferences: { pushEnabled: true, digestFrequency: "realtime" } },
+        { id: "user-2", preferences: { pushEnabled: true, digestFrequency: "daily" } },
+      ]);
+
+      const { createBulkNotifications } = await import("@/lib/notifications");
+      await createBulkNotifications([
+        { type: "new_episode", userId: "user-1", episodeId: 1, title: "P1", body: "New" },
+        { type: "new_episode", userId: "user-2", episodeId: 1, title: "P1", body: "New" },
+      ]);
+
+      expect(mockSendPushToUser).toHaveBeenCalledTimes(1);
+      expect(mockSendPushToUser).toHaveBeenCalledWith(
+        "user-1",
+        expect.any(Object),
+        expect.any(Object)
       );
     });
 
