@@ -160,9 +160,10 @@ describe("push module", () => {
       mockDelete.mockReturnValue({ where: vi.fn() });
 
       const { sendPushToUser } = await import("@/lib/push");
-      await sendPushToUser("user-1", { title: "Test", body: "Body" });
+      const result = await sendPushToUser("user-1", { title: "Test", body: "Body" });
 
       expect(mockDelete).toHaveBeenCalled();
+      expect(result).toEqual({ sent: 0, failed: 1 });
     });
 
     it("deletes stale subscriptions on 410 response", async () => {
@@ -173,9 +174,10 @@ describe("push module", () => {
       mockDelete.mockReturnValue({ where: vi.fn() });
 
       const { sendPushToUser } = await import("@/lib/push");
-      await sendPushToUser("user-1", { title: "Test", body: "Body" });
+      const result = await sendPushToUser("user-1", { title: "Test", body: "Body" });
 
       expect(mockDelete).toHaveBeenCalled();
+      expect(result).toEqual({ sent: 0, failed: 1 });
     });
 
     it("returns failed count when push fails with non-stale error", async () => {
