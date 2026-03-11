@@ -7,7 +7,6 @@ import { episodes, listenHistory } from "@/db/schema"
 
 export async function recordListenEvent(input: {
   podcastIndexEpisodeId: number
-  started?: boolean
   completed?: boolean
   durationSeconds?: number
 }): Promise<{ success: boolean }> {

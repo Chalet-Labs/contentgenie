@@ -778,7 +778,6 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
         listenHistoryFiredRef.current.add(ep.id)
         void recordListenEvent({
           podcastIndexEpisodeId: Number(ep.id),
-          started: true,
         })
       }
 

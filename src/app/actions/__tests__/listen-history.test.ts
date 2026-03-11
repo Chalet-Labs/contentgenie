@@ -77,7 +77,7 @@ describe("recordListenEvent", () => {
     const { recordListenEvent } = await import("@/app/actions/listen-history")
     const result = await recordListenEvent({
       podcastIndexEpisodeId: 12345,
-      started: true,
+
     })
     expect(result).toEqual({ success: false })
     expect(mockInsert).not.toHaveBeenCalled()
@@ -88,7 +88,7 @@ describe("recordListenEvent", () => {
     const { recordListenEvent } = await import("@/app/actions/listen-history")
     const result = await recordListenEvent({
       podcastIndexEpisodeId: 99999,
-      started: true,
+
     })
     expect(result).toEqual({ success: false })
     expect(mockFindFirst).toHaveBeenCalledTimes(1)
@@ -99,7 +99,7 @@ describe("recordListenEvent", () => {
     const { recordListenEvent } = await import("@/app/actions/listen-history")
     const result = await recordListenEvent({
       podcastIndexEpisodeId: 99999,
-      started: true,
+
     })
     expect(result).toEqual({ success: true })
     expect(mockFindFirst).toHaveBeenCalledTimes(1)
@@ -136,7 +136,7 @@ describe("recordListenEvent", () => {
     const { recordListenEvent } = await import("@/app/actions/listen-history")
     await recordListenEvent({
       podcastIndexEpisodeId: 111,
-      started: true,
+
     })
     expect(mockOnConflictDoUpdate).toHaveBeenCalledTimes(1)
     const upsertOpts = mockOnConflictDoUpdate.mock.calls[0][0]
@@ -175,7 +175,7 @@ describe("recordListenEvent", () => {
     const { recordListenEvent } = await import("@/app/actions/listen-history")
     const result = await recordListenEvent({
       podcastIndexEpisodeId: -1,
-      started: true,
+
     })
     expect(result).toEqual({ success: false })
     expect(mockFindFirst).not.toHaveBeenCalled()
