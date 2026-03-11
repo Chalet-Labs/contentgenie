@@ -9,13 +9,11 @@ vi.mock("@/lib/push", () => ({
 const mockInsert = vi.fn();
 const mockFindFirst = vi.fn();
 const mockUsersFindMany = vi.fn();
-const mockFindMany = vi.fn();
 
 vi.mock("@/db", () => ({
   db: {
     insert: (...args: unknown[]) => mockInsert(...args),
     query: {
-      pushSubscriptions: { findMany: (...args: unknown[]) => mockFindMany(...args) },
       users: {
         findFirst: (...args: unknown[]) => mockFindFirst(...args),
         findMany: (...args: unknown[]) => mockUsersFindMany(...args),
@@ -26,7 +24,6 @@ vi.mock("@/db", () => ({
 
 vi.mock("@/db/schema", () => ({
   notifications: { userId: "userId" },
-  pushSubscriptions: { userId: "userId", endpoint: "endpoint" },
   users: { id: "id" },
 }));
 

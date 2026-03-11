@@ -17,7 +17,7 @@ export interface PushLogger {
 }
 
 export const consolePushLogger: PushLogger = {
-  warn: (msg, meta) => console.error(`[push] ${msg}`, meta ?? ""),
+  warn: (msg, meta) => console.warn(`[push] ${msg}`, meta ?? ""),
   error: (msg, meta) => console.error(`[push] ${msg}`, meta ?? ""),
 };
 
@@ -135,8 +135,11 @@ export async function sendPushToUser(
     })
   );
 
-  return {
-    sent: results.filter((r) => r.status === "fulfilled").length,
-    failed: results.filter((r) => r.status === "rejected").length,
-  };
+  let sent = 0;
+  let failed = 0;
+  for (const r of results) {
+    if (r.status === "fulfilled") sent++;
+    else failed++;
+  }
+  return { sent, failed };
 }
