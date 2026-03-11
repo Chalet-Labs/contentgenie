@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
 
     const {
       podcastIndexId, title, description, publisher,
-      imageUrl, rssFeedUrl, categories, totalEpisodes, latestEpisodeDate,
+      imageUrl, categories, totalEpisodes, latestEpisodeDate,
     } = result.data;
 
     const latestEpisodeDateValue = safeParseDate(latestEpisodeDate);
@@ -64,7 +64,6 @@ export async function POST(request: NextRequest) {
         description,
         publisher,
         imageUrl,
-        rssFeedUrl,
         categories,
         totalEpisodes,
         latestEpisodeDate: latestEpisodeDateValue,
@@ -78,12 +77,12 @@ export async function POST(request: NextRequest) {
       .onConflictDoNothing()
       .returning({ id: userSubscriptions.id });
 
-    revalidatePath("/subscriptions");
-    revalidatePath(`/podcast/${podcastIndexId}`);
-
     if (subResult.length === 0) {
       return NextResponse.json({ success: true, message: "Already subscribed" });
     }
+
+    revalidatePath("/subscriptions");
+    revalidatePath(`/podcast/${podcastIndexId}`);
 
     return NextResponse.json({ success: true, message: "Subscribed successfully" });
   } catch (error) {

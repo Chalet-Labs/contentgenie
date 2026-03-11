@@ -61,7 +61,6 @@ export async function saveEpisodeToLibrary(episodeData: EpisodeData) {
       description: podcastInput.description,
       publisher: podcastInput.publisher,
       imageUrl: podcastInput.imageUrl,
-      rssFeedUrl: podcastInput.rssFeedUrl,
       categories: podcastInput.categories,
       totalEpisodes: podcastInput.totalEpisodes,
     }, { updateOnConflict: "safe" });

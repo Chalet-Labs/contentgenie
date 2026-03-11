@@ -61,7 +61,6 @@ export async function POST(request: NextRequest) {
         description: podcast.description,
         publisher: podcast.publisher,
         imageUrl: podcast.imageUrl,
-        rssFeedUrl: podcast.rssFeedUrl,
         categories: podcast.categories,
         totalEpisodes: podcast.totalEpisodes,
       }, { updateOnConflict: "safe" }),
@@ -92,12 +91,12 @@ export async function POST(request: NextRequest) {
       .onConflictDoNothing()
       .returning({ id: userLibrary.id });
 
-    revalidatePath("/library");
-    revalidatePath(`/episode/${podcastIndexId}`);
-
     if (libraryResult.length === 0) {
       return NextResponse.json({ success: true, message: "Episode already in library" });
     }
+
+    revalidatePath("/library");
+    revalidatePath(`/episode/${podcastIndexId}`);
 
     return NextResponse.json({ success: true, message: "Episode saved to library" });
   } catch (error) {

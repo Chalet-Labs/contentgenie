@@ -230,7 +230,6 @@ export async function subscribeToPodcast(podcastData: PodcastData) {
       description: input.description,
       publisher: input.publisher,
       imageUrl: input.imageUrl,
-      rssFeedUrl: input.rssFeedUrl,
       categories: input.categories,
       totalEpisodes: input.totalEpisodes,
       latestEpisodeDate,

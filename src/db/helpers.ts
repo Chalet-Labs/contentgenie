@@ -45,8 +45,8 @@ export interface UpsertPodcastData {
 interface UpsertPodcastOptions {
   /**
    * Controls conflict-update behaviour:
-   * - `"full"` (default): updates all provided fields including `source`,
-   *   `rssFeedUrl`, and `lastPolledAt`. Use for trusted Trigger.dev call sites.
+   * - `"full"` (default): updates all provided fields including `source` and
+   *   `rssFeedUrl`. Use for trusted Trigger.dev call sites.
    * - `"safe"`: no metadata updates on conflict — only bumps `updatedAt` so
    *   RETURNING works. Protected fields (`source`, `rssFeedUrl`) are also
    *   stripped from the INSERT values. Use for client-facing server actions
