@@ -12,7 +12,7 @@ import {
   generateEpisodeSyntheticId,
 } from "@/lib/rss";
 import { isSafeUrl } from "@/lib/security";
-import { subscribeSchema } from "@/lib/schemas/library";
+import { subscribeSchema, safeParseDate } from "@/lib/schemas/library";
 
 const MAX_EPISODES_PER_IMPORT = 50;
 
@@ -215,15 +215,14 @@ export async function subscribeToPodcast(podcastData: PodcastData) {
       latestEpisodeDate: podcastData.latestEpisodeDate?.toISOString(),
     });
     if (!parsed.success) {
+      console.warn("[subscribeToPodcast] validation failed", parsed.error.issues);
       return { success: false, error: "Invalid podcast data" };
     }
     const input = parsed.data;
 
     await ensureUserExists(userId);
 
-    const latestEpisodeDate = input.latestEpisodeDate
-      ? new Date(input.latestEpisodeDate)
-      : undefined;
+    const latestEpisodeDate = safeParseDate(input.latestEpisodeDate);
 
     const podcastId = await upsertPodcast({
       podcastIndexId: input.podcastIndexId,

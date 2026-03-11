@@ -13,7 +13,7 @@ import {
   COLLECTION_LIST_COLUMNS,
   type SavedItemDTO,
 } from "@/db/library-columns";
-import { saveEpisodeSchema } from "@/lib/schemas/library";
+import { saveEpisodeSchema, safeParseDate } from "@/lib/schemas/library";
 
 type EpisodeData = {
   podcastIndexId: string;
@@ -48,6 +48,7 @@ export async function saveEpisodeToLibrary(episodeData: EpisodeData) {
       publishDate: episodeData.publishDate?.toISOString(),
     });
     if (!parsed.success) {
+      console.warn("[saveEpisodeToLibrary] validation failed", parsed.error.issues);
       return { success: false, error: "Invalid episode data" };
     }
     const { podcast: podcastInput } = parsed.data;
@@ -65,9 +66,7 @@ export async function saveEpisodeToLibrary(episodeData: EpisodeData) {
       totalEpisodes: podcastInput.totalEpisodes,
     }, { updateOnConflict: "safe" });
 
-    const publishDate = parsed.data.publishDate
-      ? new Date(parsed.data.publishDate)
-      : undefined;
+    const publishDate = safeParseDate(parsed.data.publishDate);
 
     // BOLT OPTIMIZATION: Use upsert (onConflictDoUpdate) for episodes to consolidate lookup
     // and insertion into one round-trip.
@@ -87,7 +86,6 @@ export async function saveEpisodeToLibrary(episodeData: EpisodeData) {
         set: {
           title: parsed.data.title,
           description: parsed.data.description,
-          audioUrl: parsed.data.audioUrl,
           duration: parsed.data.duration,
           publishDate,
           updatedAt: new Date(),

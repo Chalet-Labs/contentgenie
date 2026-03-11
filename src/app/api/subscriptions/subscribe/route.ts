@@ -78,12 +78,12 @@ export async function POST(request: NextRequest) {
       .onConflictDoNothing()
       .returning({ id: userSubscriptions.id });
 
+    revalidatePath("/subscriptions");
+    revalidatePath(`/podcast/${podcastIndexId}`);
+
     if (subResult.length === 0) {
       return NextResponse.json({ success: true, message: "Already subscribed" });
     }
-
-    revalidatePath("/subscriptions");
-    revalidatePath(`/podcast/${podcastIndexId}`);
 
     return NextResponse.json({ success: true, message: "Subscribed successfully" });
   } catch (error) {

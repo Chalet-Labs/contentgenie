@@ -84,7 +84,6 @@ export async function POST(request: NextRequest) {
         set: {
           title,
           description,
-          audioUrl,
           duration,
           publishDate: publishDateValue,
           updatedAt: new Date(),
@@ -99,12 +98,12 @@ export async function POST(request: NextRequest) {
       .onConflictDoNothing()
       .returning({ id: userLibrary.id });
 
+    revalidatePath("/library");
+    revalidatePath(`/episode/${podcastIndexId}`);
+
     if (libraryResult.length === 0) {
       return NextResponse.json({ success: true, message: "Episode already in library" });
     }
-
-    revalidatePath("/library");
-    revalidatePath(`/episode/${podcastIndexId}`);
 
     return NextResponse.json({ success: true, message: "Episode saved to library" });
   } catch (error) {

@@ -108,14 +108,21 @@ export async function upsertPodcast(
     // rssFeedUrl, lastPolledAt) are never overwritten from client paths.
     const set = {
       ...Object.fromEntries(
-        Object.entries(safeDisplayFields).filter(([, v]) => v != null)
+        Object.entries(safeDisplayFields).filter(([, v]) => {
+          if (Array.isArray(v)) return v.length > 0;
+          return v != null;
+        })
       ),
       updatedAt: new Date(),
     };
 
+    // Strip protected fields from INSERT values too — client paths should
+    // never seed rssFeedUrl or source, even for brand-new records.
+    const { rssFeedUrl: _url, source: _src, ...safeValues } = values;
+
     const [row] = await db
       .insert(podcasts)
-      .values(values)
+      .values(safeValues)
       .onConflictDoUpdate({
         target: podcasts.podcastIndexId,
         set,
