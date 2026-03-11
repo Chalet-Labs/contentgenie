@@ -272,7 +272,7 @@ describe("send-notification-digests", () => {
     expect(mockUpdateSet).not.toHaveBeenCalled();
   });
 
-  it("skips digest state update when sendPushToUser delivers zero pushes", async () => {
+  it("advances digest state when user has no push subscriptions (sent=0, failed=0)", async () => {
     const lastDigest = new Date(Date.now() - 25 * 60 * 60 * 1000);
     const digestUser = {
       id: "user-1",
@@ -284,6 +284,26 @@ describe("send-notification-digests", () => {
     };
     setupSelectChain([digestUser], 3);
     mockSendPushToUser.mockResolvedValueOnce({ sent: 0, failed: 0 }); // No push subscriptions
+
+    const result = await taskRunner.run();
+
+    expect(result.digestsSent).toBe(1);
+    expect(mockSendPushToUser).toHaveBeenCalled();
+    expect(mockUpdateSet).toHaveBeenCalled();
+  });
+
+  it("skips digest state update when all pushes fail (sent=0, failed>0)", async () => {
+    const lastDigest = new Date(Date.now() - 25 * 60 * 60 * 1000);
+    const digestUser = {
+      id: "user-1",
+      preferences: {
+        digestFrequency: "daily",
+        pushEnabled: true,
+        lastDigestSentAt: lastDigest.toISOString(),
+      },
+    };
+    setupSelectChain([digestUser], 3);
+    mockSendPushToUser.mockResolvedValueOnce({ sent: 0, failed: 2 }); // All pushes failed
 
     const result = await taskRunner.run();
 

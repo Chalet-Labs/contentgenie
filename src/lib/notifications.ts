@@ -5,7 +5,7 @@ import {
   type NewNotification,
 } from "@/db/schema";
 import { eq, inArray } from "drizzle-orm";
-import { sendPushToUser } from "@/lib/push";
+import { sendPushToUser, consolePushLogger } from "@/lib/push";
 
 async function getNotificationPrefs(
   userId: string
@@ -51,16 +51,20 @@ export async function createNotification(params: {
 
   const preference = await getNotificationPrefs(params.userId);
   if (preference.pushEnabled && preference.digestFrequency === "realtime") {
-    await sendPushToUser(params.userId, {
-      title: params.title,
-      body: params.body,
-      tag: params.episodeId
-        ? `${params.type}-${params.episodeId}`
-        : params.type,
-      data: {
-        url: params.episodeId ? `/episode/${params.episodeId}` : "/dashboard",
+    await sendPushToUser(
+      params.userId,
+      {
+        title: params.title,
+        body: params.body,
+        tag: params.episodeId
+          ? `${params.type}-${params.episodeId}`
+          : params.type,
+        data: {
+          url: params.episodeId ? `/episode/${params.episodeId}` : "/dashboard",
+        },
       },
-    });
+      consolePushLogger
+    );
   }
 }
 
@@ -113,18 +117,22 @@ export async function createBulkNotifications(
     items
       .filter((item) => realtimeUsers.has(item.userId))
       .map((item) =>
-        sendPushToUser(item.userId, {
-          title: item.title,
-          body: item.body,
-          tag: item.episodeId
-            ? `${item.type}-${item.episodeId}`
-            : item.type,
-          data: {
-            url: item.episodeId
-              ? `/episode/${item.episodeId}`
-              : "/dashboard",
+        sendPushToUser(
+          item.userId,
+          {
+            title: item.title,
+            body: item.body,
+            tag: item.episodeId
+              ? `${item.type}-${item.episodeId}`
+              : item.type,
+            data: {
+              url: item.episodeId
+                ? `/episode/${item.episodeId}`
+                : "/dashboard",
+            },
           },
-        })
+          consolePushLogger
+        )
       )
   );
 }

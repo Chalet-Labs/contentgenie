@@ -219,7 +219,7 @@ describe("push module", () => {
         { endpoint: "https://push.example.com/fail", p256dh: "key", auth: "auth" },
       ]);
       mockSendNotification.mockRejectedValue(new Error("Network error"));
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
       const { sendPushToUser } = await import("@/lib/push");
       // Should not throw even with console logger

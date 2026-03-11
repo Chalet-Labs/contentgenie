@@ -21,6 +21,24 @@ export const consolePushLogger: PushLogger = {
   error: (msg, meta) => console.error(`[push] ${msg}`, meta ?? ""),
 };
 
+/** Redact a push endpoint for safe logging (preserves origin + first/last token chars). */
+function redactEndpoint(endpoint: string): string {
+  try {
+    const url = new URL(endpoint);
+    const pathParts = url.pathname.split("/");
+    const token = pathParts[pathParts.length - 1];
+    const short =
+      token.length > 12
+        ? `${token.slice(0, 6)}…${token.slice(-4)}`
+        : token;
+    return `${url.origin}/…/${short}`;
+  } catch {
+    return endpoint.length > 20
+      ? `${endpoint.slice(0, 12)}…${endpoint.slice(-4)}`
+      : endpoint;
+  }
+}
+
 export interface PushResult {
   sent: number;
   failed: number;
@@ -116,7 +134,7 @@ export async function sendPushToUser(
               );
           } catch (deleteErr) {
             logger.error("Failed to delete stale push subscription", {
-              endpoint: sub.endpoint,
+              endpoint: redactEndpoint(sub.endpoint),
               error:
                 deleteErr instanceof Error
                   ? deleteErr.message
@@ -125,7 +143,7 @@ export async function sendPushToUser(
           }
         } else {
           logger.warn("Push notification failed", {
-            endpoint: sub.endpoint,
+            endpoint: redactEndpoint(sub.endpoint),
             statusCode,
             error: err instanceof Error ? err.message : String(err),
           });

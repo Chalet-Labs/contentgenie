@@ -4,6 +4,10 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 const mockSendPushToUser = vi.fn();
 vi.mock("@/lib/push", () => ({
   sendPushToUser: (...args: unknown[]) => mockSendPushToUser(...args),
+  consolePushLogger: {
+    warn: () => {},
+    error: () => {},
+  },
 }));
 
 const mockInsert = vi.fn();
@@ -63,7 +67,8 @@ describe("notifications library", () => {
       expect(mockSendPushToUser).toHaveBeenCalledTimes(1);
       expect(mockSendPushToUser).toHaveBeenCalledWith(
         "user-1",
-        expect.objectContaining({ title: "Test Podcast", body: "New episode: Test" })
+        expect.objectContaining({ title: "Test Podcast", body: "New episode: Test" }),
+        expect.any(Object)
       );
     });
 
@@ -125,6 +130,7 @@ describe("notifications library", () => {
       expect(mockSendPushToUser).toHaveBeenCalledTimes(1);
       expect(mockSendPushToUser).toHaveBeenCalledWith(
         "user-1",
+        expect.any(Object),
         expect.any(Object)
       );
     });

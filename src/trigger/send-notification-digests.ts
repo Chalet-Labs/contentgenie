@@ -90,8 +90,11 @@ export const sendNotificationDigests = schedules.task({
           logger
         );
 
-        // Only advance digest state when at least one push was delivered
-        if (pushResult.sent === 0) continue;
+        // Skip advancement only when push was attempted but none succeeded
+        // (e.g. transient network errors). When sent+failed are both 0
+        // (no subscriptions or VAPID unconfigured), advance to prevent
+        // infinite reprocessing of unreachable users.
+        if (pushResult.sent === 0 && pushResult.failed > 0) continue;
 
         // Update lastDigestSentAt using read-modify-write
         const currentPrefs = prefs ?? {};
