@@ -61,10 +61,9 @@ export async function POST(request: NextRequest) {
         description: podcast.description,
         publisher: podcast.publisher,
         imageUrl: podcast.imageUrl,
-        rssFeedUrl: podcast.rssFeedUrl,
         categories: podcast.categories,
         totalEpisodes: podcast.totalEpisodes,
-      }, { updateOnConflict: false }),
+      }, { updateOnConflict: "safe" }),
     };
 
     // Upsert episode
@@ -81,14 +80,7 @@ export async function POST(request: NextRequest) {
       })
       .onConflictDoUpdate({
         target: episodes.podcastIndexId,
-        set: {
-          title,
-          description,
-          audioUrl,
-          duration,
-          publishDate: publishDateValue,
-          updatedAt: new Date(),
-        },
+        set: { updatedAt: new Date() },
       })
       .returning({ id: episodes.id });
 

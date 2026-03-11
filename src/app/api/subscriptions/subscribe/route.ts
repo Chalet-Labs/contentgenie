@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
 
     const {
       podcastIndexId, title, description, publisher,
-      imageUrl, rssFeedUrl, categories, totalEpisodes, latestEpisodeDate,
+      imageUrl, categories, totalEpisodes, latestEpisodeDate,
     } = result.data;
 
     const latestEpisodeDateValue = safeParseDate(latestEpisodeDate);
@@ -64,11 +64,10 @@ export async function POST(request: NextRequest) {
         description,
         publisher,
         imageUrl,
-        rssFeedUrl,
         categories,
         totalEpisodes,
         latestEpisodeDate: latestEpisodeDateValue,
-      }, { updateOnConflict: false }),
+      }, { updateOnConflict: "safe" }),
     };
 
     // Insert subscription (idempotent)

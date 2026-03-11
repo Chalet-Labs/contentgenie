@@ -13,8 +13,9 @@ import {
   COLLECTION_LIST_COLUMNS,
   type SavedItemDTO,
 } from "@/db/library-columns";
+import { saveEpisodeSchema, safeParseDate } from "@/lib/schemas/library";
 
-interface EpisodeData {
+type EpisodeData = {
   podcastIndexId: string;
   title: string;
   description?: string;
@@ -31,7 +32,7 @@ interface EpisodeData {
     categories?: string[];
     totalEpisodes?: number;
   };
-}
+};
 
 // Save an episode to the user's library
 export async function saveEpisodeToLibrary(episodeData: EpisodeData) {
@@ -42,25 +43,29 @@ export async function saveEpisodeToLibrary(episodeData: EpisodeData) {
   }
 
   try {
+    const parsed = saveEpisodeSchema.safeParse({
+      ...episodeData,
+      publishDate: episodeData.publishDate?.toISOString(),
+    });
+    if (!parsed.success) {
+      console.warn("[saveEpisodeToLibrary] validation failed", parsed.error.issues);
+      return { success: false, error: "Invalid episode data" };
+    }
+    const { podcast: podcastInput } = parsed.data;
+
     await ensureUserExists(userId);
 
-    const trimmedPodcastIndexId = episodeData.podcast.podcastIndexId.trim();
-    const trimmedPodcastTitle = episodeData.podcast.title.trim();
-
-    if (!trimmedPodcastIndexId || !trimmedPodcastTitle) {
-      return { success: false, error: "Podcast ID and title are required" };
-    }
-
     const podcastId = await upsertPodcast({
-      podcastIndexId: trimmedPodcastIndexId,
-      title: trimmedPodcastTitle,
-      description: episodeData.podcast.description,
-      publisher: episodeData.podcast.publisher,
-      imageUrl: episodeData.podcast.imageUrl,
-      rssFeedUrl: episodeData.podcast.rssFeedUrl,
-      categories: episodeData.podcast.categories,
-      totalEpisodes: episodeData.podcast.totalEpisodes,
-    }, { updateOnConflict: false });
+      podcastIndexId: podcastInput.podcastIndexId,
+      title: podcastInput.title,
+      description: podcastInput.description,
+      publisher: podcastInput.publisher,
+      imageUrl: podcastInput.imageUrl,
+      categories: podcastInput.categories,
+      totalEpisodes: podcastInput.totalEpisodes,
+    }, { updateOnConflict: "safe" });
+
+    const publishDate = safeParseDate(parsed.data.publishDate);
 
     // BOLT OPTIMIZATION: Use upsert (onConflictDoUpdate) for episodes to consolidate lookup
     // and insertion into one round-trip.
@@ -68,23 +73,16 @@ export async function saveEpisodeToLibrary(episodeData: EpisodeData) {
       .insert(episodes)
       .values({
         podcastId,
-        podcastIndexId: episodeData.podcastIndexId,
-        title: episodeData.title,
-        description: episodeData.description,
-        audioUrl: episodeData.audioUrl,
-        duration: episodeData.duration,
-        publishDate: episodeData.publishDate,
+        podcastIndexId: parsed.data.podcastIndexId,
+        title: parsed.data.title,
+        description: parsed.data.description,
+        audioUrl: parsed.data.audioUrl,
+        duration: parsed.data.duration,
+        publishDate,
       })
       .onConflictDoUpdate({
         target: episodes.podcastIndexId,
-        set: {
-          title: episodeData.title,
-          description: episodeData.description,
-          audioUrl: episodeData.audioUrl,
-          duration: episodeData.duration,
-          publishDate: episodeData.publishDate,
-          updatedAt: new Date(),
-        },
+        set: { updatedAt: new Date() },
       })
       .returning({ id: episodes.id });
 
@@ -106,7 +104,7 @@ export async function saveEpisodeToLibrary(episodeData: EpisodeData) {
     }
 
     revalidatePath("/library");
-    revalidatePath(`/episode/${episodeData.podcastIndexId}`);
+    revalidatePath(`/episode/${parsed.data.podcastIndexId}`);
 
     return { success: true, message: "Episode saved to library" };
   } catch (error) {

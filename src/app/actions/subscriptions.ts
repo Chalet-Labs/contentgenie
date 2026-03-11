@@ -12,6 +12,7 @@ import {
   generateEpisodeSyntheticId,
 } from "@/lib/rss";
 import { isSafeUrl } from "@/lib/security";
+import { subscribeSchema, safeParseDate } from "@/lib/schemas/library";
 
 const MAX_EPISODES_PER_IMPORT = 50;
 
@@ -209,26 +210,30 @@ export async function subscribeToPodcast(podcastData: PodcastData) {
   }
 
   try {
-    const trimmedPodcastIndexId = podcastData.podcastIndexId.trim();
-    const trimmedPodcastTitle = podcastData.title.trim();
-
-    if (!trimmedPodcastIndexId || !trimmedPodcastTitle) {
-      return { success: false, error: "Podcast ID and title are required" };
+    const parsed = subscribeSchema.safeParse({
+      ...podcastData,
+      latestEpisodeDate: podcastData.latestEpisodeDate?.toISOString(),
+    });
+    if (!parsed.success) {
+      console.warn("[subscribeToPodcast] validation failed", parsed.error.issues);
+      return { success: false, error: "Invalid podcast data" };
     }
+    const input = parsed.data;
 
     await ensureUserExists(userId);
 
+    const latestEpisodeDate = safeParseDate(input.latestEpisodeDate);
+
     const podcastId = await upsertPodcast({
-      podcastIndexId: trimmedPodcastIndexId,
-      title: trimmedPodcastTitle,
-      description: podcastData.description,
-      publisher: podcastData.publisher,
-      imageUrl: podcastData.imageUrl,
-      rssFeedUrl: podcastData.rssFeedUrl,
-      categories: podcastData.categories,
-      totalEpisodes: podcastData.totalEpisodes,
-      latestEpisodeDate: podcastData.latestEpisodeDate,
-    }, { updateOnConflict: false });
+      podcastIndexId: input.podcastIndexId,
+      title: input.title,
+      description: input.description,
+      publisher: input.publisher,
+      imageUrl: input.imageUrl,
+      categories: input.categories,
+      totalEpisodes: input.totalEpisodes,
+      latestEpisodeDate,
+    }, { updateOnConflict: "safe" });
 
     // BOLT OPTIMIZATION: Use onConflictDoNothing to handle already subscribed case in one query.
     // This replaces a separate existence check and reduces total round-trips from ~5 to 3.
@@ -246,7 +251,7 @@ export async function subscribeToPodcast(podcastData: PodcastData) {
     }
 
     revalidatePath("/subscriptions");
-    revalidatePath(`/podcast/${podcastData.podcastIndexId}`);
+    revalidatePath(`/podcast/${input.podcastIndexId}`);
 
     return { success: true, message: "Subscribed successfully" };
   } catch (error) {

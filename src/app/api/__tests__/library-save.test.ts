@@ -79,7 +79,7 @@ function setupInsertChains({
           onConflictDoNothing: vi.fn().mockResolvedValue(undefined),
           onConflictDoUpdate: vi.fn().mockResolvedValue(undefined),
         };
-      case 2: // podcasts (updateOnConflict: false → no-op touch via onConflictDoUpdate)
+      case 2: // podcasts (updateOnConflict: "safe" → onConflictDoUpdate with safe fields)
         return {
           values: vi.fn().mockReturnThis(),
           onConflictDoUpdate: vi.fn().mockReturnValue({
