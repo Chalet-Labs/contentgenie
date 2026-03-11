@@ -66,7 +66,7 @@ listen_history
 
 The `podcastIndexEpisodeId` column is denormalized from the `episodes` table. While it is reachable via the `episodeId` FK join, it is included per the issue #186 spec to support dashboard queries that may need the PodcastIndex ID without joining `episodes` (e.g., linking out to PodcastIndex or deduplicating across data sources).
 
-The composite unique constraint on `(userId, episodeId)` means one row per user-episode pair. Subsequent listens update `startedAt` (most recent), `completedAt`, and `listenDurationSeconds` via `onConflictDoUpdate`.
+The composite unique constraint on `(userId, episodeId)` means one row per user-episode pair. Subsequent listens preserve `startedAt` (first listen time), update `completedAt`, and keep the longest `listenDurationSeconds` via `onConflictDoUpdate`.
 
 ## Consequences
 

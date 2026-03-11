@@ -282,7 +282,7 @@ export const listenHistory = pgTable(
       .references(() => episodes.id, { onDelete: "cascade" })
       .notNull(),
     podcastIndexEpisodeId: bigint("podcast_index_episode_id", {
-      mode: "number",
+      mode: "number", // safe while PodcastIndex IDs remain < Number.MAX_SAFE_INTEGER (2^53)
     }).notNull(),
     startedAt: timestamp("started_at").notNull(),
     completedAt: timestamp("completed_at"),

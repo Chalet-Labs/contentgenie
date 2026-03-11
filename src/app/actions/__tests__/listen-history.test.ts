@@ -10,6 +10,7 @@ vi.mock("@clerk/nextjs/server", () => ({
 const mockInsert = vi.fn()
 const mockValues = vi.fn()
 const mockOnConflictDoUpdate = vi.fn()
+const mockFindFirst = vi.fn()
 
 vi.mock("@/db", () => ({
   db: {
@@ -27,6 +28,11 @@ vi.mock("@/db", () => ({
         },
       }
     },
+    query: {
+      episodes: {
+        findFirst: (...args: unknown[]) => mockFindFirst(...args),
+      },
+    },
   },
 }))
 
@@ -41,20 +47,25 @@ vi.mock("@/db/schema", () => ({
     listenDurationSeconds: "listenDurationSeconds",
     updatedAt: "updatedAt",
   },
+  episodes: {
+    podcastIndexId: "podcastIndexId",
+  },
 }))
 
-// Mock drizzle-orm sql tag
+// Mock drizzle-orm sql tag and eq
 vi.mock("drizzle-orm", () => ({
   sql: vi.fn((strings: TemplateStringsArray, ...values: unknown[]) => ({
     _sql: strings.join("?"),
     _values: values,
   })),
+  eq: vi.fn((col: unknown, val: unknown) => ({ col, val })),
 }))
 
 describe("recordListenEvent", () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockAuth.mockResolvedValue({ userId: "user_123" })
+    mockFindFirst.mockResolvedValue({ id: 42 })
   })
 
   afterEach(() => {
@@ -65,7 +76,6 @@ describe("recordListenEvent", () => {
     mockAuth.mockResolvedValue({ userId: null })
     const { recordListenEvent } = await import("@/app/actions/listen-history")
     const result = await recordListenEvent({
-      episodeId: 1,
       podcastIndexEpisodeId: 12345,
       started: true,
     })
@@ -73,14 +83,26 @@ describe("recordListenEvent", () => {
     expect(mockInsert).not.toHaveBeenCalled()
   })
 
+  it("returns { success: false } when episode not found", async () => {
+    mockFindFirst.mockResolvedValue(undefined)
+    const { recordListenEvent } = await import("@/app/actions/listen-history")
+    const result = await recordListenEvent({
+      podcastIndexEpisodeId: 99999,
+      started: true,
+    })
+    expect(result).toEqual({ success: false })
+    expect(mockFindFirst).toHaveBeenCalledTimes(1)
+    expect(mockInsert).not.toHaveBeenCalled()
+  })
+
   it("calls db.insert with correct values for a started event", async () => {
     const { recordListenEvent } = await import("@/app/actions/listen-history")
     const result = await recordListenEvent({
-      episodeId: 42,
       podcastIndexEpisodeId: 99999,
       started: true,
     })
     expect(result).toEqual({ success: true })
+    expect(mockFindFirst).toHaveBeenCalledTimes(1)
     expect(mockInsert).toHaveBeenCalledTimes(1)
     expect(mockValues).toHaveBeenCalledTimes(1)
     const insertedValues = mockValues.mock.calls[0][0]
@@ -95,7 +117,6 @@ describe("recordListenEvent", () => {
   it("calls db.insert with correct values for a completed event", async () => {
     const { recordListenEvent } = await import("@/app/actions/listen-history")
     const result = await recordListenEvent({
-      episodeId: 7,
       podcastIndexEpisodeId: 777,
       completed: true,
       durationSeconds: 1800,
@@ -105,16 +126,15 @@ describe("recordListenEvent", () => {
     const insertedValues = mockValues.mock.calls[0][0]
     expect(insertedValues).toMatchObject({
       userId: "user_123",
-      episodeId: 7,
+      episodeId: 42,
       podcastIndexEpisodeId: 777,
     })
     expect(insertedValues.startedAt).toBeInstanceOf(Date)
   })
 
-  it("uses onConflictDoUpdate for upsert semantics", async () => {
+  it("uses onConflictDoUpdate with COALESCE for startedAt (preserves first listen)", async () => {
     const { recordListenEvent } = await import("@/app/actions/listen-history")
     await recordListenEvent({
-      episodeId: 1,
       podcastIndexEpisodeId: 111,
       started: true,
     })
@@ -127,16 +147,38 @@ describe("recordListenEvent", () => {
     expect(upsertOpts).toHaveProperty("set")
     // updatedAt must always be refreshed
     expect(upsertOpts.set).toHaveProperty("updatedAt")
+    // startedAt must use COALESCE to preserve the first listen time
+    expect(upsertOpts.set.startedAt).toHaveProperty("_sql")
+    expect(upsertOpts.set.startedAt._sql).toContain("COALESCE")
+    // completedAt should preserve existing value for a non-completion event
+    expect(upsertOpts.set.completedAt).toHaveProperty("_sql")
+    // listenDurationSeconds should preserve existing value when no duration provided
+    expect(upsertOpts.set.listenDurationSeconds).toHaveProperty("_sql")
   })
 
-  it("returns { success: false } when episodeId is not a positive integer", async () => {
+  it("uses GREATEST for listenDurationSeconds on completed events", async () => {
+    const { recordListenEvent } = await import("@/app/actions/listen-history")
+    await recordListenEvent({
+      podcastIndexEpisodeId: 111,
+      completed: true,
+      durationSeconds: 1800,
+    })
+    const upsertOpts = mockOnConflictDoUpdate.mock.calls[0][0]
+    // completedAt should be a Date (not a sql template) for completion events
+    expect(upsertOpts.set.completedAt).toBeInstanceOf(Date)
+    // listenDurationSeconds must use GREATEST to keep the longest listen
+    expect(upsertOpts.set.listenDurationSeconds).toHaveProperty("_sql")
+    expect(upsertOpts.set.listenDurationSeconds._sql).toContain("GREATEST")
+  })
+
+  it("returns { success: false } when podcastIndexEpisodeId is not a positive integer", async () => {
     const { recordListenEvent } = await import("@/app/actions/listen-history")
     const result = await recordListenEvent({
-      episodeId: -1,
-      podcastIndexEpisodeId: 111,
+      podcastIndexEpisodeId: -1,
       started: true,
     })
     expect(result).toEqual({ success: false })
+    expect(mockFindFirst).not.toHaveBeenCalled()
     expect(mockInsert).not.toHaveBeenCalled()
   })
 })

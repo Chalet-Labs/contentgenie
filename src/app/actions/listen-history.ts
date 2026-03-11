@@ -1,12 +1,11 @@
 "use server"
 
 import { auth } from "@clerk/nextjs/server"
-import { sql } from "drizzle-orm"
+import { eq, sql } from "drizzle-orm"
 import { db } from "@/db"
-import { listenHistory } from "@/db/schema"
+import { episodes, listenHistory } from "@/db/schema"
 
 export async function recordListenEvent(input: {
-  episodeId: number
   podcastIndexEpisodeId: number
   started?: boolean
   completed?: boolean
@@ -15,14 +14,23 @@ export async function recordListenEvent(input: {
   const { userId } = await auth()
   if (!userId) return { success: false }
 
-  const { episodeId, podcastIndexEpisodeId, completed, durationSeconds } =
-    input
+  const { podcastIndexEpisodeId, completed, durationSeconds } = input
 
-  if (!Number.isInteger(episodeId) || episodeId <= 0) {
+  if (!Number.isInteger(podcastIndexEpisodeId) || podcastIndexEpisodeId <= 0) {
     return { success: false }
   }
 
   try {
+    const episode = await db.query.episodes.findFirst({
+      columns: { id: true },
+      where: eq(episodes.podcastIndexId, String(podcastIndexEpisodeId)),
+    })
+
+    if (!episode) {
+      return { success: false }
+    }
+
+    const { id: episodeId } = episode
     const now = new Date()
 
     await db
@@ -56,7 +64,8 @@ export async function recordListenEvent(input: {
       })
 
     return { success: true }
-  } catch {
+  } catch (e) {
+    console.error("Failed to record listen event:", e)
     return { success: false }
   }
 }

@@ -283,6 +283,9 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
   const sessionSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const isRestoringSession = useRef(false)
   const isSessionRestored = useRef(false)
+  // Tracks episodes whose "started" listen event has already fired this session.
+  // Intentionally NOT cleared on replay — upsert COALESCE preserves first startedAt,
+  // so re-firing would be a no-op server call.
   const listenHistoryFiredRef = useRef<Set<string>>(new Set())
 
   const [state, dispatch] = useReducer(reducer, initialState)
@@ -774,7 +777,6 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
         const ep = stateRef.current.currentEpisode
         listenHistoryFiredRef.current.add(ep.id)
         void recordListenEvent({
-          episodeId: Number(ep.id),
           podcastIndexEpisodeId: Number(ep.id),
           started: true,
         })
@@ -861,9 +863,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       // Record listen history completion
       if (stateRef.current.currentEpisode) {
         const ep = stateRef.current.currentEpisode
-        listenHistoryFiredRef.current.add(ep.id) // ensure no double-fire on started
         void recordListenEvent({
-          episodeId: Number(ep.id),
           podcastIndexEpisodeId: Number(ep.id),
           completed: true,
           durationSeconds: Math.floor(audio.duration || 0),
