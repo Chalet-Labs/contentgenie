@@ -55,7 +55,7 @@ listen_history
 ├── id: serial PK
 ├── userId: text FK → users.id (CASCADE) NOT NULL
 ├── episodeId: integer FK → episodes.id (CASCADE) NOT NULL
-├── podcastIndexEpisodeId: bigint NOT NULL (denormalized PodcastIndex episode ID)
+├── podcastIndexEpisodeId: text NOT NULL (denormalized PodcastIndex episode ID)
 ├── startedAt: timestamp NOT NULL (when 30s threshold was crossed)
 ├── completedAt: timestamp (nullable, set on ended)
 ├── listenDurationSeconds: integer (nullable, total seconds listened)

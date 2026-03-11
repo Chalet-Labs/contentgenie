@@ -3,10 +3,11 @@
 import { auth } from "@clerk/nextjs/server"
 import { eq, sql } from "drizzle-orm"
 import { db } from "@/db"
+import { ensureUserExists } from "@/db/helpers"
 import { episodes, listenHistory } from "@/db/schema"
 
 export async function recordListenEvent(input: {
-  podcastIndexEpisodeId: number
+  podcastIndexEpisodeId: string
   completed?: boolean
   durationSeconds?: number
 }): Promise<{ success: boolean }> {
@@ -15,14 +16,22 @@ export async function recordListenEvent(input: {
 
   const { podcastIndexEpisodeId, completed, durationSeconds } = input
 
-  if (!Number.isInteger(podcastIndexEpisodeId) || podcastIndexEpisodeId <= 0) {
+  if (!podcastIndexEpisodeId || typeof podcastIndexEpisodeId !== "string") {
+    return { success: false }
+  }
+
+  if (
+    durationSeconds !== undefined &&
+    (!Number.isInteger(durationSeconds) || durationSeconds < 0)
+  ) {
     return { success: false }
   }
 
   try {
+    await ensureUserExists(userId)
     const episode = await db.query.episodes.findFirst({
       columns: { id: true },
-      where: eq(episodes.podcastIndexId, String(podcastIndexEpisodeId)),
+      where: eq(episodes.podcastIndexId, podcastIndexEpisodeId),
     })
 
     if (!episode) {
@@ -56,7 +65,7 @@ export async function recordListenEvent(input: {
           // Keep the longest listen duration
           listenDurationSeconds:
             durationSeconds !== undefined
-              ? sql`GREATEST(${listenHistory.listenDurationSeconds}, ${durationSeconds})`
+              ? sql`GREATEST(COALESCE(${listenHistory.listenDurationSeconds}, 0), ${durationSeconds})`
               : sql`${listenHistory.listenDurationSeconds}`,
           updatedAt: now,
         },

@@ -1213,7 +1213,7 @@ describe("Listen history recording", () => {
 
     expect(mockRecordListenEvent).toHaveBeenCalledTimes(1)
     expect(mockRecordListenEvent).toHaveBeenCalledWith(
-      expect.objectContaining({ podcastIndexEpisodeId: expect.any(Number) })
+      expect.objectContaining({ podcastIndexEpisodeId: expect.any(String) })
     )
   })
 

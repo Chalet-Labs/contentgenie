@@ -777,7 +777,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
         const ep = stateRef.current.currentEpisode
         listenHistoryFiredRef.current.add(ep.id)
         void recordListenEvent({
-          podcastIndexEpisodeId: Number(ep.id),
+          podcastIndexEpisodeId: ep.id,
         })
       }
 
@@ -863,7 +863,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       if (stateRef.current.currentEpisode) {
         const ep = stateRef.current.currentEpisode
         void recordListenEvent({
-          podcastIndexEpisodeId: Number(ep.id),
+          podcastIndexEpisodeId: ep.id,
           completed: true,
           durationSeconds: Math.floor(audio.duration || 0),
         })
