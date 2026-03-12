@@ -10,6 +10,7 @@ import {
   offlineSubscribe,
   offlineUnsubscribe,
 } from "@/lib/offline-actions";
+import { useSidebarCountsOptional } from "@/contexts/sidebar-counts-context";
 
 interface SubscribeButtonProps {
   podcastIndexId: string;
@@ -43,6 +44,7 @@ export function SubscribeButton({
   const [isLoading, setIsLoading] = useState(false);
   const isOnline = useOnlineStatus();
   const { hasPending, hasFailed } = useSyncQueue();
+  const { refreshCounts } = useSidebarCountsOptional();
 
   const entityKey = `podcast:${podcastIndexId}`;
   const isPendingSync = hasPending(entityKey);
@@ -55,6 +57,7 @@ export function SubscribeButton({
         const result = await offlineUnsubscribe(podcastIndexId, isOnline);
         if (result.success) {
           setIsSubscribed(false);
+          if (!result.queued) refreshCounts();
           toast.success(
             result.queued
               ? "Unsubscribed (will sync when online)"
@@ -85,6 +88,7 @@ export function SubscribeButton({
         );
         if (result.success) {
           setIsSubscribed(true);
+          if (!result.queued) refreshCounts();
           toast.success(
             result.queued
               ? "Subscribed (will sync when online)"

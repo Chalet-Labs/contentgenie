@@ -2,6 +2,7 @@
 
 import { AudioPlayerProvider, useAudioPlayerState } from "@/contexts/audio-player-context"
 import { SyncQueueProvider } from "@/contexts/sync-queue-context"
+import { SidebarCountsProvider } from "@/contexts/sidebar-counts-context"
 import { Header } from "@/components/layout/header"
 import { Sidebar } from "@/components/layout/sidebar"
 import { PlayerBar } from "@/components/audio-player/player-bar"
@@ -31,7 +32,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <SyncQueueProvider>
       <AudioPlayerProvider>
-        <AppShellInner>{children}</AppShellInner>
+        <SidebarCountsProvider>
+          <AppShellInner>{children}</AppShellInner>
+        </SidebarCountsProvider>
       </AudioPlayerProvider>
     </SyncQueueProvider>
   )

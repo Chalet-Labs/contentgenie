@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { addPodcastByRssUrl } from "@/app/actions/subscriptions";
+import { useSidebarCountsOptional } from "@/contexts/sidebar-counts-context";
 
 interface RssFeedFormProps {
   className?: string;
@@ -16,6 +17,7 @@ export function RssFeedForm({ className }: RssFeedFormProps) {
   const [url, setUrl] = useState("");
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
+  const { refreshCounts } = useSidebarCountsOptional();
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -40,6 +42,7 @@ export function RssFeedForm({ className }: RssFeedFormProps) {
             : "";
         toast.success(`Subscribed to ${result.title ?? "podcast"}!${episodeMsg}`);
         setUrl("");
+        refreshCounts();
         if (result.podcastIndexId) {
           router.push(`/podcast/${result.podcastIndexId}?from=discover`);
         }
