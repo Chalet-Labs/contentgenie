@@ -1260,7 +1260,7 @@ describe("Listen history recording", () => {
     })
 
     expect(mockRecordListenEvent).toHaveBeenCalledWith(
-      expect.objectContaining({ completed: true })
+      expect.objectContaining({ completed: true, podcastIndexEpisodeId: mockEpisode.id })
     )
   })
 
@@ -1283,7 +1283,7 @@ describe("Listen history recording", () => {
     })
 
     expect(mockRecordListenEvent).toHaveBeenCalledWith(
-      expect.objectContaining({ durationSeconds: 600 })
+      expect.objectContaining({ durationSeconds: 600, podcastIndexEpisodeId: mockEpisode.id })
     )
   })
 
