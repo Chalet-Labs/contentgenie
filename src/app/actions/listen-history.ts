@@ -15,7 +15,10 @@ export async function recordListenEvent(input: {
   if (!userId) return { success: false }
 
   const { podcastIndexEpisodeId, completed, durationSeconds } = input
-  const trimmedPodcastIndexEpisodeId = podcastIndexEpisodeId?.trim()
+  const trimmedPodcastIndexEpisodeId =
+    typeof podcastIndexEpisodeId === "string"
+      ? podcastIndexEpisodeId.trim()
+      : undefined
 
   if (
     typeof trimmedPodcastIndexEpisodeId !== "string" ||
