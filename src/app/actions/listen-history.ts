@@ -33,7 +33,6 @@ export async function recordListenEvent(input: {
   }
 
   try {
-    await ensureUserExists(userId)
     const episode = await db.query.episodes.findFirst({
       columns: { id: true },
       where: eq(episodes.podcastIndexId, trimmedPodcastIndexEpisodeId),
@@ -42,6 +41,8 @@ export async function recordListenEvent(input: {
     if (!episode) {
       return { success: false }
     }
+
+    await ensureUserExists(userId)
 
     const { id: episodeId } = episode
     const now = new Date()
