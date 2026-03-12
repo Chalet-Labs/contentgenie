@@ -270,6 +270,36 @@ export const pushSubscriptions = pgTable(
   (table) => [index("push_subscriptions_user_id_idx").on(table.userId)]
 );
 
+// Listen History table
+export const listenHistory = pgTable(
+  "listen_history",
+  {
+    id: serial("id").primaryKey(),
+    userId: text("user_id")
+      .references(() => users.id, { onDelete: "cascade" })
+      .notNull(),
+    episodeId: integer("episode_id")
+      .references(() => episodes.id, { onDelete: "cascade" })
+      .notNull(),
+    podcastIndexEpisodeId: text("podcast_index_episode_id").notNull(),
+    startedAt: timestamp("started_at").notNull(),
+    completedAt: timestamp("completed_at"),
+    listenDurationSeconds: integer("listen_duration_seconds"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("listen_history_user_episode_idx").on(
+      table.userId,
+      table.episodeId
+    ),
+    index("listen_history_user_id_idx").on(table.userId),
+    index("listen_history_podcast_index_episode_id_idx").on(
+      table.podcastIndexEpisodeId
+    ),
+  ]
+);
+
 // Relations
 export const usersRelations = relations(users, ({ many }) => ({
   subscriptions: many(userSubscriptions),
@@ -277,6 +307,7 @@ export const usersRelations = relations(users, ({ many }) => ({
   collections: many(collections),
   notifications: many(notifications),
   pushSubscriptions: many(pushSubscriptions),
+  listenHistory: many(listenHistory),
 }));
 
 export const podcastsRelations = relations(podcasts, ({ many }) => ({
@@ -291,6 +322,7 @@ export const episodesRelations = relations(episodes, ({ one, many }) => ({
   }),
   libraryEntries: many(userLibrary),
   notifications: many(notifications),
+  listenHistory: many(listenHistory),
 }));
 
 export const userSubscriptionsRelations = relations(
@@ -366,6 +398,17 @@ export const pushSubscriptionsRelations = relations(
   })
 );
 
+export const listenHistoryRelations = relations(listenHistory, ({ one }) => ({
+  user: one(users, {
+    fields: [listenHistory.userId],
+    references: [users.id],
+  }),
+  episode: one(episodes, {
+    fields: [listenHistory.episodeId],
+    references: [episodes.id],
+  }),
+}));
+
 // Type exports for use in the application
 export type RateLimit = typeof rateLimits.$inferSelect;
 export type NewRateLimit = typeof rateLimits.$inferInsert;
@@ -399,6 +442,9 @@ export type NewNotification = typeof notifications.$inferInsert;
 
 export type PushSubscription = typeof pushSubscriptions.$inferSelect;
 export type NewPushSubscription = typeof pushSubscriptions.$inferInsert;
+
+export type ListenHistoryEntry = typeof listenHistory.$inferSelect;
+export type NewListenHistoryEntry = typeof listenHistory.$inferInsert;
 
 export type SummaryStatus = NonNullable<Episode["summaryStatus"]>;
 

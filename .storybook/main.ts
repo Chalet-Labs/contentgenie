@@ -15,6 +15,7 @@ const config: StorybookConfig = {
       // Stub out server-only modules that break Storybook's browser build
       { find: "@clerk/nextjs/server", replacement: path.resolve(__dirname, "mocks/clerk-server.ts") },
       { find: "@/db/schema", replacement: path.resolve(__dirname, "mocks/db-schema.ts") },
+      { find: "@/db/helpers", replacement: path.resolve(__dirname, "mocks/db-helpers.ts") },
       { find: "@/db", replacement: path.resolve(__dirname, "mocks/db.ts") },
       { find: "@/app/actions/library", replacement: path.resolve(__dirname, "mocks/actions.ts") },
       { find: "@/app/actions/subscriptions", replacement: path.resolve(__dirname, "mocks/actions.ts") },

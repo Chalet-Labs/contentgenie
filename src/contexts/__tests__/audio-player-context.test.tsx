@@ -17,6 +17,12 @@ vi.mock("@/lib/media-session", () => ({
   clearMediaSession: vi.fn(),
 }))
 
+// Mock recordListenEvent server action
+const mockRecordListenEvent = vi.fn().mockResolvedValue({ success: true })
+vi.mock("@/app/actions/listen-history", () => ({
+  recordListenEvent: (...args: unknown[]) => mockRecordListenEvent(...args),
+}))
+
 // Mock player-preferences helpers
 const mockLoadPrefs = vi.fn().mockReturnValue({ volume: 0.8, playbackSpeed: 1.5 })
 const mockSavePrefs = vi.fn()
@@ -1151,5 +1157,158 @@ describe("Chapter state management", () => {
     await user.click(screen.getByText("Close"))
     expect(screen.getByTestId("chapters")).toHaveTextContent("null")
     expect(screen.getByTestId("chaptersLoading")).toHaveTextContent("false")
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Listen history recording (T3.1)
+// ---------------------------------------------------------------------------
+
+describe("Listen history recording", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    playMock.mockResolvedValue(undefined)
+    mockLoadPrefs.mockReturnValue({ volume: 0.8, playbackSpeed: 1.5 })
+    mockLoadQueue.mockReturnValue([])
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it("does not call recordListenEvent when currentTime < 30s", async () => {
+    const user = userEvent.setup()
+    render(
+      <AudioPlayerProvider>
+        <TestConsumer />
+      </AudioPlayerProvider>
+    )
+
+    await user.click(screen.getByText("Play Episode"))
+
+    const audio = getAudioElement()!
+    Object.defineProperty(audio, "currentTime", { value: 10, configurable: true })
+    act(() => fireAudioEvent("timeupdate"))
+
+    expect(mockRecordListenEvent).not.toHaveBeenCalled()
+  })
+
+  it("calls recordListenEvent when currentTime crosses 30s", async () => {
+    const user = userEvent.setup()
+    render(
+      <AudioPlayerProvider>
+        <TestConsumer />
+      </AudioPlayerProvider>
+    )
+
+    await user.click(screen.getByText("Play Episode"))
+
+    const audio = getAudioElement()!
+    Object.defineProperty(audio, "currentTime", { value: 30, configurable: true })
+    act(() => fireAudioEvent("timeupdate"))
+
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0))
+    })
+
+    expect(mockRecordListenEvent).toHaveBeenCalledTimes(1)
+    expect(mockRecordListenEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ podcastIndexEpisodeId: mockEpisode.id })
+    )
+  })
+
+  it("does not call recordListenEvent again for the same episode on subsequent timeupdate events", async () => {
+    const user = userEvent.setup()
+    render(
+      <AudioPlayerProvider>
+        <TestConsumer />
+      </AudioPlayerProvider>
+    )
+
+    await user.click(screen.getByText("Play Episode"))
+
+    const audio = getAudioElement()!
+    Object.defineProperty(audio, "currentTime", { value: 30, configurable: true })
+    // Fire timeupdate multiple times past 30s
+    act(() => fireAudioEvent("timeupdate"))
+    act(() => fireAudioEvent("timeupdate"))
+    act(() => fireAudioEvent("timeupdate"))
+
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0))
+    })
+
+    expect(mockRecordListenEvent).toHaveBeenCalledTimes(1)
+  })
+
+  it("calls recordListenEvent with completed:true on ended event", async () => {
+    const user = userEvent.setup()
+    render(
+      <AudioPlayerProvider>
+        <TestConsumer />
+      </AudioPlayerProvider>
+    )
+
+    await user.click(screen.getByText("Play Episode"))
+
+    const audio = getAudioElement()!
+    Object.defineProperty(audio, "duration", { value: 600, configurable: true })
+    act(() => fireAudioEvent("ended"))
+
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0))
+    })
+
+    expect(mockRecordListenEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ completed: true, podcastIndexEpisodeId: mockEpisode.id })
+    )
+  })
+
+  it("includes durationSeconds in the completed event", async () => {
+    const user = userEvent.setup()
+    render(
+      <AudioPlayerProvider>
+        <TestConsumer />
+      </AudioPlayerProvider>
+    )
+
+    await user.click(screen.getByText("Play Episode"))
+
+    const audio = getAudioElement()!
+    Object.defineProperty(audio, "duration", { value: 600, configurable: true })
+    act(() => fireAudioEvent("ended"))
+
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0))
+    })
+
+    expect(mockRecordListenEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ durationSeconds: 600, podcastIndexEpisodeId: mockEpisode.id })
+    )
+  })
+
+  it("omits durationSeconds from completed event when audio.duration is Infinity", async () => {
+    const user = userEvent.setup()
+    render(
+      <AudioPlayerProvider>
+        <TestConsumer />
+      </AudioPlayerProvider>
+    )
+
+    await user.click(screen.getByText("Play Episode"))
+
+    const audio = getAudioElement()!
+    Object.defineProperty(audio, "duration", { value: Infinity, configurable: true })
+    act(() => fireAudioEvent("ended"))
+
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0))
+    })
+
+    expect(mockRecordListenEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ completed: true })
+    )
+    const callArgs = mockRecordListenEvent.mock.calls[0][0]
+    expect(callArgs.durationSeconds).toBeUndefined()
   })
 })

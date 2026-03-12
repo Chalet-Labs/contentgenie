@@ -30,6 +30,7 @@ import {
 } from "@/lib/player-session"
 import { fadeOutAudio } from "@/lib/audio-fade"
 import type { Chapter } from "@/lib/chapters"
+import { recordListenEvent } from "@/app/actions/listen-history"
 
 // ---------------------------------------------------------------------------
 // Types
@@ -250,6 +251,7 @@ const STALL_TIMEOUT_MS = 10_000
 const SLEEP_FADE_DURATION_MS = 3000
 const MS_PER_MINUTE = 60_000
 const SLEEP_TIMER_TOAST = "Sleep timer — playback paused"
+const MAX_LISTEN_HISTORY_RETRIES = 3
 
 const initialState: AudioPlayerState = {
   currentEpisode: null,
@@ -282,6 +284,11 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
   const sessionSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const isRestoringSession = useRef(false)
   const isSessionRestored = useRef(false)
+  // Tracks listen-history "started" attempts per episode this session.
+  // Value = attempt count. Once succeeded or MAX_LISTEN_HISTORY_RETRIES reached, no more attempts.
+  // Intentionally NOT cleared on replay — upsert COALESCE preserves first startedAt,
+  // so re-firing after success would be a no-op server call.
+  const listenHistoryFiredRef = useRef<Map<string, number>>(new Map())
 
   const [state, dispatch] = useReducer(reducer, initialState)
 
@@ -763,6 +770,31 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
         }, 5000)
       }
 
+      // Fire listen history "started" event once at 30s threshold (retry up to MAX_LISTEN_HISTORY_RETRIES)
+      if (
+        audio.currentTime >= 30 &&
+        stateRef.current.currentEpisode
+      ) {
+        const ep = stateRef.current.currentEpisode
+        const attempts = listenHistoryFiredRef.current.get(ep.id) ?? 0
+        if (attempts < MAX_LISTEN_HISTORY_RETRIES) {
+          // Block re-entry while the async call is in-flight
+          listenHistoryFiredRef.current.set(ep.id, MAX_LISTEN_HISTORY_RETRIES)
+          void (async () => {
+            try {
+              const result = await recordListenEvent({
+                podcastIndexEpisodeId: ep.id,
+              })
+              if (!result?.success) {
+                listenHistoryFiredRef.current.set(ep.id, attempts + 1)
+              }
+            } catch {
+              listenHistoryFiredRef.current.set(ep.id, attempts + 1)
+            }
+          })()
+        }
+      }
+
       // Debounced ARIA announcement (every 15s)
       if (!ariaTimerRef.current) {
         ariaTimerRef.current = setTimeout(() => {
@@ -840,6 +872,18 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
     const onEnded = () => {
       dispatch({ type: "SET_PLAYING", isPlaying: false })
       clearStallTimer()
+
+      // Record listen history completion
+      if (stateRef.current.currentEpisode) {
+        const ep = stateRef.current.currentEpisode
+        void recordListenEvent({
+          podcastIndexEpisodeId: ep.id,
+          completed: true,
+          durationSeconds: isFinite(audio.duration)
+            ? Math.floor(audio.duration)
+            : undefined,
+        })
+      }
 
       // End-of-episode sleep timer: fade out and skip auto-play-next
       if (stateRef.current.sleepTimer?.type === "end-of-episode") {
