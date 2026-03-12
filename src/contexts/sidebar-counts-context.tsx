@@ -6,6 +6,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react"
@@ -37,13 +38,19 @@ export function SidebarCountsProvider({ children }: { children: ReactNode }) {
     isLoading: true,
   })
 
+  const refreshSerial = useRef(0)
+
   const refreshCounts = useCallback(() => {
     setState((prev) => ({ ...prev, isLoading: true }))
+    const serial = ++refreshSerial.current
 
     getDashboardStats()
       .then((stats) => {
+        if (serial !== refreshSerial.current) return
         if (stats.error) {
           console.warn("[SidebarCounts] Server returned error:", stats.error)
+          setState((prev) => ({ ...prev, isLoading: false }))
+          return
         }
         setState({
           subscriptionCount: stats.subscriptionCount,
@@ -52,6 +59,7 @@ export function SidebarCountsProvider({ children }: { children: ReactNode }) {
         })
       })
       .catch((error: unknown) => {
+        if (serial !== refreshSerial.current) return
         console.error("[SidebarCounts] Failed to fetch dashboard stats:", error)
         setState((prev) => ({ ...prev, isLoading: false }))
       })
