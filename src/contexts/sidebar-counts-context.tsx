@@ -11,6 +11,7 @@ import {
   type ReactNode,
 } from "react"
 import { getDashboardStats } from "@/app/actions/dashboard"
+import { ROUTES } from "@/lib/routes"
 
 interface SidebarCountsState {
   subscriptionCount: number
@@ -69,6 +70,13 @@ export function SidebarCountsProvider({ children }: { children: ReactNode }) {
     refreshCounts()
   }, [refreshCounts])
 
+  // Refresh badge counts when the sync queue finishes draining (offline → online)
+  useEffect(() => {
+    const handleDrained = () => refreshCounts()
+    window.addEventListener("sync-queue-drained", handleDrained)
+    return () => window.removeEventListener("sync-queue-drained", handleDrained)
+  }, [refreshCounts])
+
   const value = useMemo<SidebarCountsContextValue>(
     () => ({ ...state, refreshCounts }),
     [state, refreshCounts]
@@ -101,9 +109,9 @@ export function getBadgeCount(
   counts: SidebarCountsState
 ): number | null {
   if (counts.isLoading) return null
-  if (href === "/subscriptions" && counts.subscriptionCount > 0)
+  if (href === ROUTES.SUBSCRIPTIONS && counts.subscriptionCount > 0)
     return counts.subscriptionCount
-  if (href === "/library" && counts.savedCount > 0) return counts.savedCount
+  if (href === ROUTES.LIBRARY && counts.savedCount > 0) return counts.savedCount
   return null
 }
 

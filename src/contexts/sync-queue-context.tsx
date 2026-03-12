@@ -115,6 +115,7 @@ export function SyncQueueProvider({ children }: { children: ReactNode }) {
         isSyncingRef.current = false;
         setIsSyncing(false);
         await refreshQueue();
+        window.dispatchEvent(new Event("sync-queue-drained"));
       }
     };
 
