@@ -19,3 +19,8 @@ export const unsubscribeFromPodcast = noop;
 export const getUserLibrary = async () => ({ items: [], error: null });
 export const isEpisodeSaved = async () => false;
 export const getLibraryEntryByEpisodeId = async (_episodePodcastIndexId: string) => ({ libraryEntryId: 42, episodeId: 10 });
+export const getDashboardStats = async () => ({
+  subscriptionCount: 3,
+  savedCount: 5,
+  error: null,
+});
