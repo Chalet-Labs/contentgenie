@@ -99,6 +99,7 @@ describe("recordListenEvent", () => {
     })
     expect(result).toEqual({ success: false })
     expect(mockFindFirst).toHaveBeenCalledTimes(1)
+    expect(mockEnsureUserExists).not.toHaveBeenCalled()
     expect(mockInsert).not.toHaveBeenCalled()
   })
 

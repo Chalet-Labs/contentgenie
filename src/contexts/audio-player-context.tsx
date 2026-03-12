@@ -865,7 +865,9 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
         void recordListenEvent({
           podcastIndexEpisodeId: ep.id,
           completed: true,
-          durationSeconds: Math.floor(audio.duration || 0),
+          durationSeconds: isFinite(audio.duration)
+            ? Math.floor(audio.duration)
+            : undefined,
         })
       }
 
