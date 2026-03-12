@@ -294,6 +294,9 @@ export const listenHistory = pgTable(
       table.episodeId
     ),
     index("listen_history_user_id_idx").on(table.userId),
+    index("listen_history_podcast_index_episode_id_idx").on(
+      table.podcastIndexEpisodeId
+    ),
   ]
 );
 
