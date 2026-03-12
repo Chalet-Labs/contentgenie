@@ -9,3 +9,5 @@ export const ROUTES = {
   LIBRARY: "/library",
   SETTINGS: "/settings",
 } as const
+
+export type AppRoute = (typeof ROUTES)[keyof typeof ROUTES]
