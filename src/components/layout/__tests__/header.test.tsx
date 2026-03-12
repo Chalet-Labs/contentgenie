@@ -5,6 +5,16 @@ import { Header } from "@/components/layout/header"
 const mockUseSidebarCounts = vi.fn()
 vi.mock("@/contexts/sidebar-counts-context", () => ({
   useSidebarCountsOptional: () => mockUseSidebarCounts(),
+  getBadgeCount: (
+    href: string,
+    counts: { subscriptionCount: number; savedCount: number; isLoading: boolean }
+  ): number | null => {
+    if (counts.isLoading) return null
+    if (href === "/subscriptions" && counts.subscriptionCount > 0) return counts.subscriptionCount
+    if (href === "/library" && counts.savedCount > 0) return counts.savedCount
+    return null
+  },
+  NavBadge: ({ count }: { count: number }) => <span>{count > 99 ? "99+" : count}</span>,
 }))
 
 vi.mock("@clerk/nextjs", () => ({
@@ -102,6 +112,29 @@ describe("Header mobile menu", () => {
       subscriptionCount: 0,
       savedCount: 0,
       isLoading: false,
+    })
+
+    render(<Header />)
+
+    const sheet = screen.getByTestId("sheet-content")
+    const links = sheet.querySelectorAll("a")
+
+    const subscriptionsLink = Array.from(links).find((l) =>
+      l.textContent?.includes("Subscriptions")
+    )
+    const libraryLink = Array.from(links).find((l) =>
+      l.textContent?.includes("Library")
+    )
+
+    expect(subscriptionsLink?.querySelector("span")).toBeNull()
+    expect(libraryLink?.querySelector("span")).toBeNull()
+  })
+
+  it("does not show badge while loading", () => {
+    mockUseSidebarCounts.mockReturnValue({
+      subscriptionCount: 10,
+      savedCount: 20,
+      isLoading: true,
     })
 
     render(<Header />)

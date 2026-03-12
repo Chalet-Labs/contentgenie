@@ -5,6 +5,16 @@ import { Sidebar } from "@/components/layout/sidebar"
 const mockUseSidebarCounts = vi.fn()
 vi.mock("@/contexts/sidebar-counts-context", () => ({
   useSidebarCounts: () => mockUseSidebarCounts(),
+  getBadgeCount: (
+    href: string,
+    counts: { subscriptionCount: number; savedCount: number; isLoading: boolean }
+  ): number | null => {
+    if (counts.isLoading) return null
+    if (href === "/subscriptions" && counts.subscriptionCount > 0) return counts.subscriptionCount
+    if (href === "/library" && counts.savedCount > 0) return counts.savedCount
+    return null
+  },
+  NavBadge: ({ count }: { count: number }) => <span>{count > 99 ? "99+" : count}</span>,
 }))
 
 // OrganizationSwitcher is already mocked via @clerk/nextjs in setup.ts,
