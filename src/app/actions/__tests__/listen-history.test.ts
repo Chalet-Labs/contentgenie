@@ -136,8 +136,10 @@ describe("recordListenEvent", () => {
       userId: "user_123",
       episodeId: 42,
       podcastIndexEpisodeId: "777",
+      listenDurationSeconds: 1800,
     })
     expect(insertedValues.startedAt).toBeInstanceOf(Date)
+    expect(insertedValues.completedAt).toBeInstanceOf(Date)
   })
 
   it("uses onConflictDoUpdate with COALESCE for startedAt (preserves first listen)", async () => {
