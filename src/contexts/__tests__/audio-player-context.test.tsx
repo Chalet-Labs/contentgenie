@@ -1286,4 +1286,29 @@ describe("Listen history recording", () => {
       expect.objectContaining({ durationSeconds: 600 })
     )
   })
+
+  it("omits durationSeconds from completed event when audio.duration is Infinity", async () => {
+    const user = userEvent.setup()
+    render(
+      <AudioPlayerProvider>
+        <TestConsumer />
+      </AudioPlayerProvider>
+    )
+
+    await user.click(screen.getByText("Play Episode"))
+
+    const audio = getAudioElement()!
+    Object.defineProperty(audio, "duration", { value: Infinity, configurable: true })
+    act(() => fireAudioEvent("ended"))
+
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 0))
+    })
+
+    expect(mockRecordListenEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ completed: true })
+    )
+    const callArgs = mockRecordListenEvent.mock.calls[0][0]
+    expect(callArgs.durationSeconds).toBeUndefined()
+  })
 })
