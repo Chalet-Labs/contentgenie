@@ -251,6 +251,7 @@ const STALL_TIMEOUT_MS = 10_000
 const SLEEP_FADE_DURATION_MS = 3000
 const MS_PER_MINUTE = 60_000
 const SLEEP_TIMER_TOAST = "Sleep timer — playback paused"
+const MAX_LISTEN_HISTORY_RETRIES = 3
 
 const initialState: AudioPlayerState = {
   currentEpisode: null,
@@ -283,10 +284,11 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
   const sessionSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const isRestoringSession = useRef(false)
   const isSessionRestored = useRef(false)
-  // Tracks episodes whose "started" listen event has already fired this session.
+  // Tracks listen-history "started" attempts per episode this session.
+  // Value = attempt count. Once succeeded or MAX_LISTEN_HISTORY_RETRIES reached, no more attempts.
   // Intentionally NOT cleared on replay — upsert COALESCE preserves first startedAt,
-  // so re-firing would be a no-op server call.
-  const listenHistoryFiredRef = useRef<Set<string>>(new Set())
+  // so re-firing after success would be a no-op server call.
+  const listenHistoryFiredRef = useRef<Map<string, number>>(new Map())
 
   const [state, dispatch] = useReducer(reducer, initialState)
 
@@ -768,17 +770,29 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
         }, 5000)
       }
 
-      // Fire listen history "started" event once at 30s threshold
+      // Fire listen history "started" event once at 30s threshold (retry up to MAX_LISTEN_HISTORY_RETRIES)
       if (
         audio.currentTime >= 30 &&
-        stateRef.current.currentEpisode &&
-        !listenHistoryFiredRef.current.has(stateRef.current.currentEpisode.id)
+        stateRef.current.currentEpisode
       ) {
         const ep = stateRef.current.currentEpisode
-        listenHistoryFiredRef.current.add(ep.id)
-        void recordListenEvent({
-          podcastIndexEpisodeId: ep.id,
-        })
+        const attempts = listenHistoryFiredRef.current.get(ep.id) ?? 0
+        if (attempts < MAX_LISTEN_HISTORY_RETRIES) {
+          // Block re-entry while the async call is in-flight
+          listenHistoryFiredRef.current.set(ep.id, MAX_LISTEN_HISTORY_RETRIES)
+          void (async () => {
+            try {
+              const result = await recordListenEvent({
+                podcastIndexEpisodeId: ep.id,
+              })
+              if (!result?.success) {
+                listenHistoryFiredRef.current.set(ep.id, attempts + 1)
+              }
+            } catch {
+              listenHistoryFiredRef.current.set(ep.id, attempts + 1)
+            }
+          })()
+        }
       }
 
       // Debounced ARIA announcement (every 15s)

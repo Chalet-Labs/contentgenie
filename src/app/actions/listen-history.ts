@@ -59,8 +59,6 @@ export async function recordListenEvent(input: {
         startedAt: now,
         completedAt: completed ? now : null,
         listenDurationSeconds: durationSeconds ?? null,
-        createdAt: now,
-        updatedAt: now,
       })
       .onConflictDoUpdate({
         target: [listenHistory.userId, listenHistory.episodeId],
