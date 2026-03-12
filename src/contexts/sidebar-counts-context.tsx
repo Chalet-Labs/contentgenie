@@ -2,48 +2,72 @@
 
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
+  useMemo,
   useState,
   type ReactNode,
 } from "react"
-import { usePathname } from "next/navigation"
 import { getDashboardStats } from "@/app/actions/dashboard"
 
-interface SidebarCountsContextValue {
+interface SidebarCountsState {
   subscriptionCount: number
   savedCount: number
   isLoading: boolean
 }
 
+interface SidebarCountsContextValue extends SidebarCountsState {
+  refreshCounts: () => void
+}
+
 const SidebarCountsContext = createContext<SidebarCountsContextValue | null>(null)
 
+const DEFAULT_COUNTS: SidebarCountsContextValue = {
+  subscriptionCount: 0,
+  savedCount: 0,
+  isLoading: false,
+  refreshCounts: () => {},
+}
+
 export function SidebarCountsProvider({ children }: { children: ReactNode }) {
-  const pathname = usePathname()
-  const [subscriptionCount, setSubscriptionCount] = useState(0)
-  const [savedCount, setSavedCount] = useState(0)
-  const [isLoading, setIsLoading] = useState(true)
+  const [state, setState] = useState<SidebarCountsState>({
+    subscriptionCount: 0,
+    savedCount: 0,
+    isLoading: true,
+  })
+
+  const refreshCounts = useCallback(() => {
+    setState((prev) => ({ ...prev, isLoading: true }))
+
+    getDashboardStats()
+      .then((stats) => {
+        if (stats.error) {
+          console.warn("[SidebarCounts] Server returned error:", stats.error)
+        }
+        setState({
+          subscriptionCount: stats.subscriptionCount,
+          savedCount: stats.savedCount,
+          isLoading: false,
+        })
+      })
+      .catch((error: unknown) => {
+        console.error("[SidebarCounts] Failed to fetch dashboard stats:", error)
+        setState((prev) => ({ ...prev, isLoading: false }))
+      })
+  }, [])
 
   useEffect(() => {
-    let cancelled = false
-    setIsLoading(true)
+    refreshCounts()
+  }, [refreshCounts])
 
-    getDashboardStats().then((stats) => {
-      if (cancelled) return
-      setSubscriptionCount(stats.subscriptionCount)
-      setSavedCount(stats.savedCount)
-      setIsLoading(false)
-    })
-
-    return () => {
-      cancelled = true
-    }
-  }, [pathname])
+  const value = useMemo<SidebarCountsContextValue>(
+    () => ({ ...state, refreshCounts }),
+    [state, refreshCounts]
+  )
 
   return (
-    <SidebarCountsContext.Provider
-      value={{ subscriptionCount, savedCount, isLoading }}
-    >
+    <SidebarCountsContext.Provider value={value}>
       {children}
     </SidebarCountsContext.Provider>
   )
@@ -60,5 +84,26 @@ export function useSidebarCounts(): SidebarCountsContextValue {
 /** Safe variant — returns zero counts when rendered outside the provider (e.g. public landing page). */
 export function useSidebarCountsOptional(): SidebarCountsContextValue {
   const ctx = useContext(SidebarCountsContext)
-  return ctx ?? { subscriptionCount: 0, savedCount: 0, isLoading: false }
+  return ctx ?? DEFAULT_COUNTS
+}
+
+/** Resolve the badge count for a given nav href, or null if no badge should be shown. */
+export function getBadgeCount(
+  href: string,
+  counts: SidebarCountsState
+): number | null {
+  if (counts.isLoading) return null
+  if (href === "/subscriptions" && counts.subscriptionCount > 0)
+    return counts.subscriptionCount
+  if (href === "/library" && counts.savedCount > 0) return counts.savedCount
+  return null
+}
+
+/** Renders a badge pill with the given count, capped at 99+. */
+export function NavBadge({ count }: { count: number }) {
+  return (
+    <span className="ml-auto bg-muted text-muted-foreground text-xs rounded-full px-1.5 min-w-[1.25rem] text-center">
+      {count > 99 ? "99+" : count}
+    </span>
+  )
 }

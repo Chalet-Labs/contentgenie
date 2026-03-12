@@ -11,7 +11,7 @@ import {
   Library,
   Settings,
 } from "lucide-react"
-import { useSidebarCounts } from "@/contexts/sidebar-counts-context"
+import { useSidebarCounts, getBadgeCount, NavBadge } from "@/contexts/sidebar-counts-context"
 
 const sidebarLinks = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -26,7 +26,7 @@ const bottomLinks = [
 
 export function Sidebar() {
   const pathname = usePathname()
-  const { subscriptionCount, savedCount, isLoading } = useSidebarCounts()
+  const counts = useSidebarCounts()
 
   return (
     <aside className="hidden lg:flex flex-col w-64 border-r bg-background h-[calc(100vh-3.5rem)]">
@@ -36,14 +36,7 @@ export function Sidebar() {
             const Icon = link.icon
             const isActive = pathname === link.href || pathname?.startsWith(`${link.href}/`)
 
-            let badge: number | null = null
-            if (!isLoading) {
-              if (link.href === "/subscriptions" && subscriptionCount > 0) {
-                badge = subscriptionCount
-              } else if (link.href === "/library" && savedCount > 0) {
-                badge = savedCount
-              }
-            }
+            const badge = getBadgeCount(link.href, counts)
 
             return (
               <Link
@@ -58,11 +51,7 @@ export function Sidebar() {
               >
                 <Icon className="h-4 w-4" />
                 {link.label}
-                {badge !== null && (
-                  <span className="ml-auto bg-muted text-muted-foreground text-xs rounded-full px-1.5 min-w-[1.25rem] text-center">
-                    {badge}
-                  </span>
-                )}
+                {badge !== null && <NavBadge count={badge} />}
               </Link>
             )
           })}

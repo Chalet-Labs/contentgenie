@@ -10,6 +10,7 @@ import {
   offlineSaveEpisode,
   offlineUnsaveEpisode,
 } from "@/lib/offline-actions";
+import { useSidebarCountsOptional } from "@/contexts/sidebar-counts-context";
 
 interface EpisodeData {
   podcastIndexId: string;
@@ -48,6 +49,7 @@ export function SaveButton({
   const isOnline = useOnlineStatus();
   // useState for isLoading (useTransition not viable on React 18)
   const { hasPending, hasFailed } = useSyncQueue();
+  const { refreshCounts } = useSidebarCountsOptional();
 
   const entityKey = `episode:${episodeData.podcastIndexId}`;
   const isPendingSync = hasPending(entityKey);
@@ -63,6 +65,7 @@ export function SaveButton({
         );
         if (result.success) {
           setIsSaved(false);
+          if (!result.queued) refreshCounts();
           toast.success(
             result.queued ? "Removed (will sync when online)" : "Removed from library",
             { description: `"${episodeData.title}" has been removed` },
@@ -76,6 +79,7 @@ export function SaveButton({
         const result = await offlineSaveEpisode(episodeData, isOnline);
         if (result.success) {
           setIsSaved(true);
+          if (!result.queued) refreshCounts();
           toast.success(
             result.queued ? "Saved (will sync when online)" : "Saved to library!",
             { description: `"${episodeData.title}" has been saved` },

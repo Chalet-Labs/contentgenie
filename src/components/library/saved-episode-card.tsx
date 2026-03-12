@@ -25,6 +25,7 @@ import {
   Star,
 } from "lucide-react";
 import { removeEpisodeFromLibrary, updateLibraryRating } from "@/app/actions/library";
+import { useSidebarCountsOptional } from "@/contexts/sidebar-counts-context";
 import { MoveToCollection } from "./move-to-collection";
 import { NotesEditor } from "./notes-editor";
 import { BookmarksList } from "./bookmarks-list";
@@ -44,6 +45,7 @@ export function SavedEpisodeCard({ item, onRemoved, onCollectionChanged, isOffli
   const [isRemoving, setIsRemoving] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [isExpanded, setIsExpanded] = useState(false);
+  const { refreshCounts } = useSidebarCountsOptional();
   const { episode, collection } = item;
   const hasNotes = item.notes && item.notes.trim().length > 0;
   const { podcast } = episode;
@@ -57,6 +59,7 @@ export function SavedEpisodeCard({ item, onRemoved, onCollectionChanged, isOffli
       const result = await removeEpisodeFromLibrary(episode.podcastIndexId);
       if (result.success) {
         onRemoved?.();
+        refreshCounts();
         toast.success("Removed from library", {
           description: `"${episode.title}" has been removed`,
         });

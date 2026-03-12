@@ -1,13 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { render, screen, act, waitFor } from "@testing-library/react"
-import { SidebarCountsProvider, useSidebarCounts } from "@/contexts/sidebar-counts-context"
-
-// usePathname is mocked globally in setup.ts to return "/".
-// We re-mock here so individual tests can control the value.
-const mockUsePathname = vi.fn().mockReturnValue("/")
-vi.mock("next/navigation", () => ({
-  usePathname: () => mockUsePathname(),
-}))
+import {
+  SidebarCountsProvider,
+  useSidebarCounts,
+  useSidebarCountsOptional,
+  getBadgeCount,
+} from "@/contexts/sidebar-counts-context"
 
 const mockGetDashboardStats = vi.fn()
 vi.mock("@/app/actions/dashboard", () => ({
@@ -15,19 +13,19 @@ vi.mock("@/app/actions/dashboard", () => ({
 }))
 
 function TestConsumer() {
-  const { subscriptionCount, savedCount, isLoading } = useSidebarCounts()
+  const { subscriptionCount, savedCount, isLoading, refreshCounts } = useSidebarCounts()
   return (
     <div>
       <span data-testid="sub-count">{subscriptionCount}</span>
       <span data-testid="saved-count">{savedCount}</span>
       <span data-testid="loading">{isLoading ? "loading" : "done"}</span>
+      <button data-testid="refresh" onClick={refreshCounts}>refresh</button>
     </div>
   )
 }
 
 describe("SidebarCountsProvider", () => {
   beforeEach(() => {
-    mockUsePathname.mockReturnValue("/")
     mockGetDashboardStats.mockResolvedValue({
       subscriptionCount: 3,
       savedCount: 7,
@@ -48,7 +46,7 @@ describe("SidebarCountsProvider", () => {
 
     expect(screen.getByTestId("sub-count").textContent).toBe("3")
     expect(screen.getByTestId("saved-count").textContent).toBe("7")
-    expect(mockGetDashboardStats).toHaveBeenCalledTimes(1)
+    expect(mockGetDashboardStats).toHaveBeenCalled()
   })
 
   it("shows loading state during fetch and done after", async () => {
@@ -76,10 +74,8 @@ describe("SidebarCountsProvider", () => {
     })
   })
 
-  it("re-fetches when pathname changes", async () => {
-    mockUsePathname.mockReturnValue("/dashboard")
-
-    const { rerender } = render(
+  it("refreshCounts triggers refetch with fresh data", async () => {
+    render(
       <SidebarCountsProvider>
         <TestConsumer />
       </SidebarCountsProvider>
@@ -89,35 +85,76 @@ describe("SidebarCountsProvider", () => {
       expect(screen.getByTestId("loading").textContent).toBe("done")
     })
 
+    expect(screen.getByTestId("sub-count").textContent).toBe("3")
+
     const callsAfterMount = mockGetDashboardStats.mock.calls.length
 
-    mockUsePathname.mockReturnValue("/subscriptions")
     mockGetDashboardStats.mockResolvedValue({
       subscriptionCount: 5,
       savedCount: 10,
       error: null,
     })
 
-    rerender(
-      <SidebarCountsProvider>
-        <TestConsumer />
-      </SidebarCountsProvider>
-    )
-
-    await waitFor(() => {
-      expect(mockGetDashboardStats.mock.calls.length).toBeGreaterThan(callsAfterMount)
+    await act(async () => {
+      screen.getByTestId("refresh").click()
     })
 
     await waitFor(() => {
       expect(screen.getByTestId("sub-count").textContent).toBe("5")
       expect(screen.getByTestId("saved-count").textContent).toBe("10")
     })
+
+    expect(mockGetDashboardStats.mock.calls.length).toBe(callsAfterMount + 1)
+  })
+
+  it("handles getDashboardStats rejection gracefully", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {})
+    mockGetDashboardStats.mockRejectedValue(new Error("Network failure"))
+
+    render(
+      <SidebarCountsProvider>
+        <TestConsumer />
+      </SidebarCountsProvider>
+    )
+
+    await waitFor(() => {
+      expect(screen.getByTestId("loading").textContent).toBe("done")
+    })
+
+    expect(screen.getByTestId("sub-count").textContent).toBe("0")
+    expect(screen.getByTestId("saved-count").textContent).toBe("0")
+    consoleError.mockRestore()
+  })
+
+  it("logs warning when getDashboardStats returns an error field", async () => {
+    const consoleWarn = vi.spyOn(console, "warn").mockImplementation(() => {})
+    mockGetDashboardStats.mockResolvedValue({
+      subscriptionCount: 0,
+      savedCount: 0,
+      error: "You must be signed in",
+    })
+
+    render(
+      <SidebarCountsProvider>
+        <TestConsumer />
+      </SidebarCountsProvider>
+    )
+
+    await waitFor(() => {
+      expect(screen.getByTestId("loading").textContent).toBe("done")
+    })
+
+    expect(consoleWarn).toHaveBeenCalledWith(
+      "[SidebarCounts] Server returned error:",
+      "You must be signed in"
+    )
+    expect(screen.getByTestId("sub-count").textContent).toBe("0")
+    consoleWarn.mockRestore()
   })
 })
 
 describe("useSidebarCounts", () => {
   it("throws when used outside provider", () => {
-    // Suppress the expected React error boundary console output
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => {})
 
     expect(() => {
@@ -125,5 +162,64 @@ describe("useSidebarCounts", () => {
     }).toThrow("useSidebarCounts must be used within SidebarCountsProvider")
 
     consoleError.mockRestore()
+  })
+})
+
+describe("useSidebarCountsOptional", () => {
+  it("returns default counts with no-op refreshCounts when used outside provider", () => {
+    function OptionalConsumer() {
+      const { subscriptionCount, savedCount, isLoading, refreshCounts } = useSidebarCountsOptional()
+      return (
+        <div>
+          <span data-testid="sub-count">{subscriptionCount}</span>
+          <span data-testid="saved-count">{savedCount}</span>
+          <span data-testid="loading">{isLoading ? "loading" : "done"}</span>
+          <button data-testid="refresh" onClick={refreshCounts}>refresh</button>
+        </div>
+      )
+    }
+
+    render(<OptionalConsumer />)
+
+    expect(screen.getByTestId("sub-count").textContent).toBe("0")
+    expect(screen.getByTestId("saved-count").textContent).toBe("0")
+    expect(screen.getByTestId("loading").textContent).toBe("done")
+    // Should not throw when clicking (no-op)
+    expect(() => screen.getByTestId("refresh").click()).not.toThrow()
+  })
+})
+
+describe("getBadgeCount", () => {
+  it("returns subscription count for /subscriptions when > 0", () => {
+    expect(
+      getBadgeCount("/subscriptions", { subscriptionCount: 5, savedCount: 0, isLoading: false })
+    ).toBe(5)
+  })
+
+  it("returns saved count for /library when > 0", () => {
+    expect(
+      getBadgeCount("/library", { subscriptionCount: 0, savedCount: 3, isLoading: false })
+    ).toBe(3)
+  })
+
+  it("returns null when loading", () => {
+    expect(
+      getBadgeCount("/subscriptions", { subscriptionCount: 5, savedCount: 3, isLoading: true })
+    ).toBeNull()
+  })
+
+  it("returns null for unrelated routes", () => {
+    expect(
+      getBadgeCount("/dashboard", { subscriptionCount: 5, savedCount: 3, isLoading: false })
+    ).toBeNull()
+  })
+
+  it("returns null when count is 0", () => {
+    expect(
+      getBadgeCount("/subscriptions", { subscriptionCount: 0, savedCount: 0, isLoading: false })
+    ).toBeNull()
+    expect(
+      getBadgeCount("/library", { subscriptionCount: 0, savedCount: 0, isLoading: false })
+    ).toBeNull()
   })
 })

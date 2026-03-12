@@ -14,7 +14,7 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { Separator } from "@/components/ui/separator"
 import { Menu, Moon, Sun, Headphones } from "lucide-react"
 import { NotificationBell } from "@/components/notifications/notification-bell"
-import { useSidebarCountsOptional } from "@/contexts/sidebar-counts-context"
+import { useSidebarCountsOptional, getBadgeCount, NavBadge } from "@/contexts/sidebar-counts-context"
 
 const navLinks = [
   { href: "/dashboard", label: "Dashboard" },
@@ -25,7 +25,7 @@ const navLinks = [
 
 export function Header() {
   const { setTheme } = useTheme()
-  const { subscriptionCount, savedCount, isLoading } = useSidebarCountsOptional()
+  const counts = useSidebarCountsOptional()
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -45,14 +45,7 @@ export function Header() {
             </div>
             <nav className="flex flex-col gap-2">
               {navLinks.map((link) => {
-                let badge: number | null = null
-                if (!isLoading) {
-                  if (link.href === "/subscriptions" && subscriptionCount > 0) {
-                    badge = subscriptionCount
-                  } else if (link.href === "/library" && savedCount > 0) {
-                    badge = savedCount
-                  }
-                }
+                const badge = getBadgeCount(link.href, counts)
 
                 return (
                   <Link
@@ -61,11 +54,7 @@ export function Header() {
                     className="flex items-center px-3 py-2 text-sm font-medium rounded-md hover:bg-accent hover:text-accent-foreground transition-colors"
                   >
                     {link.label}
-                    {badge !== null && (
-                      <span className="ml-auto bg-muted text-muted-foreground text-xs rounded-full px-1.5 min-w-[1.25rem] text-center">
-                        {badge}
-                      </span>
-                    )}
+                    {badge !== null && <NavBadge count={badge} />}
                   </Link>
                 )
               })}
