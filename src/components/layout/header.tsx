@@ -14,6 +14,7 @@ import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { Separator } from "@/components/ui/separator"
 import { Menu, Moon, Sun, Headphones } from "lucide-react"
 import { NotificationBell } from "@/components/notifications/notification-bell"
+import { useSidebarCountsOptional } from "@/contexts/sidebar-counts-context"
 
 const navLinks = [
   { href: "/dashboard", label: "Dashboard" },
@@ -24,6 +25,7 @@ const navLinks = [
 
 export function Header() {
   const { setTheme } = useTheme()
+  const { subscriptionCount, savedCount, isLoading } = useSidebarCountsOptional()
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -42,15 +44,31 @@ export function Header() {
               <span className="font-bold text-lg">ContentGenie</span>
             </div>
             <nav className="flex flex-col gap-2">
-              {navLinks.map((link) => (
-                <Link
-                  key={link.href}
-                  href={link.href}
-                  className="flex items-center px-3 py-2 text-sm font-medium rounded-md hover:bg-accent hover:text-accent-foreground transition-colors"
-                >
-                  {link.label}
-                </Link>
-              ))}
+              {navLinks.map((link) => {
+                let badge: number | null = null
+                if (!isLoading) {
+                  if (link.href === "/subscriptions" && subscriptionCount > 0) {
+                    badge = subscriptionCount
+                  } else if (link.href === "/library" && savedCount > 0) {
+                    badge = savedCount
+                  }
+                }
+
+                return (
+                  <Link
+                    key={link.href}
+                    href={link.href}
+                    className="flex items-center px-3 py-2 text-sm font-medium rounded-md hover:bg-accent hover:text-accent-foreground transition-colors"
+                  >
+                    {link.label}
+                    {badge !== null && (
+                      <span className="ml-auto bg-muted text-muted-foreground text-xs rounded-full px-1.5 min-w-[1.25rem] text-center">
+                        {badge}
+                      </span>
+                    )}
+                  </Link>
+                )
+              })}
               <Separator className="my-2" />
               <Link
                 href="/settings"
