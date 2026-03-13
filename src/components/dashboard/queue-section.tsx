@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import Image from "next/image";
 import { useRealtimeRun } from "@trigger.dev/react-hooks";
 import { toast } from "sonner";
-import { Loader2, ListMusic, Rss, RefreshCw } from "lucide-react";
+import { Loader2, ListMusic, Rss, RefreshCw, GripVertical } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -164,6 +164,10 @@ function QueueEpisodeRow({
 }: QueueEpisodeRowProps) {
   return (
     <div className="flex items-center gap-3 rounded-lg p-2">
+      <GripVertical
+        aria-hidden="true"
+        className="h-4 w-4 shrink-0 text-muted-foreground/50"
+      />
       {/* Artwork */}
       <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-md bg-muted">
         {episode.artwork ? (
