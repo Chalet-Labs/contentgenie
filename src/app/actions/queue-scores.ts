@@ -36,9 +36,7 @@ export async function getQueueEpisodeScores(
     const result: Record<string, number | null> = {};
     for (const row of rows) {
       result[row.podcastIndexId] =
-        row.worthItScore !== null && row.worthItScore !== undefined
-          ? parseFloat(row.worthItScore)
-          : null;
+        row.worthItScore !== null ? parseFloat(row.worthItScore) : null;
     }
     return result;
   } catch {

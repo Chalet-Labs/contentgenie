@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import Image from "next/image";
 import { useRealtimeRun } from "@trigger.dev/react-hooks";
 import { toast } from "sonner";
@@ -25,6 +25,29 @@ interface SummarizeState {
   runId?: string;
   accessToken?: string;
   errorMessage?: string;
+}
+
+// ---------------------------------------------------------------------------
+// Map state helpers — avoid repeating new Map(prev) + set/delete + return
+// ---------------------------------------------------------------------------
+
+function setMapEntry(
+  setter: React.Dispatch<React.SetStateAction<Map<string, SummarizeState>>>,
+  id: string,
+  state: SummarizeState
+) {
+  setter((prev) => new Map(prev).set(id, state));
+}
+
+function deleteMapEntry(
+  setter: React.Dispatch<React.SetStateAction<Map<string, SummarizeState>>>,
+  id: string
+) {
+  setter((prev) => {
+    const next = new Map(prev);
+    next.delete(id);
+    return next;
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -77,10 +100,13 @@ function SummarizeTracker({
     enabled: true,
   });
 
+  const handledRef = useRef(false);
+
   useEffect(() => {
-    if (!run) return;
+    if (!run || handledRef.current) return;
 
     if (run.status === "COMPLETED") {
+      handledRef.current = true;
       const score = (run.output as { worthItScore?: number } | undefined)
         ?.worthItScore;
       onScoreReceived(episodeId, typeof score === "number" ? score : 0);
@@ -92,6 +118,7 @@ function SummarizeTracker({
         run.status as (typeof TERMINAL_STATUSES)[number]
       )
     ) {
+      handledRef.current = true;
       onError(
         episodeId,
         `Summarization ${run.status.toLowerCase().replace(/_/g, " ")}`
@@ -222,24 +249,44 @@ export function QueueSection() {
     Map<string, SummarizeState>
   >(new Map());
 
+  // Ref snapshot of scores for use inside useEffect without adding it as a dep
+  const scoresRef = useRef(scores);
+  scoresRef.current = scores;
+
   // Stable key for the current set of episode IDs — avoids object identity churn
-  const episodeIdKey =
-    (currentEpisode ? currentEpisode.id : "") +
-    "|" +
-    queue.map((ep) => ep.id).join(",");
+  const episodeIdKey = useMemo(
+    () =>
+      (currentEpisode ? currentEpisode.id : "") +
+      "|" +
+      queue.map((ep) => ep.id).join(","),
+    [currentEpisode, queue]
+  );
 
   // Fetch scores whenever the set of episode IDs changes
   useEffect(() => {
+    let cancelled = false;
+
     const allIds = [
       ...(currentEpisode ? [currentEpisode.id] : []),
       ...queue.map((ep) => ep.id),
     ];
 
-    if (allIds.length === 0) return;
+    // Only fetch IDs we don't already have scores for
+    const unknownIds = allIds.filter(
+      (id) => !Object.hasOwn(scoresRef.current, id)
+    );
 
-    getQueueEpisodeScores(allIds).then((result) => {
-      setScores((prev) => ({ ...prev, ...result }));
+    if (unknownIds.length === 0) return;
+
+    getQueueEpisodeScores(unknownIds).then((result) => {
+      if (!cancelled) {
+        setScores((prev) => ({ ...prev, ...result }));
+      }
     });
+
+    return () => {
+      cancelled = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [episodeIdKey]);
 
@@ -266,10 +313,10 @@ export function QueueSection() {
       if (res.status === 202) {
         const runId = data.runId as string;
         const accessToken = data.publicAccessToken as string;
-        setSummarizeStates((prev) => {
-          const next = new Map(prev);
-          next.set(episodeId, { status: "loading", runId, accessToken });
-          return next;
+        setMapEntry(setSummarizeStates, episodeId, {
+          status: "loading",
+          runId,
+          accessToken,
         });
         return;
       }
@@ -282,13 +329,9 @@ export function QueueSection() {
         } else {
           toast.error("Rate limit exceeded. Please try again later.");
         }
-        setSummarizeStates((prev) => {
-          const next = new Map(prev);
-          next.set(episodeId, {
-            status: "error",
-            errorMessage: "Rate limited",
-          });
-          return next;
+        setMapEntry(setSummarizeStates, episodeId, {
+          status: "error",
+          errorMessage: "Rate limited",
         });
         return;
       }
@@ -299,20 +342,15 @@ export function QueueSection() {
           ? data.error
           : "Failed to start summarization";
       toast.error(message);
-      setSummarizeStates((prev) => {
-        const next = new Map(prev);
-        next.set(episodeId, { status: "error", errorMessage: message });
-        return next;
+      setMapEntry(setSummarizeStates, episodeId, {
+        status: "error",
+        errorMessage: message,
       });
     } catch {
       toast.error("Network error. Please try again.");
-      setSummarizeStates((prev) => {
-        const next = new Map(prev);
-        next.set(episodeId, {
-          status: "error",
-          errorMessage: "Network error",
-        });
-        return next;
+      setMapEntry(setSummarizeStates, episodeId, {
+        status: "error",
+        errorMessage: "Network error",
       });
     }
   }, []);
@@ -320,21 +358,16 @@ export function QueueSection() {
   const handleScoreReceived = useCallback(
     (episodeId: string, score: number) => {
       setScores((prev) => ({ ...prev, [episodeId]: score }));
-      setSummarizeStates((prev) => {
-        const next = new Map(prev);
-        next.delete(episodeId);
-        return next;
-      });
+      deleteMapEntry(setSummarizeStates, episodeId);
     },
     []
   );
 
   const handleSummarizeError = useCallback(
     (episodeId: string, message: string) => {
-      setSummarizeStates((prev) => {
-        const next = new Map(prev);
-        next.set(episodeId, { status: "error", errorMessage: message });
-        return next;
+      setMapEntry(setSummarizeStates, episodeId, {
+        status: "error",
+        errorMessage: message,
       });
     },
     []
@@ -342,11 +375,7 @@ export function QueueSection() {
 
   const handleRetry = useCallback(
     (episodeId: string) => {
-      setSummarizeStates((prev) => {
-        const next = new Map(prev);
-        next.delete(episodeId);
-        return next;
-      });
+      deleteMapEntry(setSummarizeStates, episodeId);
       handleGetScore(episodeId);
     },
     [handleGetScore]
@@ -379,21 +408,19 @@ export function QueueSection() {
         ) : (
           <div className="space-y-1">
             {currentEpisode && (
-              <>
-                <QueueEpisodeRow
-                  episode={currentEpisode}
-                  score={scores[currentEpisode.id]}
-                  summarizeState={summarizeStates.get(currentEpisode.id)}
-                  isNowPlaying
-                  onGetScore={handleGetScore}
-                  onRetry={handleRetry}
-                  onScoreReceived={handleScoreReceived}
-                  onSummarizeError={handleSummarizeError}
-                />
-                {queue.length > 0 && (
-                  <div className="my-2 border-t" />
-                )}
-              </>
+              <QueueEpisodeRow
+                episode={currentEpisode}
+                score={scores[currentEpisode.id]}
+                summarizeState={summarizeStates.get(currentEpisode.id)}
+                isNowPlaying
+                onGetScore={handleGetScore}
+                onRetry={handleRetry}
+                onScoreReceived={handleScoreReceived}
+                onSummarizeError={handleSummarizeError}
+              />
+            )}
+            {currentEpisode && queue.length > 0 && (
+              <div className="my-2 border-t" />
             )}
             {queue.map((episode) => (
               <QueueEpisodeRow
