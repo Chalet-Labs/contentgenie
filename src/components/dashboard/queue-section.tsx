@@ -109,7 +109,15 @@ function SummarizeTracker({
       handledRef.current = true;
       const score = (run.output as { worthItScore?: number } | undefined)
         ?.worthItScore;
-      onScoreReceived(episodeId, typeof score === "number" ? score : 0);
+      if (typeof score === "number") {
+        onScoreReceived(episodeId, score);
+      } else {
+        console.error(
+          "SummarizeTracker: missing worthItScore in run output for episode %s",
+          episodeId
+        );
+        onError(episodeId, "Score not available");
+      }
       return;
     }
 
@@ -278,11 +286,15 @@ export function QueueSection() {
 
     if (unknownIds.length === 0) return;
 
-    getQueueEpisodeScores(unknownIds).then((result) => {
-      if (!cancelled) {
-        setScores((prev) => ({ ...prev, ...result }));
-      }
-    });
+    getQueueEpisodeScores(unknownIds)
+      .then((result) => {
+        if (!cancelled) {
+          setScores((prev) => ({ ...prev, ...result }));
+        }
+      })
+      .catch((err) => {
+        console.error("Failed to fetch queue episode scores:", err);
+      });
 
     return () => {
       cancelled = true;
@@ -291,6 +303,9 @@ export function QueueSection() {
   }, [episodeIdKey]);
 
   const handleGetScore = useCallback(async (episodeId: string) => {
+    // Set loading immediately to prevent double-clicks
+    setMapEntry(setSummarizeStates, episodeId, { status: "loading" });
+
     try {
       const res = await fetch("/api/episodes/summarize", {
         method: "POST",
@@ -298,15 +313,31 @@ export function QueueSection() {
         body: JSON.stringify({ episodeId: Number(episodeId) }),
       });
 
-      const data = (await res.json()) as Record<string, unknown>;
+      let data: Record<string, unknown>;
+      try {
+        data = (await res.json()) as Record<string, unknown>;
+      } catch {
+        console.error(
+          "handleGetScore: non-JSON response (status %d) for episode %s",
+          res.status,
+          episodeId
+        );
+        toast.error("Failed to start summarization");
+        setMapEntry(setSummarizeStates, episodeId, {
+          status: "error",
+          errorMessage: "Invalid response",
+        });
+        return;
+      }
 
       if (res.status === 200) {
-        // Cached result — apply score immediately, no realtime subscription
+        // Score already exists in DB — apply immediately, no realtime subscription
         const score = data.worthItScore;
         setScores((prev) => ({
           ...prev,
           [episodeId]: typeof score === "number" ? score : null,
         }));
+        deleteMapEntry(setSummarizeStates, episodeId);
         return;
       }
 
@@ -346,7 +377,8 @@ export function QueueSection() {
         status: "error",
         errorMessage: message,
       });
-    } catch {
+    } catch (err) {
+      console.error("handleGetScore: network error for episode %s:", episodeId, err);
       toast.error("Network error. Please try again.");
       setMapEntry(setSummarizeStates, episodeId, {
         status: "error",

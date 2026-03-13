@@ -72,15 +72,17 @@ describe("getQueueEpisodeScores", () => {
   })
 
   it("returns scores for matching episode IDs", async () => {
-    mockWhere.mockReturnValue(
-      Promise.resolve([
-        { podcastIndexId: "111", worthItScore: "8.50" },
-        { podcastIndexId: "222", worthItScore: "5.00" },
-      ])
-    )
+    const dbRows = [
+      { podcastIndexId: "111", worthItScore: "8.50" },
+      { podcastIndexId: "222", worthItScore: "5.00" },
+    ]
+    mockWhere.mockReturnValue(Promise.resolve(dbRows))
     const { getQueueEpisodeScores } = await import("@/app/actions/queue-scores")
     const result = await getQueueEpisodeScores(["111", "222"])
-    expect(result).toEqual({ "111": 8.5, "222": 5.0 })
+    expect(result).toEqual({
+      "111": parseFloat(dbRows[0].worthItScore),
+      "222": parseFloat(dbRows[1].worthItScore),
+    })
   })
 
   it("returns null for IDs with no score (worthItScore is null)", async () => {

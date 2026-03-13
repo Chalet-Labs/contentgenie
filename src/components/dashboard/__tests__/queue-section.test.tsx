@@ -41,9 +41,8 @@ vi.mock("@trigger.dev/react-hooks", () => ({
   useRealtimeRun: (...args: unknown[]) => mockUseRealtimeRun(...args),
 }))
 
-// Fetch
+// Fetch — use vi.stubGlobal for proper lifecycle management
 const mockFetch = vi.fn()
-globalThis.fetch = mockFetch
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -73,6 +72,7 @@ async function renderQueueSection() {
 describe("QueueSection", () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.stubGlobal("fetch", mockFetch)
     // Reset state defaults
     mockState.currentEpisode = null
     mockState.queue = []
@@ -89,6 +89,7 @@ describe("QueueSection", () => {
 
   afterEach(() => {
     vi.restoreAllMocks()
+    vi.unstubAllGlobals()
   })
 
   // -------------------------------------------------------------------------
@@ -294,6 +295,119 @@ describe("QueueSection", () => {
       expect(toast.error).toHaveBeenCalledWith(
         "Rate limit exceeded. Please try again later."
       )
+    })
+  })
+
+  // -------------------------------------------------------------------------
+  // SummarizeTracker lifecycle — COMPLETED
+  // -------------------------------------------------------------------------
+
+  it("displays score when SummarizeTracker receives COMPLETED with worthItScore", async () => {
+    mockState.queue = [makeEpisode({ id: "1001" })]
+    mockGetQueueEpisodeScores.mockResolvedValue({ "1001": null })
+
+    // First click triggers 202 → loading state
+    mockFetch.mockResolvedValue({
+      status: 202,
+      json: async () => ({
+        runId: "run_abc",
+        publicAccessToken: "tok_xyz",
+        status: "queued",
+      }),
+    })
+
+    // SummarizeTracker will call useRealtimeRun — return COMPLETED run
+    mockUseRealtimeRun.mockReturnValue({
+      run: {
+        status: "COMPLETED",
+        output: { worthItScore: 9.1 },
+      },
+    })
+
+    await renderQueueSection()
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /get score/i })).toBeInTheDocument()
+    })
+
+    const user = userEvent.setup()
+    await user.click(screen.getByRole("button", { name: /get score/i }))
+
+    await waitFor(() => {
+      expect(screen.getByText("9.1")).toBeInTheDocument()
+    })
+  })
+
+  it("shows error when SummarizeTracker receives COMPLETED without worthItScore", async () => {
+    mockState.queue = [makeEpisode({ id: "1001" })]
+    mockGetQueueEpisodeScores.mockResolvedValue({ "1001": null })
+
+    mockFetch.mockResolvedValue({
+      status: 202,
+      json: async () => ({
+        runId: "run_abc",
+        publicAccessToken: "tok_xyz",
+        status: "queued",
+      }),
+    })
+
+    // COMPLETED but output missing worthItScore
+    mockUseRealtimeRun.mockReturnValue({
+      run: {
+        status: "COMPLETED",
+        output: {},
+      },
+    })
+
+    await renderQueueSection()
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /get score/i })).toBeInTheDocument()
+    })
+
+    const user = userEvent.setup()
+    await user.click(screen.getByRole("button", { name: /get score/i }))
+
+    // Should show retry button (error state), not a score badge
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /retry/i })).toBeInTheDocument()
+    })
+  })
+
+  // -------------------------------------------------------------------------
+  // SummarizeTracker lifecycle — FAILED
+  // -------------------------------------------------------------------------
+
+  it("shows retry button when SummarizeTracker receives FAILED status", async () => {
+    mockState.queue = [makeEpisode({ id: "1001" })]
+    mockGetQueueEpisodeScores.mockResolvedValue({ "1001": null })
+
+    mockFetch.mockResolvedValue({
+      status: 202,
+      json: async () => ({
+        runId: "run_abc",
+        publicAccessToken: "tok_xyz",
+        status: "queued",
+      }),
+    })
+
+    mockUseRealtimeRun.mockReturnValue({
+      run: {
+        status: "FAILED",
+      },
+    })
+
+    await renderQueueSection()
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /get score/i })).toBeInTheDocument()
+    })
+
+    const user = userEvent.setup()
+    await user.click(screen.getByRole("button", { name: /get score/i }))
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /retry/i })).toBeInTheDocument()
     })
   })
 })

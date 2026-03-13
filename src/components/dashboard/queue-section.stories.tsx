@@ -8,7 +8,7 @@ import {
   type AudioPlayerAPI,
   type AudioEpisode,
 } from "@/contexts/audio-player-context"
-import { QueueSection } from "./queue-section"
+import { QueueSection } from "@/components/dashboard/queue-section"
 
 // ---------------------------------------------------------------------------
 // Mock provider — same pattern as queue-panel.stories.tsx
