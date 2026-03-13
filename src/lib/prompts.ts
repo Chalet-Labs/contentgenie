@@ -77,7 +77,7 @@ Important:
 - Focus on value for busy professionals who need to be selective with their time`;
 }
 
-export const TRENDING_TOPICS_SYSTEM_PROMPT = `You are a podcast trend analyst. Your job is to identify distinct topic clusters from podcast episode summaries. Group related topics together into 5-8 clear, non-overlapping clusters. Each cluster should have a concise name and a brief description.
+export const TRENDING_TOPICS_SYSTEM_PROMPT = `You are a podcast trend analyst. Your job is to identify distinct topic clusters from podcast episode summaries. Group related topics together into 5-8 clear clusters. Each cluster should have a concise name and a brief description.
 
 Always respond in valid JSON format.`;
 

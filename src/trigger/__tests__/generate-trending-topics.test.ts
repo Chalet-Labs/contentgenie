@@ -37,6 +37,8 @@ vi.mock("@/db/schema", () => ({
 vi.mock("drizzle-orm", () => ({
   eq: vi.fn(),
   gte: vi.fn(),
+  lte: vi.fn(),
+  desc: vi.fn(),
   and: vi.fn(),
   isNotNull: vi.fn(),
 }));
@@ -67,6 +69,7 @@ function mockDbSelect(rows: unknown[]) {
   const chain = {
     from: vi.fn().mockReturnThis(),
     where: vi.fn().mockReturnThis(),
+    orderBy: vi.fn().mockReturnThis(),
     limit: vi.fn().mockResolvedValue(rows),
   };
   mockSelect.mockReturnValue(chain);

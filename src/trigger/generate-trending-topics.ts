@@ -1,5 +1,5 @@
 import { schedules, logger } from "@trigger.dev/sdk";
-import { eq, gte, and, isNotNull } from "drizzle-orm";
+import { eq, gte, lte, desc, and, isNotNull } from "drizzle-orm";
 import { db } from "@/db";
 import { episodes, trendingTopics, type TrendingTopic } from "@/db/schema";
 import { generateCompletion } from "@/lib/ai";
@@ -47,9 +47,11 @@ export const generateTrendingTopics = schedules.task({
           eq(episodes.summaryStatus, "completed"),
           isNotNull(episodes.processedAt),
           gte(episodes.processedAt, periodStart),
+          lte(episodes.processedAt, periodEnd),
           isNotNull(episodes.keyTakeaways)
         )
       )
+      .orderBy(desc(episodes.processedAt))
       .limit(MAX_EPISODES);
 
     logger.info("Found summarized episodes in window", {
@@ -153,7 +155,8 @@ export const generateTrendingTopics = schedules.task({
           validEpisodeIds.has(id)
         );
         return {
-          ...topic,
+          name: topic.name,
+          description: topic.description,
           episodeIds: filteredIds,
           episodeCount: filteredIds.length,
         };
