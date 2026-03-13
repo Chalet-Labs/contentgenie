@@ -77,6 +77,46 @@ Important:
 - Focus on value for busy professionals who need to be selective with their time`;
 }
 
+export const TRENDING_TOPICS_SYSTEM_PROMPT = `You are a podcast trend analyst. Your job is to identify distinct topic clusters from podcast episode summaries. Group related topics together into 5-8 clear, non-overlapping clusters. Each cluster should have a concise name and a brief description.
+
+Always respond in valid JSON format.`;
+
+export function getTrendingTopicsPrompt(
+  episodes: Array<{ id: number; title: string; keyTakeaways: string[] }>
+): string {
+  const episodeList = episodes
+    .map(
+      (ep) =>
+        `- [ID: ${ep.id}] "${ep.title}"\n  Takeaways: ${ep.keyTakeaways.join("; ")}`
+    )
+    .join("\n");
+
+  return `Analyze these ${episodes.length} recently summarized podcast episodes and identify 5-8 trending topic clusters:
+
+${episodeList}
+
+Respond in this JSON format:
+{
+  "topics": [
+    {
+      "name": "Short topic name (2-5 words)",
+      "description": "One sentence describing what this topic cluster covers",
+      "episodeCount": 3,
+      "episodeIds": [1, 5, 12]
+    }
+  ]
+}
+
+Rules:
+- Extract 5-8 distinct topic clusters (fewer if there aren't enough distinct themes)
+- Each episode can appear in multiple clusters if relevant
+- episodeIds must only contain IDs from the provided list
+- episodeCount must equal the length of episodeIds
+- Sort topics by episodeCount descending (most popular first)
+- Topic names should be concise and professional (e.g., "AI & Machine Learning", "Leadership & Management")
+- If fewer than 3 episodes are provided, return fewer clusters proportionally (minimum 1)`;
+}
+
 export function getQuickSummaryPrompt(
   title: string,
   description: string

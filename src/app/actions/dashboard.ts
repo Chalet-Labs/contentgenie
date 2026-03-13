@@ -3,7 +3,12 @@
 import { auth } from "@clerk/nextjs/server";
 import { eq, desc } from "drizzle-orm";
 import { db } from "@/db";
-import { userSubscriptions, userLibrary } from "@/db/schema";
+import {
+  userSubscriptions,
+  userLibrary,
+  trendingTopics,
+  type TrendingTopic,
+} from "@/db/schema";
 import {
   LIBRARY_ENTRY_COLUMNS,
   EPISODE_LIST_COLUMNS,
@@ -209,6 +214,39 @@ export async function getDashboardStats() {
   } catch (error) {
     console.error("Error fetching dashboard stats:", error);
     return { subscriptionCount: 0, savedCount: 0, error: "Failed to load stats" };
+  }
+}
+
+// Get latest trending topics snapshot
+export async function getTrendingTopics() {
+  const { userId } = await auth();
+
+  if (!userId) {
+    return { topics: null, error: "You must be signed in" };
+  }
+
+  try {
+    const latest = await db.query.trendingTopics.findFirst({
+      orderBy: [desc(trendingTopics.generatedAt)],
+    });
+
+    if (!latest) {
+      return { topics: null, error: null };
+    }
+
+    return {
+      topics: {
+        items: latest.topics as TrendingTopic[],
+        generatedAt: latest.generatedAt,
+        periodStart: latest.periodStart,
+        periodEnd: latest.periodEnd,
+        episodeCount: latest.episodeCount,
+      },
+      error: null,
+    };
+  } catch (error) {
+    console.error("Error fetching trending topics:", error);
+    return { topics: null, error: "Failed to load trending topics" };
   }
 }
 
