@@ -24,3 +24,4 @@ export const getDashboardStats = async () => ({
   savedCount: 5,
   error: null,
 });
+export const getQueueEpisodeScores = async () => ({});

@@ -21,6 +21,8 @@ const config: StorybookConfig = {
       { find: "@/app/actions/subscriptions", replacement: path.resolve(__dirname, "mocks/actions.ts") },
       { find: "@/app/actions/collections", replacement: path.resolve(__dirname, "mocks/actions.ts") },
       { find: "@/app/actions/dashboard", replacement: path.resolve(__dirname, "mocks/actions.ts") },
+      { find: "@/app/actions/queue-scores", replacement: path.resolve(__dirname, "mocks/actions.ts") },
+      { find: "@trigger.dev/react-hooks", replacement: path.resolve(__dirname, "mocks/trigger-react-hooks.ts") },
       { find: "@/lib/podcastindex", replacement: path.resolve(__dirname, "mocks/podcastindex.ts") },
       // General path alias — must come last
       { find: "@", replacement: path.resolve(__dirname, "../src") },
