@@ -44,7 +44,8 @@ export const generateTrendingTopics = schedules.task({
         and(
           eq(episodes.summaryStatus, "completed"),
           isNotNull(episodes.processedAt),
-          gte(episodes.processedAt, periodStart)
+          gte(episodes.processedAt, periodStart),
+          isNotNull(episodes.keyTakeaways)
         )
       );
 
@@ -66,7 +67,7 @@ export const generateTrendingTopics = schedules.task({
       return { episodeCount: 0, topicCount: 0 };
     }
 
-    // Build LLM input (only episodes with takeaways)
+    // Build LLM input (SQL filters NULL takeaways; JS filters empty arrays)
     const episodesWithTakeaways = recentEpisodes
       .filter((ep) => ep.keyTakeaways && ep.keyTakeaways.length > 0)
       .map((ep) => ({
@@ -120,6 +121,20 @@ export const generateTrendingTopics = schedules.task({
       });
       // Store empty on parse failure rather than throwing (prevents stale data)
       topics = [];
+    }
+
+    // If parsing failed completely, store empty snapshot explicitly
+    if (topics.length === 0) {
+      await db.insert(trendingTopics).values({
+        topics: [],
+        generatedAt: now,
+        periodStart,
+        periodEnd,
+        episodeCount: episodesWithTakeaways.length,
+      });
+
+      logger.info("No valid topics after parsing/validation, stored empty snapshot");
+      return { episodeCount: episodesWithTakeaways.length, topicCount: 0 };
     }
 
     // Validate: filter out topics referencing invalid episode IDs

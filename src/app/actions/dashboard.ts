@@ -236,7 +236,7 @@ export async function getTrendingTopics() {
 
     return {
       topics: {
-        items: latest.topics as TrendingTopic[],
+        items: latest.topics,
         generatedAt: latest.generatedAt,
         periodStart: latest.periodStart,
         periodEnd: latest.periodEnd,
