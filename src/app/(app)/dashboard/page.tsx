@@ -9,6 +9,7 @@ import { RecentEpisodes } from "@/components/dashboard/recent-episodes";
 import { SavedItems } from "@/components/dashboard/saved-items";
 import { Recommendations } from "@/components/dashboard/recommendations";
 import { StatsCards } from "@/components/dashboard/stats-cards";
+import { QueueSection } from "@/components/dashboard/queue-section";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 
@@ -103,6 +104,9 @@ export default function DashboardPage() {
       <Suspense fallback={<StatsLoading />}>
         <DashboardStats />
       </Suspense>
+
+      {/* Queue section */}
+      <QueueSection />
 
       {/* Main content grid */}
       <div className="grid gap-6 lg:grid-cols-2">
