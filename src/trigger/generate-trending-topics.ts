@@ -149,7 +149,7 @@ export const generateTrendingTopics = schedules.task({
     const validEpisodeIds = new Set(episodesWithTakeaways.map((ep) => ep.id));
     const validatedTopics = topics
       .map((topic) => {
-        const filteredIds = [...new Set(topic.episodeIds)].filter((id) =>
+        const filteredIds = Array.from(new Set(topic.episodeIds)).filter((id) =>
           validEpisodeIds.has(id)
         );
         return {
