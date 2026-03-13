@@ -251,6 +251,41 @@ describe("generate-trending-topics task", () => {
     );
   });
 
+  it("clamps to MAX_TOPICS and sorts by episodeCount descending", async () => {
+    const episodeRows = Array.from({ length: 20 }, (_, i) => ({
+      id: i + 1,
+      title: `Episode ${i + 1}`,
+      keyTakeaways: [`Takeaway ${i + 1}`],
+    }));
+    mockDbSelect(episodeRows);
+
+    // Generate 12 topics (exceeds MAX_TOPICS=8), with varying sizes
+    const mockTopics = Array.from({ length: 12 }, (_, i) => ({
+      name: `Topic ${i + 1}`,
+      description: `Description ${i + 1}`,
+      episodeCount: i + 1,
+      episodeIds: Array.from({ length: i + 1 }, (_, j) => j + 1),
+    }));
+
+    mockGenerateCompletion.mockResolvedValue("mock completion");
+    mockParseJsonResponse.mockReturnValue({ topics: mockTopics });
+
+    const result = await taskConfig.run();
+
+    expect(result).toEqual({ episodeCount: 20, topicCount: 8 });
+    const storedTopics = mockValues.mock.calls[0][0].topics;
+    expect(storedTopics).toHaveLength(8);
+    // Sorted descending by episodeCount
+    for (let i = 1; i < storedTopics.length; i++) {
+      expect(storedTopics[i - 1].episodeCount).toBeGreaterThanOrEqual(
+        storedTopics[i].episodeCount
+      );
+    }
+    // The largest topics should be kept (topics 5-12 have episodeCount 5-12)
+    expect(storedTopics[0].episodeCount).toBe(12);
+    expect(storedTopics[7].episodeCount).toBe(5);
+  });
+
   it("corrects episodeCount to match filtered episodeIds length", async () => {
     mockDbSelect([
       { id: 1, title: "Episode 1", keyTakeaways: ["Takeaway 1"] },

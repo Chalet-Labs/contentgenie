@@ -29,12 +29,25 @@ export const generateTrendingTopics = schedules.task({
     );
     const periodEnd = now;
 
+    const persistSnapshot = async (
+      topics: TrendingTopic[],
+      episodeCount: number
+    ) => {
+      await db.insert(trendingTopics).values({
+        topics,
+        generatedAt: now,
+        periodStart,
+        periodEnd,
+        episodeCount,
+      });
+    };
+
     logger.info("Starting trending topics generation", {
       periodStart: periodStart.toISOString(),
       periodEnd: periodEnd.toISOString(),
     });
 
-    // Query recently summarized episodes (title + keyTakeaways only for token efficiency)
+    // Query all completed episodes in the window (JS filters takeaways downstream for LLM input)
     const recentEpisodes = await db
       .select({
         id: episodes.id,
@@ -47,12 +60,17 @@ export const generateTrendingTopics = schedules.task({
           eq(episodes.summaryStatus, "completed"),
           isNotNull(episodes.processedAt),
           gte(episodes.processedAt, periodStart),
-          lte(episodes.processedAt, periodEnd),
-          isNotNull(episodes.keyTakeaways)
+          lte(episodes.processedAt, periodEnd)
         )
       )
       .orderBy(desc(episodes.processedAt))
       .limit(MAX_EPISODES);
+
+    if (recentEpisodes.length === MAX_EPISODES) {
+      logger.warn("Episode query hit MAX_EPISODES cap; snapshot may be incomplete", {
+        cap: MAX_EPISODES,
+      });
+    }
 
     logger.info("Found summarized episodes in window", {
       count: recentEpisodes.length,
@@ -60,19 +78,12 @@ export const generateTrendingTopics = schedules.task({
 
     // Handle empty window: store empty topics
     if (recentEpisodes.length === 0) {
-      await db.insert(trendingTopics).values({
-        topics: [],
-        generatedAt: now,
-        periodStart,
-        periodEnd,
-        episodeCount: 0,
-      });
-
+      await persistSnapshot([], 0);
       logger.info("No episodes in window, stored empty snapshot");
       return { episodeCount: 0, topicCount: 0 };
     }
 
-    // Build LLM input (SQL filters NULL takeaways; JS filters empty arrays)
+    // Build LLM input (JS filters episodes without takeaways)
     const episodesWithTakeaways = recentEpisodes
       .filter(
         (ep): ep is typeof ep & { keyTakeaways: string[] } =>
@@ -86,14 +97,7 @@ export const generateTrendingTopics = schedules.task({
 
     // If all episodes lack takeaways, store empty
     if (episodesWithTakeaways.length === 0) {
-      await db.insert(trendingTopics).values({
-        topics: [],
-        generatedAt: now,
-        periodStart,
-        periodEnd,
-        episodeCount: recentEpisodes.length,
-      });
-
+      await persistSnapshot([], recentEpisodes.length);
       logger.info("All episodes lack takeaways, stored empty snapshot");
       return { episodeCount: recentEpisodes.length, topicCount: 0 };
     }
@@ -135,14 +139,7 @@ export const generateTrendingTopics = schedules.task({
 
     // If parsing failed completely, store empty snapshot explicitly
     if (topics.length === 0) {
-      await db.insert(trendingTopics).values({
-        topics: [],
-        generatedAt: now,
-        periodStart,
-        periodEnd,
-        episodeCount: recentEpisodes.length,
-      });
-
+      await persistSnapshot([], recentEpisodes.length);
       logger.info("No valid topics after parsing/validation, stored empty snapshot");
       return { episodeCount: recentEpisodes.length, topicCount: 0 };
     }
@@ -172,13 +169,7 @@ export const generateTrendingTopics = schedules.task({
     }
 
     // Store snapshot
-    await db.insert(trendingTopics).values({
-      topics: validatedTopics,
-      generatedAt: now,
-      periodStart,
-      periodEnd,
-      episodeCount: recentEpisodes.length,
-    });
+    await persistSnapshot(validatedTopics, recentEpisodes.length);
 
     const result = {
       episodeCount: recentEpisodes.length,
