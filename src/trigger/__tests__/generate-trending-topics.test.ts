@@ -66,7 +66,8 @@ const taskConfig = generateTrendingTopics as unknown as {
 function mockDbSelect(rows: unknown[]) {
   const chain = {
     from: vi.fn().mockReturnThis(),
-    where: vi.fn().mockResolvedValue(rows),
+    where: vi.fn().mockReturnThis(),
+    limit: vi.fn().mockResolvedValue(rows),
   };
   mockSelect.mockReturnValue(chain);
   return chain;

@@ -66,7 +66,7 @@ Use statistical NLP techniques to cluster topics without an LLM.
 - A new `trending_topics` table is added (requires migration).
 - One additional LLM call per day (~5-10K input tokens, ~500 output tokens).
 - Dashboard gains a ~10ms DB read instead of a multi-second LLM call.
-- If the Trigger.dev task fails, the dashboard shows the previous day's snapshot
-  (graceful degradation).
+- If the Trigger.dev task fails, the dashboard continues to show the most recent
+  snapshot, which may be older than one day (graceful degradation).
 - The `trending_topics` table will grow by ~365 rows/year. No cleanup is needed for
   the foreseeable future; a retention policy can be added later if warranted.

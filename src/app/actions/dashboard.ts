@@ -7,7 +7,6 @@ import {
   userSubscriptions,
   userLibrary,
   trendingTopics,
-  type TrendingTopic,
 } from "@/db/schema";
 import {
   LIBRARY_ENTRY_COLUMNS,
@@ -227,7 +226,7 @@ export async function getTrendingTopics() {
 
   try {
     const latest = await db.query.trendingTopics.findFirst({
-      orderBy: [desc(trendingTopics.generatedAt)],
+      orderBy: [desc(trendingTopics.generatedAt), desc(trendingTopics.id)],
     });
 
     if (!latest) {

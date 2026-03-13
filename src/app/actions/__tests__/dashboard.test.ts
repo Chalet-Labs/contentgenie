@@ -23,7 +23,7 @@ vi.mock("@/db", () => ({
 vi.mock("@/db/schema", () => ({
   userSubscriptions: { userId: "user_id" },
   userLibrary: { userId: "user_id" },
-  trendingTopics: { generatedAt: "generated_at" },
+  trendingTopics: { generatedAt: "generated_at", id: "id" },
 }));
 
 // Mock drizzle-orm — include all imports used by dashboard.ts
@@ -141,6 +141,26 @@ describe("getTrendingTopics", () => {
 
     expect(result.topics).toBeNull();
     expect(result.error).toBeNull();
+  });
+
+  it("returns empty items when the latest snapshot has no topics", async () => {
+    mockAuth.mockResolvedValue({ userId: "user_123" });
+    mockFindFirst.mockResolvedValue({
+      id: 1,
+      topics: [],
+      generatedAt: new Date("2026-03-13T06:00:00Z"),
+      periodStart: new Date("2026-03-06T06:00:00Z"),
+      periodEnd: new Date("2026-03-13T06:00:00Z"),
+      episodeCount: 0,
+      createdAt: new Date("2026-03-13T06:00:00Z"),
+    });
+
+    const { getTrendingTopics } = await import("@/app/actions/dashboard");
+    const result = await getTrendingTopics();
+
+    expect(result.error).toBeNull();
+    expect(result.topics).not.toBeNull();
+    expect(result.topics!.items).toEqual([]);
   });
 
   it("returns formatted trending topics from latest snapshot", async () => {

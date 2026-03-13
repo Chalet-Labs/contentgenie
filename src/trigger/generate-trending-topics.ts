@@ -10,6 +10,8 @@ import {
 import { parseJsonResponse } from "@/lib/openrouter";
 
 const LOOKBACK_DAYS = 7;
+const MAX_EPISODES = 500;
+const MAX_TOPICS = 8;
 
 /**
  * Daily scheduled task that analyzes recent episode summaries via LLM
@@ -47,7 +49,8 @@ export const generateTrendingTopics = schedules.task({
           gte(episodes.processedAt, periodStart),
           isNotNull(episodes.keyTakeaways)
         )
-      );
+      )
+      .limit(MAX_EPISODES);
 
     logger.info("Found summarized episodes in window", {
       count: recentEpisodes.length,
@@ -69,11 +72,14 @@ export const generateTrendingTopics = schedules.task({
 
     // Build LLM input (SQL filters NULL takeaways; JS filters empty arrays)
     const episodesWithTakeaways = recentEpisodes
-      .filter((ep) => ep.keyTakeaways && ep.keyTakeaways.length > 0)
+      .filter(
+        (ep): ep is typeof ep & { keyTakeaways: string[] } =>
+          ep.keyTakeaways != null && ep.keyTakeaways.length > 0
+      )
       .map((ep) => ({
         id: ep.id,
         title: ep.title,
-        keyTakeaways: ep.keyTakeaways!,
+        keyTakeaways: ep.keyTakeaways,
       }));
 
     // If all episodes lack takeaways, store empty
@@ -112,7 +118,9 @@ export const generateTrendingTopics = schedules.task({
           typeof t === "object" &&
           t !== null &&
           typeof t.name === "string" &&
-          Array.isArray(t.episodeIds)
+          typeof t.description === "string" &&
+          Array.isArray(t.episodeIds) &&
+          t.episodeIds.every((id: unknown) => Number.isInteger(id))
       );
     } catch (err) {
       logger.error("Failed to parse LLM response", {
@@ -130,18 +138,18 @@ export const generateTrendingTopics = schedules.task({
         generatedAt: now,
         periodStart,
         periodEnd,
-        episodeCount: episodesWithTakeaways.length,
+        episodeCount: recentEpisodes.length,
       });
 
       logger.info("No valid topics after parsing/validation, stored empty snapshot");
-      return { episodeCount: episodesWithTakeaways.length, topicCount: 0 };
+      return { episodeCount: recentEpisodes.length, topicCount: 0 };
     }
 
     // Validate: filter out topics referencing invalid episode IDs
     const validEpisodeIds = new Set(episodesWithTakeaways.map((ep) => ep.id));
     const validatedTopics = topics
       .map((topic) => {
-        const filteredIds = topic.episodeIds.filter((id) =>
+        const filteredIds = [...new Set(topic.episodeIds)].filter((id) =>
           validEpisodeIds.has(id)
         );
         return {
@@ -150,7 +158,15 @@ export const generateTrendingTopics = schedules.task({
           episodeCount: filteredIds.length,
         };
       })
-      .filter((topic) => topic.episodeCount > 0);
+      .filter((topic) => topic.episodeCount > 0)
+      .sort((a, b) => b.episodeCount - a.episodeCount)
+      .slice(0, MAX_TOPICS);
+
+    if (validatedTopics.length === 0 && topics.length > 0) {
+      logger.warn("All LLM topics referenced invalid episode IDs, storing empty snapshot", {
+        parsedTopicCount: topics.length,
+      });
+    }
 
     // Store snapshot
     await db.insert(trendingTopics).values({
@@ -158,11 +174,11 @@ export const generateTrendingTopics = schedules.task({
       generatedAt: now,
       periodStart,
       periodEnd,
-      episodeCount: episodesWithTakeaways.length,
+      episodeCount: recentEpisodes.length,
     });
 
     const result = {
-      episodeCount: episodesWithTakeaways.length,
+      episodeCount: recentEpisodes.length,
       topicCount: validatedTopics.length,
     };
 
