@@ -3,11 +3,13 @@ import {
   getRecentEpisodesFromSubscriptions,
   getRecentlySavedItems,
   getRecommendedPodcasts,
+  getTrendingTopics,
 } from "@/app/actions/dashboard";
 import { RecentEpisodes } from "@/components/dashboard/recent-episodes";
 import { SavedItems } from "@/components/dashboard/saved-items";
 import { Recommendations } from "@/components/dashboard/recommendations";
 import { QueueSection } from "@/components/dashboard/queue-section";
+import { TrendingTopics, TrendingTopicsLoading } from "@/components/dashboard/trending-topics";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 
@@ -51,6 +53,17 @@ async function SavedItemsSection() {
   return <SavedItems items={items} />;
 }
 
+const STALE_THRESHOLD_MS = 48 * 60 * 60 * 1000;
+
+// Server component for trending topics
+async function TrendingTopicsSection() {
+  const { topics } = await getTrendingTopics();
+  if (!topics || topics.items.length === 0) return null;
+  const isStale = Date.now() - topics.generatedAt.getTime() > STALE_THRESHOLD_MS;
+  if (isStale) return null;
+  return <TrendingTopics topics={topics.items} generatedAt={topics.generatedAt} />;
+}
+
 // Server component for recommendations
 async function RecommendationsSection() {
   const { podcasts, error } = await getRecommendedPodcasts(6);
@@ -73,6 +86,11 @@ export default function DashboardPage() {
 
       {/* Queue section */}
       <QueueSection />
+
+      {/* Trending topics */}
+      <Suspense fallback={<TrendingTopicsLoading />}>
+        <TrendingTopicsSection />
+      </Suspense>
 
       {/* Main content grid */}
       <div className="grid gap-6 lg:grid-cols-2">
