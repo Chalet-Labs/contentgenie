@@ -76,8 +76,10 @@ describe("TrendingTopics", () => {
 // ---------------------------------------------------------------------------
 
 describe("TrendingTopicsLoading", () => {
-  it("renders without crashing", () => {
+  it("renders 6 pill-shaped skeleton placeholders", () => {
     const { container } = render(<TrendingTopicsLoading />)
     expect(container.firstChild).toBeInTheDocument()
+    const skeletons = container.querySelectorAll("[class*='rounded-full']")
+    expect(skeletons).toHaveLength(6)
   })
 })

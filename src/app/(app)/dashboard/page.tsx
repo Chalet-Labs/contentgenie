@@ -57,7 +57,8 @@ const STALE_THRESHOLD_MS = 48 * 60 * 60 * 1000;
 
 // Server component for trending topics
 async function TrendingTopicsSection() {
-  const { topics } = await getTrendingTopics();
+  const { topics, error } = await getTrendingTopics();
+  if (error) console.error("[TrendingTopicsSection]", error);
   if (!topics || topics.items.length === 0) return null;
   const isStale = Date.now() - topics.generatedAt.getTime() > STALE_THRESHOLD_MS;
   if (isStale) return null;

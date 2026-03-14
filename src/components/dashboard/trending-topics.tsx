@@ -35,8 +35,8 @@ export function TrendingTopics({ topics, generatedAt }: TrendingTopicsProps) {
       </CardHeader>
       <CardContent>
         <div className="flex flex-wrap gap-2">
-          {topics.map((topic) => (
-            <TopicPill key={topic.name} topic={topic} />
+          {topics.map((topic, index) => (
+            <TopicPill key={index} topic={topic} />
           ))}
         </div>
       </CardContent>
