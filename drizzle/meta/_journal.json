@@ -71,6 +71,20 @@
       "when": 1772106698267,
       "tag": "0009_ordinary_warbird",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1773352288391,
+      "tag": "0010_polite_shocker",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1773360735785,
+      "tag": "0011_futuristic_wildside",
+      "breakpoints": true
     }
   ]
 }

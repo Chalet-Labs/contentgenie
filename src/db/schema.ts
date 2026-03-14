@@ -270,6 +270,21 @@ export const pushSubscriptions = pgTable(
   (table) => [index("push_subscriptions_user_id_idx").on(table.userId)]
 );
 
+// Trending Topics table (daily LLM-generated snapshots)
+export const trendingTopics = pgTable(
+  "trending_topics",
+  {
+    id: serial("id").primaryKey(),
+    topics: json("topics").$type<TrendingTopic[]>().notNull(),
+    generatedAt: timestamp("generated_at").defaultNow().notNull(),
+    periodStart: timestamp("period_start").notNull(),
+    periodEnd: timestamp("period_end").notNull(),
+    episodeCount: integer("episode_count").notNull().default(0),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [index("trending_topics_generated_at_idx").on(table.generatedAt)]
+);
+
 // Listen History table
 export const listenHistory = pgTable(
   "listen_history",
@@ -445,6 +460,17 @@ export type NewPushSubscription = typeof pushSubscriptions.$inferInsert;
 
 export type ListenHistoryEntry = typeof listenHistory.$inferSelect;
 export type NewListenHistoryEntry = typeof listenHistory.$inferInsert;
+
+/** Shape of a single topic cluster in the trending_topics JSON column. */
+export interface TrendingTopic {
+  name: string;
+  description: string;
+  episodeCount: number;
+  episodeIds: number[];
+}
+
+export type TrendingTopicsRow = typeof trendingTopics.$inferSelect;
+export type NewTrendingTopicsRow = typeof trendingTopics.$inferInsert;
 
 export type SummaryStatus = NonNullable<Episode["summaryStatus"]>;
 
