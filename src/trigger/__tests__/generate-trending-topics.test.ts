@@ -110,6 +110,28 @@ describe("generate-trending-topics task", () => {
     expect(mockGenerateCompletion).not.toHaveBeenCalled();
   });
 
+  it("logs warning when MAX_EPISODES cap is reached", async () => {
+    const { logger } = await import("@trigger.dev/sdk");
+    const episodeRows = Array.from({ length: 500 }, (_, i) => ({
+      id: i + 1,
+      title: `Episode ${i + 1}`,
+      keyTakeaways: [`Takeaway ${i + 1}`],
+    }));
+    mockDbSelect(episodeRows);
+
+    mockGenerateCompletion.mockResolvedValue("mock completion");
+    mockParseJsonResponse.mockReturnValue({
+      topics: [{ name: "T1", description: "D1", episodeCount: 2, episodeIds: [1, 2] }],
+    });
+
+    await taskConfig.run();
+
+    expect(logger.warn).toHaveBeenCalledWith(
+      "Episode query hit MAX_EPISODES cap; snapshot may be incomplete",
+      { cap: 500 }
+    );
+  });
+
   it("stores empty topics when all episodes lack takeaways", async () => {
     mockDbSelect([
       { id: 1, title: "Episode 1", keyTakeaways: null },
