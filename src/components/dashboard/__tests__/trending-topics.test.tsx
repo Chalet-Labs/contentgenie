@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest"
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { render, screen } from "@testing-library/react"
 import { TrendingTopics, TrendingTopicsLoading } from "@/components/dashboard/trending-topics"
 import type { TrendingTopic } from "@/db/schema"
@@ -6,6 +6,9 @@ import type { TrendingTopic } from "@/db/schema"
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
+
+const MOCK_NOW = new Date("2026-03-15T12:00:00.000Z")
+const fixedDate = new Date(MOCK_NOW.getTime() - 10 * 60 * 1000) // 10 minutes before MOCK_NOW
 
 function makeTopic(overrides: Partial<TrendingTopic> = {}): TrendingTopic {
   return {
@@ -17,13 +20,20 @@ function makeTopic(overrides: Partial<TrendingTopic> = {}): TrendingTopic {
   }
 }
 
-const fixedDate = new Date(Date.now() - 10 * 60 * 1000) // 10 minutes ago
-
 // ---------------------------------------------------------------------------
 // TrendingTopics
 // ---------------------------------------------------------------------------
 
 describe("TrendingTopics", () => {
+  beforeEach(() => {
+    vi.useFakeTimers()
+    vi.setSystemTime(MOCK_NOW)
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
   it("renders correct number of pills for N topics", () => {
     const topics = [
       makeTopic({ name: "AI" }),
@@ -68,6 +78,13 @@ describe("TrendingTopics", () => {
     render(<TrendingTopics topics={topics} generatedAt={fixedDate} />)
     const nameSpan = screen.getByTitle(longName)
     expect(nameSpan).toBeInTheDocument()
+  })
+
+  it("displays deterministic subtitle with relative time", () => {
+    const topics = [makeTopic({ name: "AI" })]
+    render(<TrendingTopics topics={topics} generatedAt={fixedDate} />)
+    expect(screen.getByText(/Updated 10m ago/)).toBeInTheDocument()
+    expect(screen.getByText(/Past 7 days/)).toBeInTheDocument()
   })
 })
 

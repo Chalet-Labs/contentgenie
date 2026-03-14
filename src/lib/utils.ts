@@ -32,7 +32,7 @@ export function formatRelativeTime(date: Date): string {
   const diffDays = Math.floor(diffHours / 24);
   if (diffDays < 7) return `${diffDays}d ago`;
 
-  return date.toLocaleDateString();
+  return date.toLocaleDateString("en-US");
 }
 
 export function formatDate(date: Date | string | number | null | undefined): string {
