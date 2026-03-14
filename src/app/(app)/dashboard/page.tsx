@@ -3,31 +3,13 @@ import {
   getRecentEpisodesFromSubscriptions,
   getRecentlySavedItems,
   getRecommendedPodcasts,
-  getDashboardStats,
 } from "@/app/actions/dashboard";
 import { RecentEpisodes } from "@/components/dashboard/recent-episodes";
 import { SavedItems } from "@/components/dashboard/saved-items";
 import { Recommendations } from "@/components/dashboard/recommendations";
-import { StatsCards } from "@/components/dashboard/stats-cards";
 import { QueueSection } from "@/components/dashboard/queue-section";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-
-// Loading skeleton for stats section
-function StatsLoading() {
-  return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-      {[1, 2, 3, 4].map((i) => (
-        <Card key={i}>
-          <CardContent className="p-6">
-            <Skeleton className="h-4 w-24" />
-            <Skeleton className="mt-2 h-8 w-16" />
-          </CardContent>
-        </Card>
-      ))}
-    </div>
-  );
-}
 
 // Loading skeleton for card sections
 function CardLoading() {
@@ -48,17 +30,6 @@ function CardLoading() {
         ))}
       </CardContent>
     </Card>
-  );
-}
-
-// Server component for stats
-async function DashboardStats() {
-  const { subscriptionCount, savedCount } = await getDashboardStats();
-  return (
-    <StatsCards
-      subscriptionCount={subscriptionCount}
-      savedCount={savedCount}
-    />
   );
 }
 
@@ -99,11 +70,6 @@ export default function DashboardPage() {
           Welcome back! Here&apos;s what&apos;s new from your subscriptions.
         </p>
       </div>
-
-      {/* Stats Cards */}
-      <Suspense fallback={<StatsLoading />}>
-        <DashboardStats />
-      </Suspense>
 
       {/* Queue section */}
       <QueueSection />
