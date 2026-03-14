@@ -32,8 +32,8 @@ const longNameTopics: TrendingTopic[] = [
   { name: "Climate Tech", description: "", episodeCount: 9, episodeIds: [] },
 ]
 
-const recentDate = new Date(Date.now() - 2 * 60 * 60 * 1000) // 2 hours ago
-const olderDate = new Date(Date.now() - 30 * 60 * 1000)       // 30 minutes ago
+const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000)
+const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000)
 
 // ---------------------------------------------------------------------------
 // Meta
@@ -45,6 +45,13 @@ const meta: Meta<typeof TrendingTopics> = {
   parameters: {
     layout: "padded",
   },
+  decorators: [
+    (Story) => (
+      <div className="max-w-2xl">
+        <Story />
+      </div>
+    ),
+  ],
 }
 
 export default meta
@@ -57,66 +64,31 @@ type Story = StoryObj<typeof TrendingTopics>
 export const Default: Story = {
   args: {
     topics: baseTopics,
-    generatedAt: recentDate,
+    generatedAt: twoHoursAgo,
   },
-  decorators: [
-    (Story) => (
-      <div className="max-w-2xl">
-        <Story />
-      </div>
-    ),
-  ],
 }
 
 export const SingleTopic: Story = {
   args: {
     topics: singleTopic,
-    generatedAt: recentDate,
+    generatedAt: twoHoursAgo,
   },
-  decorators: [
-    (Story) => (
-      <div className="max-w-2xl">
-        <Story />
-      </div>
-    ),
-  ],
 }
 
 export const MaxTopics: Story = {
   args: {
     topics: maxTopics,
-    generatedAt: olderDate,
+    generatedAt: thirtyMinutesAgo,
   },
-  decorators: [
-    (Story) => (
-      <div className="max-w-2xl">
-        <Story />
-      </div>
-    ),
-  ],
 }
 
 export const LongNames: Story = {
   args: {
     topics: longNameTopics,
-    generatedAt: recentDate,
+    generatedAt: twoHoursAgo,
   },
-  decorators: [
-    (Story) => (
-      <div className="max-w-2xl">
-        <Story />
-      </div>
-    ),
-  ],
 }
 
 export const Loading: StoryObj<typeof TrendingTopicsLoading> = {
   render: () => <TrendingTopicsLoading />,
-  decorators: [
-    (Story) => (
-      <div className="max-w-2xl">
-        <Story />
-      </div>
-    ),
-  ],
 }

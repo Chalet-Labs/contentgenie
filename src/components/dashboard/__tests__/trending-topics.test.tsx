@@ -31,13 +31,9 @@ describe("TrendingTopics", () => {
       makeTopic({ name: "Tech" }),
     ]
     render(<TrendingTopics topics={topics} generatedAt={fixedDate} />)
-    // Each topic renders a Badge with its name
     expect(screen.getByText("AI")).toBeInTheDocument()
     expect(screen.getByText("Climate")).toBeInTheDocument()
     expect(screen.getByText("Tech")).toBeInTheDocument()
-    // Confirm exactly 3 topic name elements are present
-    const nameEls = topics.map((t) => screen.getByText(t.name))
-    expect(nameEls).toHaveLength(3)
   })
 
   it("each pill shows 'Name (episodeCount)' format", () => {
