@@ -28,7 +28,7 @@ Use the Drizzle SQL builder (`db.select().from()`) with `notInArray` subqueries 
 - Raw SQL via `sql\`\`` would work but loses type safety.
 
 The query:
-1. Selects the same 8 fields as `EPISODE_LIST_COLUMNS` (id, podcastIndexId, title, description, audioUrl, duration, publishDate, worthItScore) + podcast title/image/podcastIndexId from joined `podcasts` table. Note: `EPISODE_LIST_COLUMNS` is a relational query allowlist (boolean flags) that cannot be spread into the SQL builder's `db.select({})` which requires column references. The manual column list achieves the same performance goal — excluding heavy columns like transcription, summary, keyTakeaways, worthItDimensions, worthItReason.
+1. Selects the same 8 fields as `EPISODE_LIST_COLUMNS` (id, podcastIndexId, title, description, audioUrl, duration, publishDate, worthItScore) + podcast title/image from joined `podcasts` table. Note: `EPISODE_LIST_COLUMNS` is a relational query allowlist (boolean flags) that cannot be spread into the SQL builder's `db.select({})` which requires column references. The manual column list achieves the same performance goal — excluding heavy columns like transcription, summary, keyTakeaways, worthItDimensions, worthItReason.
 2. Filters: `worthItScore IS NOT NULL` and `worthItScore >= threshold` (default 6.0)
 3. Excludes: episodes whose `podcastId` is in the user's subscriptions (via `notInArray` subquery on `userSubscriptions`). When the subquery returns zero rows (new user), SQL evaluates `NOT IN (empty set)` as `TRUE` — no exclusions, which is correct.
 4. Excludes: episodes whose `id` is in the user's library (via `notInArray` subquery on `userLibrary`)
@@ -49,7 +49,7 @@ The component will be a server component wrapper + client presentation component
 
 ### DTO design
 
-Define a `RecommendedEpisodeDTO` type that extends `EpisodeListDTO` with podcast metadata (`podcastTitle`, `podcastImageUrl`, `podcastIndexId`). This avoids fetching heavy columns (transcription, summary, etc.) while providing everything the card needs.
+Define a `RecommendedEpisodeDTO` type that extends `EpisodeListDTO` with podcast metadata (`podcastTitle`, `podcastImageUrl`). This avoids fetching heavy columns (transcription, summary, etc.) while providing everything the card needs.
 
 ## Consequences
 
