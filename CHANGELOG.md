@@ -17,6 +17,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - ADR-018: Push Notification Hardening architecture decision record (#159)
 
 ### Added
+- Trending topics headline on the dashboard: displays AI-extracted topic clusters as styled pills between the queue and content grid, with staleness/empty auto-hide, Suspense skeleton, and shared `formatRelativeTime` utility (#193)
 - Queue section on the dashboard showing the current audio player queue with worth-it score badges. Episodes without scores show a "Get score" button that triggers inline summarization with realtime progress tracking via `useRealtimeRun`. Scores for existing episodes are batch-fetched on load via a new `getQueueEpisodeScores` server action. Handles cached (200), job-triggered (202), daily-limit and hourly-burst rate-limit (429) responses (#190)
 - Trending topics: daily scheduled Trigger.dev task analyzes recent episode summaries via LLM, extracts 5-8 topic clusters, and stores append-only snapshots in `trending_topics` table. `getTrendingTopics()` server action exposes the latest snapshot to the dashboard (#192)
 - Badge pills on Subscriptions and Library sidebar/mobile menu items showing live subscription and saved episode counts; counts refresh on each navigation (#187)
