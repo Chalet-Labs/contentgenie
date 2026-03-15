@@ -5,11 +5,13 @@ import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Calendar, Clock, Rss, ChevronRight } from "lucide-react";
+import { WorthItBadge } from "@/components/episodes/worth-it-badge";
 import type { RecentEpisode } from "@/app/actions/dashboard";
 
 interface RecentEpisodesProps {
   episodes: RecentEpisode[];
   isLoading?: boolean;
+  hasSubscriptions?: boolean;
 }
 
 function formatDuration(seconds: number | null | undefined): string {
@@ -31,12 +33,16 @@ function formatDate(timestamp: number): string {
   });
 }
 
-export function RecentEpisodes({ episodes, isLoading }: RecentEpisodesProps) {
+export function RecentEpisodes({
+  episodes,
+  isLoading,
+  hasSubscriptions = true,
+}: RecentEpisodesProps) {
   if (isLoading) {
     return (
       <Card>
         <CardHeader className="flex flex-row items-center justify-between pb-2">
-          <CardTitle className="text-lg font-semibold">Recent from Subscriptions</CardTitle>
+          <CardTitle className="text-lg font-semibold">New Episodes</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           {[1, 2, 3].map((i) => (
@@ -58,23 +64,36 @@ export function RecentEpisodes({ episodes, isLoading }: RecentEpisodesProps) {
     return (
       <Card>
         <CardHeader className="flex flex-row items-center justify-between pb-2">
-          <CardTitle className="text-lg font-semibold">Recent from Subscriptions</CardTitle>
+          <CardTitle className="text-lg font-semibold">New Episodes</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex flex-col items-center justify-center py-8 text-center">
             <Rss className="h-12 w-12 text-muted-foreground/50" />
-            <p className="mt-2 text-sm text-muted-foreground">
-              No recent episodes yet
-            </p>
-            <p className="text-xs text-muted-foreground">
-              Subscribe to podcasts to see new episodes here
-            </p>
-            <Link
-              href="/discover"
-              className="mt-4 text-sm font-medium text-primary hover:underline"
-            >
-              Discover Podcasts
-            </Link>
+            {hasSubscriptions ? (
+              <>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  No new episodes in this period
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Try switching to a broader time range.
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  No recent episodes yet
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Subscribe to podcasts to see new episodes here
+                </p>
+                <Link
+                  href="/discover"
+                  className="mt-4 text-sm font-medium text-primary hover:underline"
+                >
+                  Discover Podcasts
+                </Link>
+              </>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -84,7 +103,7 @@ export function RecentEpisodes({ episodes, isLoading }: RecentEpisodesProps) {
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between pb-2">
-        <CardTitle className="text-lg font-semibold">Recent from Subscriptions</CardTitle>
+        <CardTitle className="text-lg font-semibold">New Episodes</CardTitle>
         <Link
           href="/subscriptions"
           className="flex items-center text-sm text-muted-foreground hover:text-primary"
@@ -131,6 +150,15 @@ export function RecentEpisodes({ episodes, isLoading }: RecentEpisodesProps) {
                   <span className="flex items-center gap-1">
                     <Clock className="h-3 w-3" />
                     {formatDuration(episode.duration)}
+                  </span>
+                )}
+              </div>
+              <div className="mt-1">
+                {episode.worthItScore !== null && Number.isFinite(episode.worthItScore) ? (
+                  <WorthItBadge score={episode.worthItScore} />
+                ) : (
+                  <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                    Not rated
                   </span>
                 )}
               </div>

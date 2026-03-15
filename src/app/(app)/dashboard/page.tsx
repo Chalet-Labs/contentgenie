@@ -1,11 +1,12 @@
 import { Suspense } from "react";
+import { currentUser } from "@clerk/nextjs/server";
 import {
   getRecentEpisodesFromSubscriptions,
   getRecentlySavedItems,
   getRecommendedEpisodes,
   getTrendingTopics,
 } from "@/app/actions/dashboard";
-import { RecentEpisodes } from "@/components/dashboard/recent-episodes";
+import { RecentEpisodesContainer } from "@/components/dashboard/recent-episodes-container";
 import { SavedItems } from "@/components/dashboard/saved-items";
 import { EpisodeRecommendations } from "@/components/dashboard/episode-recommendations";
 import { QueueSection } from "@/components/dashboard/queue-section";
@@ -37,11 +38,41 @@ function CardLoading() {
 
 // Server component for recent episodes
 async function RecentEpisodesSection() {
-  const { episodes, error } = await getRecentEpisodesFromSubscriptions(5);
+  const user = await currentUser();
+  const lastSignInAt = user?.lastSignInAt ? new Date(user.lastSignInAt) : null;
+
+  // Treat as null if within 5 minutes (current session is first session)
+  const sinceLastLogin =
+    lastSignInAt === null ||
+    Math.abs(Date.now() - lastSignInAt.getTime()) < 5 * 60 * 1000
+      ? null
+      : Math.floor(lastSignInAt.getTime() / 1000);
+
+  const sinceLastWeek = Math.floor((Date.now() - 7 * 24 * 60 * 60 * 1000) / 1000);
+
+  const { episodes, hasSubscriptions, error } = await getRecentEpisodesFromSubscriptions({
+    limit: 5,
+    since: sinceLastWeek,
+  });
+
   if (error && episodes.length === 0) {
-    return <RecentEpisodes episodes={[]} />;
+    return (
+      <RecentEpisodesContainer
+        initialEpisodes={[]}
+        sinceLastLogin={sinceLastLogin}
+        sinceLastWeek={sinceLastWeek}
+        hasSubscriptions={hasSubscriptions}
+      />
+    );
   }
-  return <RecentEpisodes episodes={episodes} />;
+  return (
+    <RecentEpisodesContainer
+      initialEpisodes={episodes}
+      sinceLastLogin={sinceLastLogin}
+      sinceLastWeek={sinceLastWeek}
+      hasSubscriptions={hasSubscriptions}
+    />
+  );
 }
 
 // Server component for saved items

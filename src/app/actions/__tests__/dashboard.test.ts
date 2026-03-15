@@ -14,32 +14,39 @@ const mockInnerJoin = vi.fn();
 const mockFrom = vi.fn();
 const mockSelect = vi.fn();
 
-// Mock database — supports both query API (findFirst/$count) and select chain.
-// The select chain must handle two shapes:
-//   Subqueries: select().from().where()           (no innerJoin)
-//   Main query: select().from().innerJoin().where().orderBy().limit()
+// Mock database — supports both query API (findFirst/findMany/$count) and select chain.
+// The select chain must handle three shapes:
+//   Subqueries:   select().from().where()                  (no innerJoin, return value unused)
+//   Main query:   select().from().innerJoin().where().orderBy().limit()
+//   Score lookup: select().from().where()  → Promise<row[]> (direct await, no orderBy/limit)
+//
+// whereNode returns an object that is BOTH awaitable (Promise<result of mockWhere>)
+// and has orderBy/limit for chained callers. This allows both usage patterns.
 const mockFindFirst = vi.fn();
+const mockFindMany = vi.fn();
 vi.mock("@/db", () => ({
   db: {
     $count: vi.fn(),
     select: (...args: unknown[]) => {
       mockSelect(...args);
       const whereNode = (...wArgs: unknown[]) => {
-        mockWhere(...wArgs);
-        return {
+        const result = mockWhere(...wArgs);
+        // Return an object that is both a Promise (for direct await) and has orderBy
+        const thenable = Promise.resolve(result).then((v) => v);
+        return Object.assign(thenable, {
           orderBy: (...oArgs: unknown[]) => {
             mockOrderBy(...oArgs);
             return {
               limit: (...lArgs: unknown[]) => mockLimit(...lArgs),
             };
           },
-        };
+        });
       };
       return {
         from: (...fArgs: unknown[]) => {
           mockFrom(...fArgs);
           return {
-            // Direct where() for subqueries (no innerJoin)
+            // Direct where() for subqueries (no innerJoin) and score lookup
             where: whereNode,
             // innerJoin() for main query
             innerJoin: (...jArgs: unknown[]) => {
@@ -53,6 +60,9 @@ vi.mock("@/db", () => ({
     query: {
       trendingTopics: {
         findFirst: (...args: unknown[]) => mockFindFirst(...args),
+      },
+      userSubscriptions: {
+        findMany: (...args: unknown[]) => mockFindMany(...args),
       },
     },
   },
@@ -81,6 +91,8 @@ vi.mock("@/db/schema", () => ({
     podcastIndexId: "podcast_index_id",
   },
   trendingTopics: { generatedAt: "generated_at", id: "id" },
+  // library-columns uses these via re-export
+  userActivity: {},
 }));
 
 // Mock drizzle-orm — include all imports used by dashboard.ts
@@ -91,6 +103,13 @@ vi.mock("drizzle-orm", () => ({
   and: vi.fn((...args: unknown[]) => ({ _op: "and", args })),
   isNotNull: vi.fn((...args: unknown[]) => ({ _op: "isNotNull", args })),
   notInArray: vi.fn((...args: unknown[]) => ({ _op: "notInArray", args })),
+  inArray: vi.fn((...args: unknown[]) => ({ _op: "inArray", args })),
+}));
+
+// Mock podcastindex — used by getRecentEpisodesFromSubscriptions
+const mockGetEpisodesByFeedId = vi.fn();
+vi.mock("@/lib/podcastindex", () => ({
+  getEpisodesByFeedId: (...args: unknown[]) => mockGetEpisodesByFeedId(...args),
 }));
 
 describe("getDashboardStats", () => {
@@ -381,6 +400,192 @@ describe("getRecommendedEpisodes", () => {
 
     const { getRecommendedEpisodes } = await import("@/app/actions/dashboard");
     const result = await getRecommendedEpisodes();
+
+    expect(result.episodes).toEqual([]);
+    expect(result.error).toMatch(/failed to load/i);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Helper factories for getRecentEpisodesFromSubscriptions tests
+// ---------------------------------------------------------------------------
+
+function makeSubscription(podcastIndexId: string) {
+  return {
+    podcast: {
+      podcastIndexId,
+      title: `Podcast ${podcastIndexId}`,
+      imageUrl: `https://example.com/${podcastIndexId}.jpg`,
+    },
+  };
+}
+
+function makeApiEpisode(overrides: {
+  id: number;
+  feedId: number;
+  title?: string;
+  datePublished?: number;
+  duration?: number;
+}) {
+  return {
+    id: overrides.id,
+    feedId: overrides.feedId,
+    title: overrides.title ?? `Episode ${overrides.id}`,
+    datePublished: overrides.datePublished ?? 1_000_000,
+    duration: overrides.duration ?? 1800,
+    description: null,
+    feedImage: null,
+    enclosureUrl: null,
+  };
+}
+
+describe("getRecentEpisodesFromSubscriptions", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockAuth.mockResolvedValue({ userId: "user_123" });
+    // Default: no score rows from DB
+    mockWhere.mockResolvedValue([]);
+    // Default: no API episodes
+    mockGetEpisodesByFeedId.mockResolvedValue({ items: [] });
+    // Default: no subscriptions
+    mockFindMany.mockResolvedValue([]);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+    vi.resetModules();
+  });
+
+  it("returns error when not authenticated", async () => {
+    mockAuth.mockResolvedValue({ userId: null });
+
+    const { getRecentEpisodesFromSubscriptions } = await import("@/app/actions/dashboard");
+    const result = await getRecentEpisodesFromSubscriptions();
+
+    expect(result.episodes).toEqual([]);
+    expect(result.hasSubscriptions).toBe(false);
+    expect(result.error).toMatch(/signed in/i);
+  });
+
+  it("returns empty episodes and hasSubscriptions=false when user has no subscriptions", async () => {
+    mockFindMany.mockResolvedValue([]);
+
+    const { getRecentEpisodesFromSubscriptions } = await import("@/app/actions/dashboard");
+    const result = await getRecentEpisodesFromSubscriptions();
+
+    expect(result.episodes).toEqual([]);
+    expect(result.hasSubscriptions).toBe(false);
+    expect(result.error).toBeNull();
+  });
+
+  it("returns empty episodes and hasSubscriptions=true when subscriptions exist but no episodes returned", async () => {
+    mockFindMany.mockResolvedValue([makeSubscription("123")]);
+    mockGetEpisodesByFeedId.mockResolvedValue({ items: [] });
+
+    const { getRecentEpisodesFromSubscriptions } = await import("@/app/actions/dashboard");
+    const result = await getRecentEpisodesFromSubscriptions();
+
+    expect(result.episodes).toEqual([]);
+    expect(result.hasSubscriptions).toBe(true);
+    expect(result.error).toBeNull();
+  });
+
+  it("filters episodes by since timestamp", async () => {
+    const since = 2_000_000;
+    mockFindMany.mockResolvedValue([makeSubscription("111")]);
+    mockGetEpisodesByFeedId.mockResolvedValue({
+      items: [
+        makeApiEpisode({ id: 1, feedId: 111, datePublished: 3_000_000 }), // after since
+        makeApiEpisode({ id: 2, feedId: 111, datePublished: 1_000_000 }), // before since
+      ],
+    });
+
+    const { getRecentEpisodesFromSubscriptions } = await import("@/app/actions/dashboard");
+    const result = await getRecentEpisodesFromSubscriptions({ since });
+
+    expect(result.episodes).toHaveLength(1);
+    expect(result.episodes[0].id).toBe(1);
+  });
+
+  it("returns all episodes when since is not provided", async () => {
+    mockFindMany.mockResolvedValue([makeSubscription("111")]);
+    mockGetEpisodesByFeedId.mockResolvedValue({
+      items: [
+        makeApiEpisode({ id: 1, feedId: 111, datePublished: 3_000_000 }),
+        makeApiEpisode({ id: 2, feedId: 111, datePublished: 1_000_000 }),
+      ],
+    });
+
+    const { getRecentEpisodesFromSubscriptions } = await import("@/app/actions/dashboard");
+    const result = await getRecentEpisodesFromSubscriptions();
+
+    expect(result.episodes).toHaveLength(2);
+  });
+
+  it("places scored episodes before unscored, scored sorted by score DESC", async () => {
+    mockFindMany.mockResolvedValue([makeSubscription("111")]);
+    mockGetEpisodesByFeedId.mockResolvedValue({
+      items: [
+        makeApiEpisode({ id: 10, feedId: 111, datePublished: 1_000_003 }),
+        makeApiEpisode({ id: 20, feedId: 111, datePublished: 1_000_002 }),
+        makeApiEpisode({ id: 30, feedId: 111, datePublished: 1_000_001 }),
+      ],
+    });
+    // Score rows: ep 10 = 5.0, ep 30 = 9.0, ep 20 = unscored
+    const scoreHigh = 9.0;
+    const scoreLow = 5.0;
+    mockWhere.mockResolvedValue([
+      { podcastIndexId: "10", worthItScore: String(scoreLow) },
+      { podcastIndexId: "30", worthItScore: String(scoreHigh) },
+    ]);
+
+    const { getRecentEpisodesFromSubscriptions } = await import("@/app/actions/dashboard");
+    const result = await getRecentEpisodesFromSubscriptions();
+
+    // Scored episodes first: ep30 (9.0) then ep10 (5.0), then unscored ep20
+    expect(result.episodes[0].id).toBe(30);
+    expect(result.episodes[0].worthItScore).toBe(scoreHigh);
+    expect(result.episodes[1].id).toBe(10);
+    expect(result.episodes[1].worthItScore).toBe(scoreLow);
+    expect(result.episodes[2].id).toBe(20);
+    expect(result.episodes[2].worthItScore).toBeNull();
+  });
+
+  it("assigns null worthItScore to episodes not found in DB", async () => {
+    mockFindMany.mockResolvedValue([makeSubscription("111")]);
+    mockGetEpisodesByFeedId.mockResolvedValue({
+      items: [makeApiEpisode({ id: 99, feedId: 111 })],
+    });
+    mockWhere.mockResolvedValue([]); // no DB rows
+
+    const { getRecentEpisodesFromSubscriptions } = await import("@/app/actions/dashboard");
+    const result = await getRecentEpisodesFromSubscriptions();
+
+    expect(result.episodes).toHaveLength(1);
+    expect(result.episodes[0].worthItScore).toBeNull();
+  });
+
+  it("parses worthItScore string from DB as a number", async () => {
+    mockFindMany.mockResolvedValue([makeSubscription("222")]);
+    mockGetEpisodesByFeedId.mockResolvedValue({
+      items: [makeApiEpisode({ id: 55, feedId: 222 })],
+    });
+    mockWhere.mockResolvedValue([{ podcastIndexId: "55", worthItScore: "7.75" }]);
+
+    const { getRecentEpisodesFromSubscriptions } = await import("@/app/actions/dashboard");
+    const result = await getRecentEpisodesFromSubscriptions();
+
+    expect(result.episodes[0].worthItScore).toBe(parseFloat("7.75"));
+  });
+
+  it("returns error and empty array on API failure", async () => {
+    mockFindMany.mockResolvedValue([makeSubscription("111")]);
+    mockGetEpisodesByFeedId.mockRejectedValue(new Error("API failure"));
+
+    const { getRecentEpisodesFromSubscriptions } = await import("@/app/actions/dashboard");
+    const result = await getRecentEpisodesFromSubscriptions();
 
     expect(result.episodes).toEqual([]);
     expect(result.error).toMatch(/failed to load/i);
