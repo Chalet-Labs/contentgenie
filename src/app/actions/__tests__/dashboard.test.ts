@@ -6,11 +6,50 @@ vi.mock("@clerk/nextjs/server", () => ({
   auth: () => mockAuth(),
 }));
 
-// Mock database
+// Mock DB select chain for getRecommendedEpisodes
+const mockLimit = vi.fn();
+const mockOrderBy = vi.fn();
+const mockWhere = vi.fn();
+const mockInnerJoin = vi.fn();
+const mockFrom = vi.fn();
+const mockSelect = vi.fn();
+
+// Mock database — supports both query API (findFirst/$count) and select chain.
+// The select chain must handle two shapes:
+//   Subqueries: select().from().where()           (no innerJoin)
+//   Main query: select().from().innerJoin().where().orderBy().limit()
 const mockFindFirst = vi.fn();
 vi.mock("@/db", () => ({
   db: {
     $count: vi.fn(),
+    select: (...args: unknown[]) => {
+      mockSelect(...args);
+      const whereNode = (...wArgs: unknown[]) => {
+        mockWhere(...wArgs);
+        return {
+          orderBy: (...oArgs: unknown[]) => {
+            mockOrderBy(...oArgs);
+            return {
+              limit: (...lArgs: unknown[]) => mockLimit(...lArgs),
+            };
+          },
+        };
+      };
+      return {
+        from: (...fArgs: unknown[]) => {
+          mockFrom(...fArgs);
+          return {
+            // Direct where() for subqueries (no innerJoin)
+            where: whereNode,
+            // innerJoin() for main query
+            innerJoin: (...jArgs: unknown[]) => {
+              mockInnerJoin(...jArgs);
+              return { where: whereNode };
+            },
+          };
+        },
+      };
+    },
     query: {
       trendingTopics: {
         findFirst: (...args: unknown[]) => mockFindFirst(...args),
@@ -21,15 +60,37 @@ vi.mock("@/db", () => ({
 
 // Mock schema
 vi.mock("@/db/schema", () => ({
-  userSubscriptions: { userId: "user_id" },
-  userLibrary: { userId: "user_id" },
+  userSubscriptions: { userId: "user_id", podcastId: "podcast_id" },
+  userLibrary: { userId: "user_id", episodeId: "episode_id" },
+  listenHistory: { userId: "user_id", episodeId: "episode_id" },
+  episodes: {
+    id: "id",
+    podcastIndexId: "podcast_index_id",
+    title: "title",
+    description: "description",
+    audioUrl: "audio_url",
+    duration: "duration",
+    publishDate: "publish_date",
+    worthItScore: "worth_it_score",
+    podcastId: "podcast_id",
+  },
+  podcasts: {
+    id: "id",
+    title: "title",
+    imageUrl: "image_url",
+    podcastIndexId: "podcast_index_id",
+  },
   trendingTopics: { generatedAt: "generated_at", id: "id" },
 }));
 
 // Mock drizzle-orm — include all imports used by dashboard.ts
 vi.mock("drizzle-orm", () => ({
   eq: vi.fn((...args: unknown[]) => ({ _op: "eq", args })),
-  desc: vi.fn(),
+  desc: vi.fn((...args: unknown[]) => ({ _op: "desc", args })),
+  gte: vi.fn((...args: unknown[]) => ({ _op: "gte", args })),
+  and: vi.fn((...args: unknown[]) => ({ _op: "and", args })),
+  isNotNull: vi.fn((...args: unknown[]) => ({ _op: "isNotNull", args })),
+  notInArray: vi.fn((...args: unknown[]) => ({ _op: "notInArray", args })),
 }));
 
 describe("getDashboardStats", () => {
@@ -205,6 +266,127 @@ describe("getTrendingTopics", () => {
     const result = await getTrendingTopics();
 
     expect(result.topics).toBeNull();
+    expect(result.error).toMatch(/failed to load/i);
+  });
+});
+
+describe("getRecommendedEpisodes", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockAuth.mockResolvedValue({ userId: "user_123" });
+    mockLimit.mockResolvedValue([]);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+    vi.resetModules();
+  });
+
+  it("returns error when not authenticated", async () => {
+    mockAuth.mockResolvedValue({ userId: null });
+
+    const { getRecommendedEpisodes } = await import("@/app/actions/dashboard");
+    const result = await getRecommendedEpisodes();
+
+    expect(result.episodes).toEqual([]);
+    expect(result.error).toMatch(/signed in/i);
+    expect(mockSelect).not.toHaveBeenCalled();
+  });
+
+  it("returns empty episodes array when no scored episodes exist", async () => {
+    mockLimit.mockResolvedValue([]);
+
+    const { getRecommendedEpisodes } = await import("@/app/actions/dashboard");
+    const result = await getRecommendedEpisodes();
+
+    expect(result.episodes).toEqual([]);
+    expect(result.error).toBeNull();
+    // 3 subqueries + 1 main query = 4 select calls
+    expect(mockSelect).toHaveBeenCalledTimes(4);
+  });
+
+  it("returns recommended episodes with all required fields on success", async () => {
+    const mockEpisodes = [
+      {
+        id: 1,
+        podcastIndexId: "ep-123",
+        title: "AI Deep Dive",
+        description: "An exploration of modern AI",
+        audioUrl: "https://example.com/audio.mp3",
+        duration: 3600,
+        publishDate: new Date("2026-03-01T00:00:00Z"),
+        worthItScore: "8.50",
+        podcastTitle: "Tech Talks",
+        podcastImageUrl: "https://example.com/image.jpg",
+        podcastPodcastIndexId: "pod-456",
+      },
+      {
+        id: 2,
+        podcastIndexId: "ep-789",
+        title: "Future of Work",
+        description: null,
+        audioUrl: null,
+        duration: null,
+        publishDate: null,
+        worthItScore: "7.20",
+        podcastTitle: "Work Forward",
+        podcastImageUrl: null,
+        podcastPodcastIndexId: "pod-101",
+      },
+    ];
+    mockLimit.mockResolvedValue(mockEpisodes);
+
+    const { getRecommendedEpisodes } = await import("@/app/actions/dashboard");
+    const result = await getRecommendedEpisodes(6);
+
+    expect(result.error).toBeNull();
+    expect(result.episodes).toHaveLength(2);
+
+    // First episode — verify all DTO fields are present
+    expect(result.episodes[0].id).toBe(1);
+    expect(result.episodes[0].podcastIndexId).toBe("ep-123");
+    expect(result.episodes[0].title).toBe("AI Deep Dive");
+    expect(result.episodes[0].worthItScore).toBe("8.50");
+    expect(result.episodes[0].podcastTitle).toBe("Tech Talks");
+    expect(result.episodes[0].podcastImageUrl).toBe("https://example.com/image.jpg");
+    expect(result.episodes[0].podcastPodcastIndexId).toBe("pod-456");
+
+    // Second episode — verify nullable fields
+    expect(result.episodes[1].description).toBeNull();
+    expect(result.episodes[1].audioUrl).toBeNull();
+    expect(result.episodes[1].podcastImageUrl).toBeNull();
+
+    // Query chain was invoked: 3 subqueries + 1 main query
+    expect(mockSelect).toHaveBeenCalledTimes(4);
+    // from() called 4 times (once per select)
+    expect(mockFrom).toHaveBeenCalledTimes(4);
+    // innerJoin() called once (only the main query joins podcasts)
+    expect(mockInnerJoin).toHaveBeenCalledTimes(1);
+    // where() called 4 times
+    expect(mockWhere).toHaveBeenCalledTimes(4);
+    // orderBy() and limit() only on the main query
+    expect(mockOrderBy).toHaveBeenCalledTimes(1);
+    expect(mockLimit).toHaveBeenCalledWith(6);
+  });
+
+  it("uses default limit of 10 when called with no arguments", async () => {
+    mockLimit.mockResolvedValue([]);
+
+    const { getRecommendedEpisodes } = await import("@/app/actions/dashboard");
+    await getRecommendedEpisodes();
+
+    expect(mockLimit).toHaveBeenCalledWith(10);
+  });
+
+  it("returns error and empty episodes on database failure", async () => {
+    mockLimit.mockRejectedValue(new Error("DB connection failed"));
+
+    const { getRecommendedEpisodes } = await import("@/app/actions/dashboard");
+    const result = await getRecommendedEpisodes();
+
+    expect(result.episodes).toEqual([]);
     expect(result.error).toMatch(/failed to load/i);
   });
 });

@@ -76,3 +76,9 @@ export interface SavedItemDTO extends LibraryEntryDTO {
   };
   collection?: CollectionListDTO | null;
 }
+
+export interface RecommendedEpisodeDTO extends EpisodeListDTO {
+  podcastTitle: string;
+  podcastImageUrl: string | null;
+  podcastPodcastIndexId: string;
+}
