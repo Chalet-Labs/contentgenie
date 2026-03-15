@@ -8,7 +8,7 @@ import type { TrendingTopic } from "@/db/schema";
 function TopicPill({ topic }: { topic: TrendingTopic }) {
   return (
     <Badge variant="secondary" className="px-3 py-1 cursor-default max-w-[200px]">
-      <span className="truncate text-sm" title={topic.name}>{topic.name}</span>
+      <span className="min-w-0 flex-1 truncate text-sm" title={topic.name}>{topic.name}</span>
       <span className="ml-1.5 text-muted-foreground font-normal shrink-0">({topic.episodeCount})</span>
     </Badge>
   );

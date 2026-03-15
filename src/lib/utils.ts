@@ -19,8 +19,9 @@ export function formatDuration(seconds: number | null | undefined): string {
   return `${minutes}m`;
 }
 
-export function formatRelativeTime(date: Date): string {
-  const diffMs = Math.max(0, Date.now() - date.getTime());
+export function formatRelativeTime(date: Date | string): string {
+  const d = date instanceof Date ? date : new Date(date);
+  const diffMs = Math.max(0, Date.now() - d.getTime());
   const diffMinutes = Math.floor(diffMs / 60000);
 
   if (diffMinutes < 1) return "just now";
@@ -32,7 +33,7 @@ export function formatRelativeTime(date: Date): string {
   const diffDays = Math.floor(diffHours / 24);
   if (diffDays < 7) return `${diffDays}d ago`;
 
-  return date.toLocaleDateString("en-US");
+  return d.toLocaleDateString("en-US");
 }
 
 export function formatDate(date: Date | string | number | null | undefined): string {
