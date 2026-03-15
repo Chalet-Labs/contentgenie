@@ -1,0 +1,103 @@
+import Image from "next/image";
+import Link from "next/link";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ChevronRight, Sparkles, Mic } from "lucide-react";
+import { WorthItBadge } from "@/components/episodes/worth-it-badge";
+import { formatDate, formatDuration, stripHtml } from "@/lib/utils";
+import type { RecommendedEpisodeDTO } from "@/db/library-columns";
+
+interface EpisodeRecommendationsProps {
+  episodes: RecommendedEpisodeDTO[];
+}
+
+export function EpisodeRecommendations({ episodes }: EpisodeRecommendationsProps) {
+  if (episodes.length === 0) {
+    return (
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <CardTitle className="text-lg font-semibold">Recommended Episodes</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col items-center justify-center py-8 text-center">
+            <Sparkles className="h-12 w-12 text-muted-foreground/50" />
+            <p className="mt-2 text-sm text-muted-foreground">No recommendations yet</p>
+            <p className="text-xs text-muted-foreground">
+              Check back as more episodes are rated by the community
+            </p>
+            <Link
+              href="/discover"
+              className="mt-4 text-sm font-medium text-primary hover:underline"
+            >
+              Discover Podcasts
+            </Link>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between pb-2">
+        <CardTitle className="text-lg font-semibold">Recommended Episodes</CardTitle>
+        <Link
+          href="/discover"
+          className="flex items-center text-sm text-muted-foreground hover:text-primary"
+        >
+          Discover more
+          <ChevronRight className="ml-1 h-4 w-4" />
+        </Link>
+      </CardHeader>
+      <CardContent>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {episodes.map((episode) => (
+            <Link
+              key={episode.id}
+              href={`/episode/${episode.podcastIndexId}`}
+              className="flex gap-3 rounded-lg p-2 transition-colors hover:bg-accent"
+            >
+              <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-muted">
+                {episode.podcastImageUrl ? (
+                  <Image
+                    src={episode.podcastImageUrl}
+                    alt={episode.podcastTitle}
+                    fill
+                    className="object-cover"
+                    sizes="64px"
+                  />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center text-muted-foreground">
+                    <Mic className="h-6 w-6" />
+                  </div>
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
+                <h4 className="line-clamp-1 text-sm font-medium">{episode.title}</h4>
+                <p className="line-clamp-1 text-xs text-muted-foreground">
+                  {episode.podcastTitle}
+                </p>
+                {episode.description && (
+                  <p className="line-clamp-2 text-xs text-muted-foreground/70">
+                    {stripHtml(episode.description)}
+                  </p>
+                )}
+                <div className="mt-1 flex flex-wrap items-center gap-2">
+                  {episode.worthItScore !== null &&
+                    Number.isFinite(Number(episode.worthItScore)) && (
+                      <WorthItBadge score={Number(episode.worthItScore)} />
+                    )}
+                  <span className="text-xs text-muted-foreground">
+                    {formatDuration(episode.duration)}
+                    {episode.publishDate && (
+                      <> &middot; {formatDate(episode.publishDate)}</>
+                    )}
+                  </span>
+                </div>
+              </div>
+            </Link>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}

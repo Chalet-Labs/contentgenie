@@ -2,12 +2,12 @@ import { Suspense } from "react";
 import {
   getRecentEpisodesFromSubscriptions,
   getRecentlySavedItems,
-  getRecommendedPodcasts,
+  getRecommendedEpisodes,
   getTrendingTopics,
 } from "@/app/actions/dashboard";
 import { RecentEpisodes } from "@/components/dashboard/recent-episodes";
 import { SavedItems } from "@/components/dashboard/saved-items";
-import { Recommendations } from "@/components/dashboard/recommendations";
+import { EpisodeRecommendations } from "@/components/dashboard/episode-recommendations";
 import { QueueSection } from "@/components/dashboard/queue-section";
 import { TrendingTopics, TrendingTopicsLoading } from "@/components/dashboard/trending-topics";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -65,13 +65,13 @@ async function TrendingTopicsSection() {
   return <TrendingTopics topics={topics.items} generatedAt={topics.generatedAt} />;
 }
 
-// Server component for recommendations
+// Server component for episode recommendations
 async function RecommendationsSection() {
-  const { podcasts, error } = await getRecommendedPodcasts(6);
-  if (error && podcasts.length === 0) {
-    return <Recommendations podcasts={[]} />;
+  const { episodes, error } = await getRecommendedEpisodes(6);
+  if (error && episodes.length === 0) {
+    return <EpisodeRecommendations episodes={[]} />;
   }
-  return <Recommendations podcasts={podcasts} />;
+  return <EpisodeRecommendations episodes={episodes} />;
 }
 
 export default function DashboardPage() {

@@ -1,23 +1,25 @@
 "use server";
 
 import { auth } from "@clerk/nextjs/server";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and, gte, isNotNull, notInArray } from "drizzle-orm";
 import { db } from "@/db";
 import {
   userSubscriptions,
   userLibrary,
+  listenHistory,
+  episodes,
+  podcasts,
   trendingTopics,
 } from "@/db/schema";
 import {
   LIBRARY_ENTRY_COLUMNS,
   EPISODE_LIST_COLUMNS,
   PODCAST_LIST_COLUMNS,
+  type RecommendedEpisodeDTO,
 } from "@/db/library-columns";
 import {
   getEpisodesByFeedId,
-  getTrendingPodcasts,
   type PodcastIndexEpisode,
-  type PodcastIndexPodcast,
 } from "@/lib/podcastindex";
 
 // Maximum episodes to include per podcast for variety in the dashboard feed
@@ -146,44 +148,66 @@ export async function getRecentlySavedItems(limit: number = 5) {
   }
 }
 
-// Get trending/recommended podcasts
-export async function getRecommendedPodcasts(limit: number = 6) {
+const SCORE_THRESHOLD = "6.00";
+
+// Get cross-user episode recommendations ranked by worth-it score,
+// excluding episodes from subscribed podcasts, saved episodes, and listened episodes.
+export async function getRecommendedEpisodes(
+  limit: number = 10
+): Promise<{ episodes: RecommendedEpisodeDTO[]; error: string | null }> {
   const { userId } = await auth();
 
   if (!userId) {
-    return { podcasts: [], error: "You must be signed in" };
+    return { episodes: [], error: "You must be signed in" };
   }
 
   try {
-    // Get user's subscribed podcast IDs to exclude them from recommendations
-    const subscriptions = await db.query.userSubscriptions.findMany({
-      where: eq(userSubscriptions.userId, userId),
-      columns: {
-        podcastId: true,
-      },
-      with: {
-        podcast: {
-          columns: {
-            podcastIndexId: true,
-          },
-        },
-      },
-    });
+    const subscribedPodcastIds = db
+      .select({ id: userSubscriptions.podcastId })
+      .from(userSubscriptions)
+      .where(eq(userSubscriptions.userId, userId));
 
-    const subscribedIds = new Set(subscriptions.map((s) => s.podcast.podcastIndexId));
+    const savedEpisodeIds = db
+      .select({ id: userLibrary.episodeId })
+      .from(userLibrary)
+      .where(eq(userLibrary.userId, userId));
 
-    // Fetch trending podcasts from PodcastIndex
-    const trending = await getTrendingPodcasts(limit + subscribedIds.size);
+    const listenedEpisodeIds = db
+      .select({ id: listenHistory.episodeId })
+      .from(listenHistory)
+      .where(eq(listenHistory.userId, userId));
 
-    // Filter out already subscribed podcasts
-    const recommendations = trending.feeds
-      .filter((podcast) => !subscribedIds.has(podcast.id.toString()))
-      .slice(0, limit);
+    const results = await db
+      .select({
+        id: episodes.id,
+        podcastIndexId: episodes.podcastIndexId,
+        title: episodes.title,
+        description: episodes.description,
+        audioUrl: episodes.audioUrl,
+        duration: episodes.duration,
+        publishDate: episodes.publishDate,
+        worthItScore: episodes.worthItScore,
+        podcastTitle: podcasts.title,
+        podcastImageUrl: podcasts.imageUrl,
+      })
+      .from(episodes)
+      .innerJoin(podcasts, eq(episodes.podcastId, podcasts.id))
+      .where(
+        and(
+          isNotNull(episodes.worthItScore),
+          gte(episodes.worthItScore, SCORE_THRESHOLD),
+          notInArray(episodes.podcastId, subscribedPodcastIds),
+          notInArray(episodes.id, savedEpisodeIds),
+          notInArray(episodes.id, listenedEpisodeIds)
+        )
+      )
+      .orderBy(desc(episodes.worthItScore), desc(episodes.publishDate))
+      .limit(limit);
 
-    return { podcasts: recommendations, error: null };
+    return { episodes: results, error: null };
   } catch (error) {
-    console.error("Error fetching recommendations:", error);
-    return { podcasts: [], error: "Failed to load recommendations" };
+    console.error("Error fetching episode recommendations:", error);
+    return { episodes: [], error: "Failed to load recommendations" };
   }
 }
 
