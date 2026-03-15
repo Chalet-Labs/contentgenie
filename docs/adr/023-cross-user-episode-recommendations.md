@@ -62,7 +62,7 @@ Define a `RecommendedEpisodeDTO` type that extends `EpisodeListDTO` with podcast
 
 ### Negative
 - Recommendations are limited to episodes that have been summarized (have `worthItScore`). New podcasts without summarized episodes won't appear. This is acceptable because the Worth It score IS the quality signal.
-- Cold start: users with no subscriptions, library, or listen history get generic "top scored" episodes. This is fine as a starting point.
+- Cold start: users with no subscriptions, library, or listen history get generic "top-scored" episodes. This is fine as a starting point.
 - The `getRecommendedPodcasts()` function and `Recommendations` component become dead code and should be removed.
 
 ### Risks

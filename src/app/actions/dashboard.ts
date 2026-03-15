@@ -189,7 +189,6 @@ export async function getRecommendedEpisodes(
         worthItScore: episodes.worthItScore,
         podcastTitle: podcasts.title,
         podcastImageUrl: podcasts.imageUrl,
-        podcastPodcastIndexId: podcasts.podcastIndexId,
       })
       .from(episodes)
       .innerJoin(podcasts, eq(episodes.podcastId, podcasts.id))

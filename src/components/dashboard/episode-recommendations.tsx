@@ -82,9 +82,10 @@ export function EpisodeRecommendations({ episodes }: EpisodeRecommendationsProps
                   </p>
                 )}
                 <div className="mt-1 flex flex-wrap items-center gap-2">
-                  {episode.worthItScore !== null && (
-                    <WorthItBadge score={parseFloat(episode.worthItScore)} />
-                  )}
+                  {episode.worthItScore !== null &&
+                    Number.isFinite(Number(episode.worthItScore)) && (
+                      <WorthItBadge score={Number(episode.worthItScore)} />
+                    )}
                   <span className="text-xs text-muted-foreground">
                     {formatDuration(episode.duration)}
                     {episode.publishDate && (

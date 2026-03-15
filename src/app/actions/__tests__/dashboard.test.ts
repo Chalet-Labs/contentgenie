@@ -320,7 +320,6 @@ describe("getRecommendedEpisodes", () => {
         worthItScore: "8.50",
         podcastTitle: "Tech Talks",
         podcastImageUrl: "https://example.com/image.jpg",
-        podcastPodcastIndexId: "pod-456",
       },
       {
         id: 2,
@@ -333,7 +332,6 @@ describe("getRecommendedEpisodes", () => {
         worthItScore: "7.20",
         podcastTitle: "Work Forward",
         podcastImageUrl: null,
-        podcastPodcastIndexId: "pod-101",
       },
     ];
     mockLimit.mockResolvedValue(mockEpisodes);
@@ -351,8 +349,6 @@ describe("getRecommendedEpisodes", () => {
     expect(result.episodes[0].worthItScore).toBe("8.50");
     expect(result.episodes[0].podcastTitle).toBe("Tech Talks");
     expect(result.episodes[0].podcastImageUrl).toBe("https://example.com/image.jpg");
-    expect(result.episodes[0].podcastPodcastIndexId).toBe("pod-456");
-
     // Second episode — verify nullable fields
     expect(result.episodes[1].description).toBeNull();
     expect(result.episodes[1].audioUrl).toBeNull();
