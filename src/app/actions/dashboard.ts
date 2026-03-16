@@ -1,7 +1,7 @@
 "use server";
 
 import { auth } from "@clerk/nextjs/server";
-import { eq, desc, and, gte, isNotNull, notInArray } from "drizzle-orm";
+import { eq, desc, and, gte, isNotNull, notInArray, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import {
   userSubscriptions,
@@ -29,12 +29,23 @@ const MAX_EPISODES_PER_PODCAST = 3;
 const BATCH_FETCH_MULTIPLIER = 5;
 
 // Get recent episodes from subscribed podcasts
-export async function getRecentEpisodesFromSubscriptions(limit: number = 10) {
+export async function getRecentEpisodesFromSubscriptions(
+  { limit = 10, since }: { limit?: number; since?: number } = {}
+) {
+  const safeLimit =
+    Number.isInteger(limit) && limit > 0 ? Math.min(limit, 25) : 10;
+  const safeSince =
+    typeof since === "number" && Number.isFinite(since) && since >= 0
+      ? Math.floor(since)
+      : undefined;
+
   const { userId } = await auth();
 
   if (!userId) {
-    return { episodes: [], error: "You must be signed in to view episodes" };
+    return { episodes: [], hasSubscriptions: false, error: "You must be signed in to view episodes" };
   }
+
+  let hasSubscriptions = false;
 
   try {
     // Get user's subscriptions with podcast data
@@ -52,8 +63,10 @@ export async function getRecentEpisodesFromSubscriptions(limit: number = 10) {
       limit: 100, // Check up to 100 subscriptions (now efficient due to batching)
     });
 
-    if (subscriptions.length === 0) {
-      return { episodes: [], error: null };
+    hasSubscriptions = subscriptions.length > 0;
+
+    if (!hasSubscriptions) {
+      return { episodes: [], hasSubscriptions: false, error: null };
     }
 
     // BOLT OPTIMIZATION: Batch API calls to PodcastIndex to avoid N+1 problem.
@@ -68,15 +81,20 @@ export async function getRecentEpisodesFromSubscriptions(limit: number = 10) {
       .filter((id) => /^\d+$/.test(id));
 
     if (numericFeedIds.length === 0) {
-      return { episodes: [], error: null };
+      return { episodes: [], hasSubscriptions: true, error: null };
     }
 
-    // Fetch episodes from all podcasts in one batch
-    const batchResponse = await getEpisodesByFeedId(numericFeedIds.join(","), limit * BATCH_FETCH_MULTIPLIER);
-    const batchEpisodes = batchResponse.items || [];
+    // Fetch episodes from all podcasts in one batch (pass `since` to the API for server-side filtering)
+    const batchResponse = await getEpisodesByFeedId(numericFeedIds.join(","), safeLimit * BATCH_FETCH_MULTIPLIER, safeSince);
+    const rawEpisodes = batchResponse.items || [];
+
+    // Apply time filter if `since` is provided (Unix seconds)
+    const batchEpisodes = safeSince !== undefined
+      ? rawEpisodes.filter((ep) => (ep.datePublished || 0) >= safeSince)
+      : rawEpisodes;
 
     // Map back to our RecentEpisode type and group by feed to maintain variety (max 3 per podcast)
-    const episodesByFeed = new Map<string, RecentEpisode[]>();
+    const episodesByFeed = new Map<string, Omit<RecentEpisode, "worthItScore">[]>();
 
     for (const ep of batchEpisodes) {
       const pIndexId = String(ep.feedId);
@@ -100,15 +118,48 @@ export async function getRecentEpisodesFromSubscriptions(limit: number = 10) {
 
     const allEpisodes = Array.from(episodesByFeed.values()).flat();
 
-    // Sort by publish date and take the most recent overall
-    const sortedEpisodes = allEpisodes
-      .sort((a, b) => (b.datePublished || 0) - (a.datePublished || 0))
-      .slice(0, limit);
+    // Batch-query DB for worth-it scores (keyed by podcastIndexId = String(ep.id))
+    const podcastIndexIds = allEpisodes.map((ep) => String(ep.id));
+    const scoreRows =
+      podcastIndexIds.length > 0
+        ? await db
+            .select({
+              podcastIndexId: episodes.podcastIndexId,
+              worthItScore: episodes.worthItScore,
+            })
+            .from(episodes)
+            .where(inArray(episodes.podcastIndexId, podcastIndexIds))
+        : [];
 
-    return { episodes: sortedEpisodes, error: null };
+    const scoreMap = new Map<string, number | null>();
+    for (const row of scoreRows) {
+      const parsed = row.worthItScore !== null ? parseFloat(row.worthItScore) : null;
+      scoreMap.set(
+        row.podcastIndexId,
+        parsed !== null && Number.isFinite(parsed) ? parsed : null
+      );
+    }
+
+    // Merge scores onto episodes
+    const enrichedEpisodes: RecentEpisode[] = allEpisodes.map((ep) => ({
+      ...ep,
+      worthItScore: scoreMap.get(String(ep.id)) ?? null,
+    }));
+
+    // Sort: scored episodes by score DESC, then unscored by datePublished DESC
+    const scored = enrichedEpisodes
+      .filter((ep) => ep.worthItScore !== null)
+      .sort((a, b) => (b.worthItScore as number) - (a.worthItScore as number));
+    const unscored = enrichedEpisodes
+      .filter((ep) => ep.worthItScore === null)
+      .sort((a, b) => (b.datePublished || 0) - (a.datePublished || 0));
+
+    const sortedEpisodes = [...scored, ...unscored].slice(0, safeLimit);
+
+    return { episodes: sortedEpisodes, hasSubscriptions: true, error: null };
   } catch (error) {
     console.error("Error fetching recent episodes:", error);
-    return { episodes: [], error: "Failed to load recent episodes" };
+    return { episodes: [], hasSubscriptions, error: "Failed to load recent episodes" };
   }
 }
 
@@ -278,4 +329,5 @@ export type RecentEpisode = PodcastIndexEpisode & {
   podcastTitle: string;
   podcastImage: string | null;
   podcastId: string;
+  worthItScore: number | null;
 };
