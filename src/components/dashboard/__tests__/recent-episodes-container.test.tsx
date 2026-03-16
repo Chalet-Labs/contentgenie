@@ -180,7 +180,11 @@ describe("RecentEpisodesContainer", () => {
     expect(screen.getByTestId("episode-1")).toBeInTheDocument();
   });
 
-  it("calls server action with sinceLastWeek when 'Last week' is clicked after switching away", async () => {
+  it("calls server action with fresh sinceLastWeek when 'Last week' is clicked after switching away", async () => {
+    const mockNow = 1_710_000_000_000;
+    vi.spyOn(Date, "now").mockReturnValue(mockNow);
+    const expectedSinceWeek = Math.floor((mockNow - 7 * 24 * 60 * 60 * 1000) / 1000);
+
     const weekEpisodes = [makeEpisode(55, "Week Ep")];
     // First call: login toggle, second call: back to week
     mockGetRecentEpisodes
@@ -197,7 +201,7 @@ describe("RecentEpisodesContainer", () => {
     await waitFor(() => {
       expect(mockGetRecentEpisodes).toHaveBeenCalledWith({
         limit: 5,
-        since: SINCE_LAST_WEEK,
+        since: expectedSinceWeek,
       });
     });
   });

@@ -74,7 +74,9 @@ export function RecentEpisodes({
             {hasSubscriptions ? (
               <>
                 <p className="mt-2 text-sm text-muted-foreground">
-                  No new episodes in this period
+                  {canToggle
+                    ? "No new episodes in this period"
+                    : "No new episodes in the last week"}
                 </p>
                 {canToggle && (
                   <p className="text-xs text-muted-foreground">

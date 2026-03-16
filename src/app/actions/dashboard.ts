@@ -32,6 +32,13 @@ const BATCH_FETCH_MULTIPLIER = 5;
 export async function getRecentEpisodesFromSubscriptions(
   { limit = 10, since }: { limit?: number; since?: number } = {}
 ) {
+  const safeLimit =
+    Number.isInteger(limit) && limit > 0 ? Math.min(limit, 25) : 10;
+  const safeSince =
+    typeof since === "number" && Number.isFinite(since) && since >= 0
+      ? Math.floor(since)
+      : undefined;
+
   const { userId } = await auth();
 
   if (!userId) {
@@ -78,12 +85,12 @@ export async function getRecentEpisodesFromSubscriptions(
     }
 
     // Fetch episodes from all podcasts in one batch (pass `since` to the API for server-side filtering)
-    const batchResponse = await getEpisodesByFeedId(numericFeedIds.join(","), limit * BATCH_FETCH_MULTIPLIER, since);
+    const batchResponse = await getEpisodesByFeedId(numericFeedIds.join(","), safeLimit * BATCH_FETCH_MULTIPLIER, safeSince);
     const rawEpisodes = batchResponse.items || [];
 
     // Apply time filter if `since` is provided (Unix seconds)
-    const batchEpisodes = since !== undefined
-      ? rawEpisodes.filter((ep) => (ep.datePublished || 0) >= since)
+    const batchEpisodes = safeSince !== undefined
+      ? rawEpisodes.filter((ep) => (ep.datePublished || 0) >= safeSince)
       : rawEpisodes;
 
     // Map back to our RecentEpisode type and group by feed to maintain variety (max 3 per podcast)
@@ -136,7 +143,7 @@ export async function getRecentEpisodesFromSubscriptions(
     // Merge scores onto episodes
     const enrichedEpisodes: RecentEpisode[] = allEpisodes.map((ep) => ({
       ...ep,
-      worthItScore: scoreMap.has(String(ep.id)) ? (scoreMap.get(String(ep.id)) ?? null) : null,
+      worthItScore: scoreMap.get(String(ep.id)) ?? null,
     }));
 
     // Sort: scored episodes by score DESC, then unscored by datePublished DESC
@@ -147,7 +154,7 @@ export async function getRecentEpisodesFromSubscriptions(
       .filter((ep) => ep.worthItScore === null)
       .sort((a, b) => (b.datePublished || 0) - (a.datePublished || 0));
 
-    const sortedEpisodes = [...scored, ...unscored].slice(0, limit);
+    const sortedEpisodes = [...scored, ...unscored].slice(0, safeLimit);
 
     return { episodes: sortedEpisodes, hasSubscriptions: true, error: null };
   } catch (error) {

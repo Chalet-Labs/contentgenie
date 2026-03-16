@@ -30,23 +30,35 @@ export function RecentEpisodesContainer({
     if (range === activeRange) return;
     if (range === "login" && sinceLastLogin === null) return;
 
+    const previousRange = activeRange;
     setActiveRange(range);
     latestRangeRef.current = range;
 
     startTransition(async () => {
-      const since = range === "login" ? sinceLastLogin! : sinceLastWeek;
-      const result = await getRecentEpisodesFromSubscriptions({ limit: 5, since });
+      try {
+        const since =
+          range === "login"
+            ? sinceLastLogin!
+            : Math.floor((Date.now() - 7 * 24 * 60 * 60 * 1000) / 1000);
+        const result = await getRecentEpisodesFromSubscriptions({ limit: 5, since });
 
-      // Ignore stale results if the user toggled again while this fetch was in-flight
-      if (latestRangeRef.current !== range) return;
+        // Ignore stale results if the user toggled again while this fetch was in-flight
+        if (latestRangeRef.current !== range) return;
 
-      if (result.error) {
-        console.error("Failed to load episodes:", result.error);
-        return;
+        if (result.error) {
+          console.error("Failed to load episodes:", result.error);
+          setActiveRange(previousRange);
+          latestRangeRef.current = previousRange;
+          return;
+        }
+
+        setEpisodes(result.episodes);
+        setHasSubscriptions(result.hasSubscriptions);
+      } catch (error) {
+        console.error("Failed to load episodes:", error);
+        setActiveRange(previousRange);
+        latestRangeRef.current = previousRange;
       }
-
-      setEpisodes(result.episodes);
-      setHasSubscriptions(result.hasSubscriptions);
     });
   }
 
