@@ -56,20 +56,24 @@ export function RecentEpisodesContainer({
         <div className="flex gap-1 rounded-lg border bg-muted/40 p-1 w-fit">
           <button
             onClick={() => handleRangeChange("week")}
+            disabled={isPending}
+            aria-pressed={activeRange === "week"}
             className={
               activeRange === "week"
-                ? "rounded-md px-3 py-1 text-sm font-medium bg-background shadow-sm"
-                : "rounded-md px-3 py-1 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+                ? "rounded-md px-3 py-1 text-sm font-medium bg-background shadow-sm disabled:opacity-50"
+                : "rounded-md px-3 py-1 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
             }
           >
             Last week
           </button>
           <button
             onClick={() => handleRangeChange("login")}
+            disabled={isPending}
+            aria-pressed={activeRange === "login"}
             className={
               activeRange === "login"
-                ? "rounded-md px-3 py-1 text-sm font-medium bg-background shadow-sm"
-                : "rounded-md px-3 py-1 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+                ? "rounded-md px-3 py-1 text-sm font-medium bg-background shadow-sm disabled:opacity-50"
+                : "rounded-md px-3 py-1 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
             }
           >
             Since last login

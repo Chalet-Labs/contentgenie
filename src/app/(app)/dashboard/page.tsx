@@ -44,7 +44,7 @@ async function RecentEpisodesSection() {
   // Treat as null if within 5 minutes (current session is first session)
   const sinceLastLogin =
     lastSignInAt === null ||
-    Math.abs(Date.now() - lastSignInAt.getTime()) < 5 * 60 * 1000
+    Date.now() - lastSignInAt.getTime() < 5 * 60 * 1000
       ? null
       : Math.floor(lastSignInAt.getTime() / 1000);
 
@@ -54,6 +54,8 @@ async function RecentEpisodesSection() {
     limit: 5,
     since: sinceLastWeek,
   });
+
+  if (error) console.error("[RecentEpisodesSection]", error);
 
   return (
     <RecentEpisodesContainer
