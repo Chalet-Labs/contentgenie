@@ -48,11 +48,9 @@ async function RecentEpisodesSection() {
       ? null
       : Math.floor(lastSignInAt.getTime() / 1000);
 
-  const sinceLastWeek = Math.floor((Date.now() - 7 * 24 * 60 * 60 * 1000) / 1000);
-
   const { episodes, hasSubscriptions, error } = await getRecentEpisodesFromSubscriptions({
     limit: 5,
-    since: sinceLastWeek,
+    since: Math.floor((Date.now() - 7 * 24 * 60 * 60 * 1000) / 1000),
   });
 
   if (error) console.error("[RecentEpisodesSection]", error);
@@ -61,7 +59,6 @@ async function RecentEpisodesSection() {
     <RecentEpisodesContainer
       initialEpisodes={episodes}
       sinceLastLogin={sinceLastLogin}
-      sinceLastWeek={sinceLastWeek}
       hasSubscriptions={hasSubscriptions}
     />
   );

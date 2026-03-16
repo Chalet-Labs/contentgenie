@@ -80,7 +80,7 @@ export function RecentEpisodes({
                 </p>
                 {canToggle && (
                   <p className="text-xs text-muted-foreground">
-                    Try switching to a broader time range.
+                    Try switching to a different time range.
                   </p>
                 )}
               </>

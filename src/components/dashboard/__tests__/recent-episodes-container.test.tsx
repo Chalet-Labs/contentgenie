@@ -57,7 +57,6 @@ function makeEpisode(id: number, title = `Episode ${id}`): RecentEpisode {
   } as unknown as RecentEpisode;
 }
 
-const SINCE_LAST_WEEK = 1_700_000;
 const SINCE_LAST_LOGIN = 1_800_000;
 
 async function renderContainer(overrides?: {
@@ -75,7 +74,6 @@ async function renderContainer(overrides?: {
           ? overrides.sinceLastLogin
           : SINCE_LAST_LOGIN
       }
-      sinceLastWeek={SINCE_LAST_WEEK}
       hasSubscriptions={true}
     />
   );

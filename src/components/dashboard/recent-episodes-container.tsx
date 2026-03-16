@@ -10,14 +10,12 @@ type TimeRange = "week" | "login";
 interface RecentEpisodesContainerProps {
   initialEpisodes: RecentEpisode[];
   sinceLastLogin: number | null; // Unix seconds; null if no meaningful boundary
-  sinceLastWeek: number;         // Unix seconds; pre-computed server-side
   hasSubscriptions: boolean;
 }
 
 export function RecentEpisodesContainer({
   initialEpisodes,
   sinceLastLogin,
-  sinceLastWeek,
   hasSubscriptions: initialHasSubscriptions,
 }: RecentEpisodesContainerProps) {
   const [activeRange, setActiveRange] = useState<TimeRange>("week");
