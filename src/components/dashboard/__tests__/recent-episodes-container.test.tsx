@@ -18,12 +18,14 @@ vi.mock("@/components/dashboard/recent-episodes", () => ({
   RecentEpisodes: ({
     episodes,
     isLoading,
+    canToggle,
   }: {
     episodes: RecentEpisode[];
     isLoading?: boolean;
     hasSubscriptions?: boolean;
+    canToggle?: boolean;
   }) => (
-    <div data-testid="recent-episodes">
+    <div data-testid="recent-episodes" data-can-toggle={canToggle}>
       {isLoading && <span data-testid="loading">Loading</span>}
       {episodes.map((ep) => (
         <span key={ep.id} data-testid={`episode-${ep.id}`}>
@@ -155,6 +157,27 @@ describe("RecentEpisodesContainer", () => {
     await waitFor(() => {
       expect(screen.getByTestId("episode-77")).toBeInTheDocument();
     });
+  });
+
+  it("preserves existing episodes when server action returns an error", async () => {
+    mockGetRecentEpisodes.mockResolvedValue({
+      episodes: [],
+      hasSubscriptions: true,
+      error: "Failed to load recent episodes",
+    });
+
+    const initial = [makeEpisode(1, "Keep Me")];
+    await renderContainer({ initialEpisodes: initial });
+
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: /since last login/i }));
+
+    await waitFor(() => {
+      expect(mockGetRecentEpisodes).toHaveBeenCalledTimes(1);
+    });
+
+    // Original episodes should still be displayed since the action returned an error
+    expect(screen.getByTestId("episode-1")).toBeInTheDocument();
   });
 
   it("calls server action with sinceLastWeek when 'Last week' is clicked after switching away", async () => {

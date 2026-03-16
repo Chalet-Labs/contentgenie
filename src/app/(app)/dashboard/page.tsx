@@ -55,16 +55,6 @@ async function RecentEpisodesSection() {
     since: sinceLastWeek,
   });
 
-  if (error && episodes.length === 0) {
-    return (
-      <RecentEpisodesContainer
-        initialEpisodes={[]}
-        sinceLastLogin={sinceLastLogin}
-        sinceLastWeek={sinceLastWeek}
-        hasSubscriptions={hasSubscriptions}
-      />
-    );
-  }
   return (
     <RecentEpisodesContainer
       initialEpisodes={episodes}

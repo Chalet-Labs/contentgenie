@@ -38,6 +38,8 @@ export async function getRecentEpisodesFromSubscriptions(
     return { episodes: [], hasSubscriptions: false, error: "You must be signed in to view episodes" };
   }
 
+  let hasSubscriptions = false;
+
   try {
     // Get user's subscriptions with podcast data
     // BOLT OPTIMIZATION: Use selective column fetching to avoid loading large text fields
@@ -54,7 +56,9 @@ export async function getRecentEpisodesFromSubscriptions(
       limit: 100, // Check up to 100 subscriptions (now efficient due to batching)
     });
 
-    if (subscriptions.length === 0) {
+    hasSubscriptions = subscriptions.length > 0;
+
+    if (!hasSubscriptions) {
       return { episodes: [], hasSubscriptions: false, error: null };
     }
 
@@ -147,7 +151,7 @@ export async function getRecentEpisodesFromSubscriptions(
     return { episodes: sortedEpisodes, hasSubscriptions: true, error: null };
   } catch (error) {
     console.error("Error fetching recent episodes:", error);
-    return { episodes: [], hasSubscriptions: false, error: "Failed to load recent episodes" };
+    return { episodes: [], hasSubscriptions, error: "Failed to load recent episodes" };
   }
 }
 

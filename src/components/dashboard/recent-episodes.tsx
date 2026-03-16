@@ -12,6 +12,7 @@ interface RecentEpisodesProps {
   episodes: RecentEpisode[];
   isLoading?: boolean;
   hasSubscriptions?: boolean;
+  canToggle?: boolean;
 }
 
 function formatDuration(seconds: number | null | undefined): string {
@@ -37,6 +38,7 @@ export function RecentEpisodes({
   episodes,
   isLoading,
   hasSubscriptions = true,
+  canToggle = false,
 }: RecentEpisodesProps) {
   if (isLoading) {
     return (
@@ -74,9 +76,11 @@ export function RecentEpisodes({
                 <p className="mt-2 text-sm text-muted-foreground">
                   No new episodes in this period
                 </p>
-                <p className="text-xs text-muted-foreground">
-                  Try switching to a broader time range.
-                </p>
+                {canToggle && (
+                  <p className="text-xs text-muted-foreground">
+                    Try switching to a broader time range.
+                  </p>
+                )}
               </>
             ) : (
               <>

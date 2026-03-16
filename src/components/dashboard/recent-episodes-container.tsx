@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { getRecentEpisodesFromSubscriptions } from "@/app/actions/dashboard";
 import { RecentEpisodes } from "@/components/dashboard/recent-episodes";
 import type { RecentEpisode } from "@/app/actions/dashboard";
@@ -18,19 +18,35 @@ export function RecentEpisodesContainer({
   initialEpisodes,
   sinceLastLogin,
   sinceLastWeek,
-  hasSubscriptions,
+  hasSubscriptions: initialHasSubscriptions,
 }: RecentEpisodesContainerProps) {
   const [activeRange, setActiveRange] = useState<TimeRange>("week");
   const [episodes, setEpisodes] = useState<RecentEpisode[]>(initialEpisodes);
+  const [hasSubscriptions, setHasSubscriptions] = useState(initialHasSubscriptions);
   const [isPending, startTransition] = useTransition();
+  const latestRangeRef = useRef<TimeRange>("week");
 
   function handleRangeChange(range: TimeRange) {
     if (range === activeRange) return;
+    if (range === "login" && sinceLastLogin === null) return;
+
     setActiveRange(range);
+    latestRangeRef.current = range;
+
     startTransition(async () => {
       const since = range === "login" ? sinceLastLogin! : sinceLastWeek;
       const result = await getRecentEpisodesFromSubscriptions({ limit: 5, since });
+
+      // Ignore stale results if the user toggled again while this fetch was in-flight
+      if (latestRangeRef.current !== range) return;
+
+      if (result.error) {
+        console.error("Failed to load episodes:", result.error);
+        return;
+      }
+
       setEpisodes(result.episodes);
+      setHasSubscriptions(result.hasSubscriptions);
     });
   }
 
@@ -64,6 +80,7 @@ export function RecentEpisodesContainer({
         episodes={episodes}
         isLoading={isPending}
         hasSubscriptions={hasSubscriptions}
+        canToggle={sinceLastLogin !== null}
       />
     </div>
   );
