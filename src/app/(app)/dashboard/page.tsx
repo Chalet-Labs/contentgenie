@@ -80,9 +80,7 @@ async function TrendingTopicsSection() {
 // Server component for episode recommendations
 async function RecommendationsSection() {
   const { episodes, error } = await getRecommendedEpisodes(6);
-  if (error && episodes.length === 0) {
-    return <EpisodeRecommendations episodes={[]} />;
-  }
+  if (error) console.error("[RecommendationsSection]", error);
   return <EpisodeRecommendations episodes={episodes} />;
 }
 
