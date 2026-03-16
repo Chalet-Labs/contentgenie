@@ -2,27 +2,28 @@ import { Suspense } from "react";
 import { currentUser } from "@clerk/nextjs/server";
 import {
   getRecentEpisodesFromSubscriptions,
-  getRecentlySavedItems,
   getRecommendedEpisodes,
   getTrendingTopics,
 } from "@/app/actions/dashboard";
 import { RecentEpisodesContainer } from "@/components/dashboard/recent-episodes-container";
-import { SavedItems } from "@/components/dashboard/saved-items";
-import { EpisodeRecommendations } from "@/components/dashboard/episode-recommendations";
+import {
+  EpisodeRecommendations,
+  EpisodeRecommendationsLoading,
+} from "@/components/dashboard/episode-recommendations";
 import { QueueSection } from "@/components/dashboard/queue-section";
 import { TrendingTopics, TrendingTopicsLoading } from "@/components/dashboard/trending-topics";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 
-// Loading skeleton for card sections
-function CardLoading() {
+// Loading skeleton for recent episodes (inline — presentational file is "use client")
+function RecentEpisodesLoading() {
   return (
     <Card>
       <CardHeader>
         <Skeleton className="h-5 w-40" />
       </CardHeader>
       <CardContent className="space-y-4">
-        {[1, 2, 3].map((i) => (
+        {[1, 2, 3, 4, 5].map((i) => (
           <div key={i} className="flex gap-3">
             <Skeleton className="h-14 w-14 shrink-0 rounded-md" />
             <div className="flex-1 space-y-2">
@@ -64,15 +65,6 @@ async function RecentEpisodesSection() {
   );
 }
 
-// Server component for saved items
-async function SavedItemsSection() {
-  const { items, error } = await getRecentlySavedItems(5);
-  if (error && items.length === 0) {
-    return <SavedItems items={[]} />;
-  }
-  return <SavedItems items={items} />;
-}
-
 const STALE_THRESHOLD_MS = 48 * 60 * 60 * 1000;
 
 // Server component for trending topics
@@ -105,30 +97,22 @@ export default function DashboardPage() {
         </p>
       </div>
 
-      {/* Queue section */}
-      <QueueSection />
-
       {/* Trending topics */}
       <Suspense fallback={<TrendingTopicsLoading />}>
         <TrendingTopicsSection />
       </Suspense>
 
-      {/* Main content grid */}
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Recent episodes from subscriptions */}
-        <Suspense fallback={<CardLoading />}>
-          <RecentEpisodesSection />
-        </Suspense>
-
-        {/* Recently saved items */}
-        <Suspense fallback={<CardLoading />}>
-          <SavedItemsSection />
-        </Suspense>
-      </div>
-
-      {/* Recommendations section */}
-      <Suspense fallback={<CardLoading />}>
+      {/* Episode recommendations */}
+      <Suspense fallback={<EpisodeRecommendationsLoading />}>
         <RecommendationsSection />
+      </Suspense>
+
+      {/* Queue section */}
+      <QueueSection />
+
+      {/* Recent episodes from subscriptions */}
+      <Suspense fallback={<RecentEpisodesLoading />}>
+        <RecentEpisodesSection />
       </Suspense>
     </div>
   );
