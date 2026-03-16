@@ -62,7 +62,7 @@ export function RecentEpisodesContainer({
 
   return (
     <div className="space-y-3">
-      {sinceLastLogin !== null && (
+      {sinceLastLogin !== null && hasSubscriptions && (
         <div className="flex gap-1 rounded-lg border bg-muted/40 p-1 w-fit">
           <button
             onClick={() => handleRangeChange("week")}
@@ -94,7 +94,7 @@ export function RecentEpisodesContainer({
         episodes={episodes}
         isLoading={isPending}
         hasSubscriptions={hasSubscriptions}
-        canToggle={sinceLastLogin !== null}
+        canToggle={sinceLastLogin !== null && hasSubscriptions}
       />
     </div>
   );
