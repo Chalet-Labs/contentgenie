@@ -260,12 +260,15 @@ export async function getPodcastByItunesId(
 // Get episodes by feed ID (supports multiple comma-separated IDs)
 export async function getEpisodesByFeedId(
   feedId: number | string,
-  max: number = 20
+  max: number = 20,
+  since?: number
 ): Promise<GetEpisodesResponse> {
-  return fetchFromPodcastIndex<GetEpisodesResponse>("/episodes/byfeedid", {
+  const params: Record<string, string> = {
     id: feedId.toString(),
     max: max.toString(),
-  });
+  };
+  if (since !== undefined) params.since = since.toString();
+  return fetchFromPodcastIndex<GetEpisodesResponse>("/episodes/byfeedid", params);
 }
 
 // Get episode by ID

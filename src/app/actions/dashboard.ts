@@ -77,8 +77,8 @@ export async function getRecentEpisodesFromSubscriptions(
       return { episodes: [], hasSubscriptions: true, error: null };
     }
 
-    // Fetch episodes from all podcasts in one batch
-    const batchResponse = await getEpisodesByFeedId(numericFeedIds.join(","), limit * BATCH_FETCH_MULTIPLIER);
+    // Fetch episodes from all podcasts in one batch (pass `since` to the API for server-side filtering)
+    const batchResponse = await getEpisodesByFeedId(numericFeedIds.join(","), limit * BATCH_FETCH_MULTIPLIER, since);
     const rawEpisodes = batchResponse.items || [];
 
     // Apply time filter if `since` is provided (Unix seconds)
