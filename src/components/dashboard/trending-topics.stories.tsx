@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/react"
 import { TrendingTopics, TrendingTopicsLoading } from "@/components/dashboard/trending-topics"
 import type { TrendingTopic } from "@/db/schema"
+import { STORY_TWO_HOURS_AGO, STORY_THIRTY_MIN_AGO } from "@/test/story-fixtures"
 
 // ---------------------------------------------------------------------------
 // Sample data
@@ -32,8 +33,8 @@ const longNameTopics: TrendingTopic[] = [
   { name: "Climate Tech", description: "", episodeCount: 9, episodeIds: [] },
 ]
 
-const twoHoursAgo = new Date("2026-01-15T08:00:00Z")
-const thirtyMinutesAgo = new Date("2026-01-15T09:30:00Z")
+const twoHoursAgo = STORY_TWO_HOURS_AGO
+const thirtyMinutesAgo = STORY_THIRTY_MIN_AGO
 
 // ---------------------------------------------------------------------------
 // Meta

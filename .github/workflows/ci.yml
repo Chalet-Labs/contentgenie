@@ -46,9 +46,9 @@ jobs:
         run: |
           npx serve storybook-static -p 6006 &
           SERVE_PID=$!
-          until curl -sf http://localhost:6006 > /dev/null; do sleep 1; done
+          trap "kill $SERVE_PID" EXIT
+          timeout 60 bash -c 'until curl -sf http://localhost:6006 > /dev/null; do sleep 1; done'
           npx playwright test --config playwright.vrt.config.ts
-          kill $SERVE_PID
 
       - name: Upload VRT diff screenshots on failure
         if: failure()

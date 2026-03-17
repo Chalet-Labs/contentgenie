@@ -55,7 +55,7 @@ if (!response.ok) {
 }
 const index: StorybookIndex = await response.json()
 const storyIds = Object.entries(index.entries)
-  .filter(([_, entry]) => entry.type === "story")
+  .filter(([, entry]) => entry.type === "story")
   .map(([id]) => id)
 
 if (storyIds.length === 0) {
