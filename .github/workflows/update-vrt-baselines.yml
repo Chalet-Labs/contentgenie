@@ -1,0 +1,58 @@
+name: Update VRT Baselines
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: "Branch to update baselines on (defaults to triggering branch)"
+        required: false
+
+jobs:
+  update-baselines:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.branch || github.ref }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build Storybook
+        run: bun run build-storybook
+
+      - name: Cache Playwright Chromium
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('**/bun.lock') }}
+          restore-keys: |
+            playwright-${{ runner.os }}-
+
+      - name: Install Playwright Chromium
+        run: bunx playwright install chromium --with-deps
+
+      - name: Generate baselines
+        run: |
+          bunx serve storybook-static -p 6006 &
+          SERVE_PID=$!
+          trap "kill $SERVE_PID 2>/dev/null || true" EXIT
+          timeout 60 bash -c 'until curl -sf http://localhost:6006 > /dev/null; do sleep 1; done'
+          bunx playwright test --config playwright.vrt.config.ts --update-snapshots
+
+      - name: Commit updated baselines
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add tests/visual/__screenshots__/
+          if git diff --cached --quiet; then
+            echo "No baseline changes detected"
+          else
+            git commit -m "chore: update VRT baselines [skip ci]"
+            git push
+          fi

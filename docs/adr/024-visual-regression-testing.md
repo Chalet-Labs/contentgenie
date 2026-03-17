@@ -6,7 +6,7 @@ Accepted
 
 ## Context
 
-ContentGenie has 33 Storybook stories covering the full component surface area. PR review in issue #202 identified that 4 stories use dynamic `Date.now()` or `new Date()` calls at module level, producing non-deterministic renders that make any snapshot comparison meaningless. This surfaced the broader question of whether to adopt visual regression testing (VRT) for the project.
+ContentGenie has 33 Storybook story files containing 154 individual story exports, covering the full component surface area. PR review in issue #202 identified that 4 stories use dynamic `Date.now()` or `new Date()` calls at module level, producing non-deterministic renders that make any snapshot comparison meaningless. This surfaced the broader question of whether to adopt visual regression testing (VRT) for the project.
 
 The stories affected:
 
@@ -32,15 +32,15 @@ The alternative to adopting VRT is to fix only the 4 non-deterministic stories a
 
 ### Why not "fix only" (defer VRT)?
 
-Fixing the 4 stories eliminates the immediate problem but leaves 33 stories' worth of visual surface unguarded. A Tailwind class change, a shadcn/ui upgrade, or a theme token change could silently break 10+ components with no automated signal. The 33 stories represent a meaningful and growing visual surface — the non-determinism issue itself demonstrates active story maintenance.
+Fixing the 4 stories eliminates the immediate problem but leaves 154 story exports' worth of visual surface unguarded. A Tailwind class change, a shadcn/ui upgrade, or a theme token change could silently break dozens of components with no automated signal. The 154 exports across 33 files represent a meaningful and growing visual surface — the non-determinism issue itself demonstrates active story maintenance.
 
 ### Why not Chromatic?
 
-Chromatic's free tier provides 5000 snapshots/month. At 33 stories × ~150 full CI runs/month (PRs + pushes), the free tier would exhaust within weeks. Paid plans start at $149/month, which is not justified at current team size and velocity. Chromatic is not rejected permanently — revisit when CI run volume or team size makes the managed UI review workflow valuable enough to pay for.
+Chromatic's free tier provides 5000 snapshots/month. At 154 story exports × ~150 full CI runs/month (PRs + pushes), that is ~23,100 snapshots/month — over 4x the free tier limit. Paid plans start at $149/month, which is not justified at current team size and velocity. Chromatic is not rejected permanently — revisit when CI run volume or team size makes the managed UI review workflow valuable enough to pay for.
 
 ### Why Playwright?
 
-- `playwright ^1.58.0` is already in `devDependencies` (installed but previously unused).
+- `@playwright/test` is already in `devDependencies`.
 - `toHaveScreenshot()` is built into Playwright — no additional packages needed.
 - Storybook already builds in CI; VRT is an extension of the existing `build-storybook` step.
 - Baselines committed to the repo as binary files — no external service dependency.
@@ -91,9 +91,9 @@ Do not run `--update-snapshots` locally on macOS. Always regenerate baselines vi
 VRT runs as part of the existing `quality` job in `.github/workflows/ci.yml`, after `build-storybook`:
 
 1. Cache `~/.cache/ms-playwright` to avoid the ~30–60s Chromium download on every run.
-2. Serve `storybook-static/` with `npx serve`.
-3. Run `npx playwright test --config playwright.vrt.config.ts`.
-4. On failure, upload `tests/visual/__screenshots__/` as a GitHub Actions artifact.
+2. Serve `storybook-static/` with `bunx serve`.
+3. Run `bunx playwright test --config playwright.vrt.config.ts`.
+4. On failure, upload `test-results/` (Playwright's diff output) as a GitHub Actions artifact.
 
 Estimated CI overhead: ~90–180s on cold run, ~65–125s with Playwright cache. This is an estimate; actual measurement is needed after the first full CI run.
 
@@ -101,13 +101,13 @@ VRT runs on every PR (not main-push-only). If this proves too noisy or slow with
 
 ### Git LFS
 
-Not adopted initially. Baseline PNGs are committed as regular binary files. At 33 stories × ~400KB/PNG (worst case), total baseline size is ~13MB; realistically ~5–8MB, which is acceptable for a git repo. Add stories to Git LFS if baseline directory exceeds 50MB.
+Not adopted initially. Baseline PNGs are committed as regular binary files. At 154 story exports × ~400KB/PNG (worst case), total baseline size is ~60MB; realistically ~20–35MB, which is within acceptable range for a git repo. Add Git LFS if baseline directory exceeds 75MB or growth rate becomes a concern.
 
 ## Consequences
 
 ### Positive
 
-- Every PR gets automated visual coverage over all 33 (and growing) stories.
+- Every PR gets automated visual coverage over all 154 story exports (and growing).
 - No external service dependency — baselines are in the repo, CI uses Playwright.
 - Playwright already installed — no new `devDependencies` to install.
 - Storybook build already runs in CI — VRT piggybacks on existing infrastructure.
@@ -117,7 +117,7 @@ Not adopted initially. Baseline PNGs are committed as regular binary files. At 3
 
 - Baseline maintenance overhead: every intentional visual change requires regenerating affected PNGs and committing them. This is real, ongoing work.
 - CI time increases by ~90–180s per run (cold) or ~65–125s (cached). Acceptable at current velocity; re-evaluate if CI becomes a bottleneck.
-- Baselines add ~5–13MB to the repo. Manageable but not zero.
+- Baselines add ~20–60MB to the repo. Manageable but worth monitoring for LFS migration.
 - The Linux-only baseline rule is a footgun: a developer who runs `--update-snapshots` locally on macOS and commits will introduce persistent noise. This must be documented and enforced via PR review.
 
 ### Risks
