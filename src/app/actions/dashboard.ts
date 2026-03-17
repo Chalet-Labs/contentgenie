@@ -11,12 +11,7 @@ import {
   podcasts,
   trendingTopics,
 } from "@/db/schema";
-import {
-  LIBRARY_ENTRY_COLUMNS,
-  EPISODE_LIST_COLUMNS,
-  PODCAST_LIST_COLUMNS,
-  type RecommendedEpisodeDTO,
-} from "@/db/library-columns";
+import { type RecommendedEpisodeDTO } from "@/db/library-columns";
 import {
   getEpisodesByFeedId,
   type PodcastIndexEpisode,
@@ -160,42 +155,6 @@ export async function getRecentEpisodesFromSubscriptions(
   } catch (error) {
     console.error("Error fetching recent episodes:", error);
     return { episodes: [], hasSubscriptions, error: "Failed to load recent episodes" };
-  }
-}
-
-// Get recently saved items from user's library (limited)
-export async function getRecentlySavedItems(limit: number = 5) {
-  const { userId } = await auth();
-
-  if (!userId) {
-    return { items: [], error: "You must be signed in to view your library" };
-  }
-
-  try {
-    // BOLT OPTIMIZATION: Use selective column fetching to avoid loading large text fields
-    // (like transcription and summary) which are not needed for the dashboard list.
-    // Expected impact: Reduces DB data transfer by ~95% per item when transcripts are present.
-    const items = await db.query.userLibrary.findMany({
-      where: eq(userLibrary.userId, userId),
-      columns: LIBRARY_ENTRY_COLUMNS,
-      with: {
-        episode: {
-          columns: EPISODE_LIST_COLUMNS,
-          with: {
-            podcast: {
-              columns: PODCAST_LIST_COLUMNS,
-            },
-          },
-        },
-      },
-      orderBy: [desc(userLibrary.savedAt)],
-      limit,
-    });
-
-    return { items, error: null };
-  } catch (error) {
-    console.error("Error fetching recent library items:", error);
-    return { items: [], error: "Failed to load saved items" };
   }
 }
 

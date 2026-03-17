@@ -6,17 +6,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-### Changed
-- Replaced podcast-level recommendations on dashboard with episode-level recommendations ranked by Worth It score, excluding subscribed/saved/listened episodes (#189)
-- `upsertPodcast` now accepts `updateOnConflict: "full" | "safe"` instead of a boolean. Client-facing paths pass `"safe"` which performs no metadata updates on conflict (only bumps `updatedAt` for RETURNING compatibility) and strips protected fields (`rssFeedUrl`, `source`) from INSERT values. Trusted Trigger.dev paths use `"full"` (#180)
-- Added Zod input validation in `saveEpisodeToLibrary` and `subscribeToPodcast` server actions (#180)
-- ADR-020: Client-path metadata refresh policy architecture decision record (#180)
-
-### Security
-- Push notification topic header: `webpush.sendNotification()` now includes RFC 8030 `Topic` header derived from the notification tag, enabling push service message coalescing for offline devices (#159)
-- CSRF custom header check on push subscribe/unsubscribe API route: requires `X-Requested-With: fetch` header, returning 403 Forbidden when missing (#159)
-- ADR-018: Push Notification Hardening architecture decision record (#159)
-
 ### Added
 - New Episodes section rework: episodes are enriched with local worth-it scores and sorted scored-first, with a time-range toggle ("Last week" / "Since last login") for client-side filtering. Empty states, input validation, error rollback, and accessibility improvements (#206)
 - Trending topics headline on the dashboard: displays AI-extracted topic clusters as styled pills between the queue and content grid, with staleness/empty auto-hide, Suspense skeleton, and shared `formatRelativeTime` utility (#193)
@@ -51,7 +40,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Episode artwork and title in the audio player bar now link to the episode detail page (`/episode/[id]`), with hover feedback, aria-label for accessibility, and touch feedback on mobile (#115)
 
 ### Changed
+- Reworked dashboard layout to vertical stack: Trending, Recommendations, Queue, New Episodes (#194)
+- Replaced podcast-level recommendations on dashboard with episode-level recommendations ranked by Worth It score, excluding subscribed/saved/listened episodes (#189)
+- `upsertPodcast` now accepts `updateOnConflict: "full" | "safe"` instead of a boolean. Client-facing paths pass `"safe"` which performs no metadata updates on conflict (only bumps `updatedAt` for RETURNING compatibility) and strips protected fields (`rssFeedUrl`, `source`) from INSERT values. Trusted Trigger.dev paths use `"full"` (#180)
+- Added Zod input validation in `saveEpisodeToLibrary` and `subscribeToPodcast` server actions (#180)
+- ADR-020: Client-path metadata refresh policy architecture decision record (#180)
 - Optimized `saveEpisodeToLibrary` and `subscribeToPodcast` to use atomic upserts (`onConflictDoUpdate`/`onConflictDoNothing`), reducing DB round-trips from 7→4 and 5→3. `getUserSubscriptions` now excludes `description` column (~25% payload reduction).
+
+### Removed
+- Removed Recently Saved section from dashboard (#194)
 
 ### Fixed
 - Cached summaries no longer consume hourly rate limit points in single summarize route (#64)
@@ -65,6 +62,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Authenticated users are now redirected from landing page to dashboard after login (#50)
 - Episode detail page now returns 404 instead of 500 for invalid/missing PodcastIndex episode IDs (#52)
 - Preview deployments no longer get 500 errors from schema drift — `drizzle-kit push` now runs in the Vercel build targeting the correct Neon branch
+
+### Security
+- Push notification topic header: `webpush.sendNotification()` now includes RFC 8030 `Topic` header derived from the notification tag, enabling push service message coalescing for offline devices (#159)
+- CSRF custom header check on push subscribe/unsubscribe API route: requires `X-Requested-With: fetch` header, returning 403 Forbidden when missing (#159)
+- ADR-018: Push Notification Hardening architecture decision record (#159)
 
 ### Refactored
 - Replaced unsafe `as PodcastIndexPodcast` type assertions in search route with `PodcastSearchResult` DTO (#72)
