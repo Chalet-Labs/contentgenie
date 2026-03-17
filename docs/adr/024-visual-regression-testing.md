@@ -60,12 +60,12 @@ const twoHoursAgo = new Date("2026-01-15T08:00:00Z");
 
 The fixed date `2026-01-15T10:00:00Z` is used as the reference "now" across all story files for consistency. Relative timestamps derive from it arithmetically.
 
-**Important:** Fixed story data alone is insufficient for full VRT determinism. Several components call `Date.now()` internally at render time (e.g., `formatRelativeTime()` in `NotificationList`/`TrendingTopics`, countdown logic in `SleepTimerMenu`). The VRT test file (`stories.vrt.ts`) uses `page.addInitScript` to mock `Date.now()` to the same reference timestamp before each story navigation, ensuring all time-dependent rendering is deterministic without requiring component-level changes.
+**Important:** Fixed story data alone is insufficient for full VRT determinism. Several components call `Date.now()` internally at render time (e.g., `formatRelativeTime()` in `NotificationList`/`TrendingTopics`, countdown logic in `SleepTimerMenu`). The VRT test file (`stories.vrt.spec.ts`) uses `page.addInitScript` to mock `Date.now()` to the same reference timestamp before each story navigation, ensuring all time-dependent rendering is deterministic without requiring component-level changes.
 
 ### Playwright VRT configuration
 
 - Config file: `playwright.vrt.config.ts` (separate from the existing `playwright.config.ts` if any)
-- Test file: `tests/visual/stories.vrt.ts`
+- Test file: `tests/visual/stories.vrt.spec.ts`
 - Screenshot dir: `tests/visual/__screenshots__/`
 - Browser: Chromium only (Linux CI renderer — see baseline management below)
 - Base URL: `http://localhost:6006` (Storybook dev server or `npx serve storybook-static`)
