@@ -93,7 +93,7 @@ export const ActiveDurationTimer: Story = {
     withMockedLayout({
       ...baseState,
       sleepTimer: {
-        endTime: Date.now() + 1530_000,
+        endTime: new Date("2026-01-15T10:25:30Z").getTime(),
         type: "duration",
       },
     }),

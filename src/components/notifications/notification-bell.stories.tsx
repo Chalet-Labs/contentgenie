@@ -6,7 +6,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { NotificationList } from "./notification-list";
+import { NotificationList } from "@/components/notifications/notification-list";
 
 // NotificationBell uses server actions (getUnreadCount, getNotifications,
 // markAllNotificationsRead) that can't be mocked at the story level. We create
@@ -22,7 +22,7 @@ const meta: Meta = {
 export default meta;
 type Story = StoryObj;
 
-const now = new Date();
+const now = new Date("2026-01-15T10:00:00Z");
 
 // No unread notifications — bell icon only, no badge
 export const NoUnread: Story = {

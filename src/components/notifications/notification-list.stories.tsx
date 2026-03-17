@@ -16,7 +16,7 @@ const meta: Meta<typeof NotificationList> = {
 export default meta;
 type Story = StoryObj<typeof NotificationList>;
 
-const now = new Date();
+const now = new Date("2026-01-15T10:00:00Z");
 
 export const Empty: Story = {
   args: {

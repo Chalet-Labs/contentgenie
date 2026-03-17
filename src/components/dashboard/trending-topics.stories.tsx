@@ -32,8 +32,8 @@ const longNameTopics: TrendingTopic[] = [
   { name: "Climate Tech", description: "", episodeCount: 9, episodeIds: [] },
 ]
 
-const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000)
-const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000)
+const twoHoursAgo = new Date("2026-01-15T08:00:00Z")
+const thirtyMinutesAgo = new Date("2026-01-15T09:30:00Z")
 
 // ---------------------------------------------------------------------------
 // Meta

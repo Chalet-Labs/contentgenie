@@ -31,6 +31,33 @@ jobs:
       - name: Build Storybook
         run: bun run build-storybook
 
+      - name: Cache Playwright Chromium
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('**/bun.lock') }}
+          restore-keys: |
+            playwright-${{ runner.os }}-
+
+      - name: Install Playwright Chromium
+        run: npx playwright install chromium --with-deps
+
+      - name: Serve Storybook and run VRT
+        run: |
+          npx serve storybook-static -p 6006 &
+          SERVE_PID=$!
+          until curl -sf http://localhost:6006 > /dev/null; do sleep 1; done
+          npx playwright test --config playwright.vrt.config.ts
+          kill $SERVE_PID
+
+      - name: Upload VRT diff screenshots on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vrt-diff-screenshots
+          path: tests/visual/__screenshots__/
+          retention-days: 7
+
       - name: Validate Trigger.dev tasks (dry-run)
         if: github.event_name == 'pull_request'
         run: bunx trigger.dev@4.4.1 deploy --dry-run --skip-sync-env-vars
