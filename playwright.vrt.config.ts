@@ -17,6 +17,7 @@ import { defineConfig, devices } from "@playwright/test"
  * See docs/adr/024-visual-regression-testing.md for the full update workflow.
  */
 export default defineConfig({
+  globalSetup: "tests/visual/global-setup.ts",
   testDir: "tests/visual",
   snapshotDir: "tests/visual/__screenshots__",
   // Run all stories in parallel across workers when multiple workers are
