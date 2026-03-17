@@ -60,6 +60,8 @@ const twoHoursAgo = new Date("2026-01-15T08:00:00Z");
 
 The fixed date `2026-01-15T10:00:00Z` is used as the reference "now" across all story files for consistency. Relative timestamps derive from it arithmetically.
 
+**Important:** Fixed story data alone is insufficient for full VRT determinism. Several components call `Date.now()` internally at render time (e.g., `formatRelativeTime()` in `NotificationList`/`TrendingTopics`, countdown logic in `SleepTimerMenu`). The VRT test file (`stories.vrt.ts`) uses `page.addInitScript` to mock `Date.now()` to the same reference timestamp before each story navigation, ensuring all time-dependent rendering is deterministic without requiring component-level changes.
+
 ### Playwright VRT configuration
 
 - Config file: `playwright.vrt.config.ts` (separate from the existing `playwright.config.ts` if any)

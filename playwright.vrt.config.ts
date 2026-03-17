@@ -19,18 +19,22 @@ import { defineConfig, devices } from "@playwright/test"
 export default defineConfig({
   testDir: "tests/visual",
   snapshotDir: "tests/visual/__screenshots__",
-  // Run each story test independently so a single failure doesn't block
-  // others and all failures are visible in one run.
+  // Run all stories in parallel across workers when multiple workers are
+  // available. On CI with workers: 1 this has no effect, but it speeds up
+  // local runs where workers defaults to unlimited.
   fullyParallel: true,
   // Retry once on CI to reduce flakiness from first-paint timing variance.
   retries: process.env.CI ? 1 : 0,
-  // Single worker on CI to keep memory usage predictable.
-  workers: process.env.CI ? 1 : undefined,
+  // Two workers on CI to halve VRT time; Playwright's per-test isolation
+  // keeps memory bounded. Unlimited locally for fast iteration.
+  workers: process.env.CI ? 2 : undefined,
   reporter: process.env.CI ? "github" : "list",
   timeout: 20_000,
   expect: { timeout: 10_000 },
   use: {
-    baseURL: "http://localhost:6006",
+    baseURL: process.env.STORYBOOK_URL ?? "http://localhost:6006",
+    // Timeout for individual Playwright actions (click, fill, waitForSelector).
+    // Navigation timeouts (page.goto) use `navigationTimeout` (default 30 s).
     actionTimeout: 10_000,
   },
   projects: [

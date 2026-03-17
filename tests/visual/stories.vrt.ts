@@ -30,6 +30,13 @@
 
 import { test, expect } from "@playwright/test"
 
+const STORYBOOK_URL = process.env.STORYBOOK_URL ?? "http://localhost:6006"
+
+// Fixed timestamp matching the reference "now" used across all story files.
+// Mocked via page.addInitScript so Date.now() returns a stable value for
+// time-dependent components (formatRelativeTime, SleepTimerMenu countdown, etc.).
+const FIXED_NOW = new Date("2026-01-15T10:00:00Z").getTime()
+
 /** Shape of Storybook's /index.json response (v4, Storybook 8) */
 interface StorybookIndex {
   v: number
@@ -50,17 +57,28 @@ interface StorybookIndex {
 // per-story parallelism and isolating failures to individual stories.
 let response: Response
 try {
-  response = await fetch("http://localhost:6006/index.json")
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 10_000)
+  response = await fetch(`${STORYBOOK_URL}/index.json`, {
+    signal: controller.signal,
+  })
+  clearTimeout(timeout)
 } catch (err) {
+  const reason =
+    err instanceof DOMException && err.name === "AbortError"
+      ? "request timed out after 10 s"
+      : err instanceof Error
+        ? err.message
+        : String(err)
   throw new Error(
-    `Network error fetching Storybook index at http://localhost:6006/index.json — ` +
-      `is the server running? Underlying error: ${err instanceof Error ? err.message : String(err)}`
+    `Failed to fetch Storybook index at ${STORYBOOK_URL}/index.json — ` +
+      `is the server running? ${reason}`
   )
 }
 if (!response.ok) {
   throw new Error(
     `Failed to fetch Storybook index: HTTP ${response.status} ${response.statusText} — ` +
-      `is Storybook running on http://localhost:6006?`
+      `is Storybook running on ${STORYBOOK_URL}?`
   )
 }
 
@@ -99,13 +117,28 @@ if (storyIds.length === 0) {
 test.describe("Visual Regression", () => {
   for (const id of storyIds) {
     test(`${id} matches baseline`, async ({ page }) => {
-      await page.goto(`/iframe.html?id=${id}&viewMode=story`, {
-        waitUntil: "networkidle",
-      })
+      // Mock Date.now() so time-dependent components (formatRelativeTime,
+      // SleepTimerMenu countdown, etc.) render deterministically.
+      await page.addInitScript(`Date.now = () => ${FIXED_NOW}`)
 
-      // Wait for CSS animations/transitions to settle — `networkidle` alone
-      // won't stop Storybook skeleton loaders that use CSS animation.
-      await page.waitForTimeout(300)
+      await page.goto(
+        `/iframe.html?id=${encodeURIComponent(id)}&viewMode=story`,
+        { waitUntil: "networkidle" }
+      )
+
+      // Disable all CSS animations and transitions to prevent flaky
+      // screenshots. More reliable than a fixed waitForTimeout because it
+      // eliminates animation state variance regardless of duration.
+      await page.addStyleTag({
+        content: `
+          *, *::before, *::after {
+            animation-duration: 0s !important;
+            animation-delay: 0s !important;
+            transition-duration: 0s !important;
+            transition-delay: 0s !important;
+          }
+        `,
+      })
 
       // Screenshot name is the story ID (e.g. dashboard-trendingtopics--default).
       // Renaming the story title or export name changes the ID and orphans the
