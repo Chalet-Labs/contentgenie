@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from "@storybook/react";
 import { NotificationList } from "@/components/notifications/notification-list";
+import { STORY_NOW } from "@/test/story-fixtures";
 
 const meta: Meta<typeof NotificationList> = {
   title: "Notifications/NotificationList",
@@ -16,7 +17,7 @@ const meta: Meta<typeof NotificationList> = {
 export default meta;
 type Story = StoryObj<typeof NotificationList>;
 
-const now = new Date();
+const now = STORY_NOW;
 
 export const Empty: Story = {
   args: {

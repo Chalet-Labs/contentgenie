@@ -37,6 +37,11 @@ next-env.d.ts
 # Storybook
 storybook-static/
 
+# Playwright
+/playwright-report/
+/test-results/
+tests/visual/.story-ids.json
+
 # Claude Code
 .claude/*
 !.claude/settings.json

@@ -8,6 +8,7 @@ import {
   type AudioPlayerAPI,
 } from "@/contexts/audio-player-context"
 import { SleepTimerMenu } from "@/components/audio-player/sleep-timer-menu"
+import { STORY_NOW } from "@/test/story-fixtures"
 
 const noopAPI: AudioPlayerAPI = {
   playEpisode: () => {},
@@ -93,7 +94,7 @@ export const ActiveDurationTimer: Story = {
     withMockedLayout({
       ...baseState,
       sleepTimer: {
-        endTime: Date.now() + 1530_000,
+        endTime: new Date(STORY_NOW.getTime() + 25 * 60_000 + 30_000).getTime(),
         type: "duration",
       },
     }),

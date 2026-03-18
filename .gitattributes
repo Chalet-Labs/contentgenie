@@ -1,0 +1,4 @@
+# Mark Playwright VRT baseline screenshots as binary to prevent useless text diffs.
+# Storybook visual regression baselines live here after CI generation.
+# See docs/adr/024-visual-regression-testing.md for baseline management policy.
+tests/visual/__screenshots__/** binary

@@ -1,0 +1,64 @@
+name: Update VRT Baselines
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: "Branch to update baselines on (defaults to triggering branch)"
+        required: false
+
+jobs:
+  update-baselines:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          ref: ${{ github.event.inputs.branch || github.ref }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Build Storybook
+        run: bun run build-storybook
+
+      - name: Cache Playwright Chromium
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('**/bun.lock') }}
+          restore-keys: |
+            playwright-${{ runner.os }}-
+
+      - name: Install Playwright Chromium
+        run: bunx playwright install chromium --with-deps
+
+      - name: Generate baselines
+        run: |
+          echo '{"cleanUrls": false}' > storybook-static/serve.json
+          bunx serve storybook-static -p 6006 &
+          SERVE_PID=$!
+          trap "kill $SERVE_PID 2>/dev/null || true" EXIT
+          if ! timeout 60 bash -c 'until curl -sf http://localhost:6006 > /dev/null; do sleep 1; done'; then
+            echo "::error::Storybook did not become available on port 6006 within 60s"
+            exit 1
+          fi
+          bunx playwright test --config playwright.vrt.config.ts --update-snapshots
+
+      - name: Commit updated baselines
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add tests/visual/__screenshots__/
+          if git diff --cached --quiet; then
+            echo "No baseline changes detected"
+          else
+            git commit -m "chore: update VRT baselines [skip ci]"
+            git push
+          fi

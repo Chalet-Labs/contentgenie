@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Visual regression testing (VRT) with Playwright: all 33 Storybook stories are screenshot-tested on every PR against committed Linux/Chromium baselines; diff artifacts are uploaded on failure; Chromium cache keeps CI overhead to ~65–125s; baseline update workflow documented in ADR-024 (#203)
 - New Episodes section rework: episodes are enriched with local worth-it scores and sorted scored-first, with a time-range toggle ("Last week" / "Since last login") for client-side filtering. Empty states, input validation, error rollback, and accessibility improvements (#206)
 - Trending topics headline on the dashboard: displays AI-extracted topic clusters as styled pills between the queue and content grid, with staleness/empty auto-hide, Suspense skeleton, and shared `formatRelativeTime` utility (#193)
 - Queue section on the dashboard showing the current audio player queue with worth-it score badges. Episodes without scores show a "Get score" button that triggers inline summarization with realtime progress tracking via `useRealtimeRun`. Scores for existing episodes are batch-fetched on load via a new `getQueueEpisodeScores` server action. Handles cached (200), job-triggered (202), daily-limit and hourly-burst rate-limit (429) responses (#190)
@@ -51,6 +52,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Removed Recently Saved section from dashboard (#194)
 
 ### Fixed
+- Fixed non-deterministic Storybook stories (trending-topics, sleep-timer-menu, notification-list, notification-bell) by replacing `Date.now()` / `new Date()` module-level calls with fixed ISO timestamps, making stories VRT-safe (#203)
 - Cached summaries no longer consume hourly rate limit points in single summarize route (#64)
 - Fixed Clerk hosted sign-in/sign-up not redirecting back to the app by replacing `CLERK_SIGN_IN_FORCE_REDIRECT_URL` / `CLERK_SIGN_UP_FORCE_REDIRECT_URL` with `NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL` / `NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL` (public-prefixed, fallback semantics so `auth.protect()` redirect takes precedence) and adding `NEXT_PUBLIC_CLERK_SIGN_IN_URL` / `NEXT_PUBLIC_CLERK_SIGN_UP_URL` for correct routing to embedded auth pages
 - Fixed non-deterministic SSRF redirect tests by using public-IP fixtures instead of hostname-based URLs
