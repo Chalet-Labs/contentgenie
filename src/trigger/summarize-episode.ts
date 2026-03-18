@@ -8,7 +8,7 @@ import { createNotificationsForSubscribers, resolvePodcastId } from "@/trigger/h
 import { db } from "@/db";
 import { episodes } from "@/db/schema";
 import type { PodcastIndexEpisode, PodcastIndexPodcast } from "@/lib/podcastindex";
-import { submitTranscriptionAsync } from "@/lib/assemblyai";
+import { submitTranscriptionAsync, getTranscriptionStatus } from "@/lib/assemblyai";
 
 export type SummarizeEpisodePayload = {
   episodeId: number;
@@ -178,25 +178,29 @@ export const summarizeEpisode = task({
         const result = await wait.forToken<{
           transcript_id: string;
           status: "completed" | "error";
-          text: string | null;
-          error: string | null;
         }>(token);
 
         if (result.ok && result.output.status === "completed") {
-          if (result.output.text) {
-            transcript = result.output.text;
+          // The webhook only contains { transcript_id, status } — fetch the
+          // full transcript text via a follow-up GET request.
+          const fullResult = await retry.onThrow(
+            async () => getTranscriptionStatus(result.output.transcript_id),
+            { maxAttempts: 3 }
+          );
+          if (fullResult.text) {
+            transcript = fullResult.text;
             transcriptSource = "assemblyai";
             logger.info("Audio transcribed successfully", { length: transcript.length });
           } else {
             logger.warn("AssemblyAI transcript completed but returned no text", {
-              status: result.output.status,
-              error: result.output.error,
+              transcriptId: result.output.transcript_id,
+              status: fullResult.status,
+              error: fullResult.error,
             });
           }
         } else if (result.ok) {
           logger.warn("AssemblyAI transcription failed", {
             status: result.output.status,
-            error: result.output.error,
           });
         } else {
           logger.warn("AssemblyAI transcription wait timed out");
