@@ -52,7 +52,23 @@ jobs:
             echo "::error::Storybook did not become available on port 6006 within 60s"
             exit 1
           fi
-          bunx playwright test --config playwright.vrt.config.ts
+
+          SNAPSHOT_DIR="tests/visual/__screenshots__"
+          if [ -z "$(find "$SNAPSHOT_DIR" -name '*.png' 2>/dev/null)" ]; then
+            echo "::warning::No VRT baselines found — generating initial baselines"
+            bunx playwright test --config playwright.vrt.config.ts --update-snapshots
+          else
+            bunx playwright test --config playwright.vrt.config.ts
+          fi
+
+      - name: Upload VRT baselines (initial generation)
+        if: success()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: vrt-baselines
+          path: tests/visual/__screenshots__/
+          retention-days: 30
+          if-no-files-found: ignore
 
       - name: Upload VRT diff screenshots on failure
         if: failure()
