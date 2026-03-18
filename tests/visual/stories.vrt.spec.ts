@@ -79,7 +79,7 @@ test.describe("Visual Regression", () => {
       // Renaming the story title or export name changes the ID and orphans the
       // baseline — delete the old PNG and regenerate via the CI workflow.
       await expect(page).toHaveScreenshot(`${id}.png`, {
-        maxDiffPixelRatio: 0.01,
+        maxDiffPixelRatio: 0.005,
         // Viewport-only: consistent dimensions regardless of content height.
         fullPage: false,
       })

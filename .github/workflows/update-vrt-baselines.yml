@@ -44,7 +44,10 @@ jobs:
           bunx serve storybook-static -p 6006 &
           SERVE_PID=$!
           trap "kill $SERVE_PID 2>/dev/null || true" EXIT
-          timeout 60 bash -c 'until curl -sf http://localhost:6006 > /dev/null; do sleep 1; done'
+          if ! timeout 60 bash -c 'until curl -sf http://localhost:6006 > /dev/null; do sleep 1; done'; then
+            echo "::error::Storybook did not become available on port 6006 within 60s"
+            exit 1
+          fi
           bunx playwright test --config playwright.vrt.config.ts --update-snapshots
 
       - name: Commit updated baselines
