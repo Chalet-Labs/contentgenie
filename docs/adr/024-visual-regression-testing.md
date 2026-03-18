@@ -68,7 +68,7 @@ The fixed date `2026-01-15T10:00:00Z` is used as the reference "now" across all 
 - Test file: `tests/visual/stories.vrt.spec.ts`
 - Screenshot dir: `tests/visual/__screenshots__/`
 - Browser: Chromium only (Linux CI renderer — see baseline management below)
-- Base URL: `http://localhost:6006` (Storybook dev server or `npx serve storybook-static`)
+- Base URL: `http://localhost:6006` (Storybook dev server or `bunx serve storybook-static`)
 
 ### Baseline management policy
 

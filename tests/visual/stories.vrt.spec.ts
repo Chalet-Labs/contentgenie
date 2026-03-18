@@ -54,7 +54,9 @@ test.describe("Visual Regression", () => {
     test(`${id} matches baseline`, async ({ page }) => {
       // Mock Date.now() so time-dependent components (formatRelativeTime,
       // SleepTimerMenu countdown, etc.) render deterministically.
-      await page.addInitScript(`Date.now = () => ${FIXED_NOW}`)
+      await page.addInitScript((fixedNow: number) => {
+        Date.now = () => fixedNow
+      }, FIXED_NOW)
 
       await page.goto(
         `/iframe.html?id=${encodeURIComponent(id)}&viewMode=story`,
