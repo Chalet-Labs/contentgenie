@@ -41,6 +41,7 @@ jobs:
 
       - name: Generate baselines
         run: |
+          echo '{"cleanUrls": false}' > storybook-static/serve.json
           bunx serve storybook-static -p 6006 &
           SERVE_PID=$!
           trap "kill $SERVE_PID 2>/dev/null || true" EXIT

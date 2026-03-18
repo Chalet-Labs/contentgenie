@@ -93,7 +93,7 @@ Do not run `--update-snapshots` locally on macOS. Always regenerate baselines vi
 VRT runs as part of the existing `quality` job in `.github/workflows/ci.yml`, after `build-storybook`:
 
 1. Cache `~/.cache/ms-playwright` to avoid the ~30–60s Chromium download on every run.
-2. Serve `storybook-static/` with `bunx serve`.
+2. Serve `storybook-static/` with `bunx serve`. A `serve.json` with `{"cleanUrls": false}` is written into the output directory before starting the server — without this, `serve` redirects `/iframe.html?id=...` to `/iframe` (stripping query parameters), which causes Storybook to show "No Preview" for every story.
 3. Run `bunx playwright test --config playwright.vrt.config.ts`.
 4. On failure, upload `test-results/` (Playwright's diff output) as a GitHub Actions artifact.
 
