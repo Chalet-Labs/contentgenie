@@ -15,6 +15,7 @@ import {
   ExternalLink,
   Play,
   Pause,
+  RefreshCw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -36,6 +37,7 @@ import { useOnlineStatus } from "@/hooks/use-online-status";
 import { OfflineBanner } from "@/components/ui/offline-banner";
 import { cacheEpisode, getCachedEpisode } from "@/lib/offline-cache";
 import { IN_PROGRESS_STATUSES } from "@/db/schema";
+import { ADMIN_ROLE } from "@/lib/auth-roles";
 import type { summarizeEpisode } from "@/trigger/summarize-episode";
 
 interface EpisodePageProps {
@@ -106,7 +108,7 @@ function formatPublishDate(timestamp: number): string {
 
 export default function EpisodePage({ params }: EpisodePageProps) {
   const episodeId = params.id;
-  const { userId } = useAuth();
+  const { userId, has, isLoaded } = useAuth();
   const isOnline = useOnlineStatus();
   const playerState = useAudioPlayerState();
   const playerAPI = useAudioPlayerAPI();
@@ -121,6 +123,8 @@ export default function EpisodePage({ params }: EpisodePageProps) {
   const [isSaved, setIsSaved] = useState(false);
   const [runId, setRunId] = useState<string | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
+
+  const isAdmin = isLoaded && has?.({ role: ADMIN_ROLE });
 
   // Realtime subscription to the Trigger.dev run
   const { run } = useRealtimeRun<typeof summarizeEpisode>(runId ?? "", {
@@ -343,6 +347,39 @@ export default function EpisodePage({ params }: EpisodePageProps) {
       toast.error("Failed to generate summary", {
         description: errorMessage,
       });
+    }
+  }, [episodeId]);
+
+  // Admin-only: force re-summarization of the current episode
+  const resummarize = useCallback(async () => {
+    setIsLoadingSummary(true);
+    setSummaryError(null);
+    setSummaryData(null);
+
+    try {
+      const response = await fetch("/api/episodes/summarize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ episodeId: Number(episodeId), force: true }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to re-summarize");
+      }
+
+      if (data.runId && data.publicAccessToken) {
+        setRunId(data.runId);
+        setAccessToken(data.publicAccessToken);
+        toast.info("Re-summarization started");
+      }
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : "Failed to re-summarize";
+      setSummaryError(errorMessage);
+      setIsLoadingSummary(false);
+      toast.error("Failed to re-summarize", { description: errorMessage });
     }
   }, [episodeId]);
 
@@ -625,7 +662,19 @@ export default function EpisodePage({ params }: EpisodePageProps) {
 
       {/* AI Summary Section */}
       <div>
-        <h2 className="mb-4 text-xl font-semibold">AI-Powered Insights</h2>
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-xl font-semibold">AI-Powered Insights</h2>
+          {isAdmin && summaryData?.summary && isOnline && !isLoadingSummary && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={resummarize}
+            >
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Re-summarize
+            </Button>
+          )}
+        </div>
         <SummaryDisplay
           summary={summaryData?.summary || null}
           keyTakeaways={summaryData?.keyTakeaways || null}

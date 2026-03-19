@@ -5,19 +5,21 @@ import { tasks, auth } from "@trigger.dev/sdk";
 import { db } from "@/db";
 import { episodes, IN_PROGRESS_STATUSES } from "@/db/schema";
 import { checkRateLimit, checkDailyLimit, DAILY_SUMMARIZE_LIMIT } from "@/lib/rate-limit";
+import { ADMIN_ROLE } from "@/lib/auth-roles";
 import type { summarizeEpisode } from "@/trigger/summarize-episode";
 
 export async function POST(request: NextRequest) {
   try {
     // Verify authentication
-    const { userId } = await clerkAuth();
+    const { userId, has } = await clerkAuth();
     if (!userId) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     // Get episode ID from request body
     const body = await request.json();
-    const { episodeId } = body;
+    const { episodeId, force } = body;
+    const isAdmin = has({ role: ADMIN_ROLE });
 
     const numericEpisodeId = Number(episodeId);
     if (!episodeId || !Number.isFinite(numericEpisodeId) || numericEpisodeId <= 0) {
@@ -32,7 +34,15 @@ export async function POST(request: NextRequest) {
       where: eq(episodes.podcastIndexId, episodeId.toString()),
     });
 
-    if (existingEpisode?.summary && existingEpisode?.processedAt) {
+    // Admin force re-summarize: reject non-admins trying to force
+    if (force && !isAdmin) {
+      return NextResponse.json(
+        { error: "Only admins can force re-summarization" },
+        { status: 403 }
+      );
+    }
+
+    if (existingEpisode?.summary && existingEpisode?.processedAt && !force) {
       // Return cached summary (no rate limit consumed)
       return NextResponse.json({
         summary: existingEpisode.summary,
@@ -72,36 +82,42 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Daily rate limit check
-    const dailyLimit = await checkDailyLimit(userId);
-    if (!dailyLimit.allowed) {
-      return NextResponse.json(
-        {
-          error: "Daily summarization limit reached. Please try again tomorrow.",
-          retryAfterMs: dailyLimit.retryAfterMs,
-          dailyLimit: DAILY_SUMMARIZE_LIMIT,
-        },
-        { status: 429 }
-      );
+    // Rate limits (admins exempt when force re-summarizing)
+    if (!isAdmin) {
+      // Daily rate limit check
+      const dailyLimit = await checkDailyLimit(userId);
+      if (!dailyLimit.allowed) {
+        return NextResponse.json(
+          {
+            error: "Daily summarization limit reached. Please try again tomorrow.",
+            retryAfterMs: dailyLimit.retryAfterMs,
+            dailyLimit: DAILY_SUMMARIZE_LIMIT,
+          },
+          { status: 429 }
+        );
+      }
+
+      // Hourly rate limit check
+      const rateLimit = await checkRateLimit(userId);
+      if (!rateLimit.allowed) {
+        return NextResponse.json(
+          {
+            error: "Rate limit exceeded. Please try again later.",
+            retryAfterMs: rateLimit.retryAfterMs,
+          },
+          { status: 429 }
+        );
+      }
     }
 
-    // Hourly rate limit check
-    const rateLimit = await checkRateLimit(userId);
-    if (!rateLimit.allowed) {
-      return NextResponse.json(
-        {
-          error: "Rate limit exceeded. Please try again later.",
-          retryAfterMs: rateLimit.retryAfterMs,
-        },
-        { status: 429 }
-      );
-    }
-
-    // Trigger the summarization task (idempotencyKey prevents duplicate runs)
+    // Trigger the summarization task
+    // force: skip idempotency so a fresh run always starts
     const handle = await tasks.trigger<typeof summarizeEpisode>(
       "summarize-episode",
       { episodeId: numericEpisodeId },
-      { idempotencyKey: `summarize-episode-${numericEpisodeId}`, idempotencyKeyTTL: "10m" }
+      force
+        ? {}
+        : { idempotencyKey: `summarize-episode-${numericEpisodeId}`, idempotencyKeyTTL: "10m" }
     );
 
     // Generate public access token for realtime frontend subscription

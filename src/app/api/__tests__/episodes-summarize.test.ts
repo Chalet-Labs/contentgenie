@@ -77,7 +77,7 @@ describe("POST /api/episodes/summarize", () => {
   });
 
   it("returns 400 when episodeId is missing", async () => {
-    vi.mocked(auth).mockResolvedValue({ userId: "user-1" } as never);
+    vi.mocked(auth).mockResolvedValue({ userId: "user-1", has: () => false } as never);
 
     const request = new NextRequest(
       "http://localhost:3000/api/episodes/summarize",
@@ -94,7 +94,7 @@ describe("POST /api/episodes/summarize", () => {
   });
 
   it("returns cached summary when exists", async () => {
-    vi.mocked(auth).mockResolvedValue({ userId: "user-1" } as never);
+    vi.mocked(auth).mockResolvedValue({ userId: "user-1", has: () => false } as never);
 
     vi.mocked(db.query.episodes.findFirst).mockResolvedValue({
       summary: "Cached summary",
@@ -120,7 +120,7 @@ describe("POST /api/episodes/summarize", () => {
   });
 
   it("returns 202 with run handle when triggering new summarization", async () => {
-    vi.mocked(auth).mockResolvedValue({ userId: "user-1" } as never);
+    vi.mocked(auth).mockResolvedValue({ userId: "user-1", has: () => false } as never);
 
     vi.mocked(db.query.episodes.findFirst).mockResolvedValue(null as never);
 
@@ -148,7 +148,7 @@ describe("POST /api/episodes/summarize", () => {
   });
 
   it("returns 429 when hourly rate limit is exceeded", async () => {
-    vi.mocked(auth).mockResolvedValue({ userId: "user-1" } as never);
+    vi.mocked(auth).mockResolvedValue({ userId: "user-1", has: () => false } as never);
     vi.mocked(db.query.episodes.findFirst).mockResolvedValue(null as never);
     vi.mocked(checkRateLimit).mockResolvedValue({ allowed: false, retryAfterMs: 3600000 });
 
@@ -167,7 +167,7 @@ describe("POST /api/episodes/summarize", () => {
   });
 
   it("returns 429 with daily limit info when daily limit is exceeded", async () => {
-    vi.mocked(auth).mockResolvedValue({ userId: "user-1" } as never);
+    vi.mocked(auth).mockResolvedValue({ userId: "user-1", has: () => false } as never);
     vi.mocked(db.query.episodes.findFirst).mockResolvedValue(null as never);
     vi.mocked(checkDailyLimit).mockResolvedValue({ allowed: false, retryAfterMs: 43200000 });
 
@@ -188,7 +188,7 @@ describe("POST /api/episodes/summarize", () => {
   });
 
   it("does not consume rate limit for cached summaries", async () => {
-    vi.mocked(auth).mockResolvedValue({ userId: "user-1" } as never);
+    vi.mocked(auth).mockResolvedValue({ userId: "user-1", has: () => false } as never);
 
     vi.mocked(db.query.episodes.findFirst).mockResolvedValue({
       summary: "Cached summary",
@@ -212,7 +212,7 @@ describe("POST /api/episodes/summarize", () => {
   });
 
   it("returns 202 for existing in-progress run", async () => {
-    vi.mocked(auth).mockResolvedValue({ userId: "user-1" } as never);
+    vi.mocked(auth).mockResolvedValue({ userId: "user-1", has: () => false } as never);
 
     vi.mocked(db.query.episodes.findFirst).mockResolvedValue({
       summaryStatus: "running",
@@ -261,7 +261,7 @@ describe("GET /api/episodes/summarize", () => {
   });
 
   it("returns existing summary status", async () => {
-    vi.mocked(auth).mockResolvedValue({ userId: "user-1" } as never);
+    vi.mocked(auth).mockResolvedValue({ userId: "user-1", has: () => false } as never);
 
     vi.mocked(db.query.episodes.findFirst).mockResolvedValue({
       summary: "Summary text",
@@ -282,7 +282,7 @@ describe("GET /api/episodes/summarize", () => {
   });
 
   it("returns exists=false when no summary", async () => {
-    vi.mocked(auth).mockResolvedValue({ userId: "user-1" } as never);
+    vi.mocked(auth).mockResolvedValue({ userId: "user-1", has: () => false } as never);
 
     vi.mocked(db.query.episodes.findFirst).mockResolvedValue(null as never);
 
@@ -297,7 +297,7 @@ describe("GET /api/episodes/summarize", () => {
   });
 
   it("returns in-progress run info when summary is being generated", async () => {
-    vi.mocked(auth).mockResolvedValue({ userId: "user-1" } as never);
+    vi.mocked(auth).mockResolvedValue({ userId: "user-1", has: () => false } as never);
 
     vi.mocked(db.query.episodes.findFirst).mockResolvedValue({
       summaryRunId: "run_inprogress",
