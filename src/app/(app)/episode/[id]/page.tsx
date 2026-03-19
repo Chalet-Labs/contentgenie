@@ -354,7 +354,6 @@ export default function EpisodePage({ params }: EpisodePageProps) {
   const resummarize = useCallback(async () => {
     setIsLoadingSummary(true);
     setSummaryError(null);
-    setSummaryData(null);
 
     try {
       const response = await fetch("/api/episodes/summarize", {
@@ -370,6 +369,7 @@ export default function EpisodePage({ params }: EpisodePageProps) {
       }
 
       if (data.runId && data.publicAccessToken) {
+        setSummaryData(null);
         setRunId(data.runId);
         setAccessToken(data.publicAccessToken);
         toast.info("Re-summarization started");
