@@ -107,7 +107,8 @@ export async function persistEpisodeSummary(
   episode: PodcastIndexEpisode,
   podcast: PodcastIndexPodcast | undefined,
   summary: SummaryResult,
-  transcript?: string
+  transcript?: string,
+  transcriptSource?: "podcastindex" | "assemblyai" | "description-url" | null
 ): Promise<void> {
   const podcastId = await ensurePodcast(episode.feedId, podcast);
   if (!podcastId) {
@@ -120,20 +121,26 @@ export async function persistEpisodeSummary(
   });
 
   if (existingEpisode) {
+    const updateFields: Record<string, unknown> = {
+      summary: summary.summary,
+      keyTakeaways: summary.keyTakeaways,
+      worthItScore: summary.worthItScore.toFixed(2),
+      worthItReason: summary.worthItReason,
+      worthItDimensions: summary.worthItDimensions ?? null,
+      transcription: transcript,
+      processedAt: new Date(),
+      summaryStatus: "completed",
+      summaryRunId: null,
+      updatedAt: new Date(),
+    };
+    // Only overwrite transcriptSource when explicitly provided (undefined = keep existing)
+    if (transcriptSource !== undefined) {
+      updateFields.transcriptSource = transcriptSource;
+    }
+
     await db
       .update(episodes)
-      .set({
-        summary: summary.summary,
-        keyTakeaways: summary.keyTakeaways,
-        worthItScore: summary.worthItScore.toFixed(2),
-        worthItReason: summary.worthItReason,
-        worthItDimensions: summary.worthItDimensions ?? null,
-        transcription: transcript,
-        processedAt: new Date(),
-        summaryStatus: "completed",
-        summaryRunId: null,
-        updatedAt: new Date(),
-      })
+      .set(updateFields)
       .where(eq(episodes.id, existingEpisode.id));
   } else {
     await db.insert(episodes).values({
@@ -147,6 +154,7 @@ export async function persistEpisodeSummary(
         ? new Date(episode.datePublished * 1000)
         : null,
       transcription: transcript,
+      transcriptSource: transcriptSource ?? null,
       summary: summary.summary,
       keyTakeaways: summary.keyTakeaways,
       worthItScore: summary.worthItScore.toFixed(2),

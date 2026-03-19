@@ -91,7 +91,12 @@ export async function GET(
         };
       }
 
-      return NextResponse.json({ episode, podcast, summary });
+      return NextResponse.json({
+        episode,
+        podcast,
+        summary,
+        transcriptSource: dbEpisode.transcriptSource ?? null,
+      });
     }
 
     // PodcastIndex-sourced episode (existing behavior)
@@ -135,6 +140,7 @@ export async function GET(
 
     // Check if we have a cached summary in the database
     let summary = null;
+    let transcriptSource: string | null = null;
     try {
       // BOLT OPTIMIZATION: Selective column fetching to avoid loading large transcription fields
       // when only checking for cached summary data.
@@ -148,8 +154,11 @@ export async function GET(
           worthItReason: true,
           worthItDimensions: true,
           processedAt: true,
+          transcriptSource: true,
         },
       });
+
+      transcriptSource = cachedEpisode?.transcriptSource ?? null;
 
       if (cachedEpisode?.summary && cachedEpisode?.processedAt) {
         summary = {
@@ -170,6 +179,7 @@ export async function GET(
       episode,
       podcast,
       summary,
+      transcriptSource,
     });
   } catch (error) {
     console.error("Error fetching episode:", error);

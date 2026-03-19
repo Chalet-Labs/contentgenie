@@ -160,7 +160,8 @@ describe("summarize-episode task", () => {
       mockEpisode,
       mockPodcast,
       mockSummary,
-      "Full transcript text"
+      "Full transcript text",
+      "podcastindex"
     );
   });
 

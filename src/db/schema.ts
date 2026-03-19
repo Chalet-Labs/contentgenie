@@ -98,6 +98,9 @@ export const episodes = pgTable(
     summaryStatus: text("summary_status").$type<
       "queued" | "running" | "transcribing" | "summarizing" | "completed" | "failed"
     >(),
+    transcriptSource: text("transcript_source").$type<
+      "podcastindex" | "assemblyai" | "description-url"
+    >(),
     processingError: text("processing_error"),
     rssGuid: text("rss_guid"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -114,6 +117,10 @@ export const episodes = pgTable(
     check(
       "summary_status_enum",
       sql`${table.summaryStatus} IN ('queued', 'running', 'transcribing', 'summarizing', 'completed', 'failed')`
+    ),
+    check(
+      "transcript_source_enum",
+      sql`${table.transcriptSource} IN ('podcastindex', 'assemblyai', 'description-url')`
     ),
   ]
 );
