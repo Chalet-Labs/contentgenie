@@ -279,6 +279,45 @@ describe("summarize-episode task", () => {
     );
   });
 
+  it("proceeds without transcript when AssemblyAI follow-up GET returns no text", async () => {
+    vi.mocked(getEpisodeById).mockResolvedValue({ episode: mockEpisode } as never);
+    vi.mocked(getPodcastById).mockResolvedValue({ feed: mockPodcast } as never);
+    vi.mocked(fetchTranscript).mockResolvedValue(undefined);
+    vi.mocked(extractTranscriptUrl).mockReturnValue(null);
+    const mockToken = { id: "token-1", url: "https://hooks.trigger.dev/token/1" };
+    mockCreateToken.mockResolvedValue(mockToken);
+    vi.mocked(submitTranscriptionAsync).mockResolvedValue("transcript-null");
+    mockForToken.mockResolvedValue({
+      ok: true,
+      output: { transcript_id: "transcript-null", status: "completed" },
+    });
+    // Follow-up GET returns completed but with no text
+    vi.mocked(getTranscriptionStatus).mockResolvedValue({
+      id: "transcript-null", status: "completed", text: null, error: null,
+    });
+    vi.mocked(generateEpisodeSummary).mockResolvedValue(mockSummary);
+    vi.mocked(persistEpisodeSummary).mockResolvedValue(undefined);
+
+    const result = await taskConfig.run(
+      { episodeId: 123 },
+      mockCtx
+    );
+
+    expect(result).toEqual(mockSummary);
+    expect(getTranscriptionStatus).toHaveBeenCalledWith("transcript-null");
+    // No transcript available — summary generated without it
+    expect(generateEpisodeSummary).toHaveBeenCalledWith(
+      mockPodcast,
+      mockEpisode,
+      undefined
+    );
+    const { logger } = await import("@trigger.dev/sdk");
+    expect(vi.mocked(logger.warn)).toHaveBeenCalledWith(
+      "AssemblyAI transcription unavailable, proceeding without it",
+      expect.objectContaining({ error: "AssemblyAI transcript text not available yet" })
+    );
+  });
+
   it("falls back to AssemblyAI when cached transcription lookup fails", async () => {
     vi.mocked(getEpisodeById).mockResolvedValue({ episode: mockEpisode } as never);
     vi.mocked(getPodcastById).mockResolvedValue({ feed: mockPodcast } as never);
@@ -435,6 +474,10 @@ describe("summarize-episode task", () => {
       ok: true,
       output: { transcript_id: "transcript-456", status: "error" },
     });
+    // Follow-up GET fetches error details for logging
+    vi.mocked(getTranscriptionStatus).mockResolvedValue({
+      id: "transcript-456", status: "error", text: null, error: "Audio file could not be processed",
+    });
     vi.mocked(generateEpisodeSummary).mockResolvedValue(mockSummary);
     vi.mocked(persistEpisodeSummary).mockResolvedValue(undefined);
 
@@ -444,7 +487,7 @@ describe("summarize-episode task", () => {
     );
 
     expect(result).toEqual(mockSummary);
-    expect(getTranscriptionStatus).not.toHaveBeenCalled();
+    expect(getTranscriptionStatus).toHaveBeenCalledWith("transcript-456");
     expect(generateEpisodeSummary).toHaveBeenCalledWith(
       mockPodcast,
       mockEpisode,

@@ -183,11 +183,22 @@ export const summarizeEpisode = task({
         if (result.ok && result.output.status === "completed") {
           // The webhook only contains { transcript_id, status } — fetch the
           // full transcript text via a follow-up GET request.
-          const fullResult = await retry.onThrow(
-            async () => getTranscriptionStatus(result.output.transcript_id),
-            { maxAttempts: 3 }
-          );
-          if (fullResult.text) {
+          const fullResult = await retry.onThrow(async () => {
+            const statusResult = await getTranscriptionStatus(result.output.transcript_id);
+            if (statusResult.status === "error") {
+              return statusResult;
+            }
+            if (!statusResult.text?.trim()) {
+              throw new Error("AssemblyAI transcript text not available yet");
+            }
+            return statusResult;
+          }, { maxAttempts: 3, minTimeoutInMs: 1_000 });
+          if (fullResult.status === "error") {
+            logger.warn("AssemblyAI transcript status check returned error", {
+              transcriptId: result.output.transcript_id,
+              error: fullResult.error,
+            });
+          } else if (fullResult.text) {
             transcript = fullResult.text;
             transcriptSource = "assemblyai";
             logger.info("Audio transcribed successfully", { length: transcript.length });
@@ -199,9 +210,20 @@ export const summarizeEpisode = task({
             });
           }
         } else if (result.ok) {
-          logger.warn("AssemblyAI transcription failed", {
-            status: result.output.status,
-          });
+          try {
+            const fullResult = await getTranscriptionStatus(result.output.transcript_id);
+            logger.warn("AssemblyAI transcription failed", {
+              transcriptId: result.output.transcript_id,
+              status: fullResult.status,
+              error: fullResult.error,
+            });
+          } catch (statusError) {
+            logger.warn("AssemblyAI transcription failed", {
+              transcriptId: result.output.transcript_id,
+              status: result.output.status,
+              statusFetchError: statusError instanceof Error ? statusError.message : String(statusError),
+            });
+          }
         } else {
           logger.warn("AssemblyAI transcription wait timed out");
         }
