@@ -2,8 +2,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 // Mock Trigger.dev SDK before imports
 const mockMetadataRootIncrement = vi.fn();
-const mockCreateToken = vi.fn();
-const mockForToken = vi.fn();
 vi.mock("@trigger.dev/sdk", () => ({
   task: vi.fn((config) => config),
   retry: {
@@ -19,10 +17,6 @@ vi.mock("@trigger.dev/sdk", () => ({
     root: {
       increment: (...args: unknown[]) => mockMetadataRootIncrement(...args),
     },
-  },
-  wait: {
-    createToken: (...args: unknown[]) => mockCreateToken(...args),
-    forToken: (...args: unknown[]) => mockForToken(...args),
   },
   AbortTaskRunError: class AbortTaskRunError extends Error {
     constructor(message: string) {
@@ -62,12 +56,6 @@ vi.mock("@/trigger/helpers/podcastindex", () => ({
   getPodcastById: vi.fn(),
 }));
 
-vi.mock("@/trigger/helpers/transcript", () => ({
-  fetchTranscript: vi.fn(),
-  extractTranscriptUrl: vi.fn(),
-  fetchTranscriptFromUrl: vi.fn(),
-}));
-
 vi.mock("@/trigger/helpers/ai-summary", () => ({
   generateEpisodeSummary: vi.fn(),
 }));
@@ -78,16 +66,22 @@ vi.mock("@/trigger/helpers/database", () => ({
   updateEpisodeStatus: vi.fn(),
 }));
 
-vi.mock("@/lib/assemblyai", () => ({
-  submitTranscriptionAsync: vi.fn(),
-  getTranscriptionStatus: vi.fn(),
+vi.mock("@/trigger/helpers/notifications", () => ({
+  createNotificationsForSubscribers: vi.fn(),
+  resolvePodcastId: vi.fn(),
+}));
+
+const mockFetchTranscriptTriggerAndWait = vi.fn();
+vi.mock("@/trigger/fetch-transcript", () => ({
+  fetchTranscriptTask: {
+    triggerAndWait: (...args: unknown[]) => mockFetchTranscriptTriggerAndWait(...args),
+  },
 }));
 
 import { getEpisodeById, getPodcastById } from "@/trigger/helpers/podcastindex";
-import { fetchTranscript, extractTranscriptUrl, fetchTranscriptFromUrl } from "@/trigger/helpers/transcript";
 import { generateEpisodeSummary } from "@/trigger/helpers/ai-summary";
-import { trackEpisodeRun, persistEpisodeSummary } from "@/trigger/helpers/database";
-import { submitTranscriptionAsync, getTranscriptionStatus } from "@/lib/assemblyai";
+import { persistEpisodeSummary, updateEpisodeStatus } from "@/trigger/helpers/database";
+import { createNotificationsForSubscribers, resolvePodcastId } from "@/trigger/helpers/notifications";
 import { summarizeEpisode } from "@/trigger/summarize-episode";
 
 // The task mock returns the raw config object, so `.run` and `.onFailure` are available at runtime
@@ -125,6 +119,11 @@ describe("summarize-episode task", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockFindFirst.mockResolvedValue(null);
+    // Default: fetch-transcript returns a transcript
+    mockFetchTranscriptTriggerAndWait.mockResolvedValue({
+      ok: true,
+      output: { transcript: "Full transcript text", source: "podcastindex" },
+    });
   });
 
   afterEach(() => {
@@ -137,20 +136,20 @@ describe("summarize-episode task", () => {
   it("completes the full pipeline successfully", async () => {
     vi.mocked(getEpisodeById).mockResolvedValue({ episode: mockEpisode } as never);
     vi.mocked(getPodcastById).mockResolvedValue({ feed: mockPodcast } as never);
-    vi.mocked(fetchTranscript).mockResolvedValue("Full transcript text");
     vi.mocked(generateEpisodeSummary).mockResolvedValue(mockSummary);
     vi.mocked(persistEpisodeSummary).mockResolvedValue(undefined);
 
-    // The task config is extracted by our mock — call the run function directly
-    const result = await taskConfig.run(
-      { episodeId: 123 },
-      mockCtx
-    );
+    const result = await taskConfig.run({ episodeId: 123 }, mockCtx);
 
     expect(result).toEqual(mockSummary);
     expect(getEpisodeById).toHaveBeenCalledWith(123);
     expect(getPodcastById).toHaveBeenCalledWith(456);
-    expect(fetchTranscript).toHaveBeenCalledWith(mockEpisode);
+    expect(mockFetchTranscriptTriggerAndWait).toHaveBeenCalledWith({
+      episodeId: 123,
+      enclosureUrl: mockEpisode.enclosureUrl,
+      description: mockEpisode.description,
+      transcripts: mockEpisode.transcripts,
+    });
     expect(generateEpisodeSummary).toHaveBeenCalledWith(
       mockPodcast,
       mockEpisode,
@@ -165,38 +164,6 @@ describe("summarize-episode task", () => {
     );
   });
 
-  it("proceeds without transcript when all sources fail", async () => {
-    vi.mocked(getEpisodeById).mockResolvedValue({ episode: mockEpisode } as never);
-    vi.mocked(getPodcastById).mockResolvedValue({ feed: mockPodcast } as never);
-    vi.mocked(fetchTranscript).mockRejectedValue(new Error("Transcript unavailable"));
-    vi.mocked(extractTranscriptUrl).mockReturnValue(null);
-    mockCreateToken.mockResolvedValue({ id: "token-1", url: "https://hooks.trigger.dev/token/1" });
-    vi.mocked(submitTranscriptionAsync).mockRejectedValue(new Error("AssemblyAI unavailable"));
-    vi.mocked(generateEpisodeSummary).mockResolvedValue(mockSummary);
-    vi.mocked(persistEpisodeSummary).mockResolvedValue(undefined);
-
-    const result = await taskConfig.run(
-      { episodeId: 123 },
-      mockCtx
-    );
-
-    expect(result).toEqual(mockSummary);
-    expect(submitTranscriptionAsync).toHaveBeenCalled();
-    expect(generateEpisodeSummary).toHaveBeenCalledWith(
-      mockPodcast,
-      mockEpisode,
-      undefined
-    );
-    // "none" sentinel maps to null → persisted as null in DB
-    expect(persistEpisodeSummary).toHaveBeenCalledWith(
-      mockEpisode,
-      mockPodcast,
-      mockSummary,
-      undefined,
-      null
-    );
-  });
-
   it("throws AbortTaskRunError when episode is not found", async () => {
     vi.mocked(getEpisodeById).mockResolvedValue({ episode: null } as never);
 
@@ -208,17 +175,14 @@ describe("summarize-episode task", () => {
   it("proceeds without podcast context when fetch fails", async () => {
     vi.mocked(getEpisodeById).mockResolvedValue({ episode: mockEpisode } as never);
     vi.mocked(getPodcastById).mockRejectedValue(new Error("Podcast not found"));
-    vi.mocked(fetchTranscript).mockResolvedValue(undefined);
-    vi.mocked(extractTranscriptUrl).mockReturnValue(null);
-    mockCreateToken.mockResolvedValue({ id: "token-1", url: "https://hooks.trigger.dev/token/1" });
-    vi.mocked(submitTranscriptionAsync).mockRejectedValue(new Error("AssemblyAI unavailable"));
+    mockFetchTranscriptTriggerAndWait.mockResolvedValue({
+      ok: true,
+      output: { transcript: undefined, source: null },
+    });
     vi.mocked(generateEpisodeSummary).mockResolvedValue(mockSummary);
     vi.mocked(persistEpisodeSummary).mockResolvedValue(undefined);
 
-    const result = await taskConfig.run(
-      { episodeId: 123 },
-      mockCtx
-    );
+    const result = await taskConfig.run({ episodeId: 123 }, mockCtx);
 
     expect(result).toEqual(mockSummary);
     expect(generateEpisodeSummary).toHaveBeenCalledWith(
@@ -228,385 +192,87 @@ describe("summarize-episode task", () => {
     );
   });
 
-  it("uses cached transcription from database and skips external fetches", async () => {
+  it("fetch-transcript ok:false path — continues without transcript, does not throw", async () => {
     vi.mocked(getEpisodeById).mockResolvedValue({ episode: mockEpisode } as never);
     vi.mocked(getPodcastById).mockResolvedValue({ feed: mockPodcast } as never);
-    mockFindFirst.mockResolvedValue({ transcription: "Cached transcript text" });
+    mockFetchTranscriptTriggerAndWait.mockResolvedValue({ ok: false });
     vi.mocked(generateEpisodeSummary).mockResolvedValue(mockSummary);
     vi.mocked(persistEpisodeSummary).mockResolvedValue(undefined);
 
-    const result = await taskConfig.run(
-      { episodeId: 123 },
-      mockCtx
-    );
+    const result = await taskConfig.run({ episodeId: 123 }, mockCtx);
 
     expect(result).toEqual(mockSummary);
-    expect(fetchTranscript).not.toHaveBeenCalled();
-    expect(submitTranscriptionAsync).not.toHaveBeenCalled();
     expect(generateEpisodeSummary).toHaveBeenCalledWith(
       mockPodcast,
       mockEpisode,
-      "Cached transcript text"
+      undefined
     );
-    // "cached" sentinel maps to undefined → preserves existing DB value
     expect(persistEpisodeSummary).toHaveBeenCalledWith(
       mockEpisode,
       mockPodcast,
       mockSummary,
-      "Cached transcript text",
+      undefined,
       undefined
     );
   });
 
-  it("falls back to AssemblyAI when PodcastIndex transcript unavailable", async () => {
+  it("passes transcript and source from fetch-transcript to persistEpisodeSummary", async () => {
     vi.mocked(getEpisodeById).mockResolvedValue({ episode: mockEpisode } as never);
     vi.mocked(getPodcastById).mockResolvedValue({ feed: mockPodcast } as never);
-    vi.mocked(fetchTranscript).mockResolvedValue(undefined);
-    vi.mocked(extractTranscriptUrl).mockReturnValue(null);
-    const mockToken = { id: "token-1", url: "https://hooks.trigger.dev/token/1" };
-    mockCreateToken.mockResolvedValue(mockToken);
-    vi.mocked(submitTranscriptionAsync).mockResolvedValue("transcript-123");
-    // Webhook only sends transcript_id + status (no text)
-    mockForToken.mockResolvedValue({
+    mockFetchTranscriptTriggerAndWait.mockResolvedValue({
       ok: true,
-      output: { transcript_id: "transcript-123", status: "completed" },
-    });
-    // Follow-up GET fetches the full transcript
-    vi.mocked(getTranscriptionStatus).mockResolvedValue({
-      id: "transcript-123", status: "completed", text: "AssemblyAI transcript text", error: null,
+      output: { transcript: "AssemblyAI text", source: "assemblyai" },
     });
     vi.mocked(generateEpisodeSummary).mockResolvedValue(mockSummary);
     vi.mocked(persistEpisodeSummary).mockResolvedValue(undefined);
 
-    const result = await taskConfig.run(
-      { episodeId: 123 },
-      mockCtx
-    );
+    await taskConfig.run({ episodeId: 123 }, mockCtx);
 
-    expect(result).toEqual(mockSummary);
-    expect(submitTranscriptionAsync).toHaveBeenCalledWith(
-      "https://example.com/audio.mp3",
-      "https://hooks.trigger.dev/token/1"
-    );
-    expect(getTranscriptionStatus).toHaveBeenCalledWith("transcript-123");
-    expect(generateEpisodeSummary).toHaveBeenCalledWith(
-      mockPodcast,
+    expect(persistEpisodeSummary).toHaveBeenCalledWith(
       mockEpisode,
-      "AssemblyAI transcript text"
-    );
-  });
-
-  it("proceeds without transcript when AssemblyAI follow-up GET returns no text", async () => {
-    vi.mocked(getEpisodeById).mockResolvedValue({ episode: mockEpisode } as never);
-    vi.mocked(getPodcastById).mockResolvedValue({ feed: mockPodcast } as never);
-    vi.mocked(fetchTranscript).mockResolvedValue(undefined);
-    vi.mocked(extractTranscriptUrl).mockReturnValue(null);
-    const mockToken = { id: "token-1", url: "https://hooks.trigger.dev/token/1" };
-    mockCreateToken.mockResolvedValue(mockToken);
-    vi.mocked(submitTranscriptionAsync).mockResolvedValue("transcript-null");
-    mockForToken.mockResolvedValue({
-      ok: true,
-      output: { transcript_id: "transcript-null", status: "completed" },
-    });
-    // Follow-up GET returns completed but with no text
-    vi.mocked(getTranscriptionStatus).mockResolvedValue({
-      id: "transcript-null", status: "completed", text: null, error: null,
-    });
-    vi.mocked(generateEpisodeSummary).mockResolvedValue(mockSummary);
-    vi.mocked(persistEpisodeSummary).mockResolvedValue(undefined);
-
-    const result = await taskConfig.run(
-      { episodeId: 123 },
-      mockCtx
-    );
-
-    expect(result).toEqual(mockSummary);
-    expect(getTranscriptionStatus).toHaveBeenCalledWith("transcript-null");
-    // No transcript available — summary generated without it
-    expect(generateEpisodeSummary).toHaveBeenCalledWith(
       mockPodcast,
-      mockEpisode,
-      undefined
-    );
-    const { logger } = await import("@trigger.dev/sdk");
-    expect(vi.mocked(logger.warn)).toHaveBeenCalledWith(
-      "AssemblyAI transcription unavailable, proceeding without it",
-      expect.objectContaining({ error: "AssemblyAI transcript text not available yet" })
+      mockSummary,
+      "AssemblyAI text",
+      "assemblyai"
     );
   });
 
-  it("falls back to AssemblyAI when cached transcription lookup fails", async () => {
+  it("passes undefined source (cache hit) through to persistEpisodeSummary", async () => {
     vi.mocked(getEpisodeById).mockResolvedValue({ episode: mockEpisode } as never);
     vi.mocked(getPodcastById).mockResolvedValue({ feed: mockPodcast } as never);
-    vi.mocked(fetchTranscript).mockResolvedValue(undefined);
-    vi.mocked(extractTranscriptUrl).mockReturnValue(null);
-    mockFindFirst.mockRejectedValue(new Error("DB connection lost"));
-    const mockToken = { id: "token-1", url: "https://hooks.trigger.dev/token/1" };
-    mockCreateToken.mockResolvedValue(mockToken);
-    vi.mocked(submitTranscriptionAsync).mockResolvedValue("transcript-789");
-    mockForToken.mockResolvedValue({
+    mockFetchTranscriptTriggerAndWait.mockResolvedValue({
       ok: true,
-      output: { transcript_id: "transcript-789", status: "completed" },
-    });
-    vi.mocked(getTranscriptionStatus).mockResolvedValue({
-      id: "transcript-789", status: "completed", text: "AssemblyAI fallback text", error: null,
+      output: { transcript: "Cached transcript", source: undefined },
     });
     vi.mocked(generateEpisodeSummary).mockResolvedValue(mockSummary);
     vi.mocked(persistEpisodeSummary).mockResolvedValue(undefined);
 
-    const result = await taskConfig.run(
-      { episodeId: 123 },
-      mockCtx
-    );
+    await taskConfig.run({ episodeId: 123 }, mockCtx);
 
-    expect(result).toEqual(mockSummary);
-    expect(mockFindFirst).toHaveBeenCalled();
-    expect(submitTranscriptionAsync).toHaveBeenCalled();
-    expect(getTranscriptionStatus).toHaveBeenCalledWith("transcript-789");
-    expect(generateEpisodeSummary).toHaveBeenCalledWith(
+    // undefined source preserves existing DB value
+    expect(persistEpisodeSummary).toHaveBeenCalledWith(
+      mockEpisode,
       mockPodcast,
-      mockEpisode,
-      "AssemblyAI fallback text"
-    );
-  });
-
-  it("does not call AssemblyAI when PodcastIndex returns valid transcript", async () => {
-    vi.mocked(getEpisodeById).mockResolvedValue({ episode: mockEpisode } as never);
-    vi.mocked(getPodcastById).mockResolvedValue({ feed: mockPodcast } as never);
-    vi.mocked(fetchTranscript).mockResolvedValue("Valid PodcastIndex transcript");
-    vi.mocked(generateEpisodeSummary).mockResolvedValue(mockSummary);
-    vi.mocked(persistEpisodeSummary).mockResolvedValue(undefined);
-
-    await taskConfig.run({ episodeId: 123 }, mockCtx);
-
-    expect(submitTranscriptionAsync).not.toHaveBeenCalled();
-  });
-
-  it("logs transcript source as 'podcastindex' when PodcastIndex provides transcript", async () => {
-    vi.mocked(getEpisodeById).mockResolvedValue({ episode: mockEpisode } as never);
-    vi.mocked(getPodcastById).mockResolvedValue({ feed: mockPodcast } as never);
-    vi.mocked(fetchTranscript).mockResolvedValue("PodcastIndex transcript");
-    vi.mocked(generateEpisodeSummary).mockResolvedValue(mockSummary);
-    vi.mocked(persistEpisodeSummary).mockResolvedValue(undefined);
-
-    await taskConfig.run({ episodeId: 123 }, mockCtx);
-
-    const { logger } = await import("@trigger.dev/sdk");
-    expect(vi.mocked(logger.info)).toHaveBeenCalledWith(
-      "Transcript acquisition complete",
-      expect.objectContaining({ source: "podcastindex" })
-    );
-  });
-
-  it("logs transcript source as 'cached' when database cache provides transcript", async () => {
-    vi.mocked(getEpisodeById).mockResolvedValue({ episode: mockEpisode } as never);
-    vi.mocked(getPodcastById).mockResolvedValue({ feed: mockPodcast } as never);
-    mockFindFirst.mockResolvedValue({ transcription: "Cached transcript text" });
-    vi.mocked(generateEpisodeSummary).mockResolvedValue(mockSummary);
-    vi.mocked(persistEpisodeSummary).mockResolvedValue(undefined);
-
-    await taskConfig.run({ episodeId: 123 }, mockCtx);
-
-    const { logger } = await import("@trigger.dev/sdk");
-    expect(vi.mocked(logger.info)).toHaveBeenCalledWith(
-      "Transcript acquisition complete",
-      expect.objectContaining({ source: "cached" })
-    );
-  });
-
-  it("logs transcript source as 'assemblyai' when AssemblyAI provides transcript", async () => {
-    vi.mocked(getEpisodeById).mockResolvedValue({ episode: mockEpisode } as never);
-    vi.mocked(getPodcastById).mockResolvedValue({ feed: mockPodcast } as never);
-    vi.mocked(fetchTranscript).mockResolvedValue(undefined);
-    vi.mocked(extractTranscriptUrl).mockReturnValue(null);
-    const mockToken = { id: "token-1", url: "https://hooks.trigger.dev/token/1" };
-    mockCreateToken.mockResolvedValue(mockToken);
-    vi.mocked(submitTranscriptionAsync).mockResolvedValue("transcript-source-test");
-    mockForToken.mockResolvedValue({
-      ok: true,
-      output: { transcript_id: "transcript-source-test", status: "completed" },
-    });
-    vi.mocked(getTranscriptionStatus).mockResolvedValue({
-      id: "transcript-source-test", status: "completed", text: "AssemblyAI transcript text", error: null,
-    });
-    vi.mocked(generateEpisodeSummary).mockResolvedValue(mockSummary);
-    vi.mocked(persistEpisodeSummary).mockResolvedValue(undefined);
-
-    await taskConfig.run({ episodeId: 123 }, mockCtx);
-
-    const { logger } = await import("@trigger.dev/sdk");
-    expect(vi.mocked(logger.info)).toHaveBeenCalledWith(
-      "Transcript acquisition complete",
-      expect.objectContaining({ source: "assemblyai" })
-    );
-  });
-
-  it("logs transcript source as 'none' when no source provides transcript", async () => {
-    vi.mocked(getEpisodeById).mockResolvedValue({ episode: mockEpisode } as never);
-    vi.mocked(getPodcastById).mockResolvedValue({ feed: mockPodcast } as never);
-    vi.mocked(fetchTranscript).mockResolvedValue(undefined);
-    vi.mocked(extractTranscriptUrl).mockReturnValue(null);
-    mockCreateToken.mockResolvedValue({ id: "token-1", url: "https://hooks.trigger.dev/token/1" });
-    vi.mocked(submitTranscriptionAsync).mockRejectedValue(new Error("AssemblyAI unavailable"));
-    vi.mocked(generateEpisodeSummary).mockResolvedValue(mockSummary);
-    vi.mocked(persistEpisodeSummary).mockResolvedValue(undefined);
-
-    await taskConfig.run({ episodeId: 123 }, mockCtx);
-
-    const { logger } = await import("@trigger.dev/sdk");
-    expect(vi.mocked(logger.info)).toHaveBeenCalledWith(
-      "Transcript acquisition complete",
-      expect.objectContaining({ source: "none" })
-    );
-  });
-
-  it("falls back to PodcastIndex when cached transcription is whitespace-only", async () => {
-    vi.mocked(getEpisodeById).mockResolvedValue({ episode: mockEpisode } as never);
-    vi.mocked(getPodcastById).mockResolvedValue({ feed: mockPodcast } as never);
-    mockFindFirst.mockResolvedValue({ transcription: "   \n  " });
-    vi.mocked(fetchTranscript).mockResolvedValue("PodcastIndex fallback transcript");
-    vi.mocked(generateEpisodeSummary).mockResolvedValue(mockSummary);
-    vi.mocked(persistEpisodeSummary).mockResolvedValue(undefined);
-
-    await taskConfig.run({ episodeId: 123 }, mockCtx);
-
-    expect(fetchTranscript).toHaveBeenCalled();
-    expect(submitTranscriptionAsync).not.toHaveBeenCalled();
-    const { logger } = await import("@trigger.dev/sdk");
-    expect(vi.mocked(logger.info)).toHaveBeenCalledWith(
-      "Transcript acquisition complete",
-      expect.objectContaining({ source: "podcastindex" })
-    );
-  });
-
-  it("handles AssemblyAI error status via webhook", async () => {
-    vi.mocked(getEpisodeById).mockResolvedValue({ episode: mockEpisode } as never);
-    vi.mocked(getPodcastById).mockResolvedValue({ feed: mockPodcast } as never);
-    vi.mocked(fetchTranscript).mockResolvedValue(undefined);
-    vi.mocked(extractTranscriptUrl).mockReturnValue(null);
-    const mockToken = { id: "token-1", url: "https://hooks.trigger.dev/token/1" };
-    mockCreateToken.mockResolvedValue(mockToken);
-    vi.mocked(submitTranscriptionAsync).mockResolvedValue("transcript-456");
-    mockForToken.mockResolvedValue({
-      ok: true,
-      output: { transcript_id: "transcript-456", status: "error" },
-    });
-    // Follow-up GET fetches error details for logging
-    vi.mocked(getTranscriptionStatus).mockResolvedValue({
-      id: "transcript-456", status: "error", text: null, error: "Audio file could not be processed",
-    });
-    vi.mocked(generateEpisodeSummary).mockResolvedValue(mockSummary);
-    vi.mocked(persistEpisodeSummary).mockResolvedValue(undefined);
-
-    const result = await taskConfig.run(
-      { episodeId: 123 },
-      mockCtx
-    );
-
-    expect(result).toEqual(mockSummary);
-    expect(getTranscriptionStatus).toHaveBeenCalledWith("transcript-456");
-    expect(generateEpisodeSummary).toHaveBeenCalledWith(
-      mockPodcast,
-      mockEpisode,
+      mockSummary,
+      "Cached transcript",
       undefined
     );
   });
 
-  it("uses description URL when PodcastIndex unavailable", async () => {
+  it("calls updateEpisodeStatus('summarizing') after fetch-transcript completes", async () => {
     vi.mocked(getEpisodeById).mockResolvedValue({ episode: mockEpisode } as never);
     vi.mocked(getPodcastById).mockResolvedValue({ feed: mockPodcast } as never);
-    vi.mocked(fetchTranscript).mockResolvedValue(undefined);
-    vi.mocked(extractTranscriptUrl).mockReturnValue("https://example.com/transcript.txt");
-    vi.mocked(fetchTranscriptFromUrl).mockResolvedValue("Description URL transcript text");
-    vi.mocked(generateEpisodeSummary).mockResolvedValue(mockSummary);
-    vi.mocked(persistEpisodeSummary).mockResolvedValue(undefined);
-
-    const result = await taskConfig.run({ episodeId: 123 }, mockCtx);
-
-    expect(result).toEqual(mockSummary);
-    expect(submitTranscriptionAsync).not.toHaveBeenCalled();
-    expect(generateEpisodeSummary).toHaveBeenCalledWith(
-      mockPodcast,
-      mockEpisode,
-      "Description URL transcript text"
-    );
-  });
-
-  it("falls through to AssemblyAI when description URL returns no content", async () => {
-    vi.mocked(getEpisodeById).mockResolvedValue({ episode: mockEpisode } as never);
-    vi.mocked(getPodcastById).mockResolvedValue({ feed: mockPodcast } as never);
-    vi.mocked(fetchTranscript).mockResolvedValue(undefined);
-    vi.mocked(extractTranscriptUrl).mockReturnValue("https://example.com/transcript.txt");
-    vi.mocked(fetchTranscriptFromUrl).mockResolvedValue(undefined);
-    const mockToken = { id: "token-1", url: "https://hooks.trigger.dev/token/1" };
-    mockCreateToken.mockResolvedValue(mockToken);
-    vi.mocked(submitTranscriptionAsync).mockResolvedValue("transcript-fallback");
-    mockForToken.mockResolvedValue({
-      ok: true,
-      output: { transcript_id: "transcript-fallback", status: "completed" },
-    });
-    vi.mocked(getTranscriptionStatus).mockResolvedValue({
-      id: "transcript-fallback", status: "completed", text: "AssemblyAI fallback text", error: null,
-    });
-    vi.mocked(generateEpisodeSummary).mockResolvedValue(mockSummary);
-    vi.mocked(persistEpisodeSummary).mockResolvedValue(undefined);
-
-    const result = await taskConfig.run({ episodeId: 123 }, mockCtx);
-
-    expect(result).toEqual(mockSummary);
-    expect(submitTranscriptionAsync).toHaveBeenCalled();
-    expect(getTranscriptionStatus).toHaveBeenCalledWith("transcript-fallback");
-    expect(generateEpisodeSummary).toHaveBeenCalledWith(
-      mockPodcast,
-      mockEpisode,
-      "AssemblyAI fallback text"
-    );
-  });
-
-  it("handles AssemblyAI token timeout gracefully", async () => {
-    vi.mocked(getEpisodeById).mockResolvedValue({ episode: mockEpisode } as never);
-    vi.mocked(getPodcastById).mockResolvedValue({ feed: mockPodcast } as never);
-    vi.mocked(fetchTranscript).mockResolvedValue(undefined);
-    vi.mocked(extractTranscriptUrl).mockReturnValue(null);
-    const mockToken = { id: "token-1", url: "https://hooks.trigger.dev/token/1" };
-    mockCreateToken.mockResolvedValue(mockToken);
-    vi.mocked(submitTranscriptionAsync).mockResolvedValue("transcript-timeout");
-    mockForToken.mockResolvedValue({ ok: false });
-    vi.mocked(generateEpisodeSummary).mockResolvedValue(mockSummary);
-    vi.mocked(persistEpisodeSummary).mockResolvedValue(undefined);
-
-    const result = await taskConfig.run({ episodeId: 123 }, mockCtx);
-
-    expect(result).toEqual(mockSummary);
-    expect(generateEpisodeSummary).toHaveBeenCalledWith(
-      mockPodcast,
-      mockEpisode,
-      undefined
-    );
-  });
-
-  it("logs transcript source as 'description-url' when description URL provides transcript", async () => {
-    vi.mocked(getEpisodeById).mockResolvedValue({ episode: mockEpisode } as never);
-    vi.mocked(getPodcastById).mockResolvedValue({ feed: mockPodcast } as never);
-    vi.mocked(fetchTranscript).mockResolvedValue(undefined);
-    vi.mocked(extractTranscriptUrl).mockReturnValue("https://example.com/transcript.txt");
-    vi.mocked(fetchTranscriptFromUrl).mockResolvedValue("Description transcript text");
     vi.mocked(generateEpisodeSummary).mockResolvedValue(mockSummary);
     vi.mocked(persistEpisodeSummary).mockResolvedValue(undefined);
 
     await taskConfig.run({ episodeId: 123 }, mockCtx);
 
-    const { logger } = await import("@trigger.dev/sdk");
-    expect(vi.mocked(logger.info)).toHaveBeenCalledWith(
-      "Transcript acquisition complete",
-      expect.objectContaining({ source: "description-url" })
-    );
+    expect(vi.mocked(updateEpisodeStatus)).toHaveBeenCalledWith(123, "summarizing");
   });
 
   it("calls metadata.root.increment('completed', 1) after successful run", async () => {
     vi.mocked(getEpisodeById).mockResolvedValue({ episode: mockEpisode } as never);
     vi.mocked(getPodcastById).mockResolvedValue({ feed: mockPodcast } as never);
-    vi.mocked(fetchTranscript).mockResolvedValue("Full transcript text");
     vi.mocked(generateEpisodeSummary).mockResolvedValue(mockSummary);
     vi.mocked(persistEpisodeSummary).mockResolvedValue(undefined);
 
@@ -618,7 +284,6 @@ describe("summarize-episode task", () => {
   it("calls metadata.root.increment('completed', 1) exactly once per successful run", async () => {
     vi.mocked(getEpisodeById).mockResolvedValue({ episode: mockEpisode } as never);
     vi.mocked(getPodcastById).mockResolvedValue({ feed: mockPodcast } as never);
-    vi.mocked(fetchTranscript).mockResolvedValue("Transcript");
     vi.mocked(generateEpisodeSummary).mockResolvedValue(mockSummary);
     vi.mocked(persistEpisodeSummary).mockResolvedValue(undefined);
 
@@ -645,7 +310,6 @@ describe("summarize-episode task", () => {
   });
 
   it("calls metadata.root.increment('failed', 1) in onFailure", async () => {
-    // taskConfig.onFailure is called by Trigger.dev when the task permanently fails
     await taskConfig.onFailure({ payload: { episodeId: 42 } });
 
     expect(mockMetadataRootIncrement).toHaveBeenCalledWith("failed", 1);
@@ -662,5 +326,35 @@ describe("summarize-episode task", () => {
     await taskConfig.onFailure({ payload: { episodeId: 42 } });
 
     expect(mockMetadataRootIncrement).toHaveBeenCalledWith("failed", 1);
+  });
+
+  it("isNewEpisode=false skips new_episode notification on re-summarization", async () => {
+    vi.mocked(getEpisodeById).mockResolvedValue({ episode: mockEpisode } as never);
+    vi.mocked(getPodcastById).mockResolvedValue({ feed: mockPodcast } as never);
+    vi.mocked(generateEpisodeSummary).mockResolvedValue(mockSummary);
+    vi.mocked(persistEpisodeSummary).mockResolvedValue(undefined);
+    // Enter the notification branch
+    vi.mocked(resolvePodcastId).mockResolvedValue(99);
+    // First call: prior summary check (existing summary → re-summarization)
+    // Second call: episodeDbId lookup for notifications
+    mockFindFirst
+      .mockResolvedValueOnce({ summary: "Existing summary" })
+      .mockResolvedValueOnce({ id: 42 });
+
+    const result = await taskConfig.run({ episodeId: 123 }, mockCtx);
+
+    expect(result).toEqual(mockSummary);
+    // new_episode should NOT be sent on re-summarization
+    const newEpisodeCalls = vi.mocked(createNotificationsForSubscribers).mock.calls
+      .filter(([, , type]) => type === "new_episode");
+    expect(newEpisodeCalls).toHaveLength(0);
+    // summary_completed should still be sent
+    expect(createNotificationsForSubscribers).toHaveBeenCalledWith(
+      99,
+      42,
+      "summary_completed",
+      mockPodcast.title,
+      `Summary ready: ${mockEpisode.title}`
+    );
   });
 });
