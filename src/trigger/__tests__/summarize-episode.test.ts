@@ -160,7 +160,8 @@ describe("summarize-episode task", () => {
       mockEpisode,
       mockPodcast,
       mockSummary,
-      "Full transcript text"
+      "Full transcript text",
+      "podcastindex"
     );
   });
 
@@ -185,6 +186,14 @@ describe("summarize-episode task", () => {
       mockPodcast,
       mockEpisode,
       undefined
+    );
+    // "none" sentinel maps to null → persisted as null in DB
+    expect(persistEpisodeSummary).toHaveBeenCalledWith(
+      mockEpisode,
+      mockPodcast,
+      mockSummary,
+      undefined,
+      null
     );
   });
 
@@ -238,6 +247,14 @@ describe("summarize-episode task", () => {
       mockPodcast,
       mockEpisode,
       "Cached transcript text"
+    );
+    // "cached" sentinel maps to undefined → preserves existing DB value
+    expect(persistEpisodeSummary).toHaveBeenCalledWith(
+      mockEpisode,
+      mockPodcast,
+      mockSummary,
+      "Cached transcript text",
+      undefined
     );
   });
 

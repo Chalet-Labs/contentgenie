@@ -10,6 +10,7 @@ import {
   ArrowLeft,
   Clock,
   Calendar,
+  FileText,
   Mic,
   Rss,
   ExternalLink,
@@ -20,7 +21,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { stripHtml } from "@/lib/utils";
+import { cn, stripHtml } from "@/lib/utils";
 import { useAudioPlayerState, useAudioPlayerAPI } from "@/contexts/audio-player-context";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -30,6 +31,12 @@ import {
 import { SaveButton } from "@/components/episodes/save-button";
 import { ShareButton } from "@/components/ui/share-button";
 import { AddToQueueButton } from "@/components/audio-player/add-to-queue-button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { WorthItBadge } from "@/components/episodes/worth-it-badge";
 import { CommunityRating } from "@/components/episodes/community-rating";
 import { isEpisodeSaved } from "@/app/actions/library";
@@ -96,6 +103,15 @@ function formatDuration(seconds: number): string {
   return `${minutes}m`;
 }
 
+function formatTranscriptSource(source: string | null): string {
+  switch (source) {
+    case "podcastindex": return "PodcastIndex";
+    case "assemblyai": return "AI Transcribed";
+    case "description-url": return "Episode Page";
+    default: return source ?? "Unknown";
+  }
+}
+
 function formatPublishDate(timestamp: number): string {
   if (!timestamp) return "Unknown";
   const date = new Date(timestamp * 1000);
@@ -123,6 +139,7 @@ export default function EpisodePage({ params }: EpisodePageProps) {
   const [isSaved, setIsSaved] = useState(false);
   const [runId, setRunId] = useState<string | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [transcriptSource, setTranscriptSource] = useState<string | null>(null);
 
   const isAdmin = isLoaded && has?.({ role: ADMIN_ROLE });
 
@@ -187,6 +204,7 @@ export default function EpisodePage({ params }: EpisodePageProps) {
 
       setEpisode(data.episode);
       setPodcast(data.podcast);
+      setTranscriptSource(data.transcriptSource ?? null);
 
       // Cache episode data for offline use
       if (userId) {
@@ -553,6 +571,24 @@ export default function EpisodePage({ params }: EpisodePageProps) {
               </div>
             )}
             {episode.season > 0 && <span>Season {episode.season}</span>}
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    className={cn("flex items-center gap-1", !transcriptSource && "text-muted-foreground/50")}
+                  >
+                    <FileText className="h-4 w-4" />
+                    <span>{transcriptSource ? "Transcript" : "No Transcript"}</span>
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  {transcriptSource
+                    ? `Source: ${formatTranscriptSource(transcriptSource)}`
+                    : "No transcript available"}
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
 
           {/* Community Rating */}

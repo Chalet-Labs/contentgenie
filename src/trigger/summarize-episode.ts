@@ -286,8 +286,17 @@ export const summarizeEpisode = task({
       // If lookup fails, default to treating as new episode
     }
 
+    // Map local transcriptSource to DB-safe value:
+    // "cached" → undefined (preserve existing DB value), "none" → null
+    const dbTranscriptSource =
+      transcriptSource === "cached"
+        ? undefined
+        : transcriptSource === "none"
+          ? null
+          : transcriptSource;
+
     await retry.onThrow(
-      async () => persistEpisodeSummary(episode, podcast, summary, transcript),
+      async () => persistEpisodeSummary(episode, podcast, summary, transcript, dbTranscriptSource),
       { maxAttempts: 3 }
     );
 
