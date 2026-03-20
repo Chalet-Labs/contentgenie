@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { episodes, podcasts } from "@/db/schema";
+import { episodes, podcasts, type NewEpisode } from "@/db/schema";
 import { upsertPodcast } from "@/db/helpers";
 import type { SummaryResult } from "@/lib/openrouter";
 import type { PodcastIndexPodcast, PodcastIndexEpisode } from "@/lib/podcastindex";
@@ -121,7 +121,7 @@ export async function persistEpisodeSummary(
   });
 
   if (existingEpisode) {
-    const updateFields: Record<string, unknown> = {
+    const updateFields: Partial<NewEpisode> = {
       summary: summary.summary,
       keyTakeaways: summary.keyTakeaways,
       worthItScore: summary.worthItScore.toFixed(2),

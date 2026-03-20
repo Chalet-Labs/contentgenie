@@ -21,7 +21,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
-import { stripHtml } from "@/lib/utils";
+import { cn, stripHtml } from "@/lib/utils";
 import { useAudioPlayerState, useAudioPlayerAPI } from "@/contexts/audio-player-context";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -574,7 +574,7 @@ export default function EpisodePage({ params }: EpisodePageProps) {
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <div className={`flex items-center gap-1${transcriptSource ? "" : " text-muted-foreground/50"}`}>
+                  <div className={cn("flex items-center gap-1", !transcriptSource && "text-muted-foreground/50")}>
                     <FileText className="h-4 w-4" />
                     <span>{transcriptSource ? "Transcript" : "No Transcript"}</span>
                   </div>
