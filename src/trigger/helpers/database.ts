@@ -113,15 +113,16 @@ export async function persistTranscript(
   transcript: string,
   source: "podcastindex" | "assemblyai" | "description-url"
 ): Promise<void> {
+  const now = new Date();
   const updated = await db
     .update(episodes)
     .set({
       transcription: transcript,
       transcriptSource: source,
       transcriptStatus: "available",
-      transcriptFetchedAt: new Date(),
+      transcriptFetchedAt: now,
       transcriptError: null,
-      updatedAt: new Date(),
+      updatedAt: now,
     })
     .where(eq(episodes.podcastIndexId, String(episodeId)))
     .returning({ id: episodes.id });
@@ -148,6 +149,8 @@ export async function persistEpisodeSummary(
     where: eq(episodes.podcastIndexId, episode.id.toString()),
   });
 
+  const transcriptStatus = transcript ? "available" : "missing";
+
   if (existingEpisode) {
     const updateFields: Partial<NewEpisode> = {
       summary: summary.summary,
@@ -159,7 +162,7 @@ export async function persistEpisodeSummary(
       processedAt: new Date(),
       summaryStatus: "completed",
       summaryRunId: null,
-      transcriptStatus: transcript ? "available" : "missing",
+      transcriptStatus,
       transcriptError: null,
       updatedAt: new Date(),
     };
@@ -185,7 +188,7 @@ export async function persistEpisodeSummary(
         : null,
       transcription: transcript,
       transcriptSource: transcriptSource ?? null,
-      transcriptStatus: transcript ? "available" : "missing",
+      transcriptStatus,
       transcriptFetchedAt: null,
       summary: summary.summary,
       keyTakeaways: summary.keyTakeaways,
