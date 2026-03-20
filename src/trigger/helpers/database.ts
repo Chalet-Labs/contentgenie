@@ -113,14 +113,19 @@ export async function persistTranscript(
   transcript: string,
   source: "podcastindex" | "assemblyai" | "description-url"
 ): Promise<void> {
-  await db
+  const updated = await db
     .update(episodes)
     .set({
       transcription: transcript,
       transcriptSource: source,
       updatedAt: new Date(),
     })
-    .where(eq(episodes.podcastIndexId, String(episodeId)));
+    .where(eq(episodes.podcastIndexId, String(episodeId)))
+    .returning({ id: episodes.id });
+
+  if (updated.length === 0) {
+    throw new Error(`Episode ${episodeId} not found for transcript persistence`);
+  }
 }
 
 export async function persistEpisodeSummary(

@@ -115,7 +115,7 @@ export const summarizeEpisode = task({
         // Summarization continues without a transcript rather than aborting.
         logger.warn("fetch-transcript task failed permanently, continuing without transcript", { episodeId });
         transcript = undefined;
-        dbTranscriptSource = null;
+        dbTranscriptSource = undefined;
       }
     } catch (error) {
       // SDK-level errors (network, serialization, queue) — treat same as ok:false
@@ -124,7 +124,7 @@ export const summarizeEpisode = task({
         error: error instanceof Error ? error.message : String(error),
       });
       transcript = undefined;
-      dbTranscriptSource = null;
+      dbTranscriptSource = undefined;
     }
 
     // Step 4: Generate AI summary

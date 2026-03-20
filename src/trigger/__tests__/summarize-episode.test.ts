@@ -80,7 +80,8 @@ vi.mock("@/trigger/fetch-transcript", () => ({
 
 import { getEpisodeById, getPodcastById } from "@/trigger/helpers/podcastindex";
 import { generateEpisodeSummary } from "@/trigger/helpers/ai-summary";
-import { trackEpisodeRun, persistEpisodeSummary, updateEpisodeStatus } from "@/trigger/helpers/database";
+import { persistEpisodeSummary, updateEpisodeStatus } from "@/trigger/helpers/database";
+import { createNotificationsForSubscribers, resolvePodcastId } from "@/trigger/helpers/notifications";
 import { summarizeEpisode } from "@/trigger/summarize-episode";
 
 // The task mock returns the raw config object, so `.run` and `.onFailure` are available at runtime
@@ -211,7 +212,7 @@ describe("summarize-episode task", () => {
       mockPodcast,
       mockSummary,
       undefined,
-      null
+      undefined
     );
   });
 
@@ -330,13 +331,30 @@ describe("summarize-episode task", () => {
   it("isNewEpisode=false skips new_episode notification on re-summarization", async () => {
     vi.mocked(getEpisodeById).mockResolvedValue({ episode: mockEpisode } as never);
     vi.mocked(getPodcastById).mockResolvedValue({ feed: mockPodcast } as never);
-    // findFirst returns an episode with an existing summary → re-summarization
-    mockFindFirst.mockResolvedValue({ summary: "Existing summary" });
     vi.mocked(generateEpisodeSummary).mockResolvedValue(mockSummary);
     vi.mocked(persistEpisodeSummary).mockResolvedValue(undefined);
+    // Enter the notification branch
+    vi.mocked(resolvePodcastId).mockResolvedValue(99);
+    // First call: prior summary check (existing summary → re-summarization)
+    // Second call: episodeDbId lookup for notifications
+    mockFindFirst
+      .mockResolvedValueOnce({ summary: "Existing summary" })
+      .mockResolvedValueOnce({ id: 42 });
 
     const result = await taskConfig.run({ episodeId: 123 }, mockCtx);
 
     expect(result).toEqual(mockSummary);
+    // new_episode should NOT be sent on re-summarization
+    const newEpisodeCalls = vi.mocked(createNotificationsForSubscribers).mock.calls
+      .filter(([, , type]) => type === "new_episode");
+    expect(newEpisodeCalls).toHaveLength(0);
+    // summary_completed should still be sent
+    expect(createNotificationsForSubscribers).toHaveBeenCalledWith(
+      99,
+      42,
+      "summary_completed",
+      mockPodcast.title,
+      `Summary ready: ${mockEpisode.title}`
+    );
   });
 });
