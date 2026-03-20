@@ -140,7 +140,7 @@ export async function GET(
 
     // Check if we have a cached summary in the database
     let summary = null;
-    let transcriptSource: string | null = null;
+    let transcriptSource: "podcastindex" | "assemblyai" | "description-url" | null = null;
     try {
       // BOLT OPTIMIZATION: Selective column fetching to avoid loading large transcription fields
       // when only checking for cached summary data.

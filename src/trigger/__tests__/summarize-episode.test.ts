@@ -187,6 +187,14 @@ describe("summarize-episode task", () => {
       mockEpisode,
       undefined
     );
+    // "none" sentinel maps to null → persisted as null in DB
+    expect(persistEpisodeSummary).toHaveBeenCalledWith(
+      mockEpisode,
+      mockPodcast,
+      mockSummary,
+      undefined,
+      null
+    );
   });
 
   it("throws AbortTaskRunError when episode is not found", async () => {
@@ -239,6 +247,14 @@ describe("summarize-episode task", () => {
       mockPodcast,
       mockEpisode,
       "Cached transcript text"
+    );
+    // "cached" sentinel maps to undefined → preserves existing DB value
+    expect(persistEpisodeSummary).toHaveBeenCalledWith(
+      mockEpisode,
+      mockPodcast,
+      mockSummary,
+      "Cached transcript text",
+      undefined
     );
   });
 

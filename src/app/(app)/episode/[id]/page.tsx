@@ -574,10 +574,13 @@ export default function EpisodePage({ params }: EpisodePageProps) {
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <div className={cn("flex items-center gap-1", !transcriptSource && "text-muted-foreground/50")}>
+                  <button
+                    type="button"
+                    className={cn("flex items-center gap-1", !transcriptSource && "text-muted-foreground/50")}
+                  >
                     <FileText className="h-4 w-4" />
                     <span>{transcriptSource ? "Transcript" : "No Transcript"}</span>
-                  </div>
+                  </button>
                 </TooltipTrigger>
                 <TooltipContent>
                   {transcriptSource
