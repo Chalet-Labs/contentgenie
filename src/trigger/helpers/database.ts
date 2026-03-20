@@ -105,7 +105,9 @@ export async function updateEpisodeStatus(
 
 // NOTE: intentional double-write for non-cache sources — fetch-transcript persists here
 // for retry idempotency. On the success path, persistEpisodeSummary in summarize-episode
-// will overwrite these columns after summarization completes (that write is authoritative).
+// will overwrite transcription, transcriptSource, and transcriptStatus after summarization
+// completes (that write is authoritative for those columns). It intentionally does NOT
+// overwrite transcriptFetchedAt — see ADR-026.
 // On cache-hit paths (source returned as undefined), this function is not called.
 // Do not remove either call.
 export async function persistTranscript(
@@ -190,6 +192,7 @@ export async function persistEpisodeSummary(
       transcriptSource: transcriptSource ?? null,
       transcriptStatus,
       transcriptFetchedAt: null,
+      transcriptError: null,
       summary: summary.summary,
       keyTakeaways: summary.keyTakeaways,
       worthItScore: summary.worthItScore.toFixed(2),

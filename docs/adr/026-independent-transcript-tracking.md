@@ -1,6 +1,6 @@
 # ADR-026: Independent Transcript Tracking Columns
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-03-20
 **Issue:** [#214](https://github.com/Chalet-Labs/contentgenie/issues/214)
 
