@@ -41,6 +41,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Episode artwork and title in the audio player bar now link to the episode detail page (`/episode/[id]`), with hover feedback, aria-label for accessibility, and touch feedback on mobile (#115)
 
 ### Changed
+- Extract transcript waterfall (cached → PodcastIndex → description URL → AssemblyAI) from `summarize-episode` into a standalone `fetch-transcript` Trigger.dev task; `summarize-episode` now delegates via `triggerAndWait` (#213)
 - Reworked dashboard layout to vertical stack: Trending, Recommendations, Queue, New Episodes (#194)
 - Replaced podcast-level recommendations on dashboard with episode-level recommendations ranked by Worth It score, excluding subscribed/saved/listened episodes (#189)
 - `upsertPodcast` now accepts `updateOnConflict: "full" | "safe"` instead of a boolean. Client-facing paths pass `"safe"` which performs no metadata updates on conflict (only bumps `updatedAt` for RETURNING compatibility) and strips protected fields (`rssFeedUrl`, `source`) from INSERT values. Trusted Trigger.dev paths use `"full"` (#180)

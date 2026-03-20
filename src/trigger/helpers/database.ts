@@ -103,6 +103,24 @@ export async function updateEpisodeStatus(
     .where(eq(episodes.podcastIndexId, String(episodeId)));
 }
 
+// NOTE: intentional double-write — fetch-transcript persists here for retry idempotency,
+// and persistEpisodeSummary will overwrite these same columns again immediately after.
+// Do not remove either call; the second write (persistEpisodeSummary) is authoritative.
+export async function persistTranscript(
+  episodeId: number,
+  transcript: string,
+  source: "podcastindex" | "assemblyai" | "description-url"
+): Promise<void> {
+  await db
+    .update(episodes)
+    .set({
+      transcription: transcript,
+      transcriptSource: source,
+      updatedAt: new Date(),
+    })
+    .where(eq(episodes.podcastIndexId, String(episodeId)));
+}
+
 export async function persistEpisodeSummary(
   episode: PodcastIndexEpisode,
   podcast: PodcastIndexPodcast | undefined,
