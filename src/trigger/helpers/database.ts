@@ -118,6 +118,9 @@ export async function persistTranscript(
     .set({
       transcription: transcript,
       transcriptSource: source,
+      transcriptStatus: "available",
+      transcriptFetchedAt: new Date(),
+      transcriptError: null,
       updatedAt: new Date(),
     })
     .where(eq(episodes.podcastIndexId, String(episodeId)))
@@ -156,6 +159,8 @@ export async function persistEpisodeSummary(
       processedAt: new Date(),
       summaryStatus: "completed",
       summaryRunId: null,
+      transcriptStatus: transcript ? "available" : "missing",
+      transcriptError: null,
       updatedAt: new Date(),
     };
     // Only overwrite transcriptSource when explicitly provided (undefined = keep existing)
@@ -180,6 +185,8 @@ export async function persistEpisodeSummary(
         : null,
       transcription: transcript,
       transcriptSource: transcriptSource ?? null,
+      transcriptStatus: transcript ? "available" : "missing",
+      transcriptFetchedAt: null,
       summary: summary.summary,
       keyTakeaways: summary.keyTakeaways,
       worthItScore: summary.worthItScore.toFixed(2),
