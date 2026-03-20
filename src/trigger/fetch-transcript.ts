@@ -3,7 +3,6 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { episodes } from "@/db/schema";
 import { fetchTranscript, extractTranscriptUrl, fetchTranscriptFromUrl } from "@/trigger/helpers/transcript";
-import type { PodcastIndexEpisode } from "@/lib/podcastindex";
 import { submitTranscriptionAsync, getTranscriptionStatus } from "@/lib/assemblyai";
 import { updateEpisodeStatus, persistTranscript } from "@/trigger/helpers/database";
 
@@ -23,7 +22,7 @@ export type FetchTranscriptResult = {
 export const fetchTranscriptTask = task({
   id: "fetch-transcript",
   retry: { maxAttempts: 3, factor: 2, minTimeoutInMs: 1000, maxTimeoutInMs: 30000 },
-  queue: { name: "fetch-transcript-queue" }, // dedicated queue — never share summarize-queue (deadlock risk)
+  queue: { name: "fetch-transcript-queue" }, // dedicated queue with no concurrency limit — sharing summarize-queue (concurrencyLimit: 3) would deadlock when 3 parents each await a child
   maxDuration: 7200,
   run: async (payload: FetchTranscriptPayload): Promise<FetchTranscriptResult> => {
     const { episodeId, enclosureUrl, description, transcripts, force = false } = payload;
@@ -58,7 +57,7 @@ export const fetchTranscriptTask = task({
       logger.info("Fetching transcript from PodcastIndex");
       try {
         transcript = await retry.onThrow(
-          async () => fetchTranscript({ transcripts: transcripts ?? [] } as PodcastIndexEpisode),
+          async () => fetchTranscript({ transcripts: transcripts ?? [] }),
           { maxAttempts: 2 }
         );
         if (transcript) {
@@ -68,7 +67,8 @@ export const fetchTranscriptTask = task({
           logger.info("No transcript available from PodcastIndex");
         }
       } catch (error) {
-        logger.warn("Transcript unavailable, proceeding without it", {
+        logger.warn("PodcastIndex transcript fetch failed, proceeding without it", {
+          episodeId,
           error: error instanceof Error ? error.message : String(error),
         });
       }
@@ -104,13 +104,16 @@ export const fetchTranscriptTask = task({
         await updateEpisodeStatus(episodeId, "transcribing");
       } catch (error) {
         logger.warn("Failed to update episode status to transcribing", {
+          episodeId,
           error: error instanceof Error ? error.message : String(error),
         });
       }
 
+      let submittedTranscriptId: string | undefined;
       try {
         const token = await wait.createToken({ timeout: "1h30m" });
-        const transcriptId = await submitTranscriptionAsync(enclosureUrl, token.url);
+        submittedTranscriptId = await submitTranscriptionAsync(enclosureUrl, token.url);
+        const transcriptId = submittedTranscriptId;
         logger.info("Submitted audio for async transcription", { transcriptId });
 
         const result = await wait.forToken<{
@@ -167,6 +170,9 @@ export const fetchTranscriptTask = task({
         }
       } catch (error) {
         logger.warn("AssemblyAI transcription unavailable, proceeding without it", {
+          episodeId,
+          enclosureUrl,
+          transcriptId: submittedTranscriptId,
           error: error instanceof Error ? error.message : String(error),
         });
       }

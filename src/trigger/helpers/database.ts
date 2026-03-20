@@ -103,9 +103,11 @@ export async function updateEpisodeStatus(
     .where(eq(episodes.podcastIndexId, String(episodeId)));
 }
 
-// NOTE: intentional double-write — fetch-transcript persists here for retry idempotency,
-// and persistEpisodeSummary will overwrite these same columns again immediately after.
-// Do not remove either call; the second write (persistEpisodeSummary) is authoritative.
+// NOTE: intentional double-write for non-cache sources — fetch-transcript persists here
+// for retry idempotency. On the success path, persistEpisodeSummary in summarize-episode
+// will overwrite these columns after summarization completes (that write is authoritative).
+// On cache-hit paths (source returned as undefined), this function is not called.
+// Do not remove either call.
 export async function persistTranscript(
   episodeId: number,
   transcript: string,

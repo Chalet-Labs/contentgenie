@@ -25,7 +25,7 @@ export const summarizeEpisode = task({
     name: "summarize-queue",
     concurrencyLimit: 3,
   },
-  maxDuration: 7200, // 2 hours — allows async AssemblyAI webhook wait
+  maxDuration: 7200, // 2 hours — retained for safety; actual AssemblyAI wait is in fetch-transcript
   onFailure: async (params: { payload: SummarizeEpisodePayload }) => {
     const { episodeId } = params.payload;
     logger.error("Summarization task failed permanently", { episodeId });
@@ -95,23 +95,34 @@ export const summarizeEpisode = task({
     // Step 3: Fetch transcript via dedicated task
     metadata.set("step", "fetching-transcript");
     logger.info("Fetching transcript");
-    const fetchTranscriptResult = await fetchTranscriptTask.triggerAndWait({
-      episodeId,
-      enclosureUrl: episode.enclosureUrl,
-      description: episode.description,
-      transcripts: episode.transcripts,
-    });
 
     let transcript: string | undefined;
     let dbTranscriptSource: "podcastindex" | "assemblyai" | "description-url" | null | undefined;
 
-    if (fetchTranscriptResult.ok) {
-      transcript = fetchTranscriptResult.output.transcript;
-      dbTranscriptSource = fetchTranscriptResult.output.source;
-    } else {
-      // Child task permanently failed after its retries — treat as no transcript available.
-      // Summarization continues without a transcript rather than aborting.
-      logger.warn("fetch-transcript task failed permanently, continuing without transcript", { episodeId });
+    try {
+      const fetchTranscriptResult = await fetchTranscriptTask.triggerAndWait({
+        episodeId,
+        enclosureUrl: episode.enclosureUrl,
+        description: episode.description,
+        transcripts: episode.transcripts,
+      });
+
+      if (fetchTranscriptResult.ok) {
+        transcript = fetchTranscriptResult.output.transcript;
+        dbTranscriptSource = fetchTranscriptResult.output.source;
+      } else {
+        // Child task permanently failed after its retries — treat as no transcript available.
+        // Summarization continues without a transcript rather than aborting.
+        logger.warn("fetch-transcript task failed permanently, continuing without transcript", { episodeId });
+        transcript = undefined;
+        dbTranscriptSource = null;
+      }
+    } catch (error) {
+      // SDK-level errors (network, serialization, queue) — treat same as ok:false
+      logger.warn("fetch-transcript task invocation failed, continuing without transcript", {
+        episodeId,
+        error: error instanceof Error ? error.message : String(error),
+      });
       transcript = undefined;
       dbTranscriptSource = null;
     }
@@ -151,8 +162,11 @@ export const summarizeEpisode = task({
         columns: { summary: true },
       });
       isNewEpisode = !priorEpisode?.summary;
-    } catch {
-      // If lookup fails, default to treating as new episode
+    } catch (error) {
+      logger.warn("Failed to check for prior summary, defaulting to new episode", {
+        episodeId,
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
 
     await retry.onThrow(

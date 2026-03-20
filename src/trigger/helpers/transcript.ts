@@ -6,7 +6,7 @@ const MAX_TRANSCRIPT_LENGTH = 50000;
 const FETCH_TIMEOUT_MS = 30000;
 
 export async function fetchTranscript(
-  episode: PodcastIndexEpisode
+  episode: Pick<PodcastIndexEpisode, "transcripts">
 ): Promise<string | undefined> {
   if (!episode.transcripts || episode.transcripts.length === 0) {
     return undefined;

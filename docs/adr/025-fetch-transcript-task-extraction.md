@@ -6,7 +6,7 @@
 
 ## Context
 
-The `summarize-episode` Trigger.dev task contains a ~150-line transcript acquisition waterfall (lines 96–248) that:
+The `summarize-episode` Trigger.dev task contained a ~150-line transcript acquisition waterfall that:
 
 1. Checks the DB cache for an existing transcription
 2. Fetches from PodcastIndex transcripts API
@@ -44,7 +44,7 @@ Create a dedicated `fetch-transcript` Trigger.dev task that owns the entire wate
 
 1. **Dedicated queue (`fetch-transcript-queue`), not `summarize-queue`.** With `concurrencyLimit: 3` on `summarize-queue`, three concurrent `summarize-episode` runs would hold all queue slots while awaiting their child `fetch-transcript` tasks — a guaranteed deadlock. A dedicated queue with no concurrency limit eliminates this entirely and allows independent scaling of transcript fetching.
 
-2. **`fetch-transcript` persists the transcript before returning.** Persistence is non-fatal: if the DB write fails, the task still returns the transcript. This makes the task idempotent — a retry after a network blip won't lose a successfully fetched transcript. `persistEpisodeSummary` in `summarize-episode` will overwrite the same columns again immediately after; the second write is authoritative.
+2. **`fetch-transcript` persists the transcript before returning.** Persistence is non-fatal: if the DB write fails, the task still returns the transcript. This makes the task idempotent — a retry after a network blip won't lose a successfully fetched transcript. For non-cache sources, `persistEpisodeSummary` in `summarize-episode` will overwrite these columns after summarization completes; that write is authoritative. On cache-hit paths (`source` returned as `undefined`), `persistTranscript` is not called and `transcriptSource` is preserved by `persistEpisodeSummary`'s conditional guard.
 
 3. **Source mapping moves into `fetch-transcript`.** The `"cached"` → `undefined` / `"none"` → `null` sentinel mapping previously lived in `summarize-episode`. It now lives in `fetch-transcript`, co-located with the responsibility that generates those sentinels. `summarize-episode` receives a clean DB-safe type and passes it straight through to `persistEpisodeSummary`.
 
