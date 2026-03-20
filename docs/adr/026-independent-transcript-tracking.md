@@ -13,7 +13,7 @@ Transcript state is currently implicit: `episodes.transcription` is either `NULL
 3. **No error tracking** — when transcript fetching fails, the error is only in Trigger.dev logs, not queryable from the database.
 4. **No timestamp** — we can't tell when a transcript was fetched vs. when the summary completed.
 
-The `transcriptSource` column already exists (added in a prior commit) with values `"podcastindex" | "assemblyai" | "description-url"`. Its CHECK constraint was defined in schema.ts but never generated into a migration (not in snapshot 0011). The existing column and CHECK constraint are unchanged by this work.
+The `transcriptSource` column was defined in `schema.ts` in a prior commit with values `"podcastindex" | "assemblyai" | "description-url"`, but neither the column nor its CHECK constraint were present in the database — they were missing from snapshot 0011 and no migration had been generated for them. Migration 0012 (this PR) materializes both in the database alongside the new transcript tracking columns.
 
 ## Decision
 
@@ -40,7 +40,7 @@ Add three new columns to the `episodes` table:
 ## Consequences
 
 - Migration 0012 will add `transcript_status`, `transcript_fetched_at`, `transcript_error` columns and a CHECK constraint for `transcript_status`.
-- The existing `transcript_source_enum` CHECK constraint (already in schema.ts but not in a migration) will be picked up by `drizzle-kit generate` alongside the new columns.
+- The `transcript_source` column and `transcript_source_enum` CHECK constraint (previously defined only in schema.ts, not in any migration) are materialized in the database by migration 0012 alongside the new columns.
 - Production requires manual `drizzle-kit push` after merge — same as every schema change (see `worth_it_reason` incident).
 - The `TranscriptStatus` type export enables downstream consumers (future UI, API routes) to use the new column safely.
 - No UI changes in this PR — the episode page already reads `transcriptSource` and will continue to work. Future PRs can use `transcriptStatus` for richer UI states.
