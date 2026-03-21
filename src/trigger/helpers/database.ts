@@ -160,6 +160,7 @@ export async function persistEpisodeSummary(
         processedAt: new Date(),
         summaryStatus: "completed",
         summaryRunId: null,
+        processingError: null,
         updatedAt: new Date(),
       })
       .where(eq(episodes.id, existingEpisode.id));

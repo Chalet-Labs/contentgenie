@@ -314,6 +314,21 @@ describe("summarize-episode task", () => {
     );
   });
 
+  it("onFailure still writes failed status when processingError lookup throws", async () => {
+    mockFindFirst.mockRejectedValueOnce(new Error("DB read failed"));
+    const { setFn } = makeUpdateChain();
+
+    await taskConfig.onFailure({ payload: { episodeId: 42 } });
+
+    // Update must still run with generic fallback
+    expect(mockUpdate).toHaveBeenCalled();
+    const setArgs = setFn.mock.calls[0][0];
+    expect(setArgs.summaryStatus).toBe("failed");
+    expect(setArgs.processingError).toBe(
+      "Summarization failed after maximum retry attempts"
+    );
+  });
+
   it("calls metadata.root.increment('failed', 1) in onFailure", async () => {
     await taskConfig.onFailure({ payload: { episodeId: 42 } });
 

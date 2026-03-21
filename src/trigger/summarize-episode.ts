@@ -33,19 +33,31 @@ export const summarizeEpisode = task({
   onFailure: async (params: { payload: SummarizeEpisodePayload }) => {
     const { episodeId } = params.payload;
     logger.error("Summarization task failed permanently", { episodeId });
+    let existingProcessingError: string | null = null;
     try {
       const existing = await db.query.episodes.findFirst({
         where: eq(episodes.podcastIndexId, String(episodeId)),
         columns: { processingError: true },
       });
+      existingProcessingError = existing?.processingError ?? null;
+    } catch (lookupError) {
+      logger.warn("Failed to read existing processingError in onFailure", {
+        episodeId,
+        error:
+          lookupError instanceof Error
+            ? lookupError.message
+            : String(lookupError),
+      });
+    }
 
+    try {
       await db
         .update(episodes)
         .set({
           summaryStatus: "failed",
           summaryRunId: null,
           processingError:
-            existing?.processingError ??
+            existingProcessingError ??
             "Summarization failed after maximum retry attempts",
           updatedAt: new Date(),
         })
