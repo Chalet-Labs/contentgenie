@@ -8,7 +8,7 @@ export type { SummaryResult } from "@/lib/openrouter";
 export async function generateEpisodeSummary(
   podcast: PodcastIndexPodcast | undefined,
   episode: PodcastIndexEpisode,
-  transcript?: string
+  transcript: string
 ): Promise<SummaryResult> {
   const prompt = getSummarizationPrompt(
     podcast?.title || "Unknown Podcast",

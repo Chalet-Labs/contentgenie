@@ -27,14 +27,11 @@ vi.mock("@trigger.dev/sdk", () => ({
 }));
 
 const mockFindFirst = vi.fn().mockResolvedValue(null);
+const mockUpdate = vi.fn();
 
 vi.mock("@/db", () => ({
   db: {
-    update: vi.fn().mockReturnValue({
-      set: vi.fn().mockReturnValue({
-        where: vi.fn().mockResolvedValue(undefined),
-      }),
-    }),
+    update: (...args: unknown[]) => mockUpdate(...args),
     query: {
       episodes: {
         findFirst: (...args: unknown[]) => mockFindFirst(...args),
@@ -69,13 +66,6 @@ vi.mock("@/trigger/helpers/database", () => ({
 vi.mock("@/trigger/helpers/notifications", () => ({
   createNotificationsForSubscribers: vi.fn(),
   resolvePodcastId: vi.fn(),
-}));
-
-const mockFetchTranscriptTriggerAndWait = vi.fn();
-vi.mock("@/trigger/fetch-transcript", () => ({
-  fetchTranscriptTask: {
-    triggerAndWait: (...args: unknown[]) => mockFetchTranscriptTriggerAndWait(...args),
-  },
 }));
 
 import { getEpisodeById, getPodcastById } from "@/trigger/helpers/podcastindex";
@@ -115,15 +105,19 @@ const mockSummary = {
   worthItReason: "Good content",
 };
 
+function makeUpdateChain(resolvedValue: unknown = undefined) {
+  const whereFn = vi.fn().mockResolvedValue(resolvedValue);
+  const setFn = vi.fn().mockReturnValue({ where: whereFn });
+  mockUpdate.mockReturnValue({ set: setFn });
+  return { setFn, whereFn };
+}
+
 describe("summarize-episode task", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockFindFirst.mockResolvedValue(null);
-    // Default: fetch-transcript returns a transcript
-    mockFetchTranscriptTriggerAndWait.mockResolvedValue({
-      ok: true,
-      output: { transcript: "Full transcript text", source: "podcastindex" },
-    });
+    // Default: episode has a transcript in the DB
+    mockFindFirst.mockResolvedValue({ transcription: "Full transcript text" });
+    makeUpdateChain();
   });
 
   afterEach(() => {
@@ -144,12 +138,6 @@ describe("summarize-episode task", () => {
     expect(result).toEqual(mockSummary);
     expect(getEpisodeById).toHaveBeenCalledWith(123);
     expect(getPodcastById).toHaveBeenCalledWith(456);
-    expect(mockFetchTranscriptTriggerAndWait).toHaveBeenCalledWith({
-      episodeId: 123,
-      enclosureUrl: mockEpisode.enclosureUrl,
-      description: mockEpisode.description,
-      transcripts: mockEpisode.transcripts,
-    });
     expect(generateEpisodeSummary).toHaveBeenCalledWith(
       mockPodcast,
       mockEpisode,
@@ -158,11 +146,24 @@ describe("summarize-episode task", () => {
     expect(persistEpisodeSummary).toHaveBeenCalledWith(
       mockEpisode,
       mockPodcast,
-      mockSummary,
-      "Full transcript text",
-      "podcastindex",
-      undefined,
-      null
+      mockSummary
+    );
+  });
+
+  it("reads transcript from DB (does not call fetch-transcript)", async () => {
+    vi.mocked(getEpisodeById).mockResolvedValue({ episode: mockEpisode } as never);
+    vi.mocked(getPodcastById).mockResolvedValue({ feed: mockPodcast } as never);
+    vi.mocked(generateEpisodeSummary).mockResolvedValue(mockSummary);
+    vi.mocked(persistEpisodeSummary).mockResolvedValue(undefined);
+
+    await taskConfig.run({ episodeId: 123 }, mockCtx);
+
+    // Transcript comes from findFirst (DB read), not from any external task
+    expect(mockFindFirst).toHaveBeenCalled();
+    expect(generateEpisodeSummary).toHaveBeenCalledWith(
+      mockPodcast,
+      mockEpisode,
+      "Full transcript text"
     );
   });
 
@@ -174,13 +175,55 @@ describe("summarize-episode task", () => {
     ).rejects.toThrow("Episode 999 not found");
   });
 
+  it("aborts when transcript is missing — writes failed status to DB before throwing", async () => {
+    vi.mocked(getEpisodeById).mockResolvedValue({ episode: mockEpisode } as never);
+    vi.mocked(getPodcastById).mockResolvedValue({ feed: mockPodcast } as never);
+    mockFindFirst.mockResolvedValue(null);
+    const { setFn } = makeUpdateChain();
+
+    await expect(
+      taskConfig.run({ episodeId: 123 }, mockCtx)
+    ).rejects.toThrow("has no transcript available");
+
+    // DB write must happen before the abort
+    expect(mockUpdate).toHaveBeenCalled();
+    const setArgs = setFn.mock.calls[0][0];
+    expect(setArgs.summaryStatus).toBe("failed");
+    expect(setArgs.summaryRunId).toBeNull();
+    expect(setArgs.processingError).toContain("123");
+    expect(setArgs.processingError).toContain("fetch-transcript");
+  });
+
+  it("aborts when transcript is whitespace-only — writes failed status to DB before throwing", async () => {
+    vi.mocked(getEpisodeById).mockResolvedValue({ episode: mockEpisode } as never);
+    vi.mocked(getPodcastById).mockResolvedValue({ feed: mockPodcast } as never);
+    mockFindFirst.mockResolvedValue({ transcription: "   \n  " });
+    const { setFn } = makeUpdateChain();
+
+    await expect(
+      taskConfig.run({ episodeId: 123 }, mockCtx)
+    ).rejects.toThrow("has no transcript available");
+
+    expect(setFn.mock.calls[0][0].summaryStatus).toBe("failed");
+  });
+
+  it("aborts when transcript is missing even if DB write fails", async () => {
+    vi.mocked(getEpisodeById).mockResolvedValue({ episode: mockEpisode } as never);
+    vi.mocked(getPodcastById).mockResolvedValue({ feed: mockPodcast } as never);
+    mockFindFirst.mockResolvedValue(null);
+    const whereFn = vi.fn().mockRejectedValue(new Error("DB unavailable"));
+    const setFn = vi.fn().mockReturnValue({ where: whereFn });
+    mockUpdate.mockReturnValue({ set: setFn });
+
+    // AbortTaskRunError must still be thrown even though the DB write fails
+    await expect(
+      taskConfig.run({ episodeId: 123 }, mockCtx)
+    ).rejects.toThrow("has no transcript available");
+  });
+
   it("proceeds without podcast context when fetch fails", async () => {
     vi.mocked(getEpisodeById).mockResolvedValue({ episode: mockEpisode } as never);
     vi.mocked(getPodcastById).mockRejectedValue(new Error("Podcast not found"));
-    mockFetchTranscriptTriggerAndWait.mockResolvedValue({
-      ok: true,
-      output: { transcript: undefined, source: null },
-    });
     vi.mocked(generateEpisodeSummary).mockResolvedValue(mockSummary);
     vi.mocked(persistEpisodeSummary).mockResolvedValue(undefined);
 
@@ -190,84 +233,11 @@ describe("summarize-episode task", () => {
     expect(generateEpisodeSummary).toHaveBeenCalledWith(
       undefined,
       mockEpisode,
-      undefined
+      "Full transcript text"
     );
   });
 
-  it("fetch-transcript ok:false path — continues without transcript, does not throw", async () => {
-    vi.mocked(getEpisodeById).mockResolvedValue({ episode: mockEpisode } as never);
-    vi.mocked(getPodcastById).mockResolvedValue({ feed: mockPodcast } as never);
-    mockFetchTranscriptTriggerAndWait.mockResolvedValue({ ok: false });
-    vi.mocked(generateEpisodeSummary).mockResolvedValue(mockSummary);
-    vi.mocked(persistEpisodeSummary).mockResolvedValue(undefined);
-
-    const result = await taskConfig.run({ episodeId: 123 }, mockCtx);
-
-    expect(result).toEqual(mockSummary);
-    expect(generateEpisodeSummary).toHaveBeenCalledWith(
-      mockPodcast,
-      mockEpisode,
-      undefined
-    );
-    expect(persistEpisodeSummary).toHaveBeenCalledWith(
-      mockEpisode,
-      mockPodcast,
-      mockSummary,
-      undefined,
-      undefined,
-      "failed",
-      "fetch-transcript task failed permanently after retries"
-    );
-  });
-
-  it("passes transcript and source from fetch-transcript to persistEpisodeSummary", async () => {
-    vi.mocked(getEpisodeById).mockResolvedValue({ episode: mockEpisode } as never);
-    vi.mocked(getPodcastById).mockResolvedValue({ feed: mockPodcast } as never);
-    mockFetchTranscriptTriggerAndWait.mockResolvedValue({
-      ok: true,
-      output: { transcript: "AssemblyAI text", source: "assemblyai" },
-    });
-    vi.mocked(generateEpisodeSummary).mockResolvedValue(mockSummary);
-    vi.mocked(persistEpisodeSummary).mockResolvedValue(undefined);
-
-    await taskConfig.run({ episodeId: 123 }, mockCtx);
-
-    expect(persistEpisodeSummary).toHaveBeenCalledWith(
-      mockEpisode,
-      mockPodcast,
-      mockSummary,
-      "AssemblyAI text",
-      "assemblyai",
-      undefined,
-      null
-    );
-  });
-
-  it("passes undefined source (cache hit) through to persistEpisodeSummary", async () => {
-    vi.mocked(getEpisodeById).mockResolvedValue({ episode: mockEpisode } as never);
-    vi.mocked(getPodcastById).mockResolvedValue({ feed: mockPodcast } as never);
-    mockFetchTranscriptTriggerAndWait.mockResolvedValue({
-      ok: true,
-      output: { transcript: "Cached transcript", source: undefined },
-    });
-    vi.mocked(generateEpisodeSummary).mockResolvedValue(mockSummary);
-    vi.mocked(persistEpisodeSummary).mockResolvedValue(undefined);
-
-    await taskConfig.run({ episodeId: 123 }, mockCtx);
-
-    // undefined source preserves existing DB value
-    expect(persistEpisodeSummary).toHaveBeenCalledWith(
-      mockEpisode,
-      mockPodcast,
-      mockSummary,
-      "Cached transcript",
-      undefined,
-      undefined,
-      null
-    );
-  });
-
-  it("calls updateEpisodeStatus('summarizing') after fetch-transcript completes", async () => {
+  it("calls updateEpisodeStatus('summarizing') before generating summary", async () => {
     vi.mocked(getEpisodeById).mockResolvedValue({ episode: mockEpisode } as never);
     vi.mocked(getPodcastById).mockResolvedValue({ feed: mockPodcast } as never);
     vi.mocked(generateEpisodeSummary).mockResolvedValue(mockSummary);
@@ -317,6 +287,48 @@ describe("summarize-episode task", () => {
     expect(completedCalls).toHaveLength(0);
   });
 
+  it("onFailure preserves existing processingError instead of overwriting", async () => {
+    mockFindFirst.mockResolvedValueOnce({
+      processingError: "Episode 42 has no transcript available — run fetch-transcript first",
+    });
+    const { setFn } = makeUpdateChain();
+
+    await taskConfig.onFailure({ payload: { episodeId: 42 } });
+
+    const setArgs = setFn.mock.calls[0][0];
+    expect(setArgs.processingError).toBe(
+      "Episode 42 has no transcript available — run fetch-transcript first"
+    );
+    expect(setArgs.summaryStatus).toBe("failed");
+  });
+
+  it("onFailure uses generic message when no prior processingError exists", async () => {
+    mockFindFirst.mockResolvedValueOnce({ processingError: null });
+    const { setFn } = makeUpdateChain();
+
+    await taskConfig.onFailure({ payload: { episodeId: 42 } });
+
+    const setArgs = setFn.mock.calls[0][0];
+    expect(setArgs.processingError).toBe(
+      "Summarization failed after maximum retry attempts"
+    );
+  });
+
+  it("onFailure still writes failed status when processingError lookup throws", async () => {
+    mockFindFirst.mockRejectedValueOnce(new Error("DB read failed"));
+    const { setFn } = makeUpdateChain();
+
+    await taskConfig.onFailure({ payload: { episodeId: 42 } });
+
+    // Update must still run with generic fallback
+    expect(mockUpdate).toHaveBeenCalled();
+    const setArgs = setFn.mock.calls[0][0];
+    expect(setArgs.summaryStatus).toBe("failed");
+    expect(setArgs.processingError).toBe(
+      "Summarization failed after maximum retry attempts"
+    );
+  });
+
   it("calls metadata.root.increment('failed', 1) in onFailure", async () => {
     await taskConfig.onFailure({ payload: { episodeId: 42 } });
 
@@ -324,16 +336,45 @@ describe("summarize-episode task", () => {
   });
 
   it("calls metadata.root.increment('failed', 1) even when DB update in onFailure fails", async () => {
-    const { db } = await import("@/db");
-    vi.mocked(db.update).mockReturnValue({
-      set: vi.fn().mockReturnValue({
-        where: vi.fn().mockRejectedValue(new Error("DB unavailable")),
-      }),
-    } as never);
+    const whereFn = vi.fn().mockRejectedValue(new Error("DB unavailable"));
+    const setFn = vi.fn().mockReturnValue({ where: whereFn });
+    mockUpdate.mockReturnValue({ set: setFn });
 
     await taskConfig.onFailure({ payload: { episodeId: 42 } });
 
     expect(mockMetadataRootIncrement).toHaveBeenCalledWith("failed", 1);
+  });
+
+  it("isNewEpisode=true sends both new_episode and summary_completed notifications", async () => {
+    vi.mocked(getEpisodeById).mockResolvedValue({ episode: mockEpisode } as never);
+    vi.mocked(getPodcastById).mockResolvedValue({ feed: mockPodcast } as never);
+    vi.mocked(generateEpisodeSummary).mockResolvedValue(mockSummary);
+    vi.mocked(persistEpisodeSummary).mockResolvedValue(undefined);
+    vi.mocked(resolvePodcastId).mockResolvedValue(99);
+    // Calls in order:
+    // 1. transcript + summary read (no prior summary → first-time)
+    // 2. episodeDbId lookup for notifications
+    mockFindFirst
+      .mockResolvedValueOnce({ transcription: "Full transcript text" })
+      .mockResolvedValueOnce({ id: 42 });
+
+    await taskConfig.run({ episodeId: 123 }, mockCtx);
+
+    expect(createNotificationsForSubscribers).toHaveBeenCalledWith(
+      99,
+      42,
+      "new_episode",
+      mockPodcast.title,
+      `New episode: ${mockEpisode.title}`
+    );
+    expect(createNotificationsForSubscribers).toHaveBeenCalledWith(
+      99,
+      42,
+      "summary_completed",
+      mockPodcast.title,
+      `Summary ready: ${mockEpisode.title}`
+    );
+    expect(createNotificationsForSubscribers).toHaveBeenCalledTimes(2);
   });
 
   it("isNewEpisode=false skips new_episode notification on re-summarization", async () => {
@@ -341,22 +382,20 @@ describe("summarize-episode task", () => {
     vi.mocked(getPodcastById).mockResolvedValue({ feed: mockPodcast } as never);
     vi.mocked(generateEpisodeSummary).mockResolvedValue(mockSummary);
     vi.mocked(persistEpisodeSummary).mockResolvedValue(undefined);
-    // Enter the notification branch
     vi.mocked(resolvePodcastId).mockResolvedValue(99);
-    // First call: prior summary check (existing summary → re-summarization)
-    // Second call: episodeDbId lookup for notifications
+    // Calls in order:
+    // 1. transcript + summary read (existing summary → re-summarization)
+    // 2. episodeDbId lookup for notifications
     mockFindFirst
-      .mockResolvedValueOnce({ summary: "Existing summary" })
+      .mockResolvedValueOnce({ transcription: "Full transcript text", summary: "Existing summary" })
       .mockResolvedValueOnce({ id: 42 });
 
     const result = await taskConfig.run({ episodeId: 123 }, mockCtx);
 
     expect(result).toEqual(mockSummary);
-    // new_episode should NOT be sent on re-summarization
     const newEpisodeCalls = vi.mocked(createNotificationsForSubscribers).mock.calls
       .filter(([, , type]) => type === "new_episode");
     expect(newEpisodeCalls).toHaveLength(0);
-    // summary_completed should still be sent
     expect(createNotificationsForSubscribers).toHaveBeenCalledWith(
       99,
       42,

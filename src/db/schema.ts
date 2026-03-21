@@ -96,7 +96,7 @@ export const episodes = pgTable(
     processedAt: timestamp("processed_at"),
     summaryRunId: text("summary_run_id"),
     summaryStatus: text("summary_status").$type<
-      "queued" | "running" | "transcribing" | "summarizing" | "completed" | "failed"
+      "queued" | "running" | "summarizing" | "completed" | "failed"
     >(),
     transcriptSource: text("transcript_source").$type<
       "podcastindex" | "assemblyai" | "description-url"
@@ -121,7 +121,7 @@ export const episodes = pgTable(
     ),
     check(
       "summary_status_enum",
-      sql`${table.summaryStatus} IN ('queued', 'running', 'transcribing', 'summarizing', 'completed', 'failed')`
+      sql`${table.summaryStatus} IN ('queued', 'running', 'summarizing', 'completed', 'failed')`
     ),
     check(
       "transcript_source_enum",
@@ -495,6 +495,5 @@ export type TranscriptStatus = NonNullable<Episode["transcriptStatus"]>;
 export const IN_PROGRESS_STATUSES: SummaryStatus[] = [
   "queued",
   "running",
-  "transcribing",
   "summarizing",
 ];

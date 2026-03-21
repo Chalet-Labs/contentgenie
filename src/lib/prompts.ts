@@ -14,18 +14,12 @@ export function getSummarizationPrompt(
   episodeTitle: string,
   description: string,
   duration: number,
-  transcript?: string
+  transcript: string
 ): string {
   const durationMinutes = duration > 0 ? Math.round(duration / 60) : null;
-  const hasTranscript = transcript && transcript.length > 100;
 
-  const contentSection = hasTranscript
-    ? `## Transcript (full or partial):
-${transcript}`
-    : `## Episode Description:
-${description}
-
-Note: Full transcript not available. Base your analysis on the episode description and metadata.`;
+  const contentSection = `## Transcript (full or partial):
+${transcript}`;
 
   return `Analyze this podcast episode and provide a structured summary:
 
@@ -70,7 +64,6 @@ The **worthItScore** is the average of the three dimensions, rounded to 1 decima
 Important:
 - 5 is the average baseline. Justify every point above 5 with specific evidence.
 - Extract 3-5 key takeaways, prioritizing actionable insights
-- If working from description only, be honest about the limitations and score conservatively
 - The summary must include all 5 sections (TL;DR, What You'll Learn, Notable Quotes / Key Moments, Action Items, Bottom Line) using ## headers
 - For Notable Quotes / Key Moments: include 2-3 standout moments; add approximate timestamps (~XX:XX) when working from a transcript; write "No notable moments available" if nothing stands out
 - Consider the time investment (${durationMinutes != null ? `${durationMinutes} min` : "unknown duration"}) when scoring timeValue

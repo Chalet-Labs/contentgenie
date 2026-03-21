@@ -20,11 +20,10 @@ export function ProcessingStatus({ status, className }: ProcessingStatusProps) {
         </Badge>
       );
     case "running":
-    case "transcribing":
       return (
         <Badge variant="secondary" className={className}>
           <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-          Transcribing...
+          Processing...
         </Badge>
       );
     case "summarizing":
@@ -48,5 +47,9 @@ export function ProcessingStatus({ status, className }: ProcessingStatusProps) {
           Failed
         </Badge>
       );
+    default: {
+      const _exhaustive: never = status;
+      return null;
+    }
   }
 }

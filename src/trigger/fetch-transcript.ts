@@ -4,7 +4,7 @@ import { db } from "@/db";
 import { episodes } from "@/db/schema";
 import { fetchTranscript, extractTranscriptUrl, fetchTranscriptFromUrl } from "@/trigger/helpers/transcript";
 import { submitTranscriptionAsync, getTranscriptionStatus } from "@/lib/assemblyai";
-import { updateEpisodeStatus, persistTranscript } from "@/trigger/helpers/database";
+import { persistTranscript } from "@/trigger/helpers/database";
 
 export type FetchTranscriptPayload = {
   episodeId: number;
@@ -100,15 +100,6 @@ export const fetchTranscriptTask = task({
     if (!transcript && enclosureUrl) {
       metadata.set("step", "transcribing-audio");
 
-      try {
-        await updateEpisodeStatus(episodeId, "transcribing");
-      } catch (error) {
-        logger.warn("Failed to update episode status to transcribing", {
-          episodeId,
-          error: error instanceof Error ? error.message : String(error),
-        });
-      }
-
       let submittedTranscriptId: string | undefined;
       try {
         const token = await wait.createToken({ timeout: "1h30m" });
@@ -202,15 +193,9 @@ export const fetchTranscriptTask = task({
 
     // Persist transcript before returning for retry idempotency.
     // Only persist when we fetched from an external source (not cache — DB is already correct).
-    // persistEpisodeSummary in summarize-episode will overwrite these columns again; that write is authoritative.
+    // This is the sole writer of transcript columns (ADR-027).
     if (transcript && dbSource !== undefined && dbSource !== null) {
-      try {
-        await persistTranscript(episodeId, transcript, dbSource);
-      } catch (error) {
-        logger.warn("Failed to persist transcript (non-fatal), continuing", {
-          error: error instanceof Error ? error.message : String(error),
-        });
-      }
+      await persistTranscript(episodeId, transcript, dbSource);
     }
 
     return { transcript, source: dbSource };

@@ -14,15 +14,9 @@ import {
   ChevronUp,
 } from "lucide-react";
 import { getScoreColor, getScoreLabel } from "@/lib/score-utils";
+import type { SummarizationStep } from "@/trigger/types";
 
-export type SummarizationStep =
-  | "fetching-episode"
-  | "fetching-podcast"
-  | "fetching-transcript"
-  | "transcribing-audio"
-  | "generating-summary"
-  | "saving-results"
-  | "completed";
+export type { SummarizationStep } from "@/trigger/types";
 
 interface SummaryDisplayProps {
   summary: string | null;
@@ -43,8 +37,6 @@ interface SummaryDisplayProps {
 const STEP_LABELS: Record<SummarizationStep, string> = {
   "fetching-episode": "Fetching episode data",
   "fetching-podcast": "Fetching podcast info",
-  "fetching-transcript": "Fetching transcript",
-  "transcribing-audio": "Transcribing audio",
   "generating-summary": "Generating AI summary",
   "saving-results": "Saving results",
   completed: "Complete",
@@ -53,8 +45,6 @@ const STEP_LABELS: Record<SummarizationStep, string> = {
 const STEP_ORDER: SummarizationStep[] = [
   "fetching-episode",
   "fetching-podcast",
-  "fetching-transcript",
-  "transcribing-audio",
   "generating-summary",
   "saving-results",
 ];

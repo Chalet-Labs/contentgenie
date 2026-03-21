@@ -35,7 +35,7 @@ Add three new columns to the `episodes` table:
 
 4. **Backfill via appended SQL in the generated migration** — `drizzle-kit generate` produces the DDL; we append UPDATE statements after the `statement-breakpoint` delimiter. Preview deploys use `drizzle-kit push` (which doesn't run migration files), but column defaults handle new inserts. Backfill is a one-time production concern.
 
-5. **`persistTranscript` owns `transcriptFetchedAt`** — the pipeline is `persistTranscript` (early, at actual fetch time) → `persistEpisodeSummary` (later, at summary completion time). Only `persistTranscript` sets `transcriptFetchedAt` because it captures the real fetch timestamp. `persistEpisodeSummary` sets `transcriptStatus` and `transcriptError` but must NOT overwrite `transcriptFetchedAt` — doing so would replace the accurate fetch time with the later summary completion time.
+5. **`persistTranscript` owns all transcript columns** — ~~the pipeline is `persistTranscript` (early, at actual fetch time) → `persistEpisodeSummary` (later, at summary completion time). Only `persistTranscript` sets `transcriptFetchedAt` because it captures the real fetch timestamp. `persistEpisodeSummary` sets `transcriptStatus` and `transcriptError` but must NOT overwrite `transcriptFetchedAt`.~~ **Superseded by [ADR-027](027-summarize-episode-pure-consumer.md):** `persistEpisodeSummary` no longer writes any transcript columns. `persistTranscript` is the sole writer of all transcript columns (`transcription`, `transcriptSource`, `transcriptStatus`, `transcriptFetchedAt`, `transcriptError`).
 
 ## Consequences
 

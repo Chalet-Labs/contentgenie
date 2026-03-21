@@ -56,10 +56,8 @@ vi.mock("@/trigger/helpers/transcript", () => ({
   fetchTranscriptFromUrl: (...args: unknown[]) => mockFetchTranscriptFromUrl(...args),
 }));
 
-const mockUpdateEpisodeStatus = vi.fn();
 const mockPersistTranscript = vi.fn();
 vi.mock("@/trigger/helpers/database", () => ({
-  updateEpisodeStatus: (...args: unknown[]) => mockUpdateEpisodeStatus(...args),
   persistTranscript: (...args: unknown[]) => mockPersistTranscript(...args),
 }));
 
@@ -89,7 +87,6 @@ describe("fetch-transcript task", () => {
     vi.clearAllMocks();
     mockFindFirst.mockResolvedValue(null);
     mockPersistTranscript.mockResolvedValue(undefined);
-    mockUpdateEpisodeStatus.mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -172,7 +169,6 @@ describe("fetch-transcript task", () => {
 
     expect(result).toEqual({ transcript: "AssemblyAI transcript", source: "assemblyai" });
     expect(mockPersistTranscript).toHaveBeenCalledWith(123, "AssemblyAI transcript", "assemblyai");
-    expect(mockUpdateEpisodeStatus).toHaveBeenCalledWith(123, "transcribing");
   });
 
   it("all sources fail returns transcript: undefined, source: null, no persistTranscript call", async () => {
@@ -231,13 +227,13 @@ describe("fetch-transcript task", () => {
     expect(mockPersistTranscript).not.toHaveBeenCalled();
   });
 
-  it("persistTranscript failure is non-fatal — task still returns transcript", async () => {
+  it("persistTranscript failure propagates — transcript must be persisted for downstream consumers", async () => {
     mockFetchTranscript.mockResolvedValue("PodcastIndex transcript");
     mockPersistTranscript.mockRejectedValue(new Error("DB unavailable"));
 
-    const result = await taskConfig.run({ episodeId: 123, transcripts: mockTranscripts });
-
-    expect(result).toEqual({ transcript: "PodcastIndex transcript", source: "podcastindex" });
+    await expect(
+      taskConfig.run({ episodeId: 123, transcripts: mockTranscripts })
+    ).rejects.toThrow("DB unavailable");
     expect(mockPersistTranscript).toHaveBeenCalled();
   });
 
