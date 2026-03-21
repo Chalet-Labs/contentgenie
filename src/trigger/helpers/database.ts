@@ -105,7 +105,9 @@ export async function updateEpisodeStatus(
 
 // NOTE: intentional double-write for non-cache sources — fetch-transcript persists here
 // for retry idempotency. On the success path, persistEpisodeSummary in summarize-episode
-// will overwrite these columns after summarization completes (that write is authoritative).
+// will overwrite transcription, transcriptSource, and transcriptStatus after summarization
+// completes (that write is authoritative for those columns). It intentionally does NOT
+// overwrite transcriptFetchedAt — see ADR-026.
 // On cache-hit paths (source returned as undefined), this function is not called.
 // Do not remove either call.
 export async function persistTranscript(
@@ -113,12 +115,16 @@ export async function persistTranscript(
   transcript: string,
   source: "podcastindex" | "assemblyai" | "description-url"
 ): Promise<void> {
+  const now = new Date();
   const updated = await db
     .update(episodes)
     .set({
       transcription: transcript,
       transcriptSource: source,
-      updatedAt: new Date(),
+      transcriptStatus: "available",
+      transcriptFetchedAt: now,
+      transcriptError: null,
+      updatedAt: now,
     })
     .where(eq(episodes.podcastIndexId, String(episodeId)))
     .returning({ id: episodes.id });
@@ -133,7 +139,9 @@ export async function persistEpisodeSummary(
   podcast: PodcastIndexPodcast | undefined,
   summary: SummaryResult,
   transcript?: string,
-  transcriptSource?: "podcastindex" | "assemblyai" | "description-url" | null
+  transcriptSource?: "podcastindex" | "assemblyai" | "description-url" | null,
+  explicitTranscriptStatus?: "available" | "missing" | "failed",
+  explicitTranscriptError?: string | null
 ): Promise<void> {
   const podcastId = await ensurePodcast(episode.feedId, podcast);
   if (!podcastId) {
@@ -144,6 +152,10 @@ export async function persistEpisodeSummary(
   const existingEpisode = await db.query.episodes.findFirst({
     where: eq(episodes.podcastIndexId, episode.id.toString()),
   });
+
+  // Use explicit status when provided (e.g. "failed" from a fetch error);
+  // fall back to deriving from transcript presence for backward compatibility
+  const transcriptStatus = explicitTranscriptStatus ?? (transcript ? "available" : "missing");
 
   if (existingEpisode) {
     const updateFields: Partial<NewEpisode> = {
@@ -156,8 +168,18 @@ export async function persistEpisodeSummary(
       processedAt: new Date(),
       summaryStatus: "completed",
       summaryRunId: null,
+      transcriptStatus,
       updatedAt: new Date(),
     };
+    // Set transcriptError based on outcome:
+    // - "available": clear any previous error
+    // - "failed": record the explicit error
+    // - "missing": omit — preserves any previously recorded fetch-failure details
+    if (transcriptStatus === "available") {
+      updateFields.transcriptError = null;
+    } else if (transcriptStatus === "failed" && explicitTranscriptError !== undefined) {
+      updateFields.transcriptError = explicitTranscriptError;
+    }
     // Only overwrite transcriptSource when explicitly provided (undefined = keep existing)
     if (transcriptSource !== undefined) {
       updateFields.transcriptSource = transcriptSource;
@@ -180,6 +202,9 @@ export async function persistEpisodeSummary(
         : null,
       transcription: transcript,
       transcriptSource: transcriptSource ?? null,
+      transcriptStatus,
+      transcriptFetchedAt: null,
+      transcriptError: (transcriptStatus === "failed" ? explicitTranscriptError ?? null : null),
       summary: summary.summary,
       keyTakeaways: summary.keyTakeaways,
       worthItScore: summary.worthItScore.toFixed(2),

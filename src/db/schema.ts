@@ -101,6 +101,11 @@ export const episodes = pgTable(
     transcriptSource: text("transcript_source").$type<
       "podcastindex" | "assemblyai" | "description-url"
     >(),
+    transcriptStatus: text("transcript_status").$type<
+      "missing" | "fetching" | "available" | "failed"
+    >(),
+    transcriptFetchedAt: timestamp("transcript_fetched_at"),
+    transcriptError: text("transcript_error"),
     processingError: text("processing_error"),
     rssGuid: text("rss_guid"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -121,6 +126,10 @@ export const episodes = pgTable(
     check(
       "transcript_source_enum",
       sql`${table.transcriptSource} IN ('podcastindex', 'assemblyai', 'description-url')`
+    ),
+    check(
+      "transcript_status_enum",
+      sql`${table.transcriptStatus} IN ('missing', 'fetching', 'available', 'failed')`
     ),
   ]
 );
@@ -480,6 +489,7 @@ export type TrendingTopicsRow = typeof trendingTopics.$inferSelect;
 export type NewTrendingTopicsRow = typeof trendingTopics.$inferInsert;
 
 export type SummaryStatus = NonNullable<Episode["summaryStatus"]>;
+export type TranscriptStatus = NonNullable<Episode["transcriptStatus"]>;
 
 /** Statuses that indicate a summarization run is still in progress. */
 export const IN_PROGRESS_STATUSES: SummaryStatus[] = [

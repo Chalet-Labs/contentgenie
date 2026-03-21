@@ -160,7 +160,9 @@ describe("summarize-episode task", () => {
       mockPodcast,
       mockSummary,
       "Full transcript text",
-      "podcastindex"
+      "podcastindex",
+      undefined,
+      null
     );
   });
 
@@ -212,7 +214,9 @@ describe("summarize-episode task", () => {
       mockPodcast,
       mockSummary,
       undefined,
-      undefined
+      undefined,
+      "failed",
+      "fetch-transcript task failed permanently after retries"
     );
   });
 
@@ -233,7 +237,9 @@ describe("summarize-episode task", () => {
       mockPodcast,
       mockSummary,
       "AssemblyAI text",
-      "assemblyai"
+      "assemblyai",
+      undefined,
+      null
     );
   });
 
@@ -255,7 +261,9 @@ describe("summarize-episode task", () => {
       mockPodcast,
       mockSummary,
       "Cached transcript",
-      undefined
+      undefined,
+      undefined,
+      null
     );
   });
 
