@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth as clerkAuth } from "@clerk/nextjs/server";
 import { inArray } from "drizzle-orm";
-import { tasks, auth } from "@trigger.dev/sdk";
+import { tasks } from "@trigger.dev/sdk";
 import { db } from "@/db";
 import { episodes } from "@/db/schema";
 import { ADMIN_ROLE } from "@/lib/auth-roles";
@@ -64,15 +64,10 @@ export async function POST(request: NextRequest) {
     }))
   );
 
-  // tasks.batchTrigger returns { batchId, runCount } — no per-run IDs at trigger time.
-  // Scope the public access token to the batch so the caller can monitor via batchId.
-  const publicAccessToken = await auth.createPublicToken({
-    scopes: { read: { batch: batchResult.batchId } },
-    expirationTime: "15m",
-  });
-
-  return NextResponse.json(
-    { batchId: batchResult.batchId, runCount: batchResult.runCount, publicAccessToken, total: episodeIds.length },
-    { status: 202 }
-  );
+  // tasks.batchTrigger returns { batchId, runCount, publicAccessToken } — no per-run IDs.
+  return NextResponse.json({
+    batchId: batchResult.batchId,
+    publicAccessToken: batchResult.publicAccessToken,
+    total: episodeIds.length,
+  }, { status: 202 });
 }

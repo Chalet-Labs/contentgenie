@@ -24,16 +24,14 @@ vi.mock("drizzle-orm", () => ({
   inArray: vi.fn((col: unknown, vals: unknown) => ({ type: "inArray", col, vals })),
 }));
 
-// tasks.batchTrigger returns { batchId, runCount } — no .runs array
+// tasks.batchTrigger returns { batchId, runCount, publicAccessToken } — no .runs array
 vi.mock("@trigger.dev/sdk", () => ({
   tasks: {
     batchTrigger: vi.fn().mockResolvedValue({
-      batchId: "batch_abc123",
+      batchId: "batch-123",
       runCount: 2,
+      publicAccessToken: "batch-token",
     }),
-  },
-  auth: {
-    createPublicToken: vi.fn().mockResolvedValue("test-batch-token"),
   },
 }));
 
@@ -228,9 +226,8 @@ describe("POST /api/episodes/batch-fetch-transcripts", () => {
     const data = await response.json();
 
     expect(response.status).toBe(202);
-    expect(data.batchId).toBe("batch_abc123");
-    expect(data.runCount).toBe(2);
-    expect(data.publicAccessToken).toBe("test-batch-token");
+    expect(data.batchId).toBe("batch-123");
+    expect(data.publicAccessToken).toBe("batch-token");
     expect(data.total).toBe(2);
   });
 
@@ -304,7 +301,7 @@ describe("POST /api/episodes/batch-fetch-transcripts", () => {
     expect(callArg[1].payload.force).toBe(true);
   });
 
-  it("publicAccessToken is scoped to the batchId", async () => {
+  it("publicAccessToken comes from batchResult (not a separate auth call)", async () => {
     vi.mocked(auth).mockResolvedValue({
       userId: "admin_1",
       has: vi.fn().mockReturnValue(true),
@@ -317,14 +314,12 @@ describe("POST /api/episodes/batch-fetch-transcripts", () => {
     const { POST } = await import(
       "@/app/api/episodes/batch-fetch-transcripts/route"
     );
-    await POST(makeRequest({ episodeIds: [1, 2] }));
+    const response = await POST(makeRequest({ episodeIds: [1, 2] }));
+    const data = await response.json();
 
-    const { auth: triggerAuth } = await import("@trigger.dev/sdk");
-    expect(triggerAuth.createPublicToken).toHaveBeenCalledWith(
-      expect.objectContaining({
-        scopes: { read: { batch: "batch_abc123" } },
-      })
-    );
+    // publicAccessToken is taken directly from batchResult, not generated via auth.createPublicToken
+    expect(data.publicAccessToken).toBe("batch-token");
+    expect(data.batchId).toBe("batch-123");
   });
 
   it("accepts exactly 20 episodes (the maximum)", async () => {
