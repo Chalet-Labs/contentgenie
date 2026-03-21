@@ -187,10 +187,65 @@ describe("persistEpisodeSummary — transcript columns", () => {
       null
     );
 
+    const setArgs = chain.set.mock.calls[0][0] as Record<string, unknown>;
+    expect(setArgs.transcriptStatus).toBe("missing");
+    // transcriptError should NOT be set — preserves any existing fetch-failure details
+    expect(Object.hasOwn(setArgs, "transcriptError")).toBe(false);
+  });
+
+  it("sets transcriptStatus to 'failed' and records error when explicit status is 'failed' (update path)", async () => {
+    mockPodcastsFindFirst.mockResolvedValue({ id: 1 });
+    mockEpisodesFindFirst.mockResolvedValue({ id: 10 });
+
+    const chain = {
+      set: vi.fn(),
+      where: vi.fn(),
+    };
+    chain.set.mockReturnValue(chain);
+    chain.where.mockResolvedValue(undefined);
+    mockUpdate.mockReturnValue(chain);
+
+    const { persistEpisodeSummary } = await import("@/trigger/helpers/database");
+    await persistEpisodeSummary(
+      baseEpisode as never,
+      undefined,
+      baseSummary,
+      undefined,
+      null,
+      "failed",
+      "fetch-transcript task failed permanently after retries"
+    );
+
     expect(chain.set).toHaveBeenCalledWith(
       expect.objectContaining({
-        transcriptStatus: "missing",
-        transcriptError: null,
+        transcriptStatus: "failed",
+        transcriptError: "fetch-transcript task failed permanently after retries",
+      })
+    );
+  });
+
+  it("sets transcriptStatus to 'failed' and records error in the insert path", async () => {
+    mockPodcastsFindFirst.mockResolvedValue({ id: 1 });
+    mockEpisodesFindFirst.mockResolvedValue(null);
+
+    const chain = makeInsertChain();
+    mockInsert.mockReturnValue(chain);
+
+    const { persistEpisodeSummary } = await import("@/trigger/helpers/database");
+    await persistEpisodeSummary(
+      baseEpisode as never,
+      undefined,
+      baseSummary,
+      undefined,
+      null,
+      "failed",
+      "SDK error: connection timeout"
+    );
+
+    expect(chain.values).toHaveBeenCalledWith(
+      expect.objectContaining({
+        transcriptStatus: "failed",
+        transcriptError: "SDK error: connection timeout",
       })
     );
   });

@@ -139,7 +139,9 @@ export async function persistEpisodeSummary(
   podcast: PodcastIndexPodcast | undefined,
   summary: SummaryResult,
   transcript?: string,
-  transcriptSource?: "podcastindex" | "assemblyai" | "description-url" | null
+  transcriptSource?: "podcastindex" | "assemblyai" | "description-url" | null,
+  explicitTranscriptStatus?: "available" | "missing" | "failed",
+  explicitTranscriptError?: string | null
 ): Promise<void> {
   const podcastId = await ensurePodcast(episode.feedId, podcast);
   if (!podcastId) {
@@ -151,7 +153,9 @@ export async function persistEpisodeSummary(
     where: eq(episodes.podcastIndexId, episode.id.toString()),
   });
 
-  const transcriptStatus = transcript ? "available" : "missing";
+  // Use explicit status when provided (e.g. "failed" from a fetch error);
+  // fall back to deriving from transcript presence for backward compatibility
+  const transcriptStatus = explicitTranscriptStatus ?? (transcript ? "available" : "missing");
 
   if (existingEpisode) {
     const updateFields: Partial<NewEpisode> = {
@@ -165,9 +169,17 @@ export async function persistEpisodeSummary(
       summaryStatus: "completed",
       summaryRunId: null,
       transcriptStatus,
-      transcriptError: null,
       updatedAt: new Date(),
     };
+    // Set transcriptError based on outcome:
+    // - "available": clear any previous error
+    // - "failed": record the explicit error
+    // - "missing": omit — preserves any previously recorded fetch-failure details
+    if (transcriptStatus === "available") {
+      updateFields.transcriptError = null;
+    } else if (transcriptStatus === "failed" && explicitTranscriptError !== undefined) {
+      updateFields.transcriptError = explicitTranscriptError;
+    }
     // Only overwrite transcriptSource when explicitly provided (undefined = keep existing)
     if (transcriptSource !== undefined) {
       updateFields.transcriptSource = transcriptSource;
@@ -192,7 +204,7 @@ export async function persistEpisodeSummary(
       transcriptSource: transcriptSource ?? null,
       transcriptStatus,
       transcriptFetchedAt: null,
-      transcriptError: null,
+      transcriptError: (transcriptStatus === "failed" ? explicitTranscriptError ?? null : null),
       summary: summary.summary,
       keyTakeaways: summary.keyTakeaways,
       worthItScore: summary.worthItScore.toFixed(2),

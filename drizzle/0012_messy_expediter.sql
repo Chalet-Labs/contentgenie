@@ -1,6 +1,8 @@
 -- NOTE: transcript_source column and transcript_source_enum constraint may already exist
--- in databases where they were applied via drizzle-kit push. Lines 1 and 5 will no-op
--- under drizzle-kit push (idempotent) but will fail under drizzle-kit migrate if already present.
+-- in databases where they were previously created via drizzle-kit push (which diffs schema.ts
+-- against the live DB and does not execute this SQL file). When this migration is applied
+-- (via drizzle-kit migrate or manual execution), the ADD COLUMN/CONSTRAINT statements will
+-- fail if these objects are already present.
 ALTER TABLE "episodes" ADD COLUMN "transcript_source" text;--> statement-breakpoint
 ALTER TABLE "episodes" ADD COLUMN "transcript_status" text;--> statement-breakpoint
 ALTER TABLE "episodes" ADD COLUMN "transcript_fetched_at" timestamp;--> statement-breakpoint

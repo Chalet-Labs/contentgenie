@@ -98,6 +98,8 @@ export const summarizeEpisode = task({
 
     let transcript: string | undefined;
     let dbTranscriptSource: "podcastindex" | "assemblyai" | "description-url" | null | undefined;
+    let explicitTranscriptStatus: "available" | "missing" | "failed" | undefined;
+    let explicitTranscriptError: string | null = null;
 
     try {
       const fetchTranscriptResult = await fetchTranscriptTask.triggerAndWait({
@@ -110,21 +112,27 @@ export const summarizeEpisode = task({
       if (fetchTranscriptResult.ok) {
         transcript = fetchTranscriptResult.output.transcript;
         dbTranscriptSource = fetchTranscriptResult.output.source;
+        // Let persistEpisodeSummary derive status from transcript presence
       } else {
-        // Child task permanently failed after its retries — treat as no transcript available.
+        // Child task permanently failed after its retries — mark as failed, not missing.
         // Summarization continues without a transcript rather than aborting.
         logger.warn("fetch-transcript task failed permanently, continuing without transcript", { episodeId });
         transcript = undefined;
         dbTranscriptSource = undefined;
+        explicitTranscriptStatus = "failed";
+        explicitTranscriptError = "fetch-transcript task failed permanently after retries";
       }
     } catch (error) {
-      // SDK-level errors (network, serialization, queue) — treat same as ok:false
+      // SDK-level errors (network, serialization, queue) — mark as failed
+      const errorMsg = error instanceof Error ? error.message : String(error);
       logger.warn("fetch-transcript task invocation failed, continuing without transcript", {
         episodeId,
-        error: error instanceof Error ? error.message : String(error),
+        error: errorMsg,
       });
       transcript = undefined;
       dbTranscriptSource = undefined;
+      explicitTranscriptStatus = "failed";
+      explicitTranscriptError = errorMsg;
     }
 
     // Step 4: Generate AI summary
@@ -170,7 +178,7 @@ export const summarizeEpisode = task({
     }
 
     await retry.onThrow(
-      async () => persistEpisodeSummary(episode, podcast, summary, transcript, dbTranscriptSource),
+      async () => persistEpisodeSummary(episode, podcast, summary, transcript, dbTranscriptSource, explicitTranscriptStatus, explicitTranscriptError),
       { maxAttempts: 3 }
     );
 
