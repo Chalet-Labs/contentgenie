@@ -7,7 +7,6 @@ import { createNotificationsForSubscribers, resolvePodcastId } from "@/trigger/h
 import { db } from "@/db";
 import { episodes } from "@/db/schema";
 import type { PodcastIndexEpisode, PodcastIndexPodcast } from "@/lib/podcastindex";
-import { fetchTranscriptTask } from "@/trigger/fetch-transcript";
 
 export type SummarizeEpisodePayload = {
   episodeId: number;
@@ -25,7 +24,7 @@ export const summarizeEpisode = task({
     name: "summarize-queue",
     concurrencyLimit: 3,
   },
-  maxDuration: 7200, // 2 hours — retained for safety; actual AssemblyAI wait is in fetch-transcript
+  maxDuration: 600, // 10 min — summarization itself is ~10-30s; generous buffer for retries
   onFailure: async (params: { payload: SummarizeEpisodePayload }) => {
     const { episodeId } = params.payload;
     logger.error("Summarization task failed permanently", { episodeId });
@@ -92,48 +91,35 @@ export const summarizeEpisode = task({
       });
     }
 
-    // Step 3: Fetch transcript via dedicated task
-    metadata.set("step", "fetching-transcript");
-    logger.info("Fetching transcript");
+    // Step 3: Read transcript from database — fetch-transcript must have run first
+    logger.info("Reading transcript from database", { episodeId });
 
-    let transcript: string | undefined;
-    let dbTranscriptSource: "podcastindex" | "assemblyai" | "description-url" | null | undefined;
-    let explicitTranscriptStatus: "available" | "missing" | "failed" | undefined;
-    let explicitTranscriptError: string | null = null;
+    const episodeRow = await db.query.episodes.findFirst({
+      where: eq(episodes.podcastIndexId, String(episodeId)),
+      columns: { transcription: true },
+    });
 
-    try {
-      const fetchTranscriptResult = await fetchTranscriptTask.triggerAndWait({
-        episodeId,
-        enclosureUrl: episode.enclosureUrl,
-        description: episode.description,
-        transcripts: episode.transcripts,
-      });
+    const transcript = episodeRow?.transcription?.trim() || null;
 
-      if (fetchTranscriptResult.ok) {
-        transcript = fetchTranscriptResult.output.transcript;
-        dbTranscriptSource = fetchTranscriptResult.output.source;
-        // Let persistEpisodeSummary derive status from transcript presence
-      } else {
-        // Child task permanently failed after its retries — mark as failed, not missing.
-        // Summarization continues without a transcript rather than aborting.
-        logger.warn("fetch-transcript task failed permanently, continuing without transcript", { episodeId });
-        transcript = undefined;
-        dbTranscriptSource = undefined;
-        explicitTranscriptStatus = "failed";
-        explicitTranscriptError = "fetch-transcript task failed permanently after retries";
+    if (!transcript) {
+      const errorMsg = `Episode ${episodeId} has no transcript available — run fetch-transcript first`;
+      try {
+        await db.update(episodes).set({
+          summaryStatus: "failed",
+          summaryRunId: null,
+          processingError: errorMsg,
+          updatedAt: new Date(),
+        }).where(eq(episodes.podcastIndexId, String(episodeId)));
+      } catch (dbErr) {
+        logger.warn("Failed to write processingError before abort", {
+          episodeId,
+          error: dbErr instanceof Error ? dbErr.message : String(dbErr),
+        });
       }
-    } catch (error) {
-      // SDK-level errors (network, serialization, queue) — mark as failed
-      const errorMsg = error instanceof Error ? error.message : String(error);
-      logger.warn("fetch-transcript task invocation failed, continuing without transcript", {
-        episodeId,
-        error: errorMsg,
-      });
-      transcript = undefined;
-      dbTranscriptSource = undefined;
-      explicitTranscriptStatus = "failed";
-      explicitTranscriptError = errorMsg;
+      throw new AbortTaskRunError(errorMsg);
     }
+
+    logger.info("Transcript read from database", { length: transcript.length });
 
     // Step 4: Generate AI summary
     metadata.set("step", "generating-summary");
@@ -178,7 +164,7 @@ export const summarizeEpisode = task({
     }
 
     await retry.onThrow(
-      async () => persistEpisodeSummary(episode, podcast, summary, transcript, dbTranscriptSource, explicitTranscriptStatus, explicitTranscriptError),
+      async () => persistEpisodeSummary(episode, podcast, summary),
       { maxAttempts: 3 }
     );
 

@@ -56,10 +56,8 @@ vi.mock("@/trigger/helpers/transcript", () => ({
   fetchTranscriptFromUrl: (...args: unknown[]) => mockFetchTranscriptFromUrl(...args),
 }));
 
-const mockUpdateEpisodeStatus = vi.fn();
 const mockPersistTranscript = vi.fn();
 vi.mock("@/trigger/helpers/database", () => ({
-  updateEpisodeStatus: (...args: unknown[]) => mockUpdateEpisodeStatus(...args),
   persistTranscript: (...args: unknown[]) => mockPersistTranscript(...args),
 }));
 
@@ -89,7 +87,6 @@ describe("fetch-transcript task", () => {
     vi.clearAllMocks();
     mockFindFirst.mockResolvedValue(null);
     mockPersistTranscript.mockResolvedValue(undefined);
-    mockUpdateEpisodeStatus.mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -172,7 +169,6 @@ describe("fetch-transcript task", () => {
 
     expect(result).toEqual({ transcript: "AssemblyAI transcript", source: "assemblyai" });
     expect(mockPersistTranscript).toHaveBeenCalledWith(123, "AssemblyAI transcript", "assemblyai");
-    expect(mockUpdateEpisodeStatus).toHaveBeenCalledWith(123, "transcribing");
   });
 
   it("all sources fail returns transcript: undefined, source: null, no persistTranscript call", async () => {

@@ -1,0 +1,3 @@
+ALTER TABLE "episodes" DROP CONSTRAINT "summary_status_enum";--> statement-breakpoint
+ALTER TABLE "episodes" ADD CONSTRAINT "summary_status_enum" CHECK ("episodes"."summary_status" IN ('queued', 'running', 'summarizing', 'completed', 'failed'));--> statement-breakpoint
+UPDATE "episodes" SET "summary_status" = 'failed', "processing_error" = 'Stale transcribing status cleaned up during migration' WHERE "summary_status" = 'transcribing';

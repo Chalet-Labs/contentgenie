@@ -104,14 +104,14 @@ describe("generateEpisodeSummary", () => {
       worthItReason: "OK",
     });
 
-    await generateEpisodeSummary(undefined, minimalEpisode, undefined);
+    await generateEpisodeSummary(undefined, minimalEpisode, "test transcript");
 
     expect(getSummarizationPrompt).toHaveBeenCalledWith(
       "Unknown Podcast",
       "Minimal Episode",
       "",
       0,
-      undefined
+      "test transcript"
     );
   });
 });

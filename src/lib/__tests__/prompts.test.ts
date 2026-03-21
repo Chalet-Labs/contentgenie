@@ -29,7 +29,8 @@ describe("getSummarizationPrompt", () => {
       "My Podcast",
       "Episode 1",
       "A great episode",
-      3600
+      3600,
+      "Transcript content here"
     );
     expect(prompt).toContain("My Podcast");
     expect(prompt).toContain("Episode 1");
@@ -40,50 +41,24 @@ describe("getSummarizationPrompt", () => {
       "Podcast",
       "Episode",
       "Description",
-      5400 // 90 minutes
+      5400, // 90 minutes
+      "Transcript content here"
     );
     expect(prompt).toContain("90 minutes");
   });
 
-  it("uses transcript when longer than 100 characters", () => {
-    const longTranscript = "A".repeat(200);
+  it("includes transcript content in prompt", () => {
+    const transcript = "A".repeat(200);
     const prompt = getSummarizationPrompt(
       "Podcast",
       "Episode",
       "Description",
       3600,
-      longTranscript
+      transcript
     );
     expect(prompt).toContain("Transcript");
-    expect(prompt).toContain(longTranscript);
-    expect(prompt).not.toContain(
-      "Full transcript not available"
-    );
-  });
-
-  it("falls back to description when transcript is short", () => {
-    const shortTranscript = "Short";
-    const prompt = getSummarizationPrompt(
-      "Podcast",
-      "Episode",
-      "My Description",
-      3600,
-      shortTranscript
-    );
-    expect(prompt).toContain("Episode Description");
-    expect(prompt).toContain("My Description");
-    expect(prompt).toContain("Full transcript not available");
-  });
-
-  it("falls back to description when no transcript", () => {
-    const prompt = getSummarizationPrompt(
-      "Podcast",
-      "Episode",
-      "My Description",
-      3600
-    );
-    expect(prompt).toContain("Episode Description");
-    expect(prompt).toContain("My Description");
+    expect(prompt).toContain(transcript);
+    expect(prompt).not.toContain("Full transcript not available");
   });
 
   it("includes JSON format instructions", () => {
@@ -91,7 +66,8 @@ describe("getSummarizationPrompt", () => {
       "Podcast",
       "Episode",
       "Description",
-      3600
+      3600,
+      "Transcript content here"
     );
     expect(prompt).toContain('"summary"');
     expect(prompt).toContain('"keyTakeaways"');
@@ -103,7 +79,8 @@ describe("getSummarizationPrompt", () => {
       "Podcast",
       "Episode",
       "Description",
-      3600
+      3600,
+      "Transcript content here"
     );
     expect(prompt).toContain('"worthItDimensions"');
     expect(prompt).toContain('"uniqueness"');
@@ -116,7 +93,8 @@ describe("getSummarizationPrompt", () => {
       "Podcast",
       "Episode",
       "Description",
-      3600
+      3600,
+      "Transcript content here"
     );
     expect(prompt).toContain("TL;DR");
     expect(prompt).toContain("What You'll Learn");
@@ -130,7 +108,8 @@ describe("getSummarizationPrompt", () => {
       "Podcast",
       "Episode",
       "Description",
-      3600
+      3600,
+      "Transcript content here"
     );
     expect(prompt).toContain("5: Average");
     expect(prompt).toContain("Justify every point above 5");

@@ -4,7 +4,7 @@ import { db } from "@/db";
 import { episodes } from "@/db/schema";
 import { fetchTranscript, extractTranscriptUrl, fetchTranscriptFromUrl } from "@/trigger/helpers/transcript";
 import { submitTranscriptionAsync, getTranscriptionStatus } from "@/lib/assemblyai";
-import { updateEpisodeStatus, persistTranscript } from "@/trigger/helpers/database";
+import { persistTranscript } from "@/trigger/helpers/database";
 
 export type FetchTranscriptPayload = {
   episodeId: number;
@@ -99,15 +99,6 @@ export const fetchTranscriptTask = task({
     // Step 4: AssemblyAI async transcription via Trigger.dev token
     if (!transcript && enclosureUrl) {
       metadata.set("step", "transcribing-audio");
-
-      try {
-        await updateEpisodeStatus(episodeId, "transcribing");
-      } catch (error) {
-        logger.warn("Failed to update episode status to transcribing", {
-          episodeId,
-          error: error instanceof Error ? error.message : String(error),
-        });
-      }
 
       let submittedTranscriptId: string | undefined;
       try {

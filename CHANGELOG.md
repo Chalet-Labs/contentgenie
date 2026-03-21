@@ -6,6 +6,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+- `summarize-episode` is now a pure consumer of existing transcripts: it reads the `transcription` column from the database and aborts with `AbortTaskRunError` if no transcript is present, instead of orchestrating `fetch-transcript` inline or generating a description-only fallback (ADR-027, #215)
+- `persistEpisodeSummary` simplified to 3 parameters — transcript-related column writes are exclusively owned by `fetch-transcript` via `persistTranscript`
+- Removed `"transcribing"` from `summaryStatus` CHECK constraint, TypeScript type, and `IN_PROGRESS_STATUSES` — transcript progress is tracked via `transcriptStatus` column
+- `summarize-episode` `maxDuration` reduced from 7200s to 600s now that AssemblyAI wait is no longer part of the summarization pipeline
+- Processing status badge for `"running"` state updated from "Transcribing..." to "Processing..."
+- Summarization step progress UI removes `"fetching-transcript"` and `"transcribing-audio"` steps — summarization no longer fetches transcripts
+
 ### Added
 - Independent transcript tracking: `transcript_status`, `transcript_fetched_at`, and `transcript_error` columns on the episodes table with CHECK constraint, `TranscriptStatus` type export, updated persist helpers, and backfill migration (ADR-026, #214)
 - Visual regression testing (VRT) with Playwright: all 33 Storybook stories are screenshot-tested on every PR against committed Linux/Chromium baselines; diff artifacts are uploaded on failure; Chromium cache keeps CI overhead to ~65–125s; baseline update workflow documented in ADR-024 (#203)

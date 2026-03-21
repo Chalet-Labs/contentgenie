@@ -18,14 +18,9 @@ describe("ProcessingStatus", () => {
     expect(screen.getByText("Queued")).toBeInTheDocument();
   });
 
-  it("renders Transcribing badge for running status", () => {
+  it("renders Processing badge for running status", () => {
     render(<ProcessingStatus status="running" />);
-    expect(screen.getByText("Transcribing...")).toBeInTheDocument();
-  });
-
-  it("renders Transcribing badge for transcribing status", () => {
-    render(<ProcessingStatus status="transcribing" />);
-    expect(screen.getByText("Transcribing...")).toBeInTheDocument();
+    expect(screen.getByText("Processing...")).toBeInTheDocument();
   });
 
   it("renders Summarizing badge for summarizing status", () => {

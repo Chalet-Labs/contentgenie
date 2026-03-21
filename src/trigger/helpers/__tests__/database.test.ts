@@ -110,7 +110,7 @@ describe("persistTranscript", () => {
   });
 });
 
-describe("persistEpisodeSummary — transcript columns", () => {
+describe("persistEpisodeSummary", () => {
   const baseSummary = {
     summary: "Summary text",
     keyTakeaways: ["point 1"],
@@ -137,168 +137,48 @@ describe("persistEpisodeSummary — transcript columns", () => {
     vi.restoreAllMocks();
   });
 
-  it("sets transcriptStatus to 'available' when transcript is provided (update path)", async () => {
+  it("updates summary fields and sets summaryStatus to 'completed' (update path)", async () => {
     mockPodcastsFindFirst.mockResolvedValue({ id: 1 });
     mockEpisodesFindFirst.mockResolvedValue({ id: 10 });
 
-    const chain = {
-      set: vi.fn(),
-      where: vi.fn(),
-    };
+    const chain = { set: vi.fn(), where: vi.fn() };
     chain.set.mockReturnValue(chain);
     chain.where.mockResolvedValue(undefined);
     mockUpdate.mockReturnValue(chain);
 
     const { persistEpisodeSummary } = await import("@/trigger/helpers/database");
-    await persistEpisodeSummary(
-      baseEpisode as never,
-      undefined,
-      baseSummary,
-      "Transcript text",
-      "podcastindex"
-    );
+    await persistEpisodeSummary(baseEpisode as never, undefined, baseSummary);
 
     expect(chain.set).toHaveBeenCalledWith(
       expect.objectContaining({
-        transcriptStatus: "available",
-        transcriptError: null,
+        summary: "Summary text",
+        summaryStatus: "completed",
+        summaryRunId: null,
       })
     );
   });
 
-  it("sets transcriptStatus to 'missing' when transcript is absent (update path)", async () => {
+  it("does NOT write transcript-related columns in the update path", async () => {
     mockPodcastsFindFirst.mockResolvedValue({ id: 1 });
     mockEpisodesFindFirst.mockResolvedValue({ id: 10 });
 
-    const chain = {
-      set: vi.fn(),
-      where: vi.fn(),
-    };
+    const chain = { set: vi.fn(), where: vi.fn() };
     chain.set.mockReturnValue(chain);
     chain.where.mockResolvedValue(undefined);
     mockUpdate.mockReturnValue(chain);
 
     const { persistEpisodeSummary } = await import("@/trigger/helpers/database");
-    await persistEpisodeSummary(
-      baseEpisode as never,
-      undefined,
-      baseSummary,
-      undefined,
-      null
-    );
+    await persistEpisodeSummary(baseEpisode as never, undefined, baseSummary);
 
     const setArgs = chain.set.mock.calls[0][0] as Record<string, unknown>;
-    expect(setArgs.transcriptStatus).toBe("missing");
-    // transcriptError should NOT be set — preserves any existing fetch-failure details
+    expect(Object.hasOwn(setArgs, "transcription")).toBe(false);
+    expect(Object.hasOwn(setArgs, "transcriptSource")).toBe(false);
+    expect(Object.hasOwn(setArgs, "transcriptStatus")).toBe(false);
     expect(Object.hasOwn(setArgs, "transcriptError")).toBe(false);
-  });
-
-  it("sets transcriptStatus to 'failed' and records error when explicit status is 'failed' (update path)", async () => {
-    mockPodcastsFindFirst.mockResolvedValue({ id: 1 });
-    mockEpisodesFindFirst.mockResolvedValue({ id: 10 });
-
-    const chain = {
-      set: vi.fn(),
-      where: vi.fn(),
-    };
-    chain.set.mockReturnValue(chain);
-    chain.where.mockResolvedValue(undefined);
-    mockUpdate.mockReturnValue(chain);
-
-    const { persistEpisodeSummary } = await import("@/trigger/helpers/database");
-    await persistEpisodeSummary(
-      baseEpisode as never,
-      undefined,
-      baseSummary,
-      undefined,
-      null,
-      "failed",
-      "fetch-transcript task failed permanently after retries"
-    );
-
-    expect(chain.set).toHaveBeenCalledWith(
-      expect.objectContaining({
-        transcriptStatus: "failed",
-        transcriptError: "fetch-transcript task failed permanently after retries",
-      })
-    );
-  });
-
-  it("sets transcriptStatus to 'failed' and records error in the insert path", async () => {
-    mockPodcastsFindFirst.mockResolvedValue({ id: 1 });
-    mockEpisodesFindFirst.mockResolvedValue(null);
-
-    const chain = makeInsertChain();
-    mockInsert.mockReturnValue(chain);
-
-    const { persistEpisodeSummary } = await import("@/trigger/helpers/database");
-    await persistEpisodeSummary(
-      baseEpisode as never,
-      undefined,
-      baseSummary,
-      undefined,
-      null,
-      "failed",
-      "SDK error: connection timeout"
-    );
-
-    expect(chain.values).toHaveBeenCalledWith(
-      expect.objectContaining({
-        transcriptStatus: "failed",
-        transcriptError: "SDK error: connection timeout",
-      })
-    );
-  });
-
-  it("does NOT set transcriptFetchedAt in the update path", async () => {
-    mockPodcastsFindFirst.mockResolvedValue({ id: 1 });
-    mockEpisodesFindFirst.mockResolvedValue({ id: 10 });
-
-    const chain = {
-      set: vi.fn(),
-      where: vi.fn(),
-    };
-    chain.set.mockReturnValue(chain);
-    chain.where.mockResolvedValue(undefined);
-    mockUpdate.mockReturnValue(chain);
-
-    const { persistEpisodeSummary } = await import("@/trigger/helpers/database");
-    await persistEpisodeSummary(
-      baseEpisode as never,
-      undefined,
-      baseSummary,
-      "transcript",
-      "assemblyai"
-    );
-
-    const setArgs = chain.set.mock.calls[0][0] as Record<string, unknown>;
     expect(Object.hasOwn(setArgs, "transcriptFetchedAt")).toBe(false);
   });
 
-  it("sets transcriptFetchedAt to null in the insert path", async () => {
-    mockPodcastsFindFirst.mockResolvedValue({ id: 1 });
-    mockEpisodesFindFirst.mockResolvedValue(null); // no existing episode → insert path
-
-    const chain = makeInsertChain();
-    mockInsert.mockReturnValue(chain);
-
-    const { persistEpisodeSummary } = await import("@/trigger/helpers/database");
-    await persistEpisodeSummary(
-      baseEpisode as never,
-      undefined,
-      baseSummary,
-      "transcript",
-      "podcastindex"
-    );
-
-    expect(chain.values).toHaveBeenCalledWith(
-      expect.objectContaining({
-        transcriptFetchedAt: null,
-      })
-    );
-  });
-
-  it("sets transcriptStatus to 'available' in the insert path when transcript is provided", async () => {
+  it("inserts summary fields and sets summaryStatus to 'completed' (insert path)", async () => {
     mockPodcastsFindFirst.mockResolvedValue({ id: 1 });
     mockEpisodesFindFirst.mockResolvedValue(null);
 
@@ -306,23 +186,17 @@ describe("persistEpisodeSummary — transcript columns", () => {
     mockInsert.mockReturnValue(chain);
 
     const { persistEpisodeSummary } = await import("@/trigger/helpers/database");
-    await persistEpisodeSummary(
-      baseEpisode as never,
-      undefined,
-      baseSummary,
-      "Transcript text",
-      "assemblyai"
-    );
+    await persistEpisodeSummary(baseEpisode as never, undefined, baseSummary);
 
     expect(chain.values).toHaveBeenCalledWith(
       expect.objectContaining({
-        transcriptStatus: "available",
-        transcriptFetchedAt: null,
+        summary: "Summary text",
+        summaryStatus: "completed",
       })
     );
   });
 
-  it("sets transcriptStatus to 'missing' in the insert path when transcript is absent", async () => {
+  it("does NOT write transcript-related columns in the insert path", async () => {
     mockPodcastsFindFirst.mockResolvedValue({ id: 1 });
     mockEpisodesFindFirst.mockResolvedValue(null);
 
@@ -330,45 +204,22 @@ describe("persistEpisodeSummary — transcript columns", () => {
     mockInsert.mockReturnValue(chain);
 
     const { persistEpisodeSummary } = await import("@/trigger/helpers/database");
-    await persistEpisodeSummary(
-      baseEpisode as never,
-      undefined,
-      baseSummary,
-      undefined,
-      null
-    );
+    await persistEpisodeSummary(baseEpisode as never, undefined, baseSummary);
 
-    expect(chain.values).toHaveBeenCalledWith(
-      expect.objectContaining({
-        transcriptStatus: "missing",
-        transcriptFetchedAt: null,
-      })
-    );
+    const valuesArgs = chain.values.mock.calls[0][0] as Record<string, unknown>;
+    expect(Object.hasOwn(valuesArgs, "transcription")).toBe(false);
+    expect(Object.hasOwn(valuesArgs, "transcriptSource")).toBe(false);
+    expect(Object.hasOwn(valuesArgs, "transcriptStatus")).toBe(false);
+    expect(Object.hasOwn(valuesArgs, "transcriptError")).toBe(false);
+    expect(Object.hasOwn(valuesArgs, "transcriptFetchedAt")).toBe(false);
   });
 
-  it("only overwrites transcriptSource when explicitly provided (not undefined)", async () => {
-    mockPodcastsFindFirst.mockResolvedValue({ id: 1 });
-    mockEpisodesFindFirst.mockResolvedValue({ id: 10 });
-
-    const chain = {
-      set: vi.fn(),
-      where: vi.fn(),
-    };
-    chain.set.mockReturnValue(chain);
-    chain.where.mockResolvedValue(undefined);
-    mockUpdate.mockReturnValue(chain);
+  it("throws when podcast cannot be resolved", async () => {
+    mockPodcastsFindFirst.mockResolvedValue(null);
 
     const { persistEpisodeSummary } = await import("@/trigger/helpers/database");
-    // Pass transcriptSource as undefined — should NOT appear in updateFields
-    await persistEpisodeSummary(
-      baseEpisode as never,
-      undefined,
-      baseSummary,
-      "transcript"
-      // transcriptSource omitted → undefined
-    );
-
-    const setArgs = chain.set.mock.calls[0][0] as Record<string, unknown>;
-    expect(Object.hasOwn(setArgs, "transcriptSource")).toBe(false);
+    await expect(
+      persistEpisodeSummary(baseEpisode as never, undefined, baseSummary)
+    ).rejects.toThrow("Could not find or create podcast in database");
   });
 });

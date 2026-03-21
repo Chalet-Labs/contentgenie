@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { episodes, podcasts, type NewEpisode } from "@/db/schema";
+import { episodes, podcasts } from "@/db/schema";
 import { upsertPodcast } from "@/db/helpers";
 import type { SummaryResult } from "@/lib/openrouter";
 import type { PodcastIndexPodcast, PodcastIndexEpisode } from "@/lib/podcastindex";
@@ -92,7 +92,7 @@ export async function trackEpisodeRun(
  */
 export async function updateEpisodeStatus(
   episodeId: number | string,
-  status: "transcribing" | "summarizing"
+  status: "summarizing"
 ): Promise<void> {
   await db
     .update(episodes)
@@ -103,13 +103,12 @@ export async function updateEpisodeStatus(
     .where(eq(episodes.podcastIndexId, String(episodeId)));
 }
 
-// NOTE: intentional double-write for non-cache sources — fetch-transcript persists here
-// for retry idempotency. On the success path, persistEpisodeSummary in summarize-episode
-// will overwrite transcription, transcriptSource, and transcriptStatus after summarization
-// completes (that write is authoritative for those columns). It intentionally does NOT
-// overwrite transcriptFetchedAt — see ADR-026.
-// On cache-hit paths (source returned as undefined), this function is not called.
-// Do not remove either call.
+// persistTranscript is the sole writer of transcript columns (transcription,
+// transcriptSource, transcriptStatus, transcriptFetchedAt, transcriptError).
+// It is called by fetch-transcript after fetching from an external source
+// (not on cache-hit paths where source is undefined).
+// See ADR-026 for column ownership and ADR-027 for the refactor that removed
+// transcript writes from persistEpisodeSummary.
 export async function persistTranscript(
   episodeId: number,
   transcript: string,
@@ -137,11 +136,7 @@ export async function persistTranscript(
 export async function persistEpisodeSummary(
   episode: PodcastIndexEpisode,
   podcast: PodcastIndexPodcast | undefined,
-  summary: SummaryResult,
-  transcript?: string,
-  transcriptSource?: "podcastindex" | "assemblyai" | "description-url" | null,
-  explicitTranscriptStatus?: "available" | "missing" | "failed",
-  explicitTranscriptError?: string | null
+  summary: SummaryResult
 ): Promise<void> {
   const podcastId = await ensurePodcast(episode.feedId, podcast);
   if (!podcastId) {
@@ -153,41 +148,20 @@ export async function persistEpisodeSummary(
     where: eq(episodes.podcastIndexId, episode.id.toString()),
   });
 
-  // Use explicit status when provided (e.g. "failed" from a fetch error);
-  // fall back to deriving from transcript presence for backward compatibility
-  const transcriptStatus = explicitTranscriptStatus ?? (transcript ? "available" : "missing");
-
   if (existingEpisode) {
-    const updateFields: Partial<NewEpisode> = {
-      summary: summary.summary,
-      keyTakeaways: summary.keyTakeaways,
-      worthItScore: summary.worthItScore.toFixed(2),
-      worthItReason: summary.worthItReason,
-      worthItDimensions: summary.worthItDimensions ?? null,
-      transcription: transcript,
-      processedAt: new Date(),
-      summaryStatus: "completed",
-      summaryRunId: null,
-      transcriptStatus,
-      updatedAt: new Date(),
-    };
-    // Set transcriptError based on outcome:
-    // - "available": clear any previous error
-    // - "failed": record the explicit error
-    // - "missing": omit — preserves any previously recorded fetch-failure details
-    if (transcriptStatus === "available") {
-      updateFields.transcriptError = null;
-    } else if (transcriptStatus === "failed" && explicitTranscriptError !== undefined) {
-      updateFields.transcriptError = explicitTranscriptError;
-    }
-    // Only overwrite transcriptSource when explicitly provided (undefined = keep existing)
-    if (transcriptSource !== undefined) {
-      updateFields.transcriptSource = transcriptSource;
-    }
-
     await db
       .update(episodes)
-      .set(updateFields)
+      .set({
+        summary: summary.summary,
+        keyTakeaways: summary.keyTakeaways,
+        worthItScore: summary.worthItScore.toFixed(2),
+        worthItReason: summary.worthItReason,
+        worthItDimensions: summary.worthItDimensions ?? null,
+        processedAt: new Date(),
+        summaryStatus: "completed",
+        summaryRunId: null,
+        updatedAt: new Date(),
+      })
       .where(eq(episodes.id, existingEpisode.id));
   } else {
     await db.insert(episodes).values({
@@ -200,11 +174,6 @@ export async function persistEpisodeSummary(
       publishDate: episode.datePublished
         ? new Date(episode.datePublished * 1000)
         : null,
-      transcription: transcript,
-      transcriptSource: transcriptSource ?? null,
-      transcriptStatus,
-      transcriptFetchedAt: null,
-      transcriptError: (transcriptStatus === "failed" ? explicitTranscriptError ?? null : null),
       summary: summary.summary,
       keyTakeaways: summary.keyTakeaways,
       worthItScore: summary.worthItScore.toFixed(2),
