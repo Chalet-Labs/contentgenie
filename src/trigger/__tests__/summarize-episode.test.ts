@@ -287,6 +287,33 @@ describe("summarize-episode task", () => {
     expect(completedCalls).toHaveLength(0);
   });
 
+  it("onFailure preserves existing processingError instead of overwriting", async () => {
+    mockFindFirst.mockResolvedValueOnce({
+      processingError: "Episode 42 has no transcript available — run fetch-transcript first",
+    });
+    const { setFn } = makeUpdateChain();
+
+    await taskConfig.onFailure({ payload: { episodeId: 42 } });
+
+    const setArgs = setFn.mock.calls[0][0];
+    expect(setArgs.processingError).toBe(
+      "Episode 42 has no transcript available — run fetch-transcript first"
+    );
+    expect(setArgs.summaryStatus).toBe("failed");
+  });
+
+  it("onFailure uses generic message when no prior processingError exists", async () => {
+    mockFindFirst.mockResolvedValueOnce({ processingError: null });
+    const { setFn } = makeUpdateChain();
+
+    await taskConfig.onFailure({ payload: { episodeId: 42 } });
+
+    const setArgs = setFn.mock.calls[0][0];
+    expect(setArgs.processingError).toBe(
+      "Summarization failed after maximum retry attempts"
+    );
+  });
+
   it("calls metadata.root.increment('failed', 1) in onFailure", async () => {
     await taskConfig.onFailure({ payload: { episodeId: 42 } });
 

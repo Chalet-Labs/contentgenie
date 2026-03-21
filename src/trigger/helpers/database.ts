@@ -98,6 +98,7 @@ export async function updateEpisodeStatus(
     .update(episodes)
     .set({
       summaryStatus: status,
+      processingError: null,
       updatedAt: new Date(),
     })
     .where(eq(episodes.podcastIndexId, String(episodeId)));

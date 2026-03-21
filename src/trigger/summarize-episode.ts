@@ -34,12 +34,19 @@ export const summarizeEpisode = task({
     const { episodeId } = params.payload;
     logger.error("Summarization task failed permanently", { episodeId });
     try {
+      const existing = await db.query.episodes.findFirst({
+        where: eq(episodes.podcastIndexId, String(episodeId)),
+        columns: { processingError: true },
+      });
+
       await db
         .update(episodes)
         .set({
           summaryStatus: "failed",
           summaryRunId: null,
-          processingError: "Summarization failed after maximum retry attempts",
+          processingError:
+            existing?.processingError ??
+            "Summarization failed after maximum retry attempts",
           updatedAt: new Date(),
         })
         .where(eq(episodes.podcastIndexId, String(episodeId)));
