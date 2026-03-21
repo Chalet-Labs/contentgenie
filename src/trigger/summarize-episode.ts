@@ -96,7 +96,7 @@ export const summarizeEpisode = task({
 
     const episodeRow = await db.query.episodes.findFirst({
       where: eq(episodes.podcastIndexId, String(episodeId)),
-      columns: { transcription: true },
+      columns: { transcription: true, summary: true },
     });
 
     const transcript = episodeRow?.transcription?.trim() || null;
@@ -147,21 +147,8 @@ export const summarizeEpisode = task({
     metadata.set("step", "saving-results");
     logger.info("Persisting summary to database");
 
-    // Check if this is a first-time summarization (no prior summary)
-    // so we can skip the new_episode notification on re-summarizations.
-    let isNewEpisode = true;
-    try {
-      const priorEpisode = await db.query.episodes.findFirst({
-        where: eq(episodes.podcastIndexId, String(episodeId)),
-        columns: { summary: true },
-      });
-      isNewEpisode = !priorEpisode?.summary;
-    } catch (error) {
-      logger.warn("Failed to check for prior summary, defaulting to new episode", {
-        episodeId,
-        error: error instanceof Error ? error.message : String(error),
-      });
-    }
+    // Use the already-fetched episodeRow from Step 3 to check for prior summary
+    const isNewEpisode = !episodeRow?.summary;
 
     await retry.onThrow(
       async () => persistEpisodeSummary(episode, podcast, summary),

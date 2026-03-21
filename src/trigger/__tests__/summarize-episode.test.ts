@@ -310,12 +310,10 @@ describe("summarize-episode task", () => {
     vi.mocked(persistEpisodeSummary).mockResolvedValue(undefined);
     vi.mocked(resolvePodcastId).mockResolvedValue(99);
     // Calls in order:
-    // 1. transcript read (returns transcript)
-    // 2. prior summary check (existing summary → re-summarization)
-    // 3. episodeDbId lookup for notifications
+    // 1. transcript + summary read (existing summary → re-summarization)
+    // 2. episodeDbId lookup for notifications
     mockFindFirst
-      .mockResolvedValueOnce({ transcription: "Full transcript text" })
-      .mockResolvedValueOnce({ summary: "Existing summary" })
+      .mockResolvedValueOnce({ transcription: "Full transcript text", summary: "Existing summary" })
       .mockResolvedValueOnce({ id: 42 });
 
     const result = await taskConfig.run({ episodeId: 123 }, mockCtx);

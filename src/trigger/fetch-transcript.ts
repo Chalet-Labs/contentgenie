@@ -193,7 +193,7 @@ export const fetchTranscriptTask = task({
 
     // Persist transcript before returning for retry idempotency.
     // Only persist when we fetched from an external source (not cache — DB is already correct).
-    // persistEpisodeSummary in summarize-episode will overwrite these columns again; that write is authoritative.
+    // This is the sole writer of transcript columns (ADR-027).
     if (transcript && dbSource !== undefined && dbSource !== null) {
       try {
         await persistTranscript(episodeId, transcript, dbSource);
