@@ -7,6 +7,11 @@ import { createNotificationsForSubscribers, resolvePodcastId } from "@/trigger/h
 import { db } from "@/db";
 import { episodes } from "@/db/schema";
 import type { PodcastIndexEpisode, PodcastIndexPodcast } from "@/lib/podcastindex";
+import type { SummarizationStep } from "@/trigger/types";
+
+function setStep(step: SummarizationStep) {
+  metadata.set("step", step);
+}
 
 export type SummarizeEpisodePayload = {
   episodeId: number;
@@ -50,7 +55,7 @@ export const summarizeEpisode = task({
     const { episodeId } = payload;
 
     // Step 1: Fetch episode from PodcastIndex
-    metadata.set("step", "fetching-episode");
+    setStep("fetching-episode");
     logger.info("Fetching episode from PodcastIndex", { episodeId });
 
     const episodeResponse = await retry.onThrow(
@@ -59,14 +64,28 @@ export const summarizeEpisode = task({
     );
 
     if (!episodeResponse?.episode) {
-      throw new AbortTaskRunError(`Episode ${episodeId} not found`);
+      const errorMsg = `Episode ${episodeId} not found in PodcastIndex`;
+      try {
+        await db.update(episodes).set({
+          summaryStatus: "failed",
+          summaryRunId: null,
+          processingError: errorMsg,
+          updatedAt: new Date(),
+        }).where(eq(episodes.podcastIndexId, String(episodeId)));
+      } catch (dbErr) {
+        logger.warn("Failed to write processingError before abort", {
+          episodeId,
+          error: dbErr instanceof Error ? dbErr.message : String(dbErr),
+        });
+      }
+      throw new AbortTaskRunError(errorMsg);
     }
 
     const episode: PodcastIndexEpisode = episodeResponse.episode;
     logger.info("Episode fetched", { title: episode.title, feedId: episode.feedId });
 
     // Step 2: Fetch podcast context
-    metadata.set("step", "fetching-podcast");
+    setStep("fetching-podcast");
     logger.info("Fetching podcast context", { feedId: episode.feedId });
 
     let podcast: PodcastIndexPodcast | undefined;
@@ -94,10 +113,13 @@ export const summarizeEpisode = task({
     // Step 3: Read transcript from database — fetch-transcript must have run first
     logger.info("Reading transcript from database", { episodeId });
 
-    const episodeRow = await db.query.episodes.findFirst({
-      where: eq(episodes.podcastIndexId, String(episodeId)),
-      columns: { transcription: true, summary: true },
-    });
+    const episodeRow = await retry.onThrow(
+      async () => db.query.episodes.findFirst({
+        where: eq(episodes.podcastIndexId, String(episodeId)),
+        columns: { transcription: true, summary: true },
+      }),
+      { maxAttempts: 3 }
+    );
 
     const transcript = episodeRow?.transcription?.trim() || null;
 
@@ -122,7 +144,7 @@ export const summarizeEpisode = task({
     logger.info("Transcript read from database", { length: transcript.length });
 
     // Step 4: Generate AI summary
-    metadata.set("step", "generating-summary");
+    setStep("generating-summary");
     logger.info("Generating AI summary");
 
     try {
@@ -144,7 +166,7 @@ export const summarizeEpisode = task({
     });
 
     // Step 5: Persist to database
-    metadata.set("step", "saving-results");
+    setStep("saving-results");
     logger.info("Persisting summary to database");
 
     // Use the already-fetched episodeRow from Step 3 to check for prior summary
@@ -195,7 +217,7 @@ export const summarizeEpisode = task({
       });
     }
 
-    metadata.set("step", "completed");
+    setStep("completed");
     metadata.root.increment("completed", 1);
 
     return summary;

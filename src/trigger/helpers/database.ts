@@ -87,7 +87,7 @@ export async function trackEpisodeRun(
 }
 
 /**
- * Updates the episode's summaryStatus during processing pipeline transitions.
+ * Updates the episode's summaryStatus to "summarizing".
  * Non-critical — callers should wrap in try/catch.
  */
 export async function updateEpisodeStatus(
@@ -103,10 +103,9 @@ export async function updateEpisodeStatus(
     .where(eq(episodes.podcastIndexId, String(episodeId)));
 }
 
-// persistTranscript is the sole writer of transcript columns (transcription,
-// transcriptSource, transcriptStatus, transcriptFetchedAt, transcriptError).
-// It is called by fetch-transcript after fetching from an external source
-// (not on cache-hit paths where source is undefined).
+// persistTranscript is the sole writer of transcript columns — summarize-episode
+// no longer touches them (ADR-027). Called by fetch-transcript after fetching
+// from an external source (not on cache-hit paths where source is undefined).
 // See ADR-026 for column ownership and ADR-027 for the refactor that removed
 // transcript writes from persistEpisodeSummary.
 export async function persistTranscript(

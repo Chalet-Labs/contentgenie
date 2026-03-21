@@ -195,13 +195,7 @@ export const fetchTranscriptTask = task({
     // Only persist when we fetched from an external source (not cache — DB is already correct).
     // This is the sole writer of transcript columns (ADR-027).
     if (transcript && dbSource !== undefined && dbSource !== null) {
-      try {
-        await persistTranscript(episodeId, transcript, dbSource);
-      } catch (error) {
-        logger.warn("Failed to persist transcript (non-fatal), continuing", {
-          error: error instanceof Error ? error.message : String(error),
-        });
-      }
+      await persistTranscript(episodeId, transcript, dbSource);
     }
 
     return { transcript, source: dbSource };

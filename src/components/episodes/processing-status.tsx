@@ -47,5 +47,9 @@ export function ProcessingStatus({ status, className }: ProcessingStatusProps) {
           Failed
         </Badge>
       );
+    default: {
+      const _exhaustive: never = status;
+      return null;
+    }
   }
 }

@@ -303,6 +303,38 @@ describe("summarize-episode task", () => {
     expect(mockMetadataRootIncrement).toHaveBeenCalledWith("failed", 1);
   });
 
+  it("isNewEpisode=true sends both new_episode and summary_completed notifications", async () => {
+    vi.mocked(getEpisodeById).mockResolvedValue({ episode: mockEpisode } as never);
+    vi.mocked(getPodcastById).mockResolvedValue({ feed: mockPodcast } as never);
+    vi.mocked(generateEpisodeSummary).mockResolvedValue(mockSummary);
+    vi.mocked(persistEpisodeSummary).mockResolvedValue(undefined);
+    vi.mocked(resolvePodcastId).mockResolvedValue(99);
+    // Calls in order:
+    // 1. transcript + summary read (no prior summary → first-time)
+    // 2. episodeDbId lookup for notifications
+    mockFindFirst
+      .mockResolvedValueOnce({ transcription: "Full transcript text" })
+      .mockResolvedValueOnce({ id: 42 });
+
+    await taskConfig.run({ episodeId: 123 }, mockCtx);
+
+    expect(createNotificationsForSubscribers).toHaveBeenCalledWith(
+      99,
+      42,
+      "new_episode",
+      mockPodcast.title,
+      `New episode: ${mockEpisode.title}`
+    );
+    expect(createNotificationsForSubscribers).toHaveBeenCalledWith(
+      99,
+      42,
+      "summary_completed",
+      mockPodcast.title,
+      `Summary ready: ${mockEpisode.title}`
+    );
+    expect(createNotificationsForSubscribers).toHaveBeenCalledTimes(2);
+  });
+
   it("isNewEpisode=false skips new_episode notification on re-summarization", async () => {
     vi.mocked(getEpisodeById).mockResolvedValue({ episode: mockEpisode } as never);
     vi.mocked(getPodcastById).mockResolvedValue({ feed: mockPodcast } as never);
