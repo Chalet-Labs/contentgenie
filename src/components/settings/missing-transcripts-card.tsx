@@ -20,30 +20,18 @@ import {
 } from "@/components/ui/select";
 import { FileText, Loader2, ChevronDown, ChevronUp, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
-import { getEpisodeTranscriptStats } from "@/app/actions/transcript-stats";
+import {
+  getEpisodeTranscriptStats,
+  type TranscriptStatsEpisode,
+} from "@/app/actions/transcript-stats";
 import { ADMIN_ROLE } from "@/lib/auth-roles";
-
-interface StatsEpisode {
-  id: number;
-  title: string;
-  podcastTitle: string;
-  podcastId: number;
-  podcastIndexId: string;
-  transcriptStatus: string | null;
-  transcriptError: string | null;
-  publishDate: Date | null;
-}
-
-interface PodcastOption {
-  id: number;
-  title: string;
-}
+import type { TranscriptStatus } from "@/db/schema";
 
 type CardState = "idle" | "loading" | "error";
 
 const PAGE_SIZE = 10;
 
-function StatusBadge({ status }: { status: string | null }) {
+export function StatusBadge({ status }: { status: TranscriptStatus | null }) {
   if (!status) {
     return <Badge variant="secondary">Not attempted</Badge>;
   }
@@ -68,8 +56,8 @@ export function MissingTranscriptsCard() {
 
   const [state, setState] = useState<CardState>("idle");
   const [totalMissing, setTotalMissing] = useState(0);
-  const [episodes, setEpisodes] = useState<StatsEpisode[]>([]);
-  const [podcasts, setPodcasts] = useState<PodcastOption[]>([]);
+  const [episodes, setEpisodes] = useState<TranscriptStatsEpisode[]>([]);
+  const [podcasts, setPodcasts] = useState<Array<{ id: number; title: string }>>([]);
   const [selectedPodcastId, setSelectedPodcastId] = useState<string>("");
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(false);
@@ -79,13 +67,21 @@ export function MissingTranscriptsCard() {
 
   const isAdmin = isLoaded && has?.({ role: ADMIN_ROLE });
 
-  const loadStats = useCallback(async (podcastId?: number, currentPage = 1, append = false) => {
+  const parsePodcastId = (value: string) =>
+    value && value !== "all" ? Number(value) : undefined;
+
+  const loadStats = useCallback(async (
+    podcastId?: number,
+    currentPage = 1,
+    opts?: { append?: boolean; skipPodcasts?: boolean },
+  ) => {
     setState("loading");
     try {
       const result = await getEpisodeTranscriptStats({
         page: currentPage,
         pageSize: PAGE_SIZE,
         podcastId,
+        skipPodcasts: opts?.skipPodcasts,
       });
 
       if (result.error) {
@@ -94,8 +90,8 @@ export function MissingTranscriptsCard() {
       }
 
       setTotalMissing(result.totalMissing);
-      setPodcasts(result.podcasts);
-      setEpisodes((prev) => append ? [...prev, ...result.episodes] : result.episodes);
+      if (result.podcasts.length > 0) setPodcasts(result.podcasts);
+      setEpisodes((prev) => opts?.append ? [...prev, ...result.episodes] : result.episodes);
       setHasMore(result.episodes.length === PAGE_SIZE);
       setState("idle");
     } catch {
@@ -113,22 +109,19 @@ export function MissingTranscriptsCard() {
     setSelectedPodcastId(value);
     setPage(1);
     setEpisodes([]);
-    const podcastId = value && value !== "all" ? Number(value) : undefined;
-    loadStats(podcastId, 1, false);
+    loadStats(parsePodcastId(value), 1, { skipPodcasts: true });
   }, [loadStats]);
 
   const handleRefresh = useCallback(() => {
     setPage(1);
     setEpisodes([]);
-    const podcastId = selectedPodcastId && selectedPodcastId !== "all" ? Number(selectedPodcastId) : undefined;
-    loadStats(podcastId, 1, false);
+    loadStats(parsePodcastId(selectedPodcastId), 1);
   }, [loadStats, selectedPodcastId]);
 
   const handleLoadMore = useCallback(() => {
     const nextPage = page + 1;
     setPage(nextPage);
-    const podcastId = selectedPodcastId && selectedPodcastId !== "all" ? Number(selectedPodcastId) : undefined;
-    loadStats(podcastId, nextPage, true);
+    loadStats(parsePodcastId(selectedPodcastId), nextPage, { append: true, skipPodcasts: true });
   }, [loadStats, page, selectedPodcastId]);
 
   const handleFetchOne = useCallback(async (episodeId: number) => {

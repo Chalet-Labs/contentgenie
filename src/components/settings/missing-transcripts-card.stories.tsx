@@ -21,7 +21,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -30,6 +29,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { FileText, Loader2, ChevronDown, ChevronUp, RefreshCw } from "lucide-react";
+import { StatusBadge } from "@/components/settings/missing-transcripts-card";
+import type { TranscriptStatus } from "@/db/schema";
 
 type Story = StoryObj;
 
@@ -39,19 +40,6 @@ const PODCASTS = [
   { id: 2, value: "2", label: "Lex Fridman Podcast" },
   { id: 3, value: "3", label: "Hardcore History" },
 ];
-
-function StatusBadge({ status }: { status: string | null }) {
-  if (!status) return <Badge variant="secondary">Not attempted</Badge>;
-  if (status === "missing") return <Badge variant="outline">Missing</Badge>;
-  if (status === "failed") return <Badge variant="destructive">Failed</Badge>;
-  if (status === "fetching")
-    return (
-      <Badge variant="secondary" title="May be stale if the previous run crashed">
-        Fetching... (stale?)
-      </Badge>
-    );
-  return <Badge variant="outline">{status}</Badge>;
-}
 
 // Loading state — initial data fetch in progress
 export const Loading: Story = {
@@ -139,10 +127,10 @@ export const Empty: Story = {
 export const WithEpisodes: Story = {
   render: () => {
     const episodes = [
-      { id: 1, title: "AI Alignment and the Future of Intelligence", podcastTitle: "Lex Fridman Podcast", status: null, publishDate: "2024-03-15", error: null },
-      { id: 2, title: "The War in Ukraine: Six Months In", podcastTitle: "The Daily", status: "missing", publishDate: "2024-02-20", error: null },
-      { id: 3, title: "Blueprint for Armageddon Part I", podcastTitle: "Hardcore History", status: "failed", publishDate: "2024-01-10", error: "AssemblyAI quota exceeded" },
-      { id: 4, title: "The Science of Sleep", podcastTitle: "The Daily", status: "fetching", publishDate: "2024-03-01", error: null },
+      { id: 1, title: "AI Alignment and the Future of Intelligence", podcastTitle: "Lex Fridman Podcast", status: null as TranscriptStatus | null, publishDate: "2024-03-15", error: null },
+      { id: 2, title: "The War in Ukraine: Six Months In", podcastTitle: "The Daily", status: "missing" as TranscriptStatus, publishDate: "2024-02-20", error: null },
+      { id: 3, title: "Blueprint for Armageddon Part I", podcastTitle: "Hardcore History", status: "failed" as TranscriptStatus, publishDate: "2024-01-10", error: "AssemblyAI quota exceeded" },
+      { id: 4, title: "The Science of Sleep", podcastTitle: "The Daily", status: "fetching" as TranscriptStatus, publishDate: "2024-03-01", error: null },
     ];
     return (
       <Card className="max-w-2xl">
@@ -224,8 +212,8 @@ export const WithEpisodes: Story = {
 export const WithPodcastFilter: Story = {
   render: () => {
     const episodes = [
-      { id: 2, title: "The War in Ukraine: Six Months In", podcastTitle: "The Daily", status: "missing", publishDate: "2024-02-20", error: null },
-      { id: 4, title: "The Science of Sleep", podcastTitle: "The Daily", status: "fetching", publishDate: "2024-03-01", error: null },
+      { id: 2, title: "The War in Ukraine: Six Months In", podcastTitle: "The Daily", status: "missing" as TranscriptStatus, publishDate: "2024-02-20", error: null },
+      { id: 4, title: "The Science of Sleep", podcastTitle: "The Daily", status: "fetching" as TranscriptStatus, publishDate: "2024-03-01", error: null },
     ];
     return (
       <Card className="max-w-2xl">
@@ -300,8 +288,8 @@ export const WithPodcastFilter: Story = {
 export const FetchInProgress: Story = {
   render: () => {
     const episodes = [
-      { id: 1, title: "AI Alignment and the Future of Intelligence", podcastTitle: "Lex Fridman Podcast", status: "fetching", publishDate: "2024-03-15", error: null },
-      { id: 2, title: "The War in Ukraine: Six Months In", podcastTitle: "The Daily", status: "missing", publishDate: "2024-02-20", error: null },
+      { id: 1, title: "AI Alignment and the Future of Intelligence", podcastTitle: "Lex Fridman Podcast", status: "fetching" as TranscriptStatus, publishDate: "2024-03-15", error: null },
+      { id: 2, title: "The War in Ukraine: Six Months In", podcastTitle: "The Daily", status: "missing" as TranscriptStatus, publishDate: "2024-02-20", error: null },
     ];
     return (
       <Card className="max-w-2xl">
@@ -377,9 +365,9 @@ export const FetchInProgress: Story = {
 export const BatchFetchInProgress: Story = {
   render: () => {
     const episodes = [
-      { id: 1, title: "AI Alignment and the Future of Intelligence", podcastTitle: "Lex Fridman Podcast", status: null, publishDate: "2024-03-15" },
-      { id: 2, title: "The War in Ukraine: Six Months In", podcastTitle: "The Daily", status: "missing", publishDate: "2024-02-20" },
-      { id: 3, title: "Blueprint for Armageddon Part I", podcastTitle: "Hardcore History", status: "failed", publishDate: "2024-01-10" },
+      { id: 1, title: "AI Alignment and the Future of Intelligence", podcastTitle: "Lex Fridman Podcast", status: null as TranscriptStatus | null, publishDate: "2024-03-15" },
+      { id: 2, title: "The War in Ukraine: Six Months In", podcastTitle: "The Daily", status: "missing" as TranscriptStatus, publishDate: "2024-02-20" },
+      { id: 3, title: "Blueprint for Armageddon Part I", podcastTitle: "Hardcore History", status: "failed" as TranscriptStatus, publishDate: "2024-01-10" },
     ];
     return (
       <Card className="max-w-2xl">

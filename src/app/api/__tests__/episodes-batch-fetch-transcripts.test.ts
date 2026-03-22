@@ -7,17 +7,22 @@ vi.mock("@clerk/nextjs/server", () => ({
   auth: vi.fn(),
 }));
 
+const mockDbSelect = vi.fn();
 vi.mock("@/db", () => ({
   db: {
-    query: {
-      episodes: { findMany: vi.fn() },
-    },
+    select: (...args: unknown[]) => mockDbSelect(...args),
     update: vi.fn(),
   },
 }));
 
 vi.mock("@/db/schema", () => ({
-  episodes: { id: "id", transcriptStatus: "transcript_status" },
+  episodes: {
+    id: "id",
+    podcastIndexId: "podcast_index_id",
+    audioUrl: "audio_url",
+    description: "description",
+    transcriptStatus: "transcript_status",
+  },
 }));
 
 vi.mock("drizzle-orm", () => ({
@@ -43,6 +48,15 @@ function mockUpdateChain() {
   const setMock = vi.fn().mockReturnValue({ where: whereMock });
   vi.mocked(db.update).mockReturnValue({ set: setMock } as never);
   return { setMock, whereMock };
+}
+
+// Mock the db.select().from().where() chain for episode lookup
+function mockEpisodeSelect(results: unknown[]) {
+  mockDbSelect.mockReturnValue({
+    from: vi.fn().mockReturnValue({
+      where: vi.fn().mockResolvedValue(results),
+    }),
+  });
 }
 
 function makeEpisode(id: number, podcastIndexId: string) {
@@ -194,9 +208,7 @@ describe("POST /api/episodes/batch-fetch-transcripts", () => {
       has: vi.fn().mockReturnValue(true),
     } as never);
     // Only returns 1 of the 2 requested episodes
-    vi.mocked(db.query.episodes.findMany).mockResolvedValue([
-      makeEpisode(1, "111"),
-    ] as never);
+    mockEpisodeSelect([makeEpisode(1, "111")]);
 
     const { POST } = await import(
       "@/app/api/episodes/batch-fetch-transcripts/route"
@@ -214,10 +226,7 @@ describe("POST /api/episodes/batch-fetch-transcripts", () => {
       userId: "admin_1",
       has: vi.fn().mockReturnValue(true),
     } as never);
-    vi.mocked(db.query.episodes.findMany).mockResolvedValue([
-      makeEpisode(1, "111"),
-      makeEpisode(2, "222"),
-    ] as never);
+    mockEpisodeSelect([makeEpisode(1, "111"), makeEpisode(2, "222")]);
 
     const { POST } = await import(
       "@/app/api/episodes/batch-fetch-transcripts/route"
@@ -236,10 +245,7 @@ describe("POST /api/episodes/batch-fetch-transcripts", () => {
       userId: "admin_1",
       has: vi.fn().mockReturnValue(true),
     } as never);
-    vi.mocked(db.query.episodes.findMany).mockResolvedValue([
-      makeEpisode(1, "111"),
-      makeEpisode(2, "222"),
-    ] as never);
+    mockEpisodeSelect([makeEpisode(1, "111"), makeEpisode(2, "222")]);
 
     const { POST } = await import(
       "@/app/api/episodes/batch-fetch-transcripts/route"
@@ -259,10 +265,7 @@ describe("POST /api/episodes/batch-fetch-transcripts", () => {
       userId: "admin_1",
       has: vi.fn().mockReturnValue(true),
     } as never);
-    vi.mocked(db.query.episodes.findMany).mockResolvedValue([
-      makeEpisode(1, "111"),
-      makeEpisode(2, "222"),
-    ] as never);
+    mockEpisodeSelect([makeEpisode(1, "111"), makeEpisode(2, "222")]);
     const { setMock } = mockUpdateChain();
 
     const { POST } = await import(
@@ -281,10 +284,7 @@ describe("POST /api/episodes/batch-fetch-transcripts", () => {
       userId: "admin_1",
       has: vi.fn().mockReturnValue(true),
     } as never);
-    vi.mocked(db.query.episodes.findMany).mockResolvedValue([
-      makeEpisode(1, "11111"),
-      makeEpisode(2, "22222"),
-    ] as never);
+    mockEpisodeSelect([makeEpisode(1, "11111"), makeEpisode(2, "22222")]);
 
     const { POST } = await import(
       "@/app/api/episodes/batch-fetch-transcripts/route"
@@ -306,10 +306,7 @@ describe("POST /api/episodes/batch-fetch-transcripts", () => {
       userId: "admin_1",
       has: vi.fn().mockReturnValue(true),
     } as never);
-    vi.mocked(db.query.episodes.findMany).mockResolvedValue([
-      makeEpisode(1, "111"),
-      makeEpisode(2, "222"),
-    ] as never);
+    mockEpisodeSelect([makeEpisode(1, "111"), makeEpisode(2, "222")]);
 
     const { POST } = await import(
       "@/app/api/episodes/batch-fetch-transcripts/route"
@@ -329,7 +326,7 @@ describe("POST /api/episodes/batch-fetch-transcripts", () => {
     } as never);
     const ids = Array.from({ length: 20 }, (_, i) => i + 1);
     const episodes = ids.map((id) => makeEpisode(id, String(id * 100)));
-    vi.mocked(db.query.episodes.findMany).mockResolvedValue(episodes as never);
+    mockEpisodeSelect(episodes);
 
     const { POST } = await import(
       "@/app/api/episodes/batch-fetch-transcripts/route"

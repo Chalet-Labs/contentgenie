@@ -25,10 +25,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "A valid positive episode ID is required" }, { status: 400 });
   }
 
-  // Look up episode by primary key
-  const episode = await db.query.episodes.findFirst({
-    where: eq(episodes.id, numericId),
-  });
+  const [episode] = await db
+    .select({
+      id: episodes.id,
+      podcastIndexId: episodes.podcastIndexId,
+      audioUrl: episodes.audioUrl,
+      description: episodes.description,
+    })
+    .from(episodes)
+    .where(eq(episodes.id, numericId))
+    .limit(1);
   if (!episode) {
     return NextResponse.json({ error: "Episode not found" }, { status: 404 });
   }

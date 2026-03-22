@@ -7,17 +7,22 @@ vi.mock("@clerk/nextjs/server", () => ({
   auth: vi.fn(),
 }));
 
+const mockDbSelect = vi.fn();
 vi.mock("@/db", () => ({
   db: {
-    query: {
-      episodes: { findFirst: vi.fn() },
-    },
+    select: (...args: unknown[]) => mockDbSelect(...args),
     update: vi.fn(),
   },
 }));
 
 vi.mock("@/db/schema", () => ({
-  episodes: { id: "id", transcriptStatus: "transcript_status" },
+  episodes: {
+    id: "id",
+    podcastIndexId: "podcast_index_id",
+    audioUrl: "audio_url",
+    description: "description",
+    transcriptStatus: "transcript_status",
+  },
 }));
 
 vi.mock("drizzle-orm", () => ({
@@ -41,6 +46,17 @@ function mockUpdateChain() {
   const setMock = vi.fn().mockReturnValue({ where: whereMock });
   vi.mocked(db.update).mockReturnValue({ set: setMock } as never);
   return { setMock, whereMock };
+}
+
+// Mock the db.select().from().where().limit() chain for episode lookup
+function mockEpisodeSelect(result: unknown) {
+  mockDbSelect.mockReturnValue({
+    from: vi.fn().mockReturnValue({
+      where: vi.fn().mockReturnValue({
+        limit: vi.fn().mockResolvedValue(Array.isArray(result) ? result : [result].filter(Boolean)),
+      }),
+    }),
+  });
 }
 
 function makeEpisode(overrides: Record<string, unknown> = {}) {
@@ -146,7 +162,7 @@ describe("POST /api/episodes/fetch-transcript", () => {
       userId: "admin_1",
       has: vi.fn().mockReturnValue(true),
     } as never);
-    vi.mocked(db.query.episodes.findFirst).mockResolvedValue(undefined as never);
+    mockEpisodeSelect(null);
 
     const { POST } = await import("@/app/api/episodes/fetch-transcript/route");
     const response = await POST(makeRequest({ episodeId: 999 }));
@@ -161,7 +177,7 @@ describe("POST /api/episodes/fetch-transcript", () => {
       userId: "admin_1",
       has: vi.fn().mockReturnValue(true),
     } as never);
-    vi.mocked(db.query.episodes.findFirst).mockResolvedValue(makeEpisode() as never);
+    mockEpisodeSelect(makeEpisode());
 
     const { POST } = await import("@/app/api/episodes/fetch-transcript/route");
     const response = await POST(makeRequest({ episodeId: 5 }));
@@ -177,7 +193,7 @@ describe("POST /api/episodes/fetch-transcript", () => {
       userId: "admin_1",
       has: vi.fn().mockReturnValue(true),
     } as never);
-    vi.mocked(db.query.episodes.findFirst).mockResolvedValue(makeEpisode() as never);
+    mockEpisodeSelect(makeEpisode());
     const { setMock } = mockUpdateChain();
 
     const { POST } = await import("@/app/api/episodes/fetch-transcript/route");
@@ -194,9 +210,7 @@ describe("POST /api/episodes/fetch-transcript", () => {
       userId: "admin_1",
       has: vi.fn().mockReturnValue(true),
     } as never);
-    vi.mocked(db.query.episodes.findFirst).mockResolvedValue(
-      makeEpisode({ id: 5, podcastIndexId: "98765" }) as never
-    );
+    mockEpisodeSelect(makeEpisode({ id: 5, podcastIndexId: "98765" }));
 
     const { POST } = await import("@/app/api/episodes/fetch-transcript/route");
     await POST(makeRequest({ episodeId: 5 }));
@@ -213,7 +227,7 @@ describe("POST /api/episodes/fetch-transcript", () => {
       userId: "admin_1",
       has: vi.fn().mockReturnValue(true),
     } as never);
-    vi.mocked(db.query.episodes.findFirst).mockResolvedValue(makeEpisode() as never);
+    mockEpisodeSelect(makeEpisode());
 
     const { POST } = await import("@/app/api/episodes/fetch-transcript/route");
     await POST(makeRequest({ episodeId: 5 }));
@@ -230,7 +244,7 @@ describe("POST /api/episodes/fetch-transcript", () => {
       userId: "admin_1",
       has: vi.fn().mockReturnValue(true),
     } as never);
-    vi.mocked(db.query.episodes.findFirst).mockResolvedValue(makeEpisode() as never);
+    mockEpisodeSelect(makeEpisode());
     const { eq } = await import("drizzle-orm");
 
     const { POST } = await import("@/app/api/episodes/fetch-transcript/route");

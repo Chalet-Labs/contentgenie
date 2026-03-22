@@ -29,10 +29,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "All episode IDs must be positive integers" }, { status: 400 });
   }
 
-  // Look up all episodes by primary key (episodeIds are episodes.id, NOT podcastIndexId)
-  const foundEpisodes = await db.query.episodes.findMany({
-    where: inArray(episodes.id, episodeIds),
-  });
+  // episodeIds are episodes.id (primary key), NOT podcastIndexId
+  const foundEpisodes = await db
+    .select({
+      id: episodes.id,
+      podcastIndexId: episodes.podcastIndexId,
+      audioUrl: episodes.audioUrl,
+      description: episodes.description,
+    })
+    .from(episodes)
+    .where(inArray(episodes.id, episodeIds));
 
   if (foundEpisodes.length !== episodeIds.length) {
     const foundIds = new Set(foundEpisodes.map((e) => e.id));
