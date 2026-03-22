@@ -9,7 +9,7 @@ vi.mock("@clerk/nextjs/server", () => ({
 // Mock database
 const mockDbSelect = vi.fn();
 const mockEpisodesFindMany = vi.fn();
-const mockPodcastsFindMany = vi.fn();
+
 vi.mock("@/db", () => ({
   db: {
     select: (...args: unknown[]) => mockDbSelect(...args),

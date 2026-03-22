@@ -167,7 +167,7 @@ describe("POST /api/episodes/batch-fetch-transcripts", () => {
     const data = await response.json();
 
     expect(response.status).toBe(400);
-    expect(data.error).toBe("Maximum 20 episodes per batch");
+    expect(data.error).toBe("Maximum 20 unique episodes per batch");
   });
 
   it("returns 400 when episodeIds contains non-integers", async () => {

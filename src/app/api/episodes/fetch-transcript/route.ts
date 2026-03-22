@@ -54,6 +54,16 @@ export async function POST(request: NextRequest) {
     updatedAt: new Date(),
   }).where(eq(episodes.id, numericId));
 
+  // Validate podcastIndexId is numeric — RSS-sourced episodes have synthetic "rss-..." IDs
+  // that would produce NaN when passed to the fetch-transcript task.
+  const numericPodcastIndexId = Number(episode.podcastIndexId);
+  if (!Number.isFinite(numericPodcastIndexId) || numericPodcastIndexId <= 0) {
+    return NextResponse.json(
+      { error: "Episode has a non-numeric PodcastIndex ID and cannot be fetched via this endpoint" },
+      { status: 400 }
+    );
+  }
+
   // CRITICAL: episodeId in the task payload is podcastIndexId (as a number), NOT episodes.id.
   // The fetch-transcript task looks up the episode by podcastIndexId internally.
   // NOTE: FetchTranscriptPayload also accepts `transcripts` (PodcastIndex transcript URLs),
@@ -62,7 +72,7 @@ export async function POST(request: NextRequest) {
   const handle = await tasks.trigger<typeof fetchTranscriptTask>(
     "fetch-transcript",
     {
-      episodeId: Number(episode.podcastIndexId),
+      episodeId: numericPodcastIndexId,
       enclosureUrl: episode.audioUrl ?? undefined,
       description: episode.description ?? undefined,
       force: true, // Admin is explicitly requesting a re-fetch — skip cache check
@@ -74,7 +84,7 @@ export async function POST(request: NextRequest) {
     expirationTime: "15m",
   });
 
-  return NextResponse.json({ runId: handle.id, publicAccessToken }, { status: 202 });
+  return NextResponse.json({ status: "queued", runId: handle.id, publicAccessToken }, { status: 202 });
   } catch (error) {
     console.error("Error triggering transcript fetch:", error);
     return NextResponse.json(

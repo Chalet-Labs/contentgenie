@@ -94,7 +94,7 @@ export function MissingTranscriptsCard() {
       setTotalMissing(result.totalMissing);
       if (result.podcasts.length > 0) setPodcasts(result.podcasts);
       setEpisodes((prev) => opts?.append ? [...prev, ...result.episodes] : result.episodes);
-      setHasMore(result.episodes.length === PAGE_SIZE);
+      setHasMore(currentPage * PAGE_SIZE < result.totalMissing);
       setState("idle");
     } catch (error) {
       console.error("Failed to load transcript stats:", error);
@@ -146,10 +146,12 @@ export function MissingTranscriptsCard() {
         toast.error((data.error as string) ?? "Failed to trigger transcript fetch");
         return;
       }
-      // Optimistically update status in list
+      // Optimistically update status and clear stale error
       setEpisodes((prev) =>
         prev.map((ep) =>
-          ep.id === episodeId ? { ...ep, transcriptStatus: "fetching" } : ep
+          ep.id === episodeId
+            ? { ...ep, transcriptStatus: "fetching", transcriptError: null }
+            : ep
         )
       );
       toast.success("Transcript fetch triggered");
@@ -186,11 +188,13 @@ export function MissingTranscriptsCard() {
         toast.error((data.error as string) ?? "Failed to trigger batch transcript fetch");
         return;
       }
-      // Optimistically update all visible rows
+      // Optimistically update all visible rows and clear stale errors
       const triggeredIds = new Set(ids);
       setEpisodes((prev) =>
         prev.map((ep) =>
-          triggeredIds.has(ep.id) ? { ...ep, transcriptStatus: "fetching" } : ep
+          triggeredIds.has(ep.id)
+            ? { ...ep, transcriptStatus: "fetching", transcriptError: null }
+            : ep
         )
       );
       toast.success(`Triggered fetch for ${ids.length} episodes`);
