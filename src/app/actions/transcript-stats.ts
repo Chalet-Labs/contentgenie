@@ -1,7 +1,7 @@
 "use server";
 
 import { auth } from "@clerk/nextjs/server";
-import { and, count, eq, isNull, or, desc } from "drizzle-orm";
+import { and, count, eq, isNotNull, isNull, or, desc } from "drizzle-orm";
 import { db } from "@/db";
 import { episodes, podcasts, type TranscriptStatus } from "@/db/schema";
 import { ADMIN_ROLE } from "@/lib/auth-roles";
@@ -40,12 +40,18 @@ export async function getEpisodeTranscriptStats(opts?: {
   const offset = (page - 1) * pageSize;
 
   try {
-  // Include 'fetching' so rows left in that state by crashed/timed-out Trigger.dev runs remain visible and can be retried
+  // Explicit statuses: episodes that entered the transcript pipeline and ended up missing/failed/stuck
+  // Plus: episodes that have been processed (processedAt set) but still have no transcript —
+  // this catches the "gap" condition without pulling in freshly ingested episodes whose
+  // transcript pipeline hasn't run yet (avoids duplicate fetch triggers).
   const missingCondition = or(
-    isNull(episodes.transcriptStatus),
     eq(episodes.transcriptStatus, "missing"),
     eq(episodes.transcriptStatus, "failed"),
-    eq(episodes.transcriptStatus, "fetching")
+    eq(episodes.transcriptStatus, "fetching"),
+    and(
+      isNull(episodes.transcriptStatus),
+      isNotNull(episodes.processedAt)
+    )
   );
 
   const conditions = [missingCondition];

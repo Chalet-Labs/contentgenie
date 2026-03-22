@@ -29,6 +29,7 @@ vi.mock("@/db/schema", () => ({
     transcriptStatus: "transcript_status",
     transcriptError: "transcript_error",
     publishDate: "publish_date",
+    processedAt: "processed_at",
   },
   podcasts: {
     id: "id",
@@ -41,6 +42,7 @@ vi.mock("drizzle-orm", () => ({
   and: vi.fn((...args: unknown[]) => ({ type: "and", conditions: args })),
   or: vi.fn((...args: unknown[]) => ({ type: "or", conditions: args })),
   isNull: vi.fn((col: unknown) => ({ type: "isNull", col })),
+  isNotNull: vi.fn((col: unknown) => ({ type: "isNotNull", col })),
   eq: vi.fn((col: unknown, val: unknown) => ({ type: "eq", col, val })),
   count: vi.fn(() => "count(*)"),
   desc: vi.fn((col: unknown) => ({ type: "desc", col })),
@@ -224,20 +226,24 @@ describe("getEpisodeTranscriptStats", () => {
     expect(result.episodes[0].transcriptStatus).toBe("fetching");
   });
 
-  it("builds the or condition with all four transcript status values", async () => {
+  it("builds the or condition with explicit statuses and processedAt gap check", async () => {
     mockAuth.mockResolvedValue({ userId: "admin_1", has: vi.fn().mockReturnValue(true) });
     mockSelectChain(0, [], []);
-    const { or, isNull, eq } = await import("drizzle-orm");
+    const { or, isNull, isNotNull, eq, and } = await import("drizzle-orm");
 
     const { getEpisodeTranscriptStats } = await import(
       "@/app/actions/transcript-stats"
     );
     await getEpisodeTranscriptStats();
 
-    expect(isNull).toHaveBeenCalled();
+    // Explicit status checks
     expect(eq).toHaveBeenCalledWith(expect.anything(), "missing");
     expect(eq).toHaveBeenCalledWith(expect.anything(), "failed");
     expect(eq).toHaveBeenCalledWith(expect.anything(), "fetching");
+    // Gap condition: isNull(transcriptStatus) AND isNotNull(processedAt)
+    expect(isNull).toHaveBeenCalledWith("transcript_status");
+    expect(isNotNull).toHaveBeenCalledWith("processed_at");
+    expect(and).toHaveBeenCalled();
     expect(or).toHaveBeenCalled();
   });
 
