@@ -34,13 +34,21 @@ function isRssSourced(id: string): boolean {
 }
 
 function buildSummaryMaps(
-  episodes: { podcastIndexId: string; summaryStatus: SummaryStatus | null; worthItScore: string | null }[],
+  episodes: { podcastIndexId: string; summaryStatus: SummaryStatus | null; worthItScore: string | null; processedAt: Date | null }[],
 ) {
   const statusMap: Record<string, SummaryStatus> = {};
   const scoreMap: Record<string, string> = {};
   for (const ep of episodes) {
-    if (ep.summaryStatus) statusMap[ep.podcastIndexId] = ep.summaryStatus;
-    if (ep.worthItScore !== null) scoreMap[ep.podcastIndexId] = ep.worthItScore;
+    // processedAt indicates that summary content has been persisted.
+    const isPersisted = !!ep.processedAt;
+
+    if (ep.summaryStatus && (ep.summaryStatus !== "completed" || isPersisted)) {
+      statusMap[ep.podcastIndexId] = ep.summaryStatus;
+    }
+
+    if (ep.worthItScore !== null && isPersisted) {
+      scoreMap[ep.podcastIndexId] = ep.worthItScore;
+    }
   }
   return { statusMap, scoreMap };
 }
@@ -70,6 +78,7 @@ async function loadRssPodcast(podcastIndexId: string) {
       duration: true,
       summaryStatus: true,
       worthItScore: true,
+      processedAt: true,
     },
   });
 
@@ -267,7 +276,7 @@ export default async function PodcastPage({ params, searchParams }: PodcastPageP
     const dbEpisodeData = episodeStringIds.length > 0
       ? await db.query.episodes.findMany({
           where: inArray(episodesTable.podcastIndexId, episodeStringIds),
-          columns: { podcastIndexId: true, summaryStatus: true, worthItScore: true },
+          columns: { podcastIndexId: true, summaryStatus: true, worthItScore: true, processedAt: true },
         })
       : [];
     const { statusMap, scoreMap } = buildSummaryMaps(dbEpisodeData);
