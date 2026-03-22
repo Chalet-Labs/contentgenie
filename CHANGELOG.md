@@ -14,6 +14,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Processing status badge for `"running"` state updated from "Transcribing..." to "Processing..."
 - Summarization step progress UI removes `"fetching-transcript"` and `"transcribing-audio"` steps — summarization no longer fetches transcripts
 
+### Fixed
+- Add required `speech_models` parameter to AssemblyAI API calls to resolve 400 errors from the updated API
+
 ### Added
 - Admin missing-transcripts panel on the settings page: shows count of episodes with null/missing/failed/fetching `transcriptStatus`, podcast dropdown filter, paginated episode list with status badges and error display, per-episode "Fetch" button, and "Fetch All" batch button (max 20). Backed by `getEpisodeTranscriptStats` server action and two new API routes (`POST /api/episodes/fetch-transcript`, `POST /api/episodes/batch-fetch-transcripts`). Stale `fetching` rows from crashed runs remain visible and are retryable (#216)
 - Independent transcript tracking: `transcript_status`, `transcript_fetched_at`, and `transcript_error` columns on the episodes table with CHECK constraint, `TranscriptStatus` type export, updated persist helpers, and backfill migration (ADR-026, #214)
