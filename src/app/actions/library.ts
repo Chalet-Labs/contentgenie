@@ -566,5 +566,7 @@ export async function getBookmarks(libraryEntryId: number) {
  * summary statuses and scores from the database.
  */
 export async function revalidatePodcastPage(feedId: number) {
+  const { userId } = await auth();
+  if (!userId) return;
   revalidatePath(`/podcast/${feedId}`);
 }

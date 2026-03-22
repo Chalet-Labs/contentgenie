@@ -39,13 +39,16 @@ function buildSummaryMaps(
   const statusMap: Record<string, SummaryStatus> = {};
   const scoreMap: Record<string, string> = {};
   for (const ep of episodes) {
-    if (ep.summaryStatus) {
-      // Only report "completed" when summary was actually persisted —
-      // processedAt is set alongside summary in persistEpisodeSummary.
-      if (ep.summaryStatus === "completed" && !ep.processedAt) continue;
+    // processedAt indicates that summary content has been persisted.
+    const isPersisted = !!ep.processedAt;
+
+    if (ep.summaryStatus && (ep.summaryStatus !== "completed" || isPersisted)) {
       statusMap[ep.podcastIndexId] = ep.summaryStatus;
     }
-    if (ep.worthItScore !== null && ep.processedAt) scoreMap[ep.podcastIndexId] = ep.worthItScore;
+
+    if (ep.worthItScore !== null && isPersisted) {
+      scoreMap[ep.podcastIndexId] = ep.worthItScore;
+    }
   }
   return { statusMap, scoreMap };
 }
