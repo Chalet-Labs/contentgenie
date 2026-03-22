@@ -560,3 +560,11 @@ export async function getBookmarks(libraryEntryId: number) {
     return { bookmarks: [], error: "Failed to load bookmarks" };
   }
 }
+
+/**
+ * Revalidate the podcast page so the next navigation picks up fresh
+ * summary statuses and scores from the database.
+ */
+export async function revalidatePodcastPage(feedId: number) {
+  revalidatePath(`/podcast/${feedId}`);
+}

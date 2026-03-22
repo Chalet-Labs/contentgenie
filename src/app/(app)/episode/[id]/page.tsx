@@ -39,7 +39,7 @@ import {
 } from "@/components/ui/tooltip";
 import { WorthItBadge } from "@/components/episodes/worth-it-badge";
 import { CommunityRating } from "@/components/episodes/community-rating";
-import { isEpisodeSaved } from "@/app/actions/library";
+import { isEpisodeSaved, revalidatePodcastPage } from "@/app/actions/library";
 import { useOnlineStatus } from "@/hooks/use-online-status";
 import { OfflineBanner } from "@/components/ui/offline-banner";
 import { cacheEpisode, getCachedEpisode } from "@/lib/offline-cache";
@@ -173,6 +173,8 @@ export default function EpisodePage({ params }: EpisodePageProps) {
       setIsLoadingSummary(false);
       setRunId(null);
       setAccessToken(null);
+      // Invalidate the podcast page so the next navigation picks up fresh scores/status
+      if (episode) void revalidatePodcastPage(episode.feedId);
       toast.success("Summary generated!", {
         description: "AI insights are now available for this episode",
       });
