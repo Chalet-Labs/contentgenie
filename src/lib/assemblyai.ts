@@ -45,7 +45,7 @@ export async function submitTranscription(audioUrl: string): Promise<string> {
   const response = await fetch(`${API_BASE_URL}/transcript`, {
     method: "POST",
     headers: getAuthHeaders(),
-    body: JSON.stringify({ audio_url: audioUrl }),
+    body: JSON.stringify({ audio_url: audioUrl, speech_models: ["universal-2"] }),
   });
 
   if (!response.ok) {
@@ -72,7 +72,7 @@ export async function submitTranscriptionAsync(
   const response = await fetch(`${API_BASE_URL}/transcript`, {
     method: "POST",
     headers: getAuthHeaders(),
-    body: JSON.stringify({ audio_url: audioUrl, webhook_url: webhookUrl }),
+    body: JSON.stringify({ audio_url: audioUrl, webhook_url: webhookUrl, speech_models: ["universal-2"] }),
   });
 
   if (!response.ok) {
