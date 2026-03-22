@@ -17,17 +17,19 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  let body: Record<string, unknown>;
+  let body: unknown;
   try {
     body = await request.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
   }
-  const { episodeId } = body;
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    return NextResponse.json({ error: "Request body must be a JSON object" }, { status: 400 });
+  }
+  const { episodeId } = body as { episodeId?: unknown };
 
   // Validate: episodeId is episodes.id (DB primary key), NOT podcastIndexId
-  const numericId = Number(episodeId);
-  if (!Number.isFinite(numericId) || numericId <= 0 || !Number.isInteger(numericId)) {
+  if (typeof episodeId !== "number" || !Number.isInteger(episodeId) || episodeId <= 0) {
     return NextResponse.json({ error: "A valid positive episode ID is required" }, { status: 400 });
   }
 
@@ -39,23 +41,15 @@ export async function POST(request: NextRequest) {
       description: episodes.description,
     })
     .from(episodes)
-    .where(eq(episodes.id, numericId))
+    .where(eq(episodes.id, episodeId))
     .limit(1);
   if (!episode) {
     return NextResponse.json({ error: "Episode not found" }, { status: 404 });
   }
 
-  // Set transcriptStatus to 'fetching' optimistically so the UI shows immediate feedback.
-  // If the task fails, the row remains 'fetching' (stale). The stats query includes
-  // 'fetching' so stale rows stay visible and can be retried.
-  await db.update(episodes).set({
-    transcriptStatus: "fetching",
-    transcriptError: null,
-    updatedAt: new Date(),
-  }).where(eq(episodes.id, numericId));
-
-  // Validate podcastIndexId is numeric — RSS-sourced episodes have synthetic "rss-..." IDs
-  // that would produce NaN when passed to the fetch-transcript task.
+  // Validate podcastIndexId is numeric BEFORE the optimistic update —
+  // RSS-sourced episodes have synthetic "rss-..." IDs that would produce NaN.
+  // If we set 'fetching' first, the row gets stuck in that state on 400.
   const numericPodcastIndexId = Number(episode.podcastIndexId);
   if (!Number.isFinite(numericPodcastIndexId) || numericPodcastIndexId <= 0) {
     return NextResponse.json(
@@ -64,11 +58,16 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // Set transcriptStatus to 'fetching' optimistically so the UI shows immediate feedback.
+  // Only after validating the episode is queueable — avoids leaving rows stuck in 'fetching'.
+  await db.update(episodes).set({
+    transcriptStatus: "fetching",
+    transcriptError: null,
+    updatedAt: new Date(),
+  }).where(eq(episodes.id, episodeId));
+
   // CRITICAL: episodeId in the task payload is podcastIndexId (as a number), NOT episodes.id.
   // The fetch-transcript task looks up the episode by podcastIndexId internally.
-  // NOTE: FetchTranscriptPayload also accepts `transcripts` (PodcastIndex transcript URLs),
-  // but these are not stored on the episode row — they come from the PodcastIndex API at
-  // feed-poll time. The task falls back gracefully to other sources without them.
   const handle = await tasks.trigger<typeof fetchTranscriptTask>(
     "fetch-transcript",
     {
@@ -79,12 +78,21 @@ export async function POST(request: NextRequest) {
     }
   );
 
-  const publicAccessToken = await auth.createPublicToken({
-    scopes: { read: { runs: [handle.id] } },
-    expirationTime: "15m",
-  });
+  // Token creation is non-critical — if it fails, the run is still queued.
+  let publicAccessToken: string | undefined;
+  try {
+    publicAccessToken = await auth.createPublicToken({
+      scopes: { read: { runs: [handle.id] } },
+      expirationTime: "15m",
+    });
+  } catch (tokenError) {
+    console.error("Failed to create Trigger.dev public token:", tokenError);
+  }
 
-  return NextResponse.json({ status: "queued", runId: handle.id, publicAccessToken }, { status: 202 });
+  return NextResponse.json(
+    { status: "queued", runId: handle.id, ...(publicAccessToken && { publicAccessToken }) },
+    { status: 202 }
+  );
   } catch (error) {
     console.error("Error triggering transcript fetch:", error);
     return NextResponse.json(
