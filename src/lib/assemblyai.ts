@@ -1,5 +1,6 @@
 const API_BASE_URL = "https://api.assemblyai.com/v2";
 
+const DEFAULT_SPEECH_MODELS = ["universal-2"];
 const DEFAULT_POLL_INTERVAL_MS = 5000;
 const MAX_WAIT_MS = 30 * 60 * 1000; // 30 minutes
 const BACKOFF_FACTOR = 1.5;
@@ -45,7 +46,7 @@ export async function submitTranscription(audioUrl: string): Promise<string> {
   const response = await fetch(`${API_BASE_URL}/transcript`, {
     method: "POST",
     headers: getAuthHeaders(),
-    body: JSON.stringify({ audio_url: audioUrl }),
+    body: JSON.stringify({ audio_url: audioUrl, speech_models: DEFAULT_SPEECH_MODELS }),
   });
 
   if (!response.ok) {
@@ -72,7 +73,7 @@ export async function submitTranscriptionAsync(
   const response = await fetch(`${API_BASE_URL}/transcript`, {
     method: "POST",
     headers: getAuthHeaders(),
-    body: JSON.stringify({ audio_url: audioUrl, webhook_url: webhookUrl }),
+    body: JSON.stringify({ audio_url: audioUrl, webhook_url: webhookUrl, speech_models: DEFAULT_SPEECH_MODELS }),
   });
 
   if (!response.ok) {
