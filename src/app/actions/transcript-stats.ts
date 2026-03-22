@@ -35,11 +35,12 @@ export async function getEpisodeTranscriptStats(opts?: {
     return { totalMissing: 0, episodes: [], podcasts: [], error: "Unauthorized" };
   }
 
-  const page = opts?.page ?? 1;
-  const pageSize = opts?.pageSize ?? 10;
+  const page = Math.max(1, opts?.page ?? 1);
+  const pageSize = Math.min(Math.max(1, opts?.pageSize ?? 10), 50);
   const offset = (page - 1) * pageSize;
 
-  // Include 'fetching' so stale rows from failed/crashed runs remain visible
+  try {
+  // Include 'fetching' so rows left in that state by crashed/timed-out Trigger.dev runs remain visible and can be retried
   const missingCondition = or(
     isNull(episodes.transcriptStatus),
     eq(episodes.transcriptStatus, "missing"),
@@ -87,4 +88,8 @@ export async function getEpisodeTranscriptStats(opts?: {
     episodes: rows,
     podcasts: allPodcasts,
   };
+  } catch (error) {
+    console.error("Error fetching transcript stats:", error);
+    return { totalMissing: 0, episodes: [], podcasts: [], error: "Failed to load transcript stats" };
+  }
 }

@@ -253,4 +253,40 @@ describe("POST /api/episodes/fetch-transcript", () => {
     // eq should be called with the "id" column (primary key), value 5
     expect(eq).toHaveBeenCalledWith("id", 5);
   });
+
+  it("returns 400 for malformed JSON body", async () => {
+    vi.mocked(auth).mockResolvedValue({
+      userId: "admin_1",
+      has: vi.fn().mockReturnValue(true),
+    } as never);
+
+    const { POST } = await import("@/app/api/episodes/fetch-transcript/route");
+    const badRequest = new NextRequest("http://localhost:3000/api/episodes/fetch-transcript", {
+      method: "POST",
+      body: "not json",
+      headers: { "Content-Type": "application/json" },
+    });
+    const response = await POST(badRequest);
+
+    expect(response.status).toBe(400);
+    const data = await response.json();
+    expect(data.error).toBe("Invalid JSON body");
+  });
+
+  it("returns 500 on unexpected error without leaking details", async () => {
+    vi.mocked(auth).mockResolvedValue({
+      userId: "admin_1",
+      has: vi.fn().mockReturnValue(true),
+    } as never);
+    mockEpisodeSelect(makeEpisode());
+    const { tasks } = await import("@trigger.dev/sdk");
+    vi.mocked(tasks.trigger).mockRejectedValue(new Error("Trigger.dev down"));
+
+    const { POST } = await import("@/app/api/episodes/fetch-transcript/route");
+    const response = await POST(makeRequest({ episodeId: 5 }));
+
+    expect(response.status).toBe(500);
+    const data = await response.json();
+    expect(data.error).toBe("Failed to trigger transcript fetch");
+  });
 });

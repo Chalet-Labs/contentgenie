@@ -85,6 +85,8 @@ export function MissingTranscriptsCard() {
       });
 
       if (result.error) {
+        console.error("Transcript stats error:", result.error);
+        toast.error(result.error);
         setState("error");
         return;
       }
@@ -94,7 +96,8 @@ export function MissingTranscriptsCard() {
       setEpisodes((prev) => opts?.append ? [...prev, ...result.episodes] : result.episodes);
       setHasMore(result.episodes.length === PAGE_SIZE);
       setState("idle");
-    } catch {
+    } catch (error) {
+      console.error("Failed to load transcript stats:", error);
       setState("error");
     }
   }, []);
@@ -132,9 +135,15 @@ export function MissingTranscriptsCard() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ episodeId }),
       });
-      const data = await res.json();
+      let data: Record<string, unknown>;
+      try {
+        data = await res.json();
+      } catch {
+        toast.error("Unexpected response from server");
+        return;
+      }
       if (!res.ok) {
-        toast.error(data.error ?? "Failed to trigger transcript fetch");
+        toast.error((data.error as string) ?? "Failed to trigger transcript fetch");
         return;
       }
       // Optimistically update status in list
@@ -144,7 +153,8 @@ export function MissingTranscriptsCard() {
         )
       );
       toast.success("Transcript fetch triggered");
-    } catch {
+    } catch (error) {
+      console.error("Transcript fetch error:", error);
       toast.error("Network error. Please try again.");
     } finally {
       setFetchingIds((prev) => {
@@ -165,9 +175,15 @@ export function MissingTranscriptsCard() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ episodeIds: ids }),
       });
-      const data = await res.json();
+      let data: Record<string, unknown>;
+      try {
+        data = await res.json();
+      } catch {
+        toast.error("Unexpected response from server");
+        return;
+      }
       if (!res.ok) {
-        toast.error(data.error ?? "Failed to trigger batch transcript fetch");
+        toast.error((data.error as string) ?? "Failed to trigger batch transcript fetch");
         return;
       }
       // Optimistically update all visible rows
@@ -178,7 +194,8 @@ export function MissingTranscriptsCard() {
         )
       );
       toast.success(`Triggered fetch for ${ids.length} episodes`);
-    } catch {
+    } catch (error) {
+      console.error("Batch transcript fetch error:", error);
       toast.error("Network error. Please try again.");
     } finally {
       setIsBatchFetching(false);

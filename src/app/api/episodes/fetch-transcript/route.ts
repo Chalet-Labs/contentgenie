@@ -8,6 +8,7 @@ import { ADMIN_ROLE } from "@/lib/auth-roles";
 import type { fetchTranscriptTask } from "@/trigger/fetch-transcript";
 
 export async function POST(request: NextRequest) {
+  try {
   const { userId, has } = await clerkAuth();
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -16,7 +17,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const body = await request.json();
+  let body: Record<string, unknown>;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
   const { episodeId } = body;
 
   // Validate: episodeId is episodes.id (DB primary key), NOT podcastIndexId
@@ -59,7 +65,7 @@ export async function POST(request: NextRequest) {
       episodeId: Number(episode.podcastIndexId),
       enclosureUrl: episode.audioUrl ?? undefined,
       description: episode.description ?? undefined,
-      force: true,
+      force: true, // Admin is explicitly requesting a re-fetch — skip cache check
     }
   );
 
@@ -69,4 +75,11 @@ export async function POST(request: NextRequest) {
   });
 
   return NextResponse.json({ runId: handle.id, publicAccessToken }, { status: 202 });
+  } catch (error) {
+    console.error("Error triggering transcript fetch:", error);
+    return NextResponse.json(
+      { error: "Failed to trigger transcript fetch", details: error instanceof Error ? error.message : "Unknown error" },
+      { status: 500 }
+    );
+  }
 }

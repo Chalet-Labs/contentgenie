@@ -8,6 +8,7 @@ import { ADMIN_ROLE } from "@/lib/auth-roles";
 import type { fetchTranscriptTask } from "@/trigger/fetch-transcript";
 
 export async function POST(request: NextRequest) {
+  try {
   const { userId, has } = await clerkAuth();
   if (!userId) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -16,7 +17,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const body = await request.json();
+  let body: Record<string, unknown>;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 });
+  }
   const { episodeIds } = body;
 
   if (!Array.isArray(episodeIds) || episodeIds.length === 0) {
@@ -65,15 +71,23 @@ export async function POST(request: NextRequest) {
         episodeId: Number(ep.podcastIndexId),
         enclosureUrl: ep.audioUrl ?? undefined,
         description: ep.description ?? undefined,
-        force: true,
+        force: true, // Admin is explicitly requesting a re-fetch — skip cache check
       },
     }))
   );
 
-  // tasks.batchTrigger returns { batchId, runCount, publicAccessToken } — no per-run IDs.
+  // batchTrigger resolves with { batchId, runCount, publicAccessToken }.
+  // Individual run IDs are not in the immediate response — use subscribeToBatch to track per-run status.
   return NextResponse.json({
     batchId: batchResult.batchId,
     publicAccessToken: batchResult.publicAccessToken,
     total: episodeIds.length,
   }, { status: 202 });
+  } catch (error) {
+    console.error("Error triggering batch transcript fetch:", error);
+    return NextResponse.json(
+      { error: "Failed to trigger batch transcript fetch", details: error instanceof Error ? error.message : "Unknown error" },
+      { status: 500 }
+    );
+  }
 }

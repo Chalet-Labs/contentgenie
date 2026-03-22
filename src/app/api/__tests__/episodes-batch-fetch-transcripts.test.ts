@@ -335,4 +335,43 @@ describe("POST /api/episodes/batch-fetch-transcripts", () => {
 
     expect(response.status).toBe(202);
   });
+
+  it("returns 400 for malformed JSON body", async () => {
+    vi.mocked(auth).mockResolvedValue({
+      userId: "admin_1",
+      has: vi.fn().mockReturnValue(true),
+    } as never);
+
+    const { POST } = await import(
+      "@/app/api/episodes/batch-fetch-transcripts/route"
+    );
+    const badRequest = new NextRequest(
+      "http://localhost:3000/api/episodes/batch-fetch-transcripts",
+      { method: "POST", body: "not json", headers: { "Content-Type": "application/json" } }
+    );
+    const response = await POST(badRequest);
+
+    expect(response.status).toBe(400);
+    const data = await response.json();
+    expect(data.error).toBe("Invalid JSON body");
+  });
+
+  it("returns 500 on unexpected error without leaking details", async () => {
+    vi.mocked(auth).mockResolvedValue({
+      userId: "admin_1",
+      has: vi.fn().mockReturnValue(true),
+    } as never);
+    mockEpisodeSelect([makeEpisode(1, "111"), makeEpisode(2, "222")]);
+    const { tasks } = await import("@trigger.dev/sdk");
+    vi.mocked(tasks.batchTrigger).mockRejectedValue(new Error("Trigger.dev down"));
+
+    const { POST } = await import(
+      "@/app/api/episodes/batch-fetch-transcripts/route"
+    );
+    const response = await POST(makeRequest({ episodeIds: [1, 2] }));
+
+    expect(response.status).toBe(500);
+    const data = await response.json();
+    expect(data.error).toBe("Failed to trigger batch transcript fetch");
+  });
 });

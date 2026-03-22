@@ -254,4 +254,62 @@ describe("getEpisodeTranscriptStats", () => {
     expect(result.podcasts).toHaveLength(2);
     expect(result.podcasts[0].title).toBe("Pod A");
   });
+
+  it("skips podcasts query when skipPodcasts is true", async () => {
+    mockAuth.mockResolvedValue({ userId: "admin_1", has: vi.fn().mockReturnValue(true) });
+    // Only 2 db.select calls needed (count + episodes) — no podcasts query
+    let callIndex = 0;
+    mockDbSelect.mockImplementation(() => {
+      const call = callIndex++;
+      if (call === 0) {
+        return { from: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue([{ count: 0 }]) }) };
+      }
+      return {
+        from: vi.fn().mockReturnValue({
+          innerJoin: vi.fn().mockReturnValue({
+            where: vi.fn().mockReturnValue({
+              orderBy: vi.fn().mockReturnValue({
+                limit: vi.fn().mockReturnValue({ offset: vi.fn().mockResolvedValue([]) }),
+              }),
+            }),
+          }),
+        }),
+      };
+    });
+
+    const { getEpisodeTranscriptStats } = await import(
+      "@/app/actions/transcript-stats"
+    );
+    const result = await getEpisodeTranscriptStats({ skipPodcasts: true });
+
+    expect(result.podcasts).toEqual([]);
+    // Only 2 db.select calls — count and episode list; no third call for podcasts
+    expect(mockDbSelect).toHaveBeenCalledTimes(2);
+  });
+
+  it("clamps pageSize to max 50 and page to min 1", async () => {
+    mockAuth.mockResolvedValue({ userId: "admin_1", has: vi.fn().mockReturnValue(true) });
+    mockSelectChain(0, [], []);
+
+    const { getEpisodeTranscriptStats } = await import(
+      "@/app/actions/transcript-stats"
+    );
+    // Should not throw even with extreme values
+    await getEpisodeTranscriptStats({ page: -5, pageSize: 99999 });
+    expect(mockDbSelect).toHaveBeenCalled();
+  });
+
+  it("returns error on DB failure instead of throwing", async () => {
+    mockAuth.mockResolvedValue({ userId: "admin_1", has: vi.fn().mockReturnValue(true) });
+    mockDbSelect.mockImplementation(() => { throw new Error("DB connection failed"); });
+
+    const { getEpisodeTranscriptStats } = await import(
+      "@/app/actions/transcript-stats"
+    );
+    const result = await getEpisodeTranscriptStats();
+
+    expect(result.error).toBe("Failed to load transcript stats");
+    expect(result.totalMissing).toBe(0);
+    expect(result.episodes).toEqual([]);
+  });
 });
