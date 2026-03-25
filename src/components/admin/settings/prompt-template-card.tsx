@@ -51,10 +51,12 @@ export function PromptTemplateCard({ initialPrompt }: PromptTemplateCardProps) {
   const [pickerOpen, setPickerOpen] = useState(false)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const latestSearchIdRef = useRef(0)
+  const testAbortRef = useRef<AbortController | null>(null)
 
   useEffect(() => {
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current)
+      testAbortRef.current?.abort()
     }
   }, [])
 
@@ -86,6 +88,9 @@ export function PromptTemplateCard({ initialPrompt }: PromptTemplateCardProps) {
 
   const handleTest = async () => {
     if (!selectedEpisode || isTesting || !promptText.trim()) return
+    testAbortRef.current?.abort()
+    const controller = new AbortController()
+    testAbortRef.current = controller
     setIsTesting(true)
     setTestOutput("")
 
@@ -94,6 +99,7 @@ export function PromptTemplateCard({ initialPrompt }: PromptTemplateCardProps) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prompt: promptText, episodeId: selectedEpisode.id }),
+        signal: controller.signal,
       })
 
       if (!res.ok) {
@@ -120,6 +126,7 @@ export function PromptTemplateCard({ initialPrompt }: PromptTemplateCardProps) {
         setTestOutput((prev) => prev + decoder.decode(value, { stream: true }))
       }
     } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") return
       toast.error("Test failed: " + (err instanceof Error ? err.message : String(err)))
     } finally {
       setIsTesting(false)
@@ -129,7 +136,8 @@ export function PromptTemplateCard({ initialPrompt }: PromptTemplateCardProps) {
   const handleSave = async () => {
     setIsSaving(true)
     try {
-      const result = await updateSummarizationPrompt(promptText || null)
+      const normalizedPrompt = promptText.trim().length === 0 ? null : promptText
+      const result = await updateSummarizationPrompt(normalizedPrompt)
       if (result.success) {
         toast.success("Prompt saved successfully")
       } else {
