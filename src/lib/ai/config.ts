@@ -6,6 +6,7 @@ import type { AiConfig } from "@/lib/ai/types";
 export const DEFAULT_AI_CONFIG: AiConfig = {
   provider: "openrouter",
   model: "google/gemini-2.0-flash-001",
+  summarizationPrompt: null,
 };
 
 export async function getActiveAiConfig(): Promise<AiConfig> {
@@ -21,6 +22,7 @@ export async function getActiveAiConfig(): Promise<AiConfig> {
     return {
       provider: row.provider,
       model: row.model,
+      summarizationPrompt: row.summarizationPrompt ?? null,
     };
   } catch (error) {
     console.error("Failed to read AI config from database, using default:", error);

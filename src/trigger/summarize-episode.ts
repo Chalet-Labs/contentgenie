@@ -4,6 +4,7 @@ import { getEpisodeById, getPodcastById } from "@/trigger/helpers/podcastindex";
 import { generateEpisodeSummary, type SummaryResult } from "@/trigger/helpers/ai-summary";
 import { trackEpisodeRun, persistEpisodeSummary, updateEpisodeStatus } from "@/trigger/helpers/database";
 import { createNotificationsForSubscribers, resolvePodcastId } from "@/trigger/helpers/notifications";
+import { getActiveAiConfig } from "@/lib/ai/config";
 import { db } from "@/db";
 import { episodes } from "@/db/schema";
 import type { PodcastIndexEpisode, PodcastIndexPodcast } from "@/lib/podcastindex";
@@ -166,6 +167,8 @@ export const summarizeEpisode = task({
     setStep("generating-summary");
     logger.info("Generating AI summary");
 
+    const aiConfig = await getActiveAiConfig();
+
     try {
       await updateEpisodeStatus(episodeId, "summarizing");
     } catch (error) {
@@ -175,7 +178,7 @@ export const summarizeEpisode = task({
     }
 
     const summary = await retry.onThrow(
-      async () => generateEpisodeSummary(podcast, episode, transcript),
+      async () => generateEpisodeSummary(podcast, episode, transcript, aiConfig.summarizationPrompt),
       { maxAttempts: 3, minTimeoutInMs: 5000, maxTimeoutInMs: 60000 }
     );
 

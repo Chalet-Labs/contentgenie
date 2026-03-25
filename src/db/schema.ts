@@ -210,6 +210,7 @@ export const aiConfig = pgTable(
     id: serial("id").primaryKey(),
     provider: text("provider").$type<"openrouter" | "zai">().notNull(),
     model: text("model").notNull(),
+    summarizationPrompt: text("summarization_prompt"),
     updatedBy: text("updated_by").references(() => users.id, {
       onDelete: "set null",
     }),

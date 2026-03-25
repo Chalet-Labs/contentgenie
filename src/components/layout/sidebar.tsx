@@ -3,6 +3,7 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { OrganizationSwitcher } from "@clerk/nextjs"
+import { useAuth } from "@clerk/nextjs"
 import { cn } from "@/lib/utils"
 import {
   LayoutDashboard,
@@ -10,8 +11,10 @@ import {
   Rss,
   Library,
   Settings,
+  Shield,
 } from "lucide-react"
 import { useSidebarCounts, getBadgeCount, NavBadge } from "@/contexts/sidebar-counts-context"
+import { ADMIN_ROLE } from "@/lib/auth-roles"
 
 const sidebarLinks = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -27,6 +30,8 @@ const bottomLinks = [
 export function Sidebar() {
   const pathname = usePathname()
   const counts = useSidebarCounts()
+  const { has } = useAuth()
+  const isAdmin = has?.({ role: ADMIN_ROLE }) ?? false
 
   return (
     <aside className="hidden lg:flex flex-col w-64 border-r bg-background h-[calc(100vh-3.5rem)]">
@@ -93,6 +98,20 @@ export function Sidebar() {
               </Link>
             )
           })}
+          {isAdmin && (
+            <Link
+              href="/admin"
+              className={cn(
+                "flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors",
+                pathname === "/admin" || pathname?.startsWith("/admin/")
+                  ? "bg-accent text-accent-foreground"
+                  : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+              )}
+            >
+              <Shield className="size-4" />
+              Admin
+            </Link>
+          )}
         </nav>
       </div>
     </aside>

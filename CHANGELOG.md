@@ -6,7 +6,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- Dedicated `/admin` panel with three sub-routes: Overview (aggregated stats dashboard with transcript coverage, summary coverage, queue depth, active fetches, failure trend, and recent failures), Settings (AI provider config + prompt template editor), and Episodes (filterable global table with pagination, row actions, and batch re-summarization) (#224)
+- Prompt template editor: admins can write a custom summarization prompt with `{{transcript}}` and other placeholders, test it live against any real episode via streaming AI response (dry-run with full production fidelity), and persist it to the `aiConfig` table; `summarizationPrompt` nullable column added to `ai_config` table
+- `POST /api/admin/test-prompt` — streaming prompt playground route using raw SSE fetch (no Vercel AI SDK); see ADR-008 addendum
+- `POST /api/admin/batch-resummarize` — admin batch re-summarization by explicit episode IDs (no rate limit, returns `{ queued, skipped }`, fire-and-forget)
+- Admin link in sidebar (visible to `org:admin` users only)
+
 ### Changed
+- Admin features (AI provider card, bulk re-summarize, missing transcripts) moved from `/settings` page to dedicated `/admin` panel; regular users no longer see or have access to these features
+- `generateEpisodeSummary` now accepts an optional `customPrompt` parameter; when provided, `interpolatePrompt` is used instead of the default `getSummarizationPrompt`
+- `summarize-episode` Trigger.dev task reads `summarizationPrompt` from `getActiveAiConfig()` and passes it to `generateEpisodeSummary` at execution time
+
+### Removed
+- `BulkResummarizeCard` component deleted (superseded by admin panel batch re-summarization)
+- `MissingTranscriptsCard` component deleted (superseded by admin panel episodes table with transcript status filter)
 - `summarize-episode` is now a pure consumer of existing transcripts: it reads the `transcription` column from the database and aborts with `AbortTaskRunError` if no transcript is present, instead of orchestrating `fetch-transcript` inline or generating a description-only fallback (ADR-027, #215)
 - `persistEpisodeSummary` simplified to 3 parameters — transcript-related column writes are exclusively owned by `fetch-transcript` via `persistTranscript`
 - Removed `"transcribing"` from `summaryStatus` CHECK constraint, TypeScript type, and `IN_PROGRESS_STATUSES` — transcript progress is tracked via `transcriptStatus` column

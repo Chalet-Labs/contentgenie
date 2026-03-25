@@ -27,9 +27,6 @@ import {
 import { Skeleton } from "@/components/ui/skeleton"
 import { toast } from "sonner"
 import { Sun, Moon, Monitor, Bell, Link2, Trash2, ExternalLink, Mail } from "lucide-react"
-import { AiProviderCard } from "@/components/settings/ai-provider-card"
-import { BulkResummarizeCard } from "@/components/settings/bulk-resummarize-card"
-import { MissingTranscriptsCard } from "@/components/settings/missing-transcripts-card"
 import { InstallAppCard } from "@/components/settings/install-app-card"
 import { NotificationSettings } from "@/components/notifications/notification-settings"
 
@@ -183,15 +180,6 @@ export default function SettingsPage() {
 
       {/* Install App */}
       <InstallAppCard />
-
-      {/* AI Provider (admin only) */}
-      <AiProviderCard />
-
-      {/* AI Summaries */}
-      <BulkResummarizeCard />
-
-      {/* Missing Transcripts (admin only) */}
-      <MissingTranscriptsCard />
 
       {/* Connected Accounts */}
       <Card>
