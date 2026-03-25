@@ -1,4 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Progress } from "@/components/ui/progress"
 import type { TranscriptSourceBreakdown } from "@/lib/admin/overview-queries"
 
 interface TranscriptSourceCardProps {
@@ -28,12 +29,7 @@ export function TranscriptSourceCard({ breakdown }: TranscriptSourceCardProps) {
                     {row.count} ({pct}%)
                   </span>
                 </div>
-                <div className="h-2 rounded-full bg-muted overflow-hidden">
-                  <div
-                    className="h-full rounded-full bg-primary"
-                    style={{ width: `${pct}%` }}
-                  />
-                </div>
+                <Progress value={pct} className="h-2" />
               </div>
             )
           })

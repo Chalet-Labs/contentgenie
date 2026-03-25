@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/command"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { ChevronsUpDown, X } from "lucide-react"
 import type { EpisodeFilters } from "@/lib/admin/episode-filters"
 
@@ -182,9 +183,8 @@ export function EpisodeFiltersBar({ podcasts, initialFilters }: EpisodeFiltersPr
       </DropdownMenu>
 
       {/* Date range */}
-      <input
+      <Input
         type="date"
-        className="h-9 rounded-md border border-input px-3 text-sm bg-background"
         aria-label="Published from date"
         value={
           initialFilters.dateFrom
@@ -194,10 +194,10 @@ export function EpisodeFiltersBar({ podcasts, initialFilters }: EpisodeFiltersPr
         onChange={(e) => updateParams({ dateFrom: e.target.value || undefined })}
         placeholder="From"
         title="Published from"
+        className="w-auto"
       />
-      <input
+      <Input
         type="date"
-        className="h-9 rounded-md border border-input px-3 text-sm bg-background"
         aria-label="Published to date"
         value={
           initialFilters.dateTo
@@ -207,6 +207,7 @@ export function EpisodeFiltersBar({ podcasts, initialFilters }: EpisodeFiltersPr
         onChange={(e) => updateParams({ dateTo: e.target.value || undefined })}
         placeholder="To"
         title="Published to"
+        className="w-auto"
       />
 
       {hasFilters && (
