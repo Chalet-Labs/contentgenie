@@ -202,7 +202,13 @@ export function EpisodeFiltersBar({ podcasts, initialFilters }: EpisodeFiltersPr
         }
         onChange={(e) => {
           const d = e.target.value ? new Date(e.target.value) : undefined
-          updateFilter({ dateFrom: d && !isNaN(d.getTime()) ? d : undefined })
+          const from = d && !isNaN(d.getTime()) ? d : undefined
+          // Swap if from > to
+          if (from && filters.dateTo && from > filters.dateTo) {
+            updateFilter({ dateFrom: filters.dateTo, dateTo: from })
+          } else {
+            updateFilter({ dateFrom: from })
+          }
         }}
         placeholder="From"
         title="Published from"
@@ -218,7 +224,13 @@ export function EpisodeFiltersBar({ podcasts, initialFilters }: EpisodeFiltersPr
         }
         onChange={(e) => {
           const d = e.target.value ? new Date(e.target.value) : undefined
-          updateFilter({ dateTo: d && !isNaN(d.getTime()) ? d : undefined })
+          const to = d && !isNaN(d.getTime()) ? d : undefined
+          // Swap if to < from
+          if (to && filters.dateFrom && to < filters.dateFrom) {
+            updateFilter({ dateFrom: to, dateTo: filters.dateFrom })
+          } else {
+            updateFilter({ dateTo: to })
+          }
         }}
         placeholder="To"
         title="Published to"

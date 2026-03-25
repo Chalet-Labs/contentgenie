@@ -50,6 +50,7 @@ export function PromptTemplateCard({ initialPrompt }: PromptTemplateCardProps) {
   const [searchResults, setSearchResults] = useState<EpisodeSearchResult[]>([])
   const [pickerOpen, setPickerOpen] = useState(false)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const latestSearchIdRef = useRef(0)
 
   useEffect(() => {
     return () => {
@@ -61,23 +62,30 @@ export function PromptTemplateCard({ initialPrompt }: PromptTemplateCardProps) {
 
   const handleSearch = useCallback((query: string) => {
     if (debounceRef.current) clearTimeout(debounceRef.current)
+    const searchId = ++latestSearchIdRef.current
     debounceRef.current = setTimeout(async () => {
       if (!query.trim()) {
         setSearchResults([])
         return
       }
-      const { results, error } = await searchEpisodesWithTranscript(query)
-      if (error) {
-        toast.error(error)
-        setSearchResults([])
-        return
+      try {
+        const { results, error } = await searchEpisodesWithTranscript(query)
+        if (searchId !== latestSearchIdRef.current) return
+        if (error) {
+          toast.error(error)
+          setSearchResults([])
+          return
+        }
+        setSearchResults(results)
+      } catch (err) {
+        if (searchId !== latestSearchIdRef.current) return
+        toast.error("Search failed: " + (err instanceof Error ? err.message : String(err)))
       }
-      setSearchResults(results)
     }, 300)
   }, [])
 
   const handleTest = async () => {
-    if (!selectedEpisode || isTesting) return
+    if (!selectedEpisode || isTesting || !promptText.trim()) return
     setIsTesting(true)
     setTestOutput("")
 
@@ -226,7 +234,7 @@ export function PromptTemplateCard({ initialPrompt }: PromptTemplateCardProps) {
         {/* Test button */}
         <Button
           onClick={handleTest}
-          disabled={!selectedEpisode || isTesting || missingTranscript}
+          disabled={!selectedEpisode || isTesting || missingTranscript || !promptText.trim()}
           variant="secondary"
         >
           {isTesting ? "Testing…" : "Test Prompt"}
