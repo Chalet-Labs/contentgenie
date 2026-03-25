@@ -63,7 +63,9 @@ export async function POST(request: Request) {
     (e) =>
       e.transcriptStatus === "available" &&
       typeof e.podcastIndexId === "string" &&
-      /^\d+$/.test(e.podcastIndexId)
+      e.podcastIndexId.length > 0 &&
+      Number.isFinite(Number(e.podcastIndexId)) &&
+      Number(e.podcastIndexId) > 0
   )
 
   const validDbIds = validEpisodes.map((e) => e.id)

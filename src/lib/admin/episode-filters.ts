@@ -1,5 +1,6 @@
 import { and, eq, gte, lte, inArray } from "drizzle-orm"
 import { episodes } from "@/db/schema"
+import { safeParseDate } from "@/lib/schemas/library"
 
 export interface EpisodeFilters {
   podcastId?: number
@@ -11,13 +12,6 @@ export interface EpisodeFilters {
 }
 
 export const PAGE_SIZE = 25
-
-function parseValidDate(raw: string | string[] | undefined): Date | undefined {
-  if (typeof raw !== "string" || !raw) return undefined
-  const d = new Date(raw)
-  if (isNaN(d.getTime())) return undefined
-  return d
-}
 
 function asArray(val: string | string[] | undefined): string[] {
   if (!val) return []
@@ -36,8 +30,10 @@ export function parseEpisodeFilters(
   const transcriptStatuses = asArray(searchParams["transcriptStatus"]).filter(Boolean)
   const summaryStatuses = asArray(searchParams["summaryStatus"]).filter(Boolean)
 
-  const dateFrom = parseValidDate(searchParams["dateFrom"])
-  const dateTo = parseValidDate(searchParams["dateTo"])
+  const dateFromRaw = searchParams["dateFrom"]
+  const dateFrom = safeParseDate(typeof dateFromRaw === "string" ? dateFromRaw : undefined)
+  const dateToRaw = searchParams["dateTo"]
+  const dateTo = safeParseDate(typeof dateToRaw === "string" ? dateToRaw : undefined)
 
   const pageRaw = typeof searchParams["page"] === "string" ? parseInt(searchParams["page"], 10) : NaN
   const page = Number.isFinite(pageRaw) && pageRaw > 0 ? pageRaw : 1

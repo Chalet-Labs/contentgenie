@@ -9,7 +9,8 @@ export interface StreamCompletionOptions {
   messages: AiMessage[]
 }
 
-const STREAM_TIMEOUT_MS = 30_000
+const CONNECT_TIMEOUT_MS = 30_000
+const STREAM_IDLE_TIMEOUT_MS = 15_000
 
 /**
  * Makes a streaming request to the AI provider and returns a ReadableStream of text chunks.
@@ -46,7 +47,7 @@ export async function streamCompletion(options: StreamCompletionOptions): Promis
   })
 
   const abortController = new AbortController()
-  const timeout = setTimeout(() => abortController.abort(), STREAM_TIMEOUT_MS)
+  const timeout = setTimeout(() => abortController.abort(), CONNECT_TIMEOUT_MS)
 
   let response: Response
   try {
@@ -79,10 +80,18 @@ export async function streamCompletion(options: StreamCompletionOptions): Promis
     async start(controller) {
       const decoder = new TextDecoder()
       let buffer = ""
+      let idleTimer: ReturnType<typeof setTimeout> | null = null
+
+      const resetIdleTimer = () => {
+        if (idleTimer) clearTimeout(idleTimer)
+        idleTimer = setTimeout(() => abortController.abort(), STREAM_IDLE_TIMEOUT_MS)
+      }
 
       try {
+        resetIdleTimer()
         while (true) {
           const { done, value } = await reader.read()
+          resetIdleTimer()
           if (done) break
 
           buffer += decoder.decode(value, { stream: true })
@@ -118,6 +127,8 @@ export async function streamCompletion(options: StreamCompletionOptions): Promis
       } catch (err) {
         controller.error(err)
         return
+      } finally {
+        if (idleTimer) clearTimeout(idleTimer)
       }
 
       controller.close()
