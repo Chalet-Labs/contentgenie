@@ -27,12 +27,13 @@ describe("getActiveAiConfig", () => {
       id: 1,
       provider: "zai",
       model: "glm-4.7-flash",
+      summarizationPrompt: null,
       updatedBy: "user_123",
       updatedAt: new Date(),
     });
 
     const config = await getActiveAiConfig();
-    expect(config).toEqual({ provider: "zai", model: "glm-4.7-flash" });
+    expect(config).toEqual({ provider: "zai", model: "glm-4.7-flash", summarizationPrompt: null });
   });
 
   it("returns DEFAULT_AI_CONFIG when no rows exist", async () => {
@@ -55,6 +56,7 @@ describe("getActiveAiConfig", () => {
     expect(DEFAULT_AI_CONFIG).toEqual({
       provider: "openrouter",
       model: "google/gemini-2.0-flash-001",
+      summarizationPrompt: null,
     });
   });
 });

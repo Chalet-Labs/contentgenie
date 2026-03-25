@@ -17,10 +17,18 @@ vi.mock("@/contexts/sidebar-counts-context", () => ({
   NavBadge: ({ count }: { count: number }) => <span>{count > 99 ? "99+" : count}</span>,
 }))
 
+const mockHas = vi.fn()
+
 // OrganizationSwitcher is already mocked via @clerk/nextjs in setup.ts,
 // but it's not exported — mock the whole module for layout tests.
 vi.mock("@clerk/nextjs", () => ({
   OrganizationSwitcher: () => null,
+  useAuth: () => ({
+    isLoaded: true,
+    isSignedIn: true,
+    userId: "test-user-id",
+    has: mockHas,
+  }),
 }))
 
 describe("Sidebar", () => {
@@ -30,6 +38,7 @@ describe("Sidebar", () => {
       savedCount: 0,
       isLoading: false,
     })
+    mockHas.mockReturnValue(false)
   })
 
   it("shows badge on Subscriptions link when subscriptionCount > 0", () => {
@@ -88,5 +97,17 @@ describe("Sidebar", () => {
 
     expect(subscriptionsLink.querySelector("span")).toBeNull()
     expect(libraryLink.querySelector("span")).toBeNull()
+  })
+
+  it("shows Admin link when user has admin role", () => {
+    mockHas.mockReturnValue(true)
+    render(<Sidebar />)
+    expect(screen.getByRole("link", { name: /admin/i })).toBeInTheDocument()
+  })
+
+  it("does not show Admin link when user is not admin", () => {
+    mockHas.mockReturnValue(false)
+    render(<Sidebar />)
+    expect(screen.queryByRole("link", { name: /admin/i })).not.toBeInTheDocument()
   })
 })

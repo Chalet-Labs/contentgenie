@@ -68,6 +68,14 @@ vi.mock("@/trigger/helpers/notifications", () => ({
   resolvePodcastId: vi.fn(),
 }));
 
+vi.mock("@/lib/ai/config", () => ({
+  getActiveAiConfig: vi.fn().mockResolvedValue({
+    provider: "openrouter",
+    model: "google/gemini-2.0-flash-001",
+    summarizationPrompt: null,
+  }),
+}));
+
 import { getEpisodeById, getPodcastById } from "@/trigger/helpers/podcastindex";
 import { generateEpisodeSummary } from "@/trigger/helpers/ai-summary";
 import { persistEpisodeSummary, updateEpisodeStatus } from "@/trigger/helpers/database";
@@ -141,7 +149,8 @@ describe("summarize-episode task", () => {
     expect(generateEpisodeSummary).toHaveBeenCalledWith(
       mockPodcast,
       mockEpisode,
-      "Full transcript text"
+      "Full transcript text",
+      null
     );
     expect(persistEpisodeSummary).toHaveBeenCalledWith(
       mockEpisode,
@@ -163,7 +172,8 @@ describe("summarize-episode task", () => {
     expect(generateEpisodeSummary).toHaveBeenCalledWith(
       mockPodcast,
       mockEpisode,
-      "Full transcript text"
+      "Full transcript text",
+      null
     );
   });
 
@@ -233,7 +243,8 @@ describe("summarize-episode task", () => {
     expect(generateEpisodeSummary).toHaveBeenCalledWith(
       undefined,
       mockEpisode,
-      "Full transcript text"
+      "Full transcript text",
+      null
     );
   });
 

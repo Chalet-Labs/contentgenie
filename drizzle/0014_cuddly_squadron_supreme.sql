@@ -1,0 +1,1 @@
+ALTER TABLE "ai_config" ADD COLUMN "summarization_prompt" text;

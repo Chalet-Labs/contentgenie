@@ -22,4 +22,5 @@ export type AiProviderName = "openrouter" | "zai";
 export interface AiConfig {
   provider: AiProviderName;
   model: string;
+  summarizationPrompt?: string | null;
 }

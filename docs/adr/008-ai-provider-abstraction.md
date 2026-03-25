@@ -64,6 +64,16 @@ Deploy an AI proxy that handles provider routing, and point ContentGenie at the 
 
 10. **Role-based access control.** Clerk organization roles are now used end-to-end to protect AI configuration. The server action enforces `org:admin` via `auth().has({ role: "org:admin" })`. The client-side card renders conditionally based on organization membership role checks. The middleware is not modified — the settings page itself is already protected by the existing auth middleware; the admin card is conditionally rendered within it.
 
+## Amendment: Streaming exception for prompt playground (2026-03-25)
+
+The `AiProvider` abstraction covers **non-streaming completions only**. The admin prompt playground (`POST /api/admin/test-prompt`, introduced in issue #224) requires streaming to display the AI response incrementally in the browser. Rather than adding the Vercel AI SDK as a dependency, the test-prompt route uses raw `fetch` with `stream: true` against the same OpenRouter/ZAI endpoints, piping the SSE response through a `TransformStream` to the client.
+
+This is an intentional, documented exception. The implementation lives in `src/lib/admin/stream-completion.ts`. The `AiProvider.generateCompletion` interface is not changed.
+
+**When to use the abstraction vs. the streaming path:**
+- Non-streaming completions (summarization, trending topics, etc.): use `generateCompletion` via `@/lib/ai`.
+- Streaming completions (prompt playground, or future streaming features): use `streamCompletion` from `@/lib/admin/stream-completion`, or extend that helper. Do not add the Vercel AI SDK unless there is a compelling need beyond what the raw SSE approach supports.
+
 ## Consequences
 
 - A new `src/lib/ai/` directory is introduced with provider abstraction, replacing the monolithic `src/lib/openrouter.ts` for completion generation. The old module retains `parseJsonResponse` and `SummaryResult` for backward compatibility.
