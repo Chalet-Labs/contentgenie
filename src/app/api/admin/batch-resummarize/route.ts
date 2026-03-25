@@ -88,10 +88,14 @@ export async function POST(request: Request) {
         )
       } catch (triggerErr) {
         // Revert queued status if task triggering fails
-        await db
-          .update(episodes)
-          .set({ summaryStatus: null, updatedAt: new Date() })
-          .where(inArray(episodes.id, validDbIds))
+        try {
+          await db
+            .update(episodes)
+            .set({ summaryStatus: null, updatedAt: new Date() })
+            .where(inArray(episodes.id, validDbIds))
+        } catch (revertErr) {
+          console.error("Failed to revert queued status:", revertErr)
+        }
         throw triggerErr
       }
     }

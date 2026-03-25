@@ -22,7 +22,7 @@ vi.mock("@/lib/admin/prompt-utils", () => ({
   interpolatePrompt: (...args: unknown[]) => mockInterpolatePrompt(...args),
 }));
 
-import { generateEpisodeSummary } from "../ai-summary";
+import { generateEpisodeSummary } from "@/trigger/helpers/ai-summary";
 import type { PodcastIndexEpisode, PodcastIndexPodcast } from "@/lib/podcastindex";
 
 const mockEpisode = {

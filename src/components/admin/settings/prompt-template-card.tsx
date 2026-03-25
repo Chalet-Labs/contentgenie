@@ -104,7 +104,11 @@ export function PromptTemplateCard({ initialPrompt }: PromptTemplateCardProps) {
 
       while (true) {
         const { done, value } = await reader.read()
-        if (done) break
+        if (done) {
+          const tail = decoder.decode()
+          if (tail) setTestOutput((prev) => prev + tail)
+          break
+        }
         setTestOutput((prev) => prev + decoder.decode(value, { stream: true }))
       }
     } catch (err) {

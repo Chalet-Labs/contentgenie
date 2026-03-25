@@ -22,7 +22,7 @@ vi.mock("@/components/notifications/notification-settings", () => ({
   NotificationSettings: () => <div data-testid="notification-settings" />,
 }))
 
-import SettingsPage from "../page"
+import SettingsPage from "@/app/(app)/settings/page"
 
 describe("SettingsPage", () => {
   it("does not render AiProviderCard", () => {

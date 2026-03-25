@@ -66,7 +66,7 @@ describe("POST /api/admin/batch-resummarize", () => {
     vi.clearAllMocks()
     mockAuth.mockResolvedValue({ userId: "user_1", has: () => true })
     mockBatchTrigger.mockResolvedValue(undefined)
-    mockUpdate.mockReturnValue(makeUpdateChain())
+    mockUpdate.mockImplementation(() => makeUpdateChain())
   })
 
   it("returns 403 for non-admin", async () => {

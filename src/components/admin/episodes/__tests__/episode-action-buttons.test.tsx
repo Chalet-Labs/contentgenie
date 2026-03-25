@@ -100,11 +100,10 @@ describe("EpisodeActionButtons", () => {
     })
   })
 
-  it("polls getEpisodeStatus after Summarize click (not GET API route)", async () => {
+  it("posts to /api/episodes/summarize on Summarize click", async () => {
     render(<EpisodeActionButtons episode={baseEpisode} />)
     fireEvent.click(screen.getByRole("button", { name: /summarize/i }))
 
-    // Wait for polling to fire (mocked at module level — just verify the action was called)
     await waitFor(() => {
       expect(mockFetch).toHaveBeenCalledWith(
         "/api/episodes/summarize",
