@@ -108,7 +108,7 @@ export function Sidebar() {
                   : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
               )}
             >
-              <Shield className="h-4 w-4" />
+              <Shield className="size-4" />
               Admin
             </Link>
           )}

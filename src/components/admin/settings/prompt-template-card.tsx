@@ -188,7 +188,7 @@ export function PromptTemplateCard({ initialPrompt }: PromptTemplateCardProps) {
                 {selectedEpisode
                   ? `${selectedEpisode.podcastTitle} — ${selectedEpisode.title}`
                   : "Search for an episode…"}
-                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                <ChevronsUpDown className="ml-2 shrink-0 opacity-50" data-icon="inline-end" />
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-[500px] p-0">

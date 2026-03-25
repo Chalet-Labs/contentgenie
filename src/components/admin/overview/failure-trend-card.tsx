@@ -26,7 +26,7 @@ export function FailureTrendCard({ trend }: FailureTrendCardProps) {
                 <TableCell className="text-sm">{row.day}</TableCell>
                 <TableCell className="text-right text-sm">
                   {row.count > 0 ? (
-                    <span className="text-red-600 dark:text-red-400 font-medium">{row.count}</span>
+                    <span className="text-destructive font-medium">{row.count}</span>
                   ) : (
                     <span className="text-muted-foreground">0</span>
                   )}

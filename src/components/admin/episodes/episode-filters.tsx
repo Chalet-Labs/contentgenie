@@ -104,7 +104,7 @@ export function EpisodeFiltersBar({ podcasts, initialFilters }: EpisodeFiltersPr
         <PopoverTrigger asChild>
           <Button variant="outline" size="sm" className="gap-2">
             {selectedPodcast ? selectedPodcast.title : "All podcasts"}
-            <ChevronsUpDown className="h-3 w-3 opacity-50" />
+            <ChevronsUpDown className="size-3 opacity-50" />
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-72 p-0">
@@ -212,7 +212,7 @@ export function EpisodeFiltersBar({ podcasts, initialFilters }: EpisodeFiltersPr
 
       {hasFilters && (
         <Button variant="ghost" size="sm" onClick={handleClearAll} className="gap-1">
-          <X className="h-3 w-3" />
+          <X className="size-3" />
           Clear all
         </Button>
       )}

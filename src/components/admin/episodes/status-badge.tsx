@@ -1,5 +1,7 @@
+import { cn } from "@/lib/utils"
 import { Badge } from "@/components/ui/badge"
 
+// Domain-specific status colors — no semantic token exists for these states
 const statusStyles: Record<string, string> = {
   available: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
   completed: "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400",
@@ -21,7 +23,7 @@ export function StatusBadge({ status }: StatusBadgeProps) {
   return (
     <Badge
       variant="outline"
-      className={`border-0 font-medium ${statusStyles[status ?? ""] ?? fallbackStyle}`}
+      className={cn("border-0", statusStyles[status ?? ""] ?? fallbackStyle)}
     >
       {status ?? "none"}
     </Badge>
