@@ -86,10 +86,10 @@ describe("getEpisodeStatus", () => {
     mockAuth.mockResolvedValue({ has: () => true })
   })
 
-  it("returns null for non-admin", async () => {
+  it("returns error for non-admin", async () => {
     mockAuth.mockResolvedValue({ has: () => false })
     const result = await getEpisodeStatus(1)
-    expect(result).toBeNull()
+    expect(result).toEqual({ ok: false, error: "Admin access required" })
   })
 
   it("returns status for existing episode", async () => {
@@ -98,12 +98,18 @@ describe("getEpisodeStatus", () => {
       summaryStatus: "completed",
     })
     const result = await getEpisodeStatus(1)
-    expect(result).toEqual({ transcriptStatus: "available", summaryStatus: "completed" })
+    expect(result).toEqual({ ok: true, transcriptStatus: "available", summaryStatus: "completed" })
   })
 
-  it("returns null for missing episode", async () => {
+  it("returns error for missing episode", async () => {
     mockEpisodesFindFirst.mockResolvedValue(undefined)
     const result = await getEpisodeStatus(999)
-    expect(result).toBeNull()
+    expect(result).toEqual({ ok: false, error: "Episode not found" })
+  })
+
+  it("returns error on database failure", async () => {
+    mockEpisodesFindFirst.mockRejectedValue(new Error("DB connection failed"))
+    const result = await getEpisodeStatus(1)
+    expect(result).toEqual({ ok: false, error: "Failed to check status" })
   })
 })

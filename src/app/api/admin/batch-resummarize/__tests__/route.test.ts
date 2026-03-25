@@ -85,6 +85,29 @@ describe("POST /api/admin/batch-resummarize", () => {
     expect(res.status).toBe(400)
   })
 
+  it("returns 400 when episodeIds exceeds 100", async () => {
+    const ids = Array.from({ length: 101 }, (_, i) => i + 1)
+    const res = await POST(makeRequest({ episodeIds: ids }))
+    expect(res.status).toBe(400)
+    const body = await res.json()
+    expect(body.error).toMatch(/100/)
+  })
+
+  it("returns 400 for negative or non-integer IDs", async () => {
+    const res = await POST(makeRequest({ episodeIds: [-1, 0, 1.5] }))
+    expect(res.status).toBe(400)
+  })
+
+  it("returns 400 for invalid JSON body", async () => {
+    const req = new Request("http://localhost/api/admin/batch-resummarize", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "not json",
+    })
+    const res = await POST(req)
+    expect(res.status).toBe(400)
+  })
+
   it("skips episodes without transcript and returns correct counts", async () => {
     mockSelect.mockReturnValue(
       makeSelectChain([

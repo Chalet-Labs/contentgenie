@@ -124,4 +124,31 @@ describe("streamCompletion", () => {
     const result = await collectStream(stream)
     expect(result).toBe("hi")
   })
+
+  it("rejects when response.body is null", async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      body: null,
+    })
+
+    await expect(
+      streamCompletion({
+        provider: "openrouter",
+        model: "gpt-4",
+        messages: [{ role: "user", content: "test" }],
+      })
+    ).rejects.toThrow(/No response body/)
+  })
+
+  it("rejects when API key is missing", async () => {
+    delete process.env.OPENROUTER_API_KEY
+
+    await expect(
+      streamCompletion({
+        provider: "openrouter",
+        model: "gpt-4",
+        messages: [{ role: "user", content: "test" }],
+      })
+    ).rejects.toThrow(/Missing API key/)
+  })
 })

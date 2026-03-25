@@ -47,12 +47,16 @@ export async function searchEpisodesWithTranscript(
   }
 }
 
+export type EpisodeStatusResult =
+  | { ok: true; transcriptStatus: string | null; summaryStatus: string | null }
+  | { ok: false; error: string }
+
 export async function getEpisodeStatus(
   id: number
-): Promise<{ transcriptStatus: string | null; summaryStatus: string | null } | null> {
+): Promise<EpisodeStatusResult> {
   const { has } = await auth()
   if (!has({ role: ADMIN_ROLE })) {
-    return null
+    return { ok: false, error: "Admin access required" }
   }
 
   try {
@@ -61,14 +65,15 @@ export async function getEpisodeStatus(
       columns: { transcriptStatus: true, summaryStatus: true },
     })
 
-    if (!row) return null
+    if (!row) return { ok: false, error: "Episode not found" }
 
     return {
+      ok: true,
       transcriptStatus: row.transcriptStatus ?? null,
       summaryStatus: row.summaryStatus ?? null,
     }
   } catch (error) {
     console.error("getEpisodeStatus error:", error)
-    return null
+    return { ok: false, error: "Failed to check status" }
   }
 }

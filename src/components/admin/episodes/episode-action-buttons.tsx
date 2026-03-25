@@ -53,14 +53,18 @@ export function EpisodeActionButtons({ episode }: EpisodeActionButtonsProps) {
           return
         }
 
-        const status = await getEpisodeStatus(episode.id)
-        if (!status) return
+        const result = await getEpisodeStatus(episode.id)
+        if (!result.ok) {
+          clearInterval(transcriptPollRef.current!)
+          setTranscriptMsg(result.error)
+          return
+        }
 
-        setLocalTranscriptStatus(status.transcriptStatus)
+        setLocalTranscriptStatus(result.transcriptStatus)
 
         if (
-          status.transcriptStatus === "available" ||
-          status.transcriptStatus === "failed"
+          result.transcriptStatus === "available" ||
+          result.transcriptStatus === "failed"
         ) {
           clearInterval(transcriptPollRef.current!)
           setTranscriptMsg(null)
@@ -86,14 +90,18 @@ export function EpisodeActionButtons({ episode }: EpisodeActionButtonsProps) {
           return
         }
 
-        const status = await getEpisodeStatus(episode.id)
-        if (!status) return
+        const result = await getEpisodeStatus(episode.id)
+        if (!result.ok) {
+          clearInterval(summaryPollRef.current!)
+          setSummaryMsg(result.error)
+          return
+        }
 
-        setLocalSummaryStatus(status.summaryStatus)
+        setLocalSummaryStatus(result.summaryStatus)
 
         if (
-          status.summaryStatus === "completed" ||
-          status.summaryStatus === "failed"
+          result.summaryStatus === "completed" ||
+          result.summaryStatus === "failed"
         ) {
           clearInterval(summaryPollRef.current!)
           setSummaryMsg(null)

@@ -1,5 +1,6 @@
 import { Suspense } from "react"
 import { Skeleton } from "@/components/ui/skeleton"
+import { SectionErrorBoundary } from "@/components/admin/overview/section-error"
 import { StatsGrid } from "@/components/admin/overview/stats-grid"
 import { TranscriptSourceCard } from "@/components/admin/overview/transcript-source-card"
 import { RecentFailuresCard } from "@/components/admin/overview/recent-failures-card"
@@ -34,23 +35,31 @@ async function TrendSection() {
 export default function AdminOverviewPage() {
   return (
     <div className="space-y-6">
-      <Suspense fallback={<Skeleton className="h-48 w-full" />}>
-        <StatsSection />
-      </Suspense>
+      <SectionErrorBoundary>
+        <Suspense fallback={<Skeleton className="h-48 w-full" />}>
+          <StatsSection />
+        </Suspense>
+      </SectionErrorBoundary>
 
       <div className="grid gap-6 md:grid-cols-2">
-        <Suspense fallback={<Skeleton className="h-64 w-full" />}>
-          <SourceSection />
-        </Suspense>
+        <SectionErrorBoundary>
+          <Suspense fallback={<Skeleton className="h-64 w-full" />}>
+            <SourceSection />
+          </Suspense>
+        </SectionErrorBoundary>
 
-        <Suspense fallback={<Skeleton className="h-64 w-full" />}>
-          <TrendSection />
-        </Suspense>
+        <SectionErrorBoundary>
+          <Suspense fallback={<Skeleton className="h-64 w-full" />}>
+            <TrendSection />
+          </Suspense>
+        </SectionErrorBoundary>
       </div>
 
-      <Suspense fallback={<Skeleton className="h-64 w-full" />}>
-        <FailuresSection />
-      </Suspense>
+      <SectionErrorBoundary>
+        <Suspense fallback={<Skeleton className="h-64 w-full" />}>
+          <FailuresSection />
+        </Suspense>
+      </SectionErrorBoundary>
     </div>
   )
 }

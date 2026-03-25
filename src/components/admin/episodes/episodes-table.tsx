@@ -13,6 +13,7 @@ import { StatusBadge } from "@/components/admin/episodes/status-badge"
 import { RowCheckbox } from "@/components/admin/episodes/row-checkbox"
 import { EpisodeActionButtons } from "@/components/admin/episodes/episode-action-buttons"
 import { PAGE_SIZE } from "@/lib/admin/episode-filters"
+import { relativeTime } from "@/lib/admin/format-utils"
 import type { EpisodeRow } from "@/lib/admin/episode-queries"
 
 interface EpisodesTableProps {
@@ -24,14 +25,7 @@ interface EpisodesTableProps {
 
 function relativeDate(date: Date | null): string {
   if (!date) return "—"
-  const rtf = new Intl.RelativeTimeFormat("en", { numeric: "auto" })
-  const diff = Date.now() - date.getTime()
-  const days = Math.round(diff / 86400000)
-  const months = Math.round(diff / (86400000 * 30))
-  const years = Math.round(diff / (86400000 * 365))
-  if (Math.abs(days) < 30) return rtf.format(-days, "day")
-  if (Math.abs(months) < 12) return rtf.format(-months, "month")
-  return rtf.format(-years, "year")
+  return relativeTime(date)
 }
 
 export function EpisodesTable({ episodes: rows, totalCount, currentPage, searchParams = {} }: EpisodesTableProps) {
