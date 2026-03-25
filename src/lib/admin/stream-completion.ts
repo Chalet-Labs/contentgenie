@@ -14,7 +14,7 @@ const STREAM_IDLE_TIMEOUT_MS = 15_000
 
 /**
  * Makes a streaming request to the AI provider and returns a ReadableStream of text chunks.
- * Uses raw SSE fetch — no Vercel AI SDK (see ADR-008 addendum, decision D2).
+ * Uses raw SSE fetch — no Vercel AI SDK (see ADR-008 amendment).
  *
  * The fetch is performed before returning the stream so startup/auth/network errors
  * propagate immediately to the caller (fail-fast). The stream is abortable via cancel().
@@ -25,8 +25,14 @@ export async function streamCompletion(options: StreamCompletionOptions): Promis
   const apiUrl = provider === "zai" ? ZAI_API_URL : OPENROUTER_API_URL
   const apiKey =
     provider === "zai"
-      ? process.env.ZAI_API_KEY ?? ""
-      : process.env.OPENROUTER_API_KEY ?? ""
+      ? process.env.ZAI_API_KEY
+      : process.env.OPENROUTER_API_KEY
+
+  if (!apiKey) {
+    throw new Error(
+      `Missing API key: ${provider === "zai" ? "ZAI_API_KEY" : "OPENROUTER_API_KEY"} is not set`
+    )
+  }
 
   const headers: Record<string, string> = {
     Authorization: `Bearer ${apiKey}`,

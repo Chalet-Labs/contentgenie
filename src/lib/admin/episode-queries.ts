@@ -1,7 +1,7 @@
 import { db } from "@/db"
 import { episodes, podcasts } from "@/db/schema"
 import { count, eq, sql } from "drizzle-orm"
-import { buildEpisodeWhereConditions, PAGE_SIZE, type EpisodeFilters } from "./episode-filters"
+import { buildEpisodeWhereConditions, PAGE_SIZE, type EpisodeFilters } from "@/lib/admin/episode-filters"
 
 export interface EpisodeRow {
   id: number

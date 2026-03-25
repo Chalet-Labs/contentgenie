@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useCallback, useRef } from "react"
+import { useState, useCallback, useRef, useEffect } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Textarea } from "@/components/ui/textarea"
@@ -51,6 +51,12 @@ export function PromptTemplateCard({ initialPrompt }: PromptTemplateCardProps) {
   const [pickerOpen, setPickerOpen] = useState(false)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current)
+    }
+  }, [])
+
   const missingTranscript = promptText.length > 0 && !promptText.includes("{{transcript}}")
 
   const handleSearch = useCallback((query: string) => {
@@ -60,7 +66,12 @@ export function PromptTemplateCard({ initialPrompt }: PromptTemplateCardProps) {
         setSearchResults([])
         return
       }
-      const { results } = await searchEpisodesWithTranscript(query)
+      const { results, error } = await searchEpisodesWithTranscript(query)
+      if (error) {
+        toast.error(error)
+        setSearchResults([])
+        return
+      }
       setSearchResults(results)
     }, 300)
   }, [])
@@ -112,18 +123,24 @@ export function PromptTemplateCard({ initialPrompt }: PromptTemplateCardProps) {
       } else {
         toast.error(result.error ?? "Failed to save prompt")
       }
+    } catch (err) {
+      toast.error("Failed to save: " + (err instanceof Error ? err.message : String(err)))
     } finally {
       setIsSaving(false)
     }
   }
 
   const handleReset = async () => {
-    const result = await updateSummarizationPrompt(null)
-    if (result.success) {
-      setPromptText("")
-      toast.success("Prompt reset to default")
-    } else {
-      toast.error(result.error ?? "Failed to reset prompt")
+    try {
+      const result = await updateSummarizationPrompt(null)
+      if (result.success) {
+        setPromptText("")
+        toast.success("Prompt reset to default")
+      } else {
+        toast.error(result.error ?? "Failed to reset prompt")
+      }
+    } catch (err) {
+      toast.error("Failed to reset: " + (err instanceof Error ? err.message : String(err)))
     }
   }
 

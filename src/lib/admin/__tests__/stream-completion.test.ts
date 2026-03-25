@@ -36,11 +36,15 @@ describe("streamCompletion", () => {
   beforeEach(() => {
     vi.stubGlobal("fetch", mockFetch)
     vi.clearAllMocks()
+    process.env.OPENROUTER_API_KEY = "test-key"
+    process.env.ZAI_API_KEY = "test-key"
   })
 
   afterEach(() => {
     vi.restoreAllMocks()
     vi.unstubAllGlobals()
+    delete process.env.OPENROUTER_API_KEY
+    delete process.env.ZAI_API_KEY
   })
 
   it("parses SSE chunks and extracts content", async () => {

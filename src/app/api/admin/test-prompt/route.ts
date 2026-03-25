@@ -9,8 +9,8 @@ import { interpolatePrompt } from "@/lib/admin/prompt-utils"
 import { streamCompletion } from "@/lib/admin/stream-completion"
 
 export async function POST(request: Request) {
-  const { has } = await auth()
-  if (!has({ role: ADMIN_ROLE })) {
+  const { userId, has } = await auth()
+  if (!userId || !has({ role: ADMIN_ROLE })) {
     return new Response("Forbidden", { status: 403 })
   }
 
@@ -73,8 +73,9 @@ export async function POST(request: Request) {
       ],
     })
   } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown error"
     console.error("Failed to start stream:", err)
-    return new Response("AI provider error", { status: 502 })
+    return new Response(`AI provider error: ${message}`, { status: 502 })
   }
 
   return new Response(stream, {

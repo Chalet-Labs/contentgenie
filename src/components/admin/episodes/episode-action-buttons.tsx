@@ -44,25 +44,30 @@ export function EpisodeActionButtons({ episode }: EpisodeActionButtonsProps) {
     if (transcriptPollRef.current) clearInterval(transcriptPollRef.current)
 
     transcriptPollRef.current = setInterval(async () => {
-      transcriptPollCount.current += 1
+      try {
+        transcriptPollCount.current += 1
 
-      if (transcriptPollCount.current >= TRANSCRIPT_POLL_CAP) {
+        if (transcriptPollCount.current >= TRANSCRIPT_POLL_CAP) {
+          clearInterval(transcriptPollRef.current!)
+          setTranscriptMsg("Still fetching — check back later")
+          return
+        }
+
+        const status = await getEpisodeStatus(episode.id)
+        if (!status) return
+
+        setLocalTranscriptStatus(status.transcriptStatus)
+
+        if (
+          status.transcriptStatus === "available" ||
+          status.transcriptStatus === "failed"
+        ) {
+          clearInterval(transcriptPollRef.current!)
+          setTranscriptMsg(null)
+        }
+      } catch {
         clearInterval(transcriptPollRef.current!)
-        setTranscriptMsg("Still fetching — check back later")
-        return
-      }
-
-      const status = await getEpisodeStatus(episode.id)
-      if (!status) return
-
-      setLocalTranscriptStatus(status.transcriptStatus)
-
-      if (
-        status.transcriptStatus === "available" ||
-        status.transcriptStatus === "failed"
-      ) {
-        clearInterval(transcriptPollRef.current!)
-        setTranscriptMsg(null)
+        setTranscriptMsg("Status check failed — try refreshing")
       }
     }, POLL_INTERVAL_MS)
   }
@@ -72,25 +77,30 @@ export function EpisodeActionButtons({ episode }: EpisodeActionButtonsProps) {
     if (summaryPollRef.current) clearInterval(summaryPollRef.current)
 
     summaryPollRef.current = setInterval(async () => {
-      summaryPollCount.current += 1
+      try {
+        summaryPollCount.current += 1
 
-      if (summaryPollCount.current >= SUMMARY_POLL_CAP) {
+        if (summaryPollCount.current >= SUMMARY_POLL_CAP) {
+          clearInterval(summaryPollRef.current!)
+          setSummaryMsg("Still processing — check back later")
+          return
+        }
+
+        const status = await getEpisodeStatus(episode.id)
+        if (!status) return
+
+        setLocalSummaryStatus(status.summaryStatus)
+
+        if (
+          status.summaryStatus === "completed" ||
+          status.summaryStatus === "failed"
+        ) {
+          clearInterval(summaryPollRef.current!)
+          setSummaryMsg(null)
+        }
+      } catch {
         clearInterval(summaryPollRef.current!)
-        setSummaryMsg("Still processing — check back later")
-        return
-      }
-
-      const status = await getEpisodeStatus(episode.id)
-      if (!status) return
-
-      setLocalSummaryStatus(status.summaryStatus)
-
-      if (
-        status.summaryStatus === "completed" ||
-        status.summaryStatus === "failed"
-      ) {
-        clearInterval(summaryPollRef.current!)
-        setSummaryMsg(null)
+        setSummaryMsg("Status check failed — try refreshing")
       }
     }, POLL_INTERVAL_MS)
   }

@@ -7,8 +7,8 @@ import { ADMIN_ROLE } from "@/lib/auth-roles"
 import type { summarizeEpisode } from "@/trigger/summarize-episode"
 
 export async function POST(request: Request) {
-  const { has } = await auth()
-  if (!has({ role: ADMIN_ROLE })) {
+  const { userId, has } = await auth()
+  if (!userId || !has({ role: ADMIN_ROLE })) {
     return new Response(JSON.stringify({ error: "Forbidden" }), {
       status: 403,
       headers: { "Content-Type": "application/json" },
@@ -48,48 +48,56 @@ export async function POST(request: Request) {
     })
   }
 
-  // Fetch transcript status and PodcastIndex IDs for all requested episodes
-  const episodesData = await db
-    .select({
-      id: episodes.id,
-      transcriptStatus: episodes.transcriptStatus,
-      podcastIndexId: episodes.podcastIndexId,
-    })
-    .from(episodes)
-    .where(inArray(episodes.id, episodeIds as number[]))
+  try {
+    const episodesData = await db
+      .select({
+        id: episodes.id,
+        transcriptStatus: episodes.transcriptStatus,
+        podcastIndexId: episodes.podcastIndexId,
+      })
+      .from(episodes)
+      .where(inArray(episodes.id, episodeIds as number[]))
 
-  // Only episodes with available transcripts and a numeric PodcastIndex ID are eligible
-  const validEpisodes = episodesData.filter(
-    (e) =>
-      e.transcriptStatus === "available" &&
-      typeof e.podcastIndexId === "string" &&
-      e.podcastIndexId.length > 0 &&
-      Number.isFinite(Number(e.podcastIndexId)) &&
-      Number(e.podcastIndexId) > 0
-  )
+    const validEpisodes = episodesData.filter(
+      (e) =>
+        e.transcriptStatus === "available" &&
+        typeof e.podcastIndexId === "string" &&
+        e.podcastIndexId.length > 0 &&
+        Number.isFinite(Number(e.podcastIndexId)) &&
+        Number(e.podcastIndexId) > 0
+    )
 
-  const validDbIds = validEpisodes.map((e) => e.id)
-  const skipped = (episodeIds as number[]).length - validEpisodes.length
+    const validDbIds = validEpisodes.map((e) => e.id)
+    const skipped = (episodeIds as number[]).length - validEpisodes.length
 
-  if (validDbIds.length > 0) {
-    // Update all valid episodes to queued status
-    await db
-      .update(episodes)
-      .set({ summaryStatus: "queued", updatedAt: new Date() })
-      .where(inArray(episodes.id, validDbIds))
+    if (validDbIds.length > 0) {
+      await db
+        .update(episodes)
+        .set({ summaryStatus: "queued", updatedAt: new Date() })
+        .where(inArray(episodes.id, validDbIds))
 
-    // Trigger summarization tasks using PodcastIndex episode IDs
-    await tasks.batchTrigger<typeof summarizeEpisode>(
-      "summarize-episode",
-      validEpisodes.map((e) => ({ payload: { episodeId: Number(e.podcastIndexId) } }))
+      // The summarize-episode task expects PodcastIndex episode IDs (not DB row IDs)
+      await tasks.batchTrigger<typeof summarizeEpisode>(
+        "summarize-episode",
+        validEpisodes.map((e) => ({ payload: { episodeId: Number(e.podcastIndexId) } }))
+      )
+    }
+
+    return new Response(
+      JSON.stringify({ queued: validDbIds.length, skipped }),
+      {
+        status: 202,
+        headers: { "Content-Type": "application/json" },
+      }
+    )
+  } catch (err) {
+    console.error("Batch resummarize error:", err)
+    return new Response(
+      JSON.stringify({ error: "Failed to process batch request" }),
+      {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      }
     )
   }
-
-  return new Response(
-    JSON.stringify({ queued: validDbIds.length, skipped }),
-    {
-      status: 202,
-      headers: { "Content-Type": "application/json" },
-    }
-  )
 }

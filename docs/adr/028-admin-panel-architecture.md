@@ -41,4 +41,4 @@ Create a dedicated admin panel at `/admin` with its own layout, route-level auth
 - Route-level auth eliminates the pattern of every component checking roles independently.
 - The `summarizationPrompt` column adds a nullable text field — zero migration risk, backward compatible.
 - The settings page becomes simpler and user-focused.
-- New shadcn/ui components needed: `table` (for episodes table), `tabs` (for tab nav), `command`/`combobox` (for episode picker in prompt editor).
+- New shadcn/ui components needed: `table`, `checkbox`, `command` (used with `popover` for combobox pattern). Tab navigation uses a custom `AdminTabNav` component with `Link` elements.

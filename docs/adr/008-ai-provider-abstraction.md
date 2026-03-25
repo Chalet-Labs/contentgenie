@@ -66,7 +66,7 @@ Deploy an AI proxy that handles provider routing, and point ContentGenie at the 
 
 ## Amendment: Streaming exception for prompt playground (2026-03-25)
 
-The `AiProvider` abstraction covers **non-streaming completions only**. The admin prompt playground (`POST /api/admin/test-prompt`, introduced in issue #224) requires streaming to display the AI response incrementally in the browser. Rather than adding the Vercel AI SDK as a dependency, the test-prompt route uses raw `fetch` with `stream: true` against the same OpenRouter/ZAI endpoints, piping the SSE response through a `TransformStream` to the client.
+The `AiProvider` abstraction covers **non-streaming completions only**. The admin prompt playground (`POST /api/admin/test-prompt`, introduced in issue #224) requires streaming to display the AI response incrementally in the browser. Rather than adding the Vercel AI SDK as a dependency, the test-prompt route uses raw `fetch` with `stream: true` against the same OpenRouter/ZAI endpoints, parsing SSE chunks through a custom `ReadableStream` that extracts text content and forwards it to the client.
 
 This is an intentional, documented exception. The implementation lives in `src/lib/admin/stream-completion.ts`. The `AiProvider.generateCompletion` interface is not changed.
 

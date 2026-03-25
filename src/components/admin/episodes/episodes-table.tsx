@@ -43,7 +43,11 @@ export function EpisodesTable({ episodes: rows, totalCount, currentPage, searchP
     const params = new URLSearchParams()
     for (const [key, value] of Object.entries(searchParams)) {
       if (key !== "page" && value !== undefined) {
-        params.set(key, Array.isArray(value) ? value[0] : value)
+        if (Array.isArray(value)) {
+          value.forEach((v) => params.append(key, v))
+        } else {
+          params.set(key, value)
+        }
       }
     }
     params.set("page", String(page))

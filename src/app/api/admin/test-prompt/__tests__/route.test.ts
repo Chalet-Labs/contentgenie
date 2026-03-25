@@ -63,7 +63,7 @@ function makeRequest(body: unknown) {
 describe("POST /api/admin/test-prompt", () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mockAuth.mockResolvedValue({ has: () => true })
+    mockAuth.mockResolvedValue({ userId: "user_1", has: () => true })
     mockEpisodesFindFirst.mockResolvedValue(validEpisode)
     mockGetActiveAiConfig.mockResolvedValue({ provider: "openrouter", model: "gpt-4" })
     mockStreamCompletion.mockReturnValue(new ReadableStream())

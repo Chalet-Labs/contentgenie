@@ -64,13 +64,13 @@ function makeRequest(body: unknown) {
 describe("POST /api/admin/batch-resummarize", () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mockAuth.mockResolvedValue({ has: () => true })
+    mockAuth.mockResolvedValue({ userId: "user_1", has: () => true })
     mockBatchTrigger.mockResolvedValue(undefined)
     mockUpdate.mockReturnValue(makeUpdateChain())
   })
 
   it("returns 403 for non-admin", async () => {
-    mockAuth.mockResolvedValue({ has: () => false })
+    mockAuth.mockResolvedValue({ userId: "user_1", has: () => false })
     const res = await POST(makeRequest({ episodeIds: [1] }))
     expect(res.status).toBe(403)
   })
