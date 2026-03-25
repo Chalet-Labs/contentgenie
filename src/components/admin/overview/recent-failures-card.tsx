@@ -31,7 +31,7 @@ function StatusBadge({ status }: { status: string | null }) {
 
 function relativeTime(date: Date): string {
   const now = Date.now()
-  const diff = now - new Date(date).getTime()
+  const diff = now - date.getTime()
   const rtf = new Intl.RelativeTimeFormat("en", { numeric: "auto" })
 
   const minutes = Math.round(diff / 60000)

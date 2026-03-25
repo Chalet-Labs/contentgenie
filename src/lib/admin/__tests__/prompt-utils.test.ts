@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { interpolatePrompt } from "../prompt-utils";
+import { interpolatePrompt } from "@/lib/admin/prompt-utils";
 
 describe("interpolatePrompt", () => {
   const baseVars = {

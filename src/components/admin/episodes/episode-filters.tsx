@@ -185,6 +185,7 @@ export function EpisodeFiltersBar({ podcasts, initialFilters }: EpisodeFiltersPr
       <input
         type="date"
         className="h-9 rounded-md border border-input px-3 text-sm bg-background"
+        aria-label="Published from date"
         value={
           initialFilters.dateFrom
             ? initialFilters.dateFrom.toISOString().split("T")[0]
@@ -197,6 +198,7 @@ export function EpisodeFiltersBar({ podcasts, initialFilters }: EpisodeFiltersPr
       <input
         type="date"
         className="h-9 rounded-md border border-input px-3 text-sm bg-background"
+        aria-label="Published to date"
         value={
           initialFilters.dateTo
             ? initialFilters.dateTo.toISOString().split("T")[0]

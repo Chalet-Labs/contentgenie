@@ -19,12 +19,13 @@ interface EpisodesTableProps {
   episodes: EpisodeRow[]
   totalCount: number
   currentPage: number
+  searchParams?: Record<string, string | string[] | undefined>
 }
 
 function relativeDate(date: Date | null): string {
   if (!date) return "—"
   const rtf = new Intl.RelativeTimeFormat("en", { numeric: "auto" })
-  const diff = Date.now() - new Date(date).getTime()
+  const diff = Date.now() - date.getTime()
   const days = Math.round(diff / 86400000)
   const months = Math.round(diff / (86400000 * 30))
   const years = Math.round(diff / (86400000 * 365))
@@ -33,10 +34,21 @@ function relativeDate(date: Date | null): string {
   return rtf.format(-years, "year")
 }
 
-export function EpisodesTable({ episodes: rows, totalCount, currentPage }: EpisodesTableProps) {
+export function EpisodesTable({ episodes: rows, totalCount, currentPage, searchParams = {} }: EpisodesTableProps) {
   const totalPages = Math.ceil(totalCount / PAGE_SIZE)
   const hasPrev = currentPage > 1
   const hasNext = currentPage < totalPages
+
+  function buildPageLink(page: number) {
+    const params = new URLSearchParams()
+    for (const [key, value] of Object.entries(searchParams)) {
+      if (key !== "page" && value !== undefined) {
+        params.set(key, Array.isArray(value) ? value[0] : value)
+      }
+    }
+    params.set("page", String(page))
+    return `?${params.toString()}`
+  }
 
   if (rows.length === 0) {
     return (
@@ -130,12 +142,12 @@ export function EpisodesTable({ episodes: rows, totalCount, currentPage }: Episo
           <div className="flex gap-2">
             {hasPrev && (
               <Button variant="outline" size="sm" asChild>
-                <Link href={`?page=${currentPage - 1}`}>Previous</Link>
+                <Link href={buildPageLink(currentPage - 1)}>Previous</Link>
               </Button>
             )}
             {hasNext && (
               <Button variant="outline" size="sm" asChild>
-                <Link href={`?page=${currentPage + 1}`}>Next</Link>
+                <Link href={buildPageLink(currentPage + 1)}>Next</Link>
               </Button>
             )}
           </div>

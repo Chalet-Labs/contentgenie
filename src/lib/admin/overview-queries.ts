@@ -1,6 +1,6 @@
 import { db } from "@/db"
 import { episodes, podcasts } from "@/db/schema"
-import { count, sql, or, eq, gte, lte, and } from "drizzle-orm"
+import { count, sql, or, eq, gte, and } from "drizzle-orm"
 
 export interface OverviewStats {
   totalPodcasts: number

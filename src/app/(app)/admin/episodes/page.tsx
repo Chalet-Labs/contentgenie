@@ -1,4 +1,3 @@
-import { eq } from "drizzle-orm"
 import { db } from "@/db"
 import { podcasts } from "@/db/schema"
 import { parseEpisodeFilters } from "@/lib/admin/episode-filters"
@@ -37,6 +36,7 @@ export default async function AdminEpisodesPage({
           episodes={rows}
           totalCount={totalCount}
           currentPage={filters.page}
+          searchParams={searchParams}
         />
       </EpisodesTableShell>
     </div>

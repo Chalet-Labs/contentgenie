@@ -25,6 +25,7 @@ vi.mock("@/db/schema", () => ({
     transcriptStatus: "transcript_status",
     summaryStatus: "summary_status",
     updatedAt: "updated_at",
+    podcastIndexId: "podcast_index_id",
   },
 }))
 
@@ -87,8 +88,8 @@ describe("POST /api/admin/batch-resummarize", () => {
   it("skips episodes without transcript and returns correct counts", async () => {
     mockSelect.mockReturnValue(
       makeSelectChain([
-        { id: 1, transcriptStatus: "available" },
-        { id: 2, transcriptStatus: "missing" },
+        { id: 1, transcriptStatus: "available", podcastIndexId: "100" },
+        { id: 2, transcriptStatus: "missing", podcastIndexId: "200" },
       ])
     )
 
@@ -102,8 +103,8 @@ describe("POST /api/admin/batch-resummarize", () => {
   it("triggers tasks and updates statuses for valid IDs", async () => {
     mockSelect.mockReturnValue(
       makeSelectChain([
-        { id: 1, transcriptStatus: "available" },
-        { id: 2, transcriptStatus: "available" },
+        { id: 1, transcriptStatus: "available", podcastIndexId: "100" },
+        { id: 2, transcriptStatus: "available", podcastIndexId: "200" },
       ])
     )
 
@@ -113,8 +114,8 @@ describe("POST /api/admin/batch-resummarize", () => {
     expect(mockBatchTrigger).toHaveBeenCalledWith(
       "summarize-episode",
       expect.arrayContaining([
-        { payload: { episodeId: 1 } },
-        { payload: { episodeId: 2 } },
+        { payload: { episodeId: 100 } },
+        { payload: { episodeId: 200 } },
       ])
     )
   })

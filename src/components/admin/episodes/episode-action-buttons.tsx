@@ -96,37 +96,49 @@ export function EpisodeActionButtons({ episode }: EpisodeActionButtonsProps) {
   }
 
   const handleFetchTranscript = async () => {
+    const previousStatus = localTranscriptStatus
     setLocalTranscriptStatus("fetching")
     setTranscriptMsg(null)
 
     try {
-      await fetch(`/api/episodes/fetch-transcript`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ podcastIndexId: episode.podcastIndexId }),
-      })
-    } catch {
-      // Polling will reflect the actual status
-    }
-
-    startTranscriptPolling()
-  }
-
-  const handleSummarize = async () => {
-    setLocalSummaryStatus("queued")
-    setSummaryMsg(null)
-
-    try {
-      await fetch(`/api/episodes/summarize`, {
+      const res = await fetch(`/api/episodes/fetch-transcript`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ episodeId: episode.id }),
       })
-    } catch {
-      // Polling will reflect the actual status
-    }
 
-    startSummaryPolling()
+      if (!res.ok) {
+        throw new Error(await res.text().catch(() => "Request failed"))
+      }
+
+      startTranscriptPolling()
+    } catch (err) {
+      setLocalTranscriptStatus(previousStatus)
+      setTranscriptMsg(err instanceof Error ? err.message : "Failed to start transcript fetch")
+    }
+  }
+
+  const handleSummarize = async () => {
+    const previousStatus = localSummaryStatus
+    setLocalSummaryStatus("queued")
+    setSummaryMsg(null)
+
+    try {
+      const res = await fetch(`/api/episodes/summarize`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ episodeId: Number(episode.podcastIndexId) }),
+      })
+
+      if (!res.ok) {
+        throw new Error(await res.text().catch(() => "Request failed"))
+      }
+
+      startSummaryPolling()
+    } catch (err) {
+      setLocalSummaryStatus(previousStatus)
+      setSummaryMsg(err instanceof Error ? err.message : "Failed to start summarization")
+    }
   }
 
   const transcriptInProgress =

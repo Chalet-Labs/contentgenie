@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest"
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 
 // We test streamCompletion by directly exercising the SSE parsing logic.
 // We mock global fetch.
@@ -34,7 +34,13 @@ async function collectStream(stream: ReadableStream<Uint8Array>): Promise<string
 
 describe("streamCompletion", () => {
   beforeEach(() => {
+    vi.stubGlobal("fetch", mockFetch)
     vi.clearAllMocks()
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+    vi.unstubAllGlobals()
   })
 
   it("parses SSE chunks and extracts content", async () => {
@@ -48,7 +54,7 @@ describe("streamCompletion", () => {
       body: makeSSEBody(sseLines),
     })
 
-    const stream = streamCompletion({
+    const stream = await streamCompletion({
       provider: "openrouter",
       model: "gpt-4",
       messages: [{ role: "user", content: "test" }],
@@ -68,7 +74,7 @@ describe("streamCompletion", () => {
       body: makeSSEBody(sseLines),
     })
 
-    const stream = streamCompletion({
+    const stream = await streamCompletion({
       provider: "zai",
       model: "glm-4",
       messages: [{ role: "user", content: "test" }],
@@ -78,20 +84,20 @@ describe("streamCompletion", () => {
     expect(result).toBe("text")
   })
 
-  it("propagates API errors as stream error", async () => {
+  it("propagates API errors as rejected promise", async () => {
     mockFetch.mockResolvedValue({
       ok: false,
       status: 429,
       text: async () => "Rate limited",
     })
 
-    const stream = streamCompletion({
-      provider: "openrouter",
-      model: "gpt-4",
-      messages: [{ role: "user", content: "test" }],
-    })
-
-    await expect(collectStream(stream)).rejects.toThrow(/429/)
+    await expect(
+      streamCompletion({
+        provider: "openrouter",
+        model: "gpt-4",
+        messages: [{ role: "user", content: "test" }],
+      })
+    ).rejects.toThrow(/429/)
   })
 
   it("skips lines without delta content", async () => {
@@ -105,7 +111,7 @@ describe("streamCompletion", () => {
       body: makeSSEBody(sseLines),
     })
 
-    const stream = streamCompletion({
+    const stream = await streamCompletion({
       provider: "openrouter",
       model: "gpt-4",
       messages: [],

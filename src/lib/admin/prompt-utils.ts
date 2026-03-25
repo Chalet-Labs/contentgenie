@@ -14,9 +14,9 @@ export function interpolatePrompt(template: string, vars: PromptVars): string {
   const durationMinutes = vars.duration > 0 ? Math.round(vars.duration / 60) : 0;
 
   return template
-    .replace(/\{\{title\}\}/g, vars.title)
-    .replace(/\{\{podcastName\}\}/g, vars.podcastName)
-    .replace(/\{\{description\}\}/g, vars.description)
-    .replace(/\{\{duration\}\}/g, String(durationMinutes))
-    .replace(/\{\{transcript\}\}/g, vars.transcript);
+    .replace(/\{\{title\}\}/g, () => vars.title)
+    .replace(/\{\{podcastName\}\}/g, () => vars.podcastName)
+    .replace(/\{\{description\}\}/g, () => vars.description)
+    .replace(/\{\{duration\}\}/g, () => String(durationMinutes))
+    .replace(/\{\{transcript\}\}/g, () => vars.transcript);
 }

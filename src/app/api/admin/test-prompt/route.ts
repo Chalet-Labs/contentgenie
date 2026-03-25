@@ -21,6 +21,10 @@ export async function POST(request: Request) {
     return new Response("Invalid JSON", { status: 400 })
   }
 
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    return new Response("Invalid JSON body", { status: 400 })
+  }
+
   const { prompt, episodeId } = body as { prompt?: unknown; episodeId?: unknown }
 
   if (typeof prompt !== "string" || !prompt.trim()) {
@@ -60,7 +64,7 @@ export async function POST(request: Request) {
 
   let stream: ReadableStream<Uint8Array>
   try {
-    stream = streamCompletion({
+    stream = await streamCompletion({
       provider: config.provider,
       model: config.model,
       messages: [
@@ -76,7 +80,6 @@ export async function POST(request: Request) {
   return new Response(stream, {
     headers: {
       "Content-Type": "text/plain; charset=utf-8",
-      "Transfer-Encoding": "chunked",
       "X-Accel-Buffering": "no",
     },
   })

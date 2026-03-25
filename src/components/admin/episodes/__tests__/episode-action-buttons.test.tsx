@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest"
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { render, screen, fireEvent, waitFor } from "@testing-library/react"
 
 const mockGetEpisodeStatus = vi.fn()
@@ -20,12 +20,18 @@ const baseEpisode = {
 
 describe("EpisodeActionButtons", () => {
   beforeEach(() => {
+    vi.stubGlobal("fetch", mockFetch)
     vi.clearAllMocks()
     mockFetch.mockResolvedValue({ ok: true, json: async () => ({}) })
     mockGetEpisodeStatus.mockResolvedValue({
       transcriptStatus: "available",
       summaryStatus: "completed",
     })
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+    vi.unstubAllGlobals()
   })
 
   it("Fetch Transcript button is disabled when transcriptStatus is available", () => {

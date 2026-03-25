@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest"
 import { render, screen } from "@testing-library/react"
-import { RecentFailuresCard } from "../recent-failures-card"
+import { RecentFailuresCard } from "@/components/admin/overview/recent-failures-card"
 import type { RecentFailure } from "@/lib/admin/overview-queries"
 
 const mockFailures: RecentFailure[] = [

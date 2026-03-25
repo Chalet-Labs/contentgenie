@@ -9,11 +9,16 @@ export interface StreamCompletionOptions {
   messages: AiMessage[]
 }
 
+const STREAM_TIMEOUT_MS = 30_000
+
 /**
  * Makes a streaming request to the AI provider and returns a ReadableStream of text chunks.
  * Uses raw SSE fetch — no Vercel AI SDK (see ADR-008 addendum, decision D2).
+ *
+ * The fetch is performed before returning the stream so startup/auth/network errors
+ * propagate immediately to the caller (fail-fast). The stream is abortable via cancel().
  */
-export function streamCompletion(options: StreamCompletionOptions): ReadableStream<Uint8Array> {
+export async function streamCompletion(options: StreamCompletionOptions): Promise<ReadableStream<Uint8Array>> {
   const { provider, model, messages } = options
 
   const apiUrl = provider === "zai" ? ZAI_API_URL : OPENROUTER_API_URL
@@ -40,30 +45,38 @@ export function streamCompletion(options: StreamCompletionOptions): ReadableStre
     temperature: 0.7,
   })
 
+  const abortController = new AbortController()
+  const timeout = setTimeout(() => abortController.abort(), STREAM_TIMEOUT_MS)
+
+  let response: Response
+  try {
+    response = await fetch(apiUrl, {
+      method: "POST",
+      headers,
+      body,
+      signal: abortController.signal,
+    })
+  } catch (err) {
+    clearTimeout(timeout)
+    throw err
+  }
+
+  clearTimeout(timeout)
+
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => `HTTP ${response.status}`)
+    throw new Error(`AI provider error: ${response.status} - ${errorText}`)
+  }
+
+  if (!response.body) {
+    throw new Error("No response body from AI provider")
+  }
+
+  const reader = response.body.getReader()
   const encoder = new TextEncoder()
 
   return new ReadableStream({
     async start(controller) {
-      let response: Response
-      try {
-        response = await fetch(apiUrl, { method: "POST", headers, body })
-      } catch (err) {
-        controller.error(err)
-        return
-      }
-
-      if (!response.ok) {
-        const errorText = await response.text().catch(() => `HTTP ${response.status}`)
-        controller.error(new Error(`AI provider error: ${response.status} - ${errorText}`))
-        return
-      }
-
-      if (!response.body) {
-        controller.error(new Error("No response body from AI provider"))
-        return
-      }
-
-      const reader = response.body.getReader()
       const decoder = new TextDecoder()
       let buffer = ""
 
@@ -108,6 +121,10 @@ export function streamCompletion(options: StreamCompletionOptions): ReadableStre
       }
 
       controller.close()
+    },
+    cancel() {
+      abortController.abort()
+      reader.cancel().catch(() => {})
     },
   })
 }

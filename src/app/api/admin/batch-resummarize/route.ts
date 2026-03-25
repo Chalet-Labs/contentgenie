@@ -1,9 +1,10 @@
 import { auth } from "@clerk/nextjs/server"
 import { tasks } from "@trigger.dev/sdk"
-import { eq, inArray } from "drizzle-orm"
+import { inArray } from "drizzle-orm"
 import { db } from "@/db"
 import { episodes } from "@/db/schema"
 import { ADMIN_ROLE } from "@/lib/auth-roles"
+import type { summarizeEpisode } from "@/trigger/summarize-episode"
 
 export async function POST(request: Request) {
   const { has } = await auth()
@@ -47,34 +48,43 @@ export async function POST(request: Request) {
     })
   }
 
-  // Fetch transcript status for all requested episodes in one query
+  // Fetch transcript status and PodcastIndex IDs for all requested episodes
   const episodesData = await db
-    .select({ id: episodes.id, transcriptStatus: episodes.transcriptStatus })
+    .select({
+      id: episodes.id,
+      transcriptStatus: episodes.transcriptStatus,
+      podcastIndexId: episodes.podcastIndexId,
+    })
     .from(episodes)
     .where(inArray(episodes.id, episodeIds as number[]))
 
-  const validIds = episodesData
-    .filter((e) => e.transcriptStatus === "available")
-    .map((e) => e.id)
+  // Only episodes with available transcripts and a numeric PodcastIndex ID are eligible
+  const validEpisodes = episodesData.filter(
+    (e) =>
+      e.transcriptStatus === "available" &&
+      typeof e.podcastIndexId === "string" &&
+      /^\d+$/.test(e.podcastIndexId)
+  )
 
-  const skipped = (episodeIds as number[]).length - validIds.length
+  const validDbIds = validEpisodes.map((e) => e.id)
+  const skipped = (episodeIds as number[]).length - validEpisodes.length
 
-  if (validIds.length > 0) {
+  if (validDbIds.length > 0) {
     // Update all valid episodes to queued status
     await db
       .update(episodes)
       .set({ summaryStatus: "queued", updatedAt: new Date() })
-      .where(inArray(episodes.id, validIds))
+      .where(inArray(episodes.id, validDbIds))
 
-    // Trigger summarization tasks
-    await tasks.batchTrigger(
+    // Trigger summarization tasks using PodcastIndex episode IDs
+    await tasks.batchTrigger<typeof summarizeEpisode>(
       "summarize-episode",
-      validIds.map((id) => ({ payload: { episodeId: id } }))
+      validEpisodes.map((e) => ({ payload: { episodeId: Number(e.podcastIndexId) } }))
     )
   }
 
   return new Response(
-    JSON.stringify({ queued: validIds.length, skipped }),
+    JSON.stringify({ queued: validDbIds.length, skipped }),
     {
       status: 202,
       headers: { "Content-Type": "application/json" },

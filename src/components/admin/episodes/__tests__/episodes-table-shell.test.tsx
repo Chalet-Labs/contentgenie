@@ -1,8 +1,15 @@
-import { describe, it, expect, vi, beforeEach } from "vitest"
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { render, screen, fireEvent, waitFor } from "@testing-library/react"
 
 const mockFetch = vi.fn()
 vi.stubGlobal("fetch", mockFetch)
+
+vi.mock("sonner", () => ({
+  toast: {
+    success: vi.fn(),
+    error: vi.fn(),
+  },
+}))
 
 import { EpisodesTableShell } from "../episodes-table-shell"
 import { RowCheckbox } from "../row-checkbox"
@@ -13,7 +20,13 @@ function TestChild({ episodeId }: { episodeId: number }) {
 
 describe("EpisodesTableShell", () => {
   beforeEach(() => {
+    vi.stubGlobal("fetch", mockFetch)
     vi.clearAllMocks()
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+    vi.unstubAllGlobals()
   })
 
   it("does not show batch toolbar when nothing is selected", () => {
@@ -71,7 +84,7 @@ describe("EpisodesTableShell", () => {
       json: async () => ({ queued: 2, skipped: 0 }),
     })
 
-    const { toast } = await import("sonner")
+    const { toast } = vi.mocked(await import("sonner"))
 
     render(
       <EpisodesTableShell>

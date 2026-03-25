@@ -12,6 +12,13 @@ export interface EpisodeFilters {
 
 export const PAGE_SIZE = 25
 
+function parseValidDate(raw: string | string[] | undefined): Date | undefined {
+  if (typeof raw !== "string" || !raw) return undefined
+  const d = new Date(raw)
+  if (isNaN(d.getTime())) return undefined
+  return d
+}
+
 function asArray(val: string | string[] | undefined): string[] {
   if (!val) return []
   return Array.isArray(val) ? val : [val]
@@ -29,15 +36,8 @@ export function parseEpisodeFilters(
   const transcriptStatuses = asArray(searchParams["transcriptStatus"]).filter(Boolean)
   const summaryStatuses = asArray(searchParams["summaryStatus"]).filter(Boolean)
 
-  const dateFrom =
-    typeof searchParams["dateFrom"] === "string" && searchParams["dateFrom"]
-      ? new Date(searchParams["dateFrom"])
-      : undefined
-
-  const dateTo =
-    typeof searchParams["dateTo"] === "string" && searchParams["dateTo"]
-      ? new Date(searchParams["dateTo"])
-      : undefined
+  const dateFrom = parseValidDate(searchParams["dateFrom"])
+  const dateTo = parseValidDate(searchParams["dateTo"])
 
   const pageRaw = typeof searchParams["page"] === "string" ? parseInt(searchParams["page"], 10) : NaN
   const page = Number.isFinite(pageRaw) && pageRaw > 0 ? pageRaw : 1
@@ -82,7 +82,10 @@ export function buildEpisodeWhereConditions(filters: EpisodeFilters) {
   }
 
   if (filters.dateTo) {
-    conditions.push(lte(episodes.publishDate, filters.dateTo))
+    // Normalize to end-of-day so episodes published later that day are included
+    const endOfDay = new Date(filters.dateTo)
+    endOfDay.setUTCHours(23, 59, 59, 999)
+    conditions.push(lte(episodes.publishDate, endOfDay))
   }
 
   return conditions.length > 0 ? and(...conditions) : undefined
