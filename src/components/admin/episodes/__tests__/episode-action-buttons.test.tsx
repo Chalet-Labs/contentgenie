@@ -9,7 +9,7 @@ vi.mock("@/app/actions/admin", () => ({
   getEpisodeStatus: (...args: unknown[]) => mockGetEpisodeStatus(...args),
 }))
 
-import { EpisodeActionButtons } from "../episode-action-buttons"
+import { EpisodeActionButtons } from "@/components/admin/episodes/episode-action-buttons"
 
 const baseEpisode = {
   id: 1,

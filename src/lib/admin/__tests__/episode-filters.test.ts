@@ -17,7 +17,7 @@ vi.mock("drizzle-orm", () => ({
   inArray: vi.fn((col, vals) => ({ inArray: [col, vals] })),
 }))
 
-import { parseEpisodeFilters, buildEpisodeWhereConditions } from "../episode-filters"
+import { parseEpisodeFilters, buildEpisodeWhereConditions } from "@/lib/admin/episode-filters"
 
 describe("parseEpisodeFilters", () => {
   it("defaults page to 1 when not provided", () => {

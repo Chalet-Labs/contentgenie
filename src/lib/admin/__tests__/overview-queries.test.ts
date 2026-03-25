@@ -53,7 +53,7 @@ import {
   getOverviewStats,
   getTranscriptSourceBreakdown,
   getFailureTrend,
-} from "../overview-queries"
+} from "@/lib/admin/overview-queries"
 
 describe("getOverviewStats", () => {
   beforeEach(() => {

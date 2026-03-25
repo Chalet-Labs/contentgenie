@@ -25,7 +25,7 @@ vi.mock("@/lib/ai", () => ({
 }));
 
 import { db } from "@/db";
-import { getAiConfig, updateAiConfig, updateSummarizationPrompt } from "../ai-config";
+import { getAiConfig, updateAiConfig, updateSummarizationPrompt } from "@/app/actions/ai-config";
 
 describe("getAiConfig", () => {
   beforeEach(() => {

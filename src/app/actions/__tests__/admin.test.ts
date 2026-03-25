@@ -44,7 +44,7 @@ function makeSelectChain(rows: unknown[]) {
   return chain
 }
 
-import { searchEpisodesWithTranscript, getEpisodeStatus } from "../admin"
+import { searchEpisodesWithTranscript, getEpisodeStatus } from "@/app/actions/admin"
 
 describe("searchEpisodesWithTranscript", () => {
   beforeEach(() => {

@@ -6,7 +6,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 const mockFetch = vi.fn()
 vi.stubGlobal("fetch", mockFetch)
 
-import { streamCompletion } from "../stream-completion"
+import { streamCompletion } from "@/lib/admin/stream-completion"
 
 function makeSSEBody(chunks: string[]): ReadableStream<Uint8Array> {
   const encoder = new TextEncoder()

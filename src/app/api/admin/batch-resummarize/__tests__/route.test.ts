@@ -51,7 +51,7 @@ function makeUpdateChain() {
   return chain
 }
 
-import { POST } from "../route"
+import { POST } from "@/app/api/admin/batch-resummarize/route"
 
 function makeRequest(body: unknown) {
   return new Request("http://localhost/api/admin/batch-resummarize", {
@@ -111,8 +111,8 @@ describe("POST /api/admin/batch-resummarize", () => {
   it("skips episodes without transcript and returns correct counts", async () => {
     mockSelect.mockReturnValue(
       makeSelectChain([
-        { id: 1, transcriptStatus: "available", podcastIndexId: "100" },
-        { id: 2, transcriptStatus: "missing", podcastIndexId: "200" },
+        { id: 1, transcriptStatus: "available", summaryStatus: null, podcastIndexId: "100" },
+        { id: 2, transcriptStatus: "missing", summaryStatus: null, podcastIndexId: "200" },
       ])
     )
 
@@ -123,11 +123,50 @@ describe("POST /api/admin/batch-resummarize", () => {
     expect(body.skipped).toBe(1)
   })
 
+  it("skips episodes already in-progress (queued, running, summarizing)", async () => {
+    mockSelect.mockReturnValue(
+      makeSelectChain([
+        { id: 1, transcriptStatus: "available", summaryStatus: "queued", podcastIndexId: "100" },
+        { id: 2, transcriptStatus: "available", summaryStatus: "running", podcastIndexId: "200" },
+        { id: 3, transcriptStatus: "available", summaryStatus: "summarizing", podcastIndexId: "300" },
+        { id: 4, transcriptStatus: "available", summaryStatus: "completed", podcastIndexId: "400" },
+        { id: 5, transcriptStatus: "available", summaryStatus: null, podcastIndexId: "500" },
+      ])
+    )
+
+    const res = await POST(makeRequest({ episodeIds: [1, 2, 3, 4, 5] }))
+    expect(res.status).toBe(202)
+    const body = await res.json()
+    expect(body.queued).toBe(2)
+    expect(body.skipped).toBe(3)
+    expect(mockBatchTrigger).toHaveBeenCalledWith(
+      "summarize-episode",
+      expect.arrayContaining([
+        { payload: { episodeId: 400 } },
+        { payload: { episodeId: 500 } },
+      ])
+    )
+  })
+
+  it("reverts queued status if task triggering fails", async () => {
+    mockSelect.mockReturnValue(
+      makeSelectChain([
+        { id: 1, transcriptStatus: "available", summaryStatus: null, podcastIndexId: "100" },
+      ])
+    )
+    mockBatchTrigger.mockRejectedValue(new Error("Trigger.dev unavailable"))
+
+    const res = await POST(makeRequest({ episodeIds: [1] }))
+    expect(res.status).toBe(500)
+    // update called twice: once to set "queued", once to revert to null
+    expect(mockUpdate).toHaveBeenCalledTimes(2)
+  })
+
   it("triggers tasks and updates statuses for valid IDs", async () => {
     mockSelect.mockReturnValue(
       makeSelectChain([
-        { id: 1, transcriptStatus: "available", podcastIndexId: "100" },
-        { id: 2, transcriptStatus: "available", podcastIndexId: "200" },
+        { id: 1, transcriptStatus: "available", summaryStatus: null, podcastIndexId: "100" },
+        { id: 2, transcriptStatus: "available", summaryStatus: null, podcastIndexId: "200" },
       ])
     )
 

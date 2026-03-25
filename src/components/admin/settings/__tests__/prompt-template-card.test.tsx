@@ -12,7 +12,7 @@ vi.mock("@/app/actions/admin", () => ({
   searchEpisodesWithTranscript: (...args: unknown[]) => mockSearchEpisodes(...args),
 }))
 
-import { PromptTemplateCard } from "../prompt-template-card"
+import { PromptTemplateCard } from "@/components/admin/settings/prompt-template-card"
 
 describe("PromptTemplateCard", () => {
   beforeEach(() => {

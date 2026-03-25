@@ -40,7 +40,7 @@ vi.mock("@/lib/admin/stream-completion", () => ({
   streamCompletion: (...args: unknown[]) => mockStreamCompletion(...args),
 }))
 
-import { POST } from "../route"
+import { POST } from "@/app/api/admin/test-prompt/route"
 
 const validEpisode = {
   id: 1,

@@ -11,7 +11,7 @@ vi.mock("@/components/admin/episodes/episode-action-buttons", () => ({
   EpisodeActionButtons: () => <div data-testid="action-buttons" />,
 }))
 
-import { EpisodesTable } from "../episodes-table"
+import { EpisodesTable } from "@/components/admin/episodes/episodes-table"
 import type { EpisodeRow } from "@/lib/admin/episode-queries"
 
 const makeEpisode = (id: number): EpisodeRow => ({

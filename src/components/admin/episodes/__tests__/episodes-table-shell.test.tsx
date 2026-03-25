@@ -11,8 +11,8 @@ vi.mock("sonner", () => ({
   },
 }))
 
-import { EpisodesTableShell } from "../episodes-table-shell"
-import { RowCheckbox } from "../row-checkbox"
+import { EpisodesTableShell } from "@/components/admin/episodes/episodes-table-shell"
+import { RowCheckbox } from "@/components/admin/episodes/row-checkbox"
 
 function TestChild({ episodeId }: { episodeId: number }) {
   return <RowCheckbox episodeId={episodeId} />

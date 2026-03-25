@@ -53,6 +53,7 @@ export async function POST(request: Request) {
       .select({
         id: episodes.id,
         transcriptStatus: episodes.transcriptStatus,
+        summaryStatus: episodes.summaryStatus,
         podcastIndexId: episodes.podcastIndexId,
       })
       .from(episodes)
@@ -61,6 +62,9 @@ export async function POST(request: Request) {
     const validEpisodes = episodesData.filter(
       (e) =>
         e.transcriptStatus === "available" &&
+        e.summaryStatus !== "queued" &&
+        e.summaryStatus !== "running" &&
+        e.summaryStatus !== "summarizing" &&
         typeof e.podcastIndexId === "string" &&
         e.podcastIndexId.length > 0 &&
         Number.isFinite(Number(e.podcastIndexId)) &&
@@ -76,11 +80,20 @@ export async function POST(request: Request) {
         .set({ summaryStatus: "queued", updatedAt: new Date() })
         .where(inArray(episodes.id, validDbIds))
 
-      // The summarize-episode task expects PodcastIndex episode IDs (not DB row IDs)
-      await tasks.batchTrigger<typeof summarizeEpisode>(
-        "summarize-episode",
-        validEpisodes.map((e) => ({ payload: { episodeId: Number(e.podcastIndexId) } }))
-      )
+      try {
+        // The summarize-episode task expects PodcastIndex episode IDs (not DB row IDs)
+        await tasks.batchTrigger<typeof summarizeEpisode>(
+          "summarize-episode",
+          validEpisodes.map((e) => ({ payload: { episodeId: Number(e.podcastIndexId) } }))
+        )
+      } catch (triggerErr) {
+        // Revert queued status if task triggering fails
+        await db
+          .update(episodes)
+          .set({ summaryStatus: null, updatedAt: new Date() })
+          .where(inArray(episodes.id, validDbIds))
+        throw triggerErr
+      }
     }
 
     return new Response(

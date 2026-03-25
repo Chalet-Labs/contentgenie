@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest"
 import { render, screen } from "@testing-library/react"
-import { StatsGrid } from "../stats-grid"
+import { StatsGrid } from "@/components/admin/overview/stats-grid"
 import type { OverviewStats } from "@/lib/admin/overview-queries"
 
 const baseStats: OverviewStats = {

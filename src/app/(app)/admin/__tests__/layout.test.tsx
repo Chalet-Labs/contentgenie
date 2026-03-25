@@ -20,7 +20,7 @@ vi.mock("@/components/admin/admin-tab-nav", () => ({
   AdminTabNav: () => <nav data-testid="admin-tab-nav" />,
 }))
 
-import AdminLayout from "../layout"
+import AdminLayout from "@/app/(app)/admin/layout"
 
 describe("AdminLayout", () => {
   beforeEach(() => {
