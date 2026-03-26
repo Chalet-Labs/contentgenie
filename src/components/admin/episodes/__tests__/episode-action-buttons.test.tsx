@@ -14,7 +14,7 @@ const baseEpisode = {
   id: 1,
   transcriptStatus: "available",
   summaryStatus: null,
-  podcastIndexId: "idx_1",
+  podcastIndexId: "123",
 }
 
 describe("EpisodeActionButtons", () => {
@@ -206,7 +206,7 @@ describe("EpisodeActionButtons", () => {
   })
 
   it("combined action does NOT call /api/episodes/summarize when transcript fetch fails", async () => {
-    mockFetch.mockResolvedValue({ ok: false, text: async () => "Server error" })
+    mockFetch.mockResolvedValue({ ok: false, json: async () => ({ error: "Server error" }), status: 500 })
     render(
       <EpisodeActionButtons
         episode={{ ...baseEpisode, transcriptStatus: "missing" }}
@@ -278,7 +278,10 @@ describe("EpisodeActionButtons", () => {
     await waitFor(() => {
       expect(mockFetch).toHaveBeenCalledWith(
         "/api/episodes/summarize",
-        expect.any(Object)
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({ episodeId: Number(baseEpisode.podcastIndexId) }),
+        })
       )
     })
   })
@@ -299,7 +302,7 @@ describe("EpisodeActionButtons", () => {
     })
   })
 
-  it("Summarize button is disabled during a combined action chain", async () => {
+  it("Summarize button is disabled while transcript is still fetching in a combined action", async () => {
     // Mock set so polling would return "available" — but no timer advance happens,
     // so transcript is still "fetching" at assertion time
     mockGetEpisodeStatus.mockResolvedValue({
@@ -349,7 +352,7 @@ describe("EpisodeActionButtons", () => {
   })
 
   it("combined action: fetch HTTP failure shows error and re-enables buttons", async () => {
-    mockFetch.mockResolvedValue({ ok: false, text: async () => "Server error", status: 500 })
+    mockFetch.mockResolvedValue({ ok: false, json: async () => ({ error: "Server error" }), status: 500 })
     render(
       <EpisodeActionButtons
         episode={{ ...baseEpisode, transcriptStatus: "missing" }}

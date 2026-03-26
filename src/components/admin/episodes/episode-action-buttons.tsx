@@ -130,12 +130,12 @@ export function EpisodeActionButtons({ episode }: EpisodeActionButtonsProps) {
           prev !== result.summaryStatus ? result.summaryStatus : prev
         )
 
-        if (
-          result.summaryStatus === "completed" ||
-          result.summaryStatus === "failed"
-        ) {
+        if (result.summaryStatus === "completed") {
           clearInterval(summaryPollRef.current!)
           setSummaryMsg(null)
+        } else if (result.summaryStatus === "failed") {
+          clearInterval(summaryPollRef.current!)
+          setSummaryMsg("Summarization failed")
         }
       } catch (err) {
         clearInterval(summaryPollRef.current!)
@@ -158,7 +158,8 @@ export function EpisodeActionButtons({ episode }: EpisodeActionButtonsProps) {
       })
 
       if (!res.ok) {
-        throw new Error(await res.text().catch(() => `Request failed (HTTP ${res.status})`))
+        const errBody = await res.json().catch(() => null)
+        throw new Error(errBody?.error ?? `Request failed (HTTP ${res.status})`)
       }
 
       startTranscriptPolling()
@@ -182,7 +183,8 @@ export function EpisodeActionButtons({ episode }: EpisodeActionButtonsProps) {
       })
 
       if (!res.ok) {
-        throw new Error(await res.text().catch(() => `Request failed (HTTP ${res.status})`))
+        const errBody = await res.json().catch(() => null)
+        throw new Error(errBody?.error ?? `Request failed (HTTP ${res.status})`)
       }
 
       startSummaryPolling()
@@ -194,6 +196,7 @@ export function EpisodeActionButtons({ episode }: EpisodeActionButtonsProps) {
   handleSummarizeRef.current = handleSummarize
 
   const handleFetchAndSummarize = () => {
+    if (transcriptInProgress || summaryInProgress) return
     setCombinedAction(true)
     handleFetchTranscript()
   }
@@ -239,48 +242,52 @@ export function EpisodeActionButtons({ episode }: EpisodeActionButtonsProps) {
       <div className="flex items-center gap-1">
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button
-              size="icon"
-              variant="outline"
-              className="h-8 w-8"
-              aria-label={fetchTranscriptLabel}
-              disabled={
-                transcriptAvailable ||
-                transcriptInProgress ||
-                isCombinedAction
-              }
-              onClick={handleFetchTranscript}
-            >
-              {transcriptInProgress ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <FileText className="h-4 w-4" />
-              )}
-            </Button>
+            <span className="inline-block">
+              <Button
+                size="icon"
+                variant="outline"
+                className="h-8 w-8"
+                aria-label={fetchTranscriptLabel}
+                disabled={
+                  transcriptAvailable ||
+                  transcriptInProgress ||
+                  isCombinedAction
+                }
+                onClick={handleFetchTranscript}
+              >
+                {transcriptInProgress ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <FileText className="h-4 w-4" />
+                )}
+              </Button>
+            </span>
           </TooltipTrigger>
           <TooltipContent>{fetchTranscriptLabel}</TooltipContent>
         </Tooltip>
 
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button
-              size="icon"
-              variant="outline"
-              className="h-8 w-8"
-              aria-label={summarizeLabel}
-              disabled={
-                !transcriptAvailable ||
-                summaryInProgress ||
-                isCombinedAction
-              }
-              onClick={handleSummarize}
-            >
-              {summaryInProgress ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Sparkles className="h-4 w-4" />
-              )}
-            </Button>
+            <span className="inline-block">
+              <Button
+                size="icon"
+                variant="outline"
+                className="h-8 w-8"
+                aria-label={summarizeLabel}
+                disabled={
+                  !transcriptAvailable ||
+                  summaryInProgress ||
+                  isCombinedAction
+                }
+                onClick={handleSummarize}
+              >
+                {summaryInProgress ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Sparkles className="h-4 w-4" />
+                )}
+              </Button>
+            </span>
           </TooltipTrigger>
           <TooltipContent>{summarizeLabel}</TooltipContent>
         </Tooltip>
@@ -288,20 +295,26 @@ export function EpisodeActionButtons({ episode }: EpisodeActionButtonsProps) {
         {showFetchAndSummarize && (
           <Tooltip>
             <TooltipTrigger asChild>
-              <Button
-                size="icon"
-                variant="outline"
-                className="h-8 w-8"
-                aria-label={fetchAndSummarizeLabel}
-                disabled={transcriptInProgress || summaryInProgress}
-                onClick={handleFetchAndSummarize}
-              >
-                {transcriptInProgress || summaryInProgress ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Zap className="h-4 w-4" />
-                )}
-              </Button>
+              <span className="inline-block">
+                <Button
+                  size="icon"
+                  variant="outline"
+                  className="h-8 w-8"
+                  aria-label={fetchAndSummarizeLabel}
+                  disabled={
+                    transcriptInProgress ||
+                    summaryInProgress ||
+                    isCombinedAction
+                  }
+                  onClick={handleFetchAndSummarize}
+                >
+                  {transcriptInProgress || summaryInProgress ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Zap className="h-4 w-4" />
+                  )}
+                </Button>
+              </span>
             </TooltipTrigger>
             <TooltipContent>{fetchAndSummarizeLabel}</TooltipContent>
           </Tooltip>
