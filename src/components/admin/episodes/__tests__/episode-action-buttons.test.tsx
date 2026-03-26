@@ -76,7 +76,7 @@ describe("EpisodeActionButtons", () => {
     })
   })
 
-  it("posts to /api/episodes/fetch-transcript on Fetch click", async () => {
+  it("posts to /api/episodes/fetch-transcript with episodeId on Fetch click", async () => {
     render(
       <EpisodeActionButtons
         episode={{ ...baseEpisode, transcriptStatus: "missing" }}
@@ -86,7 +86,10 @@ describe("EpisodeActionButtons", () => {
     await waitFor(() => {
       expect(mockFetch).toHaveBeenCalledWith(
         "/api/episodes/fetch-transcript",
-        expect.any(Object)
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({ episodeId: 1 }),
+        })
       )
     })
   })
@@ -140,13 +143,16 @@ describe("EpisodeActionButtons", () => {
     expect(screen.getByRole("button", { name: /summarizing/i })).toBeDisabled()
   })
 
-  it("posts to /api/episodes/summarize on Summarize click", async () => {
+  it("posts to /api/episodes/summarize with podcastIndexId on Summarize click", async () => {
     render(<EpisodeActionButtons episode={baseEpisode} />)
     fireEvent.click(screen.getByRole("button", { name: /^summarize$/i }))
     await waitFor(() => {
       expect(mockFetch).toHaveBeenCalledWith(
         "/api/episodes/summarize",
-        expect.any(Object)
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({ episodeId: Number(baseEpisode.podcastIndexId) }),
+        })
       )
     })
   })
@@ -241,11 +247,10 @@ describe("EpisodeActionButtons", () => {
       await vi.advanceTimersByTimeAsync(5000)
     })
     await waitFor(() => {
-      // Both the fetch-transcript and fetch-&-summarize buttons reflect the error in aria-label
       const errorBtns = screen.getAllByRole("button", {
         name: /transcript fetch failed/i,
       })
-      expect(errorBtns.length).toBeGreaterThanOrEqual(1)
+      expect(errorBtns).toHaveLength(2)
     })
   })
 
@@ -295,7 +300,8 @@ describe("EpisodeActionButtons", () => {
   })
 
   it("Summarize button is disabled during a combined action chain", async () => {
-    // Transcript becomes available mid-chain so Summarize would normally be enabled
+    // Mock set so polling would return "available" — but no timer advance happens,
+    // so transcript is still "fetching" at assertion time
     mockGetEpisodeStatus.mockResolvedValue({
       ok: true,
       transcriptStatus: "available",
@@ -315,5 +321,73 @@ describe("EpisodeActionButtons", () => {
     )
     expect(screen.getByRole("button", { name: /fetching transcript/i })).toBeDisabled()
     expect(screen.getByRole("button", { name: /transcript required/i })).toBeDisabled()
+  })
+
+  // --- Combined action error paths ---
+
+  it("combined action: buttons re-enable when getEpisodeStatus returns { ok: false }", async () => {
+    mockGetEpisodeStatus.mockResolvedValue({
+      ok: false,
+      error: "Admin access required",
+    })
+    render(
+      <EpisodeActionButtons
+        episode={{ ...baseEpisode, transcriptStatus: "missing" }}
+      />
+    )
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /fetch & summarize/i }))
+      await vi.advanceTimersByTimeAsync(100)
+    })
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5000)
+    })
+    await waitFor(() => {
+      const errorBtns = screen.getAllByRole("button", { name: /admin access required/i })
+      errorBtns.forEach(btn => expect(btn).not.toBeDisabled())
+    })
+  })
+
+  it("combined action: fetch HTTP failure shows error and re-enables buttons", async () => {
+    mockFetch.mockResolvedValue({ ok: false, text: async () => "Server error", status: 500 })
+    render(
+      <EpisodeActionButtons
+        episode={{ ...baseEpisode, transcriptStatus: "missing" }}
+      />
+    )
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /fetch & summarize/i }))
+      await vi.advanceTimersByTimeAsync(100)
+    })
+    await waitFor(() => {
+      const errorBtns = screen.getAllByRole("button", { name: /server error/i })
+      errorBtns.forEach(btn => expect(btn).not.toBeDisabled())
+    })
+  })
+
+  it("standalone transcript fetch failure shows error message", async () => {
+    mockGetEpisodeStatus.mockResolvedValue({
+      ok: true,
+      transcriptStatus: "failed",
+      summaryStatus: null,
+    })
+    render(
+      <EpisodeActionButtons
+        episode={{ ...baseEpisode, transcriptStatus: "missing" }}
+      />
+    )
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /fetch transcript/i }))
+      await vi.advanceTimersByTimeAsync(100)
+    })
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5000)
+    })
+    await waitFor(() => {
+      const errorBtns = screen.getAllByRole("button", {
+        name: /transcript fetch failed/i,
+      })
+      expect(errorBtns.length).toBeGreaterThanOrEqual(1)
+    })
   })
 })

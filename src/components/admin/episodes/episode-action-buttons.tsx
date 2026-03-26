@@ -45,6 +45,7 @@ export function EpisodeActionButtons({ episode }: EpisodeActionButtonsProps) {
     isCombinedRef.current = value
     _setIsCombinedAction(value)
   }
+  const handleSummarizeRef = useRef<() => Promise<void>>(() => Promise.resolve())
 
   useEffect(() => {
     return () => {
@@ -64,6 +65,7 @@ export function EpisodeActionButtons({ episode }: EpisodeActionButtonsProps) {
         if (transcriptPollCount.current >= TRANSCRIPT_POLL_CAP) {
           clearInterval(transcriptPollRef.current!)
           setCombinedAction(false)
+          setLocalTranscriptStatus(episode.transcriptStatus)
           setTranscriptMsg("Still fetching — check back later")
           return
         }
@@ -72,6 +74,7 @@ export function EpisodeActionButtons({ episode }: EpisodeActionButtonsProps) {
         if (!result.ok) {
           clearInterval(transcriptPollRef.current!)
           setCombinedAction(false)
+          setLocalTranscriptStatus(episode.transcriptStatus)
           setTranscriptMsg(result.error)
           return
         }
@@ -85,7 +88,7 @@ export function EpisodeActionButtons({ episode }: EpisodeActionButtonsProps) {
           setTranscriptMsg(null)
           if (isCombinedRef.current) {
             setCombinedAction(false)
-            handleSummarize()
+            handleSummarizeRef.current()
           }
         } else if (result.transcriptStatus === "failed") {
           clearInterval(transcriptPollRef.current!)
@@ -95,6 +98,7 @@ export function EpisodeActionButtons({ episode }: EpisodeActionButtonsProps) {
       } catch (err) {
         clearInterval(transcriptPollRef.current!)
         setCombinedAction(false)
+        setLocalTranscriptStatus(episode.transcriptStatus)
         console.error(`Transcript status poll failed for episode ${episode.id}:`, err)
         setTranscriptMsg("Status check failed — try refreshing")
       }
@@ -154,7 +158,7 @@ export function EpisodeActionButtons({ episode }: EpisodeActionButtonsProps) {
       })
 
       if (!res.ok) {
-        throw new Error(await res.text().catch(() => "Request failed"))
+        throw new Error(await res.text().catch(() => `Request failed (HTTP ${res.status})`))
       }
 
       startTranscriptPolling()
@@ -178,7 +182,7 @@ export function EpisodeActionButtons({ episode }: EpisodeActionButtonsProps) {
       })
 
       if (!res.ok) {
-        throw new Error(await res.text().catch(() => "Request failed"))
+        throw new Error(await res.text().catch(() => `Request failed (HTTP ${res.status})`))
       }
 
       startSummaryPolling()
@@ -187,6 +191,7 @@ export function EpisodeActionButtons({ episode }: EpisodeActionButtonsProps) {
       setSummaryMsg(err instanceof Error ? err.message : "Failed to start summarization")
     }
   }
+  handleSummarizeRef.current = handleSummarize
 
   const handleFetchAndSummarize = () => {
     setCombinedAction(true)
