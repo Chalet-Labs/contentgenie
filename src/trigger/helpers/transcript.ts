@@ -44,8 +44,8 @@ export function stripVttTimestamps(raw: string): string {
  * Extracts plain text from an HTML transcript page.
  */
 export function stripHtmlTranscript(raw: string): string {
-  let text = raw.replace(/<script\b[^>]*>[\s\S]*?<\/script\s*>/gi, " ");
-  text = text.replace(/<style\b[^>]*>[\s\S]*?<\/style\s*>/gi, " ");
+  let text = raw.replace(/<script\b[^>]*>[\s\S]*?<\/script[^>]*>/gi, " ");
+  text = text.replace(/<style\b[^>]*>[\s\S]*?<\/style[^>]*>/gi, " ");
   text = text.replace(/<[^>]+>/g, " ");
   text = he.decode(text);
   text = text.replace(/[ \t]+/g, " ").replace(/\n{3,}/g, "\n\n").trim();
