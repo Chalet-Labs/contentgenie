@@ -2,6 +2,13 @@
 
 import { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
+import { FileText, Sparkles, Zap, Loader2 } from "lucide-react"
 import { getEpisodeStatus } from "@/app/actions/admin"
 
 interface EpisodeActionButtonsProps {
@@ -31,6 +38,7 @@ export function EpisodeActionButtons({ episode }: EpisodeActionButtonsProps) {
   const summaryPollRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const transcriptPollCount = useRef(0)
   const summaryPollCount = useRef(0)
+  const isCombinedAction = useRef(false)
 
   useEffect(() => {
     return () => {
@@ -62,12 +70,21 @@ export function EpisodeActionButtons({ episode }: EpisodeActionButtonsProps) {
 
         setLocalTranscriptStatus(result.transcriptStatus)
 
-        if (
-          result.transcriptStatus === "available" ||
-          result.transcriptStatus === "failed"
-        ) {
+        if (result.transcriptStatus === "available") {
           clearInterval(transcriptPollRef.current!)
           setTranscriptMsg(null)
+          if (isCombinedAction.current) {
+            isCombinedAction.current = false
+            handleSummarize()
+          }
+        } else if (result.transcriptStatus === "failed") {
+          clearInterval(transcriptPollRef.current!)
+          if (isCombinedAction.current) {
+            isCombinedAction.current = false
+            setTranscriptMsg("Transcript fetch failed")
+          } else {
+            setTranscriptMsg(null)
+          }
         }
       } catch {
         clearInterval(transcriptPollRef.current!)
@@ -131,6 +148,7 @@ export function EpisodeActionButtons({ episode }: EpisodeActionButtonsProps) {
 
       startTranscriptPolling()
     } catch (err) {
+      isCombinedAction.current = false
       setLocalTranscriptStatus(previousStatus)
       setTranscriptMsg(err instanceof Error ? err.message : "Failed to start transcript fetch")
     }
@@ -159,48 +177,121 @@ export function EpisodeActionButtons({ episode }: EpisodeActionButtonsProps) {
     }
   }
 
-  const transcriptInProgress =
-    localTranscriptStatus === "fetching"
+  const handleFetchAndSummarize = () => {
+    isCombinedAction.current = true
+    handleFetchTranscript()
+  }
 
+  const transcriptInProgress = localTranscriptStatus === "fetching"
   const summaryInProgress =
     localSummaryStatus === "queued" ||
     localSummaryStatus === "running" ||
     localSummaryStatus === "summarizing"
-
   const transcriptAvailable = localTranscriptStatus === "available"
+  const showFetchAndSummarize =
+    localTranscriptStatus === "missing" || localTranscriptStatus === "failed"
 
-  const summarizeLabel =
+  const fetchTranscriptLabel = transcriptMsg
+    ? transcriptMsg
+    : transcriptInProgress
+      ? "Fetching transcript..."
+      : transcriptAvailable
+        ? "Transcript available"
+        : "Fetch Transcript"
+
+  const summarizeBaseLabel =
     localSummaryStatus === "completed" || localSummaryStatus === "failed"
       ? "Re-summarize"
       : "Summarize"
+  const summarizeLabel = summaryMsg
+    ? summaryMsg
+    : summaryInProgress
+      ? "Summarizing..."
+      : !transcriptAvailable
+        ? "Transcript required"
+        : summarizeBaseLabel
+
+  const fetchAndSummarizeLabel = transcriptMsg
+    ? transcriptMsg
+    : transcriptInProgress
+      ? "Fetching transcript..."
+      : summaryInProgress
+        ? "Summarizing..."
+        : "Fetch & Summarize"
 
   return (
-    <div className="flex items-center gap-2">
-      <Button
-        size="sm"
-        variant="outline"
-        disabled={transcriptAvailable || transcriptInProgress}
-        onClick={handleFetchTranscript}
-      >
-        {transcriptInProgress ? "Fetching…" : "Fetch Transcript"}
-      </Button>
+    <TooltipProvider delayDuration={0}>
+      <div className="flex items-center gap-1">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              size="icon"
+              variant="outline"
+              className="h-8 w-8"
+              aria-label={fetchTranscriptLabel}
+              disabled={
+                transcriptAvailable ||
+                transcriptInProgress ||
+                isCombinedAction.current
+              }
+              onClick={handleFetchTranscript}
+            >
+              {transcriptInProgress ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <FileText className="h-4 w-4" />
+              )}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>{fetchTranscriptLabel}</TooltipContent>
+        </Tooltip>
 
-      {transcriptMsg && (
-        <span className="text-xs text-muted-foreground">{transcriptMsg}</span>
-      )}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              size="icon"
+              variant="outline"
+              className="h-8 w-8"
+              aria-label={summarizeLabel}
+              disabled={
+                !transcriptAvailable ||
+                summaryInProgress ||
+                isCombinedAction.current
+              }
+              onClick={handleSummarize}
+            >
+              {summaryInProgress ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Sparkles className="h-4 w-4" />
+              )}
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>{summarizeLabel}</TooltipContent>
+        </Tooltip>
 
-      <Button
-        size="sm"
-        variant="outline"
-        disabled={!transcriptAvailable || summaryInProgress}
-        onClick={handleSummarize}
-      >
-        {summaryInProgress ? (localSummaryStatus ?? "Processing…") : summarizeLabel}
-      </Button>
-
-      {summaryMsg && (
-        <span className="text-xs text-muted-foreground">{summaryMsg}</span>
-      )}
-    </div>
+        {showFetchAndSummarize && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                size="icon"
+                variant="outline"
+                className="h-8 w-8"
+                aria-label={fetchAndSummarizeLabel}
+                disabled={transcriptInProgress || summaryInProgress}
+                onClick={handleFetchAndSummarize}
+              >
+                {transcriptInProgress || summaryInProgress ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Zap className="h-4 w-4" />
+                )}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>{fetchAndSummarizeLabel}</TooltipContent>
+          </Tooltip>
+        )}
+      </div>
+    </TooltipProvider>
   )
 }
