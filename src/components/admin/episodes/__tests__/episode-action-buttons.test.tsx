@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { render, screen, fireEvent, waitFor, act } from "@testing-library/react"
+import userEvent from "@testing-library/user-event"
 
 const mockGetEpisodeStatus = vi.fn()
 const mockFetch = vi.fn()
@@ -392,5 +393,149 @@ describe("EpisodeActionButtons", () => {
       })
       expect(errorBtns.length).toBeGreaterThanOrEqual(1)
     })
+  })
+
+  // --- Tooltip rendering on hover ---
+
+  it("tooltip renders on hover for disabled Fetch Transcript button", async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    render(<EpisodeActionButtons episode={baseEpisode} />)
+    const btn = screen.getByRole("button", { name: /transcript available/i })
+    await user.hover(btn.closest("span")!)
+    await waitFor(() => {
+      expect(screen.getByRole("tooltip")).toHaveTextContent("Transcript available")
+    })
+  })
+
+  it("tooltip renders on hover for disabled Summarize button", async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    render(
+      <EpisodeActionButtons
+        episode={{ ...baseEpisode, transcriptStatus: "missing" }}
+      />
+    )
+    const btn = screen.getByRole("button", { name: /transcript required/i })
+    await user.hover(btn.closest("span")!)
+    await waitFor(() => {
+      expect(screen.getByRole("tooltip")).toHaveTextContent("Transcript required")
+    })
+  })
+
+  it("tooltip renders error text when transcript fetch fails", async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    mockGetEpisodeStatus.mockResolvedValue({
+      ok: true,
+      transcriptStatus: "failed",
+      summaryStatus: null,
+    })
+    render(
+      <EpisodeActionButtons
+        episode={{ ...baseEpisode, transcriptStatus: "missing" }}
+      />
+    )
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /fetch transcript/i }))
+      await vi.advanceTimersByTimeAsync(100)
+    })
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5000)
+    })
+    const errorBtn = screen.getAllByRole("button", { name: /transcript fetch failed/i })[0]
+    await user.hover(errorBtn.closest("span")!)
+    await waitFor(() => {
+      expect(screen.getByRole("tooltip")).toHaveTextContent("Transcript fetch failed")
+    })
+  })
+
+  // --- Combined action chain pinning ---
+
+  it("combined action polls with correct episode ID", async () => {
+    mockGetEpisodeStatus.mockResolvedValue({
+      ok: true,
+      transcriptStatus: "available",
+      summaryStatus: null,
+    })
+    render(
+      <EpisodeActionButtons
+        episode={{ ...baseEpisode, transcriptStatus: "missing" }}
+      />
+    )
+    fireEvent.click(screen.getByRole("button", { name: /fetch & summarize/i }))
+    await waitFor(() =>
+      expect(mockFetch).toHaveBeenCalledWith(
+        "/api/episodes/fetch-transcript",
+        expect.any(Object)
+      )
+    )
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5000)
+    })
+    expect(mockGetEpisodeStatus).toHaveBeenCalledWith(baseEpisode.id)
+  })
+
+  it("combined action does not call summarize before polling detects available", async () => {
+    mockGetEpisodeStatus.mockResolvedValue({
+      ok: true,
+      transcriptStatus: "fetching",
+      summaryStatus: null,
+    })
+    render(
+      <EpisodeActionButtons
+        episode={{ ...baseEpisode, transcriptStatus: "missing" }}
+      />
+    )
+    fireEvent.click(screen.getByRole("button", { name: /fetch & summarize/i }))
+    await waitFor(() =>
+      expect(mockFetch).toHaveBeenCalledWith(
+        "/api/episodes/fetch-transcript",
+        expect.any(Object)
+      )
+    )
+    // Advance one poll cycle — status still "fetching"
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5000)
+    })
+    expect(mockGetEpisodeStatus).toHaveBeenCalledTimes(1)
+    expect(mockFetch).not.toHaveBeenCalledWith(
+      "/api/episodes/summarize",
+      expect.any(Object)
+    )
+  })
+
+  it("combined action calls fetch before summarize in strict order", async () => {
+    const callOrder: string[] = []
+    mockFetch.mockImplementation(async (url: string) => {
+      callOrder.push(url)
+      return { ok: true, json: async () => ({}) }
+    })
+    mockGetEpisodeStatus.mockResolvedValue({
+      ok: true,
+      transcriptStatus: "available",
+      summaryStatus: null,
+    })
+    render(
+      <EpisodeActionButtons
+        episode={{ ...baseEpisode, transcriptStatus: "missing" }}
+      />
+    )
+    fireEvent.click(screen.getByRole("button", { name: /fetch & summarize/i }))
+    await waitFor(() =>
+      expect(mockFetch).toHaveBeenCalledWith(
+        "/api/episodes/fetch-transcript",
+        expect.any(Object)
+      )
+    )
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5000)
+    })
+    await waitFor(() =>
+      expect(mockFetch).toHaveBeenCalledWith(
+        "/api/episodes/summarize",
+        expect.any(Object)
+      )
+    )
+    const fetchIdx = callOrder.indexOf("/api/episodes/fetch-transcript")
+    const summarizeIdx = callOrder.indexOf("/api/episodes/summarize")
+    expect(fetchIdx).toBeLessThan(summarizeIdx)
   })
 })
