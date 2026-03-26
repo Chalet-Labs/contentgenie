@@ -28,8 +28,12 @@ export function stripVttTimestamps(raw: string): string {
 
   // Timestamp tags must be removed before named tags to avoid partial matches
   text = text.replace(/<(?:\d{2}:)?\d{2}:\d{2}\.\d{3}>/g, "");
-  text = text.replace(/<\/?(?:v|c|b|i|u|ruby|rt|lang)[^>]*>/g, "");
-  text = text.replace(/<[^>]*>/g, "");
+  // Loop handles nested brackets (e.g. <<iframe>) that survive a single pass
+  let prev;
+  do {
+    prev = text;
+    text = text.replace(/<[^>]*>/g, "");
+  } while (text !== prev);
 
   text = text.replace(/\n{2,}/g, "\n").trim();
 
@@ -40,8 +44,8 @@ export function stripVttTimestamps(raw: string): string {
  * Extracts plain text from an HTML transcript page.
  */
 export function stripHtmlTranscript(raw: string): string {
-  let text = raw.replace(/<script\b[^>]*>(?:(?!<\/script\s*>)[\s\S])*<\/script\s*>/gi, " ");
-  text = text.replace(/<style\b[^>]*>(?:(?!<\/style\s*>)[\s\S])*<\/style\s*>/gi, " ");
+  let text = raw.replace(/<script\b[^>]*>[\s\S]*?<\/script\s*>/gi, " ");
+  text = text.replace(/<style\b[^>]*>[\s\S]*?<\/style\s*>/gi, " ");
   text = text.replace(/<[^>]+>/g, " ");
   text = he.decode(text);
   text = text.replace(/[ \t]+/g, " ").replace(/\n{3,}/g, "\n\n").trim();
