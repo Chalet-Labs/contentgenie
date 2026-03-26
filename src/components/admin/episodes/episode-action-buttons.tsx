@@ -66,7 +66,7 @@ export function EpisodeActionButtons({ episode }: EpisodeActionButtonsProps) {
           clearInterval(transcriptPollRef.current!)
           setCombinedAction(false)
           setLocalTranscriptStatus(episode.transcriptStatus)
-          setTranscriptMsg("Still fetching — check back later")
+          setTranscriptMsg("Fetch timed out — retry or check back later")
           return
         }
 
@@ -115,7 +115,7 @@ export function EpisodeActionButtons({ episode }: EpisodeActionButtonsProps) {
 
         if (summaryPollCount.current >= SUMMARY_POLL_CAP) {
           clearInterval(summaryPollRef.current!)
-          setSummaryMsg("Still processing — check back later")
+          setSummaryMsg("Summary timed out — retry or check back later")
           return
         }
 
