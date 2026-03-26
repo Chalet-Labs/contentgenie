@@ -39,7 +39,12 @@ export function EpisodeActionButtons({ episode }: EpisodeActionButtonsProps) {
   const summaryPollRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const transcriptPollCount = useRef(0)
   const summaryPollCount = useRef(0)
-  const isCombinedAction = useRef(false)
+  const [isCombinedAction, _setIsCombinedAction] = useState(false)
+  const isCombinedRef = useRef(false)
+  const setCombinedAction = (value: boolean) => {
+    isCombinedRef.current = value
+    _setIsCombinedAction(value)
+  }
 
   useEffect(() => {
     return () => {
@@ -58,6 +63,7 @@ export function EpisodeActionButtons({ episode }: EpisodeActionButtonsProps) {
 
         if (transcriptPollCount.current >= TRANSCRIPT_POLL_CAP) {
           clearInterval(transcriptPollRef.current!)
+          setCombinedAction(false)
           setTranscriptMsg("Still fetching — check back later")
           return
         }
@@ -65,6 +71,7 @@ export function EpisodeActionButtons({ episode }: EpisodeActionButtonsProps) {
         const result = await getEpisodeStatus(episode.id)
         if (!result.ok) {
           clearInterval(transcriptPollRef.current!)
+          setCombinedAction(false)
           setTranscriptMsg(result.error)
           return
         }
@@ -76,21 +83,19 @@ export function EpisodeActionButtons({ episode }: EpisodeActionButtonsProps) {
         if (result.transcriptStatus === "available") {
           clearInterval(transcriptPollRef.current!)
           setTranscriptMsg(null)
-          if (isCombinedAction.current) {
-            isCombinedAction.current = false
+          if (isCombinedRef.current) {
+            setCombinedAction(false)
             handleSummarize()
           }
         } else if (result.transcriptStatus === "failed") {
           clearInterval(transcriptPollRef.current!)
-          if (isCombinedAction.current) {
-            isCombinedAction.current = false
-            setTranscriptMsg("Transcript fetch failed")
-          } else {
-            setTranscriptMsg(null)
-          }
+          setCombinedAction(false)
+          setTranscriptMsg("Transcript fetch failed")
         }
-      } catch {
+      } catch (err) {
         clearInterval(transcriptPollRef.current!)
+        setCombinedAction(false)
+        console.error(`Transcript status poll failed for episode ${episode.id}:`, err)
         setTranscriptMsg("Status check failed — try refreshing")
       }
     }, POLL_INTERVAL_MS)
@@ -128,8 +133,9 @@ export function EpisodeActionButtons({ episode }: EpisodeActionButtonsProps) {
           clearInterval(summaryPollRef.current!)
           setSummaryMsg(null)
         }
-      } catch {
+      } catch (err) {
         clearInterval(summaryPollRef.current!)
+        console.error(`Summary status poll failed for episode ${episode.id}:`, err)
         setSummaryMsg("Status check failed — try refreshing")
       }
     }, POLL_INTERVAL_MS)
@@ -153,7 +159,7 @@ export function EpisodeActionButtons({ episode }: EpisodeActionButtonsProps) {
 
       startTranscriptPolling()
     } catch (err) {
-      isCombinedAction.current = false
+      setCombinedAction(false)
       setLocalTranscriptStatus(previousStatus)
       setTranscriptMsg(err instanceof Error ? err.message : "Failed to start transcript fetch")
     }
@@ -183,7 +189,7 @@ export function EpisodeActionButtons({ episode }: EpisodeActionButtonsProps) {
   }
 
   const handleFetchAndSummarize = () => {
-    isCombinedAction.current = true
+    setCombinedAction(true)
     handleFetchTranscript()
   }
 
@@ -236,7 +242,7 @@ export function EpisodeActionButtons({ episode }: EpisodeActionButtonsProps) {
               disabled={
                 transcriptAvailable ||
                 transcriptInProgress ||
-                isCombinedAction.current
+                isCombinedAction
               }
               onClick={handleFetchTranscript}
             >
@@ -260,7 +266,7 @@ export function EpisodeActionButtons({ episode }: EpisodeActionButtonsProps) {
               disabled={
                 !transcriptAvailable ||
                 summaryInProgress ||
-                isCombinedAction.current
+                isCombinedAction
               }
               onClick={handleSummarize}
             >
