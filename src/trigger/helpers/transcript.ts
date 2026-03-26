@@ -18,13 +18,14 @@ const SUPPORTED_TRANSCRIPT_TYPES = [
 export function stripVttTimestamps(raw: string): string {
   let text = raw;
 
-  text = text.replace(/^WEBVTT[^\n]*\n(.*?\n)?\n/m, "");
+  text = text.replace(/^WEBVTT[^\n]*\n([^\n]+\n)*\n/m, "");
   text = text.replace(/^(?:NOTE|STYLE|REGION)[^\n]*(?:\n[^\n]+)*/gm, "");
+  // Cue IDs must be removed before timing lines — the lookahead needs the timing line present
+  text = text.replace(/^\d+\s*$(?=\n(?:\d{2}:)?\d{2}:\d{2}\.\d{3}\s+-->)/gm, "");
   text = text.replace(
     /^(?:\d{2}:)?\d{2}:\d{2}\.\d{3}\s+-->\s+(?:\d{2}:)?\d{2}:\d{2}\.\d{3}[^\n]*$/gm,
     ""
   );
-  text = text.replace(/^\d+\s*$/gm, "");
 
   // Timestamp tags must be removed before named tags to avoid partial matches
   text = text.replace(/<(?:\d{2}:)?\d{2}:\d{2}\.\d{3}>/g, "");
@@ -48,6 +49,7 @@ export function stripHtmlTranscript(raw: string): string {
   text = text.replace(/<style\b[^>]*>[\s\S]*?<\/style[^>]*>/gi, " ");
   text = text.replace(/<[^>]+>/g, " ");
   text = he.decode(text);
+  text = text.replace(/<[^>]+>/g, " ");
   text = text.replace(/[ \t]+/g, " ").replace(/\n{3,}/g, "\n\n").trim();
 
   return text;
@@ -79,8 +81,8 @@ export async function fetchTranscript(
 
   // Priority: least processing needed → most processing needed
   const transcriptEntry = SUPPORTED_TRANSCRIPT_TYPES
-    .map((type) => episode.transcripts.find((t) => t.type === type))
-    .find((entry) => entry?.url);
+    .map((type) => episode.transcripts.find((t) => t.type === type && t.url))
+    .find((entry) => entry != null);
 
   if (!transcriptEntry?.url) {
     return undefined;

@@ -133,6 +133,29 @@ This is a test`;
     expect(result).not.toContain("-->");
   });
 
+  it("removes WEBVTT header with multiple metadata lines", () => {
+    const vtt = `WEBVTT
+Kind: captions
+Language: en
+
+00:00:01.000 --> 00:00:04.000
+Hello world`;
+    const result = stripVttTimestamps(vtt);
+    expect(result).toBe("Hello world");
+    expect(result).not.toContain("Kind");
+    expect(result).not.toContain("Language");
+  });
+
+  it("preserves numeric-only transcript lines that aren't cue IDs", () => {
+    const vtt = `WEBVTT
+
+00:00:01.000 --> 00:00:04.000
+The answer is
+100`;
+    const result = stripVttTimestamps(vtt);
+    expect(result).toContain("100");
+  });
+
   it("removes NOTE blocks entirely", () => {
     const vtt = `WEBVTT
 
@@ -324,6 +347,16 @@ describe("stripHtmlTranscript", () => {
     expect(result).not.toContain("&amp;");
     expect(result).not.toContain("&mdash;");
     expect(result).not.toContain("&#39;");
+  });
+
+  it("strips entity-encoded tags that survive initial tag removal", () => {
+    const html = "<p>Safe text &lt;b&gt;bold&lt;/b&gt; end</p>";
+    const result = stripHtmlTranscript(html);
+    expect(result).toContain("Safe text");
+    expect(result).toContain("bold");
+    expect(result).toContain("end");
+    expect(result).not.toContain("<b");
+    expect(result).not.toContain("&lt;");
   });
 
   it("strips a full HTML document leaving only text content", () => {
