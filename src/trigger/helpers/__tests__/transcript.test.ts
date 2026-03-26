@@ -264,6 +264,16 @@ Another cue`;
     expect(result).toContain("Another cue");
   });
 
+  it("strips unknown HTML-like tags from VTT cue text", () => {
+    const vtt = `WEBVTT
+
+00:00:01.000 --> 00:00:04.000
+Hello <iframe>injected</iframe> world`;
+    const result = stripVttTimestamps(vtt);
+    expect(result).toBe("Hello injected world");
+    expect(result).not.toContain("<iframe");
+  });
+
   it("removes short-form inline timestamp tags", () => {
     const vtt = `WEBVTT
 
@@ -295,6 +305,14 @@ describe("stripHtmlTranscript", () => {
     expect(result).not.toContain("color: red");
     expect(result).not.toContain("<script");
     expect(result).not.toContain("<style");
+  });
+
+  it("handles script/style end tags with whitespace before >", () => {
+    const html = "<script>malicious()</script ><style>h1{}</style ><p>Content</p>";
+    const result = stripHtmlTranscript(html);
+    expect(result).not.toContain("malicious");
+    expect(result).not.toContain("h1{}");
+    expect(result).toContain("Content");
   });
 
   it("decodes HTML entities", () => {
