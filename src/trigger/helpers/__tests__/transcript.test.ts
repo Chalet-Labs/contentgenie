@@ -236,6 +236,42 @@ Hello <00:00:03.500>world <00:00:06.000>goodbye`;
     expect(result).toBe("Hello world goodbye");
     expect(result).not.toContain("<00:");
   });
+
+  it("removes short-form timestamps without hours (MM:SS.mmm)", () => {
+    const vtt = `WEBVTT
+
+01:30.000 --> 02:00.000
+Short form speech
+
+00:00:05.000 --> 00:00:08.000
+Long form speech`;
+    const result = stripVttTimestamps(vtt);
+    expect(result).toBe("Short form speech\nLong form speech");
+    expect(result).not.toContain("-->");
+  });
+
+  it("preserves multi-line cue text", () => {
+    const vtt = `WEBVTT
+
+00:00:01.000 --> 00:00:04.000
+First line of the cue
+second line of the cue
+
+00:00:05.000 --> 00:00:08.000
+Another cue`;
+    const result = stripVttTimestamps(vtt);
+    expect(result).toContain("First line of the cue\nsecond line of the cue");
+    expect(result).toContain("Another cue");
+  });
+
+  it("removes short-form inline timestamp tags", () => {
+    const vtt = `WEBVTT
+
+00:00:01.000 --> 00:00:10.000
+Hello <01:30.500>world`;
+    const result = stripVttTimestamps(vtt);
+    expect(result).toBe("Hello world");
+  });
 });
 
 describe("stripHtmlTranscript", () => {
@@ -440,10 +476,40 @@ VTT speech`);
   });
 
   it("returns undefined when fetched transcript is empty after normalization", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     vi.mocked(safeFetch).mockResolvedValue("WEBVTT\n\n");
     const result = await fetchTranscript({
       transcripts: [{ type: "text/vtt", url: "https://example.com/t.vtt" }],
     });
     expect(result).toBeUndefined();
+    warnSpy.mockRestore();
+  });
+
+  it("prefers application/srt over text/vtt", async () => {
+    vi.mocked(safeFetch).mockResolvedValue("1\n00:00:01,000 --> 00:00:04,000\nSRT content");
+    const result = await fetchTranscript({
+      transcripts: [
+        { type: "text/vtt", url: "https://example.com/t.vtt" },
+        { type: "application/srt", url: "https://example.com/t.srt" },
+      ],
+    });
+    expect(safeFetch).toHaveBeenCalledWith(
+      "https://example.com/t.srt",
+      expect.anything()
+    );
+    expect(result).toContain("SRT content");
+  });
+
+  it("logs warning when normalization produces empty output from non-empty content", async () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    vi.mocked(safeFetch).mockResolvedValue("WEBVTT\n\n00:00:01.000 --> 00:00:04.000\n\n");
+    await fetchTranscript({
+      transcripts: [{ type: "text/vtt", url: "https://example.com/t.vtt" }],
+    });
+    expect(warnSpy).toHaveBeenCalledWith(
+      "[fetchTranscript] Normalization produced empty output",
+      expect.objectContaining({ type: "text/vtt", url: "https://example.com/t.vtt" })
+    );
+    warnSpy.mockRestore();
   });
 });

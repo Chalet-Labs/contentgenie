@@ -21,13 +21,13 @@ export function stripVttTimestamps(raw: string): string {
   text = text.replace(/^WEBVTT[^\n]*\n(.*?\n)?\n/m, "");
   text = text.replace(/^(?:NOTE|STYLE|REGION)[^\n]*(?:\n[^\n]+)*/gm, "");
   text = text.replace(
-    /^\d{2}:\d{2}:\d{2}\.\d{3}\s+-->\s+\d{2}:\d{2}:\d{2}\.\d{3}[^\n]*$/gm,
+    /^(?:\d{2}:)?\d{2}:\d{2}\.\d{3}\s+-->\s+(?:\d{2}:)?\d{2}:\d{2}\.\d{3}[^\n]*$/gm,
     ""
   );
   text = text.replace(/^\d+\s*$/gm, "");
 
   // Timestamp tags must be removed before named tags to avoid partial matches
-  text = text.replace(/<\d{2}:\d{2}:\d{2}\.\d{3}>/g, "");
+  text = text.replace(/<(?:\d{2}:)?\d{2}:\d{2}\.\d{3}>/g, "");
   text = text.replace(/<\/?(?:v|c|b|i|u|ruby|rt|lang)[^>]*>/g, "");
 
   text = text.replace(/\n{2,}/g, "\n").trim();
@@ -91,9 +91,17 @@ export async function fetchTranscript(
     clearTimeout(timeout);
   }
 
+  const rawLength = transcript.length;
   transcript = normalizeTranscriptContent(transcript, transcriptEntry.type);
   transcript = transcript.trim();
   if (!transcript) {
+    if (rawLength > 0) {
+      console.warn("[fetchTranscript] Normalization produced empty output", {
+        rawLength,
+        type: transcriptEntry.type,
+        url: transcriptEntry.url,
+      });
+    }
     return undefined;
   }
   if (transcript.length > MAX_TRANSCRIPT_LENGTH) {
