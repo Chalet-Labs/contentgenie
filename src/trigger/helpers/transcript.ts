@@ -18,28 +18,18 @@ const SUPPORTED_TRANSCRIPT_TYPES = [
 export function stripVttTimestamps(raw: string): string {
   let text = raw;
 
-  // Remove the WEBVTT header block (everything up to and including the first blank line)
   text = text.replace(/^WEBVTT[^\n]*\n(.*?\n)?\n/m, "");
-
-  // Remove NOTE, STYLE, REGION blocks (keyword line plus any following non-blank lines)
-  text = text.replace(/^(NOTE|STYLE|REGION)[^\n]*(\n[^\n]+)*/gm, "");
-
-  // Remove cue timing lines (HH:MM:SS.mmm --> HH:MM:SS.mmm with optional settings)
+  text = text.replace(/^(?:NOTE|STYLE|REGION)[^\n]*(?:\n[^\n]+)*/gm, "");
   text = text.replace(
     /^\d{2}:\d{2}:\d{2}\.\d{3}\s+-->\s+\d{2}:\d{2}:\d{2}\.\d{3}[^\n]*$/gm,
     ""
   );
-
-  // Remove numeric-only cue identifiers (a line containing only digits)
   text = text.replace(/^\d+\s*$/gm, "");
 
-  // Remove VTT timestamp tags: <HH:MM:SS.mmm> — must be before named tag removal
+  // Timestamp tags must be removed before named tags to avoid partial matches
   text = text.replace(/<\d{2}:\d{2}:\d{2}\.\d{3}>/g, "");
-
-  // Remove named inline tags: <v Name>, </v>, <c>, <b>, <i>, <u>, <ruby>, <rt>, <lang>, etc.
   text = text.replace(/<\/?(?:v|c|b|i|u|ruby|rt|lang)[^>]*>/g, "");
 
-  // Collapse multiple blank lines to a single newline and trim
   text = text.replace(/\n{2,}/g, "\n").trim();
 
   return text;
@@ -49,17 +39,10 @@ export function stripVttTimestamps(raw: string): string {
  * Extracts plain text from an HTML transcript page.
  */
 export function stripHtmlTranscript(raw: string): string {
-  // Remove <script> and <style> blocks including their content
-  let text = raw.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, " ");
-  text = text.replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, " ");
-
-  // Strip remaining HTML tags
+  let text = raw.replace(/<script\b[^>]*>(?:(?!<\/script>)[\s\S])*<\/script>/gi, " ");
+  text = text.replace(/<style\b[^>]*>(?:(?!<\/style>)[\s\S])*<\/style>/gi, " ");
   text = text.replace(/<[^>]+>/g, " ");
-
-  // Decode HTML entities
   text = he.decode(text);
-
-  // Collapse whitespace
   text = text.replace(/[ \t]+/g, " ").replace(/\n{3,}/g, "\n\n").trim();
 
   return text;
@@ -89,9 +72,7 @@ export async function fetchTranscript(
     return undefined;
   }
 
-  // Pick the best available transcript using priority order.
-  // text/plain needs no processing; application/srt is mostly text;
-  // text/vtt needs timestamp stripping; text/html needs tag removal.
+  // Priority: least processing needed → most processing needed
   const transcriptEntry = SUPPORTED_TRANSCRIPT_TYPES
     .map((type) => episode.transcripts.find((t) => t.type === type))
     .find((entry) => entry?.url);
@@ -139,18 +120,14 @@ export function extractTranscriptUrl(description: string): string | null {
     return anchorMatch[1].replace(/[).,;:]+$/, "");
   }
 
-  // Strip HTML tags and decode all HTML entities
   const text = description.replace(/<[^>]+>/g, " ");
   const decoded = he.decode(text);
 
-  // Match transcript URL patterns
   const match = decoded.match(
     /(?:full\s+)?transcripts?(?:\s+available)?[\s:]+\n?\s*(https?:\/\/\S+)/i
   );
 
   if (!match?.[1]) return null;
-
-  // Clean trailing punctuation from URL
   return match[1].replace(/[).,;:]+$/, "");
 }
 
@@ -166,9 +143,8 @@ export async function fetchTranscriptFromUrl(
   try {
     let content = await safeFetch(url, { signal: controller.signal });
 
-    // Strip HTML if content appears to be an HTML page
     if (/<html[\s>]/i.test(content) || /<!doctype\s+html/i.test(content)) {
-      content = content.replace(/<[^>]+>/g, " ");
+      content = stripHtmlTranscript(content);
     }
 
     content = content.trim();
