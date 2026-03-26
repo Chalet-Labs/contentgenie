@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/tooltip"
 import { FileText, Sparkles, Zap, Loader2 } from "lucide-react"
 import { getEpisodeStatus } from "@/app/actions/admin"
+import { IN_PROGRESS_STATUSES, type SummaryStatus } from "@/db/schema"
 
 interface EpisodeActionButtonsProps {
   episode: {
@@ -68,7 +69,9 @@ export function EpisodeActionButtons({ episode }: EpisodeActionButtonsProps) {
           return
         }
 
-        setLocalTranscriptStatus(result.transcriptStatus)
+        setLocalTranscriptStatus(prev =>
+          prev !== result.transcriptStatus ? result.transcriptStatus : prev
+        )
 
         if (result.transcriptStatus === "available") {
           clearInterval(transcriptPollRef.current!)
@@ -114,7 +117,9 @@ export function EpisodeActionButtons({ episode }: EpisodeActionButtonsProps) {
           return
         }
 
-        setLocalSummaryStatus(result.summaryStatus)
+        setLocalSummaryStatus(prev =>
+          prev !== result.summaryStatus ? result.summaryStatus : prev
+        )
 
         if (
           result.summaryStatus === "completed" ||
@@ -183,10 +188,9 @@ export function EpisodeActionButtons({ episode }: EpisodeActionButtonsProps) {
   }
 
   const transcriptInProgress = localTranscriptStatus === "fetching"
-  const summaryInProgress =
-    localSummaryStatus === "queued" ||
-    localSummaryStatus === "running" ||
-    localSummaryStatus === "summarizing"
+  const summaryInProgress = IN_PROGRESS_STATUSES.includes(
+    localSummaryStatus as SummaryStatus
+  )
   const transcriptAvailable = localTranscriptStatus === "available"
   const showFetchAndSummarize =
     localTranscriptStatus === "missing" || localTranscriptStatus === "failed"

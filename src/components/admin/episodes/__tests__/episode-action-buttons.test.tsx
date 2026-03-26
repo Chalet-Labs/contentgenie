@@ -3,7 +3,6 @@ import { render, screen, fireEvent, waitFor, act } from "@testing-library/react"
 
 const mockGetEpisodeStatus = vi.fn()
 const mockFetch = vi.fn()
-vi.stubGlobal("fetch", mockFetch)
 
 vi.mock("@/app/actions/admin", () => ({
   getEpisodeStatus: (...args: unknown[]) => mockGetEpisodeStatus(...args),
@@ -33,7 +32,6 @@ describe("EpisodeActionButtons", () => {
 
   afterEach(() => {
     vi.useRealTimers()
-    vi.restoreAllMocks()
     vi.unstubAllGlobals()
   })
 
@@ -52,7 +50,6 @@ describe("EpisodeActionButtons", () => {
 
   it("Fetch Transcript button is disabled when transcriptStatus is available", () => {
     render(<EpisodeActionButtons episode={baseEpisode} />)
-    // When available, aria-label becomes "Transcript available"
     expect(screen.getByRole("button", { name: /transcript available/i })).toBeDisabled()
   })
 
@@ -109,7 +106,6 @@ describe("EpisodeActionButtons", () => {
         episode={{ ...baseEpisode, transcriptStatus: "missing" }}
       />
     )
-    // When transcript is unavailable, aria-label becomes "Transcript required"
     expect(screen.getByRole("button", { name: /transcript required/i })).toBeDisabled()
   })
 
@@ -141,7 +137,6 @@ describe("EpisodeActionButtons", () => {
         episode={{ ...baseEpisode, summaryStatus: "queued" }}
       />
     )
-    // When in progress, aria-label becomes "Summarizing..."
     expect(screen.getByRole("button", { name: /summarizing/i })).toBeDisabled()
   })
 
@@ -293,7 +288,6 @@ describe("EpisodeActionButtons", () => {
     )
     fireEvent.click(screen.getByRole("button", { name: /fetch & summarize/i }))
     await waitFor(() => {
-      // During combined action, fetch transcript shows "Fetching transcript..." and is disabled
       expect(
         screen.getByRole("button", { name: /fetching transcript/i })
       ).toBeDisabled()
@@ -319,9 +313,6 @@ describe("EpisodeActionButtons", () => {
         expect.any(Object)
       )
     )
-    // Both individual buttons must be disabled while combined chain is running.
-    // Fetch transcript is in "fetching" state; summarize shows "Transcript required" since
-    // transcript is not yet available during the fetch phase.
     expect(screen.getByRole("button", { name: /fetching transcript/i })).toBeDisabled()
     expect(screen.getByRole("button", { name: /transcript required/i })).toBeDisabled()
   })
