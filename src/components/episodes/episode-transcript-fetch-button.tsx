@@ -57,34 +57,40 @@ export function EpisodeTranscriptFetchButton({
     if (pollRef.current) clearInterval(pollRef.current)
 
     pollRef.current = setInterval(async () => {
-      pollCount.current += 1
+      try {
+        pollCount.current += 1
 
-      if (pollCount.current >= POLL_CAP) {
+        if (pollCount.current >= POLL_CAP) {
+          clearInterval(pollRef.current!)
+          setIsFetching(false)
+          toast.error("Transcript fetch timed out — retry or check back later")
+          return
+        }
+
+        const result = await getEpisodeStatus(episodeDbId)
+
+        if (!result.ok) {
+          clearInterval(pollRef.current!)
+          setIsFetching(false)
+          toast.error(result.error)
+          return
+        }
+
+        if (result.transcriptStatus === "available") {
+          clearInterval(pollRef.current!)
+          setIsFetching(false)
+          setTranscriptStatus("available")
+          onTranscriptReadyRef.current()
+        } else if (result.transcriptStatus === "failed") {
+          clearInterval(pollRef.current!)
+          setIsFetching(false)
+          setTranscriptStatus("failed")
+          toast.error("Transcript fetch failed — please try again")
+        }
+      } catch {
         clearInterval(pollRef.current!)
         setIsFetching(false)
-        toast.error("Transcript fetch timed out — retry or check back later")
-        return
-      }
-
-      const result = await getEpisodeStatus(episodeDbId)
-
-      if (!result.ok) {
-        clearInterval(pollRef.current!)
-        setIsFetching(false)
-        toast.error(result.error)
-        return
-      }
-
-      if (result.transcriptStatus === "available") {
-        clearInterval(pollRef.current!)
-        setIsFetching(false)
-        setTranscriptStatus("available")
-        onTranscriptReadyRef.current()
-      } else if (result.transcriptStatus === "failed") {
-        clearInterval(pollRef.current!)
-        setIsFetching(false)
-        setTranscriptStatus("failed")
-        toast.error("Transcript fetch failed — please try again")
+        toast.error("Status check failed — try refreshing")
       }
     }, POLL_INTERVAL_MS)
   }

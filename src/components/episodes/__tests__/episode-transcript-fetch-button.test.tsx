@@ -313,6 +313,29 @@ describe("EpisodeTranscriptFetchButton", () => {
     })
   })
 
+  // --- Poll exception → toast + re-enable ---
+
+  it("shows toast error and re-enables button when getEpisodeStatus throws", async () => {
+    mockGetEpisodeStatus.mockRejectedValue(new Error("Network error"))
+    render(<EpisodeTranscriptFetchButton {...baseProps} />)
+    fireEvent.click(screen.getByRole("button", { name: /fetch & summarize/i }))
+    await waitFor(() =>
+      expect(mockFetch).toHaveBeenCalledWith(
+        "/api/episodes/fetch-transcript",
+        expect.any(Object)
+      )
+    )
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5000)
+    })
+    await waitFor(() => {
+      expect(vi.mocked(toast.error)).toHaveBeenCalled()
+      expect(
+        screen.getByRole("button", { name: /fetch & summarize/i })
+      ).toBeInTheDocument()
+    })
+  })
+
   // --- Test case 12: cleanup on unmount ---
 
   it("clears the poll interval on unmount", async () => {
