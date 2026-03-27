@@ -46,8 +46,9 @@ vi.mock("drizzle-orm", () => ({
 
 describe("notifications library", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     mockSendPushToUser.mockResolvedValue({ sent: 1, failed: 0 });
+    mockEpisodesFindFirst.mockResolvedValue(null);
     mockEpisodesFindMany.mockResolvedValue([]);
     vi.resetModules();
   });

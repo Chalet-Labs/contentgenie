@@ -184,7 +184,6 @@ describe("notification server actions", () => {
           body: "New episode",
           isRead: false,
           createdAt: new Date(),
-          episodeId: 42,
           episodePodcastIndexId: "PI-42",
           episodeTitle: "Test Episode",
           podcastTitle: "Test Podcast",

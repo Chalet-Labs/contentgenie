@@ -18,10 +18,13 @@ import {
  * notification records, and dispatches push for realtime users.
  *
  * @param podcastId - Internal podcast serial PK (not PodcastIndex ID)
- * @param episodeId - Internal episode serial PK (null if episode not yet in DB)
+ * @param episodeId - Internal episode serial PK (not PodcastIndex ID); null if episode not yet in DB. Used for notification record FK, not for user-facing URLs.
  * @param type - Notification type
  * @param title - Notification title (e.g., podcast name)
  * @param body - Notification body (e.g., "New episode: ...")
+ * @param options - Optional overrides for push behavior
+ * @param options.pushTag - Custom notification tag (defaults to `${type}-${episodeId}`)
+ * @param options.podcastIndexEpisodeId - PodcastIndex episode ID for push URL; when provided, skips a DB lookup
  */
 export async function createNotificationsForSubscribers(
   podcastId: number,
@@ -78,23 +81,32 @@ export async function createNotificationsForSubscribers(
     })
     .map((u) => u.id);
 
-  // Resolve the PodcastIndex episode ID for push URL construction.
-  // Short-circuit when the caller already has the PodcastIndex ID (avoids a redundant DB round-trip).
-  let episodePushUrl: string = ROUTES.DASHBOARD;
-  if (options?.podcastIndexEpisodeId) {
-    episodePushUrl = `/episode/${options.podcastIndexEpisodeId}`;
-  } else if (episodeId != null) {
-    const episode = await db.query.episodes.findFirst({
-      where: eq(episodes.id, episodeId),
-      columns: { podcastIndexId: true },
-    });
-    episodePushUrl = episode?.podcastIndexId
-      ? `/episode/${episode.podcastIndexId}`
-      : ROUTES.DASHBOARD;
-  }
-
   // Dispatch push for realtime users
   if (realtimeUserIds.length > 0) {
+    // Resolve the PodcastIndex episode ID for push URL construction.
+    // Short-circuit when the caller already provides the PodcastIndex ID, avoiding an extra DB round-trip.
+    let episodePushUrl: string = ROUTES.DASHBOARD;
+    if (options?.podcastIndexEpisodeId) {
+      episodePushUrl = ROUTES.episode(options.podcastIndexEpisodeId);
+    } else if (episodeId != null) {
+      try {
+        const episode = await db.query.episodes.findFirst({
+          where: eq(episodes.id, episodeId),
+          columns: { podcastIndexId: true },
+        });
+        if (episode?.podcastIndexId) {
+          episodePushUrl = ROUTES.episode(episode.podcastIndexId);
+        } else {
+          logger.warn("Episode not found for push URL, falling back to dashboard", { episodeId });
+        }
+      } catch (err) {
+        logger.error("Failed to resolve episode for push URL", {
+          episodeId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+
     await Promise.allSettled(
       realtimeUserIds.map((userId) =>
         sendPushToUser(

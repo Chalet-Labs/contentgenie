@@ -91,7 +91,7 @@ export const PopoverOpen: Story = {
                 body: "New episode: What's Next for AI Policy",
                 isRead: false,
                 createdAt: new Date(now.getTime() - 5 * 60 * 1000),
-                episodeId: 101,
+
                 episodePodcastIndexId: "pi-101",
                 episodeTitle: "What's Next for AI Policy",
                 podcastTitle: "The Daily",
@@ -103,7 +103,7 @@ export const PopoverOpen: Story = {
                 body: "Summary ready: Interview with Yann LeCun",
                 isRead: false,
                 createdAt: new Date(now.getTime() - 2 * 60 * 60 * 1000),
-                episodeId: 102,
+
                 episodePodcastIndexId: "pi-102",
                 episodeTitle: "Interview with Yann LeCun",
                 podcastTitle: "Lex Fridman Podcast",

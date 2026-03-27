@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { Bell, FileText, Podcast } from "lucide-react";
 import { markNotificationRead } from "@/app/actions/notifications";
 import { formatRelativeTime } from "@/lib/utils";
+import { ROUTES } from "@/lib/routes";
 
 interface NotificationItem {
   id: number;
@@ -12,7 +13,6 @@ interface NotificationItem {
   body: string;
   isRead: boolean;
   createdAt: Date;
-  episodeId: number | null;
   episodePodcastIndexId: string | null;
   episodeTitle: string | null;
   podcastTitle: string | null;
@@ -51,9 +51,11 @@ export function NotificationList({
         // Keep UX responsive even if marking read fails
       }
     }
-    if (notification.episodePodcastIndexId !== null) {
-      router.push(`/episode/${notification.episodePodcastIndexId}`);
-    }
+    router.push(
+      notification.episodePodcastIndexId
+        ? ROUTES.episode(notification.episodePodcastIndexId)
+        : ROUTES.DASHBOARD
+    );
     onItemClick?.();
   };
 

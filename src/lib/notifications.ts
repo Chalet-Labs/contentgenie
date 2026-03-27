@@ -55,13 +55,24 @@ export async function createNotification(params: {
   if (preference.pushEnabled && preference.digestFrequency === "realtime") {
     let pushUrl: string = ROUTES.DASHBOARD;
     if (params.episodeId != null) {
-      const episode = await db.query.episodes.findFirst({
-        where: eq(episodes.id, params.episodeId),
-        columns: { podcastIndexId: true },
-      });
-      pushUrl = episode?.podcastIndexId
-        ? `/episode/${episode.podcastIndexId}`
-        : ROUTES.DASHBOARD;
+      try {
+        const episode = await db.query.episodes.findFirst({
+          where: eq(episodes.id, params.episodeId),
+          columns: { podcastIndexId: true },
+        });
+        if (episode?.podcastIndexId) {
+          pushUrl = ROUTES.episode(episode.podcastIndexId);
+        } else {
+          console.warn("[notifications] Episode not found for push URL, falling back to dashboard", {
+            episodeId: params.episodeId,
+          });
+        }
+      } catch (err) {
+        console.error("[notifications] Failed to resolve episode for push URL", {
+          episodeId: params.episodeId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
     }
     await sendPushToUser(
       params.userId,
@@ -122,21 +133,32 @@ export async function createBulkNotifications(
     }
   }
 
-  // Resolve PodcastIndex IDs for episodes referenced by realtime-push items
+  // Resolve PodcastIndex IDs for episodes that will generate a push (skip digest/disabled users)
   const realtimeItems = items.filter((item) => realtimeUsers.has(item.userId));
   const episodeDbIds = Array.from(
     new Set(realtimeItems.map((i) => i.episodeId).filter((id): id is number => id != null))
   );
   const episodePodcastIndexMap = new Map<number, string>();
   if (episodeDbIds.length > 0) {
-    const episodeRows = await db.query.episodes.findMany({
-      where: inArray(episodes.id, episodeDbIds),
-      columns: { id: true, podcastIndexId: true },
-    });
-    for (const row of episodeRows) {
-      if (row.podcastIndexId) {
+    try {
+      const episodeRows = await db.query.episodes.findMany({
+        where: inArray(episodes.id, episodeDbIds),
+        columns: { id: true, podcastIndexId: true },
+      });
+      for (const row of episodeRows) {
         episodePodcastIndexMap.set(row.id, row.podcastIndexId);
       }
+      const missing = episodeDbIds.filter((id) => !episodePodcastIndexMap.has(id));
+      if (missing.length > 0) {
+        console.warn("[notifications] Episodes not found for push URLs, falling back to dashboard", {
+          missingEpisodeIds: missing,
+        });
+      }
+    } catch (err) {
+      console.error("[notifications] Failed to resolve episodes for push URLs", {
+        episodeDbIds,
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
   }
 
@@ -146,7 +168,7 @@ export async function createBulkNotifications(
       const podcastIndexId = item.episodeId != null
         ? episodePodcastIndexMap.get(item.episodeId)
         : undefined;
-      const pushUrl = podcastIndexId ? `/episode/${podcastIndexId}` : ROUTES.DASHBOARD;
+      const pushUrl = podcastIndexId ? ROUTES.episode(podcastIndexId) : ROUTES.DASHBOARD;
       return sendPushToUser(
         item.userId,
         {

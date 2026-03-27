@@ -261,6 +261,39 @@ describe("trigger/helpers/notifications", () => {
       );
     });
 
+    it("push URL falls back to /dashboard when episode lookup returns null", async () => {
+      mockUserSubsFindMany.mockResolvedValueOnce([{ userId: "user-realtime" }]);
+      mockUsersFindMany.mockResolvedValueOnce([
+        {
+          id: "user-realtime",
+          preferences: { digestFrequency: "realtime", pushEnabled: true },
+        },
+      ]);
+      mockEpisodesFindFirst.mockResolvedValueOnce(null);
+
+      const mockValues = vi.fn().mockResolvedValue(undefined);
+      mockInsert.mockReturnValue({ values: mockValues });
+
+      const { createNotificationsForSubscribers } = await import(
+        "@/trigger/helpers/notifications"
+      );
+      await createNotificationsForSubscribers(
+        1,
+        100,
+        "new_episode",
+        "Test Podcast",
+        "New episode: Test Episode"
+      );
+
+      expect(mockSendPushToUser).toHaveBeenCalledWith(
+        "user-realtime",
+        expect.objectContaining({
+          data: expect.objectContaining({ url: "/dashboard" }),
+        }),
+        expect.anything()
+      );
+    });
+
     it("skips DB lookup when podcastIndexEpisodeId is provided", async () => {
       mockUserSubsFindMany.mockResolvedValueOnce([{ userId: "user-realtime" }]);
       mockUsersFindMany.mockResolvedValueOnce([
