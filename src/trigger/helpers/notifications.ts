@@ -2,6 +2,7 @@ import { logger } from "@trigger.dev/sdk";
 import { eq, and, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { sendPushToUser } from "@/lib/push";
+import { ROUTES } from "@/lib/routes";
 import {
   notifications,
   userSubscriptions,
@@ -78,7 +79,7 @@ export async function createNotificationsForSubscribers(
     .map((u) => u.id);
 
   // Resolve the PodcastIndex episode ID for push URL construction
-  let episodePushUrl = "/dashboard";
+  let episodePushUrl: string = ROUTES.DASHBOARD;
   if (episodeId != null) {
     const episode = await db.query.episodes.findFirst({
       where: eq(episodes.id, episodeId),
@@ -86,7 +87,7 @@ export async function createNotificationsForSubscribers(
     });
     episodePushUrl = episode?.podcastIndexId
       ? `/episode/${episode.podcastIndexId}`
-      : "/dashboard";
+      : ROUTES.DASHBOARD;
   }
 
   // Dispatch push for realtime users

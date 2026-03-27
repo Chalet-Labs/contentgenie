@@ -7,6 +7,7 @@ import {
 } from "@/db/schema";
 import { eq, inArray } from "drizzle-orm";
 import { sendPushToUser, consolePushLogger } from "@/lib/push";
+import { ROUTES } from "@/lib/routes";
 
 async function getNotificationPrefs(
   userId: string
@@ -52,7 +53,7 @@ export async function createNotification(params: {
 
   const preference = await getNotificationPrefs(params.userId);
   if (preference.pushEnabled && preference.digestFrequency === "realtime") {
-    let pushUrl = "/dashboard";
+    let pushUrl: string = ROUTES.DASHBOARD;
     if (params.episodeId != null) {
       const episode = await db.query.episodes.findFirst({
         where: eq(episodes.id, params.episodeId),
@@ -60,7 +61,7 @@ export async function createNotification(params: {
       });
       pushUrl = episode?.podcastIndexId
         ? `/episode/${episode.podcastIndexId}`
-        : "/dashboard";
+        : ROUTES.DASHBOARD;
     }
     await sendPushToUser(
       params.userId,
@@ -145,7 +146,7 @@ export async function createBulkNotifications(
       const podcastIndexId = item.episodeId != null
         ? episodePodcastIndexMap.get(item.episodeId)
         : undefined;
-      const pushUrl = podcastIndexId ? `/episode/${podcastIndexId}` : "/dashboard";
+      const pushUrl = podcastIndexId ? `/episode/${podcastIndexId}` : ROUTES.DASHBOARD;
       return sendPushToUser(
         item.userId,
         {
