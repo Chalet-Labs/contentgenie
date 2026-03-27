@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
+import { useRealtimeRun } from "@trigger.dev/react-hooks"
 import { Button } from "@/components/ui/button"
 import {
   Tooltip,
@@ -11,6 +12,8 @@ import {
 import { FileText, Sparkles, Zap, Loader2 } from "lucide-react"
 import { getEpisodeStatus } from "@/app/actions/admin"
 import { IN_PROGRESS_STATUSES, type SummaryStatus } from "@/db/schema"
+import type { fetchTranscriptTask } from "@/trigger/fetch-transcript"
+import type { summarizeEpisode } from "@/trigger/summarize-episode"
 
 interface EpisodeActionButtonsProps {
   episode: {
@@ -21,9 +24,15 @@ interface EpisodeActionButtonsProps {
   }
 }
 
-const POLL_INTERVAL_MS = 5000
-const TRANSCRIPT_POLL_CAP = 240
-const SUMMARY_POLL_CAP = 120
+const TERMINAL_STATUSES = [
+  "COMPLETED",
+  "FAILED",
+  "CANCELED",
+  "TIMED_OUT",
+  "SYSTEM_FAILURE",
+  "CRASHED",
+  "EXPIRED",
+] as const
 
 export function EpisodeActionButtons({ episode }: EpisodeActionButtonsProps) {
   const [localTranscriptStatus, setLocalTranscriptStatus] = useState(
@@ -35,115 +44,99 @@ export function EpisodeActionButtons({ episode }: EpisodeActionButtonsProps) {
   const [transcriptMsg, setTranscriptMsg] = useState<string | null>(null)
   const [summaryMsg, setSummaryMsg] = useState<string | null>(null)
 
-  const transcriptPollRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const summaryPollRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const transcriptPollCount = useRef(0)
-  const summaryPollCount = useRef(0)
-  const [isCombinedAction, _setIsCombinedAction] = useState(false)
+  const [transcriptRunId, setTranscriptRunId] = useState<string | null>(null)
+  const [transcriptAccessToken, setTranscriptAccessToken] = useState<string | null>(null)
+  const [summaryRunId, setSummaryRunId] = useState<string | null>(null)
+  const [summaryAccessToken, setSummaryAccessToken] = useState<string | null>(null)
+
   const isCombinedRef = useRef(false)
-  const setCombinedAction = (value: boolean) => {
-    isCombinedRef.current = value
-    _setIsCombinedAction(value)
-  }
   const handleSummarizeRef = useRef<() => Promise<void>>(() => Promise.resolve())
 
-  useEffect(() => {
-    return () => {
-      if (transcriptPollRef.current) clearInterval(transcriptPollRef.current)
-      if (summaryPollRef.current) clearInterval(summaryPollRef.current)
+  const { run: transcriptRun } = useRealtimeRun<typeof fetchTranscriptTask>(
+    transcriptRunId ?? "",
+    {
+      accessToken: transcriptAccessToken ?? "",
+      enabled: !!transcriptRunId && !!transcriptAccessToken,
     }
+  )
+
+  const { run: summaryRun } = useRealtimeRun<typeof summarizeEpisode>(
+    summaryRunId ?? "",
+    {
+      accessToken: summaryAccessToken ?? "",
+      enabled: !!summaryRunId && !!summaryAccessToken,
+    }
+  )
+
+  // React to transcript run status changes
+  useEffect(() => {
+    if (!transcriptRun) return
+    if (!TERMINAL_STATUSES.includes(transcriptRun.status as (typeof TERMINAL_STATUSES)[number])) return
+
+    if (transcriptRun.status === "COMPLETED") {
+      setLocalTranscriptStatus("available")
+      setTranscriptMsg(null)
+      setTranscriptRunId(null)
+      setTranscriptAccessToken(null)
+      if (isCombinedRef.current) {
+        isCombinedRef.current = false
+        handleSummarizeRef.current()
+      }
+    } else {
+      setLocalTranscriptStatus("failed")
+      setTranscriptMsg("Transcript fetch failed")
+      setTranscriptRunId(null)
+      setTranscriptAccessToken(null)
+      isCombinedRef.current = false
+    }
+  }, [transcriptRun])
+
+  // React to summary run status changes
+  useEffect(() => {
+    if (!summaryRun) return
+    if (!TERMINAL_STATUSES.includes(summaryRun.status as (typeof TERMINAL_STATUSES)[number])) return
+
+    if (summaryRun.status === "COMPLETED") {
+      setLocalSummaryStatus("completed")
+      setSummaryMsg(null)
+    } else {
+      setLocalSummaryStatus("failed")
+      setSummaryMsg("Summarization failed")
+    }
+    setSummaryRunId(null)
+    setSummaryAccessToken(null)
+  }, [summaryRun])
+
+  // Mount-time recovery: one-shot DB check when status is in-progress but no runId to reconnect
+  useEffect(() => {
+    const transcriptInFlight = episode.transcriptStatus === "fetching"
+    const summaryInFlight =
+      episode.summaryStatus !== null &&
+      IN_PROGRESS_STATUSES.includes(episode.summaryStatus as SummaryStatus)
+
+    if (!transcriptInFlight && !summaryInFlight) return
+
+    let cancelled = false
+    getEpisodeStatus(episode.id)
+      .then(result => {
+        if (cancelled) return
+        if (!result.ok) return
+        if (transcriptInFlight && result.transcriptStatus !== "fetching") {
+          setLocalTranscriptStatus(result.transcriptStatus)
+        }
+        if (summaryInFlight && result.summaryStatus !== null) {
+          setLocalSummaryStatus(result.summaryStatus)
+        }
+      })
+      .catch(() => {
+        // Best-effort recovery — ignore errors, spinner remains until user retries
+      })
+
+    return () => {
+      cancelled = true
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
-
-  const startTranscriptPolling = () => {
-    transcriptPollCount.current = 0
-    if (transcriptPollRef.current) clearInterval(transcriptPollRef.current)
-
-    transcriptPollRef.current = setInterval(async () => {
-      try {
-        transcriptPollCount.current += 1
-
-        if (transcriptPollCount.current >= TRANSCRIPT_POLL_CAP) {
-          clearInterval(transcriptPollRef.current!)
-          setCombinedAction(false)
-          setLocalTranscriptStatus(episode.transcriptStatus)
-          setTranscriptMsg("Fetch timed out — retry or check back later")
-          return
-        }
-
-        const result = await getEpisodeStatus(episode.id)
-        if (!result.ok) {
-          clearInterval(transcriptPollRef.current!)
-          setCombinedAction(false)
-          setLocalTranscriptStatus(episode.transcriptStatus)
-          setTranscriptMsg(result.error)
-          return
-        }
-
-        setLocalTranscriptStatus(prev =>
-          prev !== result.transcriptStatus ? result.transcriptStatus : prev
-        )
-
-        if (result.transcriptStatus === "available") {
-          clearInterval(transcriptPollRef.current!)
-          setTranscriptMsg(null)
-          if (isCombinedRef.current) {
-            setCombinedAction(false)
-            handleSummarizeRef.current()
-          }
-        } else if (result.transcriptStatus === "failed") {
-          clearInterval(transcriptPollRef.current!)
-          setCombinedAction(false)
-          setTranscriptMsg("Transcript fetch failed")
-        }
-      } catch (err) {
-        clearInterval(transcriptPollRef.current!)
-        setCombinedAction(false)
-        setLocalTranscriptStatus(episode.transcriptStatus)
-        console.error(`Transcript status poll failed for episode ${episode.id}:`, err)
-        setTranscriptMsg("Status check failed — try refreshing")
-      }
-    }, POLL_INTERVAL_MS)
-  }
-
-  const startSummaryPolling = () => {
-    summaryPollCount.current = 0
-    if (summaryPollRef.current) clearInterval(summaryPollRef.current)
-
-    summaryPollRef.current = setInterval(async () => {
-      try {
-        summaryPollCount.current += 1
-
-        if (summaryPollCount.current >= SUMMARY_POLL_CAP) {
-          clearInterval(summaryPollRef.current!)
-          setSummaryMsg("Summary timed out — retry or check back later")
-          return
-        }
-
-        const result = await getEpisodeStatus(episode.id)
-        if (!result.ok) {
-          clearInterval(summaryPollRef.current!)
-          setSummaryMsg(result.error)
-          return
-        }
-
-        setLocalSummaryStatus(prev =>
-          prev !== result.summaryStatus ? result.summaryStatus : prev
-        )
-
-        if (result.summaryStatus === "completed") {
-          clearInterval(summaryPollRef.current!)
-          setSummaryMsg(null)
-        } else if (result.summaryStatus === "failed") {
-          clearInterval(summaryPollRef.current!)
-          setSummaryMsg("Summarization failed")
-        }
-      } catch (err) {
-        clearInterval(summaryPollRef.current!)
-        console.error(`Summary status poll failed for episode ${episode.id}:`, err)
-        setSummaryMsg("Status check failed — try refreshing")
-      }
-    }, POLL_INTERVAL_MS)
-  }
 
   const handleFetchTranscript = async () => {
     const previousStatus = localTranscriptStatus
@@ -162,9 +155,13 @@ export function EpisodeActionButtons({ episode }: EpisodeActionButtonsProps) {
         throw new Error(errBody?.error ?? `Request failed (HTTP ${res.status})`)
       }
 
-      startTranscriptPolling()
+      const data = await res.json()
+      if (data.runId && data.publicAccessToken) {
+        setTranscriptRunId(data.runId)
+        setTranscriptAccessToken(data.publicAccessToken)
+      }
     } catch (err) {
-      setCombinedAction(false)
+      isCombinedRef.current = false
       setLocalTranscriptStatus(previousStatus)
       setTranscriptMsg(err instanceof Error ? err.message : "Failed to start transcript fetch")
     }
@@ -187,7 +184,11 @@ export function EpisodeActionButtons({ episode }: EpisodeActionButtonsProps) {
         throw new Error(errBody?.error ?? `Request failed (HTTP ${res.status})`)
       }
 
-      startSummaryPolling()
+      const data = await res.json()
+      if (data.runId && data.publicAccessToken) {
+        setSummaryRunId(data.runId)
+        setSummaryAccessToken(data.publicAccessToken)
+      }
     } catch (err) {
       setLocalSummaryStatus(previousStatus)
       setSummaryMsg(err instanceof Error ? err.message : "Failed to start summarization")
@@ -197,7 +198,7 @@ export function EpisodeActionButtons({ episode }: EpisodeActionButtonsProps) {
 
   const handleFetchAndSummarize = () => {
     if (transcriptInProgress || summaryInProgress) return
-    setCombinedAction(true)
+    isCombinedRef.current = true
     handleFetchTranscript()
   }
 
@@ -208,6 +209,7 @@ export function EpisodeActionButtons({ episode }: EpisodeActionButtonsProps) {
   const transcriptAvailable = localTranscriptStatus === "available"
   const showFetchAndSummarize =
     localTranscriptStatus === "missing" || localTranscriptStatus === "failed"
+  const isCombinedAction = isCombinedRef.current
 
   const fetchTranscriptLabel = transcriptMsg
     ? transcriptMsg
