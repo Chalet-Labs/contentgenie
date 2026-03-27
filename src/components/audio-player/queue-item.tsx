@@ -5,6 +5,7 @@ import { CSS } from "@dnd-kit/utilities"
 import Image from "next/image"
 import { GripVertical, X, Rss } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { cn } from "@/lib/utils"
 import type { AudioEpisode } from "@/contexts/audio-player-context"
 
 interface QueueItemProps {
@@ -32,9 +33,10 @@ export function QueueItem({ episode, onRemove, onPlay }: QueueItemProps) {
     <div
       ref={setNodeRef}
       style={style}
-      className={`flex items-center gap-2 rounded-md p-2 ${
+      className={cn(
+        "flex items-center gap-2 rounded-md p-2",
         isDragging ? "z-10 bg-accent opacity-80 shadow-md" : "hover:bg-accent/50"
-      }`}
+      )}
     >
       <button
         className="flex shrink-0 cursor-grab touch-none items-center text-muted-foreground hover:text-foreground active:cursor-grabbing"
@@ -45,8 +47,9 @@ export function QueueItem({ episode, onRemove, onPlay }: QueueItemProps) {
         <GripVertical className="h-4 w-4" />
       </button>
 
-      <button
-        className="flex min-w-0 flex-1 items-center gap-2 text-left"
+      <Button
+        variant="ghost"
+        className="flex min-w-0 flex-1 items-center gap-2 text-left h-auto p-0 hover:bg-transparent"
         onClick={onPlay}
         aria-label={`Play ${episode.title}`}
       >
@@ -76,7 +79,7 @@ export function QueueItem({ episode, onRemove, onPlay }: QueueItemProps) {
             {episode.podcastTitle}
           </p>
         </div>
-      </button>
+      </Button>
 
       <Button
         variant="ghost"

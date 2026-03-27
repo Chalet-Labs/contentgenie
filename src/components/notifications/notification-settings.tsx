@@ -171,7 +171,7 @@ export function NotificationSettings() {
       {/* Push Notifications */}
       <div className="flex items-center justify-between">
         <div className="space-y-0.5">
-          <label className="text-sm font-medium">Push Notifications</label>
+          <span className="text-sm font-medium">Push Notifications</span>
           <p className="text-sm text-muted-foreground">
             Get browser notifications when new summaries are available.
           </p>
@@ -215,7 +215,7 @@ export function NotificationSettings() {
       {/* Digest Frequency */}
       <div className="flex items-center justify-between">
         <div className="space-y-0.5">
-          <label className="text-sm font-medium">Notification Frequency</label>
+          <span className="text-sm font-medium">Notification Frequency</span>
           <p className="text-sm text-muted-foreground">
             How often to receive push notification digests.
           </p>

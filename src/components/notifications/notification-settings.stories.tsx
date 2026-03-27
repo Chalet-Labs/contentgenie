@@ -36,7 +36,7 @@ export const Default: Story = {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div className="space-y-0.5">
-          <label className="text-sm font-medium">Push Notifications</label>
+          <span className="text-sm font-medium">Push Notifications</span>
           <p className="text-sm text-muted-foreground">
             Get browser notifications when new summaries are available.
           </p>
@@ -48,7 +48,7 @@ export const Default: Story = {
 
       <div className="flex items-center justify-between">
         <div className="space-y-0.5">
-          <label className="text-sm font-medium">Notification Frequency</label>
+          <span className="text-sm font-medium">Notification Frequency</span>
           <p className="text-sm text-muted-foreground">
             How often to receive push notification digests.
           </p>
@@ -79,7 +79,7 @@ export const Granted: Story = {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div className="space-y-0.5">
-          <label className="text-sm font-medium">Push Notifications</label>
+          <span className="text-sm font-medium">Push Notifications</span>
           <p className="text-sm text-muted-foreground">
             Get browser notifications when new summaries are available.
           </p>
@@ -91,7 +91,7 @@ export const Granted: Story = {
 
       <div className="flex items-center justify-between">
         <div className="space-y-0.5">
-          <label className="text-sm font-medium">Notification Frequency</label>
+          <span className="text-sm font-medium">Notification Frequency</span>
           <p className="text-sm text-muted-foreground">
             How often to receive push notification digests.
           </p>
@@ -122,7 +122,7 @@ export const Denied: Story = {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div className="space-y-0.5">
-          <label className="text-sm font-medium">Push Notifications</label>
+          <span className="text-sm font-medium">Push Notifications</span>
           <p className="text-sm text-muted-foreground">
             Get browser notifications when new summaries are available.
           </p>
@@ -140,7 +140,7 @@ export const Denied: Story = {
 
       <div className="flex items-center justify-between">
         <div className="space-y-0.5">
-          <label className="text-sm font-medium">Notification Frequency</label>
+          <span className="text-sm font-medium">Notification Frequency</span>
           <p className="text-sm text-muted-foreground">
             How often to receive push notification digests.
           </p>
@@ -171,7 +171,7 @@ export const Unsupported: Story = {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div className="space-y-0.5">
-          <label className="text-sm font-medium">Push Notifications</label>
+          <span className="text-sm font-medium">Push Notifications</span>
           <p className="text-sm text-muted-foreground">
             Get browser notifications when new summaries are available.
           </p>
@@ -188,7 +188,7 @@ export const Unsupported: Story = {
 
       <div className="flex items-center justify-between">
         <div className="space-y-0.5">
-          <label className="text-sm font-medium">Notification Frequency</label>
+          <span className="text-sm font-medium">Notification Frequency</span>
           <p className="text-sm text-muted-foreground">
             How often to receive push notification digests.
           </p>
@@ -219,7 +219,7 @@ export const Enabling: Story = {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div className="space-y-0.5">
-          <label className="text-sm font-medium">Push Notifications</label>
+          <span className="text-sm font-medium">Push Notifications</span>
           <p className="text-sm text-muted-foreground">
             Get browser notifications when new summaries are available.
           </p>
@@ -233,7 +233,7 @@ export const Enabling: Story = {
 
       <div className="flex items-center justify-between">
         <div className="space-y-0.5">
-          <label className="text-sm font-medium">Notification Frequency</label>
+          <span className="text-sm font-medium">Notification Frequency</span>
           <p className="text-sm text-muted-foreground">
             How often to receive push notification digests.
           </p>
@@ -264,7 +264,7 @@ export const Loading: Story = {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div className="space-y-0.5">
-          <label className="text-sm font-medium">Push Notifications</label>
+          <span className="text-sm font-medium">Push Notifications</span>
           <p className="text-sm text-muted-foreground">
             Get browser notifications when new summaries are available.
           </p>
@@ -276,7 +276,7 @@ export const Loading: Story = {
 
       <div className="flex items-center justify-between">
         <div className="space-y-0.5">
-          <label className="text-sm font-medium">Notification Frequency</label>
+          <span className="text-sm font-medium">Notification Frequency</span>
           <p className="text-sm text-muted-foreground">
             How often to receive push notification digests.
           </p>

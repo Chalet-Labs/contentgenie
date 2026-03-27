@@ -112,7 +112,7 @@ export default function SettingsPage() {
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
-              <label className="text-sm font-medium">Theme</label>
+              <span className="text-sm font-medium">Theme</span>
               <p className="text-sm text-muted-foreground">
                 Select your preferred color scheme.
               </p>
@@ -164,7 +164,7 @@ export default function SettingsPage() {
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
-              <label className="text-sm font-medium">Email Notifications</label>
+              <span className="text-sm font-medium">Email Notifications</span>
               <p className="text-sm text-muted-foreground">
                 Receive email updates about new episodes from your subscriptions.
               </p>
@@ -264,7 +264,7 @@ export default function SettingsPage() {
         <CardContent>
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
-              <label className="text-sm font-medium">Delete Account</label>
+              <span className="text-sm font-medium">Delete Account</span>
               <p className="text-sm text-muted-foreground">
                 Permanently delete your account and all associated data.
               </p>

@@ -3,8 +3,9 @@
 import { useRouter } from "next/navigation";
 import { Bell, FileText, Podcast } from "lucide-react";
 import { markNotificationRead } from "@/app/actions/notifications";
-import { formatRelativeTime } from "@/lib/utils";
+import { formatRelativeTime, cn } from "@/lib/utils";
 import { ROUTES } from "@/lib/routes";
+import { Button } from "@/components/ui/button";
 
 interface NotificationItem {
   id: number;
@@ -62,12 +63,14 @@ export function NotificationList({
   return (
     <div className="divide-y">
       {notifications.map((notification) => (
-        <button
+        <Button
           key={notification.id}
+          variant="ghost"
           onClick={() => handleClick(notification)}
-          className={`w-full flex items-start gap-3 p-3 text-left hover:bg-accent/50 transition-colors ${
-            !notification.isRead ? "bg-accent/20" : ""
-          }`}
+          className={cn(
+            "w-full flex items-start gap-3 p-3 text-left hover:bg-accent/50 transition-colors h-auto rounded-none justify-start",
+            !notification.isRead && "bg-accent/20"
+          )}
         >
           <NotificationIcon type={notification.type} />
           <div className="flex-1 min-w-0">
@@ -84,7 +87,7 @@ export function NotificationList({
           {!notification.isRead && (
             <span className="h-2 w-2 rounded-full bg-blue-500 shrink-0 mt-1.5" />
           )}
-        </button>
+        </Button>
       ))}
     </div>
   );

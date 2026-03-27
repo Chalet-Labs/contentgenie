@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Bell } from "lucide-react";
+import { Bell, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Popover,
@@ -88,18 +88,15 @@ export function NotificationBell() {
         <div className="flex items-center justify-between px-3 py-2 border-b">
           <h3 className="text-sm font-semibold">Notifications</h3>
           {unreadCount > 0 && (
-            <button
-              onClick={handleMarkAllRead}
-              className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-            >
+            <Button variant="ghost" size="sm" onClick={handleMarkAllRead} className="h-auto p-0 text-xs text-muted-foreground hover:text-foreground">
               Mark all as read
-            </button>
+            </Button>
           )}
         </div>
         <div className="max-h-80 overflow-y-auto">
           {isLoading ? (
             <div className="flex items-center justify-center py-8">
-              <div className="h-5 w-5 animate-spin rounded-full border-2 border-muted-foreground border-t-transparent" />
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
             </div>
           ) : (
             <NotificationList

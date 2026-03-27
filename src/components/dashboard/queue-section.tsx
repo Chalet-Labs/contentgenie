@@ -8,6 +8,7 @@ import { Loader2, ListMusic, Rss, RefreshCw, GripVertical } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { useAudioPlayerState } from "@/contexts/audio-player-context";
 import { getQueueEpisodeScores } from "@/app/actions/queue-scores";
 import { getScoreColor } from "@/lib/score-utils";
@@ -56,14 +57,14 @@ function deleteMapEntry(
 
 function QueueScoreBadge({ score }: { score: number }) {
   return (
-    <span
+    <Badge
       className={cn(
         "rounded-full px-2 py-0.5 text-xs font-semibold text-white",
         getScoreColor(score)
       )}
     >
       {score.toFixed(1)}
-    </span>
+    </Badge>
   );
 }
 
