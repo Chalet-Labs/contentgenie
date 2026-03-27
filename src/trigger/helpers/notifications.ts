@@ -29,7 +29,7 @@ export async function createNotificationsForSubscribers(
   type: "new_episode" | "summary_completed",
   title: string,
   body: string,
-  options?: { pushTag?: string }
+  options?: { pushTag?: string; podcastIndexEpisodeId?: string }
 ): Promise<void> {
   // Find subscribers with notifications enabled
   const subscribers = await db.query.userSubscriptions.findMany({
@@ -78,9 +78,12 @@ export async function createNotificationsForSubscribers(
     })
     .map((u) => u.id);
 
-  // Resolve the PodcastIndex episode ID for push URL construction
+  // Resolve the PodcastIndex episode ID for push URL construction.
+  // Short-circuit when the caller already has the PodcastIndex ID (avoids a redundant DB round-trip).
   let episodePushUrl: string = ROUTES.DASHBOARD;
-  if (episodeId != null) {
+  if (options?.podcastIndexEpisodeId) {
+    episodePushUrl = `/episode/${options.podcastIndexEpisodeId}`;
+  } else if (episodeId != null) {
     const episode = await db.query.episodes.findFirst({
       where: eq(episodes.id, episodeId),
       columns: { podcastIndexId: true },

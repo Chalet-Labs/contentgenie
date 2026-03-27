@@ -376,14 +376,16 @@ describe("summarize-episode task", () => {
       42,
       "new_episode",
       mockPodcast.title,
-      `New episode: ${mockEpisode.title}`
+      `New episode: ${mockEpisode.title}`,
+      { podcastIndexEpisodeId: "123" }
     );
     expect(createNotificationsForSubscribers).toHaveBeenCalledWith(
       99,
       42,
       "summary_completed",
       mockPodcast.title,
-      `Summary ready: ${mockEpisode.title}`
+      `Summary ready: ${mockEpisode.title}`,
+      { podcastIndexEpisodeId: "123" }
     );
     expect(createNotificationsForSubscribers).toHaveBeenCalledTimes(2);
   });
@@ -412,7 +414,8 @@ describe("summarize-episode task", () => {
       42,
       "summary_completed",
       mockPodcast.title,
-      `Summary ready: ${mockEpisode.title}`
+      `Summary ready: ${mockEpisode.title}`,
+      { podcastIndexEpisodeId: "123" }
     );
   });
 });

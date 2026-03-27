@@ -261,6 +261,40 @@ describe("trigger/helpers/notifications", () => {
       );
     });
 
+    it("skips DB lookup when podcastIndexEpisodeId is provided", async () => {
+      mockUserSubsFindMany.mockResolvedValueOnce([{ userId: "user-realtime" }]);
+      mockUsersFindMany.mockResolvedValueOnce([
+        {
+          id: "user-realtime",
+          preferences: { digestFrequency: "realtime", pushEnabled: true },
+        },
+      ]);
+
+      const mockValues = vi.fn().mockResolvedValue(undefined);
+      mockInsert.mockReturnValue({ values: mockValues });
+
+      const { createNotificationsForSubscribers } = await import(
+        "@/trigger/helpers/notifications"
+      );
+      await createNotificationsForSubscribers(
+        1,
+        100,
+        "new_episode",
+        "Test Podcast",
+        "New episode: Test Episode",
+        { podcastIndexEpisodeId: "PI-100" }
+      );
+
+      expect(mockEpisodesFindFirst).not.toHaveBeenCalled();
+      expect(mockSendPushToUser).toHaveBeenCalledWith(
+        "user-realtime",
+        expect.objectContaining({
+          data: expect.objectContaining({ url: "/episode/PI-100" }),
+        }),
+        expect.anything()
+      );
+    });
+
     it("handles null episodeId correctly", async () => {
       mockUserSubsFindMany.mockResolvedValueOnce([{ userId: "user-1" }]);
       // Bulk user preferences query (pushEnabled defaults to false — no push dispatched)
