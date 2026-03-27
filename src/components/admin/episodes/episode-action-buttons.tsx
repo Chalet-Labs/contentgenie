@@ -68,7 +68,6 @@ export function EpisodeActionButtons({ episode }: EpisodeActionButtonsProps) {
     }
   )
 
-  // React to transcript run status changes
   useEffect(() => {
     if (!transcriptRun) return
     if (!TERMINAL_STATUSES.includes(transcriptRun.status as (typeof TERMINAL_STATUSES)[number])) return
@@ -89,9 +88,9 @@ export function EpisodeActionButtons({ episode }: EpisodeActionButtonsProps) {
       setTranscriptAccessToken(null)
       isCombinedRef.current = false
     }
-  }, [transcriptRun])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [transcriptRun?.status])
 
-  // React to summary run status changes
   useEffect(() => {
     if (!summaryRun) return
     if (!TERMINAL_STATUSES.includes(summaryRun.status as (typeof TERMINAL_STATUSES)[number])) return
@@ -105,9 +104,10 @@ export function EpisodeActionButtons({ episode }: EpisodeActionButtonsProps) {
     }
     setSummaryRunId(null)
     setSummaryAccessToken(null)
-  }, [summaryRun])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [summaryRun?.status])
 
-  // Mount-time recovery: one-shot DB check when status is in-progress but no runId to reconnect
+  // Recovery: page may have loaded mid-run with no active socket to reconnect to
   useEffect(() => {
     const transcriptInFlight = episode.transcriptStatus === "fetching"
     const summaryInFlight =
@@ -124,7 +124,11 @@ export function EpisodeActionButtons({ episode }: EpisodeActionButtonsProps) {
         if (transcriptInFlight && result.transcriptStatus !== "fetching") {
           setLocalTranscriptStatus(result.transcriptStatus)
         }
-        if (summaryInFlight && result.summaryStatus !== null) {
+        if (
+          summaryInFlight &&
+          result.summaryStatus !== null &&
+          !IN_PROGRESS_STATUSES.includes(result.summaryStatus as SummaryStatus)
+        ) {
           setLocalSummaryStatus(result.summaryStatus)
         }
       })

@@ -140,12 +140,9 @@ describe("EpisodeActionButtons", () => {
   })
 
   it("transcript run FAILED → local status updates to 'failed', shows error", async () => {
-    let capturedArgs: unknown[] = []
     mockUseRealtimeRun.mockImplementation((...args: unknown[]) => {
-      capturedArgs = args
-      if (capturedArgs[1] && (capturedArgs[1] as { enabled?: boolean }).enabled) {
-        return { run: { status: "FAILED" } }
-      }
+      const opts = args[1] as { enabled?: boolean } | undefined
+      if (opts?.enabled) return { run: { status: "FAILED" } }
       return { run: null }
     })
     render(
