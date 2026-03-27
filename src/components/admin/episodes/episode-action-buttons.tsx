@@ -131,8 +131,9 @@ export function EpisodeActionButtons({ episode }: EpisodeActionButtonsProps) {
     setSummaryAccessToken(null)
   }, [summaryError])
 
-  // Staleness guard: if the realtime subscription doesn't resolve within the
-  // timeout, assume the connection was silently lost and transition to error.
+  // Staleness guard: if the realtime subscription goes silent for too long,
+  // assume the connection was lost. Resets on every status update so long-running
+  // tasks (e.g. AssemblyAI transcription) don't get prematurely timed out.
   useEffect(() => {
     if (!transcriptRunId) return
     const timeout = setTimeout(() => {
@@ -143,7 +144,7 @@ export function EpisodeActionButtons({ episode }: EpisodeActionButtonsProps) {
       isCombinedRef.current = false
     }, TRANSCRIPT_STALE_MS)
     return () => clearTimeout(timeout)
-  }, [transcriptRunId])
+  }, [transcriptRunId, transcriptRun?.status])
 
   useEffect(() => {
     if (!summaryRunId) return
@@ -154,7 +155,7 @@ export function EpisodeActionButtons({ episode }: EpisodeActionButtonsProps) {
       setSummaryAccessToken(null)
     }, SUMMARY_STALE_MS)
     return () => clearTimeout(timeout)
-  }, [summaryRunId])
+  }, [summaryRunId, summaryRun?.status])
 
   // Recovery: if the page was server-rendered while a run was in-flight, we have
   // no runId/accessToken to subscribe to. Do a one-shot status check to reconcile.
@@ -171,8 +172,14 @@ export function EpisodeActionButtons({ episode }: EpisodeActionButtonsProps) {
       .then(result => {
         if (cancelled) return
         if (!result.ok) {
-          if (transcriptInFlight) setTranscriptMsg(result.error)
-          if (summaryInFlight) setSummaryMsg(result.error)
+          if (transcriptInFlight) {
+            setLocalTranscriptStatus("failed")
+            setTranscriptMsg(result.error)
+          }
+          if (summaryInFlight) {
+            setLocalSummaryStatus("failed")
+            setSummaryMsg(result.error)
+          }
           return
         }
         if (transcriptInFlight && result.transcriptStatus !== "fetching") {
@@ -187,10 +194,16 @@ export function EpisodeActionButtons({ episode }: EpisodeActionButtonsProps) {
         }
       })
       .catch(() => {
-        // Network/auth failure — surface a message so the user knows to refresh
+        // Network/auth failure — transition to failed so the user can retry
         if (!cancelled) {
-          if (transcriptInFlight) setTranscriptMsg("Could not verify status — try refreshing")
-          if (summaryInFlight) setSummaryMsg("Could not verify status — try refreshing")
+          if (transcriptInFlight) {
+            setLocalTranscriptStatus("failed")
+            setTranscriptMsg("Could not verify status — try again")
+          }
+          if (summaryInFlight) {
+            setLocalSummaryStatus("failed")
+            setSummaryMsg("Could not verify status — try again")
+          }
         }
       })
 
