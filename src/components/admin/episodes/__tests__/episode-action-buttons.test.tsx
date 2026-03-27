@@ -2,8 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { render, screen, fireEvent, waitFor, act } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 
-// Mock useRealtimeRun
-const mockUseRealtimeRun = vi.fn().mockReturnValue({ run: null })
+const mockUseRealtimeRun = vi.fn().mockReturnValue({ run: null, error: null })
 vi.mock("@trigger.dev/react-hooks", () => ({
   useRealtimeRun: (...args: unknown[]) => mockUseRealtimeRun(...args),
 }))
@@ -28,7 +27,7 @@ describe("EpisodeActionButtons", () => {
   beforeEach(() => {
     vi.stubGlobal("fetch", mockFetch)
     vi.clearAllMocks()
-    mockUseRealtimeRun.mockReturnValue({ run: null })
+    mockUseRealtimeRun.mockReturnValue({ run: null, error: null })
     mockFetch.mockResolvedValue({
       ok: true,
       json: async () => ({ runId: "run_123", publicAccessToken: "tok_abc" }),
@@ -122,8 +121,8 @@ describe("EpisodeActionButtons", () => {
   it("transcript run COMPLETED → local status updates to 'available'", async () => {
     mockUseRealtimeRun.mockImplementation((...args: unknown[]) => {
       const opts = args[1] as { enabled?: boolean } | undefined
-      if (opts?.enabled) return { run: { status: "COMPLETED" } }
-      return { run: null }
+      if (opts?.enabled) return { run: { status: "COMPLETED" }, error: null }
+      return { run: null, error: null }
     })
     render(
       <EpisodeActionButtons
@@ -134,7 +133,6 @@ describe("EpisodeActionButtons", () => {
       fireEvent.click(screen.getByRole("button", { name: /fetch transcript/i }))
     })
     await waitFor(() => {
-      // Button becomes disabled with "Transcript available"
       expect(screen.getByRole("button", { name: /transcript available/i })).toBeDisabled()
     })
   })
@@ -142,8 +140,8 @@ describe("EpisodeActionButtons", () => {
   it("transcript run FAILED → local status updates to 'failed', shows error", async () => {
     mockUseRealtimeRun.mockImplementation((...args: unknown[]) => {
       const opts = args[1] as { enabled?: boolean } | undefined
-      if (opts?.enabled) return { run: { status: "FAILED" } }
-      return { run: null }
+      if (opts?.enabled) return { run: { status: "FAILED" }, error: null }
+      return { run: null, error: null }
     })
     render(
       <EpisodeActionButtons
@@ -163,8 +161,8 @@ describe("EpisodeActionButtons", () => {
   it("transcript run CANCELED → shows error (terminal status handling)", async () => {
     mockUseRealtimeRun.mockImplementation((...args: unknown[]) => {
       const opts = args[1] as { enabled?: boolean } | undefined
-      if (opts?.enabled) return { run: { status: "CANCELED" } }
-      return { run: null }
+      if (opts?.enabled) return { run: { status: "CANCELED" }, error: null }
+      return { run: null, error: null }
     })
     render(
       <EpisodeActionButtons
@@ -261,8 +259,8 @@ describe("EpisodeActionButtons", () => {
     let summarizeTriggered = false
     mockUseRealtimeRun.mockImplementation((...args: unknown[]) => {
       const opts = args[1] as { enabled?: boolean } | undefined
-      if (opts?.enabled && summarizeTriggered) return { run: { status: "COMPLETED" } }
-      return { run: null }
+      if (opts?.enabled && summarizeTriggered) return { run: { status: "COMPLETED" }, error: null }
+      return { run: null, error: null }
     })
     render(<EpisodeActionButtons episode={baseEpisode} />)
     await act(async () => {
@@ -277,8 +275,8 @@ describe("EpisodeActionButtons", () => {
   it("summary run FAILED → shows summarization error", async () => {
     mockUseRealtimeRun.mockImplementation((...args: unknown[]) => {
       const opts = args[1] as { enabled?: boolean } | undefined
-      if (opts?.enabled) return { run: { status: "FAILED" } }
-      return { run: null }
+      if (opts?.enabled) return { run: { status: "FAILED" }, error: null }
+      return { run: null, error: null }
     })
     render(<EpisodeActionButtons episode={baseEpisode} />)
     await act(async () => {
@@ -326,7 +324,7 @@ describe("EpisodeActionButtons", () => {
     })
   })
 
-  it("mount with transcriptStatus 'fetching' → getEpisodeStatus errors → shows error message, no crash", async () => {
+  it("mount with transcriptStatus 'fetching' → getEpisodeStatus errors → surfaces recovery error", async () => {
     mockGetEpisodeStatus.mockRejectedValue(new Error("Network error"))
     render(
       <EpisodeActionButtons
@@ -336,11 +334,14 @@ describe("EpisodeActionButtons", () => {
     await waitFor(() => {
       expect(mockGetEpisodeStatus).toHaveBeenCalledWith(baseEpisode.id)
     })
-    // Component should still render — no crash
-    expect(screen.getAllByRole("button").length).toBeGreaterThan(0)
+    await waitFor(() => {
+      expect(
+        screen.getAllByRole("button", { name: /could not verify status/i }).length
+      ).toBeGreaterThanOrEqual(1)
+    })
   })
 
-  it("mount with transcriptStatus 'fetching' → getEpisodeStatus returns ok:false → shows error message", async () => {
+  it("mount with transcriptStatus 'fetching' → getEpisodeStatus returns ok:false → surfaces server error", async () => {
     mockGetEpisodeStatus.mockResolvedValue({
       ok: false,
       error: "Admin access required",
@@ -353,13 +354,15 @@ describe("EpisodeActionButtons", () => {
     await waitFor(() => {
       expect(mockGetEpisodeStatus).toHaveBeenCalledWith(baseEpisode.id)
     })
-    // Component should still render — no crash
-    expect(screen.getAllByRole("button").length).toBeGreaterThan(0)
+    await waitFor(() => {
+      expect(
+        screen.getAllByRole("button", { name: /admin access required/i }).length
+      ).toBeGreaterThanOrEqual(1)
+    })
   })
 
   it("mount with transcriptStatus 'available' → does NOT call getEpisodeStatus", async () => {
     render(<EpisodeActionButtons episode={baseEpisode} />)
-    // Wait a tick for any effects to run
     await act(async () => {})
     expect(mockGetEpisodeStatus).not.toHaveBeenCalled()
   })
@@ -440,9 +443,9 @@ describe("EpisodeActionButtons", () => {
       const opts = args[1] as { enabled?: boolean } | undefined
       // The first hook call with a real runId is the transcript hook
       if (opts?.enabled && id === "run_123" && transcriptRunEnabled) {
-        return { run: { status: "COMPLETED" } }
+        return { run: { status: "COMPLETED" }, error: null }
       }
-      return { run: null }
+      return { run: null, error: null }
     })
     render(
       <EpisodeActionButtons
@@ -467,8 +470,8 @@ describe("EpisodeActionButtons", () => {
   it("combined action: transcript run FAILED → does NOT trigger summarize", async () => {
     mockUseRealtimeRun.mockImplementation((...args: unknown[]) => {
       const opts = args[1] as { enabled?: boolean } | undefined
-      if (opts?.enabled) return { run: { status: "FAILED" } }
-      return { run: null }
+      if (opts?.enabled) return { run: { status: "FAILED" }, error: null }
+      return { run: null, error: null }
     })
     render(
       <EpisodeActionButtons
@@ -545,8 +548,8 @@ describe("EpisodeActionButtons", () => {
   it("standalone transcript fetch failure shows error message", async () => {
     mockUseRealtimeRun.mockImplementation((...args: unknown[]) => {
       const opts = args[1] as { enabled?: boolean } | undefined
-      if (opts?.enabled) return { run: { status: "FAILED" } }
-      return { run: null }
+      if (opts?.enabled) return { run: { status: "FAILED" }, error: null }
+      return { run: null, error: null }
     })
     render(
       <EpisodeActionButtons
@@ -562,6 +565,156 @@ describe("EpisodeActionButtons", () => {
       })
       expect(errorBtns.length).toBeGreaterThanOrEqual(1)
     })
+  })
+
+  // --- useRealtimeRun connection errors ---
+
+  it("transcript realtime error → shows 'Connection lost' and re-enables button", async () => {
+    const wsError = new Error("WebSocket closed")
+    // Return error when the hook is enabled (after click sets runId/token)
+    mockUseRealtimeRun.mockImplementation((...args: unknown[]) => {
+      const opts = args[1] as { enabled?: boolean } | undefined
+      if (opts?.enabled) return { run: null, error: wsError }
+      return { run: null, error: null }
+    })
+    render(
+      <EpisodeActionButtons
+        episode={{ ...baseEpisode, transcriptStatus: "missing" }}
+      />
+    )
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /fetch transcript/i }))
+    })
+    await waitFor(() => {
+      expect(
+        screen.getAllByRole("button", { name: /connection lost/i }).length
+      ).toBeGreaterThanOrEqual(1)
+    })
+  })
+
+  it("summary realtime error → shows 'Connection lost'", async () => {
+    const sseError = new Error("SSE failed")
+    // Both hooks called each render; return error only for summary (second call when enabled)
+    let summarizeTriggered = false
+    mockUseRealtimeRun.mockImplementation((...args: unknown[]) => {
+      const opts = args[1] as { enabled?: boolean } | undefined
+      if (opts?.enabled && summarizeTriggered) return { run: null, error: sseError }
+      return { run: null, error: null }
+    })
+    render(<EpisodeActionButtons episode={baseEpisode} />)
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /^summarize$/i }))
+      summarizeTriggered = true
+    })
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: /connection lost/i })
+      ).toBeInTheDocument()
+    })
+  })
+
+  // --- Missing publicAccessToken ---
+
+  it("fetch transcript API returns runId without publicAccessToken → shows tracking unavailable", async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({ runId: "run_123" }),
+    })
+    render(
+      <EpisodeActionButtons
+        episode={{ ...baseEpisode, transcriptStatus: "missing" }}
+      />
+    )
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /fetch transcript/i }))
+    })
+    await waitFor(() => {
+      expect(
+        screen.getAllByRole("button", { name: /task queued/i }).length
+      ).toBeGreaterThanOrEqual(1)
+    })
+  })
+
+  // --- Summarize HTTP failure ---
+
+  it("standalone summarize HTTP failure shows error and re-enables button", async () => {
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 429,
+      json: async () => ({ error: "Rate limited" }),
+    })
+    render(<EpisodeActionButtons episode={baseEpisode} />)
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /^summarize$/i }))
+    })
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: /rate limited/i })
+      ).toBeInTheDocument()
+    })
+  })
+
+  // --- Mount-time recovery: summary in-progress ---
+
+  it("mount with summaryStatus 'running' → one-shot getEpisodeStatus → detects 'completed'", async () => {
+    mockGetEpisodeStatus.mockResolvedValue({
+      ok: true,
+      transcriptStatus: "available",
+      summaryStatus: "completed",
+    })
+    render(
+      <EpisodeActionButtons
+        episode={{ ...baseEpisode, summaryStatus: "running" }}
+      />
+    )
+    await waitFor(() => {
+      expect(mockGetEpisodeStatus).toHaveBeenCalledWith(baseEpisode.id)
+      expect(screen.getByRole("button", { name: /re-summarize/i })).toBeInTheDocument()
+    })
+  })
+
+  it("mount with summaryStatus 'queued' → getEpisodeStatus returns ok:false → surfaces error", async () => {
+    mockGetEpisodeStatus.mockResolvedValue({
+      ok: false,
+      error: "Episode not found",
+    })
+    render(
+      <EpisodeActionButtons
+        episode={{ ...baseEpisode, summaryStatus: "queued" }}
+      />
+    )
+    await waitFor(() => {
+      expect(mockGetEpisodeStatus).toHaveBeenCalledWith(baseEpisode.id)
+    })
+    await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: /episode not found/i })
+      ).toBeInTheDocument()
+    })
+  })
+
+  // --- Staleness timeout ---
+
+  it("transcript staleness timeout fires after subscription hangs", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    render(
+      <EpisodeActionButtons
+        episode={{ ...baseEpisode, transcriptStatus: "missing" }}
+      />
+    )
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /fetch transcript/i }))
+    })
+    // Advance past the 20-minute staleness guard
+    await act(async () => {
+      vi.advanceTimersByTime(20 * 60 * 1000 + 100)
+    })
+    await waitFor(() => {
+      expect(
+        screen.getAllByRole("button", { name: /fetch timed out/i }).length
+      ).toBeGreaterThanOrEqual(1)
+    })
+    vi.useRealTimers()
   })
 
   // --- Tooltip rendering on hover ---
@@ -594,8 +747,8 @@ describe("EpisodeActionButtons", () => {
     const user = userEvent.setup()
     mockUseRealtimeRun.mockImplementation((...args: unknown[]) => {
       const opts = args[1] as { enabled?: boolean } | undefined
-      if (opts?.enabled) return { run: { status: "FAILED" } }
-      return { run: null }
+      if (opts?.enabled) return { run: { status: "FAILED" }, error: null }
+      return { run: null, error: null }
     })
     render(
       <EpisodeActionButtons

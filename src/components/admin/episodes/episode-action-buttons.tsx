@@ -34,6 +34,10 @@ const TERMINAL_STATUSES = [
   "EXPIRED",
 ] as const
 
+/** Staleness timeout: if the realtime subscription doesn't resolve, give up */
+const TRANSCRIPT_STALE_MS = 20 * 60 * 1000 // 20 minutes
+const SUMMARY_STALE_MS = 10 * 60 * 1000 // 10 minutes
+
 export function EpisodeActionButtons({ episode }: EpisodeActionButtonsProps) {
   const [localTranscriptStatus, setLocalTranscriptStatus] = useState(
     episode.transcriptStatus
@@ -52,7 +56,7 @@ export function EpisodeActionButtons({ episode }: EpisodeActionButtonsProps) {
   const isCombinedRef = useRef(false)
   const handleSummarizeRef = useRef<() => Promise<void>>(() => Promise.resolve())
 
-  const { run: transcriptRun } = useRealtimeRun<typeof fetchTranscriptTask>(
+  const { run: transcriptRun, error: transcriptError } = useRealtimeRun<typeof fetchTranscriptTask>(
     transcriptRunId ?? "",
     {
       accessToken: transcriptAccessToken ?? "",
@@ -60,7 +64,7 @@ export function EpisodeActionButtons({ episode }: EpisodeActionButtonsProps) {
     }
   )
 
-  const { run: summaryRun } = useRealtimeRun<typeof summarizeEpisode>(
+  const { run: summaryRun, error: summaryError } = useRealtimeRun<typeof summarizeEpisode>(
     summaryRunId ?? "",
     {
       accessToken: summaryAccessToken ?? "",
@@ -88,6 +92,7 @@ export function EpisodeActionButtons({ episode }: EpisodeActionButtonsProps) {
       setTranscriptAccessToken(null)
       isCombinedRef.current = false
     }
+    // Only re-run when the run's status value changes; setters and refs are stable
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [transcriptRun?.status])
 
@@ -104,10 +109,55 @@ export function EpisodeActionButtons({ episode }: EpisodeActionButtonsProps) {
     }
     setSummaryRunId(null)
     setSummaryAccessToken(null)
+    // Only re-run when the run's status value changes; setters are stable
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [summaryRun?.status])
 
-  // Recovery: page may have loaded mid-run with no active socket to reconnect to
+  // WebSocket/SSE connection failures surface here, not through run status
+  useEffect(() => {
+    if (!transcriptError) return
+    setLocalTranscriptStatus("failed")
+    setTranscriptMsg("Connection lost — try again")
+    setTranscriptRunId(null)
+    setTranscriptAccessToken(null)
+    isCombinedRef.current = false
+  }, [transcriptError])
+
+  useEffect(() => {
+    if (!summaryError) return
+    setLocalSummaryStatus("failed")
+    setSummaryMsg("Connection lost — try again")
+    setSummaryRunId(null)
+    setSummaryAccessToken(null)
+  }, [summaryError])
+
+  // Staleness guard: if the realtime subscription doesn't resolve within the
+  // timeout, assume the connection was silently lost and transition to error.
+  useEffect(() => {
+    if (!transcriptRunId) return
+    const timeout = setTimeout(() => {
+      setLocalTranscriptStatus("failed")
+      setTranscriptMsg("Fetch timed out — retry or check back later")
+      setTranscriptRunId(null)
+      setTranscriptAccessToken(null)
+      isCombinedRef.current = false
+    }, TRANSCRIPT_STALE_MS)
+    return () => clearTimeout(timeout)
+  }, [transcriptRunId])
+
+  useEffect(() => {
+    if (!summaryRunId) return
+    const timeout = setTimeout(() => {
+      setLocalSummaryStatus("failed")
+      setSummaryMsg("Summarization timed out — retry or check back later")
+      setSummaryRunId(null)
+      setSummaryAccessToken(null)
+    }, SUMMARY_STALE_MS)
+    return () => clearTimeout(timeout)
+  }, [summaryRunId])
+
+  // Recovery: if the page was server-rendered while a run was in-flight, we have
+  // no runId/accessToken to subscribe to. Do a one-shot status check to reconcile.
   useEffect(() => {
     const transcriptInFlight = episode.transcriptStatus === "fetching"
     const summaryInFlight =
@@ -120,7 +170,11 @@ export function EpisodeActionButtons({ episode }: EpisodeActionButtonsProps) {
     getEpisodeStatus(episode.id)
       .then(result => {
         if (cancelled) return
-        if (!result.ok) return
+        if (!result.ok) {
+          if (transcriptInFlight) setTranscriptMsg(result.error)
+          if (summaryInFlight) setSummaryMsg(result.error)
+          return
+        }
         if (transcriptInFlight && result.transcriptStatus !== "fetching") {
           setLocalTranscriptStatus(result.transcriptStatus)
         }
@@ -133,12 +187,17 @@ export function EpisodeActionButtons({ episode }: EpisodeActionButtonsProps) {
         }
       })
       .catch(() => {
-        // Best-effort recovery — ignore errors, spinner remains until user retries
+        // Network/auth failure — surface a message so the user knows to refresh
+        if (!cancelled) {
+          if (transcriptInFlight) setTranscriptMsg("Could not verify status — try refreshing")
+          if (summaryInFlight) setSummaryMsg("Could not verify status — try refreshing")
+        }
       })
 
     return () => {
       cancelled = true
     }
+    // Run once on mount; episode prop is stable from server render
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -163,6 +222,9 @@ export function EpisodeActionButtons({ episode }: EpisodeActionButtonsProps) {
       if (data.runId && data.publicAccessToken) {
         setTranscriptRunId(data.runId)
         setTranscriptAccessToken(data.publicAccessToken)
+      } else if (data.runId) {
+        // Run was queued but token creation failed — no realtime tracking possible
+        setTranscriptMsg("Task queued — refresh to check status")
       }
     } catch (err) {
       isCombinedRef.current = false
@@ -192,6 +254,8 @@ export function EpisodeActionButtons({ episode }: EpisodeActionButtonsProps) {
       if (data.runId && data.publicAccessToken) {
         setSummaryRunId(data.runId)
         setSummaryAccessToken(data.publicAccessToken)
+      } else if (data.runId) {
+        setSummaryMsg("Task queued — refresh to check status")
       }
     } catch (err) {
       setLocalSummaryStatus(previousStatus)
@@ -201,7 +265,7 @@ export function EpisodeActionButtons({ episode }: EpisodeActionButtonsProps) {
   handleSummarizeRef.current = handleSummarize
 
   const handleFetchAndSummarize = () => {
-    if (transcriptInProgress || summaryInProgress) return
+    if (isCombinedRef.current || transcriptInProgress || summaryInProgress) return
     isCombinedRef.current = true
     handleFetchTranscript()
   }
