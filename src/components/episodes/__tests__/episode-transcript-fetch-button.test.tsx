@@ -66,6 +66,15 @@ describe("EpisodeTranscriptFetchButton", () => {
     ).toBeInTheDocument()
   })
 
+  // --- fetching on mount → spinner (no active poll yet) ---
+
+  it("shows disabled spinner when mounted with transcriptStatus 'fetching'", () => {
+    render(<EpisodeTranscriptFetchButton {...baseProps} transcriptStatus="fetching" />)
+    expect(
+      screen.getByRole("button", { name: /fetching transcript/i })
+    ).toBeDisabled()
+  })
+
   // --- Test case 3: available → null ---
 
   it("renders nothing when transcriptStatus is 'available'", () => {

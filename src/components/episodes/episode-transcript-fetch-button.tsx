@@ -28,8 +28,10 @@ export function EpisodeTranscriptFetchButton({
   transcriptStatus: initialTranscriptStatus,
   onTranscriptReady,
 }: EpisodeTranscriptFetchButtonProps) {
-  const [isFetching, setIsFetching] = useState(false)
-  const [transcriptStatus, setTranscriptStatus] = useState(initialTranscriptStatus)
+  const [isFetching, setIsFetching] = useState(initialTranscriptStatus === "fetching")
+  const [transcriptStatus, setTranscriptStatus] = useState(
+    initialTranscriptStatus === "fetching" ? "missing" : initialTranscriptStatus
+  )
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const pollCount = useRef(0)
   const onTranscriptReadyRef = useRef(onTranscriptReady)

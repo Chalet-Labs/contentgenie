@@ -578,24 +578,26 @@ export default function EpisodePage({ params }: EpisodePageProps) {
               </div>
             )}
             {episode.season > 0 && <span>Season {episode.season}</span>}
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button
-                    type="button"
-                    className={cn("flex items-center gap-1", !transcriptSource && "text-muted-foreground/50")}
-                  >
-                    <FileText className="h-4 w-4" />
-                    <span>{transcriptSource ? "Transcript" : "No Transcript"}</span>
-                  </button>
-                </TooltipTrigger>
-                <TooltipContent>
-                  {transcriptSource
-                    ? `Source: ${formatTranscriptSource(transcriptSource)}`
-                    : "No transcript available"}
-                </TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+            {(!isAdmin || !episodeDbId || transcriptSource) && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      className={cn("flex items-center gap-1", !transcriptSource && "text-muted-foreground/50")}
+                    >
+                      <FileText className="h-4 w-4" />
+                      <span>{transcriptSource ? "Transcript" : "No Transcript"}</span>
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    {transcriptSource
+                      ? `Source: ${formatTranscriptSource(transcriptSource)}`
+                      : "No transcript available"}
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
             {isAdmin && episodeDbId && (
               <EpisodeTranscriptFetchButton
                 episodeDbId={episodeDbId}
