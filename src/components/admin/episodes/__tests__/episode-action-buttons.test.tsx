@@ -41,6 +41,7 @@ describe("EpisodeActionButtons", () => {
 
   afterEach(() => {
     vi.unstubAllGlobals()
+    vi.useRealTimers()
   })
 
   // --- Fetch Transcript button ---
@@ -714,7 +715,6 @@ describe("EpisodeActionButtons", () => {
         screen.getAllByRole("button", { name: /fetch timed out/i }).length
       ).toBeGreaterThanOrEqual(1)
     })
-    vi.useRealTimers()
   })
 
   // --- Tooltip rendering on hover ---
