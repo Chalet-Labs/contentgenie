@@ -38,6 +38,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { WorthItBadge } from "@/components/episodes/worth-it-badge";
+import { EpisodeTranscriptFetchButton } from "@/components/episodes/episode-transcript-fetch-button";
 import { CommunityRating } from "@/components/episodes/community-rating";
 import { isEpisodeSaved, revalidatePodcastPage } from "@/app/actions/library";
 import { useOnlineStatus } from "@/hooks/use-online-status";
@@ -140,6 +141,8 @@ export default function EpisodePage({ params }: EpisodePageProps) {
   const [runId, setRunId] = useState<string | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [transcriptSource, setTranscriptSource] = useState<string | null>(null);
+  const [transcriptStatus, setTranscriptStatus] = useState<string | null>(null);
+  const [episodeDbId, setEpisodeDbId] = useState<number | null>(null);
 
   const isAdmin = isLoaded && has?.({ role: ADMIN_ROLE });
 
@@ -207,6 +210,8 @@ export default function EpisodePage({ params }: EpisodePageProps) {
       setEpisode(data.episode);
       setPodcast(data.podcast);
       setTranscriptSource(data.transcriptSource ?? null);
+      setTranscriptStatus(data.transcriptStatus ?? null);
+      setEpisodeDbId(data.episodeDbId ?? null);
 
       // Cache episode data for offline use
       if (userId) {
@@ -591,6 +596,14 @@ export default function EpisodePage({ params }: EpisodePageProps) {
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
+            {isAdmin && episodeDbId && (
+              <EpisodeTranscriptFetchButton
+                episodeDbId={episodeDbId}
+                podcastIndexId={episodeId}
+                transcriptStatus={transcriptStatus}
+                onTranscriptReady={generateSummary}
+              />
+            )}
           </div>
 
           {/* Community Rating */}

@@ -162,4 +162,168 @@ describe("GET /api/episodes/[id]", () => {
     expect(data.summary.summary).toBe("Cached summary");
     expect(data.summary.worthItScore).toBe(7.5);
   });
+
+  // --- transcriptStatus and episodeDbId extension tests ---
+
+  it("PodcastIndex path: includes transcriptStatus and episodeDbId when DB row exists", async () => {
+    vi.mocked(auth).mockResolvedValue({ userId: "user-1" } as never);
+
+    const mockEpisode = { id: 123, title: "Ep", feedId: 456 };
+    vi.mocked(getEpisodeById).mockResolvedValue({
+      status: "true",
+      episode: mockEpisode as never,
+      description: "",
+    });
+    vi.mocked(getPodcastById).mockResolvedValue({
+      status: "true",
+      feed: null as never,
+      description: "",
+    });
+    vi.mocked(db.query.episodes.findFirst).mockResolvedValue({
+      id: 42,
+      transcriptStatus: "available",
+      transcriptSource: "assemblyai",
+      summary: null,
+      processedAt: null,
+    } as never);
+
+    const request = new NextRequest("http://localhost:3000/api/episodes/123");
+    const response = await GET(request, { params: { id: "123" } });
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.transcriptStatus).toBe("available");
+    expect(data.episodeDbId).toBe(42);
+  });
+
+  it("PodcastIndex path: episodeDbId is null when no DB row exists", async () => {
+    vi.mocked(auth).mockResolvedValue({ userId: "user-1" } as never);
+
+    const mockEpisode = { id: 123, title: "Ep", feedId: 456 };
+    vi.mocked(getEpisodeById).mockResolvedValue({
+      status: "true",
+      episode: mockEpisode as never,
+      description: "",
+    });
+    vi.mocked(getPodcastById).mockResolvedValue({
+      status: "true",
+      feed: null as never,
+      description: "",
+    });
+    vi.mocked(db.query.episodes.findFirst).mockResolvedValue(undefined as never);
+
+    const request = new NextRequest("http://localhost:3000/api/episodes/123");
+    const response = await GET(request, { params: { id: "123" } });
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.transcriptStatus).toBeNull();
+    expect(data.episodeDbId).toBeNull();
+  });
+
+  it("PodcastIndex path: transcriptStatus is null when DB row has no transcriptStatus", async () => {
+    vi.mocked(auth).mockResolvedValue({ userId: "user-1" } as never);
+
+    const mockEpisode = { id: 123, title: "Ep", feedId: 456 };
+    vi.mocked(getEpisodeById).mockResolvedValue({
+      status: "true",
+      episode: mockEpisode as never,
+      description: "",
+    });
+    vi.mocked(getPodcastById).mockResolvedValue({
+      status: "true",
+      feed: null as never,
+      description: "",
+    });
+    vi.mocked(db.query.episodes.findFirst).mockResolvedValue({
+      id: 7,
+      transcriptStatus: null,
+      transcriptSource: null,
+      summary: null,
+      processedAt: null,
+    } as never);
+
+    const request = new NextRequest("http://localhost:3000/api/episodes/123");
+    const response = await GET(request, { params: { id: "123" } });
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.transcriptStatus).toBeNull();
+    expect(data.episodeDbId).toBe(7);
+  });
+
+  it("RSS path: includes transcriptStatus and episodeDbId from DB row", async () => {
+    vi.mocked(auth).mockResolvedValue({ userId: "user-1" } as never);
+
+    vi.mocked(db.query.episodes.findFirst).mockResolvedValue({
+      id: 99,
+      title: "RSS Ep",
+      description: "desc",
+      publishDate: new Date("2024-01-01"),
+      audioUrl: "https://example.com/ep.mp3",
+      duration: 3600,
+      podcastId: 5,
+      podcastIndexId: "rss-abc",
+      rssGuid: "guid-123",
+      transcriptSource: "podcastindex",
+      transcriptStatus: "missing",
+      summary: null,
+      processedAt: null,
+      keyTakeaways: [],
+      worthItScore: null,
+      worthItReason: null,
+      worthItDimensions: null,
+      podcast: {
+        podcastIndexId: "rss-abc",
+        title: "RSS Pod",
+        publisher: "Author",
+        imageUrl: "https://example.com/img.png",
+      },
+    } as never);
+
+    const request = new NextRequest(
+      "http://localhost:3000/api/episodes/rss-abc"
+    );
+    const response = await GET(request, { params: { id: "rss-abc" } });
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.transcriptStatus).toBe("missing");
+    expect(data.episodeDbId).toBe(99);
+  });
+
+  it("RSS path: transcriptStatus is null when not set on DB row", async () => {
+    vi.mocked(auth).mockResolvedValue({ userId: "user-1" } as never);
+
+    vi.mocked(db.query.episodes.findFirst).mockResolvedValue({
+      id: 88,
+      title: "RSS Ep 2",
+      description: null,
+      publishDate: null,
+      audioUrl: null,
+      duration: null,
+      podcastId: 3,
+      podcastIndexId: "rss-xyz",
+      rssGuid: null,
+      transcriptSource: null,
+      transcriptStatus: null,
+      summary: null,
+      processedAt: null,
+      keyTakeaways: [],
+      worthItScore: null,
+      worthItReason: null,
+      worthItDimensions: null,
+      podcast: null,
+    } as never);
+
+    const request = new NextRequest(
+      "http://localhost:3000/api/episodes/rss-xyz"
+    );
+    const response = await GET(request, { params: { id: "rss-xyz" } });
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.transcriptStatus).toBeNull();
+    expect(data.episodeDbId).toBe(88);
+  });
 });
