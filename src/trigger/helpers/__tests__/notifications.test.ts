@@ -63,8 +63,9 @@ vi.mock("drizzle-orm", () => ({
 
 describe("trigger/helpers/notifications", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     mockSendPushToUser.mockResolvedValue({ sent: 1, failed: 0 });
+    mockEpisodesFindFirst.mockResolvedValue(null);
     vi.resetModules();
   });
 
