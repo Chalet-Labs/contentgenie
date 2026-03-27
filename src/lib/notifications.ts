@@ -2,6 +2,7 @@ import { db } from "@/db";
 import {
   notifications,
   users,
+  episodes,
   type NewNotification,
 } from "@/db/schema";
 import { eq, inArray } from "drizzle-orm";
@@ -51,6 +52,16 @@ export async function createNotification(params: {
 
   const preference = await getNotificationPrefs(params.userId);
   if (preference.pushEnabled && preference.digestFrequency === "realtime") {
+    let pushUrl = "/dashboard";
+    if (params.episodeId != null) {
+      const episode = await db.query.episodes.findFirst({
+        where: eq(episodes.id, params.episodeId),
+        columns: { podcastIndexId: true },
+      });
+      pushUrl = episode?.podcastIndexId
+        ? `/episode/${episode.podcastIndexId}`
+        : "/dashboard";
+    }
     await sendPushToUser(
       params.userId,
       {
@@ -59,9 +70,7 @@ export async function createNotification(params: {
         tag: params.episodeId
           ? `${params.type}-${params.episodeId}`
           : params.type,
-        data: {
-          url: params.episodeId ? `/episode/${params.episodeId}` : "/dashboard",
-        },
+        data: { url: pushUrl },
       },
       consolePushLogger
     );
@@ -112,27 +121,43 @@ export async function createBulkNotifications(
     }
   }
 
+  // Resolve PodcastIndex IDs for episodes referenced by realtime-push items
+  const realtimeItems = items.filter((item) => realtimeUsers.has(item.userId));
+  const episodeDbIds = Array.from(
+    new Set(realtimeItems.map((i) => i.episodeId).filter((id): id is number => id != null))
+  );
+  const episodePodcastIndexMap = new Map<number, string>();
+  if (episodeDbIds.length > 0) {
+    const episodeRows = await db.query.episodes.findMany({
+      where: inArray(episodes.id, episodeDbIds),
+      columns: { id: true, podcastIndexId: true },
+    });
+    for (const row of episodeRows) {
+      if (row.podcastIndexId) {
+        episodePodcastIndexMap.set(row.id, row.podcastIndexId);
+      }
+    }
+  }
+
   // Dispatch push for realtime users
   await Promise.allSettled(
-    items
-      .filter((item) => realtimeUsers.has(item.userId))
-      .map((item) =>
-        sendPushToUser(
-          item.userId,
-          {
-            title: item.title,
-            body: item.body,
-            tag: item.episodeId
-              ? `${item.type}-${item.episodeId}`
-              : item.type,
-            data: {
-              url: item.episodeId
-                ? `/episode/${item.episodeId}`
-                : "/dashboard",
-            },
-          },
-          consolePushLogger
-        )
-      )
+    realtimeItems.map((item) => {
+      const podcastIndexId = item.episodeId != null
+        ? episodePodcastIndexMap.get(item.episodeId)
+        : undefined;
+      const pushUrl = podcastIndexId ? `/episode/${podcastIndexId}` : "/dashboard";
+      return sendPushToUser(
+        item.userId,
+        {
+          title: item.title,
+          body: item.body,
+          tag: item.episodeId
+            ? `${item.type}-${item.episodeId}`
+            : item.type,
+          data: { url: pushUrl },
+        },
+        consolePushLogger
+      );
+    })
   );
 }

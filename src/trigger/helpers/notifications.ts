@@ -6,6 +6,7 @@ import {
   notifications,
   userSubscriptions,
   users,
+  episodes,
   podcasts,
   type NewNotification,
 } from "@/db/schema";
@@ -76,6 +77,18 @@ export async function createNotificationsForSubscribers(
     })
     .map((u) => u.id);
 
+  // Resolve the PodcastIndex episode ID for push URL construction
+  let episodePushUrl = "/dashboard";
+  if (episodeId != null) {
+    const episode = await db.query.episodes.findFirst({
+      where: eq(episodes.id, episodeId),
+      columns: { podcastIndexId: true },
+    });
+    episodePushUrl = episode?.podcastIndexId
+      ? `/episode/${episode.podcastIndexId}`
+      : "/dashboard";
+  }
+
   // Dispatch push for realtime users
   if (realtimeUserIds.length > 0) {
     await Promise.allSettled(
@@ -86,9 +99,7 @@ export async function createNotificationsForSubscribers(
             title,
             body,
             tag: options?.pushTag ?? (episodeId ? `${type}-${episodeId}` : type),
-            data: {
-              url: episodeId ? `/episode/${episodeId}` : "/dashboard",
-            },
+            data: { url: episodePushUrl },
           },
           logger
         )

@@ -13,6 +13,7 @@ interface NotificationItem {
   isRead: boolean;
   createdAt: Date;
   episodeId: number | null;
+  episodePodcastIndexId: string | null;
   episodeTitle: string | null;
   podcastTitle: string | null;
 }
@@ -50,8 +51,8 @@ export function NotificationList({
         // Keep UX responsive even if marking read fails
       }
     }
-    if (notification.episodeId !== null) {
-      router.push(`/episode/${notification.episodeId}`);
+    if (notification.episodePodcastIndexId !== null) {
+      router.push(`/episode/${notification.episodePodcastIndexId}`);
     }
     onItemClick?.();
   };
