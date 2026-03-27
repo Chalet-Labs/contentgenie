@@ -25,7 +25,7 @@ export async function getNotifications(limit = 20, offset = 0) {
         body: notifications.body,
         isRead: notifications.isRead,
         createdAt: notifications.createdAt,
-        episodeId: notifications.episodeId,
+        episodePodcastIndexId: episodes.podcastIndexId,
         episodeTitle: episodes.title,
         podcastTitle: podcasts.title,
       })

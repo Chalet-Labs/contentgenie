@@ -218,7 +218,8 @@ export const summarizeEpisode = task({
             episodeDbId,
             "new_episode",
             podcast?.title ?? episode.title,
-            `New episode: ${episode.title}`
+            `New episode: ${episode.title}`,
+            { podcastIndexEpisodeId: String(episodeId) }
           );
         }
 
@@ -228,7 +229,8 @@ export const summarizeEpisode = task({
           episodeDbId,
           "summary_completed",
           podcast?.title ?? episode.title,
-          `Summary ready: ${episode.title}`
+          `Summary ready: ${episode.title}`,
+          { podcastIndexEpisodeId: String(episodeId) }
         );
       }
     } catch (notifErr) {

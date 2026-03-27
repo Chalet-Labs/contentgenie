@@ -20,6 +20,7 @@ const mockInsert = vi.fn();
 const mockUserSubsFindMany = vi.fn();
 const mockUsersFindMany = vi.fn();
 const mockFindFirst = vi.fn();
+const mockEpisodesFindFirst = vi.fn();
 
 vi.mock("@/db", () => ({
   db: {
@@ -31,6 +32,9 @@ vi.mock("@/db", () => ({
       users: {
         findMany: (...args: unknown[]) => mockUsersFindMany(...args),
         findFirst: (...args: unknown[]) => mockFindFirst(...args),
+      },
+      episodes: {
+        findFirst: (...args: unknown[]) => mockEpisodesFindFirst(...args),
       },
       podcasts: {
         findFirst: (...args: unknown[]) => mockFindFirst(...args),
@@ -47,6 +51,7 @@ vi.mock("@/db/schema", () => ({
     notificationsEnabled: "notificationsEnabled",
   },
   users: { id: "id" },
+  episodes: { id: "id", podcastIndexId: "podcastIndexId" },
   podcasts: { podcastIndexId: "podcastIndexId" },
 }));
 
@@ -58,8 +63,9 @@ vi.mock("drizzle-orm", () => ({
 
 describe("trigger/helpers/notifications", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     mockSendPushToUser.mockResolvedValue({ sent: 1, failed: 0 });
+    mockEpisodesFindFirst.mockResolvedValue(null);
     vi.resetModules();
   });
 
@@ -220,6 +226,106 @@ describe("trigger/helpers/notifications", () => {
         "user-realtime",
         expect.any(Object),
         logger
+      );
+    });
+
+    it("push URL contains PodcastIndex episode ID, not DB PK", async () => {
+      mockUserSubsFindMany.mockResolvedValueOnce([{ userId: "user-realtime" }]);
+      mockUsersFindMany.mockResolvedValueOnce([
+        {
+          id: "user-realtime",
+          preferences: { digestFrequency: "realtime", pushEnabled: true },
+        },
+      ]);
+      mockEpisodesFindFirst.mockResolvedValueOnce({ podcastIndexId: "PI-100" });
+
+      const mockValues = vi.fn().mockResolvedValue(undefined);
+      mockInsert.mockReturnValue({ values: mockValues });
+
+      const { createNotificationsForSubscribers } = await import(
+        "@/trigger/helpers/notifications"
+      );
+      await createNotificationsForSubscribers(
+        1,
+        100,
+        "new_episode",
+        "Test Podcast",
+        "New episode: Test Episode"
+      );
+
+      expect(mockSendPushToUser).toHaveBeenCalledWith(
+        "user-realtime",
+        expect.objectContaining({
+          data: expect.objectContaining({ url: "/episode/PI-100" }),
+        }),
+        expect.anything()
+      );
+    });
+
+    it("push URL falls back to /dashboard when episode lookup returns null", async () => {
+      mockUserSubsFindMany.mockResolvedValueOnce([{ userId: "user-realtime" }]);
+      mockUsersFindMany.mockResolvedValueOnce([
+        {
+          id: "user-realtime",
+          preferences: { digestFrequency: "realtime", pushEnabled: true },
+        },
+      ]);
+      mockEpisodesFindFirst.mockResolvedValueOnce(null);
+
+      const mockValues = vi.fn().mockResolvedValue(undefined);
+      mockInsert.mockReturnValue({ values: mockValues });
+
+      const { createNotificationsForSubscribers } = await import(
+        "@/trigger/helpers/notifications"
+      );
+      await createNotificationsForSubscribers(
+        1,
+        100,
+        "new_episode",
+        "Test Podcast",
+        "New episode: Test Episode"
+      );
+
+      expect(mockSendPushToUser).toHaveBeenCalledWith(
+        "user-realtime",
+        expect.objectContaining({
+          data: expect.objectContaining({ url: "/dashboard" }),
+        }),
+        expect.anything()
+      );
+    });
+
+    it("skips DB lookup when podcastIndexEpisodeId is provided", async () => {
+      mockUserSubsFindMany.mockResolvedValueOnce([{ userId: "user-realtime" }]);
+      mockUsersFindMany.mockResolvedValueOnce([
+        {
+          id: "user-realtime",
+          preferences: { digestFrequency: "realtime", pushEnabled: true },
+        },
+      ]);
+
+      const mockValues = vi.fn().mockResolvedValue(undefined);
+      mockInsert.mockReturnValue({ values: mockValues });
+
+      const { createNotificationsForSubscribers } = await import(
+        "@/trigger/helpers/notifications"
+      );
+      await createNotificationsForSubscribers(
+        1,
+        100,
+        "new_episode",
+        "Test Podcast",
+        "New episode: Test Episode",
+        { podcastIndexEpisodeId: "PI-100" }
+      );
+
+      expect(mockEpisodesFindFirst).not.toHaveBeenCalled();
+      expect(mockSendPushToUser).toHaveBeenCalledWith(
+        "user-realtime",
+        expect.objectContaining({
+          data: expect.objectContaining({ url: "/episode/PI-100" }),
+        }),
+        expect.anything()
       );
     });
 

@@ -24,7 +24,7 @@ vi.mock("@/db/schema", () => ({
     createdAt: "createdAt",
     episodeId: "episodeId",
   },
-  episodes: { id: "id", title: "title", podcastId: "podcastId" },
+  episodes: { id: "id", title: "title", podcastId: "podcastId", podcastIndexId: "podcastIndexId" },
   podcasts: { id: "id", title: "title" },
   users: { id: "id" },
 }));
@@ -184,7 +184,7 @@ describe("notification server actions", () => {
           body: "New episode",
           isRead: false,
           createdAt: new Date(),
-          episodeId: 42,
+          episodePodcastIndexId: "PI-42",
           episodeTitle: "Test Episode",
           podcastTitle: "Test Podcast",
         },
@@ -204,6 +204,7 @@ describe("notification server actions", () => {
 
       expect(result.notifications).toHaveLength(1);
       expect(result.notifications[0].type).toBe("new_episode");
+      expect(result.notifications[0].episodePodcastIndexId).toBe("PI-42");
       expect(result.error).toBeNull();
     });
 

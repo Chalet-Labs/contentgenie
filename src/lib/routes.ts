@@ -8,6 +8,7 @@ export const ROUTES = {
   SUBSCRIPTIONS: "/subscriptions",
   LIBRARY: "/library",
   SETTINGS: "/settings",
+  episode: (podcastIndexId: string) => `/episode/${podcastIndexId}` as const,
 } as const
 
 export type AppRoute = (typeof ROUTES)[keyof typeof ROUTES]

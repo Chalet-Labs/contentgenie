@@ -35,7 +35,8 @@ export const MixedTypes: Story = {
         body: "New episode: What's Next for AI Policy",
         isRead: false,
         createdAt: new Date(now.getTime() - 5 * 60 * 1000),
-        episodeId: 101,
+
+        episodePodcastIndexId: "pi-101",
         episodeTitle: "What's Next for AI Policy",
         podcastTitle: "The Daily",
       },
@@ -46,7 +47,8 @@ export const MixedTypes: Story = {
         body: "Summary ready: Interview with Yann LeCun",
         isRead: false,
         createdAt: new Date(now.getTime() - 2 * 60 * 60 * 1000),
-        episodeId: 102,
+
+        episodePodcastIndexId: "pi-102",
         episodeTitle: "Interview with Yann LeCun",
         podcastTitle: "Lex Fridman Podcast",
       },
@@ -57,7 +59,8 @@ export const MixedTypes: Story = {
         body: "New episode: Sleep Optimization",
         isRead: true,
         createdAt: new Date(now.getTime() - 24 * 60 * 60 * 1000),
-        episodeId: 103,
+
+        episodePodcastIndexId: "pi-103",
         episodeTitle: "Sleep Optimization",
         podcastTitle: "Huberman Lab",
       },
@@ -75,7 +78,8 @@ export const AllRead: Story = {
         body: "Summary ready: Episode 1",
         isRead: true,
         createdAt: new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000),
-        episodeId: 201,
+
+        episodePodcastIndexId: "pi-201",
         episodeTitle: "Episode 1",
         podcastTitle: "Podcast A",
       },
@@ -86,7 +90,8 @@ export const AllRead: Story = {
         body: "Summary ready: Episode 2",
         isRead: true,
         createdAt: new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000),
-        episodeId: 202,
+
+        episodePodcastIndexId: "pi-202",
         episodeTitle: "Episode 2",
         podcastTitle: "Podcast B",
       },

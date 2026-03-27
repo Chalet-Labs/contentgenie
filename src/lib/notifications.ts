@@ -2,10 +2,12 @@ import { db } from "@/db";
 import {
   notifications,
   users,
+  episodes,
   type NewNotification,
 } from "@/db/schema";
 import { eq, inArray } from "drizzle-orm";
 import { sendPushToUser, consolePushLogger } from "@/lib/push";
+import { ROUTES } from "@/lib/routes";
 
 async function getNotificationPrefs(
   userId: string
@@ -51,6 +53,27 @@ export async function createNotification(params: {
 
   const preference = await getNotificationPrefs(params.userId);
   if (preference.pushEnabled && preference.digestFrequency === "realtime") {
+    let pushUrl: string = ROUTES.DASHBOARD;
+    if (params.episodeId != null) {
+      try {
+        const episode = await db.query.episodes.findFirst({
+          where: eq(episodes.id, params.episodeId),
+          columns: { podcastIndexId: true },
+        });
+        if (episode?.podcastIndexId) {
+          pushUrl = ROUTES.episode(episode.podcastIndexId);
+        } else {
+          console.warn("[notifications] Episode not found for push URL, falling back to dashboard", {
+            episodeId: params.episodeId,
+          });
+        }
+      } catch (err) {
+        console.error("[notifications] Failed to resolve episode for push URL", {
+          episodeId: params.episodeId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
     await sendPushToUser(
       params.userId,
       {
@@ -59,9 +82,7 @@ export async function createNotification(params: {
         tag: params.episodeId
           ? `${params.type}-${params.episodeId}`
           : params.type,
-        data: {
-          url: params.episodeId ? `/episode/${params.episodeId}` : "/dashboard",
-        },
+        data: { url: pushUrl },
       },
       consolePushLogger
     );
@@ -112,27 +133,54 @@ export async function createBulkNotifications(
     }
   }
 
+  // Resolve PodcastIndex IDs for episodes that will generate a push (skip digest/disabled users)
+  const realtimeItems = items.filter((item) => realtimeUsers.has(item.userId));
+  const episodeDbIds = Array.from(
+    new Set(realtimeItems.map((i) => i.episodeId).filter((id): id is number => id != null))
+  );
+  const episodePodcastIndexMap = new Map<number, string>();
+  if (episodeDbIds.length > 0) {
+    try {
+      const episodeRows = await db.query.episodes.findMany({
+        where: inArray(episodes.id, episodeDbIds),
+        columns: { id: true, podcastIndexId: true },
+      });
+      for (const row of episodeRows) {
+        episodePodcastIndexMap.set(row.id, row.podcastIndexId);
+      }
+      const missing = episodeDbIds.filter((id) => !episodePodcastIndexMap.has(id));
+      if (missing.length > 0) {
+        console.warn("[notifications] Episodes not found for push URLs, falling back to dashboard", {
+          missingEpisodeIds: missing,
+        });
+      }
+    } catch (err) {
+      console.error("[notifications] Failed to resolve episodes for push URLs", {
+        episodeDbIds,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
   // Dispatch push for realtime users
   await Promise.allSettled(
-    items
-      .filter((item) => realtimeUsers.has(item.userId))
-      .map((item) =>
-        sendPushToUser(
-          item.userId,
-          {
-            title: item.title,
-            body: item.body,
-            tag: item.episodeId
-              ? `${item.type}-${item.episodeId}`
-              : item.type,
-            data: {
-              url: item.episodeId
-                ? `/episode/${item.episodeId}`
-                : "/dashboard",
-            },
-          },
-          consolePushLogger
-        )
-      )
+    realtimeItems.map((item) => {
+      const podcastIndexId = item.episodeId != null
+        ? episodePodcastIndexMap.get(item.episodeId)
+        : undefined;
+      const pushUrl = podcastIndexId ? ROUTES.episode(podcastIndexId) : ROUTES.DASHBOARD;
+      return sendPushToUser(
+        item.userId,
+        {
+          title: item.title,
+          body: item.body,
+          tag: item.episodeId
+            ? `${item.type}-${item.episodeId}`
+            : item.type,
+          data: { url: pushUrl },
+        },
+        consolePushLogger
+      );
+    })
   );
 }
