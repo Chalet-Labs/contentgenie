@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -89,12 +90,12 @@ export function AiProviderCard() {
           <>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">
-                <label className="text-sm font-medium">Provider</label>
+                <Label id="provider-label">Provider</Label>
                 <Select
                   value={provider}
                   onValueChange={(v) => setProvider(v as AiProviderName)}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger aria-labelledby="provider-label">
                     <SelectValue placeholder="Select provider" />
                   </SelectTrigger>
                   <SelectContent>
@@ -104,8 +105,9 @@ export function AiProviderCard() {
                 </Select>
               </div>
               <div className="space-y-1.5">
-                <label className="text-sm font-medium">Model</label>
+                <Label htmlFor="ai-model">Model</Label>
                 <Input
+                  id="ai-model"
                   value={model}
                   onChange={(e) => setModel(e.target.value)}
                   placeholder="e.g. google/gemini-2.0-flash-001"

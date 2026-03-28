@@ -7,6 +7,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 
 // NotificationSettings uses browser APIs (Notification, serviceWorker) and
@@ -36,7 +37,7 @@ export const Default: Story = {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div className="space-y-0.5">
-          <label className="text-sm font-medium">Push Notifications</label>
+          <span className="text-sm font-medium">Push Notifications</span>
           <p className="text-sm text-muted-foreground">
             Get browser notifications when new summaries are available.
           </p>
@@ -48,13 +49,13 @@ export const Default: Story = {
 
       <div className="flex items-center justify-between">
         <div className="space-y-0.5">
-          <label className="text-sm font-medium">Notification Frequency</label>
+          <Label id="digest-frequency-label">Notification Frequency</Label>
           <p className="text-sm text-muted-foreground">
             How often to receive push notification digests.
           </p>
         </div>
         <Select defaultValue="realtime">
-          <SelectTrigger className="w-[140px]">
+          <SelectTrigger className="w-[140px]" aria-labelledby="digest-frequency-label">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -79,7 +80,7 @@ export const Granted: Story = {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div className="space-y-0.5">
-          <label className="text-sm font-medium">Push Notifications</label>
+          <span className="text-sm font-medium">Push Notifications</span>
           <p className="text-sm text-muted-foreground">
             Get browser notifications when new summaries are available.
           </p>
@@ -91,13 +92,13 @@ export const Granted: Story = {
 
       <div className="flex items-center justify-between">
         <div className="space-y-0.5">
-          <label className="text-sm font-medium">Notification Frequency</label>
+          <Label id="digest-frequency-label">Notification Frequency</Label>
           <p className="text-sm text-muted-foreground">
             How often to receive push notification digests.
           </p>
         </div>
         <Select defaultValue="daily">
-          <SelectTrigger className="w-[140px]">
+          <SelectTrigger className="w-[140px]" aria-labelledby="digest-frequency-label">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -122,7 +123,7 @@ export const Denied: Story = {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div className="space-y-0.5">
-          <label className="text-sm font-medium">Push Notifications</label>
+          <span className="text-sm font-medium">Push Notifications</span>
           <p className="text-sm text-muted-foreground">
             Get browser notifications when new summaries are available.
           </p>
@@ -140,13 +141,13 @@ export const Denied: Story = {
 
       <div className="flex items-center justify-between">
         <div className="space-y-0.5">
-          <label className="text-sm font-medium">Notification Frequency</label>
+          <Label id="digest-frequency-label">Notification Frequency</Label>
           <p className="text-sm text-muted-foreground">
             How often to receive push notification digests.
           </p>
         </div>
         <Select defaultValue="realtime">
-          <SelectTrigger className="w-[140px]">
+          <SelectTrigger className="w-[140px]" aria-labelledby="digest-frequency-label">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -171,7 +172,7 @@ export const Unsupported: Story = {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div className="space-y-0.5">
-          <label className="text-sm font-medium">Push Notifications</label>
+          <span className="text-sm font-medium">Push Notifications</span>
           <p className="text-sm text-muted-foreground">
             Get browser notifications when new summaries are available.
           </p>
@@ -188,13 +189,13 @@ export const Unsupported: Story = {
 
       <div className="flex items-center justify-between">
         <div className="space-y-0.5">
-          <label className="text-sm font-medium">Notification Frequency</label>
+          <Label id="digest-frequency-label">Notification Frequency</Label>
           <p className="text-sm text-muted-foreground">
             How often to receive push notification digests.
           </p>
         </div>
         <Select defaultValue="realtime">
-          <SelectTrigger className="w-[140px]">
+          <SelectTrigger className="w-[140px]" aria-labelledby="digest-frequency-label">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -219,7 +220,7 @@ export const Enabling: Story = {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div className="space-y-0.5">
-          <label className="text-sm font-medium">Push Notifications</label>
+          <span className="text-sm font-medium">Push Notifications</span>
           <p className="text-sm text-muted-foreground">
             Get browser notifications when new summaries are available.
           </p>
@@ -233,13 +234,13 @@ export const Enabling: Story = {
 
       <div className="flex items-center justify-between">
         <div className="space-y-0.5">
-          <label className="text-sm font-medium">Notification Frequency</label>
+          <Label id="digest-frequency-label">Notification Frequency</Label>
           <p className="text-sm text-muted-foreground">
             How often to receive push notification digests.
           </p>
         </div>
         <Select defaultValue="realtime">
-          <SelectTrigger className="w-[140px]">
+          <SelectTrigger className="w-[140px]" aria-labelledby="digest-frequency-label">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -264,7 +265,7 @@ export const Loading: Story = {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div className="space-y-0.5">
-          <label className="text-sm font-medium">Push Notifications</label>
+          <span className="text-sm font-medium">Push Notifications</span>
           <p className="text-sm text-muted-foreground">
             Get browser notifications when new summaries are available.
           </p>
@@ -276,7 +277,7 @@ export const Loading: Story = {
 
       <div className="flex items-center justify-between">
         <div className="space-y-0.5">
-          <label className="text-sm font-medium">Notification Frequency</label>
+          <Label id="digest-frequency-label">Notification Frequency</Label>
           <p className="text-sm text-muted-foreground">
             How often to receive push notification digests.
           </p>

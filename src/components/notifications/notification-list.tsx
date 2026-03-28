@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { Bell, FileText, Podcast } from "lucide-react";
 import { markNotificationRead } from "@/app/actions/notifications";
-import { formatRelativeTime } from "@/lib/utils";
+import { formatRelativeTime, cn } from "@/lib/utils";
 import { ROUTES } from "@/lib/routes";
 
 interface NotificationItem {
@@ -65,9 +65,10 @@ export function NotificationList({
         <button
           key={notification.id}
           onClick={() => handleClick(notification)}
-          className={`w-full flex items-start gap-3 p-3 text-left hover:bg-accent/50 transition-colors ${
-            !notification.isRead ? "bg-accent/20" : ""
-          }`}
+          className={cn(
+            "flex w-full items-start gap-3 p-3 text-left hover:bg-accent/50 transition-colors",
+            !notification.isRead && "bg-accent/20"
+          )}
         >
           <NotificationIcon type={notification.type} />
           <div className="flex-1 min-w-0">

@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils"
 import { formatTime } from "@/lib/format-time"
 import { useAudioPlayerState, useAudioPlayerAPI } from "@/contexts/audio-player-context"
 import { useCurrentChapter } from "@/hooks/use-current-chapter"
+import { Button } from "@/components/ui/button"
 
 export function ChapterList() {
   const { chapters } = useAudioPlayerState()
@@ -41,13 +42,14 @@ export function ChapterList() {
         const isActive = currentChapter === chapter
 
         return (
-          <button
+          <Button
             key={`${chapter.startTime}-${index}`}
             ref={isActive ? activeRef : undefined}
             type="button"
+            variant="ghost"
             onClick={() => seek(chapter.startTime)}
             className={cn(
-              "flex w-full items-center gap-3 rounded-md px-2 py-2 text-left transition-colors hover:bg-accent",
+              "flex w-full items-center gap-3 rounded-md px-2 py-2 text-left transition-colors h-auto justify-start [&_svg]:size-auto",
               isActive && "bg-primary/10"
             )}
           >
@@ -71,7 +73,7 @@ export function ChapterList() {
             {isActive && (
               <Volume2 className="h-3.5 w-3.5 shrink-0 text-primary" />
             )}
-          </button>
+          </Button>
         )
       })}
     </div>

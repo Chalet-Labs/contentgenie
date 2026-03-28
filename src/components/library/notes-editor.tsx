@@ -75,10 +75,10 @@ export function NotesEditor({
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <label className="flex items-center gap-2 text-sm font-medium">
+        <span className="flex items-center gap-2 text-sm font-medium">
           <StickyNote className="h-4 w-4" />
           Notes
-        </label>
+        </span>
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           {isSaving && (
             <>
@@ -100,6 +100,7 @@ export function NotesEditor({
         onChange={handleChange}
         placeholder="Add your notes about this episode..."
         className="min-h-[100px] resize-y"
+        aria-label="Episode notes"
       />
     </div>
   );

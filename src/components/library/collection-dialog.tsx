@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Loader2 } from "lucide-react";
 import { createCollection, updateCollection } from "@/app/actions/collections";
 import type { Collection } from "@/db/schema";
@@ -89,9 +90,9 @@ export function CollectionDialog({
           </DialogHeader>
           <div className="grid gap-4 py-4">
             <div className="space-y-2">
-              <label htmlFor="name" className="text-sm font-medium">
+              <Label htmlFor="name">
                 Name
-              </label>
+              </Label>
               <Input
                 id="name"
                 value={name}
@@ -101,13 +102,13 @@ export function CollectionDialog({
               />
             </div>
             <div className="space-y-2">
-              <label htmlFor="description" className="text-sm font-medium">
+              <Label htmlFor="description">
                 Description
                 <span className="text-muted-foreground font-normal">
                   {" "}
                   (optional)
                 </span>
-              </label>
+              </Label>
               <Input
                 id="description"
                 value={description}

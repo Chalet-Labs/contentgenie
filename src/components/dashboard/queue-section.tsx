@@ -8,6 +8,7 @@ import { Loader2, ListMusic, Rss, RefreshCw, GripVertical } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { useAudioPlayerState } from "@/contexts/audio-player-context";
 import { getQueueEpisodeScores } from "@/app/actions/queue-scores";
 import { getScoreColor } from "@/lib/score-utils";
@@ -56,14 +57,12 @@ function deleteMapEntry(
 
 function QueueScoreBadge({ score }: { score: number }) {
   return (
-    <span
-      className={cn(
-        "rounded-full px-2 py-0.5 text-xs font-semibold text-white",
-        getScoreColor(score)
-      )}
+    <Badge
+      variant="score"
+      className={cn("px-2", getScoreColor(score))}
     >
       {score.toFixed(1)}
-    </span>
+    </Badge>
   );
 }
 
@@ -189,9 +188,9 @@ function QueueEpisodeRow({
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           {isNowPlaying && (
-            <span className="shrink-0 rounded-full bg-primary px-2 py-0.5 text-xs font-semibold text-primary-foreground">
+            <Badge className="shrink-0 rounded-full hover:bg-primary">
               Now Playing
-            </span>
+            </Badge>
           )}
           <p className="line-clamp-1 text-sm font-medium">{episode.title}</p>
         </div>

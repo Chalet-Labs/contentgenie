@@ -5,6 +5,7 @@ import { Clock, Trash2, Plus, Loader2, Bookmark } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog,
@@ -191,10 +192,10 @@ export function BookmarksList({
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <label className="flex items-center gap-2 text-sm font-medium">
+        <span className="flex items-center gap-2 text-sm font-medium">
           <Bookmark className="h-4 w-4" />
           Bookmarks
-        </label>
+        </span>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
             <Button variant="outline" size="sm">
@@ -211,13 +212,14 @@ export function BookmarksList({
             </DialogHeader>
             <div className="space-y-4 py-4">
               <div className="space-y-2">
-                <label className="text-sm font-medium">
+                <Label htmlFor="bookmark-timestamp">
                   Timestamp{" "}
                   <span className="text-xs text-muted-foreground">
                     (MM:SS or HH:MM:SS)
                   </span>
-                </label>
+                </Label>
                 <Input
+                  id="bookmark-timestamp"
                   placeholder="12:30"
                   value={newTimestamp}
                   onChange={(e) => {
@@ -227,13 +229,14 @@ export function BookmarksList({
                 />
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">
+                <Label htmlFor="bookmark-note">
                   Note{" "}
                   <span className="text-xs text-muted-foreground">
                     (optional)
                   </span>
-                </label>
+                </Label>
                 <Input
+                  id="bookmark-note"
                   placeholder="Key insight mentioned here..."
                   value={newNote}
                   onChange={(e) => setNewNote(e.target.value)}

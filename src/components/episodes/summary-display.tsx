@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Sparkles,
@@ -260,19 +261,13 @@ export function SummaryDisplay({
               </div>
             </div>
             <div className="mt-4">
-              <div
-                className="h-2 w-full overflow-hidden rounded-full bg-muted"
-                role="progressbar"
-                aria-valuenow={worthItScore}
-                aria-valuemin={0}
-                aria-valuemax={10}
+              <Progress
+                value={worthItScore}
+                max={10}
+                indicatorClassName={getScoreColor(worthItScore)}
+                className="bg-muted"
                 aria-label={`Worth-it score: ${worthItScore.toFixed(1)} out of 10`}
-              >
-                <div
-                  className={`h-full ${getScoreColor(worthItScore)} transition-all`}
-                  style={{ width: `${(worthItScore / 10) * 100}%` }}
-                />
-              </div>
+              />
               <div className="mt-1 flex justify-between text-xs text-muted-foreground">
                 <span>0</span>
                 <span>5</span>
@@ -288,19 +283,13 @@ export function SummaryDisplay({
                       <span className="text-muted-foreground">{DIMENSION_LABELS[key] ?? key}</span>
                       <span className="font-medium">{value.toFixed(1)}</span>
                     </div>
-                    <div
-                      className="h-1.5 w-full overflow-hidden rounded-full bg-muted"
-                      role="progressbar"
-                      aria-valuenow={value}
-                      aria-valuemin={0}
-                      aria-valuemax={10}
+                    <Progress
+                      value={value}
+                      max={10}
+                      indicatorClassName={getScoreColor(value)}
+                      className="h-1.5 bg-muted"
                       aria-label={`${DIMENSION_LABELS[key] ?? key}: ${value.toFixed(1)} out of 10`}
-                    >
-                      <div
-                        className={`h-full ${getScoreColor(value)} transition-all`}
-                        style={{ width: `${(value / 10) * 100}%` }}
-                      />
-                    </div>
+                    />
                   </div>
                 ))}
               </div>
