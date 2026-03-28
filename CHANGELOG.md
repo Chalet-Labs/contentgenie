@@ -31,6 +31,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Summarization step progress UI removes `"fetching-transcript"` and `"transcribing-audio"` steps — summarization no longer fetches transcripts
 
 ### Fixed
+- Fixed admin episodes table links navigating to wrong episode page by using PodcastIndex episode ID instead of internal database PK (#240)
 - Fixed notification click navigating to wrong episode page by using PodcastIndex episode ID instead of internal database PK (#229)
 - Prevent stale summary status and scores on the podcast page: `buildSummaryMaps` now gates "completed" badge and `worthItScore` on `processedAt`, and the episode page invalidates the podcast page's Router Cache when summarization completes (#223)
 - Add required `speech_models` parameter to AssemblyAI API calls to resolve 400 errors from the updated API
