@@ -3,7 +3,7 @@
 import { auth } from "@clerk/nextjs/server"
 import { eq, and, or, ilike } from "drizzle-orm"
 import { db } from "@/db"
-import { episodes, podcasts } from "@/db/schema"
+import { episodes, podcasts, type TranscriptStatus, type SummaryStatus } from "@/db/schema"
 import { ADMIN_ROLE } from "@/lib/auth-roles"
 
 export interface EpisodeSearchResult {
@@ -48,7 +48,13 @@ export async function searchEpisodesWithTranscript(
 }
 
 export type EpisodeStatusResult =
-  | { ok: true; transcriptStatus: string | null; summaryStatus: string | null }
+  | {
+      ok: true
+      transcriptStatus: TranscriptStatus | null
+      summaryStatus: SummaryStatus | null
+      transcriptRunId: string | null
+      summaryRunId: string | null
+    }
   | { ok: false; error: string }
 
 export async function getEpisodeStatus(
@@ -62,7 +68,12 @@ export async function getEpisodeStatus(
   try {
     const row = await db.query.episodes.findFirst({
       where: eq(episodes.id, id),
-      columns: { transcriptStatus: true, summaryStatus: true },
+      columns: {
+        transcriptStatus: true,
+        summaryStatus: true,
+        transcriptRunId: true,
+        summaryRunId: true,
+      },
     })
 
     if (!row) return { ok: false, error: "Episode not found" }
@@ -71,9 +82,57 @@ export async function getEpisodeStatus(
       ok: true,
       transcriptStatus: row.transcriptStatus ?? null,
       summaryStatus: row.summaryStatus ?? null,
+      transcriptRunId: row.transcriptRunId ?? null,
+      summaryRunId: row.summaryRunId ?? null,
     }
   } catch (error) {
     console.error("getEpisodeStatus error:", error)
     return { ok: false, error: "Failed to check status" }
+  }
+}
+
+export type RunReconnectionResult =
+  | { ok: true; runId: string; publicAccessToken: string }
+  | { ok: false; error: string }
+
+export async function getRunReconnectionData(
+  episodeId: number,
+  runType: "transcript" | "summary"
+): Promise<RunReconnectionResult> {
+  const { has } = await auth()
+  if (!has({ role: ADMIN_ROLE })) {
+    return { ok: false, error: "Admin access required" }
+  }
+
+  if (!Number.isInteger(episodeId) || episodeId <= 0) {
+    return { ok: false, error: "Invalid episode ID" }
+  }
+  if (runType !== "transcript" && runType !== "summary") {
+    return { ok: false, error: "Invalid run type" }
+  }
+
+  try {
+    const row = await db.query.episodes.findFirst({
+      where: eq(episodes.id, episodeId),
+      columns: { transcriptRunId: true, summaryRunId: true },
+    })
+
+    if (!row) return { ok: false, error: "Episode not found" }
+
+    const runId = runType === "transcript" ? row.transcriptRunId : row.summaryRunId
+    if (!runId) return { ok: false, error: "No in-flight run" }
+
+    const { auth: triggerAuth } = await import("@trigger.dev/sdk")
+    // Token must outlast client-side staleness timeout (20 min transcript, 10 min summary)
+    const tokenTtl = runType === "transcript" ? "30m" : "15m"
+    const publicAccessToken = await triggerAuth.createPublicToken({
+      scopes: { read: { runs: [runId] } },
+      expirationTime: tokenTtl,
+    })
+
+    return { ok: true, runId, publicAccessToken }
+  } catch (error) {
+    console.error("getRunReconnectionData error:", { episodeId, runType, error })
+    return { ok: false, error: "Failed to get reconnection data" }
   }
 }

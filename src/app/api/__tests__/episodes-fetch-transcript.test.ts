@@ -273,6 +273,26 @@ describe("POST /api/episodes/fetch-transcript", () => {
     expect(data.error).toBe("Invalid JSON body");
   });
 
+  it("stores transcriptRunId in DB after triggering task", async () => {
+    vi.mocked(auth).mockResolvedValue({
+      userId: "admin_1",
+      has: vi.fn().mockReturnValue(true),
+    } as never);
+    mockEpisodeSelect(makeEpisode());
+    const { setMock } = mockUpdateChain();
+
+    const { POST } = await import("@/app/api/episodes/fetch-transcript/route");
+    await POST(makeRequest({ episodeId: 5 }));
+
+    // The second update call stores the run ID
+    const allSetCalls = setMock.mock.calls;
+    const runIdCall = allSetCalls.find((args: unknown[]) =>
+      typeof args[0] === "object" && args[0] !== null && "transcriptRunId" in (args[0] as Record<string, unknown>)
+    );
+    expect(runIdCall).toBeDefined();
+    expect((runIdCall![0] as Record<string, unknown>).transcriptRunId).toBe("run_fetch123");
+  });
+
   it("returns 500 on unexpected error without leaking details", async () => {
     vi.mocked(auth).mockResolvedValue({
       userId: "admin_1",

@@ -10,7 +10,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { FileText, Sparkles, Zap, Loader2 } from "lucide-react"
-import { getEpisodeStatus } from "@/app/actions/admin"
+import { getEpisodeStatus, getRunReconnectionData } from "@/app/actions/admin"
 import { IN_PROGRESS_STATUSES, type SummaryStatus } from "@/db/schema"
 import type { fetchTranscriptTask } from "@/trigger/fetch-transcript"
 import type { summarizeEpisode } from "@/trigger/summarize-episode"
@@ -158,7 +158,8 @@ export function EpisodeActionButtons({ episode }: EpisodeActionButtonsProps) {
   }, [summaryRunId, summaryRun?.status])
 
   // Recovery: if the page was server-rendered while a run was in-flight, we have
-  // no runId/accessToken to subscribe to. Do a one-shot status check to reconcile.
+  // no runId/accessToken to subscribe to. Do a one-shot status check to reconcile,
+  // then attempt to reconnect via useRealtimeRun if run IDs are available.
   useEffect(() => {
     const transcriptInFlight = episode.transcriptStatus === "fetching"
     const summaryInFlight =
@@ -168,8 +169,9 @@ export function EpisodeActionButtons({ episode }: EpisodeActionButtonsProps) {
     if (!transcriptInFlight && !summaryInFlight) return
 
     let cancelled = false
-    getEpisodeStatus(episode.id)
-      .then(result => {
+    ;(async () => {
+      try {
+        const result = await getEpisodeStatus(episode.id)
         if (cancelled) return
         if (!result.ok) {
           if (transcriptInFlight) {
@@ -182,19 +184,58 @@ export function EpisodeActionButtons({ episode }: EpisodeActionButtonsProps) {
           }
           return
         }
-        if (transcriptInFlight && result.transcriptStatus !== "fetching") {
+
+        // Attempt realtime reconnection when a run ID is available
+        if (transcriptInFlight && result.transcriptStatus === "fetching" && result.transcriptRunId) {
+          const reconnect = await getRunReconnectionData(episode.id, "transcript")
+          if (!cancelled) {
+            if (reconnect.ok) {
+              setTranscriptRunId(reconnect.runId)
+              setTranscriptAccessToken(reconnect.publicAccessToken)
+            } else {
+              // Run may have completed between the two calls — re-check
+              const fresh = await getEpisodeStatus(episode.id)
+              if (!cancelled && fresh.ok && fresh.transcriptStatus !== null && fresh.transcriptStatus !== "fetching") {
+                setLocalTranscriptStatus(fresh.transcriptStatus)
+              } else if (!cancelled) {
+                setLocalTranscriptStatus("failed")
+                setTranscriptMsg("Could not reconnect — try again")
+              }
+            }
+          }
+        } else if (transcriptInFlight && result.transcriptStatus !== "fetching") {
+          // Run already completed — reconcile to terminal status from DB
           setLocalTranscriptStatus(result.transcriptStatus)
         }
-        if (
+
+        if (summaryInFlight && result.summaryStatus !== null &&
+            IN_PROGRESS_STATUSES.includes(result.summaryStatus) && result.summaryRunId) {
+          const reconnect = await getRunReconnectionData(episode.id, "summary")
+          if (!cancelled) {
+            if (reconnect.ok) {
+              setSummaryRunId(reconnect.runId)
+              setSummaryAccessToken(reconnect.publicAccessToken)
+            } else {
+              const fresh = await getEpisodeStatus(episode.id)
+              if (!cancelled && fresh.ok && fresh.summaryStatus !== null &&
+                  !IN_PROGRESS_STATUSES.includes(fresh.summaryStatus)) {
+                setLocalSummaryStatus(fresh.summaryStatus)
+              } else if (!cancelled) {
+                setLocalSummaryStatus("failed")
+                setSummaryMsg("Could not reconnect — try again")
+              }
+            }
+          }
+        } else if (
           summaryInFlight &&
           result.summaryStatus !== null &&
-          !IN_PROGRESS_STATUSES.includes(result.summaryStatus as SummaryStatus)
+          !IN_PROGRESS_STATUSES.includes(result.summaryStatus)
         ) {
+          // Run already completed — reconcile to terminal status from DB
           setLocalSummaryStatus(result.summaryStatus)
         }
-      })
-      .catch(() => {
-        // Network/auth failure — transition to failed so the user can retry
+      } catch (err) {
+        console.error("Recovery effect failed:", err)
         if (!cancelled) {
           if (transcriptInFlight) {
             setLocalTranscriptStatus("failed")
@@ -205,7 +246,8 @@ export function EpisodeActionButtons({ episode }: EpisodeActionButtonsProps) {
             setSummaryMsg("Could not verify status — try again")
           }
         }
-      })
+      }
+    })()
 
     return () => {
       cancelled = true

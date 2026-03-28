@@ -198,6 +198,34 @@ export const fetchTranscriptTask = task({
       await persistTranscript(episodeId, transcript, dbSource);
     }
 
+    // Clear run ID unconditionally — run has terminated (success or no-transcript).
+    // persistTranscript also clears it on the success path, but this covers the
+    // no-transcript path where persistTranscript is never called.
+    try {
+      await db.update(episodes)
+        .set({
+          transcriptRunId: null,
+          ...(!transcript && { transcriptStatus: "missing" }),
+          updatedAt: new Date(),
+        })
+        .where(eq(episodes.podcastIndexId, String(episodeId)));
+    } catch (err) {
+      logger.warn("Failed to clear transcriptRunId", { episodeId, error: err instanceof Error ? err.message : String(err) });
+    }
+
     return { transcript, source: dbSource };
+  },
+  onFailure: async ({ payload }) => {
+    logger.error("Transcript fetch task failed permanently", { episodeId: payload.episodeId });
+    try {
+      await db.update(episodes)
+        .set({ transcriptRunId: null, transcriptStatus: "failed", updatedAt: new Date() })
+        .where(eq(episodes.podcastIndexId, String(payload.episodeId)));
+    } catch (error) {
+      logger.error("Failed to update episode status in onFailure", {
+        episodeId: payload.episodeId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
   },
 });

@@ -83,6 +83,7 @@ describe("persistTranscript", () => {
         transcriptStatus: "available",
         transcriptFetchedAt: expect.any(Date),
         transcriptError: null,
+        transcriptRunId: null,
       })
     );
   });

@@ -8,10 +8,12 @@ vi.mock("@trigger.dev/react-hooks", () => ({
 }))
 
 const mockGetEpisodeStatus = vi.fn()
+const mockGetRunReconnectionData = vi.fn()
 const mockFetch = vi.fn()
 
 vi.mock("@/app/actions/admin", () => ({
   getEpisodeStatus: (...args: unknown[]) => mockGetEpisodeStatus(...args),
+  getRunReconnectionData: (...args: unknown[]) => mockGetRunReconnectionData(...args),
 }))
 
 import { EpisodeActionButtons } from "@/components/admin/episodes/episode-action-buttons"
@@ -36,7 +38,10 @@ describe("EpisodeActionButtons", () => {
       ok: true,
       transcriptStatus: "available",
       summaryStatus: "completed",
+      transcriptRunId: null,
+      summaryRunId: null,
     })
+    mockGetRunReconnectionData.mockResolvedValue({ ok: false, error: "No in-flight run" })
   })
 
   afterEach(() => {
@@ -295,6 +300,8 @@ describe("EpisodeActionButtons", () => {
       ok: true,
       transcriptStatus: "available",
       summaryStatus: null,
+      transcriptRunId: null,
+      summaryRunId: null,
     })
     render(
       <EpisodeActionButtons
@@ -312,6 +319,8 @@ describe("EpisodeActionButtons", () => {
       ok: true,
       transcriptStatus: "failed",
       summaryStatus: null,
+      transcriptRunId: null,
+      summaryRunId: null,
     })
     render(
       <EpisodeActionButtons
@@ -662,6 +671,8 @@ describe("EpisodeActionButtons", () => {
       ok: true,
       transcriptStatus: "available",
       summaryStatus: "completed",
+      transcriptRunId: null,
+      summaryRunId: null,
     })
     render(
       <EpisodeActionButtons
@@ -692,6 +703,103 @@ describe("EpisodeActionButtons", () => {
         screen.getByRole("button", { name: /episode not found/i })
       ).toBeInTheDocument()
     })
+  })
+
+  // --- Mount-time reconnection via getRunReconnectionData ---
+
+  it("mount with transcriptStatus 'fetching' + transcriptRunId → calls getRunReconnectionData → activates useRealtimeRun", async () => {
+    mockGetEpisodeStatus.mockResolvedValue({
+      ok: true,
+      transcriptStatus: "fetching",
+      summaryStatus: null,
+      transcriptRunId: "run_reconnect_xyz",
+      summaryRunId: null,
+    })
+    mockGetRunReconnectionData.mockResolvedValue({
+      ok: true,
+      runId: "run_reconnect_xyz",
+      publicAccessToken: "tok_reconnect",
+    })
+    render(
+      <EpisodeActionButtons
+        episode={{ ...baseEpisode, transcriptStatus: "fetching" }}
+      />
+    )
+    await waitFor(() => {
+      expect(mockGetRunReconnectionData).toHaveBeenCalledWith(baseEpisode.id, "transcript")
+      expect(mockUseRealtimeRun).toHaveBeenCalledWith("run_reconnect_xyz", {
+        accessToken: "tok_reconnect",
+        enabled: true,
+      })
+    })
+  })
+
+  it("mount with summaryStatus 'running' + summaryRunId → calls getRunReconnectionData → activates useRealtimeRun", async () => {
+    mockGetEpisodeStatus.mockResolvedValue({
+      ok: true,
+      transcriptStatus: "available",
+      summaryStatus: "running",
+      transcriptRunId: null,
+      summaryRunId: "run_summary_reconnect",
+    })
+    mockGetRunReconnectionData.mockResolvedValue({
+      ok: true,
+      runId: "run_summary_reconnect",
+      publicAccessToken: "tok_summary_reconnect",
+    })
+    render(
+      <EpisodeActionButtons
+        episode={{ ...baseEpisode, summaryStatus: "running" }}
+      />
+    )
+    await waitFor(() => {
+      expect(mockGetRunReconnectionData).toHaveBeenCalledWith(baseEpisode.id, "summary")
+      expect(mockUseRealtimeRun).toHaveBeenCalledWith("run_summary_reconnect", {
+        accessToken: "tok_summary_reconnect",
+        enabled: true,
+      })
+    })
+  })
+
+  it("mount with in-progress status + getRunReconnectionData fails → falls back to failed state", async () => {
+    mockGetEpisodeStatus.mockResolvedValue({
+      ok: true,
+      transcriptStatus: "fetching",
+      summaryStatus: null,
+      transcriptRunId: "run_xyz",
+      summaryRunId: null,
+    })
+    mockGetRunReconnectionData.mockResolvedValue({ ok: false, error: "No in-flight run" })
+    render(
+      <EpisodeActionButtons
+        episode={{ ...baseEpisode, transcriptStatus: "fetching" }}
+      />
+    )
+    await waitFor(() => {
+      expect(mockGetRunReconnectionData).toHaveBeenCalledWith(baseEpisode.id, "transcript")
+      expect(
+        screen.getAllByRole("button", { name: /could not reconnect/i }).length
+      ).toBeGreaterThanOrEqual(1)
+    })
+  })
+
+  it("mount with in-progress status + no run ID in status → does NOT call getRunReconnectionData", async () => {
+    mockGetEpisodeStatus.mockResolvedValue({
+      ok: true,
+      transcriptStatus: "fetching",
+      summaryStatus: null,
+      transcriptRunId: null,
+      summaryRunId: null,
+    })
+    render(
+      <EpisodeActionButtons
+        episode={{ ...baseEpisode, transcriptStatus: "fetching" }}
+      />
+    )
+    await waitFor(() => {
+      expect(mockGetEpisodeStatus).toHaveBeenCalledWith(baseEpisode.id)
+    })
+    expect(mockGetRunReconnectionData).not.toHaveBeenCalled()
   })
 
   // --- Staleness timeout ---

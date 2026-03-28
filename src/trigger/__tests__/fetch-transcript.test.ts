@@ -68,8 +68,9 @@ vi.mock("@/lib/assemblyai", () => ({
 
 import { fetchTranscriptTask } from "@/trigger/fetch-transcript";
 import { submitTranscriptionAsync, getTranscriptionStatus } from "@/lib/assemblyai";
+import { db } from "@/db";
 
-// The task mock returns the raw config object, so `.run` is available at runtime
+// The task mock returns the raw config object, so `.run` and `.onFailure` are available at runtime
 const taskConfig = fetchTranscriptTask as unknown as {
   run: (payload: {
     episodeId: number;
@@ -78,6 +79,7 @@ const taskConfig = fetchTranscriptTask as unknown as {
     transcripts?: Array<{ url: string; type: string }>;
     force?: boolean;
   }) => Promise<{ transcript: string | undefined; source: string | null | undefined }>;
+  onFailure: (params: { payload: { episodeId: number } }) => Promise<void>;
 };
 
 const mockTranscripts = [{ url: "https://example.com/transcript.txt", type: "text/plain" }];
@@ -256,5 +258,79 @@ describe("fetch-transcript task", () => {
     expect(result).toEqual({ transcript: undefined, source: null });
     expect(vi.mocked(submitTranscriptionAsync)).not.toHaveBeenCalled();
     expect(mockCreateToken).not.toHaveBeenCalled();
+  });
+
+  it("clears transcriptRunId after successful transcript fetch", async () => {
+    mockFetchTranscript.mockResolvedValue("PodcastIndex transcript");
+    const mockSet = vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue(undefined) });
+    vi.mocked(db.update).mockReturnValue({ set: mockSet } as never);
+
+    await taskConfig.run({ episodeId: 123, transcripts: mockTranscripts });
+
+    const setCalls = mockSet.mock.calls;
+    const clearCall = setCalls.find(
+      (call: unknown[]) => call[0] && typeof call[0] === "object" && "transcriptRunId" in (call[0] as Record<string, unknown>) && (call[0] as Record<string, unknown>).transcriptRunId === null
+    );
+    expect(clearCall).toBeDefined();
+  });
+
+  it("clears transcriptRunId when no transcript found (all sources fail)", async () => {
+    mockFetchTranscript.mockResolvedValue(undefined);
+    mockExtractTranscriptUrl.mockReturnValue(null);
+    const mockSet = vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue(undefined) });
+    vi.mocked(db.update).mockReturnValue({ set: mockSet } as never);
+
+    await taskConfig.run({ episodeId: 123, transcripts: [] });
+
+    const setCalls = mockSet.mock.calls;
+    const clearCall = setCalls.find(
+      (call: unknown[]) => call[0] && typeof call[0] === "object" && "transcriptRunId" in (call[0] as Record<string, unknown>) && (call[0] as Record<string, unknown>).transcriptRunId === null
+    );
+    expect(clearCall).toBeDefined();
+    // Should also set transcriptStatus to "missing" when no transcript found
+    const clearPayload = clearCall![0] as Record<string, unknown>;
+    expect(clearPayload.transcriptStatus).toBe("missing");
+  });
+
+  it("run-ID clear failure does not fail the task", async () => {
+    mockFetchTranscript.mockResolvedValue(undefined);
+    mockExtractTranscriptUrl.mockReturnValue(null);
+    vi.mocked(db.update).mockReturnValue({
+      set: vi.fn().mockReturnValue({
+        where: vi.fn().mockRejectedValue(new Error("DB unavailable")),
+      }),
+    } as never);
+
+    const result = await taskConfig.run({ episodeId: 123, transcripts: [] });
+    expect(result).toEqual({ transcript: undefined, source: null });
+  });
+});
+
+describe("fetch-transcript onFailure", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("clears transcriptRunId and sets transcriptStatus to failed", async () => {
+    const mockWhere = vi.fn().mockResolvedValue(undefined);
+    const mockSet = vi.fn().mockReturnValue({ where: mockWhere });
+    vi.mocked(db.update).mockReturnValue({ set: mockSet } as never);
+
+    await taskConfig.onFailure({ payload: { episodeId: 456 } });
+
+    expect(db.update).toHaveBeenCalled();
+    expect(mockSet).toHaveBeenCalledWith(
+      expect.objectContaining({ transcriptRunId: null, transcriptStatus: "failed" })
+    );
+  });
+
+  it("does not throw when DB write fails", async () => {
+    vi.mocked(db.update).mockReturnValue({
+      set: vi.fn().mockReturnValue({
+        where: vi.fn().mockRejectedValue(new Error("DB unreachable")),
+      }),
+    } as never);
+
+    await expect(taskConfig.onFailure({ payload: { episodeId: 456 } })).resolves.not.toThrow();
   });
 });

@@ -95,6 +95,7 @@ export const episodes = pgTable(
     }>(),
     processedAt: timestamp("processed_at"),
     summaryRunId: text("summary_run_id"),
+    transcriptRunId: text("transcript_run_id"),
     summaryStatus: text("summary_status").$type<
       "queued" | "running" | "summarizing" | "completed" | "failed"
     >(),

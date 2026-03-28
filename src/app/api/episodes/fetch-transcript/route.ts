@@ -78,12 +78,22 @@ export async function POST(request: NextRequest) {
     }
   );
 
+  // Store the run ID so the UI can reconnect after navigation.
+  try {
+    await db.update(episodes).set({
+      transcriptRunId: handle.id,
+      updatedAt: new Date(),
+    }).where(eq(episodes.id, episodeId));
+  } catch (err) {
+    console.error("Failed to store transcriptRunId:", { episodeId, runId: handle.id, error: err instanceof Error ? err.message : String(err) });
+  }
+
   // Token creation is non-critical — if it fails, the run is still queued.
   let publicAccessToken: string | undefined;
   try {
     publicAccessToken = await auth.createPublicToken({
       scopes: { read: { runs: [handle.id] } },
-      expirationTime: "15m",
+      expirationTime: "30m",
     });
   } catch (tokenError) {
     console.error("Failed to create Trigger.dev public token:", tokenError);
