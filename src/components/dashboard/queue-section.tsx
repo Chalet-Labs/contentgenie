@@ -188,7 +188,7 @@ function QueueEpisodeRow({
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           {isNowPlaying && (
-            <Badge className="shrink-0 rounded-full">
+            <Badge className="shrink-0 rounded-full hover:bg-primary">
               Now Playing
             </Badge>
           )}

@@ -12,7 +12,7 @@ const Progress = React.forwardRef<
   }
 >(({ className, value, max, indicatorClassName, ...props }, ref) => {
   const resolvedMax = max ?? 100
-  const pct = resolvedMax > 0 ? ((value || 0) / resolvedMax) * 100 : 0
+  const pct = Math.min(100, Math.max(0, resolvedMax > 0 ? ((value || 0) / resolvedMax) * 100 : 0))
 
   return (
     <ProgressPrimitive.Root

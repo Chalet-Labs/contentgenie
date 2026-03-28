@@ -7,6 +7,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 
 // NotificationSettings uses browser APIs (Notification, serviceWorker) and
@@ -48,13 +49,13 @@ export const Default: Story = {
 
       <div className="flex items-center justify-between">
         <div className="space-y-0.5">
-          <span className="text-sm font-medium">Notification Frequency</span>
+          <Label id="digest-frequency-label">Notification Frequency</Label>
           <p className="text-sm text-muted-foreground">
             How often to receive push notification digests.
           </p>
         </div>
         <Select defaultValue="realtime">
-          <SelectTrigger className="w-[140px]">
+          <SelectTrigger className="w-[140px]" aria-labelledby="digest-frequency-label">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -91,13 +92,13 @@ export const Granted: Story = {
 
       <div className="flex items-center justify-between">
         <div className="space-y-0.5">
-          <span className="text-sm font-medium">Notification Frequency</span>
+          <Label id="digest-frequency-label">Notification Frequency</Label>
           <p className="text-sm text-muted-foreground">
             How often to receive push notification digests.
           </p>
         </div>
         <Select defaultValue="daily">
-          <SelectTrigger className="w-[140px]">
+          <SelectTrigger className="w-[140px]" aria-labelledby="digest-frequency-label">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -140,13 +141,13 @@ export const Denied: Story = {
 
       <div className="flex items-center justify-between">
         <div className="space-y-0.5">
-          <span className="text-sm font-medium">Notification Frequency</span>
+          <Label id="digest-frequency-label">Notification Frequency</Label>
           <p className="text-sm text-muted-foreground">
             How often to receive push notification digests.
           </p>
         </div>
         <Select defaultValue="realtime">
-          <SelectTrigger className="w-[140px]">
+          <SelectTrigger className="w-[140px]" aria-labelledby="digest-frequency-label">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -188,13 +189,13 @@ export const Unsupported: Story = {
 
       <div className="flex items-center justify-between">
         <div className="space-y-0.5">
-          <span className="text-sm font-medium">Notification Frequency</span>
+          <Label id="digest-frequency-label">Notification Frequency</Label>
           <p className="text-sm text-muted-foreground">
             How often to receive push notification digests.
           </p>
         </div>
         <Select defaultValue="realtime">
-          <SelectTrigger className="w-[140px]">
+          <SelectTrigger className="w-[140px]" aria-labelledby="digest-frequency-label">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -233,13 +234,13 @@ export const Enabling: Story = {
 
       <div className="flex items-center justify-between">
         <div className="space-y-0.5">
-          <span className="text-sm font-medium">Notification Frequency</span>
+          <Label id="digest-frequency-label">Notification Frequency</Label>
           <p className="text-sm text-muted-foreground">
             How often to receive push notification digests.
           </p>
         </div>
         <Select defaultValue="realtime">
-          <SelectTrigger className="w-[140px]">
+          <SelectTrigger className="w-[140px]" aria-labelledby="digest-frequency-label">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -276,7 +277,7 @@ export const Loading: Story = {
 
       <div className="flex items-center justify-between">
         <div className="space-y-0.5">
-          <span className="text-sm font-medium">Notification Frequency</span>
+          <Label id="digest-frequency-label">Notification Frequency</Label>
           <p className="text-sm text-muted-foreground">
             How often to receive push notification digests.
           </p>
