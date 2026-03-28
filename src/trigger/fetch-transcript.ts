@@ -203,7 +203,11 @@ export const fetchTranscriptTask = task({
     // no-transcript path where persistTranscript is never called.
     try {
       await db.update(episodes)
-        .set({ transcriptRunId: null, updatedAt: new Date() })
+        .set({
+          transcriptRunId: null,
+          ...(!transcript && { transcriptStatus: "missing" }),
+          updatedAt: new Date(),
+        })
         .where(eq(episodes.podcastIndexId, String(episodeId)));
     } catch (err) {
       logger.warn("Failed to clear transcriptRunId", { episodeId, error: err instanceof Error ? err.message : String(err) });

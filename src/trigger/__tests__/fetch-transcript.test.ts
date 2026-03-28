@@ -287,6 +287,9 @@ describe("fetch-transcript task", () => {
       (call: unknown[]) => call[0] && typeof call[0] === "object" && "transcriptRunId" in (call[0] as Record<string, unknown>) && (call[0] as Record<string, unknown>).transcriptRunId === null
     );
     expect(clearCall).toBeDefined();
+    // Should also set transcriptStatus to "missing" when no transcript found
+    const clearPayload = clearCall![0] as Record<string, unknown>;
+    expect(clearPayload.transcriptStatus).toBe("missing");
   });
 
   it("run-ID clear failure does not fail the task", async () => {
