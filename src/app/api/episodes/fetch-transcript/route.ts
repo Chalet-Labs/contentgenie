@@ -93,7 +93,7 @@ export async function POST(request: NextRequest) {
   try {
     publicAccessToken = await auth.createPublicToken({
       scopes: { read: { runs: [handle.id] } },
-      expirationTime: "15m",
+      expirationTime: "30m",
     });
   } catch (tokenError) {
     console.error("Failed to create Trigger.dev public token:", tokenError);

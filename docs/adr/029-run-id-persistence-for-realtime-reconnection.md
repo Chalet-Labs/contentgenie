@@ -9,7 +9,7 @@
 The `EpisodeActionButtons` component (admin episodes table) and the episode page (`/episode/[id]`) both use `useRealtimeRun` to subscribe to in-flight Trigger.dev runs. When the user navigates away and returns while a run is still in progress, the component has no `runId` or `accessToken` to reattach the realtime subscription.
 
 **Current mitigation:** A mount-time recovery effect calls `getEpisodeStatus()` to check whether the status is still in-progress. If it is, the UI shows a spinner but cannot subscribe to realtime updates — the user sees a stuck loading state until either:
-1. The staleness timeout fires (20min transcript, 10min summary), or
+1. The staleness timeout fires (20 min transcript, 10 min summary), or
 2. The user manually refreshes after the run completes.
 
 **Root cause:** The `summaryRunId` column already exists on the `episodes` table and is used by the summary flow for exactly this reconnection pattern (see `summarize/route.ts` GET handler, lines 203-224). However, no equivalent `transcriptRunId` column exists, and neither the `fetch-transcript` API route nor the `getEpisodeStatus` server action return run IDs for reconnection.

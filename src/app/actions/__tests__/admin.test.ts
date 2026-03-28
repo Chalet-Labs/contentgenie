@@ -184,6 +184,11 @@ describe("getRunReconnectionData", () => {
     expect(result).toEqual({ ok: false, error: "Invalid episode ID" })
   })
 
+  it("returns error for invalid run type", async () => {
+    const result = await getRunReconnectionData(1, "invalid" as "transcript")
+    expect(result).toEqual({ ok: false, error: "Invalid run type" })
+  })
+
   it("returns runId and publicAccessToken for in-progress transcript run", async () => {
     mockEpisodesFindFirst.mockResolvedValue({
       transcriptRunId: "run_transcript_xyz",
@@ -194,7 +199,7 @@ describe("getRunReconnectionData", () => {
     expect(mockCreatePublicToken).toHaveBeenCalledWith(
       expect.objectContaining({
         scopes: { read: { runs: ["run_transcript_xyz"] } },
-        expirationTime: "15m",
+        expirationTime: "30m",
       })
     )
   })

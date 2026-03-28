@@ -107,6 +107,9 @@ export async function getRunReconnectionData(
   if (!Number.isInteger(episodeId) || episodeId <= 0) {
     return { ok: false, error: "Invalid episode ID" }
   }
+  if (runType !== "transcript" && runType !== "summary") {
+    return { ok: false, error: "Invalid run type" }
+  }
 
   try {
     const row = await db.query.episodes.findFirst({
@@ -120,9 +123,11 @@ export async function getRunReconnectionData(
     if (!runId) return { ok: false, error: "No in-flight run" }
 
     const { auth: triggerAuth } = await import("@trigger.dev/sdk")
+    // Token must outlast client-side staleness timeout (20 min transcript, 10 min summary)
+    const tokenTtl = runType === "transcript" ? "30m" : "15m"
     const publicAccessToken = await triggerAuth.createPublicToken({
       scopes: { read: { runs: [runId] } },
-      expirationTime: "15m",
+      expirationTime: tokenTtl,
     })
 
     return { ok: true, runId, publicAccessToken }

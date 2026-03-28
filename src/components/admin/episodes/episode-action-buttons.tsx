@@ -194,7 +194,7 @@ export function EpisodeActionButtons({ episode }: EpisodeActionButtonsProps) {
             } else {
               // Run may have completed between the two calls — re-check
               const fresh = await getEpisodeStatus(episode.id)
-              if (!cancelled && fresh.ok && fresh.transcriptStatus !== "fetching") {
+              if (!cancelled && fresh.ok && fresh.transcriptStatus !== null && fresh.transcriptStatus !== "fetching") {
                 setLocalTranscriptStatus(fresh.transcriptStatus)
               } else if (!cancelled) {
                 setLocalTranscriptStatus("failed")
