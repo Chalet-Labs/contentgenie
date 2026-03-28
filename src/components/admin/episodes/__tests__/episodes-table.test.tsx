@@ -54,9 +54,9 @@ describe("EpisodesTable", () => {
   })
 
   it("links episode title to /episode/<podcastIndexId>", () => {
-    const episodes = [makeEpisode(1)]
-    render(<EpisodesTable episodes={episodes} totalCount={1} currentPage={1} />)
-    const link = screen.getByRole("link", { name: "Episode 1" })
-    expect(link).toHaveAttribute("href", "/episode/idx_1")
+    const ep = makeEpisode(1)
+    render(<EpisodesTable episodes={[ep]} totalCount={1} currentPage={1} />)
+    const link = screen.getByRole("link", { name: ep.title })
+    expect(link).toHaveAttribute("href", `/episode/${ep.podcastIndexId}`)
   })
 })
