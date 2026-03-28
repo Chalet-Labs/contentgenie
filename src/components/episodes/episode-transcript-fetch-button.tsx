@@ -11,11 +11,12 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { getEpisodeStatus } from "@/app/actions/admin"
+import type { TranscriptStatus } from "@/db/schema"
 
 interface EpisodeTranscriptFetchButtonProps {
   episodeDbId: number
   podcastIndexId: string
-  transcriptStatus: string | null
+  transcriptStatus: TranscriptStatus | null
   onTranscriptReady: () => void
 }
 
@@ -43,8 +44,7 @@ export function EpisodeTranscriptFetchButton({
     }
   }, [])
 
-  // Returns null when transcript is available (nothing to fetch) or null (never
-  // processed — handled by the existing "Generate Summary" button in the page)
+  // Null = never processed; existing "Generate Summary" button handles that case
   if (transcriptStatus === "available" || transcriptStatus === null) {
     return null
   }

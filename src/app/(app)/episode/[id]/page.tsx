@@ -44,7 +44,7 @@ import { isEpisodeSaved, revalidatePodcastPage } from "@/app/actions/library";
 import { useOnlineStatus } from "@/hooks/use-online-status";
 import { OfflineBanner } from "@/components/ui/offline-banner";
 import { cacheEpisode, getCachedEpisode } from "@/lib/offline-cache";
-import { IN_PROGRESS_STATUSES } from "@/db/schema";
+import { IN_PROGRESS_STATUSES, type TranscriptStatus } from "@/db/schema";
 import { ADMIN_ROLE } from "@/lib/auth-roles";
 import type { summarizeEpisode } from "@/trigger/summarize-episode";
 
@@ -141,7 +141,7 @@ export default function EpisodePage({ params }: EpisodePageProps) {
   const [runId, setRunId] = useState<string | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [transcriptSource, setTranscriptSource] = useState<string | null>(null);
-  const [transcriptStatus, setTranscriptStatus] = useState<string | null>(null);
+  const [transcriptStatus, setTranscriptStatus] = useState<TranscriptStatus | null>(null);
   const [episodeDbId, setEpisodeDbId] = useState<number | null>(null);
 
   const isAdmin = isLoaded && has?.({ role: ADMIN_ROLE });
@@ -210,7 +210,7 @@ export default function EpisodePage({ params }: EpisodePageProps) {
       setEpisode(data.episode);
       setPodcast(data.podcast);
       setTranscriptSource(data.transcriptSource ?? null);
-      setTranscriptStatus(data.transcriptStatus ?? null);
+      setTranscriptStatus((data.transcriptStatus as TranscriptStatus) ?? null);
       setEpisodeDbId(data.episodeDbId ?? null);
 
       // Cache episode data for offline use
@@ -578,7 +578,8 @@ export default function EpisodePage({ params }: EpisodePageProps) {
               </div>
             )}
             {episode.season > 0 && <span>Season {episode.season}</span>}
-            {(!isAdmin || !episodeDbId || transcriptSource) && (
+            {/* Admins with a DB-tracked episode and no transcript see the fetch button instead */}
+            {!(isAdmin && episodeDbId && !transcriptSource) && (
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>

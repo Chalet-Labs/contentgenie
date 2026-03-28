@@ -19,11 +19,12 @@ vi.mock("sonner", () => ({
 
 import { toast } from "sonner"
 import { EpisodeTranscriptFetchButton } from "@/components/episodes/episode-transcript-fetch-button"
+import type { TranscriptStatus } from "@/db/schema"
 
 const baseProps = {
   episodeDbId: 42,
   podcastIndexId: "123",
-  transcriptStatus: "missing" as string | null,
+  transcriptStatus: "missing" as TranscriptStatus | null,
   onTranscriptReady: vi.fn(),
 }
 
