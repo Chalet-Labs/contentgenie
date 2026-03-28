@@ -408,6 +408,37 @@ describe("EpisodeActionButtons", () => {
     ).not.toBeInTheDocument()
   })
 
+  // --- NULL transcriptStatus (the primary bug scenario for #239) ---
+
+  it("NULL transcriptStatus behaves like 'missing': Fetch Transcript enabled", () => {
+    render(
+      <EpisodeActionButtons
+        episode={{ ...baseEpisode, transcriptStatus: null }}
+      />
+    )
+    expect(screen.getByRole("button", { name: /fetch transcript/i })).not.toBeDisabled()
+  })
+
+  it("NULL transcriptStatus behaves like 'missing': Fetch & Summarize visible", () => {
+    render(
+      <EpisodeActionButtons
+        episode={{ ...baseEpisode, transcriptStatus: null }}
+      />
+    )
+    expect(
+      screen.getByRole("button", { name: /fetch & summarize/i })
+    ).toBeInTheDocument()
+  })
+
+  it("NULL transcriptStatus behaves like 'missing': Summarize disabled with 'Transcript required'", () => {
+    render(
+      <EpisodeActionButtons
+        episode={{ ...baseEpisode, transcriptStatus: null }}
+      />
+    )
+    expect(screen.getByRole("button", { name: /transcript required/i })).toBeDisabled()
+  })
+
   // --- Combined action: fetch-and-summarize chain ---
 
   it("combined action calls /api/episodes/fetch-transcript", async () => {

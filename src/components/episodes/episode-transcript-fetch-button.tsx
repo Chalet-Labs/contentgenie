@@ -48,6 +48,7 @@ export function EpisodeTranscriptFetchButton({
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // null = unprocessed episode; show fetch button so admins can trigger a transcript fetch
   if (transcriptStatus === "available") {
     return null
   }

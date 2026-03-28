@@ -2,10 +2,11 @@
 --
 -- Background: Episodes created before the transcript tracking system have
 -- transcript_status = NULL. This script normalizes them:
---   - 47 rows with transcript text  → transcript_status = 'available',
---                                      transcript_source = 'podcastindex'
---   - 156 rows without transcript   → transcript_status = 'missing',
---                                      clear low-quality description-only summaries
+--   - ~47 rows with transcript text  → transcript_status = 'available',
+--                                       transcript_source = 'podcastindex'
+--   - ~156 rows without transcript   → transcript_status = 'missing',
+--                                       clear low-quality description-only summaries
+--   (counts as of 2026-03-28 dev DB; verify with DRY-RUN SELECT below)
 --
 -- Usage:
 --   doppler run --config prd -- psql $DATABASE_URL -f scripts/backfill-transcript-status.sql
@@ -48,7 +49,8 @@ WHERE transcript_status IS NULL;
 BEGIN;
 
 -- 1. Episodes that have transcript text but no status
---    → mark available, infer source as podcastindex (only source before AssemblyAI)
+--    → mark available, infer source as podcastindex (most common pre-existing source;
+--      description-url also possible but no reliable way to distinguish)
 UPDATE episodes
 SET
   transcript_status = 'available',
@@ -74,7 +76,7 @@ WHERE transcript_status IS NULL
   AND (transcript IS NULL OR transcript = '');
 
 -- ============================================================
--- Post-migration verification: should both return 0
+-- Post-migration verification: should return 0
 -- ============================================================
 
 DO $$

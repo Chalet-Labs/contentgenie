@@ -84,7 +84,7 @@ describe("EpisodeTranscriptFetchButton", () => {
     expect(mockGetEpisodeStatus).toHaveBeenCalledWith(baseProps.episodeDbId)
   })
 
-  // --- Test case 3: available → null ---
+  // --- Test case 3: available → renders nothing ---
 
   it("renders nothing when transcriptStatus is 'available'", () => {
     const { container } = render(
