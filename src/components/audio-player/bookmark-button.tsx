@@ -187,7 +187,10 @@ export function BookmarkButton() {
             <Input
               placeholder="Key insight mentioned here..."
               value={noteText}
-              onChange={(e) => setNoteText(e.target.value)}
+              onChange={(e) => {
+                setNoteText(e.target.value)
+                startDismissTimer()
+              }}
               onKeyDown={handleNoteKeyDown}
               maxLength={MAX_NOTE_LENGTH}
               autoFocus

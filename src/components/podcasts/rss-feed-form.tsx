@@ -19,7 +19,12 @@ import { addPodcastByRssUrl } from "@/app/actions/subscriptions";
 import { useSidebarCountsOptional } from "@/contexts/sidebar-counts-context";
 
 const rssFeedSchema = z.object({
-  url: z.url("Please enter a valid URL starting with http:// or https://"),
+  url: z
+    .url("Please enter a valid URL")
+    .refine(
+      (val) => /^https?:\/\//i.test(val),
+      "Please enter a valid URL starting with http:// or https://"
+    ),
 });
 type RssFeedValues = z.infer<typeof rssFeedSchema>;
 
@@ -31,6 +36,7 @@ export function RssFeedForm({ className }: RssFeedFormProps) {
   const form = useForm<RssFeedValues>({
     resolver: zodResolver(rssFeedSchema),
     defaultValues: { url: "" },
+    mode: "onChange",
   });
   const router = useRouter();
   const { refreshCounts } = useSidebarCountsOptional();
@@ -80,7 +86,7 @@ export function RssFeedForm({ className }: RssFeedFormProps) {
           <Button
             type="submit"
             variant="outline"
-            disabled={form.formState.isSubmitting || !form.watch("url").trim()}
+            disabled={form.formState.isSubmitting || !form.formState.isValid}
           >
             {form.formState.isSubmitting ? (
               <>

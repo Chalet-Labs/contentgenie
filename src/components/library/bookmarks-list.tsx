@@ -85,8 +85,24 @@ function parseTimestamp(input: string): number | null {
 const bookmarkSchema = z.object({
   timestamp: z
     .string()
+    .trim()
     .min(1, "Timestamp is required")
-    .refine((val) => parseTimestamp(val) !== null, "Invalid format. Use MM:SS or HH:MM:SS"),
+    .refine((val) => {
+      const parts = val.split(":");
+      if (parts.some((part) => !/^\d+$/.test(part))) return false;
+      if (parts.length === 2) {
+        return parts[1].length === 2 && Number(parts[1]) < 60;
+      }
+      if (parts.length === 3) {
+        return (
+          parts[1].length === 2 &&
+          parts[2].length === 2 &&
+          Number(parts[1]) < 60 &&
+          Number(parts[2]) < 60
+        );
+      }
+      return false;
+    }, "Invalid format. Use MM:SS or HH:MM:SS"),
   note: z.string().max(500).optional(),
 });
 type BookmarkValues = z.infer<typeof bookmarkSchema>;
@@ -209,12 +225,6 @@ export function BookmarksList({
     );
   }
 
-  if (error) {
-    return (
-      <p className="text-sm text-destructive">{error}</p>
-    );
-  }
-
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
@@ -222,7 +232,10 @@ export function BookmarksList({
           <Bookmark className="h-4 w-4" />
           Bookmarks
         </span>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <Dialog open={isDialogOpen} onOpenChange={(nextOpen) => {
+            if (form.formState.isSubmitting) return;
+            setIsDialogOpen(nextOpen);
+          }}>
           <DialogTrigger asChild>
             <Button variant="outline" size="sm">
               <Plus className="mr-1 h-3 w-3" />
@@ -305,7 +318,9 @@ export function BookmarksList({
         </Dialog>
       </div>
 
-      {bookmarks.length === 0 ? (
+      {error ? (
+        <p className="text-sm text-destructive">{error}</p>
+      ) : bookmarks.length === 0 ? (
         <div className="rounded-lg border border-dashed p-4 text-center">
           <p className="text-sm text-muted-foreground">
             No bookmarks yet. Add timestamps to mark important moments.

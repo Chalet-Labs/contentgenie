@@ -37,7 +37,7 @@ import { ADMIN_ROLE } from "@/lib/auth-roles";
 
 const aiProviderSchema = z.object({
   provider: z.enum(["openrouter", "zai"] as [AiProviderName, ...AiProviderName[]]),
-  model: z.string().min(1, "Model is required"),
+  model: z.string().trim().min(1, "Model is required"),
 });
 type AiProviderValues = z.infer<typeof aiProviderSchema>;
 

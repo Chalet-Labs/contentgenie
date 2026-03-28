@@ -28,7 +28,7 @@ import { createCollection, updateCollection } from "@/app/actions/collections";
 import type { Collection } from "@/db/schema";
 
 const collectionSchema = z.object({
-  name: z.string().min(1, "Collection name is required").max(255),
+  name: z.string().trim().min(1, "Collection name is required").max(255),
   description: z.string().max(500).optional(),
 });
 type CollectionValues = z.infer<typeof collectionSchema>;
@@ -82,7 +82,10 @@ export function CollectionDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={(nextOpen) => {
+        if (form.formState.isSubmitting) return;
+        onOpenChange(nextOpen);
+      }}>
       <DialogContent className="sm:max-w-[425px]">
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)}>
