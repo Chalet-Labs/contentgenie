@@ -262,8 +262,10 @@ export function SummaryDisplay({
             </div>
             <div className="mt-4">
               <Progress
-                value={(worthItScore / 10) * 100}
+                value={worthItScore}
+                max={10}
                 indicatorClassName={getScoreColor(worthItScore)}
+                className="bg-muted"
                 aria-label={`Worth-it score: ${worthItScore.toFixed(1)} out of 10`}
               />
               <div className="mt-1 flex justify-between text-xs text-muted-foreground">
@@ -282,9 +284,10 @@ export function SummaryDisplay({
                       <span className="font-medium">{value.toFixed(1)}</span>
                     </div>
                     <Progress
-                      value={(value / 10) * 100}
+                      value={value}
+                      max={10}
                       indicatorClassName={getScoreColor(value)}
-                      className="h-1.5"
+                      className="h-1.5 bg-muted"
                       aria-label={`${DIMENSION_LABELS[key] ?? key}: ${value.toFixed(1)} out of 10`}
                     />
                   </div>

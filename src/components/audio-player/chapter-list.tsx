@@ -45,10 +45,11 @@ export function ChapterList() {
           <Button
             key={`${chapter.startTime}-${index}`}
             ref={isActive ? activeRef : undefined}
+            type="button"
             variant="ghost"
             onClick={() => seek(chapter.startTime)}
             className={cn(
-              "flex w-full items-center gap-3 rounded-md px-2 py-2 text-left transition-colors h-auto justify-start",
+              "flex w-full items-center gap-3 rounded-md px-2 py-2 text-left transition-colors h-auto justify-start [&_svg]:size-auto",
               isActive && "bg-primary/10"
             )}
           >

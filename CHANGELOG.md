@@ -15,7 +15,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Admin link in sidebar (visible to `org:admin` users only)
 
 ### Changed
-- Replaced raw `<label>`, `<button>`, and `<span>` score elements with shadcn/ui primitives (`Label`, `Button`, `Badge`, `Progress`) across 11 component and settings files for consistent accessibility and styling; extended `Progress` with an optional `indicatorClassName` prop for dynamic color overrides (#233)
+- Replaced raw HTML elements with shadcn/ui primitives across 11 component and settings files: `<label>` → `Label` (with `htmlFor`/`aria-labelledby` for form controls) or `<span>` (for non-form headings), `<button>` → `Button`, `<span>` score pills → `Badge`, and custom progress bars → `Progress`; extended `Progress` with `indicatorClassName` and `max` props (#233)
 - Admin features (AI provider card, bulk re-summarize, missing transcripts) moved from `/settings` page to dedicated `/admin` panel; regular users no longer see or have access to these features
 - `generateEpisodeSummary` now accepts an optional `customPrompt` parameter; when provided, `interpolatePrompt` is used instead of the default `getSummarizationPrompt`
 - `summarize-episode` Trigger.dev task reads `summarizationPrompt` from `getActiveAiConfig()` and passes it to `generateEpisodeSummary` at execution time

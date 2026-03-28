@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -215,14 +216,14 @@ export function NotificationSettings() {
       {/* Digest Frequency */}
       <div className="flex items-center justify-between">
         <div className="space-y-0.5">
-          <span className="text-sm font-medium">Notification Frequency</span>
+          <Label id="digest-frequency-label">Notification Frequency</Label>
           <p className="text-sm text-muted-foreground">
             How often to receive push notification digests.
           </p>
         </div>
         {isLoaded ? (
           <Select value={digestFrequency} onValueChange={handleDigestChange}>
-            <SelectTrigger className="w-[140px]">
+            <SelectTrigger className="w-[140px]" aria-labelledby="digest-frequency-label">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

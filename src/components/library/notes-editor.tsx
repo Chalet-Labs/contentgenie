@@ -100,6 +100,7 @@ export function NotesEditor({
         onChange={handleChange}
         placeholder="Add your notes about this episode..."
         className="min-h-[100px] resize-y"
+        aria-label="Episode notes"
       />
     </div>
   );

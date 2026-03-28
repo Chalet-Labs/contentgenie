@@ -5,6 +5,7 @@ import { useTheme } from "next-themes"
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import {
   Select,
@@ -112,14 +113,14 @@ export default function SettingsPage() {
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
-              <span className="text-sm font-medium">Theme</span>
+              <Label id="theme-label">Theme</Label>
               <p className="text-sm text-muted-foreground">
                 Select your preferred color scheme.
               </p>
             </div>
             {mounted ? (
               <Select value={theme} onValueChange={handleThemeChange}>
-                <SelectTrigger className="w-[160px]">
+                <SelectTrigger className="w-[160px]" aria-labelledby="theme-label">
                   <SelectValue placeholder="Select theme" />
                 </SelectTrigger>
                 <SelectContent>
