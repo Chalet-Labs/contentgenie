@@ -7,6 +7,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- shadcn Form component with react-hook-form + Zod validation (#234)
+- Migrated collection-dialog, bookmarks-list, ai-provider-card, rss-feed-form to structured form handling
+- bookmark-button note popover uses native form submit
 - Admin-only "Fetch & Summarize" button on the episode detail page when transcript is missing or failed (#232)
 - Dedicated `/admin` panel with three sub-routes: Overview (aggregated stats dashboard with transcript coverage, summary coverage, queue depth, active fetches, failure trend, and recent failures), Settings (AI provider config + prompt template editor), and Episodes (filterable global table with pagination, row actions, and batch re-summarization) (#224)
 - Prompt template editor: admins can write a custom summarization prompt with `{{transcript}}` and other placeholders, test it live against any real episode via streaming AI response (dry-run with full production fidelity), and persist it to the `aiConfig` table; `summarizationPrompt` nullable column added to `ai_config` table

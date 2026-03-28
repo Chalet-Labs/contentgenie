@@ -144,13 +144,8 @@ export function BookmarkButton() {
     })
   }
 
-  const handleNoteKeyDown = (e: React.KeyboardEvent) => {
-    // Reset auto-dismiss timer on keystrokes
+  const handleNoteKeyDown = () => {
     startDismissTimer()
-    if (e.key === "Enter") {
-      e.preventDefault()
-      handleNoteSubmit()
-    }
   }
 
   // Hide button while resolving or if episode not in library
@@ -186,26 +181,28 @@ export function BookmarkButton() {
         className="w-64 p-3"
         onOpenAutoFocus={(e) => e.preventDefault()}
       >
-        <div className="space-y-2">
-          <p className="text-xs text-muted-foreground">Add a note (optional)</p>
-          <Input
-            placeholder="Key insight mentioned here..."
-            value={noteText}
-            onChange={(e) => setNoteText(e.target.value)}
-            onKeyDown={handleNoteKeyDown}
-            maxLength={MAX_NOTE_LENGTH}
-            autoFocus
-          />
-          <div className="flex justify-end">
-            <Button
-              size="sm"
-              onClick={handleNoteSubmit}
-              disabled={isPending || !noteText.trim()}
-            >
-              Save note
-            </Button>
+        <form onSubmit={(e) => { e.preventDefault(); handleNoteSubmit(); }}>
+          <div className="space-y-2">
+            <p className="text-xs text-muted-foreground">Add a note (optional)</p>
+            <Input
+              placeholder="Key insight mentioned here..."
+              value={noteText}
+              onChange={(e) => setNoteText(e.target.value)}
+              onKeyDown={handleNoteKeyDown}
+              maxLength={MAX_NOTE_LENGTH}
+              autoFocus
+            />
+            <div className="flex justify-end">
+              <Button
+                type="submit"
+                size="sm"
+                disabled={isPending || !noteText.trim()}
+              >
+                Save note
+              </Button>
+            </div>
           </div>
-        </div>
+        </form>
       </PopoverContent>
     </Popover>
   )
