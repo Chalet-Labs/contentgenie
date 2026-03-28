@@ -157,10 +157,11 @@ export function BookmarksList({
       return;
     }
 
+    const note = values.note?.trim();
     const result = await addBookmark(
       libraryEntryId,
       timestamp,
-      values.note || undefined,
+      note || undefined,
     );
 
     if (result.success) {
@@ -301,6 +302,7 @@ export function BookmarksList({
                   <Button
                     type="button"
                     variant="outline"
+                    disabled={form.formState.isSubmitting}
                     onClick={() => setIsDialogOpen(false)}
                   >
                     Cancel

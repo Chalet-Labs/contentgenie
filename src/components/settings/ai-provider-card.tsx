@@ -44,6 +44,7 @@ type AiProviderValues = z.infer<typeof aiProviderSchema>;
 export function AiProviderCard() {
   const { has, isLoaded } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   const form = useForm<AiProviderValues>({
     resolver: zodResolver(aiProviderSchema),
@@ -59,8 +60,10 @@ export function AiProviderCard() {
         const { config, error } = await getAiConfig();
         if (error) {
           toast.error(error);
+          setLoadError(error);
           return;
         }
+        setLoadError(null);
         reset({ provider: config.provider, model: config.model });
       } finally {
         setIsLoading(false);
@@ -102,6 +105,8 @@ export function AiProviderCard() {
             <Loader2 className="h-4 w-4 animate-spin" />
             Loading configuration...
           </div>
+        ) : loadError ? (
+          <p className="text-sm text-destructive">{loadError}</p>
         ) : (
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)}>
