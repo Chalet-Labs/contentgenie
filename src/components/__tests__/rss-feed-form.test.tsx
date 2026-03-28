@@ -66,7 +66,7 @@ describe("RssFeedForm", () => {
     expect(screen.getByRole("button", { name: "Add Feed" })).toBeEnabled();
   });
 
-  it("shows toast error for invalid URL on submit", async () => {
+  it("shows inline validation error for invalid URL on submit", async () => {
     const user = userEvent.setup();
     render(<RssFeedForm />);
 
@@ -76,9 +76,7 @@ describe("RssFeedForm", () => {
     );
     await user.click(screen.getByRole("button", { name: "Add Feed" }));
 
-    expect(mockToastError).toHaveBeenCalledWith(
-      expect.stringMatching(/valid URL/i),
-    );
+    expect(await screen.findByText(/valid URL/i)).toBeInTheDocument();
     expect(mockAddPodcastByRssUrl).not.toHaveBeenCalled();
   });
 

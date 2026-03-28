@@ -2,7 +2,7 @@ import { z } from "zod";
 
 const trimmedNonEmpty = z.string().trim().min(1).max(500);
 const optionalUrl = z
-  .union([z.string().url().max(2048), z.literal("")])
+  .union([z.url().max(2048), z.literal("")])
   .optional()
   .transform((val) => (val === "" ? undefined : val));
 const optionalText = z.string().max(5000).optional();

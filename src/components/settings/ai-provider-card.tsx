@@ -1,6 +1,9 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { useAuth } from "@clerk/nextjs";
 import {
   Card,
@@ -11,7 +14,6 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -19,18 +21,36 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { Bot, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { getAiConfig, updateAiConfig } from "@/app/actions/ai-config";
 import type { AiProviderName } from "@/lib/ai";
 import { ADMIN_ROLE } from "@/lib/auth-roles";
 
+const aiProviderSchema = z.object({
+  provider: z.enum(["openrouter", "zai"] as [AiProviderName, ...AiProviderName[]]),
+  model: z.string().trim().min(1, "Model is required"),
+});
+type AiProviderValues = z.infer<typeof aiProviderSchema>;
+
 export function AiProviderCard() {
   const { has, isLoaded } = useAuth();
-  const [provider, setProvider] = useState<AiProviderName>("openrouter");
-  const [model, setModel] = useState("");
-  const [isSaving, setIsSaving] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  const form = useForm<AiProviderValues>({
+    resolver: zodResolver(aiProviderSchema),
+    defaultValues: { provider: "openrouter", model: "" },
+  });
+  const { reset } = form;
 
   const isAdmin = isLoaded && has?.({ role: ADMIN_ROLE });
 
@@ -40,10 +60,11 @@ export function AiProviderCard() {
         const { config, error } = await getAiConfig();
         if (error) {
           toast.error(error);
+          setLoadError(error);
           return;
         }
-        setProvider(config.provider);
-        setModel(config.model);
+        setLoadError(null);
+        reset({ provider: config.provider, model: config.model });
       } finally {
         setIsLoading(false);
       }
@@ -51,16 +72,14 @@ export function AiProviderCard() {
     if (isLoaded && isAdmin) {
       loadConfig();
     }
-  }, [isLoaded, isAdmin]);
+  }, [isLoaded, isAdmin, reset]);
 
   if (!isLoaded || !isAdmin) {
     return null;
   }
 
-  const handleSave = async () => {
-    setIsSaving(true);
-    const result = await updateAiConfig(provider, model);
-    setIsSaving(false);
+  const onSubmit = async (values: AiProviderValues) => {
+    const result = await updateAiConfig(values.provider, values.model);
 
     if (result.success) {
       toast.success("AI provider configuration saved");
@@ -86,45 +105,66 @@ export function AiProviderCard() {
             <Loader2 className="h-4 w-4 animate-spin" />
             Loading configuration...
           </div>
+        ) : loadError ? (
+          <p className="text-sm text-destructive">{loadError}</p>
         ) : (
-          <>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="space-y-1.5">
-                <Label id="provider-label">Provider</Label>
-                <Select
-                  value={provider}
-                  onValueChange={(v) => setProvider(v as AiProviderName)}
-                >
-                  <SelectTrigger aria-labelledby="provider-label">
-                    <SelectValue placeholder="Select provider" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="openrouter">OpenRouter</SelectItem>
-                    <SelectItem value="zai">Z.AI</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="ai-model">Model</Label>
-                <Input
-                  id="ai-model"
-                  value={model}
-                  onChange={(e) => setModel(e.target.value)}
-                  placeholder="e.g. google/gemini-2.0-flash-001"
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)}>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <FormField
+                  control={form.control}
+                  name="provider"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Provider</FormLabel>
+                      <Select value={field.value} onValueChange={field.onChange}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select provider" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          <SelectItem value="openrouter">OpenRouter</SelectItem>
+                          <SelectItem value="zai">Z.AI</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="model"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Model</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="e.g. google/gemini-2.0-flash-001"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
                 />
               </div>
-            </div>
-            <Button onClick={handleSave} disabled={isSaving || !model.trim()}>
-              {isSaving ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                "Save"
-              )}
-            </Button>
-          </>
+              <Button
+                type="submit"
+                className="mt-4"
+                disabled={form.formState.isSubmitting}
+              >
+                {form.formState.isSubmitting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  "Save"
+                )}
+              </Button>
+            </form>
+          </Form>
         )}
       </CardContent>
     </Card>

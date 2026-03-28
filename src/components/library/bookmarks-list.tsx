@@ -1,11 +1,13 @@
 "use client";
 
 import { useState, useEffect, useCallback, useTransition } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { z } from "zod";
 import { Clock, Trash2, Plus, Loader2, Bookmark } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Dialog,
@@ -16,6 +18,14 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import {
   addBookmark,
   deleteBookmark,
@@ -55,22 +65,38 @@ function formatTimestamp(seconds: number): string {
 }
 
 function parseTimestamp(input: string): number | null {
-  const parts = input.split(":").map((p) => parseInt(p, 10));
+  const parts = input.split(":");
 
-  if (parts.some(isNaN)) return null;
+  if (parts.length < 2 || parts.length > 3) return null;
+  if (parts.some((part) => !/^\d+$/.test(part))) return null;
+
+  const nums = parts.map(Number);
 
   if (parts.length === 3) {
-    const [hours, minutes, seconds] = parts;
+    const [hours, minutes, seconds] = nums;
+    if (parts[1].length !== 2 || parts[2].length !== 2) return null;
+    if (minutes >= 60 || seconds >= 60) return null;
     return hours * 3600 + minutes * 60 + seconds;
-  } else if (parts.length === 2) {
-    const [minutes, seconds] = parts;
-    return minutes * 60 + seconds;
-  } else if (parts.length === 1) {
-    return parts[0];
   }
 
-  return null;
+  const [minutes, seconds] = nums;
+  if (parts[1].length !== 2) return null;
+  if (seconds >= 60) return null;
+  return minutes * 60 + seconds;
 }
+
+const bookmarkSchema = z.object({
+  timestamp: z
+    .string()
+    .trim()
+    .min(1, "Timestamp is required")
+    .refine(
+      (val) => parseTimestamp(val) !== null,
+      "Invalid format. Use MM:SS or HH:MM:SS"
+    ),
+  note: z.string().max(500).optional(),
+});
+type BookmarkValues = z.infer<typeof bookmarkSchema>;
 
 export function BookmarksList({
   libraryEntryId,
@@ -83,9 +109,17 @@ export function BookmarksList({
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [newTimestamp, setNewTimestamp] = useState("");
-  const [newNote, setNewNote] = useState("");
   const [isPending, startTransition] = useTransition();
+
+  const form = useForm<BookmarkValues>({
+    resolver: zodResolver(bookmarkSchema),
+    defaultValues: { timestamp: "", note: "" },
+  });
+  const { reset } = form;
+
+  useEffect(() => {
+    if (!isDialogOpen) reset();
+  }, [isDialogOpen, reset]);
 
   const loadBookmarks = useCallback(async () => {
     setIsLoading(true);
@@ -106,38 +140,32 @@ export function BookmarksList({
     loadBookmarks();
   }, [loadBookmarks]);
 
-  const handleAddBookmark = () => {
-    const timestamp = parseTimestamp(newTimestamp);
-    if (timestamp === null) {
-      setError("Invalid timestamp format. Use MM:SS or HH:MM:SS");
-      return;
-    }
+  const onSubmit = async (values: BookmarkValues) => {
+    const timestamp = parseTimestamp(values.timestamp)!;
 
     if (episodeDuration && timestamp > episodeDuration) {
-      setError("Timestamp exceeds episode duration");
+      form.setError("timestamp", { message: "Timestamp exceeds episode duration" });
       return;
     }
 
-    startTransition(async () => {
-      const result = await addBookmark(
-        libraryEntryId,
-        timestamp,
-        newNote || undefined
-      );
+    const note = values.note?.trim();
+    const result = await addBookmark(
+      libraryEntryId,
+      timestamp,
+      note || undefined,
+    );
 
-      if (result.success) {
-        setNewTimestamp("");
-        setNewNote("");
-        setIsDialogOpen(false);
-        loadBookmarks();
-        window.dispatchEvent(new CustomEvent(BOOKMARK_CHANGED_EVENT));
-        toast.success("Bookmark added", {
-          description: `Bookmark at ${formatTimestamp(timestamp)} created`,
-        });
-      } else {
-        setError(result.error || "Failed to add bookmark");
-      }
-    });
+    if (result.success) {
+      form.reset();
+      setIsDialogOpen(false);
+      loadBookmarks();
+      window.dispatchEvent(new CustomEvent(BOOKMARK_CHANGED_EVENT));
+      toast.success("Bookmark added", {
+        description: `Bookmark at ${formatTimestamp(timestamp)} created`,
+      });
+    } else {
+      form.setError("root", { message: result.error || "Failed to add bookmark" });
+    }
   };
 
   const handleSeekToBookmark = (timestamp: number) => {
@@ -196,7 +224,10 @@ export function BookmarksList({
           <Bookmark className="h-4 w-4" />
           Bookmarks
         </span>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <Dialog open={isDialogOpen} onOpenChange={(nextOpen) => {
+            if (form.formState.isSubmitting) return;
+            setIsDialogOpen(nextOpen);
+          }}>
           <DialogTrigger asChild>
             <Button variant="outline" size="sm">
               <Plus className="mr-1 h-3 w-3" />
@@ -204,67 +235,85 @@ export function BookmarksList({
             </Button>
           </DialogTrigger>
           <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Add Bookmark</DialogTitle>
-              <DialogDescription>
-                Add a timestamp bookmark with an optional note.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 py-4">
-              <div className="space-y-2">
-                <Label htmlFor="bookmark-timestamp">
-                  Timestamp{" "}
-                  <span className="text-xs text-muted-foreground">
-                    (MM:SS or HH:MM:SS)
-                  </span>
-                </Label>
-                <Input
-                  id="bookmark-timestamp"
-                  placeholder="12:30"
-                  value={newTimestamp}
-                  onChange={(e) => {
-                    setNewTimestamp(e.target.value);
-                    setError(null);
-                  }}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="bookmark-note">
-                  Note{" "}
-                  <span className="text-xs text-muted-foreground">
-                    (optional)
-                  </span>
-                </Label>
-                <Input
-                  id="bookmark-note"
-                  placeholder="Key insight mentioned here..."
-                  value={newNote}
-                  onChange={(e) => setNewNote(e.target.value)}
-                />
-              </div>
-              {error && (
-                <p className="text-sm text-destructive">{error}</p>
-              )}
-            </div>
-            <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={() => setIsDialogOpen(false)}
-              >
-                Cancel
-              </Button>
-              <Button onClick={handleAddBookmark} disabled={isPending}>
-                {isPending && (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                )}
-                Add Bookmark
-              </Button>
-            </DialogFooter>
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)}>
+                <DialogHeader>
+                  <DialogTitle>Add Bookmark</DialogTitle>
+                  <DialogDescription>
+                    Add a timestamp bookmark with an optional note.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <FormField
+                    control={form.control}
+                    name="timestamp"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>
+                          Timestamp{" "}
+                          <span className="text-xs text-muted-foreground">
+                            (MM:SS or HH:MM:SS)
+                          </span>
+                        </FormLabel>
+                        <FormControl>
+                          <Input placeholder="12:30" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="note"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>
+                          Note{" "}
+                          <span className="text-xs text-muted-foreground">
+                            (optional)
+                          </span>
+                        </FormLabel>
+                        <FormControl>
+                          <Input
+                            placeholder="Key insight mentioned here..."
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  {form.formState.errors.root?.message && (
+                    <p className="text-sm text-destructive">
+                      {form.formState.errors.root.message}
+                    </p>
+                  )}
+                </div>
+                <DialogFooter>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    disabled={form.formState.isSubmitting}
+                    onClick={() => setIsDialogOpen(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button type="submit" disabled={form.formState.isSubmitting}>
+                    {form.formState.isSubmitting && (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    )}
+                    Add Bookmark
+                  </Button>
+                </DialogFooter>
+              </form>
+            </Form>
           </DialogContent>
         </Dialog>
       </div>
 
-      {bookmarks.length === 0 ? (
+      {error ? (
+        <p className="text-sm text-destructive">{error}</p>
+      ) : bookmarks.length === 0 ? (
         <div className="rounded-lg border border-dashed p-4 text-center">
           <p className="text-sm text-muted-foreground">
             No bookmarks yet. Add timestamps to mark important moments.
