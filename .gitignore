@@ -37,16 +37,19 @@ next-env.d.ts
 # Storybook
 storybook-static/
 
-# Playwright
+# browser
 /playwright-report/
 /test-results/
 tests/visual/.story-ids.json
+.agent-browser/
 
 # Claude Code
 .claude/*
 !.claude/settings.json
 !.claude/mcp.json
 !.claude/skills/
+.dev/
+.superpowers/
 
 # Serena
 .serena/
