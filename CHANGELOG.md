@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Admin-only "Fetch & Summarize" button on the episode detail page when transcript is missing or failed (#232)
 - Dedicated `/admin` panel with three sub-routes: Overview (aggregated stats dashboard with transcript coverage, summary coverage, queue depth, active fetches, failure trend, and recent failures), Settings (AI provider config + prompt template editor), and Episodes (filterable global table with pagination, row actions, and batch re-summarization) (#224)
 - Prompt template editor: admins can write a custom summarization prompt with `{{transcript}}` and other placeholders, test it live against any real episode via streaming AI response (dry-run with full production fidelity), and persist it to the `aiConfig` table; `summarizationPrompt` nullable column added to `ai_config` table
 - `POST /api/admin/test-prompt` — streaming prompt playground route using raw SSE fetch (no Vercel AI SDK); see ADR-008 addendum

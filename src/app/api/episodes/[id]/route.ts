@@ -96,6 +96,8 @@ export async function GET(
         podcast,
         summary,
         transcriptSource: dbEpisode.transcriptSource ?? null,
+        transcriptStatus: dbEpisode.transcriptStatus ?? null,
+        episodeDbId: dbEpisode.id,
       });
     }
 
@@ -141,6 +143,8 @@ export async function GET(
     // Check if we have a cached summary in the database
     let summary = null;
     let transcriptSource: "podcastindex" | "assemblyai" | "description-url" | null = null;
+    let episodeDbId: number | null = null;
+    let transcriptStatus: string | null = null;
     try {
       // BOLT OPTIMIZATION: Selective column fetching to avoid loading large transcription fields
       // when only checking for cached summary data.
@@ -148,6 +152,7 @@ export async function GET(
       const cachedEpisode = await db.query.episodes.findFirst({
         where: eq(episodes.podcastIndexId, episodeId.toString()),
         columns: {
+          id: true,
           summary: true,
           keyTakeaways: true,
           worthItScore: true,
@@ -155,10 +160,13 @@ export async function GET(
           worthItDimensions: true,
           processedAt: true,
           transcriptSource: true,
+          transcriptStatus: true,
         },
       });
 
       transcriptSource = cachedEpisode?.transcriptSource ?? null;
+      episodeDbId = cachedEpisode?.id ?? null;
+      transcriptStatus = cachedEpisode?.transcriptStatus ?? null;
 
       if (cachedEpisode?.summary && cachedEpisode?.processedAt) {
         summary = {
@@ -180,6 +188,8 @@ export async function GET(
       podcast,
       summary,
       transcriptSource,
+      transcriptStatus,
+      episodeDbId,
     });
   } catch (error) {
     console.error("Error fetching episode:", error);
