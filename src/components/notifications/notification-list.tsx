@@ -5,7 +5,6 @@ import { Bell, FileText, Podcast } from "lucide-react";
 import { markNotificationRead } from "@/app/actions/notifications";
 import { formatRelativeTime, cn } from "@/lib/utils";
 import { ROUTES } from "@/lib/routes";
-import { Button } from "@/components/ui/button";
 
 interface NotificationItem {
   id: number;
@@ -63,12 +62,11 @@ export function NotificationList({
   return (
     <div className="divide-y">
       {notifications.map((notification) => (
-        <Button
+        <button
           key={notification.id}
-          variant="ghost"
           onClick={() => handleClick(notification)}
           className={cn(
-            "w-full flex items-start gap-3 p-3 text-left hover:bg-accent/50 transition-colors h-auto rounded-none justify-start",
+            "flex w-full items-start gap-3 p-3 text-left hover:bg-accent/50 transition-colors",
             !notification.isRead && "bg-accent/20"
           )}
         >
@@ -87,7 +85,7 @@ export function NotificationList({
           {!notification.isRead && (
             <span className="h-2 w-2 rounded-full bg-blue-500 shrink-0 mt-1.5" />
           )}
-        </Button>
+        </button>
       ))}
     </div>
   );

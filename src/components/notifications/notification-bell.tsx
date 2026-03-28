@@ -88,9 +88,9 @@ export function NotificationBell() {
         <div className="flex items-center justify-between px-3 py-2 border-b">
           <h3 className="text-sm font-semibold">Notifications</h3>
           {unreadCount > 0 && (
-            <Button variant="ghost" size="sm" onClick={handleMarkAllRead} className="h-auto p-0 text-xs text-muted-foreground hover:text-foreground">
+            <button onClick={handleMarkAllRead} className="text-xs text-muted-foreground hover:text-foreground">
               Mark all as read
-            </Button>
+            </button>
           )}
         </div>
         <div className="max-h-80 overflow-y-auto">

@@ -11,10 +11,8 @@ export function WorthItBadge({ score }: WorthItBadgeProps) {
 
   return (
     <Badge
-      className={cn(
-        "rounded-full px-3 py-1 text-sm text-white",
-        getScoreColor(score)
-      )}
+      variant="score"
+      className={cn("px-3 py-1 text-sm", getScoreColor(score))}
     >
       {score.toFixed(1)} &middot; {getScoreLabel(score)}
     </Badge>

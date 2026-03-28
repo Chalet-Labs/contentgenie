@@ -90,12 +90,12 @@ export function AiProviderCard() {
           <>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">
-                <span className="text-sm font-medium">Provider</span>
+                <Label id="provider-label">Provider</Label>
                 <Select
                   value={provider}
                   onValueChange={(v) => setProvider(v as AiProviderName)}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger aria-labelledby="provider-label">
                     <SelectValue placeholder="Select provider" />
                   </SelectTrigger>
                   <SelectContent>

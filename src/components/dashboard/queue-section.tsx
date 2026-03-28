@@ -58,7 +58,8 @@ function deleteMapEntry(
 function QueueScoreBadge({ score }: { score: number }) {
   return (
     <Badge
-      className={cn("rounded-full px-2 text-white", getScoreColor(score))}
+      variant="score"
+      className={cn("px-2", getScoreColor(score))}
     >
       {score.toFixed(1)}
     </Badge>
@@ -187,9 +188,9 @@ function QueueEpisodeRow({
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2">
           {isNowPlaying && (
-            <span className="shrink-0 rounded-full bg-primary px-2 py-0.5 text-xs font-semibold text-primary-foreground">
+            <Badge className="shrink-0 rounded-full">
               Now Playing
-            </span>
+            </Badge>
           )}
           <p className="line-clamp-1 text-sm font-medium">{episode.title}</p>
         </div>
