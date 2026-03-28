@@ -12,7 +12,7 @@ export function WorthItBadge({ score }: WorthItBadgeProps) {
   return (
     <Badge
       className={cn(
-        "inline-flex items-center rounded-full px-3 py-1 text-sm font-semibold text-white",
+        "rounded-full px-3 py-1 text-sm text-white",
         getScoreColor(score)
       )}
     >

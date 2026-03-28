@@ -58,10 +58,7 @@ function deleteMapEntry(
 function QueueScoreBadge({ score }: { score: number }) {
   return (
     <Badge
-      className={cn(
-        "rounded-full px-2 py-0.5 text-xs font-semibold text-white",
-        getScoreColor(score)
-      )}
+      className={cn("rounded-full px-2 text-white", getScoreColor(score))}
     >
       {score.toFixed(1)}
     </Badge>

@@ -47,9 +47,8 @@ export function QueueItem({ episode, onRemove, onPlay }: QueueItemProps) {
         <GripVertical className="h-4 w-4" />
       </button>
 
-      <Button
-        variant="ghost"
-        className="flex min-w-0 flex-1 items-center gap-2 text-left h-auto p-0 hover:bg-transparent"
+      <button
+        className="flex min-w-0 flex-1 items-center gap-2 text-left"
         onClick={onPlay}
         aria-label={`Play ${episode.title}`}
       >
@@ -79,7 +78,7 @@ export function QueueItem({ episode, onRemove, onPlay }: QueueItemProps) {
             {episode.podcastTitle}
           </p>
         </div>
-      </Button>
+      </button>
 
       <Button
         variant="ghost"
