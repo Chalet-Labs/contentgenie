@@ -39,10 +39,14 @@ export function EpisodeTranscriptFetchButton({
   onTranscriptReadyRef.current = onTranscriptReady
 
   useEffect(() => {
+    // If mounted mid-fetch, start polling immediately so the UI doesn't get stuck
+    if (initialTranscriptStatus === "fetching") {
+      startPolling()
+    }
     return () => {
       if (pollRef.current) clearInterval(pollRef.current)
     }
-  }, [])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Null = never processed; existing "Generate Summary" button handles that case
   if (transcriptStatus === "available" || transcriptStatus === null) {
@@ -59,13 +63,6 @@ export function EpisodeTranscriptFetchButton({
     pollRef.current = setInterval(async () => {
       try {
         pollCount.current += 1
-
-        if (pollCount.current >= POLL_CAP) {
-          clearInterval(pollRef.current!)
-          setIsFetching(false)
-          toast.error("Transcript fetch timed out — retry or check back later")
-          return
-        }
 
         const result = await getEpisodeStatus(episodeDbId)
 
@@ -86,6 +83,10 @@ export function EpisodeTranscriptFetchButton({
           setIsFetching(false)
           setTranscriptStatus("failed")
           toast.error("Transcript fetch failed — please try again")
+        } else if (pollCount.current >= POLL_CAP) {
+          clearInterval(pollRef.current!)
+          setIsFetching(false)
+          toast.error("Transcript fetch timed out — retry or check back later")
         }
       } catch {
         clearInterval(pollRef.current!)
@@ -138,11 +139,13 @@ export function EpisodeTranscriptFetchButton({
             </Button>
           </span>
         </TooltipTrigger>
-        {isRss && (
-          <TooltipContent>
-            RSS episodes cannot be fetched via PodcastIndex
-          </TooltipContent>
-        )}
+        <TooltipContent>
+          {isRss
+            ? "RSS episodes cannot be fetched via PodcastIndex"
+            : isFetching
+              ? "Fetching transcript and summary — this may take a few minutes"
+              : "Fetch a transcript and generate a summary"}
+        </TooltipContent>
       </Tooltip>
     </TooltipProvider>
   )

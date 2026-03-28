@@ -67,13 +67,21 @@ describe("EpisodeTranscriptFetchButton", () => {
     ).toBeInTheDocument()
   })
 
-  // --- fetching on mount → spinner (no active poll yet) ---
+  // --- fetching on mount → spinner + polling starts ---
 
   it("shows disabled spinner when mounted with transcriptStatus 'fetching'", () => {
     render(<EpisodeTranscriptFetchButton {...baseProps} transcriptStatus="fetching" />)
     expect(
       screen.getByRole("button", { name: /fetching transcript/i })
     ).toBeDisabled()
+  })
+
+  it("starts polling on mount when transcriptStatus is 'fetching'", async () => {
+    render(<EpisodeTranscriptFetchButton {...baseProps} transcriptStatus="fetching" />)
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5000)
+    })
+    expect(mockGetEpisodeStatus).toHaveBeenCalledWith(baseProps.episodeDbId)
   })
 
   // --- Test case 3: available → null ---
