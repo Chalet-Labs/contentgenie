@@ -192,12 +192,10 @@ export function EpisodeActionButtons({ episode }: EpisodeActionButtonsProps) {
               setTranscriptRunId(reconnect.runId)
               setTranscriptAccessToken(reconnect.publicAccessToken)
             } else {
-              // Reconnection failed — fall through to status-only reconciliation
               setLocalTranscriptStatus("failed")
               setTranscriptMsg("Could not reconnect — try again")
             }
           }
-          return
         }
 
         if (summaryInFlight && result.summaryStatus !== null &&
@@ -212,7 +210,6 @@ export function EpisodeActionButtons({ episode }: EpisodeActionButtonsProps) {
               setSummaryMsg("Could not reconnect — try again")
             }
           }
-          return
         }
 
         // No run ID available — reconcile status from DB value
