@@ -169,8 +169,9 @@ export function EpisodeActionButtons({ episode }: EpisodeActionButtonsProps) {
     if (!transcriptInFlight && !summaryInFlight) return
 
     let cancelled = false
-    getEpisodeStatus(episode.id)
-      .then(async result => {
+    ;(async () => {
+      try {
+        const result = await getEpisodeStatus(episode.id)
         if (cancelled) return
         if (!result.ok) {
           if (transcriptInFlight) {
@@ -233,8 +234,7 @@ export function EpisodeActionButtons({ episode }: EpisodeActionButtonsProps) {
           // Run already completed — reconcile to terminal status from DB
           setLocalSummaryStatus(result.summaryStatus)
         }
-      })
-      .catch((err) => {
+      } catch (err) {
         console.error("Recovery effect failed:", err)
         if (!cancelled) {
           if (transcriptInFlight) {
@@ -246,7 +246,8 @@ export function EpisodeActionButtons({ episode }: EpisodeActionButtonsProps) {
             setSummaryMsg("Could not verify status — try again")
           }
         }
-      })
+      }
+    })()
 
     return () => {
       cancelled = true
