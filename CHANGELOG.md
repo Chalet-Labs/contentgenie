@@ -18,6 +18,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Admin link in sidebar (visible to `org:admin` users only)
 
 ### Changed
+- Admin status badge shows "unprocessed" instead of "none" for NULL `transcript_status` / `summary_status`, aligning with ADR-026 terminology (#239)
 - Replaced raw HTML elements with shadcn/ui primitives across 11 component and settings files: `<label>` → `Label` (with `htmlFor`/`aria-labelledby` for form controls) or `<span>` (for non-form headings), `<button>` → `Button`, `<span>` score pills → `Badge`, and custom progress bars → `Progress`; extended `Progress` with `indicatorClassName` and `max` props (#233)
 - Admin features (AI provider card, bulk re-summarize, missing transcripts) moved from `/settings` page to dedicated `/admin` panel; regular users no longer see or have access to these features
 - `generateEpisodeSummary` now accepts an optional `customPrompt` parameter; when provided, `interpolatePrompt` is used instead of the default `getSummarizationPrompt`
@@ -34,6 +35,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Summarization step progress UI removes `"fetching-transcript"` and `"transcribing-audio"` steps — summarization no longer fetches transcripts
 
 ### Fixed
+- Admin transcript buttons showing incorrect state (all disabled) for episodes with NULL `transcript_status` — NULL is now normalized to `"missing"` at the component boundary, enabling Fetch Transcript and Fetch & Summarize (#239)
+- Episode detail page transcript fetch button hidden for NULL-status episodes — NULL no longer short-circuits the early return in `EpisodeTranscriptFetchButton` (#239)
 - Admin transcript fetch button no longer shows a stuck spinner after navigating away and back during an in-flight fetch (#238)
 - Fixed admin episodes table links navigating to wrong episode page by using PodcastIndex episode ID instead of internal database PK (#240)
 - Fixed notification click navigating to wrong episode page by using PodcastIndex episode ID instead of internal database PK (#229)

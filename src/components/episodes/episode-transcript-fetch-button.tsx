@@ -48,8 +48,8 @@ export function EpisodeTranscriptFetchButton({
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Null = never processed; existing "Generate Summary" button handles that case
-  if (transcriptStatus === "available" || transcriptStatus === null) {
+  // null = unprocessed episode; show fetch button so admins can trigger a transcript fetch
+  if (transcriptStatus === "available") {
     return null
   }
 

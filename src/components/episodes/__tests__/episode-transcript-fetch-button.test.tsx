@@ -84,7 +84,7 @@ describe("EpisodeTranscriptFetchButton", () => {
     expect(mockGetEpisodeStatus).toHaveBeenCalledWith(baseProps.episodeDbId)
   })
 
-  // --- Test case 3: available → null ---
+  // --- Test case 3: available → renders nothing ---
 
   it("renders nothing when transcriptStatus is 'available'", () => {
     const { container } = render(
@@ -93,13 +93,15 @@ describe("EpisodeTranscriptFetchButton", () => {
     expect(container).toBeEmptyDOMElement()
   })
 
-  // --- Test case 4: null → null ---
+  // --- Test case 4: null → show fetch button (treat as missing) ---
 
-  it("renders nothing when transcriptStatus is null", () => {
-    const { container } = render(
+  it("renders Fetch & Summarize button when transcriptStatus is null", () => {
+    render(
       <EpisodeTranscriptFetchButton {...baseProps} transcriptStatus={null} />
     )
-    expect(container).toBeEmptyDOMElement()
+    expect(
+      screen.getByRole("button", { name: /fetch & summarize/i })
+    ).toBeInTheDocument()
   })
 
   // --- Test case 5: RSS disabled ---
