@@ -241,7 +241,7 @@ describe("EpisodeTranscriptFetchButton", () => {
     })
   })
 
-  // --- Test case 10 (ok: false from getEpisodeStatus) ---
+  // --- Test case 10b: ok: false from getEpisodeStatus ---
 
   it("shows toast error when getEpisodeStatus returns ok: false", async () => {
     mockGetEpisodeStatus.mockResolvedValue({
@@ -288,6 +288,20 @@ describe("EpisodeTranscriptFetchButton", () => {
     render(<EpisodeTranscriptFetchButton {...baseProps} />)
     fireEvent.click(screen.getByRole("button", { name: /fetch & summarize/i }))
     await waitFor(() => {
+      expect(
+        screen.getByRole("button", { name: /fetch & summarize/i })
+      ).toBeInTheDocument()
+    })
+  })
+
+  // --- Network failure on POST → toast + re-enable ---
+
+  it("shows toast error and re-enables button when fetch throws (network failure)", async () => {
+    mockFetch.mockRejectedValue(new Error("Network error"))
+    render(<EpisodeTranscriptFetchButton {...baseProps} />)
+    fireEvent.click(screen.getByRole("button", { name: /fetch & summarize/i }))
+    await waitFor(() => {
+      expect(vi.mocked(toast.error)).toHaveBeenCalled()
       expect(
         screen.getByRole("button", { name: /fetch & summarize/i })
       ).toBeInTheDocument()
