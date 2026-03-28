@@ -19,7 +19,7 @@ import { addPodcastByRssUrl } from "@/app/actions/subscriptions";
 import { useSidebarCountsOptional } from "@/contexts/sidebar-counts-context";
 
 const rssFeedSchema = z.object({
-  url: z.string().url("Please enter a valid URL starting with http:// or https://"),
+  url: z.url("Please enter a valid URL starting with http:// or https://"),
 });
 type RssFeedValues = z.infer<typeof rssFeedSchema>;
 
