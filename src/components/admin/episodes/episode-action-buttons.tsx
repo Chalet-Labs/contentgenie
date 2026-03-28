@@ -40,7 +40,7 @@ const SUMMARY_STALE_MS = 10 * 60 * 1000 // 10 minutes
 
 export function EpisodeActionButtons({ episode }: EpisodeActionButtonsProps) {
   const [localTranscriptStatus, setLocalTranscriptStatus] = useState(
-    episode.transcriptStatus
+    episode.transcriptStatus ?? "missing"
   )
   const [localSummaryStatus, setLocalSummaryStatus] = useState(
     episode.summaryStatus
@@ -196,7 +196,7 @@ export function EpisodeActionButtons({ episode }: EpisodeActionButtonsProps) {
               // Run may have completed between the two calls — re-check
               const fresh = await getEpisodeStatus(episode.id)
               if (!cancelled && fresh.ok && fresh.transcriptStatus !== null && fresh.transcriptStatus !== "fetching") {
-                setLocalTranscriptStatus(fresh.transcriptStatus)
+                setLocalTranscriptStatus(fresh.transcriptStatus ?? "missing")
               } else if (!cancelled) {
                 setLocalTranscriptStatus("failed")
                 setTranscriptMsg("Could not reconnect — try again")
@@ -205,7 +205,7 @@ export function EpisodeActionButtons({ episode }: EpisodeActionButtonsProps) {
           }
         } else if (transcriptInFlight && result.transcriptStatus !== "fetching") {
           // Run already completed — reconcile to terminal status from DB
-          setLocalTranscriptStatus(result.transcriptStatus)
+          setLocalTranscriptStatus(result.transcriptStatus ?? "missing")
         }
 
         if (summaryInFlight && result.summaryStatus !== null &&

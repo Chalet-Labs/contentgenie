@@ -25,7 +25,7 @@ export function StatusBadge({ status }: StatusBadgeProps) {
       variant="outline"
       className={cn("border-0", statusStyles[status ?? ""] ?? fallbackStyle)}
     >
-      {status ?? "none"}
+      {status ?? "unprocessed"}
     </Badge>
   )
 }

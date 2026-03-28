@@ -43,9 +43,9 @@ describe("StatusBadge", () => {
     expect(container.firstChild).toHaveClass("bg-gray-100")
   })
 
-  it("renders gray for null", () => {
+  it("renders gray for null with 'unprocessed' label", () => {
     const { container } = render(<StatusBadge status={null} />)
     expect(container.firstChild).toHaveClass("bg-gray-100")
-    expect(screen.getByText("none")).toBeInTheDocument()
+    expect(screen.getByText("unprocessed")).toBeInTheDocument()
   })
 })
