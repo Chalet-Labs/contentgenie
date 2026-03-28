@@ -2,9 +2,9 @@
 --
 -- Background: Episodes created before the transcript tracking system have
 -- transcript_status = NULL. This script normalizes them:
---   - ~47 rows with transcript text  → transcript_status = 'available',
+--   - ~47 rows with transcription text → transcript_status = 'available',
 --                                       transcript_source = 'podcastindex'
---   - ~156 rows without transcript   → transcript_status = 'missing',
+--   - ~156 rows without transcription → transcript_status = 'missing',
 --                                       clear low-quality description-only summaries
 --   (counts as of 2026-03-28 dev DB; verify with DRY-RUN SELECT below)
 --
@@ -22,8 +22,8 @@ SELECT
   count(*)             AS row_count
 FROM episodes
 WHERE transcript_status IS NULL
-  AND transcript IS NOT NULL
-  AND transcript <> ''
+  AND transcription IS NOT NULL
+  AND transcription <> ''
 
 UNION ALL
 
@@ -32,7 +32,7 @@ SELECT
   count(*)             AS row_count
 FROM episodes
 WHERE transcript_status IS NULL
-  AND (transcript IS NULL OR transcript = '')
+  AND (transcription IS NULL OR transcription = '')
 
 UNION ALL
 
@@ -48,7 +48,7 @@ WHERE transcript_status IS NULL;
 
 BEGIN;
 
--- 1. Episodes that have transcript text but no status
+-- 1. Episodes that have transcription text but no status
 --    → mark available, infer source as podcastindex (most common pre-existing source;
 --      description-url also possible but no reliable way to distinguish)
 UPDATE episodes
@@ -57,23 +57,25 @@ SET
   transcript_source = 'podcastindex',
   updated_at        = now()
 WHERE transcript_status IS NULL
-  AND transcript IS NOT NULL
-  AND transcript <> '';
+  AND transcription IS NOT NULL
+  AND transcription <> '';
 
--- 2. Episodes with no transcript text and no status
+-- 2. Episodes with no transcription text and no status
 --    → mark missing, clear low-quality description-only summary data
 UPDATE episodes
 SET
-  transcript_status  = 'missing',
-  summary            = NULL,
-  key_takeaways      = NULL,
-  worth_it_score     = NULL,
-  worth_it_reason    = NULL,
+  transcript_status   = 'missing',
+  summary             = NULL,
+  summary_status      = NULL,
+  summary_run_id      = NULL,
+  key_takeaways       = NULL,
+  worth_it_score      = NULL,
+  worth_it_reason     = NULL,
   worth_it_dimensions = NULL,
-  processed_at       = NULL,
-  updated_at         = now()
+  processed_at        = NULL,
+  updated_at          = now()
 WHERE transcript_status IS NULL
-  AND (transcript IS NULL OR transcript = '');
+  AND (transcription IS NULL OR transcription = '');
 
 -- ============================================================
 -- Post-migration verification: should return 0
