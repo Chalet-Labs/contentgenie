@@ -52,4 +52,11 @@ describe("EpisodesTable", () => {
     render(<EpisodesTable episodes={episodes} totalCount={10} currentPage={1} />)
     expect(screen.queryByRole("link", { name: /next/i })).not.toBeInTheDocument()
   })
+
+  it("links episode title to /episode/<podcastIndexId>", () => {
+    const episodes = [makeEpisode(1)]
+    render(<EpisodesTable episodes={episodes} totalCount={1} currentPage={1} />)
+    const link = screen.getByRole("link", { name: "Episode 1" })
+    expect(link).toHaveAttribute("href", "/episode/idx_1")
+  })
 })

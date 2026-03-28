@@ -95,7 +95,7 @@ export function EpisodesTable({ episodes: rows, totalCount, currentPage, searchP
                 </TableCell>
                 <TableCell className="max-w-[200px]">
                   <Link
-                    href={`/episode/${ep.id}`}
+                    href={`/episode/${ep.podcastIndexId}`}
                     className="text-sm hover:underline truncate block"
                   >
                     {ep.title}
