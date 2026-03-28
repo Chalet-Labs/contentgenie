@@ -20,10 +20,15 @@ import { useSidebarCountsOptional } from "@/contexts/sidebar-counts-context";
 
 const rssFeedSchema = z.object({
   url: z
-    .url("Please enter a valid URL")
-    .refine(
-      (val) => /^https?:\/\//i.test(val),
-      "Please enter a valid URL starting with http:// or https://"
+    .string()
+    .trim()
+    .pipe(
+      z
+        .url("Please enter a valid URL")
+        .refine(
+          (val) => /^https?:\/\//i.test(val),
+          "Please enter a valid URL starting with http:// or https://"
+        )
     ),
 });
 type RssFeedValues = z.infer<typeof rssFeedSchema>;

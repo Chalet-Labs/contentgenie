@@ -65,21 +65,24 @@ function formatTimestamp(seconds: number): string {
 }
 
 function parseTimestamp(input: string): number | null {
-  const parts = input.split(":").map((p) => parseInt(p, 10));
+  const parts = input.split(":");
 
-  if (parts.some(isNaN)) return null;
+  if (parts.length < 2 || parts.length > 3) return null;
+  if (parts.some((part) => !/^\d+$/.test(part))) return null;
+
+  const nums = parts.map(Number);
 
   if (parts.length === 3) {
-    const [hours, minutes, seconds] = parts;
+    const [hours, minutes, seconds] = nums;
+    if (parts[1].length !== 2 || parts[2].length !== 2) return null;
+    if (minutes >= 60 || seconds >= 60) return null;
     return hours * 3600 + minutes * 60 + seconds;
-  } else if (parts.length === 2) {
-    const [minutes, seconds] = parts;
-    return minutes * 60 + seconds;
-  } else if (parts.length === 1) {
-    return parts[0];
   }
 
-  return null;
+  const [minutes, seconds] = nums;
+  if (parts[1].length !== 2) return null;
+  if (seconds >= 60) return null;
+  return minutes * 60 + seconds;
 }
 
 const bookmarkSchema = z.object({
@@ -87,22 +90,10 @@ const bookmarkSchema = z.object({
     .string()
     .trim()
     .min(1, "Timestamp is required")
-    .refine((val) => {
-      const parts = val.split(":");
-      if (parts.some((part) => !/^\d+$/.test(part))) return false;
-      if (parts.length === 2) {
-        return parts[1].length === 2 && Number(parts[1]) < 60;
-      }
-      if (parts.length === 3) {
-        return (
-          parts[1].length === 2 &&
-          parts[2].length === 2 &&
-          Number(parts[1]) < 60 &&
-          Number(parts[2]) < 60
-        );
-      }
-      return false;
-    }, "Invalid format. Use MM:SS or HH:MM:SS"),
+    .refine(
+      (val) => parseTimestamp(val) !== null,
+      "Invalid format. Use MM:SS or HH:MM:SS"
+    ),
   note: z.string().max(500).optional(),
 });
 type BookmarkValues = z.infer<typeof bookmarkSchema>;
