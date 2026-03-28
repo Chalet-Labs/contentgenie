@@ -198,6 +198,26 @@ export const fetchTranscriptTask = task({
       await persistTranscript(episodeId, transcript, dbSource);
     }
 
+    // Clear run ID unconditionally — run has terminated (success or no-transcript).
+    // persistTranscript also clears it on the success path, but this covers the
+    // no-transcript path where persistTranscript is never called.
+    try {
+      await db.update(episodes)
+        .set({ transcriptRunId: null, updatedAt: new Date() })
+        .where(eq(episodes.podcastIndexId, String(episodeId)));
+    } catch (err) {
+      logger.warn("Failed to clear transcriptRunId", { error: err instanceof Error ? err.message : String(err) });
+    }
+
     return { transcript, source: dbSource };
+  },
+  onFailure: async ({ payload }) => {
+    try {
+      await db.update(episodes)
+        .set({ transcriptRunId: null, transcriptStatus: "failed", updatedAt: new Date() })
+        .where(eq(episodes.podcastIndexId, String(payload.episodeId)));
+    } catch {
+      // Best-effort — if DB is unreachable, staleness timeout handles it client-side
+    }
   },
 });

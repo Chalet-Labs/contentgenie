@@ -123,6 +123,7 @@ export async function persistTranscript(
       transcriptStatus: "available",
       transcriptFetchedAt: now,
       transcriptError: null,
+      transcriptRunId: null,
       updatedAt: now,
     })
     .where(eq(episodes.podcastIndexId, String(episodeId)))

@@ -5,6 +5,13 @@ vi.mock("@clerk/nextjs/server", () => ({
   auth: () => mockAuth(),
 }))
 
+const mockCreatePublicToken = vi.fn()
+vi.mock("@trigger.dev/sdk", () => ({
+  auth: {
+    createPublicToken: (...args: unknown[]) => mockCreatePublicToken(...args),
+  },
+}))
+
 const mockSelect = vi.fn()
 const mockEpisodesFindFirst = vi.fn()
 vi.mock("@/db", () => ({
@@ -21,6 +28,8 @@ vi.mock("@/db/schema", () => ({
     id: "id",
     transcriptStatus: "transcript_status",
     summaryStatus: "summary_status",
+    transcriptRunId: "transcript_run_id",
+    summaryRunId: "summary_run_id",
     title: "title",
     podcastId: "podcast_id",
   },
@@ -44,7 +53,7 @@ function makeSelectChain(rows: unknown[]) {
   return chain
 }
 
-import { searchEpisodesWithTranscript, getEpisodeStatus } from "@/app/actions/admin"
+import { searchEpisodesWithTranscript, getEpisodeStatus, getRunReconnectionData } from "@/app/actions/admin"
 
 describe("searchEpisodesWithTranscript", () => {
   beforeEach(() => {
@@ -96,9 +105,34 @@ describe("getEpisodeStatus", () => {
     mockEpisodesFindFirst.mockResolvedValue({
       transcriptStatus: "available",
       summaryStatus: "completed",
+      transcriptRunId: null,
+      summaryRunId: null,
     })
     const result = await getEpisodeStatus(1)
-    expect(result).toEqual({ ok: true, transcriptStatus: "available", summaryStatus: "completed" })
+    expect(result).toEqual({
+      ok: true,
+      transcriptStatus: "available",
+      summaryStatus: "completed",
+      transcriptRunId: null,
+      summaryRunId: null,
+    })
+  })
+
+  it("returns run IDs for in-progress episode", async () => {
+    mockEpisodesFindFirst.mockResolvedValue({
+      transcriptStatus: "fetching",
+      summaryStatus: null,
+      transcriptRunId: "run_transcript_abc",
+      summaryRunId: null,
+    })
+    const result = await getEpisodeStatus(2)
+    expect(result).toEqual({
+      ok: true,
+      transcriptStatus: "fetching",
+      summaryStatus: null,
+      transcriptRunId: "run_transcript_abc",
+      summaryRunId: null,
+    })
   })
 
   it("returns error for missing episode", async () => {
@@ -111,5 +145,68 @@ describe("getEpisodeStatus", () => {
     mockEpisodesFindFirst.mockRejectedValue(new Error("DB connection failed"))
     const result = await getEpisodeStatus(1)
     expect(result).toEqual({ ok: false, error: "Failed to check status" })
+  })
+})
+
+describe("getRunReconnectionData", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockAuth.mockResolvedValue({ has: () => true })
+    mockCreatePublicToken.mockResolvedValue("test-public-token")
+  })
+
+  it("returns error for non-admin", async () => {
+    mockAuth.mockResolvedValue({ has: () => false })
+    const result = await getRunReconnectionData(1, "transcript")
+    expect(result).toEqual({ ok: false, error: "Admin access required" })
+  })
+
+  it("returns error when episode not found", async () => {
+    mockEpisodesFindFirst.mockResolvedValue(undefined)
+    const result = await getRunReconnectionData(999, "transcript")
+    expect(result).toEqual({ ok: false, error: "Episode not found" })
+  })
+
+  it("returns error when no in-flight transcript run ID", async () => {
+    mockEpisodesFindFirst.mockResolvedValue({ transcriptRunId: null, summaryRunId: null })
+    const result = await getRunReconnectionData(1, "transcript")
+    expect(result).toEqual({ ok: false, error: "No in-flight run" })
+  })
+
+  it("returns error when no in-flight summary run ID", async () => {
+    mockEpisodesFindFirst.mockResolvedValue({ transcriptRunId: null, summaryRunId: null })
+    const result = await getRunReconnectionData(1, "summary")
+    expect(result).toEqual({ ok: false, error: "No in-flight run" })
+  })
+
+  it("returns runId and publicAccessToken for in-progress transcript run", async () => {
+    mockEpisodesFindFirst.mockResolvedValue({
+      transcriptRunId: "run_transcript_xyz",
+      summaryRunId: null,
+    })
+    const result = await getRunReconnectionData(1, "transcript")
+    expect(result).toEqual({ ok: true, runId: "run_transcript_xyz", publicAccessToken: "test-public-token" })
+    expect(mockCreatePublicToken).toHaveBeenCalledWith(
+      expect.objectContaining({ scopes: { read: { runs: ["run_transcript_xyz"] } } })
+    )
+  })
+
+  it("returns runId and publicAccessToken for in-progress summary run", async () => {
+    mockEpisodesFindFirst.mockResolvedValue({
+      transcriptRunId: null,
+      summaryRunId: "run_summary_abc",
+    })
+    const result = await getRunReconnectionData(1, "summary")
+    expect(result).toEqual({ ok: true, runId: "run_summary_abc", publicAccessToken: "test-public-token" })
+    expect(mockCreatePublicToken).toHaveBeenCalledWith(
+      expect.objectContaining({ scopes: { read: { runs: ["run_summary_abc"] } } })
+    )
+  })
+
+  it("returns error when token creation fails", async () => {
+    mockEpisodesFindFirst.mockResolvedValue({ transcriptRunId: "run_xyz", summaryRunId: null })
+    mockCreatePublicToken.mockRejectedValue(new Error("Token creation failed"))
+    const result = await getRunReconnectionData(1, "transcript")
+    expect(result).toEqual({ ok: false, error: "Failed to get reconnection data" })
   })
 })

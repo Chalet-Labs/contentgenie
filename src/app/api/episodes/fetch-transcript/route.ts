@@ -78,6 +78,15 @@ export async function POST(request: NextRequest) {
     }
   );
 
+  // Store the run ID so the UI can reconnect after navigation.
+  // Non-critical — wrapped in fire-and-forget to not delay the response.
+  db.update(episodes).set({
+    transcriptRunId: handle.id,
+    updatedAt: new Date(),
+  }).where(eq(episodes.id, episodeId)).catch((err: unknown) => {
+    console.error("Failed to store transcriptRunId:", err);
+  });
+
   // Token creation is non-critical — if it fails, the run is still queued.
   let publicAccessToken: string | undefined;
   try {

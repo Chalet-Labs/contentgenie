@@ -10,7 +10,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { FileText, Sparkles, Zap, Loader2 } from "lucide-react"
-import { getEpisodeStatus } from "@/app/actions/admin"
+import { getEpisodeStatus, getRunReconnectionData } from "@/app/actions/admin"
 import { IN_PROGRESS_STATUSES, type SummaryStatus } from "@/db/schema"
 import type { fetchTranscriptTask } from "@/trigger/fetch-transcript"
 import type { summarizeEpisode } from "@/trigger/summarize-episode"
@@ -158,7 +158,8 @@ export function EpisodeActionButtons({ episode }: EpisodeActionButtonsProps) {
   }, [summaryRunId, summaryRun?.status])
 
   // Recovery: if the page was server-rendered while a run was in-flight, we have
-  // no runId/accessToken to subscribe to. Do a one-shot status check to reconcile.
+  // no runId/accessToken to subscribe to. Do a one-shot status check to reconcile,
+  // then attempt to reconnect via useRealtimeRun if run IDs are available.
   useEffect(() => {
     const transcriptInFlight = episode.transcriptStatus === "fetching"
     const summaryInFlight =
@@ -169,7 +170,7 @@ export function EpisodeActionButtons({ episode }: EpisodeActionButtonsProps) {
 
     let cancelled = false
     getEpisodeStatus(episode.id)
-      .then(result => {
+      .then(async result => {
         if (cancelled) return
         if (!result.ok) {
           if (transcriptInFlight) {
@@ -182,6 +183,39 @@ export function EpisodeActionButtons({ episode }: EpisodeActionButtonsProps) {
           }
           return
         }
+
+        // Attempt realtime reconnection when a run ID is available
+        if (transcriptInFlight && result.transcriptStatus === "fetching" && result.transcriptRunId) {
+          const reconnect = await getRunReconnectionData(episode.id, "transcript")
+          if (!cancelled) {
+            if (reconnect.ok) {
+              setTranscriptRunId(reconnect.runId)
+              setTranscriptAccessToken(reconnect.publicAccessToken)
+            } else {
+              // Reconnection failed — fall through to status-only reconciliation
+              setLocalTranscriptStatus("failed")
+              setTranscriptMsg("Could not reconnect — try again")
+            }
+          }
+          return
+        }
+
+        if (summaryInFlight && result.summaryStatus !== null &&
+            IN_PROGRESS_STATUSES.includes(result.summaryStatus as SummaryStatus) && result.summaryRunId) {
+          const reconnect = await getRunReconnectionData(episode.id, "summary")
+          if (!cancelled) {
+            if (reconnect.ok) {
+              setSummaryRunId(reconnect.runId)
+              setSummaryAccessToken(reconnect.publicAccessToken)
+            } else {
+              setLocalSummaryStatus("failed")
+              setSummaryMsg("Could not reconnect — try again")
+            }
+          }
+          return
+        }
+
+        // No run ID available — reconcile status from DB value
         if (transcriptInFlight && result.transcriptStatus !== "fetching") {
           setLocalTranscriptStatus(result.transcriptStatus)
         }
