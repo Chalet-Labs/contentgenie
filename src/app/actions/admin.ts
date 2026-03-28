@@ -1,10 +1,9 @@
 "use server"
 
 import { auth } from "@clerk/nextjs/server"
-import { auth as triggerAuth } from "@trigger.dev/sdk"
 import { eq, and, or, ilike } from "drizzle-orm"
 import { db } from "@/db"
-import { episodes, podcasts } from "@/db/schema"
+import { episodes, podcasts, type TranscriptStatus, type SummaryStatus } from "@/db/schema"
 import { ADMIN_ROLE } from "@/lib/auth-roles"
 
 export interface EpisodeSearchResult {
@@ -51,8 +50,8 @@ export async function searchEpisodesWithTranscript(
 export type EpisodeStatusResult =
   | {
       ok: true
-      transcriptStatus: string | null
-      summaryStatus: string | null
+      transcriptStatus: TranscriptStatus | null
+      summaryStatus: SummaryStatus | null
       transcriptRunId: string | null
       summaryRunId: string | null
     }
@@ -105,6 +104,10 @@ export async function getRunReconnectionData(
     return { ok: false, error: "Admin access required" }
   }
 
+  if (!Number.isInteger(episodeId) || episodeId <= 0) {
+    return { ok: false, error: "Invalid episode ID" }
+  }
+
   try {
     const row = await db.query.episodes.findFirst({
       where: eq(episodes.id, episodeId),
@@ -116,6 +119,7 @@ export async function getRunReconnectionData(
     const runId = runType === "transcript" ? row.transcriptRunId : row.summaryRunId
     if (!runId) return { ok: false, error: "No in-flight run" }
 
+    const { auth: triggerAuth } = await import("@trigger.dev/sdk")
     const publicAccessToken = await triggerAuth.createPublicToken({
       scopes: { read: { runs: [runId] } },
       expirationTime: "15m",
@@ -123,7 +127,7 @@ export async function getRunReconnectionData(
 
     return { ok: true, runId, publicAccessToken }
   } catch (error) {
-    console.error("getRunReconnectionData error:", error)
+    console.error("getRunReconnectionData error:", { episodeId, runType, error })
     return { ok: false, error: "Failed to get reconnection data" }
   }
 }

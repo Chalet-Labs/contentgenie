@@ -192,40 +192,50 @@ export function EpisodeActionButtons({ episode }: EpisodeActionButtonsProps) {
               setTranscriptRunId(reconnect.runId)
               setTranscriptAccessToken(reconnect.publicAccessToken)
             } else {
-              setLocalTranscriptStatus("failed")
-              setTranscriptMsg("Could not reconnect — try again")
+              // Run may have completed between the two calls — re-check
+              const fresh = await getEpisodeStatus(episode.id)
+              if (!cancelled && fresh.ok && fresh.transcriptStatus !== "fetching") {
+                setLocalTranscriptStatus(fresh.transcriptStatus)
+              } else if (!cancelled) {
+                setLocalTranscriptStatus("failed")
+                setTranscriptMsg("Could not reconnect — try again")
+              }
             }
           }
+        } else if (transcriptInFlight && result.transcriptStatus !== "fetching") {
+          // Run already completed — reconcile to terminal status from DB
+          setLocalTranscriptStatus(result.transcriptStatus)
         }
 
         if (summaryInFlight && result.summaryStatus !== null &&
-            IN_PROGRESS_STATUSES.includes(result.summaryStatus as SummaryStatus) && result.summaryRunId) {
+            IN_PROGRESS_STATUSES.includes(result.summaryStatus) && result.summaryRunId) {
           const reconnect = await getRunReconnectionData(episode.id, "summary")
           if (!cancelled) {
             if (reconnect.ok) {
               setSummaryRunId(reconnect.runId)
               setSummaryAccessToken(reconnect.publicAccessToken)
             } else {
-              setLocalSummaryStatus("failed")
-              setSummaryMsg("Could not reconnect — try again")
+              const fresh = await getEpisodeStatus(episode.id)
+              if (!cancelled && fresh.ok && fresh.summaryStatus !== null &&
+                  !IN_PROGRESS_STATUSES.includes(fresh.summaryStatus)) {
+                setLocalSummaryStatus(fresh.summaryStatus)
+              } else if (!cancelled) {
+                setLocalSummaryStatus("failed")
+                setSummaryMsg("Could not reconnect — try again")
+              }
             }
           }
-        }
-
-        // No run ID available — reconcile status from DB value
-        if (transcriptInFlight && result.transcriptStatus !== "fetching") {
-          setLocalTranscriptStatus(result.transcriptStatus)
-        }
-        if (
+        } else if (
           summaryInFlight &&
           result.summaryStatus !== null &&
-          !IN_PROGRESS_STATUSES.includes(result.summaryStatus as SummaryStatus)
+          !IN_PROGRESS_STATUSES.includes(result.summaryStatus)
         ) {
+          // Run already completed — reconcile to terminal status from DB
           setLocalSummaryStatus(result.summaryStatus)
         }
       })
-      .catch(() => {
-        // Network/auth failure — transition to failed so the user can retry
+      .catch((err) => {
+        console.error("Recovery effect failed:", err)
         if (!cancelled) {
           if (transcriptInFlight) {
             setLocalTranscriptStatus("failed")

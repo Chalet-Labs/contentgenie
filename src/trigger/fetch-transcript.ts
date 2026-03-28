@@ -206,18 +206,22 @@ export const fetchTranscriptTask = task({
         .set({ transcriptRunId: null, updatedAt: new Date() })
         .where(eq(episodes.podcastIndexId, String(episodeId)));
     } catch (err) {
-      logger.warn("Failed to clear transcriptRunId", { error: err instanceof Error ? err.message : String(err) });
+      logger.warn("Failed to clear transcriptRunId", { episodeId, error: err instanceof Error ? err.message : String(err) });
     }
 
     return { transcript, source: dbSource };
   },
   onFailure: async ({ payload }) => {
+    logger.error("Transcript fetch task failed permanently", { episodeId: payload.episodeId });
     try {
       await db.update(episodes)
         .set({ transcriptRunId: null, transcriptStatus: "failed", updatedAt: new Date() })
         .where(eq(episodes.podcastIndexId, String(payload.episodeId)));
-    } catch {
-      // Best-effort — if DB is unreachable, staleness timeout handles it client-side
+    } catch (error) {
+      logger.error("Failed to update episode status in onFailure", {
+        episodeId: payload.episodeId,
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
   },
 });

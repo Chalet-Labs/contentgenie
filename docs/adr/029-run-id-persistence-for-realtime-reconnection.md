@@ -15,9 +15,9 @@ The `EpisodeActionButtons` component (admin episodes table) and the episode page
 **Root cause:** The `summaryRunId` column already exists on the `episodes` table and is used by the summary flow for exactly this reconnection pattern (see `summarize/route.ts` GET handler, lines 203-224). However, no equivalent `transcriptRunId` column exists, and neither the `fetch-transcript` API route nor the `getEpisodeStatus` server action return run IDs for reconnection.
 
 The summary flow already demonstrates the correct pattern:
-1. **On trigger:** Store `summaryRunId` in the DB (line 139, `summarize/route.ts`)
-2. **On page load:** GET handler checks for in-progress run, reads `summaryRunId` from DB, generates a fresh `publicAccessToken`, and returns both (lines 203-224)
-3. **On completion:** `persistEpisodeSummary` clears `summaryRunId` to null (line 162, `database.ts`)
+1. **On trigger:** Store `summaryRunId` in the DB (the `db.update().set({ summaryRunId: handle.id })` call in the `summarize/route.ts` POST handler)
+2. **On page load:** GET handler checks for in-progress run, reads `summaryRunId` from DB, generates a fresh `publicAccessToken`, and returns both (the in-progress run check in the `summarize/route.ts` GET handler)
+3. **On completion:** `persistEpisodeSummary` clears `summaryRunId` to null (in `database.ts`)
 
 The transcript flow is missing steps 1 and 2.
 
@@ -74,4 +74,4 @@ Additionally, add an `onFailure` handler to clear the run ID when the task crash
 - Migration: Add nullable `transcript_run_id` text column. Zero-risk DDL (nullable, no default, no constraint). Must run `db:push` on dev and production after merge.
 - The `EpisodeTranscriptFetchButton` component on the episode page (`/episode/[id]`) still uses polling — this issue targets only the admin `EpisodeActionButtons`. A future PR can apply the same pattern to the episode page component.
 - `getEpisodeStatus` return type expands to include optional `summaryRunId` and `transcriptRunId` fields. Existing consumers only destructure `transcriptStatus` and `summaryStatus`, so this is backward-compatible.
-- `fetch-transcript` task gains an unconditional `transcriptRunId: null` write at the end of `run` and in an `onFailure` handler. This ensures the run ID is cleared on all termination paths (success, no-transcript, and crash).
+- `fetch-transcript` task gains an unconditional `transcriptRunId: null` write at the end of `run` and in an `onFailure` handler (which also sets `transcriptStatus: "failed"`). This ensures the run ID is cleared on all termination paths (success, no-transcript, and crash).

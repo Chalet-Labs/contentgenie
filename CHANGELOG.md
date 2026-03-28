@@ -6,9 +6,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
-### Fixed
-- Admin transcript fetch button no longer shows a stuck spinner after navigating away and back during an in-flight fetch (#238)
-
 ### Added
 - shadcn Form component with react-hook-form + Zod validation (#234)
 - Migrated collection-dialog, bookmarks-list, ai-provider-card, rss-feed-form to structured form handling
@@ -37,6 +34,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Summarization step progress UI removes `"fetching-transcript"` and `"transcribing-audio"` steps — summarization no longer fetches transcripts
 
 ### Fixed
+- Admin transcript fetch button no longer shows a stuck spinner after navigating away and back during an in-flight fetch (#238)
 - Fixed admin episodes table links navigating to wrong episode page by using PodcastIndex episode ID instead of internal database PK (#240)
 - Fixed notification click navigating to wrong episode page by using PodcastIndex episode ID instead of internal database PK (#229)
 - Prevent stale summary status and scores on the podcast page: `buildSummaryMaps` now gates "completed" badge and `worthItScore` on `processedAt`, and the episode page invalidates the podcast page's Router Cache when summarization completes (#223)

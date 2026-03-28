@@ -179,6 +179,11 @@ describe("getRunReconnectionData", () => {
     expect(result).toEqual({ ok: false, error: "No in-flight run" })
   })
 
+  it("returns error for invalid episode ID", async () => {
+    const result = await getRunReconnectionData(-1, "transcript")
+    expect(result).toEqual({ ok: false, error: "Invalid episode ID" })
+  })
+
   it("returns runId and publicAccessToken for in-progress transcript run", async () => {
     mockEpisodesFindFirst.mockResolvedValue({
       transcriptRunId: "run_transcript_xyz",
@@ -187,7 +192,10 @@ describe("getRunReconnectionData", () => {
     const result = await getRunReconnectionData(1, "transcript")
     expect(result).toEqual({ ok: true, runId: "run_transcript_xyz", publicAccessToken: "test-public-token" })
     expect(mockCreatePublicToken).toHaveBeenCalledWith(
-      expect.objectContaining({ scopes: { read: { runs: ["run_transcript_xyz"] } } })
+      expect.objectContaining({
+        scopes: { read: { runs: ["run_transcript_xyz"] } },
+        expirationTime: "15m",
+      })
     )
   })
 
@@ -199,7 +207,10 @@ describe("getRunReconnectionData", () => {
     const result = await getRunReconnectionData(1, "summary")
     expect(result).toEqual({ ok: true, runId: "run_summary_abc", publicAccessToken: "test-public-token" })
     expect(mockCreatePublicToken).toHaveBeenCalledWith(
-      expect.objectContaining({ scopes: { read: { runs: ["run_summary_abc"] } } })
+      expect.objectContaining({
+        scopes: { read: { runs: ["run_summary_abc"] } },
+        expirationTime: "15m",
+      })
     )
   })
 
