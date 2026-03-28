@@ -5,6 +5,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Clock, Trash2, Plus, Loader2, Bookmark } from "lucide-react";
+import { MAX_SHORT_TEXT } from "@/lib/schemas/library";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -94,7 +95,7 @@ const bookmarkSchema = z.object({
       (val) => parseTimestamp(val) !== null,
       "Invalid format. Use MM:SS or HH:MM:SS"
     ),
-  note: z.string().max(500).optional(),
+  note: z.string().max(MAX_SHORT_TEXT).optional(),
 });
 type BookmarkValues = z.infer<typeof bookmarkSchema>;
 

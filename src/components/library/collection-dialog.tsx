@@ -5,6 +5,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { toast } from "sonner";
+import { MAX_SHORT_TEXT } from "@/lib/schemas/library";
 import {
   Dialog,
   DialogContent,
@@ -29,7 +30,7 @@ import type { Collection } from "@/db/schema";
 
 const collectionSchema = z.object({
   name: z.string().trim().min(1, "Collection name is required").max(255),
-  description: z.string().max(500).optional(),
+  description: z.string().max(MAX_SHORT_TEXT).optional(),
 });
 type CollectionValues = z.infer<typeof collectionSchema>;
 

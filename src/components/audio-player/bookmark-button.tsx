@@ -21,9 +21,9 @@ import {
 } from "@/app/actions/library"
 import { formatTime } from "@/lib/format-time"
 import { BOOKMARK_CHANGED_EVENT } from "@/lib/events"
+import { MAX_SHORT_TEXT } from "@/lib/schemas/library"
 
 const AUTO_DISMISS_MS = 5000
-const MAX_NOTE_LENGTH = 500
 
 export function BookmarkButton() {
   const { currentEpisode } = useAudioPlayerState()
@@ -124,8 +124,8 @@ export function BookmarkButton() {
     const normalizedNote = noteText.normalize("NFKC").trim()
     if (!lastBookmarkId || !normalizedNote) return
 
-    if (normalizedNote.length > MAX_NOTE_LENGTH) {
-      toast.error(`Note is too long (max ${MAX_NOTE_LENGTH} characters)`)
+    if (normalizedNote.length > MAX_SHORT_TEXT) {
+      toast.error(`Note is too long (max ${MAX_SHORT_TEXT} characters)`)
       return
     }
 
@@ -192,7 +192,7 @@ export function BookmarkButton() {
                 startDismissTimer()
               }}
               onKeyDown={handleNoteKeyDown}
-              maxLength={MAX_NOTE_LENGTH}
+              maxLength={MAX_SHORT_TEXT}
               autoFocus
             />
             <div className="flex justify-end">
