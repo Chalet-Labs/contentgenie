@@ -12,6 +12,7 @@ vi.mock("@/components/admin/episodes/episode-action-buttons", () => ({
 }))
 
 import { EpisodesTable } from "@/components/admin/episodes/episodes-table"
+import { ROUTES } from "@/lib/routes"
 import type { EpisodeRow } from "@/lib/admin/episode-queries"
 
 const makeEpisode = (id: number): EpisodeRow => ({
@@ -57,6 +58,6 @@ describe("EpisodesTable", () => {
     const ep = makeEpisode(1)
     render(<EpisodesTable episodes={[ep]} totalCount={1} currentPage={1} />)
     const link = screen.getByRole("link", { name: ep.title })
-    expect(link).toHaveAttribute("href", `/episode/${ep.podcastIndexId}`)
+    expect(link).toHaveAttribute("href", ROUTES.episode(ep.podcastIndexId))
   })
 })
