@@ -26,11 +26,11 @@ export default async function AdminEpisodesPage({
 
   const filters: EpisodeFilters = {
     podcastId: parsed.podcastId ?? undefined,
-    transcriptStatuses: parsed.transcriptStatus ?? undefined,
-    summaryStatuses: parsed.summaryStatus ?? undefined,
+    transcriptStatuses: parsed.transcriptStatus?.filter(Boolean) ?? undefined,
+    summaryStatuses: parsed.summaryStatus?.filter(Boolean) ?? undefined,
     dateFrom: parsed.dateFrom ?? undefined,
     dateTo: parsed.dateTo ?? undefined,
-    page: parsed.page,
+    page: parsed.page > 0 ? parsed.page : 1,
   }
 
   const [{ rows, totalCount }, podcastList] = await Promise.all([

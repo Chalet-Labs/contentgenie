@@ -46,7 +46,7 @@ export function EpisodeFiltersBar({ podcasts }: EpisodeFiltersProps) {
     const next = cur.includes(status)
       ? cur.filter((s) => s !== status)
       : [...cur, status]
-    setFilters({ [type]: next.length > 0 ? next : null })
+    setFilters({ [type]: next.length > 0 ? next : null, page: 1 })
   }
 
   const handleClearAll = () => {
@@ -85,7 +85,7 @@ export function EpisodeFiltersBar({ podcasts }: EpisodeFiltersProps) {
               <CommandGroup>
                 <CommandItem
                   value="all"
-                  onSelect={() => setFilters({ podcastId: null })}
+                  onSelect={() => setFilters({ podcastId: null, page: 1 })}
                 >
                   All podcasts
                 </CommandItem>
@@ -93,7 +93,7 @@ export function EpisodeFiltersBar({ podcasts }: EpisodeFiltersProps) {
                   <CommandItem
                     key={p.id}
                     value={p.title}
-                    onSelect={() => setFilters({ podcastId: p.id })}
+                    onSelect={() => setFilters({ podcastId: p.id, page: 1 })}
                   >
                     {p.title}
                   </CommandItem>
@@ -157,9 +157,9 @@ export function EpisodeFiltersBar({ podcasts }: EpisodeFiltersProps) {
           const d = e.target.value ? new Date(e.target.value) : null
           const from = d && !isNaN(d.getTime()) ? d : null
           if (from && filters.dateTo && from > filters.dateTo) {
-            setFilters({ dateFrom: filters.dateTo, dateTo: from })
+            setFilters({ dateFrom: filters.dateTo, dateTo: from, page: 1 })
           } else {
-            setFilters({ dateFrom: from })
+            setFilters({ dateFrom: from, page: 1 })
           }
         }}
         placeholder="From"
@@ -174,9 +174,9 @@ export function EpisodeFiltersBar({ podcasts }: EpisodeFiltersProps) {
           const d = e.target.value ? new Date(e.target.value) : null
           const to = d && !isNaN(d.getTime()) ? d : null
           if (to && filters.dateFrom && to < filters.dateFrom) {
-            setFilters({ dateFrom: to, dateTo: filters.dateFrom })
+            setFilters({ dateFrom: to, dateTo: filters.dateFrom, page: 1 })
           } else {
-            setFilters({ dateTo: to })
+            setFilters({ dateTo: to, page: 1 })
           }
         }}
         placeholder="To"

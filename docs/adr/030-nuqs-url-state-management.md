@@ -32,7 +32,7 @@ Shared parser maps live in `src/lib/search-params/`:
 - `discover.ts` — exports `discoverSearchParams` for the `q` param
 - `admin-episodes.ts` — exports `adminEpisodeSearchParams` (client parsers) and `loadAdminEpisodeSearchParams` (server loader via `createLoader`)
 
-A single parser definition serves both client hooks and server-side cache, ensuring client and server always agree on serialization format and defaults.
+A single parser definition serves both client hooks and server-side loader, ensuring client and server always agree on serialization format and defaults.
 
 ### Client hooks
 
@@ -64,13 +64,13 @@ This is a breaking change for persisted URLs (bookmarks, shared links). However,
 | Surface | Before | After |
 |---------|--------|-------|
 | Discover `q` param | `useSearchParams` + `useRouter` | `useQueryState` |
-| Admin episode filters | `parseEpisodeFilters` + local state + `URLSearchParams` | `useQueryStates` + `createSearchParamsCache` |
+| Admin episode filters | `parseEpisodeFilters` + local state + `URLSearchParams` | `useQueryStates` + `createLoader` |
 
 The `EpisodeFilters` interface and `buildEpisodeWhereConditions()` Drizzle query builder are unchanged — they consume the same typed shape regardless of how params are parsed.
 
 ## Future guidance
 
-All new URL-param surfaces should use nuqs. Define parsers in `src/lib/search-params/<feature>.ts`, export both client parsers and a server cache, and import from there in both the page Server Component and client components. Do not add new `useSearchParams`/`useRouter` URL manipulation patterns.
+All new URL-param surfaces should use nuqs. Define parsers in `src/lib/search-params/<feature>.ts`, export both client parsers and a server loader, and import from there in both the page Server Component and client components. Do not add new `useSearchParams`/`useRouter` URL manipulation patterns.
 
 ## Consequences
 
