@@ -4,7 +4,9 @@ import { eq } from "drizzle-orm";
 import { tasks, auth } from "@trigger.dev/sdk";
 import { db } from "@/db";
 import { episodes } from "@/db/schema";
+import { upsertPodcast } from "@/db/helpers";
 import { ADMIN_ROLE } from "@/lib/auth-roles";
+import { getEpisodeById, getPodcastById } from "@/lib/podcastindex";
 import type { fetchTranscriptTask } from "@/trigger/fetch-transcript";
 
 export async function POST(request: NextRequest) {
@@ -26,45 +28,147 @@ export async function POST(request: NextRequest) {
   if (!body || typeof body !== "object" || Array.isArray(body)) {
     return NextResponse.json({ error: "Request body must be a JSON object" }, { status: 400 });
   }
-  const { episodeId } = body as { episodeId?: unknown };
+  const { episodeId, podcastIndexId: rawPodcastIndexId } = body as { episodeId?: unknown; podcastIndexId?: unknown };
 
-  // Validate: episodeId is episodes.id (DB primary key), NOT podcastIndexId
-  if (typeof episodeId !== "number" || !Number.isInteger(episodeId) || episodeId <= 0) {
+  // Two accepted paths:
+  // 1. episodeId (DB primary key) — existing callers, backward-compatible
+  // 2. podcastIndexId — new path for episodes with no DB row yet
+
+  let resolvedEpisodeId: number; // episodes.id (DB primary key)
+  let numericPodcastIndexId: number;
+
+  if (episodeId !== undefined) {
+    // --- Path 1: episodeId (DB primary key) ---
+    if (typeof episodeId !== "number" || !Number.isInteger(episodeId) || episodeId <= 0) {
+      return NextResponse.json({ error: "A valid positive episode ID is required" }, { status: 400 });
+    }
+
+    const [episode] = await db
+      .select({
+        id: episodes.id,
+        podcastIndexId: episodes.podcastIndexId,
+        audioUrl: episodes.audioUrl,
+        description: episodes.description,
+      })
+      .from(episodes)
+      .where(eq(episodes.id, episodeId))
+      .limit(1);
+    if (!episode) {
+      return NextResponse.json({ error: "Episode not found" }, { status: 404 });
+    }
+
+    // Validate podcastIndexId is numeric BEFORE the optimistic update —
+    // RSS-sourced episodes have synthetic "rss-..." IDs that would produce NaN.
+    numericPodcastIndexId = Number(episode.podcastIndexId);
+    if (!Number.isFinite(numericPodcastIndexId) || numericPodcastIndexId <= 0) {
+      return NextResponse.json(
+        { error: "Episode has a non-numeric PodcastIndex ID and cannot be fetched via this endpoint" },
+        { status: 400 }
+      );
+    }
+
+    resolvedEpisodeId = episode.id;
+  } else if (rawPodcastIndexId !== undefined) {
+    // --- Path 2: podcastIndexId — look up or create episode row on demand ---
+    const parsedPodcastIndexId = Number(rawPodcastIndexId);
+    if (
+      typeof rawPodcastIndexId === "string" && rawPodcastIndexId.startsWith("rss-")
+    ) {
+      return NextResponse.json(
+        { error: "Episode has a non-numeric PodcastIndex ID and cannot be fetched via this endpoint" },
+        { status: 400 }
+      );
+    }
+    if (!Number.isFinite(parsedPodcastIndexId) || parsedPodcastIndexId <= 0) {
+      return NextResponse.json({ error: "A valid positive podcastIndexId is required" }, { status: 400 });
+    }
+
+    numericPodcastIndexId = parsedPodcastIndexId;
+    const podcastIndexIdStr = numericPodcastIndexId.toString();
+
+    // Look for an existing DB row
+    const existingEpisode = await db.query.episodes.findFirst({
+      where: eq(episodes.podcastIndexId, podcastIndexIdStr),
+      columns: { id: true },
+    });
+
+    if (existingEpisode) {
+      resolvedEpisodeId = existingEpisode.id;
+    } else {
+      // No DB row — fetch episode + podcast from PodcastIndex, then create stub
+      let piEpisode: Awaited<ReturnType<typeof getEpisodeById>>["episode"];
+      try {
+        const piResponse = await getEpisodeById(numericPodcastIndexId);
+        piEpisode = piResponse.episode;
+      } catch {
+        return NextResponse.json({ error: "Episode not found in PodcastIndex" }, { status: 404 });
+      }
+      if (!piEpisode) {
+        return NextResponse.json({ error: "Episode not found in PodcastIndex" }, { status: 404 });
+      }
+
+      // Ensure the podcast row exists
+      let podcastDbId: number;
+      try {
+        const piPodcastResponse = await getPodcastById(piEpisode.feedId);
+        const piPodcast = piPodcastResponse.feed;
+        const categoryValues = piPodcast.categories ? Object.values(piPodcast.categories) : [];
+        podcastDbId = await upsertPodcast({
+          podcastIndexId: piEpisode.feedId.toString(),
+          title: piPodcast.title,
+          description: piPodcast.description,
+          publisher: piPodcast.author || piPodcast.ownerName,
+          imageUrl: piPodcast.artwork || piPodcast.image,
+          rssFeedUrl: piPodcast.url,
+          categories: categoryValues.length > 0 ? categoryValues : undefined,
+          totalEpisodes: piPodcast.episodeCount,
+          latestEpisodeDate: piPodcast.newestItemPubdate
+            ? new Date(piPodcast.newestItemPubdate * 1000)
+            : undefined,
+        }, { updateOnConflict: "full" });
+      } catch {
+        return NextResponse.json({ error: "Failed to fetch podcast data from PodcastIndex" }, { status: 502 });
+      }
+
+      // Insert episode stub with transcriptStatus: "fetching" atomically.
+      // onConflictDoNothing handles race conditions (concurrent insert wins).
+      await db.insert(episodes).values({
+        podcastId: podcastDbId,
+        podcastIndexId: podcastIndexIdStr,
+        title: piEpisode.title,
+        description: piEpisode.description,
+        audioUrl: piEpisode.enclosureUrl,
+        duration: piEpisode.duration,
+        publishDate: piEpisode.datePublished
+          ? new Date(piEpisode.datePublished * 1000)
+          : null,
+        transcriptStatus: "fetching",
+        transcriptError: null,
+      }).onConflictDoNothing({ target: episodes.podcastIndexId });
+
+      // Always re-query to get the authoritative id — onConflictDoNothing
+      // returns nothing when a concurrent insert won the race.
+      const createdEpisode = await db.query.episodes.findFirst({
+        where: eq(episodes.podcastIndexId, podcastIndexIdStr),
+        columns: { id: true },
+      });
+      if (!createdEpisode) {
+        return NextResponse.json({ error: "Failed to create episode record" }, { status: 500 });
+      }
+      resolvedEpisodeId = createdEpisode.id;
+    }
+  } else {
     return NextResponse.json({ error: "A valid positive episode ID is required" }, { status: 400 });
   }
 
-  const [episode] = await db
-    .select({
-      id: episodes.id,
-      podcastIndexId: episodes.podcastIndexId,
-      audioUrl: episodes.audioUrl,
-      description: episodes.description,
-    })
-    .from(episodes)
-    .where(eq(episodes.id, episodeId))
-    .limit(1);
-  if (!episode) {
-    return NextResponse.json({ error: "Episode not found" }, { status: 404 });
-  }
-
-  // Validate podcastIndexId is numeric BEFORE the optimistic update —
-  // RSS-sourced episodes have synthetic "rss-..." IDs that would produce NaN.
-  // If we set 'fetching' first, the row gets stuck in that state on 400.
-  const numericPodcastIndexId = Number(episode.podcastIndexId);
-  if (!Number.isFinite(numericPodcastIndexId) || numericPodcastIndexId <= 0) {
-    return NextResponse.json(
-      { error: "Episode has a non-numeric PodcastIndex ID and cannot be fetched via this endpoint" },
-      { status: 400 }
-    );
-  }
-
   // Set transcriptStatus to 'fetching' optimistically so the UI shows immediate feedback.
-  // Only after validating the episode is queueable — avoids leaving rows stuck in 'fetching'.
+  // (For the podcastIndexId path, the stub was inserted with this status already — this
+  // update is still safe and handles the "existing row" sub-case.)
   await db.update(episodes).set({
     transcriptStatus: "fetching",
     transcriptError: null,
     updatedAt: new Date(),
-  }).where(eq(episodes.id, episodeId));
+  }).where(eq(episodes.id, resolvedEpisodeId));
 
   // CRITICAL: episodeId in the task payload is podcastIndexId (as a number), NOT episodes.id.
   // The fetch-transcript task looks up the episode by podcastIndexId internally.
@@ -72,8 +176,6 @@ export async function POST(request: NextRequest) {
     "fetch-transcript",
     {
       episodeId: numericPodcastIndexId,
-      enclosureUrl: episode.audioUrl ?? undefined,
-      description: episode.description ?? undefined,
       force: true, // Admin is explicitly requesting a re-fetch — skip cache check
     }
   );
@@ -83,9 +185,9 @@ export async function POST(request: NextRequest) {
     await db.update(episodes).set({
       transcriptRunId: handle.id,
       updatedAt: new Date(),
-    }).where(eq(episodes.id, episodeId));
+    }).where(eq(episodes.id, resolvedEpisodeId));
   } catch (err) {
-    console.error("Failed to store transcriptRunId:", { episodeId, runId: handle.id, error: err instanceof Error ? err.message : String(err) });
+    console.error("Failed to store transcriptRunId:", { episodeId: resolvedEpisodeId, runId: handle.id, error: err instanceof Error ? err.message : String(err) });
   }
 
   // Token creation is non-critical — if it fails, the run is still queued.
@@ -100,7 +202,12 @@ export async function POST(request: NextRequest) {
   }
 
   return NextResponse.json(
-    { status: "queued", runId: handle.id, ...(publicAccessToken && { publicAccessToken }) },
+    {
+      status: "queued",
+      runId: handle.id,
+      episodeDbId: resolvedEpisodeId,
+      ...(publicAccessToken && { publicAccessToken }),
+    },
     { status: 202 }
   );
   } catch (error) {

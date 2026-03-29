@@ -14,7 +14,7 @@ import { getEpisodeStatus } from "@/app/actions/admin"
 import type { TranscriptStatus } from "@/db/schema"
 
 interface EpisodeTranscriptFetchButtonProps {
-  episodeDbId: number
+  episodeDbId: number | null
   podcastIndexId: string
   transcriptStatus: TranscriptStatus | null
   onTranscriptReady: () => void
@@ -37,26 +37,10 @@ export function EpisodeTranscriptFetchButton({
   const pollCount = useRef(0)
   const onTranscriptReadyRef = useRef(onTranscriptReady)
   onTranscriptReadyRef.current = onTranscriptReady
+  // Tracks the resolved DB id — may be populated from the API response when episodeDbId is null at mount
+  const resolvedDbIdRef = useRef<number | null>(episodeDbId)
 
-  useEffect(() => {
-    // If mounted mid-fetch, start polling immediately so the UI doesn't get stuck
-    if (initialTranscriptStatus === "fetching") {
-      startPolling()
-    }
-    return () => {
-      if (pollRef.current) clearInterval(pollRef.current)
-    }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
-
-  // null = unprocessed episode; show fetch button so admins can trigger a transcript fetch
-  if (transcriptStatus === "available") {
-    return null
-  }
-
-  const isRss = podcastIndexId.startsWith("rss-")
-  const label = isFetching ? "Fetching transcript..." : "Fetch & Summarize"
-
-  const startPolling = () => {
+  function startPolling(dbId: number) {
     pollCount.current = 0
     if (pollRef.current) clearInterval(pollRef.current)
 
@@ -64,7 +48,7 @@ export function EpisodeTranscriptFetchButton({
       try {
         pollCount.current += 1
 
-        const result = await getEpisodeStatus(episodeDbId)
+        const result = await getEpisodeStatus(dbId)
 
         if (!result.ok) {
           clearInterval(pollRef.current!)
@@ -96,14 +80,38 @@ export function EpisodeTranscriptFetchButton({
     }, POLL_INTERVAL_MS)
   }
 
+  useEffect(() => {
+    // Only start polling on mount if we have a DB ID to poll against.
+    // When episodeDbId is null, the page opened mid-flight but there is no
+    // DB row yet — getEpisodeStatus(null) would fail server-side.
+    if (initialTranscriptStatus === "fetching" && episodeDbId !== null) {
+      startPolling(episodeDbId)
+    }
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current)
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // null = unprocessed episode; show fetch button so admins can trigger a transcript fetch
+  if (transcriptStatus === "available") {
+    return null
+  }
+
+  const isRss = podcastIndexId.startsWith("rss-")
+  const label = isFetching ? "Fetching transcript..." : "Fetch & Summarize"
+
   const handleClick = async () => {
     setIsFetching(true)
 
     try {
+      const body = resolvedDbIdRef.current !== null
+        ? { episodeId: resolvedDbIdRef.current }
+        : { podcastIndexId }
+
       const res = await fetch("/api/episodes/fetch-transcript", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ episodeId: episodeDbId }),
+        body: JSON.stringify(body),
       })
 
       if (!res.ok) {
@@ -111,7 +119,22 @@ export function EpisodeTranscriptFetchButton({
         throw new Error(errBody?.error ?? `Request failed (HTTP ${res.status})`)
       }
 
-      startPolling()
+      const responseData = await res.json().catch(() => null)
+
+      // Capture episodeDbId from response so we can poll even when we started without one
+      const returnedDbId: number | null =
+        typeof responseData?.episodeDbId === "number" ? responseData.episodeDbId : null
+
+      if (returnedDbId !== null) {
+        resolvedDbIdRef.current = returnedDbId
+        startPolling(returnedDbId)
+      } else if (resolvedDbIdRef.current !== null) {
+        startPolling(resolvedDbIdRef.current)
+      } else {
+        // No DB ID available — can't poll, but run was queued
+        setIsFetching(false)
+        toast.error("Transcript fetch started but status polling is unavailable — refresh the page to check progress")
+      }
     } catch (err) {
       setIsFetching(false)
       toast.error(err instanceof Error ? err.message : "Failed to start transcript fetch")
