@@ -12,13 +12,21 @@ vi.mock("sonner", () => ({
 
 const defaultProps = {
   title: "Test Episode",
-  text: "Check out this episode",
-  url: "https://example.com/episode/123",
+  text: "Test Episode",
+  url: "https://contentgenie.ch/episode/123",
 };
 
 function cleanupShareMocks() {
-  Object.defineProperty(navigator, "share", { value: undefined, configurable: true, writable: true });
-  Object.defineProperty(navigator, "canShare", { value: undefined, configurable: true, writable: true });
+  Object.defineProperty(navigator, "share", {
+    value: undefined,
+    configurable: true,
+    writable: true,
+  });
+  Object.defineProperty(navigator, "canShare", {
+    value: undefined,
+    configurable: true,
+    writable: true,
+  });
 }
 
 describe("ShareButton", () => {
@@ -31,27 +39,128 @@ describe("ShareButton", () => {
     cleanupShareMocks();
   });
 
-  it("renders Share button text", () => {
+  it("renders the Share trigger button", () => {
     render(<ShareButton {...defaultProps} />);
-    expect(screen.getByRole("button", { name: /share/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /share/i })
+    ).toBeInTheDocument();
   });
 
-  it("calls navigator.share when share and canShare are available", async () => {
-    const shareMock = vi.fn().mockResolvedValue(undefined);
-    const canShareMock = vi.fn().mockReturnValue(true);
-    Object.defineProperty(navigator, "share", { value: shareMock, configurable: true, writable: true });
-    Object.defineProperty(navigator, "canShare", { value: canShareMock, configurable: true, writable: true });
+  it("shows Copy link option in dropdown", async () => {
+    const user = userEvent.setup();
+    render(<ShareButton {...defaultProps} />);
+    await user.click(screen.getByRole("button", { name: /share/i }));
+    expect(screen.getByText("Copy link")).toBeInTheDocument();
+  });
+
+  it("does not show native Share option when navigator.share is unavailable", async () => {
+    const user = userEvent.setup();
+    render(<ShareButton {...defaultProps} />);
+    await user.click(screen.getByRole("button", { name: /share/i }));
+    // Only "Copy link" should be present, no "Share" menu item
+    const menuItems = screen.getAllByRole("menuitem");
+    expect(menuItems).toHaveLength(1);
+    expect(menuItems[0]).toHaveTextContent("Copy link");
+  });
+
+  it("shows native Share option when navigator.share is available", async () => {
+    Object.defineProperty(navigator, "share", {
+      value: vi.fn().mockResolvedValue(undefined),
+      configurable: true,
+      writable: true,
+    });
 
     const user = userEvent.setup();
     render(<ShareButton {...defaultProps} />);
-    await user.click(screen.getByRole("button"));
+    await user.click(screen.getByRole("button", { name: /share/i }));
+    // Scope to menuitems to avoid matching the trigger button which also says "Share"
+    const menuItems = screen.getAllByRole("menuitem");
+    expect(menuItems.some((item) => item.textContent?.includes("Share"))).toBe(true);
+    expect(screen.getByText("Copy link")).toBeInTheDocument();
+  });
+
+  it("does not show Copy with summary when no summary prop", async () => {
+    const user = userEvent.setup();
+    render(<ShareButton {...defaultProps} />);
+    await user.click(screen.getByRole("button", { name: /share/i }));
+    expect(screen.queryByText("Copy with summary")).not.toBeInTheDocument();
+  });
+
+  it("shows Copy with summary when summary prop is provided", async () => {
+    const user = userEvent.setup();
+    render(
+      <ShareButton {...defaultProps} summary="Great insights on AI trends" />
+    );
+    await user.click(screen.getByRole("button", { name: /share/i }));
+    expect(screen.getByText("Copy with summary")).toBeInTheDocument();
+  });
+
+  it("copies only URL when Copy link is clicked", async () => {
+    const writeTextMock = vi.fn().mockResolvedValue(undefined);
+    vi.spyOn(navigator.clipboard, "writeText").mockImplementation(
+      writeTextMock
+    );
+
+    const { toast } = await import("sonner");
+    const user = userEvent.setup();
+    render(<ShareButton {...defaultProps} />);
+    await user.click(screen.getByRole("button", { name: /share/i }));
+    await user.click(screen.getByText("Copy link"));
 
     await waitFor(() => {
-      expect(canShareMock).toHaveBeenCalledWith({
-        title: defaultProps.title,
-        text: defaultProps.text,
-        url: defaultProps.url,
-      });
+      expect(writeTextMock).toHaveBeenCalledWith(defaultProps.url);
+      expect(toast.success).toHaveBeenCalledWith("Link copied to clipboard");
+    });
+  });
+
+  it("copies formatted text when Copy with summary is clicked", async () => {
+    const summary = "Great insights on AI trends";
+    const writeTextMock = vi.fn().mockResolvedValue(undefined);
+    vi.spyOn(navigator.clipboard, "writeText").mockImplementation(
+      writeTextMock
+    );
+
+    const { toast } = await import("sonner");
+    const user = userEvent.setup();
+    render(<ShareButton {...defaultProps} summary={summary} />);
+    await user.click(screen.getByRole("button", { name: /share/i }));
+    await user.click(screen.getByText("Copy with summary"));
+
+    await waitFor(() => {
+      expect(writeTextMock).toHaveBeenCalledWith(
+        `${defaultProps.title}\n\n${summary}\n\n${defaultProps.url}`
+      );
+      expect(toast.success).toHaveBeenCalledWith("Copied to clipboard");
+    });
+  });
+
+  it("calls navigator.share with correct data for native Share", async () => {
+    const shareMock = vi.fn().mockResolvedValue(undefined);
+    const canShareMock = vi.fn().mockReturnValue(true);
+    Object.defineProperty(navigator, "share", {
+      value: shareMock,
+      configurable: true,
+      writable: true,
+    });
+    Object.defineProperty(navigator, "canShare", {
+      value: canShareMock,
+      configurable: true,
+      writable: true,
+    });
+
+    const user = userEvent.setup();
+    render(<ShareButton {...defaultProps} />);
+    await user.click(screen.getByRole("button", { name: /share/i }));
+
+    // The dropdown will have both "Share" (native) and "Copy link"
+    // Click the "Share" menu item (the native share one)
+    const menuItems = screen.getAllByRole("menuitem");
+    const shareItem = menuItems.find((item) =>
+      item.textContent?.includes("Share")
+    );
+    await user.click(shareItem!);
+
+    await waitFor(() => {
       expect(shareMock).toHaveBeenCalledWith({
         title: defaultProps.title,
         text: defaultProps.text,
@@ -60,17 +169,31 @@ describe("ShareButton", () => {
     });
   });
 
-  it("silently handles AbortError from cancelled share", async () => {
+  it("silently handles AbortError from cancelled native share", async () => {
     const abortError = new DOMException("Share cancelled", "AbortError");
     const shareMock = vi.fn().mockRejectedValue(abortError);
     const canShareMock = vi.fn().mockReturnValue(true);
-    Object.defineProperty(navigator, "share", { value: shareMock, configurable: true, writable: true });
-    Object.defineProperty(navigator, "canShare", { value: canShareMock, configurable: true, writable: true });
+    Object.defineProperty(navigator, "share", {
+      value: shareMock,
+      configurable: true,
+      writable: true,
+    });
+    Object.defineProperty(navigator, "canShare", {
+      value: canShareMock,
+      configurable: true,
+      writable: true,
+    });
 
     const { toast } = await import("sonner");
     const user = userEvent.setup();
     render(<ShareButton {...defaultProps} />);
-    await user.click(screen.getByRole("button"));
+    await user.click(screen.getByRole("button", { name: /share/i }));
+
+    const menuItems = screen.getAllByRole("menuitem");
+    const shareItem = menuItems.find((item) =>
+      item.textContent?.includes("Share")
+    );
+    await user.click(shareItem!);
 
     await waitFor(() => {
       expect(shareMock).toHaveBeenCalled();
@@ -80,72 +203,21 @@ describe("ShareButton", () => {
     expect(toast).not.toHaveBeenCalled();
   });
 
-  it("falls back to clipboard when canShare returns false", async () => {
-    const canShareMock = vi.fn().mockReturnValue(false);
-    Object.defineProperty(navigator, "share", { value: vi.fn(), configurable: true, writable: true });
-    Object.defineProperty(navigator, "canShare", { value: canShareMock, configurable: true, writable: true });
-
-    const writeTextMock = vi.fn().mockResolvedValue(undefined);
-    vi.spyOn(navigator.clipboard, "writeText").mockImplementation(writeTextMock);
+  it("shows toast with URL when clipboard write fails on Copy link", async () => {
+    vi.spyOn(navigator.clipboard, "writeText").mockRejectedValue(
+      new Error("Clipboard denied")
+    );
 
     const { toast } = await import("sonner");
     const user = userEvent.setup();
     render(<ShareButton {...defaultProps} />);
-    await user.click(screen.getByRole("button"));
-
-    await waitFor(() => {
-      expect(writeTextMock).toHaveBeenCalledWith(defaultProps.url);
-      expect(toast.success).toHaveBeenCalledWith("Link copied to clipboard");
-    });
-  });
-
-  it("falls back to clipboard when navigator.share is undefined", async () => {
-    const writeTextMock = vi.fn().mockResolvedValue(undefined);
-    vi.spyOn(navigator.clipboard, "writeText").mockImplementation(writeTextMock);
-
-    const { toast } = await import("sonner");
-    const user = userEvent.setup();
-    render(<ShareButton {...defaultProps} />);
-    await user.click(screen.getByRole("button"));
-
-    await waitFor(() => {
-      expect(writeTextMock).toHaveBeenCalledWith(defaultProps.url);
-      expect(toast.success).toHaveBeenCalledWith("Link copied to clipboard");
-    });
-  });
-
-  it("shows toast with URL when both share and clipboard fail", async () => {
-    vi.spyOn(navigator.clipboard, "writeText").mockRejectedValue(new Error("Clipboard denied"));
-
-    const { toast } = await import("sonner");
-    const user = userEvent.setup();
-    render(<ShareButton {...defaultProps} />);
-    await user.click(screen.getByRole("button"));
+    await user.click(screen.getByRole("button", { name: /share/i }));
+    await user.click(screen.getByText("Copy link"));
 
     await waitFor(() => {
       expect(toast).toHaveBeenCalledWith("Could not copy link", {
         description: defaultProps.url,
       });
-    });
-  });
-
-  it("falls back to clipboard when share throws non-AbortError", async () => {
-    const shareMock = vi.fn().mockRejectedValue(new TypeError("Share failed"));
-    const canShareMock = vi.fn().mockReturnValue(true);
-    Object.defineProperty(navigator, "share", { value: shareMock, configurable: true, writable: true });
-    Object.defineProperty(navigator, "canShare", { value: canShareMock, configurable: true, writable: true });
-
-    const writeTextMock = vi.fn().mockResolvedValue(undefined);
-    vi.spyOn(navigator.clipboard, "writeText").mockImplementation(writeTextMock);
-
-    const { toast } = await import("sonner");
-    const user = userEvent.setup();
-    render(<ShareButton {...defaultProps} />);
-    await user.click(screen.getByRole("button"));
-
-    await waitFor(() => {
-      expect(writeTextMock).toHaveBeenCalledWith(defaultProps.url);
-      expect(toast.success).toHaveBeenCalledWith("Link copied to clipboard");
     });
   });
 
