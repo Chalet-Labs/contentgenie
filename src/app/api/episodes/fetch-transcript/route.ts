@@ -36,6 +36,8 @@ export async function POST(request: NextRequest) {
 
   let resolvedEpisodeId: number; // episodes.id (DB primary key)
   let numericPodcastIndexId: number;
+  let resolvedAudioUrl: string | undefined;
+  let resolvedDescription: string | undefined;
 
   if (episodeId !== undefined) {
     // --- Path 1: episodeId (DB primary key) ---
@@ -68,6 +70,8 @@ export async function POST(request: NextRequest) {
     }
 
     resolvedEpisodeId = episode.id;
+    resolvedAudioUrl = episode.audioUrl ?? undefined;
+    resolvedDescription = episode.description ?? undefined;
   } else if (rawPodcastIndexId !== undefined) {
     // --- Path 2: podcastIndexId — look up or create episode row on demand ---
     const parsedPodcastIndexId = Number(rawPodcastIndexId);
@@ -89,11 +93,13 @@ export async function POST(request: NextRequest) {
     // Look for an existing DB row
     const existingEpisode = await db.query.episodes.findFirst({
       where: eq(episodes.podcastIndexId, podcastIndexIdStr),
-      columns: { id: true },
+      columns: { id: true, audioUrl: true, description: true },
     });
 
     if (existingEpisode) {
       resolvedEpisodeId = existingEpisode.id;
+      resolvedAudioUrl = existingEpisode.audioUrl ?? undefined;
+      resolvedDescription = existingEpisode.description ?? undefined;
     } else {
       // No DB row — fetch episode + podcast from PodcastIndex, then create stub
       let piEpisode: Awaited<ReturnType<typeof getEpisodeById>>["episode"];
@@ -156,6 +162,8 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "Failed to create episode record" }, { status: 500 });
       }
       resolvedEpisodeId = createdEpisode.id;
+      resolvedAudioUrl = piEpisode.enclosureUrl ?? undefined;
+      resolvedDescription = piEpisode.description ?? undefined;
     }
   } else {
     return NextResponse.json({ error: "A valid positive episode ID is required" }, { status: 400 });
@@ -176,6 +184,8 @@ export async function POST(request: NextRequest) {
     "fetch-transcript",
     {
       episodeId: numericPodcastIndexId,
+      enclosureUrl: resolvedAudioUrl,
+      description: resolvedDescription,
       force: true, // Admin is explicitly requesting a re-fetch — skip cache check
     }
   );
