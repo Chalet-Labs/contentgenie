@@ -297,7 +297,7 @@ describe("POST /api/episodes/fetch-transcript", () => {
     expect(data.episodeDbId).toBe(5);
   });
 
-  it("sets transcriptStatus to 'fetching' before triggering task (episodeId path)", async () => {
+  it("sets transcriptStatus to 'fetching' after triggering task (episodeId path)", async () => {
     vi.mocked(auth).mockResolvedValue({
       userId: "admin_1",
       has: vi.fn().mockReturnValue(true),
@@ -416,6 +416,7 @@ describe("POST /api/episodes/fetch-transcript", () => {
     expect(response.status).toBe(500);
     const data = await response.json();
     expect(data.error).toBe("An unexpected error occurred");
+    expect(data).not.toHaveProperty("details");
   });
 
   // ─── podcastIndexId path (new behavior) ───────────────────────────────────

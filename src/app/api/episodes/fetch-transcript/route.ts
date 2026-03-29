@@ -148,7 +148,8 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: "Failed to fetch podcast data from PodcastIndex" }, { status: 502 });
       }
 
-      // Insert episode stub with transcriptStatus: "fetching" atomically.
+      // Insert episode stub — leave transcriptStatus as null until the task is
+      // actually queued, so a failed trigger doesn't leave the row stuck in "fetching".
       // onConflictDoNothing handles race conditions (concurrent insert wins).
       try {
         await db.insert(episodes).values({
@@ -161,7 +162,7 @@ export async function POST(request: NextRequest) {
           publishDate: piEpisode.datePublished
             ? new Date(piEpisode.datePublished * 1000)
             : null,
-          transcriptStatus: "fetching",
+          transcriptStatus: null,
           transcriptError: null,
         }).onConflictDoNothing({ target: episodes.podcastIndexId });
       } catch (err) {
@@ -186,16 +187,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "A valid positive episode ID is required" }, { status: 400 });
   }
 
-  // Set transcriptStatus to 'fetching' optimistically so the UI shows immediate feedback.
-  // This runs after all validation to avoid leaving rows stuck in 'fetching' on error.
-  // For the podcastIndexId path the stub was already inserted with this status —
-  // this update is idempotent and also covers the "existing row" sub-case.
-  await db.update(episodes).set({
-    transcriptStatus: "fetching",
-    transcriptError: null,
-    updatedAt: new Date(),
-  }).where(eq(episodes.id, resolvedEpisodeId));
-
   // CRITICAL: episodeId in the task payload is podcastIndexId (as a number), NOT episodes.id.
   // The fetch-transcript task looks up the episode by podcastIndexId internally.
   const handle = await tasks.trigger<typeof fetchTranscriptTask>(
@@ -208,14 +199,17 @@ export async function POST(request: NextRequest) {
     }
   );
 
-  // Store the run ID so the UI can reconnect after navigation.
+  // Set transcriptStatus and transcriptRunId together AFTER the task is queued.
+  // This prevents rows getting stuck in "fetching" with no runId if trigger fails.
   try {
     await db.update(episodes).set({
+      transcriptStatus: "fetching",
       transcriptRunId: handle.id,
+      transcriptError: null,
       updatedAt: new Date(),
     }).where(eq(episodes.id, resolvedEpisodeId));
   } catch (err) {
-    console.error("Failed to store transcriptRunId:", { episodeId: resolvedEpisodeId, runId: handle.id, error: err instanceof Error ? err.message : String(err) });
+    console.error("Failed to update episode after trigger:", { episodeId: resolvedEpisodeId, runId: handle.id, error: err instanceof Error ? err.message : String(err) });
   }
 
   // Token creation is non-critical — if it fails, the run is still queued.
@@ -241,7 +235,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error("Unhandled error in fetch-transcript route:", error);
     return NextResponse.json(
-      { error: "An unexpected error occurred", details: error instanceof Error ? error.message : "Unknown error" },
+      { error: "An unexpected error occurred" },
       { status: 500 }
     );
   }
