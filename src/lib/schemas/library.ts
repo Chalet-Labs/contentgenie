@@ -1,5 +1,8 @@
 import { z } from "zod";
 
+/** Shared max-length for short user text (notes, descriptions, etc.). */
+export const MAX_SHORT_TEXT = 500;
+
 const trimmedNonEmpty = z.string().trim().min(1).max(500);
 const optionalUrl = z
   .union([z.url().max(2048), z.literal("")])
