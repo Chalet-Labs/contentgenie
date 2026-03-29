@@ -415,7 +415,7 @@ describe("POST /api/episodes/fetch-transcript", () => {
 
     expect(response.status).toBe(500);
     const data = await response.json();
-    expect(data.error).toBe("Failed to trigger transcript fetch");
+    expect(data.error).toBe("An unexpected error occurred");
   });
 
   // ─── podcastIndexId path (new behavior) ───────────────────────────────────
@@ -503,10 +503,24 @@ describe("POST /api/episodes/fetch-transcript", () => {
     expect(response.status).toBe(400);
   });
 
-  it("returns 404 when PodcastIndex API returns no episode for podcastIndexId", async () => {
+  it("returns 502 when PodcastIndex API throws for podcastIndexId lookup", async () => {
     const { getEpisodeById } = await import("@/lib/podcastindex");
     vi.mocked(auth).mockResolvedValue({ userId: "admin_1", has: vi.fn().mockReturnValue(true) } as never);
-    vi.mocked(getEpisodeById).mockRejectedValue(new Error("Not found"));
+    vi.mocked(getEpisodeById).mockRejectedValue(new Error("Network error"));
+    mockDbQueryEpisodesFindFirst.mockResolvedValue(null);
+
+    const { POST } = await import("@/app/api/episodes/fetch-transcript/route");
+    const response = await POST(makeRequest({ podcastIndexId: "98765" }));
+    const data = await response.json();
+
+    expect(response.status).toBe(502);
+    expect(data.error).toMatch(/failed to look up/i);
+  });
+
+  it("returns 404 when PodcastIndex API returns null episode for podcastIndexId", async () => {
+    const { getEpisodeById } = await import("@/lib/podcastindex");
+    vi.mocked(auth).mockResolvedValue({ userId: "admin_1", has: vi.fn().mockReturnValue(true) } as never);
+    vi.mocked(getEpisodeById).mockResolvedValue({ status: "true", episode: null as never, description: "" });
     mockDbQueryEpisodesFindFirst.mockResolvedValue(null);
 
     const { POST } = await import("@/app/api/episodes/fetch-transcript/route");
