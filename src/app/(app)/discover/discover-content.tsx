@@ -20,6 +20,8 @@ export function DiscoverContent() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    setSearchQuery(q);
+
     if (!q.trim()) {
       setIsLoading(false);
       setPodcasts([]);

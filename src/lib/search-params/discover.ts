@@ -1,4 +1,4 @@
-import { parseAsString } from "nuqs";
+import { parseAsString } from "nuqs/server";
 
 export const discoverSearchParams = {
   q: parseAsString.withDefault(""),
