@@ -228,7 +228,7 @@ export default async function PodcastPage({ params, searchParams }: PodcastPageP
               {process.env.NEXT_PUBLIC_APP_URL && (
                 <ShareButton
                   title={podcast.title}
-                  text="Check out this podcast on ContentGenie"
+                  text={podcast.title}
                   url={`${process.env.NEXT_PUBLIC_APP_URL}/podcast/${podcast.podcastIndexId}`}
                 />
               )}
@@ -392,7 +392,7 @@ export default async function PodcastPage({ params, searchParams }: PodcastPageP
               {process.env.NEXT_PUBLIC_APP_URL && (
                 <ShareButton
                   title={podcast.title}
-                  text="Check out this podcast on ContentGenie"
+                  text={podcast.title}
                   url={`${process.env.NEXT_PUBLIC_APP_URL}/podcast/${podcast.id}`}
                 />
               )}

@@ -696,8 +696,9 @@ export default function EpisodePage({ params }: EpisodePageProps) {
             {isOnline && process.env.NEXT_PUBLIC_APP_URL && (
               <ShareButton
                 title={episode.title}
-                text={`Check out this episode of ${podcast?.title || "a podcast"} on ContentGenie`}
+                text={episode.title}
                 url={`${process.env.NEXT_PUBLIC_APP_URL}/episode/${episodeId}`}
+                summary={summaryData?.worthItReason ?? undefined}
                 size="lg"
               />
             )}

@@ -123,6 +123,7 @@ export default function CollectionDetailPage() {
             {process.env.NEXT_PUBLIC_APP_URL && (
               <ShareButton
                 title={collection.name}
+                text={collection.name}
                 url={`${process.env.NEXT_PUBLIC_APP_URL}/library/collection/${collectionId}`}
                 size="sm"
               />
