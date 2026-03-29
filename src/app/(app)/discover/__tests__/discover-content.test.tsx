@@ -147,7 +147,8 @@ describe("DiscoverContent", () => {
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
-  it("cancels in-flight request on unmount/remount with different query", async () => {
+  it("cancels in-flight request when query changes via form submission", async () => {
+    const user = userEvent.setup();
     const abortSpy = vi.spyOn(AbortController.prototype, "abort");
 
     mockFetch.mockImplementation(
@@ -172,15 +173,23 @@ describe("DiscoverContent", () => {
         })
     );
 
-    const { rerender } = render(<DiscoverContent />, {
+    render(<DiscoverContent />, {
       wrapper: withNuqsTestingAdapter({ searchParams: "?q=first" }),
     });
 
-    // Simulate query change by re-rendering with different initial params.
-    // nuqs reads initial params once on mount, so we re-render the whole tree.
-    rerender(
-      withNuqsTestingAdapter({ searchParams: "?q=second" })({ children: <DiscoverContent /> })
-    );
+    // Wait for the first fetch to be in-flight
+    await waitFor(() => {
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.stringContaining("q=first"),
+        expect.anything()
+      );
+    });
+
+    // Drive a real query change via the component's search form
+    const input = screen.getByPlaceholderText("Search podcasts...");
+    await user.clear(input);
+    await user.type(input, "second");
+    await user.keyboard("{Enter}");
 
     await waitFor(() => {
       expect(abortSpy).toHaveBeenCalled();
