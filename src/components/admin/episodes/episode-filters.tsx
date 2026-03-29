@@ -1,7 +1,6 @@
 "use client"
 
-import { useRouter } from "next/navigation"
-import { useState, useEffect, useCallback } from "react"
+import { useQueryStates } from "nuqs"
 import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
@@ -20,7 +19,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ChevronsUpDown, X } from "lucide-react"
-import type { EpisodeFilters } from "@/lib/admin/episode-filters"
+import { adminEpisodeSearchParams } from "@/lib/search-params/admin-episodes"
 
 const TRANSCRIPT_STATUSES = ["missing", "fetching", "available", "failed"]
 const SUMMARY_STATUSES = ["queued", "running", "summarizing", "completed", "failed"]
@@ -32,79 +31,41 @@ interface PodcastOption {
 
 interface EpisodeFiltersProps {
   podcasts: PodcastOption[]
-  initialFilters: EpisodeFilters
 }
 
-export function EpisodeFiltersBar({ podcasts, initialFilters }: EpisodeFiltersProps) {
-  const router = useRouter()
-
-  // Local filter state tracks optimistic updates so rapid successive clicks
-  // don't overwrite each other (each click reads the latest local state, not
-  // the stale server-rendered initialFilters prop).
-  const [filters, setFilters] = useState(initialFilters)
-
-  // Sync back when the server re-renders with new searchParams
-  useEffect(() => { setFilters(initialFilters) }, [initialFilters])
-
-  const pushFilters = useCallback(
-    (next: typeof filters) => {
-      const params = new URLSearchParams()
-
-      if (next.podcastId !== undefined)
-        params.set("podcastId", String(next.podcastId))
-      if (next.transcriptStatuses?.length)
-        next.transcriptStatuses.forEach((s) => params.append("transcriptStatus", s))
-      if (next.summaryStatuses?.length)
-        next.summaryStatuses.forEach((s) => params.append("summaryStatus", s))
-      if (next.dateFrom)
-        params.set("dateFrom", next.dateFrom.toISOString().split("T")[0])
-      if (next.dateTo)
-        params.set("dateTo", next.dateTo.toISOString().split("T")[0])
-
-      router.push(`?${params.toString()}`)
-    },
-    [router]
-  )
-
-  const updateFilter = useCallback(
-    (patch: Partial<typeof filters>) => {
-      setFilters((prev) => {
-        const next = { ...prev, ...patch }
-        pushFilters(next)
-        return next
-      })
-    },
-    [pushFilters]
-  )
+export function EpisodeFiltersBar({ podcasts }: EpisodeFiltersProps) {
+  const [filters, setFilters] = useQueryStates(adminEpisodeSearchParams, {
+    shallow: false,
+    history: "replace",
+  })
 
   const selectedPodcast = podcasts.find((p) => p.id === filters.podcastId)
 
-  const toggleStatus = (
-    type: "transcriptStatuses" | "summaryStatuses",
-    status: string,
-  ) => {
-    setFilters((prev) => {
-      const cur = prev[type] ?? []
-      const next = cur.includes(status)
-        ? cur.filter((s) => s !== status)
-        : [...cur, status]
-      const updated = { ...prev, [type]: next.length > 0 ? next : undefined }
-      pushFilters(updated)
-      return updated
-    })
+  const toggleStatus = (type: "transcriptStatus" | "summaryStatus", status: string) => {
+    const cur = filters[type] ?? []
+    const next = cur.includes(status)
+      ? cur.filter((s) => s !== status)
+      : [...cur, status]
+    setFilters({ [type]: next.length > 0 ? next : null })
   }
 
   const handleClearAll = () => {
-    setFilters({ page: 1 })
-    router.push("?")
+    setFilters({
+      podcastId: null,
+      transcriptStatus: null,
+      summaryStatus: null,
+      dateFrom: null,
+      dateTo: null,
+      page: 1,
+    })
   }
 
   const hasFilters =
-    filters.podcastId !== undefined ||
-    (filters.transcriptStatuses?.length ?? 0) > 0 ||
-    (filters.summaryStatuses?.length ?? 0) > 0 ||
-    filters.dateFrom !== undefined ||
-    filters.dateTo !== undefined
+    filters.podcastId !== null ||
+    (filters.transcriptStatus?.length ?? 0) > 0 ||
+    (filters.summaryStatus?.length ?? 0) > 0 ||
+    filters.dateFrom !== null ||
+    filters.dateTo !== null
 
   return (
     <div className="flex flex-wrap items-center gap-2">
@@ -124,7 +85,7 @@ export function EpisodeFiltersBar({ podcasts, initialFilters }: EpisodeFiltersPr
               <CommandGroup>
                 <CommandItem
                   value="all"
-                  onSelect={() => updateFilter({ podcastId: undefined })}
+                  onSelect={() => setFilters({ podcastId: null })}
                 >
                   All podcasts
                 </CommandItem>
@@ -132,7 +93,7 @@ export function EpisodeFiltersBar({ podcasts, initialFilters }: EpisodeFiltersPr
                   <CommandItem
                     key={p.id}
                     value={p.title}
-                    onSelect={() => updateFilter({ podcastId: p.id })}
+                    onSelect={() => setFilters({ podcastId: p.id })}
                   >
                     {p.title}
                   </CommandItem>
@@ -148,18 +109,16 @@ export function EpisodeFiltersBar({ podcasts, initialFilters }: EpisodeFiltersPr
         <DropdownMenuTrigger asChild>
           <Button variant="outline" size="sm">
             Transcript
-            {(filters.transcriptStatuses?.length ?? 0) > 0 &&
-              ` (${filters.transcriptStatuses!.length})`}
+            {(filters.transcriptStatus?.length ?? 0) > 0 &&
+              ` (${filters.transcriptStatus!.length})`}
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent>
           {TRANSCRIPT_STATUSES.map((s) => (
             <DropdownMenuCheckboxItem
               key={s}
-              checked={filters.transcriptStatuses?.includes(s) ?? false}
-              onCheckedChange={() =>
-                toggleStatus("transcriptStatuses", s)
-              }
+              checked={filters.transcriptStatus?.includes(s) ?? false}
+              onCheckedChange={() => toggleStatus("transcriptStatus", s)}
             >
               {s}
             </DropdownMenuCheckboxItem>
@@ -172,18 +131,16 @@ export function EpisodeFiltersBar({ podcasts, initialFilters }: EpisodeFiltersPr
         <DropdownMenuTrigger asChild>
           <Button variant="outline" size="sm">
             Summary
-            {(filters.summaryStatuses?.length ?? 0) > 0 &&
-              ` (${filters.summaryStatuses!.length})`}
+            {(filters.summaryStatus?.length ?? 0) > 0 &&
+              ` (${filters.summaryStatus!.length})`}
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent>
           {SUMMARY_STATUSES.map((s) => (
             <DropdownMenuCheckboxItem
               key={s}
-              checked={filters.summaryStatuses?.includes(s) ?? false}
-              onCheckedChange={() =>
-                toggleStatus("summaryStatuses", s)
-              }
+              checked={filters.summaryStatus?.includes(s) ?? false}
+              onCheckedChange={() => toggleStatus("summaryStatus", s)}
             >
               {s}
             </DropdownMenuCheckboxItem>
@@ -195,19 +152,14 @@ export function EpisodeFiltersBar({ podcasts, initialFilters }: EpisodeFiltersPr
       <Input
         type="date"
         aria-label="Published from date"
-        value={
-          filters.dateFrom
-            ? filters.dateFrom.toISOString().split("T")[0]
-            : ""
-        }
+        value={filters.dateFrom ? filters.dateFrom.toISOString().split("T")[0] : ""}
         onChange={(e) => {
-          const d = e.target.value ? new Date(e.target.value) : undefined
-          const from = d && !isNaN(d.getTime()) ? d : undefined
-          // Swap if from > to
+          const d = e.target.value ? new Date(e.target.value) : null
+          const from = d && !isNaN(d.getTime()) ? d : null
           if (from && filters.dateTo && from > filters.dateTo) {
-            updateFilter({ dateFrom: filters.dateTo, dateTo: from })
+            setFilters({ dateFrom: filters.dateTo, dateTo: from })
           } else {
-            updateFilter({ dateFrom: from })
+            setFilters({ dateFrom: from })
           }
         }}
         placeholder="From"
@@ -217,19 +169,14 @@ export function EpisodeFiltersBar({ podcasts, initialFilters }: EpisodeFiltersPr
       <Input
         type="date"
         aria-label="Published to date"
-        value={
-          filters.dateTo
-            ? filters.dateTo.toISOString().split("T")[0]
-            : ""
-        }
+        value={filters.dateTo ? filters.dateTo.toISOString().split("T")[0] : ""}
         onChange={(e) => {
-          const d = e.target.value ? new Date(e.target.value) : undefined
-          const to = d && !isNaN(d.getTime()) ? d : undefined
-          // Swap if to < from
+          const d = e.target.value ? new Date(e.target.value) : null
+          const to = d && !isNaN(d.getTime()) ? d : null
           if (to && filters.dateFrom && to < filters.dateFrom) {
-            updateFilter({ dateFrom: to, dateTo: filters.dateFrom })
+            setFilters({ dateFrom: to, dateTo: filters.dateFrom })
           } else {
-            updateFilter({ dateTo: to })
+            setFilters({ dateTo: to })
           }
         }}
         placeholder="To"

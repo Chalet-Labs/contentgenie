@@ -18,6 +18,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Admin link in sidebar (visible to `org:admin` users only)
 
 ### Changed
+- Migrated URL search param management to nuqs for type-safe state in discover search and admin episode filters; admin filter arrays now use comma-separated format (`?transcriptStatus=available,failed`) instead of repeated keys (ADR-030, #247)
 - Admin status badge shows "unprocessed" instead of "none" for NULL `transcript_status` / `summary_status`, aligning with ADR-026 terminology (#239)
 - Replaced raw HTML elements with shadcn/ui primitives across 11 component and settings files: `<label>` → `Label` (with `htmlFor`/`aria-labelledby` for form controls) or `<span>` (for non-form headings), `<button>` → `Button`, `<span>` score pills → `Badge`, and custom progress bars → `Progress`; extended `Progress` with `indicatorClassName` and `max` props (#233)
 - Admin features (AI provider card, bulk re-summarize, missing transcripts) moved from `/settings` page to dedicated `/admin` panel; regular users no longer see or have access to these features

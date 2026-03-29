@@ -1,24 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { withNuqsTestingAdapter } from "nuqs/adapters/testing";
 import { DiscoverContent } from "../discover-content";
-
-// Mock next/navigation with controllable searchParams
-const mockReplace = vi.fn();
-let mockSearchParams = new URLSearchParams();
-
-vi.mock("next/navigation", () => ({
-  useRouter: () => ({
-    replace: mockReplace,
-    push: vi.fn(),
-    back: vi.fn(),
-    forward: vi.fn(),
-    refresh: vi.fn(),
-    prefetch: vi.fn(),
-  }),
-  useSearchParams: () => mockSearchParams,
-  usePathname: () => "/discover",
-}));
 
 // Mock fetch
 const mockFetch = vi.fn();
@@ -27,7 +11,6 @@ global.fetch = mockFetch;
 describe("DiscoverContent", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockSearchParams = new URLSearchParams();
     mockFetch.mockResolvedValue({
       ok: true,
       json: async () => ({ podcasts: [] }),
@@ -35,7 +18,9 @@ describe("DiscoverContent", () => {
   });
 
   it("renders with empty state when no URL params", () => {
-    render(<DiscoverContent />);
+    render(<DiscoverContent />, {
+      wrapper: withNuqsTestingAdapter(),
+    });
 
     expect(
       screen.getByPlaceholderText("Search podcasts...")
@@ -44,7 +29,6 @@ describe("DiscoverContent", () => {
   });
 
   it("auto-fetches when URL has q param", async () => {
-    mockSearchParams = new URLSearchParams("q=lex");
     mockFetch.mockResolvedValue({
       ok: true,
       json: async () => ({
@@ -62,7 +46,9 @@ describe("DiscoverContent", () => {
       }),
     });
 
-    render(<DiscoverContent />);
+    render(<DiscoverContent />, {
+      wrapper: withNuqsTestingAdapter({ searchParams: "?q=lex" }),
+    });
 
     expect(screen.getByDisplayValue("lex")).toBeInTheDocument();
 
@@ -75,8 +61,11 @@ describe("DiscoverContent", () => {
   });
 
   it("updates URL on search submission", async () => {
+    const onUrlUpdate = vi.fn();
     const user = userEvent.setup();
-    render(<DiscoverContent />);
+    render(<DiscoverContent />, {
+      wrapper: withNuqsTestingAdapter({ onUrlUpdate }),
+    });
 
     await user.type(
       screen.getByPlaceholderText("Search podcasts..."),
@@ -84,30 +73,44 @@ describe("DiscoverContent", () => {
     );
     await user.click(screen.getByRole("button", { name: "Search" }));
 
-    expect(mockReplace).toHaveBeenCalledWith(
-      "/discover?q=technology"
-    );
+    await waitFor(() => {
+      expect(onUrlUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          queryString: expect.stringContaining("q=technology"),
+        })
+      );
+    });
   });
 
   it("strips URL params when submitting empty query", async () => {
+    const onUrlUpdate = vi.fn();
     const user = userEvent.setup();
-    mockSearchParams = new URLSearchParams("q=something");
-    render(<DiscoverContent />);
+    render(<DiscoverContent />, {
+      wrapper: withNuqsTestingAdapter({
+        searchParams: "?q=something",
+        onUrlUpdate,
+      }),
+    });
 
     await user.clear(screen.getByPlaceholderText("Search podcasts..."));
     await user.click(screen.getByRole("button", { name: "Search" }));
 
-    expect(mockReplace).toHaveBeenCalledWith("/discover");
+    await waitFor(() => {
+      expect(onUrlUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({ queryString: "" })
+      );
+    });
   });
 
   it("displays error when fetch fails", async () => {
-    mockSearchParams = new URLSearchParams("q=failing");
     mockFetch.mockResolvedValue({
       ok: false,
       json: async () => ({ error: "Service unavailable" }),
     });
 
-    render(<DiscoverContent />);
+    render(<DiscoverContent />, {
+      wrapper: withNuqsTestingAdapter({ searchParams: "?q=failing" }),
+    });
 
     await waitFor(() => {
       expect(screen.getByText("Service unavailable")).toBeInTheDocument();
@@ -115,8 +118,11 @@ describe("DiscoverContent", () => {
   });
 
   it("trims whitespace from query before updating URL", async () => {
+    const onUrlUpdate = vi.fn();
     const user = userEvent.setup();
-    render(<DiscoverContent />);
+    render(<DiscoverContent />, {
+      wrapper: withNuqsTestingAdapter({ onUrlUpdate }),
+    });
 
     await user.type(
       screen.getByPlaceholderText("Search podcasts..."),
@@ -124,13 +130,19 @@ describe("DiscoverContent", () => {
     );
     await user.click(screen.getByRole("button", { name: "Search" }));
 
-    expect(mockReplace).toHaveBeenCalledWith(
-      "/discover?q=lex%20fridman"
-    );
+    await waitFor(() => {
+      expect(onUrlUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          queryString: expect.stringContaining("q=lex+fridman"),
+        })
+      );
+    });
   });
 
   it("does not fetch when URL has no q param", () => {
-    render(<DiscoverContent />);
+    render(<DiscoverContent />, {
+      wrapper: withNuqsTestingAdapter(),
+    });
 
     expect(mockFetch).not.toHaveBeenCalled();
   });
@@ -138,25 +150,18 @@ describe("DiscoverContent", () => {
   it("cancels in-flight request when query changes", async () => {
     const abortSpy = vi.spyOn(AbortController.prototype, "abort");
 
-    mockSearchParams = new URLSearchParams("q=first");
     mockFetch.mockImplementation(
       (_url: string, options?: { signal?: AbortSignal }) =>
         new Promise((resolve, reject) => {
           const onAbort = () => {
-            const abortError = new DOMException("Aborted", "AbortError");
-            reject(abortError);
+            reject(new DOMException("Aborted", "AbortError"));
           };
           if (options?.signal?.aborted) {
             onAbort();
             return;
           }
           options?.signal?.addEventListener("abort", onAbort);
-          // First request never resolves naturally — it will be aborted
-          // Second request resolves immediately
-          if (
-            typeof _url === "string" &&
-            _url.includes("q=second")
-          ) {
+          if (typeof _url === "string" && _url.includes("q=second")) {
             resolve({
               ok: true,
               json: async () => ({
@@ -167,11 +172,15 @@ describe("DiscoverContent", () => {
         })
     );
 
-    const { rerender } = render(<DiscoverContent />);
+    const { rerender } = render(<DiscoverContent />, {
+      wrapper: withNuqsTestingAdapter({ searchParams: "?q=first" }),
+    });
 
-    // Simulate query change by updating searchParams and re-rendering
-    mockSearchParams = new URLSearchParams("q=second");
-    rerender(<DiscoverContent />);
+    // Simulate query change by re-rendering with different initial params.
+    // nuqs reads initial params once on mount, so we re-render the whole tree.
+    rerender(
+      withNuqsTestingAdapter({ searchParams: "?q=second" })({ children: <DiscoverContent /> })
+    );
 
     await waitFor(() => {
       expect(abortSpy).toHaveBeenCalled();
@@ -181,40 +190,38 @@ describe("DiscoverContent", () => {
   });
 
   it("does not display AbortError as user-facing error", async () => {
-    mockSearchParams = new URLSearchParams("q=test");
-
-    // Simulate a fetch that rejects with AbortError after controller is aborted
     mockFetch.mockImplementation(
       (_url: string, options?: { signal?: AbortSignal }) =>
         new Promise((_resolve, reject) => {
-          // Listen for abort and reject accordingly
           options?.signal?.addEventListener("abort", () => {
             reject(new DOMException("Aborted", "AbortError"));
           });
         })
     );
 
-    const { unmount } = render(<DiscoverContent />);
+    const { unmount } = render(<DiscoverContent />, {
+      wrapper: withNuqsTestingAdapter({ searchParams: "?q=test" }),
+    });
 
     await waitFor(() => {
       expect(mockFetch).toHaveBeenCalled();
     });
 
-    // Unmount triggers the cleanup which calls controller.abort()
+    // Unmount triggers cleanup which calls controller.abort()
     unmount();
 
-    // The AbortError is caught and silently ignored — no error state set.
-    // If it weren't handled, the test would fail with an unhandled rejection.
+    // AbortError is caught and silently ignored — no error state set.
   });
 
   it("aborts fetch on unmount", async () => {
     const abortSpy = vi.spyOn(AbortController.prototype, "abort");
 
-    mockSearchParams = new URLSearchParams("q=test");
     // Never-resolving fetch to ensure request is still in-flight on unmount
     mockFetch.mockReturnValue(new Promise(() => {}));
 
-    const { unmount } = render(<DiscoverContent />);
+    const { unmount } = render(<DiscoverContent />, {
+      wrapper: withNuqsTestingAdapter({ searchParams: "?q=test" }),
+    });
 
     await waitFor(() => {
       expect(mockFetch).toHaveBeenCalled();

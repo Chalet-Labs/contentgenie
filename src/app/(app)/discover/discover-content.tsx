@@ -1,29 +1,26 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useQueryState } from "nuqs";
 import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { SearchResults } from "@/components/podcasts/search-results";
 import { RssFeedForm } from "@/components/podcasts/rss-feed-form";
 import { OpmlImportForm } from "@/components/podcasts/opml-import-form";
+import { discoverSearchParams } from "@/lib/search-params/discover";
 import type { PodcastSearchResult } from "@/lib/podcastindex";
 
 export function DiscoverContent() {
-  const searchParams = useSearchParams();
-  const router = useRouter();
-  const urlQuery = searchParams.get("q") ?? "";
+  const [q, setQ] = useQueryState("q", discoverSearchParams.q);
 
-  const [searchQuery, setSearchQuery] = useState(urlQuery);
+  const [searchQuery, setSearchQuery] = useState(q);
   const [podcasts, setPodcasts] = useState<PodcastSearchResult[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    setSearchQuery(urlQuery);
-
-    if (!urlQuery.trim()) {
+    if (!q.trim()) {
       setIsLoading(false);
       setPodcasts([]);
       setError(null);
@@ -37,7 +34,7 @@ export function DiscoverContent() {
       setError(null);
       try {
         const response = await fetch(
-          `/api/podcasts/search?q=${encodeURIComponent(urlQuery)}&max=20`,
+          `/api/podcasts/search?q=${encodeURIComponent(q)}&max=20`,
           { signal: controller.signal }
         );
 
@@ -70,14 +67,12 @@ export function DiscoverContent() {
     fetchData();
 
     return () => controller.abort();
-  }, [urlQuery]);
+  }, [q]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const trimmed = searchQuery.trim();
-    router.replace(
-      trimmed ? `/discover?q=${encodeURIComponent(trimmed)}` : "/discover"
-    );
+    setQ(trimmed || null);
   };
 
   return (
@@ -128,7 +123,7 @@ export function DiscoverContent() {
         podcasts={podcasts}
         isLoading={isLoading}
         error={error}
-        query={urlQuery}
+        query={q}
       />
     </>
   );
