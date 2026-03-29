@@ -376,4 +376,118 @@ describe("EpisodeTranscriptFetchButton", () => {
     unmount()
     expect(clearIntervalSpy).toHaveBeenCalled()
   })
+
+  // ─── null episodeDbId (new behavior) ──────────────────────────────────────
+
+  it("renders button when episodeDbId is null", () => {
+    render(
+      <EpisodeTranscriptFetchButton
+        {...baseProps}
+        episodeDbId={null}
+        transcriptStatus="missing"
+      />
+    )
+    expect(
+      screen.getByRole("button", { name: /fetch & summarize/i })
+    ).toBeInTheDocument()
+  })
+
+  it("sends { podcastIndexId } in POST body when episodeDbId is null", async () => {
+    render(
+      <EpisodeTranscriptFetchButton
+        {...baseProps}
+        episodeDbId={null}
+        transcriptStatus="missing"
+      />
+    )
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({ status: "queued", episodeDbId: 99 }),
+    })
+    fireEvent.click(screen.getByRole("button", { name: /fetch & summarize/i }))
+    await waitFor(() => {
+      expect(mockFetch).toHaveBeenCalledWith(
+        "/api/episodes/fetch-transcript",
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({ podcastIndexId: baseProps.podcastIndexId }),
+        })
+      )
+    })
+  })
+
+  it("captures episodeDbId from response and uses it for polling when started with null", async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({ status: "queued", episodeDbId: 99 }),
+    })
+    render(
+      <EpisodeTranscriptFetchButton
+        {...baseProps}
+        episodeDbId={null}
+        transcriptStatus="missing"
+      />
+    )
+    fireEvent.click(screen.getByRole("button", { name: /fetch & summarize/i }))
+    await waitFor(() =>
+      expect(mockFetch).toHaveBeenCalledWith(
+        "/api/episodes/fetch-transcript",
+        expect.any(Object)
+      )
+    )
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5000)
+    })
+    // Should poll with the DB id returned from the API response (99), not null
+    expect(mockGetEpisodeStatus).toHaveBeenCalledWith(99)
+  })
+
+  it("shows error toast and re-enables button when response has no episodeDbId and episodeDbId was null", async () => {
+    mockFetch.mockResolvedValue({
+      ok: true,
+      json: async () => ({ status: "queued" }), // no episodeDbId in response
+    })
+    render(
+      <EpisodeTranscriptFetchButton
+        {...baseProps}
+        episodeDbId={null}
+        transcriptStatus="missing"
+      />
+    )
+    fireEvent.click(screen.getByRole("button", { name: /fetch & summarize/i }))
+    await waitFor(() => {
+      expect(vi.mocked(toast.error)).toHaveBeenCalled()
+      expect(
+        screen.getByRole("button", { name: /fetch & summarize/i })
+      ).toBeInTheDocument()
+    })
+  })
+
+  it("does NOT call getEpisodeStatus when episodeDbId is null and initialTranscriptStatus is 'fetching'", async () => {
+    render(
+      <EpisodeTranscriptFetchButton
+        {...baseProps}
+        episodeDbId={null}
+        transcriptStatus="fetching"
+      />
+    )
+    // Advance timers — polling should NOT have started
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5000)
+    })
+    expect(mockGetEpisodeStatus).not.toHaveBeenCalled()
+  })
+
+  it("shows spinner (fetching UI) when episodeDbId is null and initialTranscriptStatus is 'fetching'", () => {
+    render(
+      <EpisodeTranscriptFetchButton
+        {...baseProps}
+        episodeDbId={null}
+        transcriptStatus="fetching"
+      />
+    )
+    expect(
+      screen.getByRole("button", { name: /fetching transcript/i })
+    ).toBeDisabled()
+  })
 })

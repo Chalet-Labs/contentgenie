@@ -578,8 +578,8 @@ export default function EpisodePage({ params }: EpisodePageProps) {
               </div>
             )}
             {episode.season > 0 && <span>Season {episode.season}</span>}
-            {/* Admins with a DB-tracked episode and no transcript see the fetch button instead */}
-            {!(isAdmin && episodeDbId && !transcriptSource) && (
+            {/* Admins with no transcript see the fetch button instead */}
+            {!(isAdmin && !transcriptSource) && (
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -599,12 +599,15 @@ export default function EpisodePage({ params }: EpisodePageProps) {
                 </Tooltip>
               </TooltipProvider>
             )}
-            {isAdmin && episodeDbId && (
+            {isAdmin && (
               <EpisodeTranscriptFetchButton
                 episodeDbId={episodeDbId}
                 podcastIndexId={episodeId}
                 transcriptStatus={transcriptStatus}
-                onTranscriptReady={generateSummary}
+                onTranscriptReady={async () => {
+                  await fetchEpisodeData();
+                  await generateSummary();
+                }}
               />
             )}
           </div>

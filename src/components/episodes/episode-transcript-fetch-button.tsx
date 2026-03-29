@@ -14,7 +14,7 @@ import { getEpisodeStatus } from "@/app/actions/admin"
 import type { TranscriptStatus } from "@/db/schema"
 
 interface EpisodeTranscriptFetchButtonProps {
-  episodeDbId: number
+  episodeDbId: number | null
   podcastIndexId: string
   transcriptStatus: TranscriptStatus | null
   onTranscriptReady: () => void
@@ -37,26 +37,11 @@ export function EpisodeTranscriptFetchButton({
   const pollCount = useRef(0)
   const onTranscriptReadyRef = useRef(onTranscriptReady)
   onTranscriptReadyRef.current = onTranscriptReady
+  // Authoritative DB primary key for polling and subsequent requests. Starts as episodeDbId
+  // (may be null for episodes not yet in DB). Updated from the API response after on-demand row creation.
+  const resolvedDbIdRef = useRef<number | null>(episodeDbId)
 
-  useEffect(() => {
-    // If mounted mid-fetch, start polling immediately so the UI doesn't get stuck
-    if (initialTranscriptStatus === "fetching") {
-      startPolling()
-    }
-    return () => {
-      if (pollRef.current) clearInterval(pollRef.current)
-    }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
-
-  // null = unprocessed episode; show fetch button so admins can trigger a transcript fetch
-  if (transcriptStatus === "available") {
-    return null
-  }
-
-  const isRss = podcastIndexId.startsWith("rss-")
-  const label = isFetching ? "Fetching transcript..." : "Fetch & Summarize"
-
-  const startPolling = () => {
+  function startPolling(dbId: number) {
     pollCount.current = 0
     if (pollRef.current) clearInterval(pollRef.current)
 
@@ -64,7 +49,7 @@ export function EpisodeTranscriptFetchButton({
       try {
         pollCount.current += 1
 
-        const result = await getEpisodeStatus(episodeDbId)
+        const result = await getEpisodeStatus(dbId)
 
         if (!result.ok) {
           clearInterval(pollRef.current!)
@@ -88,7 +73,8 @@ export function EpisodeTranscriptFetchButton({
           setIsFetching(false)
           toast.error("Transcript fetch timed out — retry or check back later")
         }
-      } catch {
+      } catch (err) {
+        console.error("Polling status check failed:", err)
         clearInterval(pollRef.current!)
         setIsFetching(false)
         toast.error("Status check failed — try refreshing")
@@ -96,14 +82,40 @@ export function EpisodeTranscriptFetchButton({
     }, POLL_INTERVAL_MS)
   }
 
+  useEffect(() => {
+    // Only start polling on mount if we have a DB ID to poll against.
+    // When episodeDbId is null, a transcript fetch was started but the episode has no
+    // DB row yet. getEpisodeStatus requires a numeric id — passing null would fail.
+    if (initialTranscriptStatus === "fetching" && episodeDbId !== null) {
+      startPolling(episodeDbId)
+    }
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current)
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Hide button when transcript is already available — all other statuses
+  // (null, missing, failed, fetching) render the fetch UI for admins.
+  if (transcriptStatus === "available") {
+    return null
+  }
+
+  const isRss = podcastIndexId.startsWith("rss-")
+  const label = isFetching ? "Fetching transcript..." : "Fetch & Summarize"
+
   const handleClick = async () => {
     setIsFetching(true)
 
     try {
+      // Use DB primary key when available (faster lookup); fall back to podcastIndexId for on-demand creation
+      const body = resolvedDbIdRef.current !== null
+        ? { episodeId: resolvedDbIdRef.current }
+        : { podcastIndexId }
+
       const res = await fetch("/api/episodes/fetch-transcript", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ episodeId: episodeDbId }),
+        body: JSON.stringify(body),
       })
 
       if (!res.ok) {
@@ -111,7 +123,30 @@ export function EpisodeTranscriptFetchButton({
         throw new Error(errBody?.error ?? `Request failed (HTTP ${res.status})`)
       }
 
-      startPolling()
+      let responseData;
+      try {
+        responseData = await res.json();
+      } catch (parseErr) {
+        console.error("Failed to parse fetch-transcript response:", parseErr)
+        // Run was queued server-side but we can't read the response — fall through
+        // to the no-DB-ID handling below which will show an appropriate message.
+        responseData = null;
+      }
+
+      // Capture episodeDbId from response so we can poll even when we started without one
+      const returnedDbId: number | null =
+        typeof responseData?.episodeDbId === "number" ? responseData.episodeDbId : null
+
+      if (returnedDbId !== null) {
+        resolvedDbIdRef.current = returnedDbId
+        startPolling(returnedDbId)
+      } else if (resolvedDbIdRef.current !== null) {
+        startPolling(resolvedDbIdRef.current)
+      } else {
+        // No DB ID available — can't poll, but run was queued
+        setIsFetching(false)
+        toast.error("Transcript fetch started but status polling is unavailable — refresh the page to check progress")
+      }
     } catch (err) {
       setIsFetching(false)
       toast.error(err instanceof Error ? err.message : "Failed to start transcript fetch")
