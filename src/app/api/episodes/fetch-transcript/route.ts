@@ -74,6 +74,16 @@ export async function POST(request: NextRequest) {
     resolvedDescription = episode.description ?? undefined;
   } else if (rawPodcastIndexId !== undefined) {
     // --- Path 2: podcastIndexId — look up or create episode row on demand ---
+    if (
+      typeof rawPodcastIndexId !== "string" &&
+      typeof rawPodcastIndexId !== "number"
+    ) {
+      return NextResponse.json(
+        { error: "A valid positive podcastIndexId is required" },
+        { status: 400 }
+      );
+    }
+
     const parsedPodcastIndexId = Number(rawPodcastIndexId);
     if (
       typeof rawPodcastIndexId === "string" && rawPodcastIndexId.startsWith("rss-")
@@ -83,7 +93,7 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-    if (!Number.isFinite(parsedPodcastIndexId) || parsedPodcastIndexId <= 0) {
+    if (!Number.isInteger(parsedPodcastIndexId) || parsedPodcastIndexId <= 0) {
       return NextResponse.json({ error: "A valid positive podcastIndexId is required" }, { status: 400 });
     }
 

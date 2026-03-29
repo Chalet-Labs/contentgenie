@@ -604,7 +604,10 @@ export default function EpisodePage({ params }: EpisodePageProps) {
                 episodeDbId={episodeDbId}
                 podcastIndexId={episodeId}
                 transcriptStatus={transcriptStatus}
-                onTranscriptReady={generateSummary}
+                onTranscriptReady={async () => {
+                  await fetchEpisodeData();
+                  await generateSummary();
+                }}
               />
             )}
           </div>

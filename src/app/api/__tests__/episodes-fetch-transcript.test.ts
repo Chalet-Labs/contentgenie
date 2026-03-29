@@ -498,7 +498,7 @@ describe("POST /api/episodes/fetch-transcript", () => {
 
     const { POST } = await import("@/app/api/episodes/fetch-transcript/route");
     const response = await POST(makeRequest({ podcastIndexId: "not-a-number" }));
-    const data = await response.json();
+    await response.json();
 
     expect(response.status).toBe(400);
   });
