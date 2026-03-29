@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
     // Validate podcastIndexId is numeric BEFORE the optimistic update —
     // RSS-sourced episodes have synthetic "rss-..." IDs that would produce NaN.
     numericPodcastIndexId = Number(episode.podcastIndexId);
-    if (!Number.isFinite(numericPodcastIndexId) || numericPodcastIndexId <= 0) {
+    if (!Number.isInteger(numericPodcastIndexId) || numericPodcastIndexId <= 0) {
       return NextResponse.json(
         { error: "Episode has a non-numeric PodcastIndex ID and cannot be fetched via this endpoint" },
         { status: 400 }
