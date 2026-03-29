@@ -1,6 +1,5 @@
 import { and, eq, gte, lte, inArray } from "drizzle-orm"
 import { episodes } from "@/db/schema"
-import { safeParseDate } from "@/lib/schemas/library"
 
 export interface EpisodeFilters {
   podcastId?: number
@@ -12,41 +11,6 @@ export interface EpisodeFilters {
 }
 
 export const PAGE_SIZE = 25
-
-function asArray(val: string | string[] | undefined): string[] {
-  if (!val) return []
-  return Array.isArray(val) ? val : [val]
-}
-
-export function parseEpisodeFilters(
-  searchParams: Record<string, string | string[] | undefined>
-): EpisodeFilters {
-  const podcastIdRaw = searchParams["podcastId"]
-  const podcastId =
-    typeof podcastIdRaw === "string" && podcastIdRaw
-      ? parseInt(podcastIdRaw, 10) || undefined
-      : undefined
-
-  const transcriptStatuses = asArray(searchParams["transcriptStatus"]).filter(Boolean)
-  const summaryStatuses = asArray(searchParams["summaryStatus"]).filter(Boolean)
-
-  const dateFromRaw = searchParams["dateFrom"]
-  const dateFrom = safeParseDate(typeof dateFromRaw === "string" ? dateFromRaw : undefined)
-  const dateToRaw = searchParams["dateTo"]
-  const dateTo = safeParseDate(typeof dateToRaw === "string" ? dateToRaw : undefined)
-
-  const pageRaw = typeof searchParams["page"] === "string" ? parseInt(searchParams["page"], 10) : NaN
-  const page = Number.isFinite(pageRaw) && pageRaw > 0 ? pageRaw : 1
-
-  return {
-    podcastId,
-    transcriptStatuses: transcriptStatuses.length > 0 ? transcriptStatuses : undefined,
-    summaryStatuses: summaryStatuses.length > 0 ? summaryStatuses : undefined,
-    dateFrom,
-    dateTo,
-    page,
-  }
-}
 
 export function buildEpisodeWhereConditions(filters: EpisodeFilters) {
   const conditions = []

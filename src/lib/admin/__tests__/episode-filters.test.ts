@@ -17,45 +17,7 @@ vi.mock("drizzle-orm", () => ({
   inArray: vi.fn((col, vals) => ({ inArray: [col, vals] })),
 }))
 
-import { parseEpisodeFilters, buildEpisodeWhereConditions } from "@/lib/admin/episode-filters"
-
-describe("parseEpisodeFilters", () => {
-  it("defaults page to 1 when not provided", () => {
-    const result = parseEpisodeFilters({})
-    expect(result.page).toBe(1)
-  })
-
-  it("defaults page to 1 for invalid page values", () => {
-    expect(parseEpisodeFilters({ page: "0" }).page).toBe(1)
-    expect(parseEpisodeFilters({ page: "-1" }).page).toBe(1)
-    expect(parseEpisodeFilters({ page: "abc" }).page).toBe(1)
-  })
-
-  it("parses valid page number", () => {
-    expect(parseEpisodeFilters({ page: "3" }).page).toBe(3)
-  })
-
-  it("parses multi-value transcript status params", () => {
-    const result = parseEpisodeFilters({ transcriptStatus: ["available", "failed"] })
-    expect(result.transcriptStatuses).toEqual(["available", "failed"])
-  })
-
-  it("parses single transcript status as array", () => {
-    const result = parseEpisodeFilters({ transcriptStatus: "available" })
-    expect(result.transcriptStatuses).toEqual(["available"])
-  })
-
-  it("ignores unknown params", () => {
-    const result = parseEpisodeFilters({ unknown: "value", foo: "bar" })
-    expect(result.podcastId).toBeUndefined()
-    expect(result.transcriptStatuses).toBeUndefined()
-  })
-
-  it("parses podcastId", () => {
-    const result = parseEpisodeFilters({ podcastId: "42" })
-    expect(result.podcastId).toBe(42)
-  })
-})
+import { buildEpisodeWhereConditions } from "@/lib/admin/episode-filters"
 
 describe("buildEpisodeWhereConditions", () => {
   it("returns undefined for empty filters", () => {
@@ -68,13 +30,22 @@ describe("buildEpisodeWhereConditions", () => {
       page: 1,
       transcriptStatuses: ["available", "failed"],
     })
-    expect(result).toBeDefined()
+    expect(result).toMatchObject({
+      and: expect.arrayContaining([
+        { inArray: [expect.anything(), ["available", "failed"]] },
+      ]),
+    })
   })
 
   it("adds date filters for dateFrom and dateTo", () => {
     const dateFrom = new Date("2026-01-01")
     const dateTo = new Date("2026-03-01")
     const result = buildEpisodeWhereConditions({ page: 1, dateFrom, dateTo })
-    expect(result).toBeDefined()
+    expect(result).toMatchObject({
+      and: expect.arrayContaining([
+        { gte: [expect.anything(), dateFrom] },
+        { lte: [expect.anything(), expect.any(Date)] },
+      ]),
+    })
   })
 })
