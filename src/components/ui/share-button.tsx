@@ -38,10 +38,16 @@ export function ShareButton({
   };
 
   const handleNativeShare = async () => {
-    const shareData = { title, text: text ?? title, url };
+    const bodyText = text ?? title;
+    const shareText = summary ? `${bodyText}\n\n${summary}` : bodyText;
+    const shareData = { title, text: shareText, url };
     try {
       if (!navigator.canShare || navigator.canShare(shareData)) {
         await navigator.share(shareData);
+      } else {
+        toast("Unable to share this content", {
+          description: "Try copying the link instead",
+        });
       }
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") {
@@ -66,7 +72,7 @@ export function ShareButton({
       await navigator.clipboard.writeText(formatted);
       toast.success("Copied to clipboard");
     } catch {
-      toast("Could not copy text", { description: url });
+      toast("Could not copy text", { description: formatted });
     }
   };
 

@@ -169,6 +169,40 @@ describe("ShareButton", () => {
     });
   });
 
+  it("calls navigator.share with summary included in text when provided", async () => {
+    const shareMock = vi.fn().mockResolvedValue(undefined);
+    const canShareMock = vi.fn().mockReturnValue(true);
+    Object.defineProperty(navigator, "share", {
+      value: shareMock,
+      configurable: true,
+      writable: true,
+    });
+    Object.defineProperty(navigator, "canShare", {
+      value: canShareMock,
+      configurable: true,
+      writable: true,
+    });
+
+    const summary = "Great insights on AI trends";
+    const user = userEvent.setup();
+    render(<ShareButton {...defaultProps} summary={summary} />);
+    await user.click(screen.getByRole("button", { name: /share/i }));
+
+    const menuItems = screen.getAllByRole("menuitem");
+    const shareItem = menuItems.find((item) =>
+      item.textContent?.includes("Share")
+    );
+    await user.click(shareItem!);
+
+    await waitFor(() => {
+      expect(shareMock).toHaveBeenCalledWith({
+        title: defaultProps.title,
+        text: `${defaultProps.text}\n\n${summary}`,
+        url: defaultProps.url,
+      });
+    });
+  });
+
   it("silently handles AbortError from cancelled native share", async () => {
     const abortError = new DOMException("Share cancelled", "AbortError");
     const shareMock = vi.fn().mockRejectedValue(abortError);
