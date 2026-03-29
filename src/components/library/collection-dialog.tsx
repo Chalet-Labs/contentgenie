@@ -134,6 +134,7 @@ export function CollectionDialog({
                       <Input
                         placeholder="A brief description of this collection"
                         disabled={form.formState.isSubmitting}
+                        maxLength={MAX_SHORT_TEXT}
                         {...field}
                       />
                     </FormControl>

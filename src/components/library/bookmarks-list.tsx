@@ -277,6 +277,7 @@ export function BookmarksList({
                         <FormControl>
                           <Input
                             placeholder="Key insight mentioned here..."
+                            maxLength={MAX_SHORT_TEXT}
                             {...field}
                           />
                         </FormControl>
