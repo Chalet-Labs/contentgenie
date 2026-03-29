@@ -21,6 +21,9 @@ import { Input } from "@/components/ui/input"
 import { ChevronsUpDown, X } from "lucide-react"
 import { adminEpisodeSearchParams } from "@/lib/search-params/admin-episodes"
 
+const formatDateInput = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`
+
 const TRANSCRIPT_STATUSES = ["missing", "fetching", "available", "failed"]
 const SUMMARY_STATUSES = ["queued", "running", "summarizing", "completed", "failed"]
 
@@ -152,7 +155,7 @@ export function EpisodeFiltersBar({ podcasts }: EpisodeFiltersProps) {
       <Input
         type="date"
         aria-label="Published from date"
-        value={filters.dateFrom ? filters.dateFrom.toISOString().split("T")[0] : ""}
+        value={filters.dateFrom ? formatDateInput(filters.dateFrom) : ""}
         onChange={(e) => {
           const d = e.target.value ? new Date(e.target.value) : null
           const from = d && !isNaN(d.getTime()) ? d : null
@@ -169,7 +172,7 @@ export function EpisodeFiltersBar({ podcasts }: EpisodeFiltersProps) {
       <Input
         type="date"
         aria-label="Published to date"
-        value={filters.dateTo ? filters.dateTo.toISOString().split("T")[0] : ""}
+        value={filters.dateTo ? formatDateInput(filters.dateTo) : ""}
         onChange={(e) => {
           const d = e.target.value ? new Date(e.target.value) : null
           const to = d && !isNaN(d.getTime()) ? d : null

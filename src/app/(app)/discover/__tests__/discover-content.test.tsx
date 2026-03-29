@@ -147,7 +147,7 @@ describe("DiscoverContent", () => {
     expect(mockFetch).not.toHaveBeenCalled();
   });
 
-  it("cancels in-flight request when query changes", async () => {
+  it("cancels in-flight request on unmount/remount with different query", async () => {
     const abortSpy = vi.spyOn(AbortController.prototype, "abort");
 
     mockFetch.mockImplementation(

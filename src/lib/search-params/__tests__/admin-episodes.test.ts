@@ -48,6 +48,18 @@ describe("loadAdminEpisodeSearchParams", () => {
     expect(result.dateTo).toEqual(new Date("2026-03-01"))
   })
 
+  it("returns null for invalid date strings", () => {
+    const result = loadAdminEpisodeSearchParams({ dateFrom: "not-a-date", dateTo: "invalid" })
+    expect(result.dateFrom).toBeNull()
+    expect(result.dateTo).toBeNull()
+  })
+
+  it("parses valid date while returning null for invalid date", () => {
+    const result = loadAdminEpisodeSearchParams({ dateFrom: "2026-01-15", dateTo: "invalid" })
+    expect(result.dateFrom).toEqual(new Date("2026-01-15"))
+    expect(result.dateTo).toBeNull()
+  })
+
   it("returns null for missing optional params", () => {
     const result = loadAdminEpisodeSearchParams({})
     expect(result.podcastId).toBeNull()

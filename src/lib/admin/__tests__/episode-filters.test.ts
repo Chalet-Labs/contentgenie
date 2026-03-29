@@ -30,13 +30,22 @@ describe("buildEpisodeWhereConditions", () => {
       page: 1,
       transcriptStatuses: ["available", "failed"],
     })
-    expect(result).toBeDefined()
+    expect(result).toMatchObject({
+      and: expect.arrayContaining([
+        { inArray: [expect.anything(), ["available", "failed"]] },
+      ]),
+    })
   })
 
   it("adds date filters for dateFrom and dateTo", () => {
     const dateFrom = new Date("2026-01-01")
     const dateTo = new Date("2026-03-01")
     const result = buildEpisodeWhereConditions({ page: 1, dateFrom, dateTo })
-    expect(result).toBeDefined()
+    expect(result).toMatchObject({
+      and: expect.arrayContaining([
+        { gte: [expect.anything(), dateFrom] },
+        { lte: [expect.anything(), expect.any(Date)] },
+      ]),
+    })
   })
 })
