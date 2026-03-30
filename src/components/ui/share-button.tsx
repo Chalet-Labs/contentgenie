@@ -30,16 +30,17 @@ export function ShareButton({
   const supportsNativeShare =
     typeof navigator !== "undefined" && !!navigator.share;
 
+  const baseText = text ?? title;
+
   const formatShareText = () => {
     if (summary) {
-      return `${title}\n\n${summary}\n\n${url}`;
+      return `${baseText}\n\n${summary}\n\n${url}`;
     }
-    return `${title}\n\n${url}`;
+    return `${baseText}\n\n${url}`;
   };
 
   const handleNativeShare = async () => {
-    const bodyText = text ?? title;
-    const shareText = summary ? `${bodyText}\n\n${summary}` : bodyText;
+    const shareText = summary ? `${baseText}\n\n${summary}` : baseText;
     const shareData = { title, text: shareText, url };
     try {
       if (!navigator.canShare || navigator.canShare(shareData)) {
