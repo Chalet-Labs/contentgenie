@@ -17,8 +17,8 @@ vi.mock("@trigger.dev/sdk", () => ({
   },
 }));
 
-vi.mock("@/trigger/summarize-episode", () => ({
-  summarizeEpisode: {
+vi.mock("@/trigger/fetch-transcript", () => ({
+  fetchTranscriptTask: {
     batchTrigger: (...args: unknown[]) => mockBatchTrigger(...args),
   },
 }));
@@ -30,6 +30,8 @@ const mockFrom = vi.fn();
 const mockWhere = vi.fn();
 const mockUpdateSet = vi.fn();
 const mockUpdateWhere = vi.fn();
+const mockInsertValues = vi.fn();
+const mockOnConflictDoNothing = vi.fn();
 
 vi.mock("@/db", () => ({
   db: {
@@ -45,6 +47,12 @@ vi.mock("@/db", () => ({
       set: (...args: unknown[]) => {
         mockUpdateSet(...args);
         return { where: (...wArgs: unknown[]) => mockUpdateWhere(...wArgs) };
+      },
+    }),
+    insert: vi.fn().mockReturnValue({
+      values: (...args: unknown[]) => {
+        mockInsertValues(...args);
+        return { onConflictDoNothing: (...cdArgs: unknown[]) => mockOnConflictDoNothing(...cdArgs) };
       },
     }),
   },
@@ -103,6 +111,7 @@ describe("poll-new-episodes", () => {
     vi.clearAllMocks();
     mockBatchTrigger.mockResolvedValue({ id: "batch_default" });
     mockUpdateWhere.mockResolvedValue(undefined);
+    mockOnConflictDoNothing.mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -171,8 +180,8 @@ describe("poll-new-episodes", () => {
       mockGetEpisodesByFeedId.mockResolvedValue({
         status: "true",
         items: [
-          { id: 2001, title: "Episode A" },
-          { id: 2002, title: "Episode B" },
+          { id: 2001, title: "Episode A", enclosureUrl: "https://example.com/a.mp3", description: "Desc A", transcripts: [] },
+          { id: 2002, title: "Episode B", enclosureUrl: "https://example.com/b.mp3", description: "Desc B", transcripts: [{ url: "https://example.com/b.srt", type: "application/srt" }] },
         ],
         count: 2,
       });
@@ -183,8 +192,14 @@ describe("poll-new-episodes", () => {
       await pollSingleFeed(podcast);
 
       expect(mockBatchTrigger).toHaveBeenCalledWith([
-        { payload: { episodeId: 2001 }, options: { idempotencyKey: "poll-summarize-2001" } },
-        { payload: { episodeId: 2002 }, options: { idempotencyKey: "poll-summarize-2002" } },
+        {
+          payload: { episodeId: 2001, enclosureUrl: "https://example.com/a.mp3", description: "Desc A", transcripts: [], triggerSummarize: true },
+          options: { idempotencyKey: "poll-fetch-transcript-2001" },
+        },
+        {
+          payload: { episodeId: 2002, enclosureUrl: "https://example.com/b.mp3", description: "Desc B", transcripts: [{ url: "https://example.com/b.srt", type: "application/srt" }], triggerSummarize: true },
+          options: { idempotencyKey: "poll-fetch-transcript-2002" },
+        },
       ]);
     });
 

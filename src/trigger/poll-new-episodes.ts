@@ -3,7 +3,7 @@ import { eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { podcasts, episodes, userSubscriptions } from "@/db/schema";
 import { getEpisodesByFeedId } from "./helpers/podcastindex";
-import { summarizeEpisode } from "./summarize-episode";
+import { fetchTranscriptTask } from "./fetch-transcript";
 
 /**
  * Queries podcasts that have at least one active subscriber and are sourced
@@ -81,16 +81,45 @@ export async function pollSingleFeed(podcast: typeof podcasts.$inferSelect) {
       new: newEpisodes.length,
     });
 
-    // Fire-and-forget summarization for new episodes
+    // Create episode stubs and trigger transcript fetch for new episodes.
+    // fetch-transcript chains into summarize-episode once a transcript is
+    // persisted, closing the gap where the poller previously triggered
+    // summarize-episode directly (which always failed — no transcript yet).
     if (newEpisodes.length > 0) {
+      // Batch-insert episode stubs so persistTranscript has a row to UPDATE.
+      // onConflictDoNothing guards against races with other insert paths.
+      await db
+        .insert(episodes)
+        .values(
+          newEpisodes.map((ep) => ({
+            podcastId: podcast.id,
+            podcastIndexId: String(ep.id),
+            title: ep.title,
+            description: ep.description,
+            audioUrl: ep.enclosureUrl,
+            duration: ep.duration,
+            publishDate: ep.datePublished
+              ? new Date(ep.datePublished * 1000)
+              : null,
+            transcriptStatus: "fetching" as const,
+          }))
+        )
+        .onConflictDoNothing({ target: episodes.podcastIndexId });
+
       const batchItems = newEpisodes.map((ep) => ({
-        payload: { episodeId: Number(ep.id) },
-        options: { idempotencyKey: `poll-summarize-${ep.id}` },
+        payload: {
+          episodeId: Number(ep.id),
+          enclosureUrl: ep.enclosureUrl,
+          description: ep.description,
+          transcripts: ep.transcripts,
+          triggerSummarize: true,
+        },
+        options: { idempotencyKey: `poll-fetch-transcript-${ep.id}` },
       }));
 
-      await summarizeEpisode.batchTrigger(batchItems);
+      await fetchTranscriptTask.batchTrigger(batchItems);
 
-      logger.info("Triggered summarization for new episodes", {
+      logger.info("Triggered transcript fetch for new episodes", {
         feedId,
         count: newEpisodes.length,
       });
