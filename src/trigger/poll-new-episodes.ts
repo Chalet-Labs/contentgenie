@@ -3,7 +3,7 @@ import { eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { podcasts, episodes, userSubscriptions } from "@/db/schema";
 import { getEpisodesByFeedId } from "./helpers/podcastindex";
-import { summarizeEpisode } from "./summarize-episode";
+import { fetchTranscriptTask } from "./fetch-transcript";
 
 /**
  * Queries podcasts that have at least one active subscriber and are sourced
@@ -37,8 +37,9 @@ export async function getSubscribedPodcasts() {
 }
 
 /**
- * Polls a single podcast feed for new episodes, triggers summarization for
- * any episodes not already in the database.
+ * Polls a single podcast feed for new episodes, inserts episode stubs and
+ * triggers transcript fetching for any episodes not already in the database.
+ * fetch-transcript chains into summarize-episode after persisting a transcript.
  *
  * Errors are allowed to propagate to the caller; per-feed error isolation is
  * handled by the scheduled task's run loop.
@@ -81,16 +82,45 @@ export async function pollSingleFeed(podcast: typeof podcasts.$inferSelect) {
       new: newEpisodes.length,
     });
 
-    // Fire-and-forget summarization for new episodes
+    // Create episode stubs and trigger transcript fetch for new episodes.
+    // fetch-transcript chains into summarize-episode once a transcript is
+    // persisted, closing the gap where the poller previously triggered
+    // summarize-episode directly (which always failed — no transcript yet).
     if (newEpisodes.length > 0) {
+      // Batch-insert episode stubs so persistTranscript has a row to UPDATE.
+      // onConflictDoNothing guards against races with other insert paths.
+      await db
+        .insert(episodes)
+        .values(
+          newEpisodes.map((ep) => ({
+            podcastId: podcast.id,
+            podcastIndexId: String(ep.id),
+            title: ep.title,
+            description: ep.description,
+            audioUrl: ep.enclosureUrl,
+            duration: ep.duration,
+            publishDate: ep.datePublished
+              ? new Date(ep.datePublished * 1000)
+              : null,
+            transcriptStatus: "fetching" as const,
+          }))
+        )
+        .onConflictDoNothing({ target: episodes.podcastIndexId });
+
       const batchItems = newEpisodes.map((ep) => ({
-        payload: { episodeId: Number(ep.id) },
-        options: { idempotencyKey: `poll-summarize-${ep.id}` },
+        payload: {
+          episodeId: Number(ep.id),
+          enclosureUrl: ep.enclosureUrl,
+          description: ep.description,
+          transcripts: ep.transcripts,
+          triggerSummarize: true,
+        },
+        options: { idempotencyKey: `poll-fetch-transcript-${ep.id}` },
       }));
 
-      await summarizeEpisode.batchTrigger(batchItems);
+      await fetchTranscriptTask.batchTrigger(batchItems);
 
-      logger.info("Triggered summarization for new episodes", {
+      logger.info("Triggered transcript fetch for new episodes", {
         feedId,
         count: newEpisodes.length,
       });
@@ -108,12 +138,15 @@ export async function pollSingleFeed(podcast: typeof podcasts.$inferSelect) {
 
 /**
  * Scheduled task that polls all subscribed PodcastIndex feeds for new episodes
- * every 2 hours and triggers summarization for each new episode.
+ * every 2 hours and triggers transcript fetching (which chains into
+ * summarization) for each new episode.
  *
  * Safety notes:
  * - Concurrent run safety: unique constraints on episodes.podcastIndexId +
- *   idempotent summarize task prevent duplicate work.
- * - Backpressure: summarize-queue has concurrencyLimit of 3.
+ *   idempotency keys on fetchTranscriptTask.batchTrigger and
+ *   summarizeEpisode.trigger prevent duplicate work.
+ * - Backpressure: fetch-transcript-queue has no concurrency limit (to avoid
+ *   deadlock); summarize-queue has concurrencyLimit of 3.
  * - 300s maxDuration ceiling supports ~150 feeds at current API latency.
  */
 export const pollNewEpisodes = schedules.task({
@@ -137,14 +170,14 @@ export const pollNewEpisodes = schedules.task({
       return {
         feedsPolled: 0,
         newEpisodesFound: 0,
-        summarizationsTriggered: 0,
+        transcriptFetchesTriggered: 0,
         feedErrors: 0,
       };
     }
 
     let feedsPolled = 0;
     let newEpisodesFound = 0;
-    let summarizationsTriggered = 0;
+    let transcriptFetchesTriggered = 0;
     let feedErrors = 0;
 
     // Sequential polling to avoid thundering herd against PodcastIndex API
@@ -153,7 +186,7 @@ export const pollNewEpisodes = schedules.task({
         const result = await pollSingleFeed(podcast);
         feedsPolled++;
         newEpisodesFound += result.newEpisodes;
-        summarizationsTriggered += result.triggered;
+        transcriptFetchesTriggered += result.triggered;
       } catch (error) {
         feedErrors++;
         logger.error("Failed to poll feed", {
@@ -167,7 +200,7 @@ export const pollNewEpisodes = schedules.task({
     const summary = {
       feedsPolled,
       newEpisodesFound,
-      summarizationsTriggered,
+      transcriptFetchesTriggered,
       feedErrors,
     };
 

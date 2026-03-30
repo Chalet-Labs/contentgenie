@@ -5,6 +5,7 @@ import { episodes } from "@/db/schema";
 import { fetchTranscript, extractTranscriptUrl, fetchTranscriptFromUrl } from "@/trigger/helpers/transcript";
 import { submitTranscriptionAsync, getTranscriptionStatus } from "@/lib/assemblyai";
 import { persistTranscript } from "@/trigger/helpers/database";
+import { summarizeEpisode } from "@/trigger/summarize-episode";
 
 export type FetchTranscriptPayload = {
   episodeId: number;
@@ -12,6 +13,8 @@ export type FetchTranscriptPayload = {
   description?: string;
   transcripts?: Array<{ url: string; type: string }>;
   force?: boolean;
+  /** When true, trigger summarize-episode after a transcript is successfully persisted. */
+  triggerSummarize?: boolean;
 };
 
 export type FetchTranscriptResult = {
@@ -25,7 +28,7 @@ export const fetchTranscriptTask = task({
   queue: { name: "fetch-transcript-queue" }, // dedicated queue with no concurrency limit — sharing summarize-queue (concurrencyLimit: 3) would deadlock when 3 parents each await a child
   maxDuration: 7200,
   run: async (payload: FetchTranscriptPayload): Promise<FetchTranscriptResult> => {
-    const { episodeId, enclosureUrl, description, transcripts, force = false } = payload;
+    const { episodeId, enclosureUrl, description, transcripts, force = false, triggerSummarize = false } = payload;
 
     metadata.set("step", "fetching-transcript");
     logger.info("Checking for cached transcription");
@@ -211,6 +214,19 @@ export const fetchTranscriptTask = task({
         .where(eq(episodes.podcastIndexId, String(episodeId)));
     } catch (err) {
       logger.warn("Failed to clear transcriptRunId", { episodeId, error: err instanceof Error ? err.message : String(err) });
+    }
+
+    // Chain into summarize-episode when the poller requested it and we got a
+    // transcript (from any source, including cache). The idempotency key on
+    // .trigger() prevents duplicate summarization. Errors propagate so
+    // Trigger.dev retries the task — the transcript is already persisted so
+    // retries hit the cheap cached path.
+    if (triggerSummarize && transcript) {
+      await summarizeEpisode.trigger(
+        { episodeId },
+        { idempotencyKey: `poll-summarize-${episodeId}` }
+      );
+      logger.info("Triggered summarization after transcript fetch", { episodeId });
     }
 
     return { transcript, source: dbSource };

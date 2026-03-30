@@ -66,6 +66,13 @@ vi.mock("@/lib/assemblyai", () => ({
   getTranscriptionStatus: vi.fn(),
 }));
 
+const mockSummarizeTrigger = vi.fn();
+vi.mock("@/trigger/summarize-episode", () => ({
+  summarizeEpisode: {
+    trigger: (...args: unknown[]) => mockSummarizeTrigger(...args),
+  },
+}));
+
 import { fetchTranscriptTask } from "@/trigger/fetch-transcript";
 import { submitTranscriptionAsync, getTranscriptionStatus } from "@/lib/assemblyai";
 import { db } from "@/db";
@@ -78,6 +85,7 @@ const taskConfig = fetchTranscriptTask as unknown as {
     description?: string;
     transcripts?: Array<{ url: string; type: string }>;
     force?: boolean;
+    triggerSummarize?: boolean;
   }) => Promise<{ transcript: string | undefined; source: string | null | undefined }>;
   onFailure: (params: { payload: { episodeId: number } }) => Promise<void>;
 };
@@ -89,6 +97,7 @@ describe("fetch-transcript task", () => {
     vi.clearAllMocks();
     mockFindFirst.mockResolvedValue(null);
     mockPersistTranscript.mockResolvedValue(undefined);
+    mockSummarizeTrigger.mockResolvedValue({ id: "run_summarize" });
   });
 
   afterEach(() => {
@@ -303,6 +312,92 @@ describe("fetch-transcript task", () => {
 
     const result = await taskConfig.run({ episodeId: 123, transcripts: [] });
     expect(result).toEqual({ transcript: undefined, source: null });
+  });
+});
+
+describe("fetch-transcript triggerSummarize chaining", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockFindFirst.mockResolvedValue(null);
+    mockPersistTranscript.mockResolvedValue(undefined);
+    mockSummarizeTrigger.mockResolvedValue({ id: "run_summarize" });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+    vi.resetModules();
+  });
+
+  it("triggers summarize-episode when triggerSummarize=true and transcript found", async () => {
+    mockFetchTranscript.mockResolvedValue("PodcastIndex transcript");
+
+    await taskConfig.run({
+      episodeId: 123,
+      transcripts: [{ url: "https://example.com/t.txt", type: "text/plain" }],
+      triggerSummarize: true,
+    });
+
+    expect(mockSummarizeTrigger).toHaveBeenCalledWith(
+      { episodeId: 123 },
+      { idempotencyKey: "poll-summarize-123" }
+    );
+  });
+
+  it("triggers summarize-episode for cached transcripts (triggerSummarize=true)", async () => {
+    mockFindFirst.mockResolvedValue({ transcription: "Cached transcript" });
+
+    await taskConfig.run({
+      episodeId: 456,
+      transcripts: [],
+      triggerSummarize: true,
+    });
+
+    expect(mockSummarizeTrigger).toHaveBeenCalledWith(
+      { episodeId: 456 },
+      { idempotencyKey: "poll-summarize-456" }
+    );
+  });
+
+  it("does NOT trigger summarize-episode when no transcript found", async () => {
+    mockFetchTranscript.mockResolvedValue(undefined);
+    mockExtractTranscriptUrl.mockReturnValue(null);
+
+    await taskConfig.run({
+      episodeId: 123,
+      transcripts: [],
+      triggerSummarize: true,
+    });
+
+    expect(mockSummarizeTrigger).not.toHaveBeenCalled();
+  });
+
+  it("does NOT trigger summarize-episode when triggerSummarize is false (default)", async () => {
+    mockFetchTranscript.mockResolvedValue("PodcastIndex transcript");
+
+    await taskConfig.run({
+      episodeId: 123,
+      transcripts: [{ url: "https://example.com/t.txt", type: "text/plain" }],
+    });
+
+    expect(mockSummarizeTrigger).not.toHaveBeenCalled();
+  });
+
+  it("propagates summarize trigger failure so Trigger.dev retries the task", async () => {
+    mockFetchTranscript.mockResolvedValue("PodcastIndex transcript");
+    mockSummarizeTrigger.mockRejectedValue(new Error("Trigger.dev API timeout"));
+
+    await expect(
+      taskConfig.run({
+        episodeId: 123,
+        transcripts: [{ url: "https://example.com/t.txt", type: "text/plain" }],
+        triggerSummarize: true,
+      })
+    ).rejects.toThrow("Trigger.dev API timeout");
+
+    // Transcript was still persisted before the error
+    expect(mockPersistTranscript).toHaveBeenCalled();
   });
 });
 
