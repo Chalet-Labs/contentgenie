@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- ShareButton dropdown menu with native Share, Copy link, and Copy with summary options (#252)
+- Optional `summary` prop on ShareButton for richer share text (passes `worthItReason` on episodes)
 - shadcn Form component with react-hook-form + Zod validation (#234)
 - Migrated collection-dialog, bookmarks-list, ai-provider-card, rss-feed-form to structured form handling
 - bookmark-button note popover uses native form submit
@@ -18,6 +20,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Admin link in sidebar (visible to `org:admin` users only)
 
 ### Changed
+- Share text across episode, podcast, and collection pages uses actual titles instead of generic "Check out..." text (#252)
 - Migrated URL search param management to nuqs for type-safe state in discover search and admin episode filters; admin filter arrays now use comma-separated format (`?transcriptStatus=available,failed`) instead of repeated keys (ADR-030, #247)
 - Admin status badge shows "unprocessed" instead of "none" for NULL `transcript_status` / `summary_status`, aligning with ADR-026 terminology (#239)
 - Replaced raw HTML elements with shadcn/ui primitives across 11 component and settings files: `<label>` → `Label` (with `htmlFor`/`aria-labelledby` for form controls) or `<span>` (for non-form headings), `<button>` → `Button`, `<span>` score pills → `Badge`, and custom progress bars → `Progress`; extended `Progress` with `indicatorClassName` and `max` props (#233)
