@@ -83,7 +83,7 @@ const taskRunner = pollNewEpisodes as unknown as {
   run: (payload: { timestamp: Date }) => Promise<{
     feedsPolled: number;
     newEpisodesFound: number;
-    summarizationsTriggered: number;
+    transcriptFetchesTriggered: number;
     feedErrors: number;
   }>;
 };
@@ -158,9 +158,9 @@ describe("poll-new-episodes", () => {
       mockGetEpisodesByFeedId.mockResolvedValue({
         status: "true",
         items: [
-          { id: 1001, title: "New Episode" },
-          { id: 1002, title: "Existing Episode" },
-          { id: 1003, title: "Another New" },
+          { id: 1001, title: "New Episode", enclosureUrl: "https://example.com/1.mp3", description: "D1", transcripts: [] },
+          { id: 1002, title: "Existing Episode", enclosureUrl: "https://example.com/2.mp3", description: "D2", transcripts: [] },
+          { id: 1003, title: "Another New", enclosureUrl: "https://example.com/3.mp3", description: "D3", transcripts: [] },
         ],
         count: 3,
       });
@@ -174,14 +174,14 @@ describe("poll-new-episodes", () => {
       expect(result.triggered).toBe(2);
     });
 
-    it("calls batchTrigger with correct payloads for new episodes", async () => {
+    it("inserts episode stubs and calls batchTrigger with correct payloads", async () => {
       const podcast = makePodcast({ id: 1, podcastIndexId: "456" });
 
       mockGetEpisodesByFeedId.mockResolvedValue({
         status: "true",
         items: [
-          { id: 2001, title: "Episode A", enclosureUrl: "https://example.com/a.mp3", description: "Desc A", transcripts: [] },
-          { id: 2002, title: "Episode B", enclosureUrl: "https://example.com/b.mp3", description: "Desc B", transcripts: [{ url: "https://example.com/b.srt", type: "application/srt" }] },
+          { id: 2001, title: "Episode A", enclosureUrl: "https://example.com/a.mp3", description: "Desc A", duration: 600, datePublished: 1700000000, transcripts: [] },
+          { id: 2002, title: "Episode B", enclosureUrl: "https://example.com/b.mp3", description: "Desc B", duration: 1200, datePublished: 0, transcripts: [{ url: "https://example.com/b.srt", type: "application/srt" }] },
         ],
         count: 2,
       });
@@ -191,6 +191,26 @@ describe("poll-new-episodes", () => {
 
       await pollSingleFeed(podcast);
 
+      // Verify episode stubs are batch-inserted with correct shape
+      expect(mockInsertValues).toHaveBeenCalledWith([
+        expect.objectContaining({
+          podcastId: 1,
+          podcastIndexId: "2001",
+          title: "Episode A",
+          audioUrl: "https://example.com/a.mp3",
+          transcriptStatus: "fetching",
+        }),
+        expect.objectContaining({
+          podcastId: 1,
+          podcastIndexId: "2002",
+          title: "Episode B",
+          audioUrl: "https://example.com/b.mp3",
+          transcriptStatus: "fetching",
+        }),
+      ]);
+      expect(mockOnConflictDoNothing).toHaveBeenCalled();
+
+      // Verify fetch-transcript triggered with episode metadata
       expect(mockBatchTrigger).toHaveBeenCalledWith([
         {
           payload: { episodeId: 2001, enclosureUrl: "https://example.com/a.mp3", description: "Desc A", transcripts: [], triggerSummarize: true },
@@ -294,7 +314,7 @@ describe("poll-new-episodes", () => {
       expect(result).toEqual({
         feedsPolled: 0,
         newEpisodesFound: 0,
-        summarizationsTriggered: 0,
+        transcriptFetchesTriggered: 0,
         feedErrors: 0,
       });
     });
@@ -318,7 +338,7 @@ describe("poll-new-episodes", () => {
 
       expect(result.feedsPolled).toBe(2);
       expect(result.newEpisodesFound).toBe(3);
-      expect(result.summarizationsTriggered).toBe(3);
+      expect(result.transcriptFetchesTriggered).toBe(3);
       expect(result.feedErrors).toBe(0);
     });
 

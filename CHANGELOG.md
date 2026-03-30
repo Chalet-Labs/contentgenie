@@ -39,6 +39,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Summarization step progress UI removes `"fetching-transcript"` and `"transcribing-audio"` steps — summarization no longer fetches transcripts
 
 ### Fixed
+- Episode poller now triggers fetch-transcript before summarize-episode, fixing broken pipeline where newly discovered episodes always failed summarization due to missing transcript (#253)
 - Admin transcript buttons showing incorrect state (all disabled) for episodes with NULL `transcript_status` — NULL is now normalized to `"missing"` at the component boundary, enabling Fetch Transcript and Fetch & Summarize (#239)
 - Episode detail page transcript fetch button hidden for NULL-status episodes — NULL no longer short-circuits the early return in `EpisodeTranscriptFetchButton` (#239)
 - Admin transcript fetch button no longer shows a stuck spinner after navigating away and back during an in-flight fetch (#238)

@@ -216,20 +216,17 @@ export const fetchTranscriptTask = task({
       logger.warn("Failed to clear transcriptRunId", { episodeId, error: err instanceof Error ? err.message : String(err) });
     }
 
-    // Chain into summarize-episode when the poller requested it and we got a transcript.
-    if (triggerSummarize && transcript && dbSource) {
-      try {
-        await summarizeEpisode.trigger(
-          { episodeId },
-          { idempotencyKey: `poll-summarize-${episodeId}` }
-        );
-        logger.info("Triggered summarization after transcript fetch", { episodeId });
-      } catch (error) {
-        logger.warn("Failed to trigger summarization after transcript fetch", {
-          episodeId,
-          error: error instanceof Error ? error.message : String(error),
-        });
-      }
+    // Chain into summarize-episode when the poller requested it and we got a
+    // transcript (from any source, including cache). The idempotency key on
+    // .trigger() prevents duplicate summarization. Errors propagate so
+    // Trigger.dev retries the task — the transcript is already persisted so
+    // retries hit the cheap cached path.
+    if (triggerSummarize && transcript) {
+      await summarizeEpisode.trigger(
+        { episodeId },
+        { idempotencyKey: `poll-summarize-${episodeId}` }
+      );
+      logger.info("Triggered summarization after transcript fetch", { episodeId });
     }
 
     return { transcript, source: dbSource };
