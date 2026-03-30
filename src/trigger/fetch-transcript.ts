@@ -5,7 +5,7 @@ import { episodes } from "@/db/schema";
 import { fetchTranscript, extractTranscriptUrl, fetchTranscriptFromUrl } from "@/trigger/helpers/transcript";
 import { submitTranscriptionAsync, getTranscriptionStatus } from "@/lib/assemblyai";
 import { persistTranscript } from "@/trigger/helpers/database";
-import { summarizeEpisode } from "./summarize-episode";
+import { summarizeEpisode } from "@/trigger/summarize-episode";
 
 export type FetchTranscriptPayload = {
   episodeId: number;

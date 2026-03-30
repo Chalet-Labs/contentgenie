@@ -325,6 +325,9 @@ describe("fetch-transcript triggerSummarize chaining", () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+    vi.resetModules();
   });
 
   it("triggers summarize-episode when triggerSummarize=true and transcript found", async () => {
