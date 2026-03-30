@@ -53,7 +53,9 @@ export function ShareButton({
       if (error instanceof DOMException && error.name === "AbortError") {
         return;
       }
-      // Fall through silently — user can still use copy options
+      toast("Unable to share this content", {
+        description: "Try copying the link instead",
+      });
     }
   };
 
@@ -79,7 +81,7 @@ export function ShareButton({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant={variant} size={size}>
+        <Button type="button" variant={variant} size={size}>
           <Share2 className="mr-2" />
           Share
         </Button>
