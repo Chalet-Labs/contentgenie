@@ -247,7 +247,7 @@ export function SummaryDisplay({
           <CardContent>
             <div className="flex items-center gap-4">
               <div
-                className={`flex h-16 w-16 items-center justify-center rounded-full ${getScoreColor(worthItScore)} text-white shadow-lg`}
+                className={`flex h-16 w-16 items-center justify-center rounded-full ${getScoreColor(worthItScore)} shadow-lg`}
               >
                 <span className="text-2xl font-bold">
                   {worthItScore.toFixed(1)}

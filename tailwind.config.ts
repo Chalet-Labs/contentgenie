@@ -62,10 +62,15 @@ const config: Config = {
   			},
   			score: {
   				exceptional: 'hsl(var(--score-exceptional))',
+  				'exceptional-foreground': 'hsl(var(--score-exceptional-foreground))',
   				above: 'hsl(var(--score-above))',
+  				'above-foreground': 'hsl(var(--score-above-foreground))',
   				average: 'hsl(var(--score-average))',
+  				'average-foreground': 'hsl(var(--score-average-foreground))',
   				below: 'hsl(var(--score-below))',
+  				'below-foreground': 'hsl(var(--score-below-foreground))',
   				skip: 'hsl(var(--score-skip))',
+  				'skip-foreground': 'hsl(var(--score-skip-foreground))',
   			},
   			status: {
   				'success-bg': 'hsl(var(--status-success-bg))',

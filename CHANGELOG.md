@@ -7,6 +7,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Semantic CSS color tokens for score (`--score-exceptional` → `--score-skip`) and status indicators (`--status-success-*`, `--status-warning-*`, etc.) with light/dark mode variants and accessible foreground colors (#256)
+- Blue-indigo brand accent color replacing stock shadcn neutral defaults (#256)
+- Active nav link highlighting in desktop header (#256)
+- Global `prefers-reduced-motion: reduce` rule disabling animations/transitions for accessibility (#256)
+- Mobile Sheet-based collection navigation for library sidebar (#256)
 - ShareButton dropdown menu with native Share, Copy link, and Copy with summary options (#252)
 - Optional `summary` prop on ShareButton for richer share text (passes `worthItReason` on episodes)
 - shadcn Form component with react-hook-form + Zod validation (#234)
@@ -20,6 +25,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Admin link in sidebar (visible to `org:admin` users only)
 
 ### Changed
+- Score and status badge components migrated from hardcoded Tailwind colors to semantic design tokens (#256)
+- Empty state icons standardized to consistent `rounded-full bg-muted p-3` container pattern across 7 components (#256)
+- `InstallBanner` uses semantic `bg-card`/`text-card-foreground` tokens instead of hardcoded zinc colors (#256)
+- Library sidebar hidden on mobile with Sheet-based collection fallback (#256)
+- `NotificationSettings` loading state uses `Skeleton` component instead of raw `animate-pulse` (#256)
+- Collection page back navigation unified to Link + ArrowLeft + text pattern (#256)
 - Share text across episode, podcast, and collection pages uses actual titles instead of generic "Check out..." text (#252)
 - Migrated URL search param management to nuqs for type-safe state in discover search and admin episode filters; admin filter arrays now use comma-separated format (`?transcriptStatus=available,failed`) instead of repeated keys (ADR-030, #247)
 - Admin status badge shows "unprocessed" instead of "none" for NULL `transcript_status` / `summary_status`, aligning with ADR-026 terminology (#239)
@@ -39,6 +50,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Summarization step progress UI removes `"fetching-transcript"` and `"transcribing-audio"` steps — summarization no longer fetches transcripts
 
 ### Fixed
+- Mobile nav touch targets increased from `py-2` to `py-3` for WCAG 2.1 AA 44px minimum (#256)
+- Score badge contrast on yellow/orange backgrounds — foreground color now adapts per tier instead of hardcoded white (#256)
 - Episode poller now triggers fetch-transcript before summarize-episode, fixing broken pipeline where newly discovered episodes always failed summarization due to missing transcript (#253)
 - Admin transcript buttons showing incorrect state (all disabled) for episodes with NULL `transcript_status` — NULL is now normalized to `"missing"` at the component boundary, enabling Fetch Transcript and Fetch & Summarize (#239)
 - Episode detail page transcript fetch button hidden for NULL-status episodes — NULL no longer short-circuits the early return in `EpisodeTranscriptFetchButton` (#239)
