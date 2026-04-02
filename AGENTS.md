@@ -54,6 +54,10 @@ bun run trigger:deploy # Deploy tasks to Trigger.dev Cloud
 - Always run lint and build before pushing. The CI must pass.
 - Update `CHANGELOG.md` under the `[Unreleased]` section when adding features, fixing bugs, or making breaking changes. Use the appropriate subsection: `Added`, `Changed`, `Fixed`, or `Removed`.
 
+## Design
+
+See [.impeccable.md](.impeccable.md) for design context: users, brand personality, aesthetic direction, design principles, and accessibility targets.
+
 ## Code style
 
 - TypeScript strict mode; functional React components (no classes).
