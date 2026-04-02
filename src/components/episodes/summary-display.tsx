@@ -193,7 +193,9 @@ export function SummaryDisplay({
     return (
       <Card>
         <CardContent className="flex flex-col items-center gap-4 py-8">
-          <Sparkles className="h-12 w-12 text-muted-foreground" />
+          <div className="rounded-full bg-muted p-3">
+            <Sparkles className="h-5 w-5 text-muted-foreground" />
+          </div>
           <div className="text-center">
             <p className="font-medium">No Summary Available</p>
             <p className="mt-1 text-sm text-muted-foreground">
@@ -245,7 +247,7 @@ export function SummaryDisplay({
           <CardContent>
             <div className="flex items-center gap-4">
               <div
-                className={`flex h-16 w-16 items-center justify-center rounded-full ${getScoreColor(worthItScore)} text-white shadow-lg`}
+                className={`flex h-16 w-16 items-center justify-center rounded-full ${getScoreColor(worthItScore)} shadow-lg`}
               >
                 <span className="text-2xl font-bold">
                   {worthItScore.toFixed(1)}

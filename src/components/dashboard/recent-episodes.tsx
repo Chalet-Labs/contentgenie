@@ -70,7 +70,9 @@ export function RecentEpisodes({
         </CardHeader>
         <CardContent>
           <div className="flex flex-col items-center justify-center py-8 text-center">
-            <Rss className="h-12 w-12 text-muted-foreground/50" />
+            <div className="mb-2 rounded-full bg-muted p-3">
+              <Rss className="h-5 w-5 text-muted-foreground" />
+            </div>
             {hasSubscriptions ? (
               <>
                 <p className="mt-2 text-sm text-muted-foreground">

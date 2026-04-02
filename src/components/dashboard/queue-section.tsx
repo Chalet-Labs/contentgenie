@@ -432,7 +432,9 @@ export function QueueSection() {
       <CardContent>
         {isEmpty ? (
           <div className="flex flex-col items-center justify-center py-8 text-center">
-            <ListMusic className="h-12 w-12 text-muted-foreground/50" />
+            <div className="mb-2 rounded-full bg-muted p-3">
+              <ListMusic className="h-5 w-5 text-muted-foreground" />
+            </div>
             <p className="mt-2 text-sm text-muted-foreground">
               Your queue is empty
             </p>

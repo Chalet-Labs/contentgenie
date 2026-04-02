@@ -1,6 +1,7 @@
 "use client"
 
 import Link from "next/link"
+import { usePathname } from "next/navigation"
 import { SignedIn, SignedOut, UserButton, OrganizationSwitcher } from "@clerk/nextjs"
 import { useTheme } from "next-themes"
 import { Button } from "@/components/ui/button"
@@ -15,6 +16,7 @@ import { Separator } from "@/components/ui/separator"
 import { Menu, Moon, Sun, Headphones } from "lucide-react"
 import { NotificationBell } from "@/components/notifications/notification-bell"
 import { useSidebarCountsOptional, getBadgeCount, NavBadge } from "@/contexts/sidebar-counts-context"
+import { cn } from "@/lib/utils"
 
 const navLinks = [
   { href: "/dashboard", label: "Dashboard" },
@@ -24,6 +26,7 @@ const navLinks = [
 ]
 
 export function Header() {
+  const pathname = usePathname()
   const { setTheme } = useTheme()
   const counts = useSidebarCountsOptional()
 
@@ -51,7 +54,7 @@ export function Header() {
                   <Link
                     key={link.href}
                     href={link.href}
-                    className="flex items-center px-3 py-2 text-sm font-medium rounded-md hover:bg-accent hover:text-accent-foreground transition-colors"
+                    className="flex items-center px-3 py-3 text-sm font-medium rounded-md hover:bg-accent hover:text-accent-foreground transition-colors"
                   >
                     {link.label}
                     {badge !== null && <NavBadge count={badge} />}
@@ -61,7 +64,7 @@ export function Header() {
               <Separator className="my-2" />
               <Link
                 href="/settings"
-                className="flex items-center px-3 py-2 text-sm font-medium rounded-md hover:bg-accent hover:text-accent-foreground transition-colors"
+                className="flex items-center px-3 py-3 text-sm font-medium rounded-md hover:bg-accent hover:text-accent-foreground transition-colors"
               >
                 Settings
               </Link>
@@ -89,15 +92,23 @@ export function Header() {
 
         {/* Desktop Navigation */}
         <nav className="hidden md:flex items-center gap-6 flex-1">
-          {navLinks.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-            >
-              {link.label}
-            </Link>
-          ))}
+          {navLinks.map((link) => {
+            const isActive = pathname === link.href || pathname?.startsWith(`${link.href}/`)
+            return (
+              <Link
+                key={link.href}
+                href={link.href}
+                className={cn(
+                  "text-sm font-medium transition-colors",
+                  isActive
+                    ? "text-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                )}
+              >
+                {link.label}
+              </Link>
+            )
+          })}
         </nav>
 
         {/* Right side: Theme toggle + User menu */}

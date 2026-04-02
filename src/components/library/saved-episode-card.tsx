@@ -6,6 +6,7 @@ import Image from "next/image";
 import { toast } from "sonner";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { WorthItBadge } from "@/components/episodes/worth-it-badge";
 import { Button } from "@/components/ui/button";
 import {
   Collapsible,
@@ -136,12 +137,7 @@ export function SavedEpisodeCard({ item, onRemoved, onCollectionChanged, isOffli
                   </div>
                 )}
                 {worthItScore !== null && (
-                  <Badge
-                    variant={worthItScore >= 7 ? "default" : worthItScore >= 5 ? "secondary" : "outline"}
-                    className="text-xs"
-                  >
-                    Worth it: {worthItScore.toFixed(1)}/10
-                  </Badge>
+                  <WorthItBadge score={worthItScore} />
                 )}
                 {hasNotes && (
                   <div className="flex items-center gap-1 text-primary">

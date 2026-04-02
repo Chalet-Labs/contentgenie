@@ -12,6 +12,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   updateNotificationPreferences,
   getNotificationPreferences,
@@ -233,7 +234,7 @@ export function NotificationSettings() {
             </SelectContent>
           </Select>
         ) : (
-          <div className="h-10 w-[140px] animate-pulse rounded-md bg-muted" />
+          <Skeleton className="h-10 w-[140px]" />
         )}
       </div>
 
