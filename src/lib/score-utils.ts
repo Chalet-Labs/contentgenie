@@ -4,11 +4,11 @@
  */
 
 export function getScoreColor(score: number): string {
-  if (score >= 8) return "bg-green-500";
-  if (score >= 6) return "bg-emerald-500";
-  if (score >= 4) return "bg-yellow-500";
-  if (score >= 2) return "bg-orange-500";
-  return "bg-red-500";
+  if (score >= 8) return "bg-score-exceptional";
+  if (score >= 6) return "bg-score-above";
+  if (score >= 4) return "bg-score-average";
+  if (score >= 2) return "bg-score-below";
+  return "bg-score-skip";
 }
 
 export function getScoreLabel(score: number): string {

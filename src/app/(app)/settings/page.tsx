@@ -227,7 +227,7 @@ export default function SettingsPage() {
                     </p>
                   </div>
                 </div>
-                <span className="text-xs text-green-600 dark:text-green-400 bg-green-100 dark:bg-green-900/30 px-2 py-1 rounded">
+                <span className="text-xs bg-status-success-bg text-status-success-text px-2 py-1 rounded">
                   Connected
                 </span>
               </div>

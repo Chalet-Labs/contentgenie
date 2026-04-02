@@ -26,8 +26,8 @@
     --card-foreground: 0 0% 3.9%;
     --popover: 0 0% 100%;
     --popover-foreground: 0 0% 3.9%;
-    --primary: 0 0% 9%;
-    --primary-foreground: 0 0% 98%;
+    --primary: 221.2 83.2% 53.3%;
+    --primary-foreground: 210 40% 98%;
     --secondary: 0 0% 96.1%;
     --secondary-foreground: 0 0% 9%;
     --muted: 0 0% 96.1%;
@@ -38,12 +38,27 @@
     --destructive-foreground: 0 0% 98%;
     --border: 0 0% 89.8%;
     --input: 0 0% 89.8%;
-    --ring: 0 0% 3.9%;
+    --ring: 221.2 83.2% 53.3%;
     --chart-1: 12 76% 61%;
     --chart-2: 173 58% 39%;
     --chart-3: 197 37% 24%;
     --chart-4: 43 74% 66%;
     --chart-5: 27 87% 67%;
+    --score-exceptional: 142 71% 45%;
+    --score-above: 160 84% 39%;
+    --score-average: 48 96% 53%;
+    --score-below: 25 95% 53%;
+    --score-skip: 0 84% 60%;
+    --status-success-bg: 142 76% 94%;
+    --status-success-text: 142 71% 29%;
+    --status-warning-bg: 48 96% 92%;
+    --status-warning-text: 32 95% 33%;
+    --status-info-bg: 221 91% 94%;
+    --status-info-text: 221 83% 40%;
+    --status-danger-bg: 0 86% 94%;
+    --status-danger-text: 0 84% 40%;
+    --status-neutral-bg: 0 0% 93%;
+    --status-neutral-text: 0 0% 37%;
     --radius: 0.5rem;
   }
   .dark {
@@ -53,8 +68,8 @@
     --card-foreground: 0 0% 98%;
     --popover: 0 0% 3.9%;
     --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;
-    --primary-foreground: 0 0% 9%;
+    --primary: 217.2 91.2% 59.8%;
+    --primary-foreground: 222.2 47.4% 11.2%;
     --secondary: 0 0% 14.9%;
     --secondary-foreground: 0 0% 98%;
     --muted: 0 0% 14.9%;
@@ -65,12 +80,27 @@
     --destructive-foreground: 0 0% 98%;
     --border: 0 0% 14.9%;
     --input: 0 0% 14.9%;
-    --ring: 0 0% 83.1%;
+    --ring: 217.2 91.2% 59.8%;
     --chart-1: 220 70% 50%;
     --chart-2: 160 60% 45%;
     --chart-3: 30 80% 55%;
     --chart-4: 280 65% 60%;
     --chart-5: 340 75% 55%;
+    --score-exceptional: 142 71% 45%;
+    --score-above: 160 84% 39%;
+    --score-average: 48 96% 53%;
+    --score-below: 25 95% 53%;
+    --score-skip: 0 84% 60%;
+    --status-success-bg: 142 76% 18%;
+    --status-success-text: 142 71% 65%;
+    --status-warning-bg: 48 96% 15%;
+    --status-warning-text: 48 96% 65%;
+    --status-info-bg: 221 91% 18%;
+    --status-info-text: 221 83% 65%;
+    --status-danger-bg: 0 86% 18%;
+    --status-danger-text: 0 84% 65%;
+    --status-neutral-bg: 0 0% 15%;
+    --status-neutral-text: 0 0% 60%;
   }
 }
 
@@ -82,5 +112,16 @@
   }
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

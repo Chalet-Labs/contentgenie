@@ -94,13 +94,15 @@ export default function CollectionDetailPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center gap-4">
-        <Link href="/library">
-          <Button variant="ghost" size="icon">
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
+      <div className="space-y-4">
+        <Link
+          href="/library"
+          className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back to Library
         </Link>
-        <div className="flex-1">
+        <div>
           {isLoading ? (
             <div className="space-y-2">
               <Skeleton className="h-8 w-48" />

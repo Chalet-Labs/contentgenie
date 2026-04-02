@@ -59,6 +59,25 @@ const config: Config = {
   				'3': 'hsl(var(--chart-3))',
   				'4': 'hsl(var(--chart-4))',
   				'5': 'hsl(var(--chart-5))'
+  			},
+  			score: {
+  				exceptional: 'hsl(var(--score-exceptional))',
+  				above: 'hsl(var(--score-above))',
+  				average: 'hsl(var(--score-average))',
+  				below: 'hsl(var(--score-below))',
+  				skip: 'hsl(var(--score-skip))',
+  			},
+  			status: {
+  				'success-bg': 'hsl(var(--status-success-bg))',
+  				'success-text': 'hsl(var(--status-success-text))',
+  				'warning-bg': 'hsl(var(--status-warning-bg))',
+  				'warning-text': 'hsl(var(--status-warning-text))',
+  				'info-bg': 'hsl(var(--status-info-bg))',
+  				'info-text': 'hsl(var(--status-info-text))',
+  				'danger-bg': 'hsl(var(--status-danger-bg))',
+  				'danger-text': 'hsl(var(--status-danger-text))',
+  				'neutral-bg': 'hsl(var(--status-neutral-bg))',
+  				'neutral-text': 'hsl(var(--status-neutral-text))',
   			}
   		}
   	}

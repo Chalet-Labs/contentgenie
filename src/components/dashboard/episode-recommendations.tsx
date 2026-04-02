@@ -43,7 +43,9 @@ export function EpisodeRecommendations({ episodes }: EpisodeRecommendationsProps
         </CardHeader>
         <CardContent>
           <div className="flex flex-col items-center justify-center py-8 text-center">
-            <Sparkles className="h-12 w-12 text-muted-foreground/50" />
+            <div className="mb-2 rounded-full bg-muted p-3">
+              <Sparkles className="h-5 w-5 text-muted-foreground" />
+            </div>
             <p className="mt-2 text-sm text-muted-foreground">No recommendations yet</p>
             <p className="text-xs text-muted-foreground">
               Check back as more episodes are rated by the community

@@ -111,7 +111,9 @@ function QueueList() {
       <div className="flex flex-col">
         <NowPlaying />
         <div className="flex flex-col items-center justify-center py-8 text-center">
-          <ListMusic className="mb-3 h-10 w-10 text-muted-foreground/50" />
+          <div className="mb-3 rounded-full bg-muted p-3">
+            <ListMusic className="h-5 w-5 text-muted-foreground" />
+          </div>
           <p className="text-sm font-medium text-muted-foreground">
             Your queue is empty
           </p>

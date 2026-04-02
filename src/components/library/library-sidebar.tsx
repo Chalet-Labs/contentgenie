@@ -35,7 +35,7 @@ export function LibrarySidebar() {
   };
 
   return (
-    <aside className="w-64 shrink-0 border-r pr-6">
+    <aside className="hidden md:block w-64 shrink-0 border-r pr-6">
       <nav className="space-y-1">
         <Link
           href="/library"
