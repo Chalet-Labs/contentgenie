@@ -83,8 +83,7 @@ describe("TrendingTopics", () => {
   it("displays deterministic subtitle with relative time", () => {
     const topics = [makeTopic({ name: "AI" })]
     render(<TrendingTopics topics={topics} generatedAt={fixedDate} />)
-    expect(screen.getByText(/Updated 10m ago/)).toBeInTheDocument()
-    expect(screen.getByText(/Past 7 days/)).toBeInTheDocument()
+    expect(screen.getByText(/Trending · 10m ago/)).toBeInTheDocument()
   })
 })
 

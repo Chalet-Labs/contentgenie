@@ -49,7 +49,7 @@ export function RecentEpisodes({
         <CardContent className="space-y-4">
           {[1, 2, 3].map((i) => (
             <div key={i} className="flex gap-3">
-              <Skeleton className="h-16 w-16 shrink-0 rounded-md" />
+              <Skeleton className="h-14 w-14 shrink-0 rounded-md" />
               <div className="flex-1 space-y-2">
                 <Skeleton className="h-4 w-3/4" />
                 <Skeleton className="h-3 w-1/2" />
@@ -162,13 +162,7 @@ export function RecentEpisodes({
                 )}
               </div>
               <div className="mt-1">
-                {episode.worthItScore !== null && Number.isFinite(episode.worthItScore) ? (
-                  <WorthItBadge score={episode.worthItScore} />
-                ) : (
-                  <span className="inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
-                    Not rated
-                  </span>
-                )}
+                <WorthItBadge score={episode.worthItScore !== null && Number.isFinite(episode.worthItScore) ? episode.worthItScore : null} />
               </div>
             </div>
           </Link>
