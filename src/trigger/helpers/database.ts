@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { episodes, podcasts } from "@/db/schema";
+import { episodes, episodeTopics, podcasts } from "@/db/schema";
 import { upsertPodcast } from "@/db/helpers";
 import type { SummaryResult } from "@/lib/openrouter";
 import type { PodcastIndexPodcast, PodcastIndexEpisode } from "@/lib/podcastindex";
@@ -165,24 +165,53 @@ export async function persistEpisodeSummary(
         updatedAt: new Date(),
       })
       .where(eq(episodes.id, existingEpisode.id));
+
+    if (summary.topics && summary.topics.length > 0) {
+      await db
+        .insert(episodeTopics)
+        .values(
+          summary.topics.map((t) => ({
+            episodeId: existingEpisode.id,
+            topic: t.name,
+            relevance: t.relevance.toFixed(2),
+          }))
+        )
+        .onConflictDoNothing(); // unique (episodeId, topic) — idempotent on re-runs
+    }
   } else {
-    await db.insert(episodes).values({
-      podcastId,
-      podcastIndexId: episode.id.toString(),
-      title: episode.title,
-      description: episode.description,
-      audioUrl: episode.enclosureUrl,
-      duration: episode.duration,
-      publishDate: episode.datePublished
-        ? new Date(episode.datePublished * 1000)
-        : null,
-      summary: summary.summary,
-      keyTakeaways: summary.keyTakeaways,
-      worthItScore: summary.worthItScore.toFixed(2),
-      worthItReason: summary.worthItReason,
-      worthItDimensions: summary.worthItDimensions ?? null,
-      summaryStatus: "completed",
-      processedAt: new Date(),
-    });
+    const [inserted] = await db
+      .insert(episodes)
+      .values({
+        podcastId,
+        podcastIndexId: episode.id.toString(),
+        title: episode.title,
+        description: episode.description,
+        audioUrl: episode.enclosureUrl,
+        duration: episode.duration,
+        publishDate: episode.datePublished
+          ? new Date(episode.datePublished * 1000)
+          : null,
+        summary: summary.summary,
+        keyTakeaways: summary.keyTakeaways,
+        worthItScore: summary.worthItScore.toFixed(2),
+        worthItReason: summary.worthItReason,
+        worthItDimensions: summary.worthItDimensions ?? null,
+        summaryStatus: "completed",
+        processedAt: new Date(),
+      })
+      .returning({ id: episodes.id });
+
+    if (inserted && summary.topics && summary.topics.length > 0) {
+      await db
+        .insert(episodeTopics)
+        .values(
+          summary.topics.map((t) => ({
+            episodeId: inserted.id,
+            topic: t.name,
+            relevance: t.relevance.toFixed(2),
+          }))
+        )
+        .onConflictDoNothing(); // unique (episodeId, topic) — idempotent on re-runs
+    }
   }
 }

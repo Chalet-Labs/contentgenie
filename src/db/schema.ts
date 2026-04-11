@@ -303,6 +303,24 @@ export const trendingTopics = pgTable(
   (table) => [index("trending_topics_generated_at_idx").on(table.generatedAt)]
 );
 
+export const episodeTopics = pgTable(
+  "episode_topics",
+  {
+    id: serial("id").primaryKey(),
+    episodeId: integer("episode_id")
+      .references(() => episodes.id, { onDelete: "cascade" })
+      .notNull(),
+    topic: text("topic").notNull(),
+    relevance: decimal("relevance", { precision: 3, scale: 2 }).notNull(), // 0.00–1.00
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("episode_topics_episode_topic_idx").on(table.episodeId, table.topic),
+    index("episode_topics_topic_idx").on(table.topic),
+    check("relevance_range", sql`${table.relevance} >= 0 AND ${table.relevance} <= 1`),
+  ]
+);
+
 // Listen History table
 export const listenHistory = pgTable(
   "listen_history",
@@ -356,6 +374,14 @@ export const episodesRelations = relations(episodes, ({ one, many }) => ({
   libraryEntries: many(userLibrary),
   notifications: many(notifications),
   listenHistory: many(listenHistory),
+  topics: many(episodeTopics),
+}));
+
+export const episodeTopicsRelations = relations(episodeTopics, ({ one }) => ({
+  episode: one(episodes, {
+    fields: [episodeTopics.episodeId],
+    references: [episodes.id],
+  }),
 }));
 
 export const userSubscriptionsRelations = relations(
@@ -478,6 +504,9 @@ export type NewPushSubscription = typeof pushSubscriptions.$inferInsert;
 
 export type ListenHistoryEntry = typeof listenHistory.$inferSelect;
 export type NewListenHistoryEntry = typeof listenHistory.$inferInsert;
+
+export type EpisodeTopic = typeof episodeTopics.$inferSelect;
+export type NewEpisodeTopic = typeof episodeTopics.$inferInsert;
 
 /** Shape of a single topic cluster in the trending_topics JSON column. */
 export interface TrendingTopic {

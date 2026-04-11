@@ -9,6 +9,8 @@ You are a tough but fair critic. A score of 5 is the average baseline — most e
 
 Always respond in valid JSON format. Be objective and resist score inflation.`;
 
+// Note: custom prompts (via aiConfig.summarizationPrompt) bypass this function entirely and
+// do not receive the topics extraction instruction. This is intentional — see ADR-031.
 export function getSummarizationPrompt(
   podcastTitle: string,
   episodeTitle: string,
@@ -43,7 +45,11 @@ Please provide your analysis in the following JSON format:
     "timeValue": 5
   },
   "worthItScore": 5.0,
-  "worthItReason": "The Bottom Line section text — 1-2 sentence verdict."
+  "worthItReason": "The Bottom Line section text — 1-2 sentence verdict.",
+  "topics": [
+    { "name": "Topic Label", "relevance": 0.9 },
+    { "name": "Another Topic", "relevance": 0.7 }
+  ]
 }
 
 ## Scoring Dimensions (each 1-10):
@@ -67,7 +73,11 @@ Important:
 - The summary must include all 5 sections (TL;DR, What You'll Learn, Notable Quotes / Key Moments, Action Items, Bottom Line) using ## headers
 - For Notable Quotes / Key Moments: include 2-3 standout moments; add approximate timestamps (~XX:XX) when working from a transcript; write "No notable moments available" if nothing stands out
 - Consider the time investment (${durationMinutes != null ? `${durationMinutes} min` : "unknown duration"}) when scoring timeValue
-- Focus on value for busy professionals who need to be selective with their time`;
+- Focus on value for busy professionals who need to be selective with their time
+- Extract 1-5 topic tags that best describe the episode's subject matter.
+- Each topic name must be 2-5 words, professional, and in Title Case (e.g., "AI & Machine Learning").
+- Relevance is a float from 0.0 to 1.0 indicating how central the topic is to the episode.
+- Sort topics by relevance descending.`;
 }
 
 export const TRENDING_TOPICS_SYSTEM_PROMPT = `You are a podcast trend analyst. Your job is to identify distinct topic clusters from podcast episode summaries. Group related topics together into 5-8 clear clusters. Each cluster should have a concise name and a brief description.

@@ -15,6 +15,7 @@ export interface SummaryResult {
     actionability: number;
     timeValue: number;
   };
+  topics?: Array<{ name: string; relevance: number }>;
 }
 
 // Parse a JSON response from the LLM, handling potential markdown code blocks

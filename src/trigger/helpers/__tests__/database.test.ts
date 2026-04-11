@@ -24,6 +24,7 @@ vi.mock("@/db", () => ({
 vi.mock("@/db/schema", () => ({
   episodes: { podcastIndexId: "podcastIndexId", id: "id" },
   podcasts: { podcastIndexId: "podcastIndexId" },
+  episodeTopics: { episodeId: "episodeId", topic: "topic", relevance: "relevance" },
 }));
 
 vi.mock("drizzle-orm", () => ({
@@ -50,12 +51,14 @@ function makeUpdateChain(returnValue: unknown) {
 }
 
 // Chainable insert builder
-function makeInsertChain() {
+function makeInsertChain(returningValue: unknown[] = [{ id: 42 }]) {
   const chain = {
     values: vi.fn(),
     onConflictDoNothing: vi.fn(),
+    returning: vi.fn(),
   };
-  chain.values.mockResolvedValue(undefined);
+  chain.values.mockReturnValue(chain);
+  chain.returning.mockResolvedValue(returningValue);
   chain.onConflictDoNothing.mockResolvedValue(undefined);
   return chain;
 }
@@ -183,25 +186,26 @@ describe("persistEpisodeSummary", () => {
     mockPodcastsFindFirst.mockResolvedValue({ id: 1 });
     mockEpisodesFindFirst.mockResolvedValue(null);
 
-    const chain = makeInsertChain();
-    mockInsert.mockReturnValue(chain);
+    const episodesChain = makeInsertChain([{ id: 42 }]);
+    mockInsert.mockReturnValue(episodesChain);
 
     const { persistEpisodeSummary } = await import("@/trigger/helpers/database");
     await persistEpisodeSummary(baseEpisode as never, undefined, baseSummary);
 
-    expect(chain.values).toHaveBeenCalledWith(
+    expect(episodesChain.values).toHaveBeenCalledWith(
       expect.objectContaining({
         summary: "Summary text",
         summaryStatus: "completed",
       })
     );
+    expect(episodesChain.returning).toHaveBeenCalled();
   });
 
   it("does NOT write transcript-related columns in the insert path", async () => {
     mockPodcastsFindFirst.mockResolvedValue({ id: 1 });
     mockEpisodesFindFirst.mockResolvedValue(null);
 
-    const chain = makeInsertChain();
+    const chain = makeInsertChain([{ id: 42 }]);
     mockInsert.mockReturnValue(chain);
 
     const { persistEpisodeSummary } = await import("@/trigger/helpers/database");
@@ -222,5 +226,105 @@ describe("persistEpisodeSummary", () => {
     await expect(
       persistEpisodeSummary(baseEpisode as never, undefined, baseSummary)
     ).rejects.toThrow("Could not find or create podcast in database");
+  });
+
+  describe("topic persistence", () => {
+    const summaryWithTopics = {
+      ...baseSummary,
+      topics: [
+        { name: "AI & Machine Learning", relevance: 0.9 },
+        { name: "Data Science", relevance: 0.75 },
+      ],
+    };
+
+    it("inserts topics after episode update on the update path", async () => {
+      mockPodcastsFindFirst.mockResolvedValue({ id: 1 });
+      mockEpisodesFindFirst.mockResolvedValue({ id: 10 });
+
+      const updateChain = { set: vi.fn(), where: vi.fn() };
+      updateChain.set.mockReturnValue(updateChain);
+      updateChain.where.mockResolvedValue(undefined);
+      mockUpdate.mockReturnValue(updateChain);
+
+      const topicsChain = makeInsertChain([]);
+      mockInsert.mockReturnValue(topicsChain);
+
+      const { persistEpisodeSummary } = await import("@/trigger/helpers/database");
+      await persistEpisodeSummary(baseEpisode as never, undefined, summaryWithTopics);
+
+      expect(mockInsert).toHaveBeenCalledTimes(1);
+      expect(topicsChain.values).toHaveBeenCalledWith([
+        { episodeId: 10, topic: "AI & Machine Learning", relevance: "0.90" },
+        { episodeId: 10, topic: "Data Science", relevance: "0.75" },
+      ]);
+      expect(topicsChain.onConflictDoNothing).toHaveBeenCalled();
+    });
+
+    it("inserts episode with .returning() then inserts topics using the returned id on the insert path", async () => {
+      mockPodcastsFindFirst.mockResolvedValue({ id: 1 });
+      mockEpisodesFindFirst.mockResolvedValue(null);
+
+      const episodesChain = makeInsertChain([{ id: 42 }]);
+      const topicsChain = makeInsertChain([]);
+      mockInsert.mockReturnValueOnce(episodesChain).mockReturnValueOnce(topicsChain);
+
+      const { persistEpisodeSummary } = await import("@/trigger/helpers/database");
+      await persistEpisodeSummary(baseEpisode as never, undefined, summaryWithTopics);
+
+      expect(episodesChain.returning).toHaveBeenCalled();
+      expect(topicsChain.values).toHaveBeenCalledWith([
+        { episodeId: 42, topic: "AI & Machine Learning", relevance: "0.90" },
+        { episodeId: 42, topic: "Data Science", relevance: "0.75" },
+      ]);
+      expect(topicsChain.onConflictDoNothing).toHaveBeenCalled();
+    });
+
+    it("does not call topic insert when topics array is empty", async () => {
+      mockPodcastsFindFirst.mockResolvedValue({ id: 1 });
+      mockEpisodesFindFirst.mockResolvedValue({ id: 10 });
+
+      const updateChain = { set: vi.fn(), where: vi.fn() };
+      updateChain.set.mockReturnValue(updateChain);
+      updateChain.where.mockResolvedValue(undefined);
+      mockUpdate.mockReturnValue(updateChain);
+
+      const { persistEpisodeSummary } = await import("@/trigger/helpers/database");
+      await persistEpisodeSummary(baseEpisode as never, undefined, { ...baseSummary, topics: [] });
+
+      expect(mockInsert).not.toHaveBeenCalled();
+    });
+
+    it("does not call topic insert when topics is undefined", async () => {
+      mockPodcastsFindFirst.mockResolvedValue({ id: 1 });
+      mockEpisodesFindFirst.mockResolvedValue({ id: 10 });
+
+      const updateChain = { set: vi.fn(), where: vi.fn() };
+      updateChain.set.mockReturnValue(updateChain);
+      updateChain.where.mockResolvedValue(undefined);
+      mockUpdate.mockReturnValue(updateChain);
+
+      const { persistEpisodeSummary } = await import("@/trigger/helpers/database");
+      await persistEpisodeSummary(baseEpisode as never, undefined, baseSummary);
+
+      expect(mockInsert).not.toHaveBeenCalled();
+    });
+
+    it("calls onConflictDoNothing on the topic insert chain (idempotent on re-runs)", async () => {
+      mockPodcastsFindFirst.mockResolvedValue({ id: 1 });
+      mockEpisodesFindFirst.mockResolvedValue({ id: 10 });
+
+      const updateChain = { set: vi.fn(), where: vi.fn() };
+      updateChain.set.mockReturnValue(updateChain);
+      updateChain.where.mockResolvedValue(undefined);
+      mockUpdate.mockReturnValue(updateChain);
+
+      const topicsChain = makeInsertChain([]);
+      mockInsert.mockReturnValue(topicsChain);
+
+      const { persistEpisodeSummary } = await import("@/trigger/helpers/database");
+      await persistEpisodeSummary(baseEpisode as never, undefined, summaryWithTopics);
+
+      expect(topicsChain.onConflictDoNothing).toHaveBeenCalled();
+    });
   });
 });

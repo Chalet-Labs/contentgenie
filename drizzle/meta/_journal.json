@@ -113,6 +113,13 @@
       "when": 1774704480185,
       "tag": "0015_low_firebrand",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1775935644984,
+      "tag": "0016_abnormal_wendell_vaughn",
+      "breakpoints": true
     }
   ]
 }

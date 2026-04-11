@@ -58,6 +58,196 @@ describe("generateEpisodeSummary", () => {
     mockInterpolatePrompt.mockReturnValue("interpolated prompt");
   });
 
+  describe("topic normalization", () => {
+    it("includes valid topics sorted by relevance descending", async () => {
+      mockParseJsonResponse.mockReturnValue({
+        ...mockSummaryResult,
+        topics: [
+          { name: "machine learning", relevance: 0.6 },
+          { name: "leadership skills", relevance: 0.9 },
+          { name: "data science", relevance: 0.75 },
+        ],
+      });
+
+      const result = await generateEpisodeSummary(mockPodcast, mockEpisode, "transcript text");
+
+      expect(result.topics).toEqual([
+        { name: "Leadership Skills", relevance: 0.9 },
+        { name: "Data Science", relevance: 0.75 },
+        { name: "Machine Learning", relevance: 0.6 },
+      ]);
+    });
+
+    it("clamps relevance below 0 to 0", async () => {
+      mockParseJsonResponse.mockReturnValue({
+        ...mockSummaryResult,
+        topics: [{ name: "Topic One", relevance: -0.5 }],
+      });
+
+      const result = await generateEpisodeSummary(mockPodcast, mockEpisode, "transcript text");
+
+      expect(result.topics).toEqual([{ name: "Topic One", relevance: 0 }]);
+    });
+
+    it("clamps relevance above 1 to 1", async () => {
+      mockParseJsonResponse.mockReturnValue({
+        ...mockSummaryResult,
+        topics: [{ name: "Topic One", relevance: 1.5 }],
+      });
+
+      const result = await generateEpisodeSummary(mockPodcast, mockEpisode, "transcript text");
+
+      expect(result.topics).toEqual([{ name: "Topic One", relevance: 1 }]);
+    });
+
+    it("returns only top 5 topics when more than 5 are provided", async () => {
+      mockParseJsonResponse.mockReturnValue({
+        ...mockSummaryResult,
+        topics: [
+          { name: "Topic A", relevance: 0.9 },
+          { name: "Topic B", relevance: 0.8 },
+          { name: "Topic C", relevance: 0.7 },
+          { name: "Topic D", relevance: 0.6 },
+          { name: "Topic E", relevance: 0.5 },
+          { name: "Topic F", relevance: 0.3 },
+        ],
+      });
+
+      const result = await generateEpisodeSummary(mockPodcast, mockEpisode, "transcript text");
+
+      expect(result.topics).toHaveLength(5);
+      expect(result.topics!.map((t) => t.name)).toEqual([
+        "Topic A",
+        "Topic B",
+        "Topic C",
+        "Topic D",
+        "Topic E",
+      ]);
+    });
+
+    it("deduplicates topics after title-case normalization, keeping highest relevance", async () => {
+      mockParseJsonResponse.mockReturnValue({
+        ...mockSummaryResult,
+        topics: [
+          { name: "machine learning", relevance: 0.6 },
+          { name: "Machine Learning", relevance: 0.85 },
+          { name: "MACHINE LEARNING", relevance: 0.4 },
+        ],
+      });
+
+      const result = await generateEpisodeSummary(mockPodcast, mockEpisode, "transcript text");
+
+      expect(result.topics).toHaveLength(1);
+      expect(result.topics![0]).toEqual({ name: "Machine Learning", relevance: 0.85 });
+    });
+
+    it("filters out entries missing name", async () => {
+      mockParseJsonResponse.mockReturnValue({
+        ...mockSummaryResult,
+        topics: [
+          { relevance: 0.8 },
+          { name: "Valid Topic", relevance: 0.7 },
+        ],
+      });
+
+      const result = await generateEpisodeSummary(mockPodcast, mockEpisode, "transcript text");
+
+      expect(result.topics).toEqual([{ name: "Valid Topic", relevance: 0.7 }]);
+    });
+
+    it("filters out entries missing relevance", async () => {
+      mockParseJsonResponse.mockReturnValue({
+        ...mockSummaryResult,
+        topics: [
+          { name: "No Relevance Topic" },
+          { name: "Valid Topic", relevance: 0.7 },
+        ],
+      });
+
+      const result = await generateEpisodeSummary(mockPodcast, mockEpisode, "transcript text");
+
+      expect(result.topics).toEqual([{ name: "Valid Topic", relevance: 0.7 }]);
+    });
+
+    it("filters out entries with empty name after trim", async () => {
+      mockParseJsonResponse.mockReturnValue({
+        ...mockSummaryResult,
+        topics: [
+          { name: "   ", relevance: 0.8 },
+          { name: "Valid Topic", relevance: 0.7 },
+        ],
+      });
+
+      const result = await generateEpisodeSummary(mockPodcast, mockEpisode, "transcript text");
+
+      expect(result.topics).toEqual([{ name: "Valid Topic", relevance: 0.7 }]);
+    });
+
+    // Pin test: string relevance is dropped (not coerced). If coercion is added later, this test must change intentionally.
+    it("drops entries where relevance is a string (pin test — documents current behavior)", async () => {
+      mockParseJsonResponse.mockReturnValue({
+        ...mockSummaryResult,
+        topics: [
+          { name: "String Relevance", relevance: "0.9" },
+          { name: "Valid Topic", relevance: 0.7 },
+        ],
+      });
+
+      const result = await generateEpisodeSummary(mockPodcast, mockEpisode, "transcript text");
+
+      expect(result.topics).toEqual([{ name: "Valid Topic", relevance: 0.7 }]);
+    });
+
+    it("sets topics to undefined when LLM returns a non-array topics field", async () => {
+      mockParseJsonResponse.mockReturnValue({
+        ...mockSummaryResult,
+        topics: "not an array",
+      });
+
+      const result = await generateEpisodeSummary(mockPodcast, mockEpisode, "transcript text");
+
+      expect(result.topics).toBeUndefined();
+    });
+
+    it("sets topics to undefined when topics is null", async () => {
+      mockParseJsonResponse.mockReturnValue({
+        ...mockSummaryResult,
+        topics: null,
+      });
+
+      const result = await generateEpisodeSummary(mockPodcast, mockEpisode, "transcript text");
+
+      expect(result.topics).toBeUndefined();
+    });
+
+    it("normalizes topics even when a custom prompt is used", async () => {
+      mockParseJsonResponse.mockReturnValue({
+        ...mockSummaryResult,
+        topics: [{ name: "custom prompt topic", relevance: 0.8 }],
+      });
+
+      const result = await generateEpisodeSummary(
+        mockPodcast,
+        mockEpisode,
+        "transcript text",
+        "Custom {{transcript}}"
+      );
+
+      expect(result.topics).toEqual([{ name: "Custom Prompt Topic", relevance: 0.8 }]);
+    });
+
+    it("returns no topics field on LLM parse failure (fallback path)", async () => {
+      mockGenerateCompletion.mockResolvedValue("not valid json {{}}");
+      mockParseJsonResponse.mockImplementation(() => {
+        throw new Error("JSON parse error");
+      });
+
+      const result = await generateEpisodeSummary(mockPodcast, mockEpisode, "transcript text");
+
+      expect(Object.hasOwn(result, "topics")).toBe(false);
+    });
+  });
+
   it("uses default getSummarizationPrompt when customPrompt is not provided", async () => {
     await generateEpisodeSummary(mockPodcast, mockEpisode, "transcript text");
 
