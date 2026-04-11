@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 // Mock DB — separate mock functions per operation to avoid order-dependent fragility
 const mockUpdate = vi.fn();
 const mockInsert = vi.fn();
+const mockDelete = vi.fn();
 const mockEpisodesFindFirst = vi.fn();
 const mockPodcastsFindFirst = vi.fn();
 
@@ -10,6 +11,7 @@ vi.mock("@/db", () => ({
   db: {
     update: (...args: unknown[]) => mockUpdate(...args),
     insert: (...args: unknown[]) => mockInsert(...args),
+    delete: (...args: unknown[]) => mockDelete(...args),
     query: {
       episodes: {
         findFirst: (...args: unknown[]) => mockEpisodesFindFirst(...args),
@@ -60,6 +62,14 @@ function makeInsertChain(returningValue: unknown[] = [{ id: 42 }]) {
   chain.values.mockReturnValue(chain);
   chain.returning.mockResolvedValue(returningValue);
   chain.onConflictDoNothing.mockResolvedValue(undefined);
+  return chain;
+}
+
+// Chainable delete builder
+function makeDeleteChain() {
+  const chain = { where: vi.fn() };
+  chain.where.mockResolvedValue(undefined);
+  mockDelete.mockReturnValue(chain);
   return chain;
 }
 
@@ -238,10 +248,11 @@ describe("persistEpisodeSummary", () => {
       ],
     };
 
-    it("inserts topics after episode update on the update path", async () => {
+    it("deletes existing topics then inserts new ones on the update path", async () => {
       mockPodcastsFindFirst.mockResolvedValue({ id: 1 });
       mockEpisodesFindFirst.mockResolvedValue({ id: 10 });
       makeSimpleUpdateChain();
+      makeDeleteChain();
 
       const topicsChain = makeInsertChain([]);
       mockInsert.mockReturnValue(topicsChain);
@@ -249,20 +260,19 @@ describe("persistEpisodeSummary", () => {
       const { persistEpisodeSummary } = await import("@/trigger/helpers/database");
       await persistEpisodeSummary(baseEpisode as never, undefined, summaryWithTopics);
 
+      expect(mockDelete).toHaveBeenCalledTimes(1);
       expect(mockInsert).toHaveBeenCalledTimes(1);
       expect(topicsChain.values).toHaveBeenCalledWith([
         { episodeId: 10, topic: "AI & Machine Learning", relevance: "0.90" },
         { episodeId: 10, topic: "Data Science", relevance: "0.75" },
       ]);
-      expect(topicsChain.onConflictDoNothing).toHaveBeenCalledWith({
-        target: ["episodeId", "topic"],
-      });
     });
 
-    it("inserts episode with .returning() then inserts topics using the returned id on the insert path", async () => {
+    it("deletes existing topics then inserts using the returned id on the insert path", async () => {
       mockPodcastsFindFirst.mockResolvedValue({ id: 1 });
       mockEpisodesFindFirst.mockResolvedValue(null);
 
+      makeDeleteChain();
       const episodesChain = makeInsertChain([{ id: 42 }]);
       const topicsChain = makeInsertChain([]);
       mockInsert.mockReturnValueOnce(episodesChain).mockReturnValueOnce(topicsChain);
@@ -271,16 +281,14 @@ describe("persistEpisodeSummary", () => {
       await persistEpisodeSummary(baseEpisode as never, undefined, summaryWithTopics);
 
       expect(episodesChain.returning).toHaveBeenCalled();
+      expect(mockDelete).toHaveBeenCalledTimes(1);
       expect(topicsChain.values).toHaveBeenCalledWith([
         { episodeId: 42, topic: "AI & Machine Learning", relevance: "0.90" },
         { episodeId: 42, topic: "Data Science", relevance: "0.75" },
       ]);
-      expect(topicsChain.onConflictDoNothing).toHaveBeenCalledWith({
-        target: ["episodeId", "topic"],
-      });
     });
 
-    it("does not call topic insert when topics array is empty", async () => {
+    it("does not delete or insert topics when topics array is empty", async () => {
       mockPodcastsFindFirst.mockResolvedValue({ id: 1 });
       mockEpisodesFindFirst.mockResolvedValue({ id: 10 });
       makeSimpleUpdateChain();
@@ -288,10 +296,11 @@ describe("persistEpisodeSummary", () => {
       const { persistEpisodeSummary } = await import("@/trigger/helpers/database");
       await persistEpisodeSummary(baseEpisode as never, undefined, { ...baseSummary, topics: [] });
 
+      expect(mockDelete).not.toHaveBeenCalled();
       expect(mockInsert).not.toHaveBeenCalled();
     });
 
-    it("does not call topic insert when topics is undefined", async () => {
+    it("does not delete or insert topics when topics is undefined", async () => {
       mockPodcastsFindFirst.mockResolvedValue({ id: 1 });
       mockEpisodesFindFirst.mockResolvedValue({ id: 10 });
       makeSimpleUpdateChain();
@@ -299,23 +308,8 @@ describe("persistEpisodeSummary", () => {
       const { persistEpisodeSummary } = await import("@/trigger/helpers/database");
       await persistEpisodeSummary(baseEpisode as never, undefined, baseSummary);
 
+      expect(mockDelete).not.toHaveBeenCalled();
       expect(mockInsert).not.toHaveBeenCalled();
-    });
-
-    it("calls onConflictDoNothing with explicit conflict target (idempotent on re-runs)", async () => {
-      mockPodcastsFindFirst.mockResolvedValue({ id: 1 });
-      mockEpisodesFindFirst.mockResolvedValue({ id: 10 });
-      makeSimpleUpdateChain();
-
-      const topicsChain = makeInsertChain([]);
-      mockInsert.mockReturnValue(topicsChain);
-
-      const { persistEpisodeSummary } = await import("@/trigger/helpers/database");
-      await persistEpisodeSummary(baseEpisode as never, undefined, summaryWithTopics);
-
-      expect(topicsChain.onConflictDoNothing).toHaveBeenCalledWith({
-        target: ["episodeId", "topic"],
-      });
     });
   });
 });

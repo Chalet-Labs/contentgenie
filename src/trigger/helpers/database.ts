@@ -139,6 +139,10 @@ async function persistTopics(
   topics: SummaryResult["topics"]
 ): Promise<void> {
   if (!topics || topics.length === 0) return;
+  // Delete-then-insert to reconcile stale topics on re-summarization.
+  // No transaction — benign failure mode matches the existing pattern
+  // (summary saved without topics; Trigger.dev retries self-heal).
+  await db.delete(episodeTopics).where(eq(episodeTopics.episodeId, episodeId));
   await db
     .insert(episodeTopics)
     .values(
@@ -147,8 +151,7 @@ async function persistTopics(
         topic: t.name,
         relevance: t.relevance.toFixed(2),
       }))
-    )
-    .onConflictDoNothing({ target: [episodeTopics.episodeId, episodeTopics.topic] }); // idempotent on re-runs
+    );
 }
 
 export async function persistEpisodeSummary(
