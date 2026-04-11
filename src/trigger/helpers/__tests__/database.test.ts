@@ -56,12 +56,10 @@ function makeUpdateChain(returnValue: unknown) {
 function makeInsertChain(returningValue: unknown[] = [{ id: 42 }]) {
   const chain = {
     values: vi.fn(),
-    onConflictDoNothing: vi.fn(),
     returning: vi.fn(),
   };
   chain.values.mockReturnValue(chain);
   chain.returning.mockResolvedValue(returningValue);
-  chain.onConflictDoNothing.mockResolvedValue(undefined);
   return chain;
 }
 
@@ -310,6 +308,29 @@ describe("persistEpisodeSummary", () => {
 
       expect(mockDelete).not.toHaveBeenCalled();
       expect(mockInsert).not.toHaveBeenCalled();
+    });
+
+    it("does not throw if topic insert fails after delete (benign failure — retries self-heal)", async () => {
+      mockPodcastsFindFirst.mockResolvedValue({ id: 1 });
+      mockEpisodesFindFirst.mockResolvedValue({ id: 10 });
+      makeSimpleUpdateChain();
+      makeDeleteChain();
+
+      const topicsChain = {
+        values: vi.fn(),
+      };
+      topicsChain.values.mockImplementation(() => {
+        throw new Error("insert failed");
+      });
+      mockInsert.mockReturnValue(topicsChain);
+
+      const { persistEpisodeSummary } = await import("@/trigger/helpers/database");
+      await expect(
+        persistEpisodeSummary(baseEpisode as never, undefined, summaryWithTopics)
+      ).rejects.toThrow("insert failed");
+
+      // Delete ran before the insert failure — topics are cleared until next retry
+      expect(mockDelete).toHaveBeenCalledTimes(1);
     });
   });
 });

@@ -310,7 +310,7 @@ export const episodeTopics = pgTable(
     episodeId: integer("episode_id")
       .references(() => episodes.id, { onDelete: "cascade" })
       .notNull(),
-    topic: text("topic").notNull(),
+    topic: varchar("topic", { length: 100 }).notNull(),
     relevance: decimal("relevance", { precision: 3, scale: 2 }).notNull(), // 0.00–1.00
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
@@ -318,6 +318,7 @@ export const episodeTopics = pgTable(
     uniqueIndex("episode_topics_episode_topic_idx").on(table.episodeId, table.topic),
     index("episode_topics_topic_idx").on(table.topic),
     check("relevance_range", sql`${table.relevance} >= 0 AND ${table.relevance} <= 1`),
+    check("topic_not_blank", sql`length(btrim(${table.topic})) > 0`),
   ]
 );
 
