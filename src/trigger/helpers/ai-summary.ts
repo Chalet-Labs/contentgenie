@@ -78,12 +78,14 @@ export async function generateEpisodeSummary(
         }))
         // 3. Deduplicate by normalized name (keep highest relevance)
         // case-insensitivity is provided by toTitleCase() above, not by this comparison
-        .reduce<Array<{ name: string; relevance: number }>>((acc, t) => {
-          const existing = acc.find((x) => x.name === t.name);
-          if (!existing) acc.push(t);
+        .reduce<Map<string, { name: string; relevance: number }>>((acc, t) => {
+          const existing = acc.get(t.name);
+          if (!existing) acc.set(t.name, t);
           else if (t.relevance > existing.relevance) existing.relevance = t.relevance;
           return acc;
-        }, [])
+        }, new Map())
+        .values()
+        .toArray()
         // 4. Sort descending and cap at 5
         .sort((a, b) => b.relevance - a.relevance)
         .slice(0, 5);
