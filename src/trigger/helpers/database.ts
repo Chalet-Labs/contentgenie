@@ -136,7 +136,7 @@ export async function persistTranscript(
 
 async function persistTopics(
   episodeId: number,
-  topics: Array<{ name: string; relevance: number }> | undefined
+  topics: SummaryResult["topics"]
 ): Promise<void> {
   if (!topics || topics.length === 0) return;
   await db
@@ -148,7 +148,7 @@ async function persistTopics(
         relevance: t.relevance.toFixed(2),
       }))
     )
-    .onConflictDoNothing(); // unique (episodeId, topic) — idempotent on re-runs
+    .onConflictDoNothing({ target: [episodeTopics.episodeId, episodeTopics.topic] }); // idempotent on re-runs
 }
 
 export async function persistEpisodeSummary(
@@ -161,7 +161,7 @@ export async function persistEpisodeSummary(
     throw new Error("Could not find or create podcast in database");
   }
 
-  // Check for existing episode (may have been created by trackEpisodeRun)
+  // May have been created by trackEpisodeRun
   const existingEpisode = await db.query.episodes.findFirst({
     where: eq(episodes.podcastIndexId, episode.id.toString()),
   });
