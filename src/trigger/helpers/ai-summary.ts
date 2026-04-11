@@ -68,6 +68,7 @@ export async function generateEpisodeSummary(
           t !== null &&
           typeof t.name === "string" &&
           t.name.trim().length > 0 &&
+          t.name.trim().length <= 100 &&
           typeof t.relevance === "number" &&
           !Number.isNaN(t.relevance)
       );

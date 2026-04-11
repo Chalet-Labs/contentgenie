@@ -116,6 +116,14 @@ describe("generateEpisodeSummary", () => {
       expect(result.topics![0]).toEqual({ name: "Machine Learning", relevance: 0.85 });
     });
 
+    it("filters out entries with name exceeding 100 characters", async () => {
+      const result = await summarizeWithTopics([
+        { name: "A".repeat(101), relevance: 0.9 },
+        { name: "Valid Topic", relevance: 0.7 },
+      ]);
+      expect(result.topics).toEqual([{ name: "Valid Topic", relevance: 0.7 }]);
+    });
+
     it("filters out entries missing name", async () => {
       const result = await summarizeWithTopics([
         { relevance: 0.8 },
