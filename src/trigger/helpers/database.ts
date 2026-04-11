@@ -134,6 +134,23 @@ export async function persistTranscript(
   }
 }
 
+async function persistTopics(
+  episodeId: number,
+  topics: Array<{ name: string; relevance: number }> | undefined
+): Promise<void> {
+  if (!topics || topics.length === 0) return;
+  await db
+    .insert(episodeTopics)
+    .values(
+      topics.map((t) => ({
+        episodeId,
+        topic: t.name,
+        relevance: t.relevance.toFixed(2),
+      }))
+    )
+    .onConflictDoNothing(); // unique (episodeId, topic) — idempotent on re-runs
+}
+
 export async function persistEpisodeSummary(
   episode: PodcastIndexEpisode,
   podcast: PodcastIndexPodcast | undefined,
@@ -166,18 +183,7 @@ export async function persistEpisodeSummary(
       })
       .where(eq(episodes.id, existingEpisode.id));
 
-    if (summary.topics && summary.topics.length > 0) {
-      await db
-        .insert(episodeTopics)
-        .values(
-          summary.topics.map((t) => ({
-            episodeId: existingEpisode.id,
-            topic: t.name,
-            relevance: t.relevance.toFixed(2),
-          }))
-        )
-        .onConflictDoNothing(); // unique (episodeId, topic) — idempotent on re-runs
-    }
+    await persistTopics(existingEpisode.id, summary.topics);
   } else {
     const [inserted] = await db
       .insert(episodes)
@@ -201,17 +207,8 @@ export async function persistEpisodeSummary(
       })
       .returning({ id: episodes.id });
 
-    if (inserted && summary.topics && summary.topics.length > 0) {
-      await db
-        .insert(episodeTopics)
-        .values(
-          summary.topics.map((t) => ({
-            episodeId: inserted.id,
-            topic: t.name,
-            relevance: t.relevance.toFixed(2),
-          }))
-        )
-        .onConflictDoNothing(); // unique (episodeId, topic) — idempotent on re-runs
+    if (inserted) {
+      await persistTopics(inserted.id, summary.topics);
     }
   }
 }
