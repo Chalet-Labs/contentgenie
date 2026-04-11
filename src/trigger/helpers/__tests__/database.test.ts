@@ -310,7 +310,7 @@ describe("persistEpisodeSummary", () => {
       expect(mockInsert).not.toHaveBeenCalled();
     });
 
-    it("does not throw if topic insert fails after delete (benign failure — retries self-heal)", async () => {
+    it("propagates topic insert error after delete (benign failure — retries self-heal)", async () => {
       mockPodcastsFindFirst.mockResolvedValue({ id: 1 });
       mockEpisodesFindFirst.mockResolvedValue({ id: 10 });
       makeSimpleUpdateChain();
