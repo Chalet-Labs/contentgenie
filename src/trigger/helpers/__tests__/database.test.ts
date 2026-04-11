@@ -257,7 +257,9 @@ describe("persistEpisodeSummary", () => {
         { episodeId: 10, topic: "AI & Machine Learning", relevance: "0.90" },
         { episodeId: 10, topic: "Data Science", relevance: "0.75" },
       ]);
-      expect(topicsChain.onConflictDoNothing).toHaveBeenCalled();
+      expect(topicsChain.onConflictDoNothing).toHaveBeenCalledWith({
+        target: ["episodeId", "topic"],
+      });
     });
 
     it("inserts episode with .returning() then inserts topics using the returned id on the insert path", async () => {
@@ -276,7 +278,9 @@ describe("persistEpisodeSummary", () => {
         { episodeId: 42, topic: "AI & Machine Learning", relevance: "0.90" },
         { episodeId: 42, topic: "Data Science", relevance: "0.75" },
       ]);
-      expect(topicsChain.onConflictDoNothing).toHaveBeenCalled();
+      expect(topicsChain.onConflictDoNothing).toHaveBeenCalledWith({
+        target: ["episodeId", "topic"],
+      });
     });
 
     it("does not call topic insert when topics array is empty", async () => {
@@ -309,7 +313,7 @@ describe("persistEpisodeSummary", () => {
       expect(mockInsert).not.toHaveBeenCalled();
     });
 
-    it("calls onConflictDoNothing on the topic insert chain (idempotent on re-runs)", async () => {
+    it("calls onConflictDoNothing with explicit conflict target (idempotent on re-runs)", async () => {
       mockPodcastsFindFirst.mockResolvedValue({ id: 1 });
       mockEpisodesFindFirst.mockResolvedValue({ id: 10 });
 
@@ -324,7 +328,9 @@ describe("persistEpisodeSummary", () => {
       const { persistEpisodeSummary } = await import("@/trigger/helpers/database");
       await persistEpisodeSummary(baseEpisode as never, undefined, summaryWithTopics);
 
-      expect(topicsChain.onConflictDoNothing).toHaveBeenCalled();
+      expect(topicsChain.onConflictDoNothing).toHaveBeenCalledWith({
+        target: ["episodeId", "topic"],
+      });
     });
   });
 });

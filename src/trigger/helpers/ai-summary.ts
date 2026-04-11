@@ -69,7 +69,7 @@ export async function generateEpisodeSummary(
             t !== null &&
             typeof t.name === "string" &&
             t.name.trim().length > 0 &&
-            typeof t.relevance === "number"
+            typeof t.relevance === "number" && !Number.isNaN(t.relevance)
         )
         // 2. Normalize: title-case name, clamp relevance to [0, 1]
         .map((t) => ({

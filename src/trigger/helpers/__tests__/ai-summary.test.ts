@@ -198,6 +198,21 @@ describe("generateEpisodeSummary", () => {
       expect(result.topics).toEqual([{ name: "Valid Topic", relevance: 0.7 }]);
     });
 
+    // Pin test: NaN relevance is dropped — typeof NaN === "number" is true, so an explicit isNaN guard is required.
+    it("drops entries where relevance is NaN (pin test — guards against DB constraint violation)", async () => {
+      mockParseJsonResponse.mockReturnValue({
+        ...mockSummaryResult,
+        topics: [
+          { name: "NaN Relevance", relevance: NaN },
+          { name: "Valid Topic", relevance: 0.7 },
+        ],
+      });
+
+      const result = await generateEpisodeSummary(mockPodcast, mockEpisode, "transcript text");
+
+      expect(result.topics).toEqual([{ name: "Valid Topic", relevance: 0.7 }]);
+    });
+
     it("sets topics to undefined when LLM returns a non-array topics field", async () => {
       mockParseJsonResponse.mockReturnValue({
         ...mockSummaryResult,
