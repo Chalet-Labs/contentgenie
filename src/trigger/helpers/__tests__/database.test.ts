@@ -63,6 +63,15 @@ function makeInsertChain(returningValue: unknown[] = [{ id: 42 }]) {
   return chain;
 }
 
+// Lightweight update chain (no .returning) — used when only .set/.where are needed
+function makeSimpleUpdateChain() {
+  const chain = { set: vi.fn(), where: vi.fn() };
+  chain.set.mockReturnValue(chain);
+  chain.where.mockResolvedValue(undefined);
+  mockUpdate.mockReturnValue(chain);
+  return chain;
+}
+
 describe("persistTranscript", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -144,11 +153,7 @@ describe("persistEpisodeSummary", () => {
   it("updates summary fields and sets summaryStatus to 'completed' (update path)", async () => {
     mockPodcastsFindFirst.mockResolvedValue({ id: 1 });
     mockEpisodesFindFirst.mockResolvedValue({ id: 10 });
-
-    const chain = { set: vi.fn(), where: vi.fn() };
-    chain.set.mockReturnValue(chain);
-    chain.where.mockResolvedValue(undefined);
-    mockUpdate.mockReturnValue(chain);
+    const chain = makeSimpleUpdateChain();
 
     const { persistEpisodeSummary } = await import("@/trigger/helpers/database");
     await persistEpisodeSummary(baseEpisode as never, undefined, baseSummary);
@@ -165,11 +170,7 @@ describe("persistEpisodeSummary", () => {
   it("does NOT write transcript-related columns in the update path", async () => {
     mockPodcastsFindFirst.mockResolvedValue({ id: 1 });
     mockEpisodesFindFirst.mockResolvedValue({ id: 10 });
-
-    const chain = { set: vi.fn(), where: vi.fn() };
-    chain.set.mockReturnValue(chain);
-    chain.where.mockResolvedValue(undefined);
-    mockUpdate.mockReturnValue(chain);
+    const chain = makeSimpleUpdateChain();
 
     const { persistEpisodeSummary } = await import("@/trigger/helpers/database");
     await persistEpisodeSummary(baseEpisode as never, undefined, baseSummary);
@@ -240,11 +241,7 @@ describe("persistEpisodeSummary", () => {
     it("inserts topics after episode update on the update path", async () => {
       mockPodcastsFindFirst.mockResolvedValue({ id: 1 });
       mockEpisodesFindFirst.mockResolvedValue({ id: 10 });
-
-      const updateChain = { set: vi.fn(), where: vi.fn() };
-      updateChain.set.mockReturnValue(updateChain);
-      updateChain.where.mockResolvedValue(undefined);
-      mockUpdate.mockReturnValue(updateChain);
+      makeSimpleUpdateChain();
 
       const topicsChain = makeInsertChain([]);
       mockInsert.mockReturnValue(topicsChain);
@@ -286,11 +283,7 @@ describe("persistEpisodeSummary", () => {
     it("does not call topic insert when topics array is empty", async () => {
       mockPodcastsFindFirst.mockResolvedValue({ id: 1 });
       mockEpisodesFindFirst.mockResolvedValue({ id: 10 });
-
-      const updateChain = { set: vi.fn(), where: vi.fn() };
-      updateChain.set.mockReturnValue(updateChain);
-      updateChain.where.mockResolvedValue(undefined);
-      mockUpdate.mockReturnValue(updateChain);
+      makeSimpleUpdateChain();
 
       const { persistEpisodeSummary } = await import("@/trigger/helpers/database");
       await persistEpisodeSummary(baseEpisode as never, undefined, { ...baseSummary, topics: [] });
@@ -301,11 +294,7 @@ describe("persistEpisodeSummary", () => {
     it("does not call topic insert when topics is undefined", async () => {
       mockPodcastsFindFirst.mockResolvedValue({ id: 1 });
       mockEpisodesFindFirst.mockResolvedValue({ id: 10 });
-
-      const updateChain = { set: vi.fn(), where: vi.fn() };
-      updateChain.set.mockReturnValue(updateChain);
-      updateChain.where.mockResolvedValue(undefined);
-      mockUpdate.mockReturnValue(updateChain);
+      makeSimpleUpdateChain();
 
       const { persistEpisodeSummary } = await import("@/trigger/helpers/database");
       await persistEpisodeSummary(baseEpisode as never, undefined, baseSummary);
@@ -316,11 +305,7 @@ describe("persistEpisodeSummary", () => {
     it("calls onConflictDoNothing with explicit conflict target (idempotent on re-runs)", async () => {
       mockPodcastsFindFirst.mockResolvedValue({ id: 1 });
       mockEpisodesFindFirst.mockResolvedValue({ id: 10 });
-
-      const updateChain = { set: vi.fn(), where: vi.fn() };
-      updateChain.set.mockReturnValue(updateChain);
-      updateChain.where.mockResolvedValue(undefined);
-      mockUpdate.mockReturnValue(updateChain);
+      makeSimpleUpdateChain();
 
       const topicsChain = makeInsertChain([]);
       mockInsert.mockReturnValue(topicsChain);
