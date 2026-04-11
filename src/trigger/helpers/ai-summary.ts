@@ -61,32 +61,29 @@ export async function generateEpisodeSummary(
 
     // Validate and normalize topics
     if (Array.isArray(result.topics)) {
-      result.topics = result.topics
-        // 1. Array shape check: drop entries missing name or relevance
-        .filter(
-          (t): t is { name: string; relevance: number } =>
-            typeof t === "object" &&
-            t !== null &&
-            typeof t.name === "string" &&
-            t.name.trim().length > 0 &&
-            typeof t.relevance === "number" && !Number.isNaN(t.relevance)
-        )
-        // 2. Normalize: title-case name, clamp relevance to [0, 1]
-        .map((t) => ({
-          name: toTitleCase(t.name.trim()),
-          relevance: Math.min(1, Math.max(0, t.relevance)),
-        }))
-        // 3. Deduplicate by normalized name (keep highest relevance)
-        // case-insensitivity is provided by toTitleCase() above, not by this comparison
-        .reduce<Map<string, { name: string; relevance: number }>>((acc, t) => {
-          const existing = acc.get(t.name);
-          if (!existing) acc.set(t.name, t);
-          else if (t.relevance > existing.relevance) existing.relevance = t.relevance;
-          return acc;
-        }, new Map())
-        .values()
-        .toArray()
-        // 4. Sort descending and cap at 5
+      // 1. Filter: drop entries missing name or relevance
+      const valid = result.topics.filter(
+        (t): t is { name: string; relevance: number } =>
+          typeof t === "object" &&
+          t !== null &&
+          typeof t.name === "string" &&
+          t.name.trim().length > 0 &&
+          typeof t.relevance === "number" &&
+          !Number.isNaN(t.relevance)
+      );
+      // 2. Normalize: title-case name, clamp relevance to [0, 1]
+      // 3. Deduplicate by normalized name using Map for O(1) lookup (keep highest relevance)
+      // case-insensitivity is provided by toTitleCase() above, not by the Map key comparison
+      const deduped = new Map<string, { name: string; relevance: number }>();
+      for (const t of valid) {
+        const name = toTitleCase(t.name.trim());
+        const relevance = Math.min(1, Math.max(0, t.relevance));
+        const existing = deduped.get(name);
+        if (!existing) deduped.set(name, { name, relevance });
+        else if (relevance > existing.relevance) existing.relevance = relevance;
+      }
+      // 4. Sort descending and cap at 5
+      result.topics = Array.from(deduped.values())
         .sort((a, b) => b.relevance - a.relevance)
         .slice(0, 5);
     } else {
