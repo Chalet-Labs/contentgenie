@@ -19,6 +19,7 @@ import {
 
 // Maximum episodes to include per podcast for variety in the dashboard feed
 const MAX_EPISODES_PER_PODCAST = 3;
+
 // Lightweight check for first-run detection — avoids loading full subscription data
 export async function hasAnySubscriptions(): Promise<boolean> {
   const { userId } = await auth();

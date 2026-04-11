@@ -162,7 +162,7 @@ export function RecentEpisodes({
                 )}
               </div>
               <div className="mt-1">
-                <WorthItBadge score={episode.worthItScore !== null && Number.isFinite(episode.worthItScore) ? episode.worthItScore : null} />
+                <WorthItBadge score={episode.worthItScore ?? null} />
               </div>
             </div>
           </Link>

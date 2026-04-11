@@ -166,7 +166,7 @@ function QueueEpisodeRow({
       "flex items-center gap-3 rounded-lg p-2",
       isNowPlaying && "bg-accent/50"
     )}>
-      <span title="Drag to reorder" aria-label="Drag to reorder" role="button" className="shrink-0 cursor-grab">
+      <span aria-hidden="true" title="Drag to reorder" className="shrink-0 cursor-grab">
         <GripVertical
           aria-hidden="true"
           className="h-4 w-4 text-muted-foreground/50"
