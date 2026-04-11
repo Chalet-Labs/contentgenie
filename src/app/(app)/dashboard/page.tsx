@@ -86,18 +86,22 @@ async function RecommendationsSection() {
   return <EpisodeRecommendations episodes={episodes} />;
 }
 
+function DashboardHeader({ description }: { description: string }) {
+  return (
+    <div>
+      <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+      <p className="text-muted-foreground">{description}</p>
+    </div>
+  );
+}
+
 export default async function DashboardPage() {
   const hasSubs = await hasAnySubscriptions();
 
   if (!hasSubs) {
     return (
       <div className="space-y-8">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-          <p className="text-muted-foreground">
-            Get started by finding podcasts you love.
-          </p>
-        </div>
+        <DashboardHeader description="Get started by finding podcasts you love." />
         <WelcomeCard />
         <QueueSection />
       </div>
@@ -108,12 +112,7 @@ export default async function DashboardPage() {
     <div className="space-y-8">
       {/* Header + Trending topics — compact top section */}
       <div className="space-y-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-          <p className="text-muted-foreground">
-            Welcome back! Here&apos;s what&apos;s new from your subscriptions.
-          </p>
-        </div>
+        <DashboardHeader description="Welcome back! Here's what's new from your subscriptions." />
 
         <Suspense fallback={<TrendingTopicsLoading />}>
           <TrendingTopicsSection />
