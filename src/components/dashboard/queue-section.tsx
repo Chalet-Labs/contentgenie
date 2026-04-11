@@ -162,11 +162,16 @@ function QueueEpisodeRow({
   onSummarizeError,
 }: QueueEpisodeRowProps) {
   return (
-    <div className="flex items-center gap-3 rounded-lg p-2">
-      <GripVertical
-        aria-hidden="true"
-        className="h-4 w-4 shrink-0 text-muted-foreground/50"
-      />
+    <div className={cn(
+      "flex items-center gap-3 rounded-lg p-2",
+      isNowPlaying && "bg-accent/50"
+    )}>
+      <span aria-hidden="true" title="Drag to reorder" className="shrink-0 cursor-grab">
+        <GripVertical
+          aria-hidden="true"
+          className="h-4 w-4 text-muted-foreground/50"
+        />
+      </span>
       {/* Artwork */}
       <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded-md bg-muted">
         {episode.artwork ? (

@@ -19,6 +19,20 @@ import {
 
 // Maximum episodes to include per podcast for variety in the dashboard feed
 const MAX_EPISODES_PER_PODCAST = 3;
+
+// Lightweight check for first-run detection — avoids loading full subscription data
+export async function hasAnySubscriptions(): Promise<boolean> {
+  const { userId } = await auth();
+  if (!userId) return false;
+
+  const row = await db.query.userSubscriptions.findFirst({
+    where: eq(userSubscriptions.userId, userId),
+    columns: { id: true },
+  });
+
+  return row !== undefined;
+}
+
 // Fetch more episodes than needed (5x) to account for the per-podcast variety cap.
 // In skewed cases (one very active podcast dominates), we may still return fewer than `limit` items.
 const BATCH_FETCH_MULTIPLIER = 5;

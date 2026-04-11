@@ -3,9 +3,9 @@ import { render, screen } from "@testing-library/react";
 import { WorthItBadge } from "@/components/episodes/worth-it-badge";
 
 describe("WorthItBadge", () => {
-  it("renders nothing when score is null", () => {
-    const { container } = render(<WorthItBadge score={null} />);
-    expect(container.innerHTML).toBe("");
+  it("renders 'Not rated' badge when score is null", () => {
+    render(<WorthItBadge score={null} />);
+    expect(screen.getByText("Not rated")).toBeInTheDocument();
   });
 
   it("renders score value and label for high score (>= 8)", () => {

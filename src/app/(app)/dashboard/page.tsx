@@ -4,7 +4,9 @@ import {
   getRecentEpisodesFromSubscriptions,
   getRecommendedEpisodes,
   getTrendingTopics,
+  hasAnySubscriptions,
 } from "@/app/actions/dashboard";
+import { WelcomeCard } from "@/components/dashboard/welcome-card";
 import { RecentEpisodesContainer } from "@/components/dashboard/recent-episodes-container";
 import {
   EpisodeRecommendations,
@@ -22,8 +24,8 @@ function RecentEpisodesLoading() {
       <CardHeader>
         <Skeleton className="h-5 w-40" />
       </CardHeader>
-      <CardContent className="space-y-4">
-        {[1, 2, 3, 4, 5].map((i) => (
+      <CardContent className="space-y-3">
+        {[1, 2, 3].map((i) => (
           <div key={i} className="flex gap-3">
             <Skeleton className="h-14 w-14 shrink-0 rounded-md" />
             <div className="flex-1 space-y-2">
@@ -50,7 +52,7 @@ async function RecentEpisodesSection() {
       : Math.floor(lastSignInAt.getTime() / 1000);
 
   const { episodes, hasSubscriptions, error } = await getRecentEpisodesFromSubscriptions({
-    limit: 5,
+    limit: 3,
     since: Math.floor((Date.now() - 7 * 24 * 60 * 60 * 1000) / 1000),
   });
 
@@ -84,34 +86,52 @@ async function RecommendationsSection() {
   return <EpisodeRecommendations episodes={episodes} />;
 }
 
-export default function DashboardPage() {
+function DashboardHeader({ description }: { description: string }) {
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-        <p className="text-muted-foreground">
-          Welcome back! Here&apos;s what&apos;s new from your subscriptions.
-        </p>
+    <div>
+      <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+      <p className="text-muted-foreground">{description}</p>
+    </div>
+  );
+}
+
+export default async function DashboardPage() {
+  const hasSubs = await hasAnySubscriptions();
+
+  if (!hasSubs) {
+    return (
+      <div className="space-y-8">
+        <DashboardHeader description="Get started by finding podcasts you love." />
+        <WelcomeCard />
+        <QueueSection />
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-8">
+      {/* Header + Trending topics — compact top section */}
+      <div className="space-y-4">
+        <DashboardHeader description="Welcome back! Here's what's new from your subscriptions." />
+
+        <Suspense fallback={<TrendingTopicsLoading />}>
+          <TrendingTopicsSection />
+        </Suspense>
       </div>
 
-      {/* Trending topics */}
-      <Suspense fallback={<TrendingTopicsLoading />}>
-        <TrendingTopicsSection />
-      </Suspense>
-
-      {/* Episode recommendations */}
+      {/* Episode recommendations — primary discovery section */}
       <Suspense fallback={<EpisodeRecommendationsLoading />}>
         <RecommendationsSection />
       </Suspense>
 
-      {/* Queue section */}
-      <QueueSection />
+      {/* Queue + Recent episodes — secondary sections, side by side on lg */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        <QueueSection />
 
-      {/* Recent episodes from subscriptions */}
-      <Suspense fallback={<RecentEpisodesLoading />}>
-        <RecentEpisodesSection />
-      </Suspense>
+        <Suspense fallback={<RecentEpisodesLoading />}>
+          <RecentEpisodesSection />
+        </Suspense>
+      </div>
     </div>
   );
 }
