@@ -52,7 +52,7 @@ async function RecentEpisodesSection() {
       : Math.floor(lastSignInAt.getTime() / 1000);
 
   const { episodes, hasSubscriptions, error } = await getRecentEpisodesFromSubscriptions({
-    limit: 5,
+    limit: 3,
     since: Math.floor((Date.now() - 7 * 24 * 60 * 60 * 1000) / 1000),
   });
 

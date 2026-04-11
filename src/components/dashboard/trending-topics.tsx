@@ -33,7 +33,7 @@ export function TrendingTopics({ topics, generatedAt }: TrendingTopicsProps) {
         </span>
       </div>
       <div className="flex flex-wrap gap-2">
-        {topics.map((topic) => (
+        {Array.from(new Map(topics.map((t) => [t.name, t])).values()).map((topic) => (
           <TopicPill key={topic.name} topic={topic} />
         ))}
       </div>
