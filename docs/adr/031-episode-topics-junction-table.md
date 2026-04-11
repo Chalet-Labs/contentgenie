@@ -24,17 +24,19 @@ The primary value of topic tags is enabling queries like "find all episodes tagg
 
 The `trendingTopics` table (see ADR-022) stores topics as a JSON snapshot column. That is appropriate because trending topics are time-series aggregates — the unit of lookup is the snapshot row, not an individual topic. Episode topics have the opposite access pattern: the individual topic is the unit of lookup. The same JSON-blob approach would be wrong here.
 
-### Idempotent inserts via `onConflictDoNothing`
+### Delete-then-insert for topic reconciliation
 
-Trigger.dev tasks can be retried on failure. Using `onConflictDoNothing` on the unique `(episodeId, topic)` index makes topic persistence idempotent: a retry will not fail or create duplicates. We do not update relevance on conflict — if the LLM produces a different score on retry, neither score is authoritative and the complexity of resolving it is not justified for v1.
+Trigger.dev tasks can be retried on failure, and episodes can be re-summarized with different results. `persistTopics` deletes all existing topic rows for the episode, then inserts the new set. This fully reconciles stale topics and updated relevance scores on re-summarization — no orphaned rows are left behind.
+
+The delete is idempotent (deletes 0 rows if none exist), so retries are safe. If the delete succeeds but the insert fails, there is a narrow window where the episode has a valid summary but no topics; the next Trigger.dev retry will re-insert them.
 
 ### No Drizzle transaction
 
-The episode update/insert and topic insert are sequential awaits without a `db.transaction()`. See ADR-006 section in plan for full rationale. In summary:
+The episode update/insert, topic delete, and topic insert are sequential awaits without a `db.transaction()`. See ADR-006 section in plan for full rationale. In summary:
 
-- **Failure mode is benign**: An episode with a valid summary but no topics is not data-corrupting — the summary is still correct and visible.
-- **Retries are self-healing**: Trigger.dev retries + `onConflictDoNothing` idempotency mean a subsequent run will re-attempt the topic insert cleanly.
-- **Transaction overhead is real**: Neon serverless reconnects per request; holding a connection across two round-trips adds latency.
+- **Failure mode is benign**: An episode with a valid summary but temporarily missing topics is not data-corrupting — the summary is still correct and visible.
+- **Retries are self-healing**: Trigger.dev retries mean a subsequent run will re-delete and re-insert the topic set cleanly.
+- **Transaction overhead is real**: Neon serverless reconnects per request; holding a connection across multiple round-trips adds latency.
 
 If topic persistence becomes critical enough that partial writes are unacceptable, add a transaction then.
 
