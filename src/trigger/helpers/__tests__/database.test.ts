@@ -135,9 +135,23 @@ describe("persistEpisodeSummary", () => {
   const baseSummary = {
     summary: "Summary text",
     keyTakeaways: ["point 1"],
-    worthItScore: 7.5,
-    worthItReason: "Good content",
-    worthItDimensions: { uniqueness: 8, actionability: 7, timeValue: 7 },
+    worthItScore: 7,
+    worthItReason: "6/8 signals: actionable insights, focused, beyond surface, well-structured, time justified, concrete examples. Adjustment: 0 (signals capture quality accurately).",
+    worthItDimensions: {
+      kind: "signals" as const,
+      signals: {
+        hasActionableInsights: true,
+        hasNearTermApplicability: false,
+        staysFocused: true,
+        goesBeyondSurface: true,
+        isWellStructured: true,
+        timeJustified: true,
+        hasConcreteExamples: true,
+        hasExpertPerspectives: false,
+      },
+      adjustment: 0 as const,
+      adjustmentReason: "Signals capture quality accurately.",
+    },
   };
 
   const baseEpisode = {

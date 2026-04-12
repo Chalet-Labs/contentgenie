@@ -14,12 +14,12 @@ describe("SYSTEM_PROMPT", () => {
   it("contains key instructions", () => {
     expect(SYSTEM_PROMPT).toContain("critical");
     expect(SYSTEM_PROMPT).toContain("JSON format");
-    expect(SYSTEM_PROMPT).toContain("worth it");
+    expect(SYSTEM_PROMPT).toContain("signal");
   });
 
-  it("contains anti-inflation anchoring", () => {
-    expect(SYSTEM_PROMPT).toContain("5");
-    expect(SYSTEM_PROMPT).toContain("score inflation");
+  it("mentions signal-based evaluation", () => {
+    expect(SYSTEM_PROMPT).toContain("signal");
+    expect(SYSTEM_PROMPT).toContain("inflation");
   });
 });
 
@@ -71,10 +71,10 @@ describe("getSummarizationPrompt", () => {
     );
     expect(prompt).toContain('"summary"');
     expect(prompt).toContain('"keyTakeaways"');
-    expect(prompt).toContain('"worthItScore"');
+    expect(prompt).toContain('"worthItReason"');
   });
 
-  it("includes worthItDimensions in the prompt", () => {
+  it("includes worthItSignals in the prompt", () => {
     const prompt = getSummarizationPrompt(
       "Podcast",
       "Episode",
@@ -82,10 +82,10 @@ describe("getSummarizationPrompt", () => {
       3600,
       "Transcript content here"
     );
-    expect(prompt).toContain('"worthItDimensions"');
-    expect(prompt).toContain('"uniqueness"');
-    expect(prompt).toContain('"actionability"');
-    expect(prompt).toContain('"timeValue"');
+    expect(prompt).toContain('"worthItSignals"');
+    expect(prompt).toContain('"hasActionableInsights"');
+    expect(prompt).toContain('"staysFocused"');
+    expect(prompt).toContain('"worthItAdjustment"');
   });
 
   it("includes structured summary sections", () => {
@@ -103,7 +103,7 @@ describe("getSummarizationPrompt", () => {
     expect(prompt).toContain("Bottom Line");
   });
 
-  it("includes anti-inflation scoring guide", () => {
+  it("includes signal-based scoring instructions", () => {
     const prompt = getSummarizationPrompt(
       "Podcast",
       "Episode",
@@ -111,8 +111,8 @@ describe("getSummarizationPrompt", () => {
       3600,
       "Transcript content here"
     );
-    expect(prompt).toContain("5: Average");
-    expect(prompt).toContain("Justify every point above 5");
+    expect(prompt).toContain("Boolean Quality Signals");
+    expect(prompt).toContain("Adjustment (-1, 0, or +1)");
   });
 });
 

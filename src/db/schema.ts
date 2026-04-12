@@ -14,6 +14,7 @@ import {
   bigint,
 } from "drizzle-orm/pg-core";
 import { relations, sql } from "drizzle-orm";
+import type { WorthItSignals } from "@/lib/openrouter";
 
 // Rate limits table (managed by rate-limiter-flexible, see ADR-001).
 // Defined here so drizzle-kit push doesn't try to drop it.
@@ -88,11 +89,10 @@ export const episodes = pgTable(
     keyTakeaways: json("key_takeaways").$type<string[]>(),
     worthItScore: decimal("worth_it_score", { precision: 4, scale: 2 }), // 0.00 - 10.00
     worthItReason: text("worth_it_reason"),
-    worthItDimensions: json("worth_it_dimensions").$type<{
-      uniqueness: number;
-      actionability: number;
-      timeValue: number;
-    }>(),
+    worthItDimensions: json("worth_it_dimensions").$type<
+      | { kind: "signals"; signals: WorthItSignals; adjustment: -1 | 0 | 1; adjustmentReason: string }
+      | { kind: "dimensions"; uniqueness: number; actionability: number; timeValue: number }
+    >(),
     processedAt: timestamp("processed_at"),
     summaryRunId: text("summary_run_id"),
     transcriptRunId: text("transcript_run_id"),
