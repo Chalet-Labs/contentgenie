@@ -16,7 +16,7 @@ The scoring system needs to shift from subjective numeric calibration to objecti
 
 Replace the 3-dimension numeric scoring system with **8 boolean signal questions** plus a **constrained ±1 LLM adjustment**. The score formula becomes:
 
-```
+```text
 score = clamp(1 + count_of_true_signals + adjustment, 1, 10)
 ```
 

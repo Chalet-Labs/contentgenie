@@ -91,7 +91,7 @@ export const episodes = pgTable(
     worthItReason: text("worth_it_reason"),
     worthItDimensions: json("worth_it_dimensions").$type<
       | { kind: "signals"; signals: WorthItSignals; adjustment: -1 | 0 | 1; adjustmentReason: string }
-      | { uniqueness: number; actionability: number; timeValue: number }
+      | { kind: "dimensions"; uniqueness: number; actionability: number; timeValue: number }
     >(),
     processedAt: timestamp("processed_at"),
     summaryRunId: text("summary_run_id"),

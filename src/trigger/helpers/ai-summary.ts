@@ -3,7 +3,7 @@ import { parseJsonResponse, type SummaryResult } from "@/lib/openrouter";
 import { WORTH_IT_SIGNAL_KEYS, SIGNAL_LABELS } from "@/lib/openrouter";
 import { SYSTEM_PROMPT, getSummarizationPrompt } from "@/lib/prompts";
 import { interpolatePrompt } from "@/lib/admin/prompt-utils";
-import { computeSignalScore, coerceSignals, clampAdjustment } from "@/lib/score-utils";
+import { computeSignalScore, coerceSignals, clampAdjustment, toSignalBoolean } from "@/lib/score-utils";
 import type { PodcastIndexPodcast, PodcastIndexEpisode } from "@/lib/podcastindex";
 
 // File-private helper — not exported. If a second consumer appears, extract it then.
@@ -49,11 +49,11 @@ export async function generateEpisodeSummary(
     const rawSignals = raw.worthItSignals;
     if (rawSignals && typeof rawSignals === "object") {
       const signalObj = rawSignals as Record<string, unknown>;
-      // Warn on non-boolean signal values before coercion
+      // Warn on non-boolean signal values before coercion (skip missing keys to reduce noise)
       for (const key of WORTH_IT_SIGNAL_KEYS) {
-        if (typeof signalObj[key] !== "boolean") {
+        if (key in signalObj && typeof signalObj[key] !== "boolean") {
           console.warn(
-            `[ai-summary] non-boolean signal coerced: ${key}=${signalObj[key]} → ${Boolean(signalObj[key])}`
+            `[ai-summary] non-boolean signal coerced: ${key}=${signalObj[key]} → ${toSignalBoolean(signalObj[key])}`
           );
         }
       }
@@ -81,8 +81,9 @@ export async function generateEpisodeSummary(
         adjustment === 0
           ? `Adjustment: 0 (${adjustmentReason || "signals capture quality accurately"}).`
           : `Adjustment: ${adjustment > 0 ? "+1" : "-1"} (${adjustmentReason}).`;
-      result.worthItReason =
-        `${firedCount}/8 signals: ${firedLabels.join(", ") || "none"}. ${adjText}`;
+      const signalSummary = `${firedCount}/8 signals: ${firedLabels.join(", ") || "none"}. ${adjText}`;
+      const llmReason = typeof raw.worthItReason === "string" ? raw.worthItReason.trim() : "";
+      result.worthItReason = llmReason ? `${llmReason} (${signalSummary})` : signalSummary;
     }
     // Legacy dimension-averaging (backward compat for custom prompts)
     else if (raw.worthItDimensions && typeof raw.worthItDimensions === "object") {
@@ -108,7 +109,10 @@ export async function generateEpisodeSummary(
         };
       }
     }
-    // Neither format (custom prompt returning raw score) — keep as-is
+    // Neither format (custom prompt returning raw score) — keep as-is, default if missing
+    if (typeof result.worthItScore !== "number") {
+      result.worthItScore = 5;
+    }
 
     // Validate and normalize topics
     if (Array.isArray(result.topics)) {

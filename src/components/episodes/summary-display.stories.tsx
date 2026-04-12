@@ -82,7 +82,7 @@ export const WithSignals: Story = {
     ],
     worthItScore: 7,
     worthItReason:
-      "5/8 signals: actionable insights, near-term applicability, focused, beyond surface, concrete examples. Adjustment: +1 (exceptional guest lineup).",
+      "5/8 signals: actionable insights, near-term applicability, focused, beyond surface, well-structured. Adjustment: +1 (exceptional guest lineup).",
     worthItDimensions: {
       kind: "signals",
       signals: {

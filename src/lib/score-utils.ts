@@ -30,17 +30,29 @@ export function clampAdjustment(raw: unknown): -1 | 0 | 1 {
   return Math.round(raw) as -1 | 0 | 1;
 }
 
+/** Safely coerce an unknown value to boolean. Handles string "true"/"false" and numeric 0/1. */
+export function toSignalBoolean(value: unknown): boolean {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === "true") return true;
+    if (normalized === "false") return false;
+  }
+  if (typeof value === "number") return value === 1;
+  return false;
+}
+
 /** Coerce a raw object into a valid WorthItSignals. Missing keys → false. */
 export function coerceSignals(raw: Record<string, unknown>): WorthItSignals {
   return {
-    hasActionableInsights: Boolean(raw.hasActionableInsights),
-    hasNearTermApplicability: Boolean(raw.hasNearTermApplicability),
-    staysFocused: Boolean(raw.staysFocused),
-    goesBeyondSurface: Boolean(raw.goesBeyondSurface),
-    isWellStructured: Boolean(raw.isWellStructured),
-    timeJustified: Boolean(raw.timeJustified),
-    hasConcreteExamples: Boolean(raw.hasConcreteExamples),
-    hasExpertPerspectives: Boolean(raw.hasExpertPerspectives),
+    hasActionableInsights: toSignalBoolean(raw.hasActionableInsights),
+    hasNearTermApplicability: toSignalBoolean(raw.hasNearTermApplicability),
+    staysFocused: toSignalBoolean(raw.staysFocused),
+    goesBeyondSurface: toSignalBoolean(raw.goesBeyondSurface),
+    isWellStructured: toSignalBoolean(raw.isWellStructured),
+    timeJustified: toSignalBoolean(raw.timeJustified),
+    hasConcreteExamples: toSignalBoolean(raw.hasConcreteExamples),
+    hasExpertPerspectives: toSignalBoolean(raw.hasExpertPerspectives),
   };
 }
 

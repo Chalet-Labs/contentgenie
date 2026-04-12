@@ -140,19 +140,40 @@ describe("coerceSignals", () => {
     expect(coerceSignals(input)).toEqual(input);
   });
 
-  it("coerces truthy non-boolean values to true", () => {
+  it("coerces recognized non-boolean values correctly", () => {
     const result = coerceSignals({
-      hasActionableInsights: 1,
-      hasNearTermApplicability: "yes",
-      staysFocused: "true",
-      goesBeyondSurface: 42,
-      isWellStructured: true,
-      timeJustified: true,
-      hasConcreteExamples: true,
-      hasExpertPerspectives: true,
+      hasActionableInsights: 1,            // number 1 → true
+      hasNearTermApplicability: "true",    // string "true" → true
+      staysFocused: "TRUE",               // case-insensitive → true
+      goesBeyondSurface: 0,               // number 0 → false
+      isWellStructured: "false",           // string "false" → false
+      timeJustified: "yes",               // unrecognized string → false
+      hasConcreteExamples: 42,            // number ≠ 1 → false
+      hasExpertPerspectives: null,        // null → false
+    });
+    expect(result.hasActionableInsights).toBe(true);
+    expect(result.hasNearTermApplicability).toBe(true);
+    expect(result.staysFocused).toBe(true);
+    expect(result.goesBeyondSurface).toBe(false);
+    expect(result.isWellStructured).toBe(false);
+    expect(result.timeJustified).toBe(false);
+    expect(result.hasConcreteExamples).toBe(false);
+    expect(result.hasExpertPerspectives).toBe(false);
+  });
+
+  it("coerces string 'false' to false (not truthy like Boolean())", () => {
+    const result = coerceSignals({
+      hasActionableInsights: "false",
+      hasNearTermApplicability: "FALSE",
+      staysFocused: " False ",
+      goesBeyondSurface: false,
+      isWellStructured: false,
+      timeJustified: false,
+      hasConcreteExamples: false,
+      hasExpertPerspectives: false,
     });
     for (const key of WORTH_IT_SIGNAL_KEYS) {
-      expect(result[key]).toBe(true);
+      expect(result[key]).toBe(false);
     }
   });
 

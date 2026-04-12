@@ -319,24 +319,24 @@ describe("generateEpisodeSummary", () => {
       expect(result.worthItReason).toContain("5/8 signals");
     });
 
-    it("coerces non-boolean signal values to boolean", async () => {
+    it("coerces non-boolean signal values via toSignalBoolean", async () => {
       mockParseJsonResponse.mockReturnValue({
         ...mockSignalResult,
         worthItSignals: {
-          hasActionableInsights: 1,
-          hasNearTermApplicability: "yes",
-          staysFocused: 0,
-          goesBeyondSurface: "",
-          isWellStructured: true,
-          timeJustified: false,
-          hasConcreteExamples: null,
-          hasExpertPerspectives: undefined,
+          hasActionableInsights: 1,          // number 1 → true
+          hasNearTermApplicability: "true",  // string "true" → true
+          staysFocused: 0,                   // number 0 → false
+          goesBeyondSurface: "",             // unrecognized → false
+          isWellStructured: true,            // boolean → true
+          timeJustified: false,              // boolean → false
+          hasConcreteExamples: null,         // null → false
+          hasExpertPerspectives: undefined,  // undefined → false
         },
       });
 
       const result = await generateEpisodeSummary(mockPodcast, mockEpisode, "transcript text");
 
-      // Truthy: 1, "yes", true → 3 true signals. base=4, adj=0 → score 4
+      // True: 1, "true", true → 3 true signals. base=4, adj=0 → score 4
       expect(result.worthItScore).toBe(4);
     });
 
@@ -363,6 +363,25 @@ describe("generateEpisodeSummary", () => {
       );
       expect(signalWarns).toHaveLength(1);
       expect(signalWarns[0][0]).toContain("hasActionableInsights");
+      warnSpy.mockRestore();
+    });
+
+    it("does not log console.warn for missing signal keys", async () => {
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+      mockParseJsonResponse.mockReturnValue({
+        ...mockSignalResult,
+        worthItSignals: {
+          hasActionableInsights: true,
+          // All other keys missing — should NOT warn
+        },
+      });
+
+      await generateEpisodeSummary(mockPodcast, mockEpisode, "transcript text");
+
+      const signalWarns = warnSpy.mock.calls.filter(
+        (args) => typeof args[0] === "string" && args[0].includes("non-boolean signal coerced")
+      );
+      expect(signalWarns).toHaveLength(0);
       warnSpy.mockRestore();
     });
 
@@ -435,6 +454,19 @@ describe("generateEpisodeSummary", () => {
       );
 
       expect(result.worthItScore).toBe(8.5);
+    });
+
+    it("defaults worthItScore to 5 when neither format nor raw score present", async () => {
+      mockParseJsonResponse.mockReturnValue({
+        summary: "Test",
+        keyTakeaways: ["one"],
+        worthItReason: "custom reason",
+      });
+      const result = await generateEpisodeSummary(
+        mockPodcast, mockEpisode, "transcript text", "custom prompt"
+      );
+
+      expect(result.worthItScore).toBe(5);
     });
   });
 });

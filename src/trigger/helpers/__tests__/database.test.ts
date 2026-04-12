@@ -136,7 +136,7 @@ describe("persistEpisodeSummary", () => {
     summary: "Summary text",
     keyTakeaways: ["point 1"],
     worthItScore: 7,
-    worthItReason: "5/8 signals: actionable insights, focused, beyond surface, well-structured, concrete examples. Adjustment: 0 (signals capture quality accurately).",
+    worthItReason: "6/8 signals: actionable insights, focused, beyond surface, well-structured, time justified, concrete examples. Adjustment: 0 (signals capture quality accurately).",
     worthItDimensions: {
       kind: "signals" as const,
       signals: {
