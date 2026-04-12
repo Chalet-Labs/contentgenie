@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Extract 1–5 topic tags per episode during summarization; stored in new `episode_topics` junction table with relevance scores (0–1) and a cross-episode index for efficient topic queries (#259)
 - Semantic CSS color tokens for score (`--score-exceptional` → `--score-skip`) and status indicators (`--status-success-*`, `--status-warning-*`, etc.) with light/dark mode variants and accessible foreground colors (#256)
 - Blue-indigo brand accent color replacing stock shadcn neutral defaults (#256)
 - Active nav link highlighting in desktop header (#256)

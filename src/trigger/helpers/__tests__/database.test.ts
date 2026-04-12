@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 // Mock DB — separate mock functions per operation to avoid order-dependent fragility
 const mockUpdate = vi.fn();
 const mockInsert = vi.fn();
+const mockDelete = vi.fn();
 const mockEpisodesFindFirst = vi.fn();
 const mockPodcastsFindFirst = vi.fn();
 
@@ -10,6 +11,7 @@ vi.mock("@/db", () => ({
   db: {
     update: (...args: unknown[]) => mockUpdate(...args),
     insert: (...args: unknown[]) => mockInsert(...args),
+    delete: (...args: unknown[]) => mockDelete(...args),
     query: {
       episodes: {
         findFirst: (...args: unknown[]) => mockEpisodesFindFirst(...args),
@@ -24,6 +26,7 @@ vi.mock("@/db", () => ({
 vi.mock("@/db/schema", () => ({
   episodes: { podcastIndexId: "podcastIndexId", id: "id" },
   podcasts: { podcastIndexId: "podcastIndexId" },
+  episodeTopics: { episodeId: "episodeId", topic: "topic", relevance: "relevance" },
 }));
 
 vi.mock("drizzle-orm", () => ({
@@ -50,13 +53,30 @@ function makeUpdateChain(returnValue: unknown) {
 }
 
 // Chainable insert builder
-function makeInsertChain() {
+function makeInsertChain(returningValue: unknown[] = [{ id: 42 }]) {
   const chain = {
     values: vi.fn(),
-    onConflictDoNothing: vi.fn(),
+    returning: vi.fn(),
   };
-  chain.values.mockResolvedValue(undefined);
-  chain.onConflictDoNothing.mockResolvedValue(undefined);
+  chain.values.mockReturnValue(chain);
+  chain.returning.mockResolvedValue(returningValue);
+  return chain;
+}
+
+// Chainable delete builder
+function makeDeleteChain() {
+  const chain = { where: vi.fn() };
+  chain.where.mockResolvedValue(undefined);
+  mockDelete.mockReturnValue(chain);
+  return chain;
+}
+
+// Lightweight update chain (no .returning) — used when only .set/.where are needed
+function makeSimpleUpdateChain() {
+  const chain = { set: vi.fn(), where: vi.fn() };
+  chain.set.mockReturnValue(chain);
+  chain.where.mockResolvedValue(undefined);
+  mockUpdate.mockReturnValue(chain);
   return chain;
 }
 
@@ -141,11 +161,7 @@ describe("persistEpisodeSummary", () => {
   it("updates summary fields and sets summaryStatus to 'completed' (update path)", async () => {
     mockPodcastsFindFirst.mockResolvedValue({ id: 1 });
     mockEpisodesFindFirst.mockResolvedValue({ id: 10 });
-
-    const chain = { set: vi.fn(), where: vi.fn() };
-    chain.set.mockReturnValue(chain);
-    chain.where.mockResolvedValue(undefined);
-    mockUpdate.mockReturnValue(chain);
+    const chain = makeSimpleUpdateChain();
 
     const { persistEpisodeSummary } = await import("@/trigger/helpers/database");
     await persistEpisodeSummary(baseEpisode as never, undefined, baseSummary);
@@ -162,11 +178,7 @@ describe("persistEpisodeSummary", () => {
   it("does NOT write transcript-related columns in the update path", async () => {
     mockPodcastsFindFirst.mockResolvedValue({ id: 1 });
     mockEpisodesFindFirst.mockResolvedValue({ id: 10 });
-
-    const chain = { set: vi.fn(), where: vi.fn() };
-    chain.set.mockReturnValue(chain);
-    chain.where.mockResolvedValue(undefined);
-    mockUpdate.mockReturnValue(chain);
+    const chain = makeSimpleUpdateChain();
 
     const { persistEpisodeSummary } = await import("@/trigger/helpers/database");
     await persistEpisodeSummary(baseEpisode as never, undefined, baseSummary);
@@ -183,25 +195,26 @@ describe("persistEpisodeSummary", () => {
     mockPodcastsFindFirst.mockResolvedValue({ id: 1 });
     mockEpisodesFindFirst.mockResolvedValue(null);
 
-    const chain = makeInsertChain();
-    mockInsert.mockReturnValue(chain);
+    const episodesChain = makeInsertChain([{ id: 42 }]);
+    mockInsert.mockReturnValue(episodesChain);
 
     const { persistEpisodeSummary } = await import("@/trigger/helpers/database");
     await persistEpisodeSummary(baseEpisode as never, undefined, baseSummary);
 
-    expect(chain.values).toHaveBeenCalledWith(
+    expect(episodesChain.values).toHaveBeenCalledWith(
       expect.objectContaining({
         summary: "Summary text",
         summaryStatus: "completed",
       })
     );
+    expect(episodesChain.returning).toHaveBeenCalled();
   });
 
   it("does NOT write transcript-related columns in the insert path", async () => {
     mockPodcastsFindFirst.mockResolvedValue({ id: 1 });
     mockEpisodesFindFirst.mockResolvedValue(null);
 
-    const chain = makeInsertChain();
+    const chain = makeInsertChain([{ id: 42 }]);
     mockInsert.mockReturnValue(chain);
 
     const { persistEpisodeSummary } = await import("@/trigger/helpers/database");
@@ -222,5 +235,102 @@ describe("persistEpisodeSummary", () => {
     await expect(
       persistEpisodeSummary(baseEpisode as never, undefined, baseSummary)
     ).rejects.toThrow("Could not find or create podcast in database");
+  });
+
+  describe("topic persistence", () => {
+    const summaryWithTopics = {
+      ...baseSummary,
+      topics: [
+        { name: "AI & Machine Learning", relevance: 0.9 },
+        { name: "Data Science", relevance: 0.75 },
+      ],
+    };
+
+    it("deletes existing topics then inserts new ones on the update path", async () => {
+      mockPodcastsFindFirst.mockResolvedValue({ id: 1 });
+      mockEpisodesFindFirst.mockResolvedValue({ id: 10 });
+      makeSimpleUpdateChain();
+      makeDeleteChain();
+
+      const topicsChain = makeInsertChain([]);
+      mockInsert.mockReturnValue(topicsChain);
+
+      const { persistEpisodeSummary } = await import("@/trigger/helpers/database");
+      await persistEpisodeSummary(baseEpisode as never, undefined, summaryWithTopics);
+
+      expect(mockDelete).toHaveBeenCalledTimes(1);
+      expect(mockInsert).toHaveBeenCalledTimes(1);
+      expect(topicsChain.values).toHaveBeenCalledWith([
+        { episodeId: 10, topic: "AI & Machine Learning", relevance: "0.90" },
+        { episodeId: 10, topic: "Data Science", relevance: "0.75" },
+      ]);
+    });
+
+    it("deletes existing topics then inserts using the returned id on the insert path", async () => {
+      mockPodcastsFindFirst.mockResolvedValue({ id: 1 });
+      mockEpisodesFindFirst.mockResolvedValue(null);
+
+      makeDeleteChain();
+      const episodesChain = makeInsertChain([{ id: 42 }]);
+      const topicsChain = makeInsertChain([]);
+      mockInsert.mockReturnValueOnce(episodesChain).mockReturnValueOnce(topicsChain);
+
+      const { persistEpisodeSummary } = await import("@/trigger/helpers/database");
+      await persistEpisodeSummary(baseEpisode as never, undefined, summaryWithTopics);
+
+      expect(episodesChain.returning).toHaveBeenCalled();
+      expect(mockDelete).toHaveBeenCalledTimes(1);
+      expect(topicsChain.values).toHaveBeenCalledWith([
+        { episodeId: 42, topic: "AI & Machine Learning", relevance: "0.90" },
+        { episodeId: 42, topic: "Data Science", relevance: "0.75" },
+      ]);
+    });
+
+    it("does not delete or insert topics when topics array is empty", async () => {
+      mockPodcastsFindFirst.mockResolvedValue({ id: 1 });
+      mockEpisodesFindFirst.mockResolvedValue({ id: 10 });
+      makeSimpleUpdateChain();
+
+      const { persistEpisodeSummary } = await import("@/trigger/helpers/database");
+      await persistEpisodeSummary(baseEpisode as never, undefined, { ...baseSummary, topics: [] });
+
+      expect(mockDelete).not.toHaveBeenCalled();
+      expect(mockInsert).not.toHaveBeenCalled();
+    });
+
+    it("does not delete or insert topics when topics is undefined", async () => {
+      mockPodcastsFindFirst.mockResolvedValue({ id: 1 });
+      mockEpisodesFindFirst.mockResolvedValue({ id: 10 });
+      makeSimpleUpdateChain();
+
+      const { persistEpisodeSummary } = await import("@/trigger/helpers/database");
+      await persistEpisodeSummary(baseEpisode as never, undefined, baseSummary);
+
+      expect(mockDelete).not.toHaveBeenCalled();
+      expect(mockInsert).not.toHaveBeenCalled();
+    });
+
+    it("propagates topic insert error after delete (benign failure — retries self-heal)", async () => {
+      mockPodcastsFindFirst.mockResolvedValue({ id: 1 });
+      mockEpisodesFindFirst.mockResolvedValue({ id: 10 });
+      makeSimpleUpdateChain();
+      makeDeleteChain();
+
+      const topicsChain = {
+        values: vi.fn(),
+      };
+      topicsChain.values.mockImplementation(() => {
+        throw new Error("insert failed");
+      });
+      mockInsert.mockReturnValue(topicsChain);
+
+      const { persistEpisodeSummary } = await import("@/trigger/helpers/database");
+      await expect(
+        persistEpisodeSummary(baseEpisode as never, undefined, summaryWithTopics)
+      ).rejects.toThrow("insert failed");
+
+      // Delete ran before the insert failure — topics are cleared until next retry
+      expect(mockDelete).toHaveBeenCalledTimes(1);
+    });
   });
 });
