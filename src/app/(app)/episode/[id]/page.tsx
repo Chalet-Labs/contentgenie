@@ -46,6 +46,7 @@ import { OfflineBanner } from "@/components/ui/offline-banner";
 import { cacheEpisode, getCachedEpisode } from "@/lib/offline-cache";
 import { IN_PROGRESS_STATUSES, type TranscriptStatus } from "@/db/schema";
 import { ADMIN_ROLE } from "@/lib/auth-roles";
+import type { WorthItDimensionsData } from "@/lib/openrouter";
 import type { summarizeEpisode } from "@/trigger/summarize-episode";
 
 interface EpisodePageProps {
@@ -86,11 +87,7 @@ interface SummaryData {
   keyTakeaways: string[];
   worthItScore: number | null;
   worthItReason?: string;
-  worthItDimensions?: {
-    uniqueness: number;
-    actionability: number;
-    timeValue: number;
-  } | null;
+  worthItDimensions?: WorthItDimensionsData | null;
   cached: boolean;
 }
 

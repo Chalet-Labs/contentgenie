@@ -9,9 +9,13 @@ vi.mock("@/lib/ai", () => ({
   generateCompletion: (...args: unknown[]) => mockGenerateCompletion(...args),
 }));
 
-vi.mock("@/lib/openrouter", () => ({
-  parseJsonResponse: (...args: unknown[]) => mockParseJsonResponse(...args),
-}));
+vi.mock("@/lib/openrouter", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/openrouter")>();
+  return {
+    ...actual,
+    parseJsonResponse: (...args: unknown[]) => mockParseJsonResponse(...args),
+  };
+});
 
 vi.mock("@/lib/prompts", () => ({
   SYSTEM_PROMPT: "system prompt",
@@ -41,13 +45,34 @@ const mockPodcast = {
   description: "",
 } as PodcastIndexPodcast;
 
-const mockSummaryResult = {
+const mockSignalResult = {
+  summary: "Test summary",
+  keyTakeaways: ["Takeaway 1"],
+  worthItReason: "Good episode",
+  worthItSignals: {
+    hasActionableInsights: true,
+    hasNearTermApplicability: true,
+    staysFocused: true,
+    goesBeyondSurface: true,
+    isWellStructured: true,
+    timeJustified: false,
+    hasConcreteExamples: false,
+    hasExpertPerspectives: false,
+  },
+  worthItAdjustment: 0,
+  worthItAdjustmentReason: "Signals capture quality accurately.",
+};
+
+const mockLegacyDimensionResult = {
   summary: "Test summary",
   keyTakeaways: ["Takeaway 1"],
   worthItScore: 7,
   worthItReason: "Good episode",
   worthItDimensions: { uniqueness: 7, actionability: 7, timeValue: 7 },
 };
+
+// Default to signal-based result (matches current default prompt)
+const mockSummaryResult = mockSignalResult;
 
 describe("generateEpisodeSummary", () => {
   beforeEach(() => {
@@ -267,5 +292,149 @@ describe("generateEpisodeSummary", () => {
       expect.any(Number),
       expect.any(String)
     );
+  });
+
+  describe("signal score computation", () => {
+    it("computes score as 1 + trueCount + adjustment from signals", async () => {
+      mockParseJsonResponse.mockReturnValue({ ...mockSignalResult });
+      const result = await generateEpisodeSummary(mockPodcast, mockEpisode, "transcript text");
+
+      // 5 true signals → base 6, adj 0 → score 6
+      expect(result.worthItScore).toBe(6);
+    });
+
+    it("stores worthItDimensions with kind 'signals'", async () => {
+      mockParseJsonResponse.mockReturnValue({ ...mockSignalResult });
+      const result = await generateEpisodeSummary(mockPodcast, mockEpisode, "transcript text");
+
+      expect(result.worthItDimensions).toEqual(
+        expect.objectContaining({ kind: "signals" })
+      );
+    });
+
+    it("includes signal summary in worthItReason", async () => {
+      mockParseJsonResponse.mockReturnValue({ ...mockSignalResult });
+      const result = await generateEpisodeSummary(mockPodcast, mockEpisode, "transcript text");
+
+      expect(result.worthItReason).toContain("5/8 signals");
+    });
+
+    it("coerces non-boolean signal values to boolean", async () => {
+      mockParseJsonResponse.mockReturnValue({
+        ...mockSignalResult,
+        worthItSignals: {
+          hasActionableInsights: 1,
+          hasNearTermApplicability: "yes",
+          staysFocused: 0,
+          goesBeyondSurface: "",
+          isWellStructured: true,
+          timeJustified: false,
+          hasConcreteExamples: null,
+          hasExpertPerspectives: undefined,
+        },
+      });
+
+      const result = await generateEpisodeSummary(mockPodcast, mockEpisode, "transcript text");
+
+      // Truthy: 1, "yes", true → 3 true signals. base=4, adj=0 → score 4
+      expect(result.worthItScore).toBe(4);
+    });
+
+    it("logs console.warn for each non-boolean signal value", async () => {
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+      mockParseJsonResponse.mockReturnValue({
+        ...mockSignalResult,
+        worthItSignals: {
+          hasActionableInsights: 1,
+          hasNearTermApplicability: true,
+          staysFocused: true,
+          goesBeyondSurface: true,
+          isWellStructured: true,
+          timeJustified: true,
+          hasConcreteExamples: true,
+          hasExpertPerspectives: true,
+        },
+      });
+
+      await generateEpisodeSummary(mockPodcast, mockEpisode, "transcript text");
+
+      const signalWarns = warnSpy.mock.calls.filter(
+        (args) => typeof args[0] === "string" && args[0].includes("non-boolean signal coerced")
+      );
+      expect(signalWarns).toHaveLength(1);
+      expect(signalWarns[0][0]).toContain("hasActionableInsights");
+      warnSpy.mockRestore();
+    });
+
+    it("does not log console.warn when all signals are booleans", async () => {
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+      mockParseJsonResponse.mockReturnValue({ ...mockSignalResult });
+
+      await generateEpisodeSummary(mockPodcast, mockEpisode, "transcript text");
+
+      const signalWarns = warnSpy.mock.calls.filter(
+        (args) => typeof args[0] === "string" && args[0].includes("non-boolean signal coerced")
+      );
+      expect(signalWarns).toHaveLength(0);
+      warnSpy.mockRestore();
+    });
+
+    it("clamps adjustment outside [-1,1]", async () => {
+      mockParseJsonResponse.mockReturnValue({
+        ...mockSignalResult,
+        worthItAdjustment: 5,
+      });
+      const result = await generateEpisodeSummary(mockPodcast, mockEpisode, "transcript text");
+
+      // 5 true signals → base 6, adj clamped to 1 → score 7
+      expect(result.worthItScore).toBe(7);
+    });
+
+    it("defaults missing adjustment to 0", async () => {
+      const { worthItAdjustment: _, ...withoutAdj } = mockSignalResult;
+      mockParseJsonResponse.mockReturnValue(withoutAdj);
+      const result = await generateEpisodeSummary(mockPodcast, mockEpisode, "transcript text");
+
+      // 5 true → base 6, adj 0 → score 6
+      expect(result.worthItScore).toBe(6);
+    });
+
+    it("defaults missing adjustmentReason to empty string", async () => {
+      const { worthItAdjustmentReason: _, ...withoutReason } = mockSignalResult;
+      mockParseJsonResponse.mockReturnValue(withoutReason);
+      const result = await generateEpisodeSummary(mockPodcast, mockEpisode, "transcript text");
+
+      expect(result.worthItDimensions).toEqual(
+        expect.objectContaining({ adjustmentReason: "" })
+      );
+    });
+  });
+
+  describe("legacy dimension scoring (custom prompts)", () => {
+    it("averages dimensions when LLM returns old format", async () => {
+      mockParseJsonResponse.mockReturnValue({ ...mockLegacyDimensionResult });
+      const result = await generateEpisodeSummary(
+        mockPodcast, mockEpisode, "transcript text", "custom prompt"
+      );
+
+      expect(result.worthItScore).toBe(7);
+      expect(result.worthItDimensions).toEqual(
+        expect.objectContaining({ kind: "dimensions" })
+      );
+    });
+
+    it("uses raw LLM score when neither signals nor dimensions present", async () => {
+      mockParseJsonResponse.mockReturnValue({
+        summary: "Test",
+        keyTakeaways: ["one"],
+        worthItScore: 8.5,
+        worthItReason: "custom reason",
+      });
+      const result = await generateEpisodeSummary(
+        mockPodcast, mockEpisode, "transcript text", "custom prompt"
+      );
+
+      expect(result.worthItScore).toBe(8.5);
+    });
   });
 });

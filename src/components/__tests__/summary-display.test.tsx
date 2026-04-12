@@ -207,7 +207,7 @@ describe("SummaryDisplay", () => {
         summary="Short summary."
         keyTakeaways={[]}
         worthItScore={7}
-        worthItDimensions={{ uniqueness: 3, actionability: 4, timeValue: 9 }}
+        worthItDimensions={{ kind: "dimensions", uniqueness: 3, actionability: 4, timeValue: 9 }}
       />
     );
     expect(screen.getByText("Score Breakdown")).toBeInTheDocument();
@@ -223,6 +223,7 @@ describe("SummaryDisplay", () => {
         keyTakeaways={[]}
         worthItScore={7}
         worthItDimensions={{
+          kind: "dimensions",
           uniqueness: 8,
           actionability: NaN as unknown as number,
           timeValue: 6,

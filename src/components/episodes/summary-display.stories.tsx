@@ -70,3 +70,46 @@ export const LowScore: Story = {
     worthItReason: "Limited value — mostly rehashed material from other episodes.",
   },
 };
+
+export const WithSignals: Story = {
+  args: {
+    summary:
+      "This episode dives deep into the latest advancements in AI-powered tools for content creators.",
+    keyTakeaways: [
+      "AI tools can reduce podcast editing time by up to 60%",
+      "Content creators should focus on authenticity",
+      "Emerging transcription tools achieve 98%+ accuracy",
+    ],
+    worthItScore: 7,
+    worthItReason:
+      "5/8 signals: actionable insights, near-term applicability, focused, beyond surface, concrete examples. Adjustment: +1 (exceptional guest lineup).",
+    worthItDimensions: {
+      kind: "signals",
+      signals: {
+        hasActionableInsights: true,
+        hasNearTermApplicability: true,
+        staysFocused: true,
+        goesBeyondSurface: true,
+        isWellStructured: true,
+        timeJustified: false,
+        hasConcreteExamples: false,
+        hasExpertPerspectives: false,
+      },
+      adjustment: 1,
+      adjustmentReason:
+        "Exceptional guest lineup elevates the content beyond the checklist.",
+    },
+  },
+};
+
+export const WithLegacyDimensions: Story = {
+  args: {
+    ...FullSummary.args,
+    worthItDimensions: {
+      kind: "dimensions",
+      uniqueness: 8,
+      actionability: 7,
+      timeValue: 9,
+    },
+  },
+};

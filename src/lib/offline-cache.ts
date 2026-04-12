@@ -1,5 +1,6 @@
 import { get, set, del, keys, entries, delMany, createStore } from "idb-keyval";
 import type { SavedItemDTO } from "@/db/library-columns";
+import type { WorthItDimensionsData } from "@/lib/openrouter";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -62,11 +63,7 @@ export interface SummaryData {
   keyTakeaways: string[];
   worthItScore: number | null;
   worthItReason?: string;
-  worthItDimensions?: {
-    uniqueness: number;
-    actionability: number;
-    timeValue: number;
-  } | null;
+  worthItDimensions?: WorthItDimensionsData | null;
   cached: boolean;
 }
 
