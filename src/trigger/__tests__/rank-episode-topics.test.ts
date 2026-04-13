@@ -164,7 +164,8 @@ describe("rank-episode-topics task", () => {
     expect(result.topicsRanked).toBe(1);
     expect(result.comparisonsRun).toBe(3);
     expect(result.comparisonsFailed).toBe(0);
-    expect(mockUpdate).toHaveBeenCalledTimes(3);
+    // 1 stale-rank clear + 3 rank updates = 4
+    expect(mockUpdate).toHaveBeenCalledTimes(4);
   });
 
   it("skips failed LLM comparison and still produces partial ranking", async () => {
@@ -190,7 +191,8 @@ describe("rank-episode-topics task", () => {
     expect(result.comparisonsRun).toBe(2);
     expect(result.comparisonsFailed).toBe(1);
     expect(result.topicsRanked).toBe(1);
-    expect(mockUpdate).toHaveBeenCalledTimes(3); // still ranks all 3 episodes
+    // 1 stale-rank clear + 3 rank updates = 4
+    expect(mockUpdate).toHaveBeenCalledTimes(4);
   });
 
   it("skips topic entirely when all comparisons fail", async () => {
@@ -330,32 +332,35 @@ describe("rank-episode-topics task", () => {
   });
 
   it("correctly parses worthItScore string values via parseScore", async () => {
-    const topicRows = [{ topic: "Tech", episodeCount: 2 }];
+    const topicRows = [{ topic: "Tech", episodeCount: 3 }];
     const episodeRows = [
       { episodeId: 1, title: "Ep 1", summary: "S1", worthItScore: "7.50" },
       { episodeId: 2, title: "Ep 2", summary: "S2", worthItScore: null },
+      { episodeId: 3, title: "Ep 3", summary: "S3", worthItScore: "3.00" },
     ];
 
     setupSelectSequence(topicRows, episodeRows);
     mockGenerateCompletion.mockResolvedValue("ok");
-    // tie → tiebreaker by score: ep1(7.5) ranks above ep2(0)
+    // tie → tiebreaker by score: ep1(7.5) ranks above ep3(3.0) ranks above ep2(0)
     mockParseJsonResponse.mockReturnValue({ winner: "tie", reason: "Equal" });
 
     const result = await taskConfig.run();
 
     expect(result.topicsRanked).toBe(1);
 
-    // Verify db.update was called with topicRank values
-    const setCalls = mockSet.mock.calls;
+    // Verify db.update was called with topicRank values (filter out the stale-rank clear call)
+    const setCalls = mockSet.mock.calls.filter((args) => args[0]?.topicRank !== null);
     expect(setCalls.some((args) => args[0]?.topicRank === 1)).toBe(true);
     expect(setCalls.some((args) => args[0]?.topicRank === 2)).toBe(true);
+    expect(setCalls.some((args) => args[0]?.topicRank === 3)).toBe(true);
   });
 
   it("persists topicRank and rankedAt for each episode in a topic", async () => {
-    const topicRows = [{ topic: "Startups", episodeCount: 2 }];
+    const topicRows = [{ topic: "Startups", episodeCount: 3 }];
     const episodeRows = [
       { episodeId: 10, title: "E1", summary: "S1", worthItScore: "9.00" },
       { episodeId: 20, title: "E2", summary: "S2", worthItScore: "6.00" },
+      { episodeId: 30, title: "E3", summary: "S3", worthItScore: "4.00" },
     ];
 
     setupSelectSequence(topicRows, episodeRows);
@@ -364,7 +369,8 @@ describe("rank-episode-topics task", () => {
 
     await taskConfig.run();
 
-    expect(mockUpdate).toHaveBeenCalledTimes(2);
+    // 1 stale-rank clear + 3 rank updates = 4
+    expect(mockUpdate).toHaveBeenCalledTimes(4);
     const setCalls = mockSet.mock.calls;
     // Each set call should have both topicRank and rankedAt
     for (const [args] of setCalls) {

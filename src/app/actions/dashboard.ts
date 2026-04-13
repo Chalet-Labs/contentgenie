@@ -244,7 +244,8 @@ export async function getRecommendedEpisodes(
           .where(
             and(
               inArray(episodeTopics.episodeId, episodeIds),
-              isNotNull(episodeTopics.topicRank)
+              isNotNull(episodeTopics.topicRank),
+              gte(episodeTopics.rankedAt, new Date(Date.now() - 30 * 24 * 60 * 60 * 1000))
             )
           )
           .groupBy(episodeTopics.episodeId);

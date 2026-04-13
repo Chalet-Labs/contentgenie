@@ -106,11 +106,11 @@ export const rankEpisodeTopics = schedules.task({
               gte(episodes.processedAt, windowStart)
             )
           )
-          .orderBy(desc(episodes.worthItScore))
+          .orderBy(sql`${episodes.worthItScore} DESC NULLS LAST`)
           .limit(episodeCap);
 
-        if (episodeRows.length < 2) {
-          logger.info("Topic has fewer than 2 episodes after filtering; skipping", {
+        if (episodeRows.length < 3) {
+          logger.info("Topic has fewer than 3 episodes after filtering; skipping", {
             topic,
             episodeCount: episodeRows.length,
           });
@@ -177,6 +177,12 @@ export const rankEpisodeTopics = schedules.task({
 
         const rankedAt = new Date();
         try {
+          // Clear old ranks for this topic to avoid stale data
+          await db
+            .update(episodeTopics)
+            .set({ topicRank: null, rankedAt: null })
+            .where(eq(episodeTopics.topic, topic));
+
           await Promise.all(
             ranked.map(({ episodeId, rank }) =>
               db
