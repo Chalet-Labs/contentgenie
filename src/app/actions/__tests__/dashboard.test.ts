@@ -43,8 +43,7 @@ vi.mock("@/db", () => ({
             };
           },
           groupBy: (...gArgs: unknown[]) => {
-            mockGroupBy(...gArgs);
-            return Promise.resolve([]);
+            return mockGroupBy(...gArgs);
           },
         });
       };
@@ -97,7 +96,7 @@ vi.mock("@/db/schema", () => ({
     podcastIndexId: "podcast_index_id",
   },
   trendingTopics: { generatedAt: "generated_at", id: "id" },
-  episodeTopics: { episodeId: "episode_id", topic: "topic", topicRank: "topic_rank" },
+  episodeTopics: { episodeId: "episode_id", topic: "topic", topicRank: "topic_rank", rankedAt: "ranked_at" },
   // library-columns uses these via re-export
   userActivity: {},
 }));
@@ -303,6 +302,7 @@ describe("getRecommendedEpisodes", () => {
     vi.clearAllMocks();
     mockAuth.mockResolvedValue({ userId: "user_123" });
     mockLimit.mockResolvedValue([]);
+    mockGroupBy.mockResolvedValue([]);
   });
 
   afterEach(() => {
@@ -393,6 +393,33 @@ describe("getRecommendedEpisodes", () => {
     // orderBy() and limit() only on the main query
     expect(mockOrderBy).toHaveBeenCalledTimes(1);
     expect(mockLimit).toHaveBeenCalledWith(6);
+  });
+
+  it("populates bestTopicRank and topRankedTopic when rank data exists", async () => {
+    const mockEpisodes = [
+      {
+        id: 1,
+        podcastIndexId: "ep-123",
+        title: "AI Deep Dive",
+        description: null,
+        audioUrl: null,
+        duration: null,
+        publishDate: null,
+        worthItScore: "8.50",
+        podcastTitle: "Tech Talks",
+        podcastImageUrl: null,
+      },
+    ];
+    mockLimit.mockResolvedValue(mockEpisodes);
+    mockGroupBy.mockResolvedValue([
+      { episodeId: 1, bestRank: 2, topTopic: "Artificial Intelligence" },
+    ]);
+
+    const { getRecommendedEpisodes } = await import("@/app/actions/dashboard");
+    const result = await getRecommendedEpisodes();
+
+    expect(result.episodes[0].bestTopicRank).toBe(2);
+    expect(result.episodes[0].topRankedTopic).toBe("Artificial Intelligence");
   });
 
   it("uses default limit of 10 when called with no arguments", async () => {

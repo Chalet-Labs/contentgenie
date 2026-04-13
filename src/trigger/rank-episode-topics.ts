@@ -72,7 +72,7 @@ export const rankEpisodeTopics = schedules.task({
 
     if (qualifyingTopics.length === 0) {
       logger.info("No qualifying topics found");
-      return { topicsRanked: 0, comparisonsRun: 0, comparisonsFailed: 0 };
+      return { topicsRanked: 0, comparisonsRun: 0, comparisonsFailed: 0, writeFailed: 0 };
     }
 
     // Step 1b: Compute adaptive episode cap based on number of qualifying topics

@@ -319,6 +319,7 @@ export const episodeTopics = pgTable(
   (table) => [
     uniqueIndex("episode_topics_episode_topic_idx").on(table.episodeId, table.topic),
     index("episode_topics_topic_idx").on(table.topic),
+    index("episode_topics_topic_rank_idx").on(table.topicRank),
     check("relevance_range", sql`${table.relevance} >= 0 AND ${table.relevance} <= 1`),
     check("topic_not_blank", sql`length(btrim(${table.topic})) > 0`),
     check("topic_rank_positive", sql`${table.topicRank} IS NULL OR ${table.topicRank} >= 1`),

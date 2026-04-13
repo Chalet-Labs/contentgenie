@@ -139,7 +139,7 @@ describe("rank-episode-topics task", () => {
 
     const result = await taskConfig.run();
 
-    expect(result).toEqual({ topicsRanked: 0, comparisonsRun: 0, comparisonsFailed: 0 });
+    expect(result).toEqual({ topicsRanked: 0, comparisonsRun: 0, comparisonsFailed: 0, writeFailed: 0 });
     expect(mockGenerateCompletion).not.toHaveBeenCalled();
     expect(mockUpdate).not.toHaveBeenCalled();
   });
