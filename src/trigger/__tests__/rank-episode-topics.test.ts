@@ -73,7 +73,7 @@ vi.mock("@/trigger/helpers/topic-ranking", async (importOriginal) => {
 import { rankEpisodeTopics } from "@/trigger/rank-episode-topics";
 
 const taskConfig = rankEpisodeTopics as unknown as {
-  run: () => Promise<{ topicsRanked: number; comparisonsRun: number; comparisonsFailed: number }>;
+  run: () => Promise<{ topicsRanked: number; comparisonsRun: number; comparisonsFailed: number; writeFailed: number }>;
 };
 
 // Build a chainable select mock that resolves to `rows` at the end
