@@ -7,13 +7,17 @@ import { parseJsonResponse } from "@/lib/openrouter";
 import {
   generateAllPairs,
   aggregateWinCounts,
-  parseScore,
   getEpisodeCap,
-  TOPIC_RANKING_SYSTEM_PROMPT,
-  getTopicComparisonPrompt,
   MAX_TOPICS_PER_RUN,
   type PairwiseResult,
 } from "@/trigger/helpers/topic-ranking";
+import { parseScore } from "@/lib/score-utils";
+import {
+  TOPIC_RANKING_SYSTEM_PROMPT,
+  getTopicComparisonPrompt,
+} from "@/lib/prompts";
+
+const LOOKBACK_DAYS = 30;
 
 /**
  * Daily scheduled task that ranks episodes within each topic using pairwise
@@ -25,7 +29,7 @@ export const rankEpisodeTopics = schedules.task({
   maxDuration: 600,
   retry: { maxAttempts: 2 },
   run: async () => {
-    const windowStart = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const windowStart = new Date(Date.now() - LOOKBACK_DAYS * 24 * 60 * 60 * 1000);
 
     logger.info("Starting cross-episode topic ranking", {
       windowStart: windowStart.toISOString(),
@@ -161,17 +165,19 @@ export const rankEpisodeTopics = schedules.task({
       const ranked = aggregateWinCounts(results, episodeIds, scores);
 
       const rankedAt = new Date();
-      for (const { episodeId, rank } of ranked) {
-        await db
-          .update(episodeTopics)
-          .set({ topicRank: rank, rankedAt })
-          .where(
-            and(
-              eq(episodeTopics.episodeId, episodeId),
-              eq(episodeTopics.topic, topic)
+      await Promise.all(
+        ranked.map(({ episodeId, rank }) =>
+          db
+            .update(episodeTopics)
+            .set({ topicRank: rank, rankedAt })
+            .where(
+              and(
+                eq(episodeTopics.episodeId, episodeId),
+                eq(episodeTopics.topic, topic)
+              )
             )
-          );
-      }
+        )
+      );
 
       topicsRanked++;
     }

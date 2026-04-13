@@ -229,7 +229,7 @@ export async function getRecommendedEpisodes(
       .orderBy(desc(episodes.worthItScore), desc(episodes.publishDate))
       .limit(limit);
 
-    // Post-query enrichment: fetch best topic rank for each returned episode
+    // Separate query to avoid aggregation expanding the outer LIMIT result set
     const episodeIds = results.map((r) => r.id);
     const topicRankRows =
       episodeIds.length > 0
@@ -250,7 +250,7 @@ export async function getRecommendedEpisodes(
         : [];
 
     const rankMap = new Map(
-      topicRankRows.map((r) => [r.episodeId, { bestRank: r.bestRank, topTopic: r.topTopic }])
+      topicRankRows.map((r) => [r.episodeId, r])
     );
 
     const enriched = results.map((r) => {
