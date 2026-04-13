@@ -80,4 +80,6 @@ export interface SavedItemDTO extends LibraryEntryDTO {
 export interface RecommendedEpisodeDTO extends EpisodeListDTO {
   podcastTitle: string;
   podcastImageUrl: string | null;
+  bestTopicRank: number | null;
+  topRankedTopic: string | null;
 }

@@ -56,6 +56,16 @@ export function coerceSignals(raw: Record<string, unknown>): WorthItSignals {
   };
 }
 
+/**
+ * Converts a Drizzle decimal string to a number.
+ * Returns 0 for null, empty string, or non-numeric values.
+ */
+export function parseScore(raw: string | null): number {
+  if (raw === null || raw === "") return 0;
+  const n = parseFloat(raw);
+  return Number.isFinite(n) ? n : 0;
+}
+
 /** Compute the worth-it score from boolean signals + adjustment. Range: [1, 10]. */
 export function computeSignalScore(signals: WorthItSignals, adjustment: number): number {
   const trueCount = WORTH_IT_SIGNAL_KEYS.filter((k) => signals[k]).length;

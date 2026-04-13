@@ -15,13 +15,15 @@ const mockFrom = vi.fn();
 const mockSelect = vi.fn();
 
 // Mock database — supports both query API (findFirst/findMany/$count) and select chain.
-// The select chain must handle three shapes:
+// The select chain must handle four shapes:
 //   Subqueries:   select().from().where()                  (no innerJoin, return value unused)
 //   Main query:   select().from().innerJoin().where().orderBy().limit()
 //   Score lookup: select().from().where()  → Promise<row[]> (direct await, no orderBy/limit)
+//   Rank lookup:  select().from().where().groupBy()        → Promise<row[]>
 //
 // whereNode returns an object that is BOTH awaitable (Promise<result of mockWhere>)
-// and has orderBy/limit for chained callers. This allows both usage patterns.
+// and has orderBy/groupBy for chained callers. This allows all usage patterns.
+const mockGroupBy = vi.fn();
 const mockFindFirst = vi.fn();
 const mockFindMany = vi.fn();
 vi.mock("@/db", () => ({
@@ -31,7 +33,7 @@ vi.mock("@/db", () => ({
       mockSelect(...args);
       const whereNode = (...wArgs: unknown[]) => {
         const result = mockWhere(...wArgs);
-        // Return an object that is both a Promise (for direct await) and has orderBy
+        // Return an object that is both a Promise (for direct await) and has orderBy/groupBy
         const thenable = Promise.resolve(result).then((v) => v);
         return Object.assign(thenable, {
           orderBy: (...oArgs: unknown[]) => {
@@ -40,13 +42,16 @@ vi.mock("@/db", () => ({
               limit: (...lArgs: unknown[]) => mockLimit(...lArgs),
             };
           },
+          groupBy: (...gArgs: unknown[]) => {
+            return mockGroupBy(...gArgs);
+          },
         });
       };
       return {
         from: (...fArgs: unknown[]) => {
           mockFrom(...fArgs);
           return {
-            // Direct where() for subqueries (no innerJoin) and score lookup
+            // Direct where() for subqueries (no innerJoin), score lookup, and rank lookup
             where: whereNode,
             // innerJoin() for main query
             innerJoin: (...jArgs: unknown[]) => {
@@ -91,6 +96,7 @@ vi.mock("@/db/schema", () => ({
     podcastIndexId: "podcast_index_id",
   },
   trendingTopics: { generatedAt: "generated_at", id: "id" },
+  episodeTopics: { episodeId: "episode_id", topic: "topic", topicRank: "topic_rank", rankedAt: "ranked_at" },
   // library-columns uses these via re-export
   userActivity: {},
 }));
@@ -104,6 +110,8 @@ vi.mock("drizzle-orm", () => ({
   isNotNull: vi.fn((...args: unknown[]) => ({ _op: "isNotNull", args })),
   notInArray: vi.fn((...args: unknown[]) => ({ _op: "notInArray", args })),
   inArray: vi.fn((...args: unknown[]) => ({ _op: "inArray", args })),
+  // sql is used as a tagged template literal: sql`MIN(...)` → return a placeholder
+  sql: vi.fn((_strings: TemplateStringsArray, ..._values: unknown[]) => ({ _op: "sql" })),
 }));
 
 // Mock podcastindex — used by getRecentEpisodesFromSubscriptions
@@ -294,6 +302,7 @@ describe("getRecommendedEpisodes", () => {
     vi.clearAllMocks();
     mockAuth.mockResolvedValue({ userId: "user_123" });
     mockLimit.mockResolvedValue([]);
+    mockGroupBy.mockResolvedValue([]);
   });
 
   afterEach(() => {
@@ -322,7 +331,7 @@ describe("getRecommendedEpisodes", () => {
 
     expect(result.episodes).toEqual([]);
     expect(result.error).toBeNull();
-    // 3 subqueries + 1 main query = 4 select calls
+    // 3 subqueries + 1 main query = 4 select calls; no 5th (episodeIds is empty)
     expect(mockSelect).toHaveBeenCalledTimes(4);
   });
 
@@ -373,17 +382,44 @@ describe("getRecommendedEpisodes", () => {
     expect(result.episodes[1].audioUrl).toBeNull();
     expect(result.episodes[1].podcastImageUrl).toBeNull();
 
-    // Query chain was invoked: 3 subqueries + 1 main query
-    expect(mockSelect).toHaveBeenCalledTimes(4);
-    // from() called 4 times (once per select)
-    expect(mockFrom).toHaveBeenCalledTimes(4);
+    // Query chain: 3 subqueries + 1 main query + 1 topic rank enrichment = 5 select calls
+    expect(mockSelect).toHaveBeenCalledTimes(5);
+    // from() called 5 times (once per select)
+    expect(mockFrom).toHaveBeenCalledTimes(5);
     // innerJoin() called once (only the main query joins podcasts)
     expect(mockInnerJoin).toHaveBeenCalledTimes(1);
-    // where() called 4 times
-    expect(mockWhere).toHaveBeenCalledTimes(4);
+    // where() called 5 times
+    expect(mockWhere).toHaveBeenCalledTimes(5);
     // orderBy() and limit() only on the main query
     expect(mockOrderBy).toHaveBeenCalledTimes(1);
     expect(mockLimit).toHaveBeenCalledWith(6);
+  });
+
+  it("populates bestTopicRank and topRankedTopic when rank data exists", async () => {
+    const mockEpisodes = [
+      {
+        id: 1,
+        podcastIndexId: "ep-123",
+        title: "AI Deep Dive",
+        description: null,
+        audioUrl: null,
+        duration: null,
+        publishDate: null,
+        worthItScore: "8.50",
+        podcastTitle: "Tech Talks",
+        podcastImageUrl: null,
+      },
+    ];
+    mockLimit.mockResolvedValue(mockEpisodes);
+    mockGroupBy.mockResolvedValue([
+      { episodeId: 1, bestRank: 2, topTopic: "Artificial Intelligence" },
+    ]);
+
+    const { getRecommendedEpisodes } = await import("@/app/actions/dashboard");
+    const result = await getRecommendedEpisodes();
+
+    expect(result.episodes[0].bestTopicRank).toBe(2);
+    expect(result.episodes[0].topRankedTopic).toBe("Artificial Intelligence");
   });
 
   it("uses default limit of 10 when called with no arguments", async () => {
