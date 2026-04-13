@@ -7,6 +7,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- `rank-episode-topics` daily Trigger.dev scheduled task (7 AM UTC) that ranks episodes within each topic via exhaustive pairwise LLM comparison; win-count aggregation with worthItScore tiebreaker; adaptive episode cap (10/topic for ≤20 topics, 5/topic for >20); up to 50 topics per run (#261)
+- `topicRank` (integer, nullable) and `rankedAt` (timestamp, nullable) columns on `episode_topics` — rank 1 = best coverage of that topic (#261)
+- `bestTopicRank` and `topRankedTopic` fields on `RecommendedEpisodeDTO` and `getRecommendedEpisodes()` response (#261)
 - Extract 1–5 topic tags per episode during summarization; stored in new `episode_topics` junction table with relevance scores (0–1) and a cross-episode index for efficient topic queries (#259)
 - Semantic CSS color tokens for score (`--score-exceptional` → `--score-skip`) and status indicators (`--status-success-*`, `--status-warning-*`, etc.) with light/dark mode variants and accessible foreground colors (#256)
 - Blue-indigo brand accent color replacing stock shadcn neutral defaults (#256)

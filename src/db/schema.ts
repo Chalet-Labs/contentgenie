@@ -312,6 +312,8 @@ export const episodeTopics = pgTable(
       .notNull(),
     topic: varchar("topic", { length: 100 }).notNull(),
     relevance: decimal("relevance", { precision: 3, scale: 2 }).notNull(), // 0.00–1.00
+    topicRank: integer("topic_rank"), // 1 = best, NULL = unranked
+    rankedAt: timestamp("ranked_at"), // when ranking was last computed
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => [

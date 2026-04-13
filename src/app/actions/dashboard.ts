@@ -1,7 +1,7 @@
 "use server";
 
 import { auth } from "@clerk/nextjs/server";
-import { eq, desc, and, gte, isNotNull, notInArray, inArray } from "drizzle-orm";
+import { eq, desc, and, gte, isNotNull, notInArray, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   userSubscriptions,
@@ -10,6 +10,7 @@ import {
   episodes,
   podcasts,
   trendingTopics,
+  episodeTopics,
 } from "@/db/schema";
 import { type RecommendedEpisodeDTO } from "@/db/library-columns";
 import {
@@ -228,7 +229,40 @@ export async function getRecommendedEpisodes(
       .orderBy(desc(episodes.worthItScore), desc(episodes.publishDate))
       .limit(limit);
 
-    return { episodes: results, error: null };
+    // Post-query enrichment: fetch best topic rank for each returned episode
+    const episodeIds = results.map((r) => r.id);
+    const topicRankRows =
+      episodeIds.length > 0
+        ? await db
+            .select({
+              episodeId: episodeTopics.episodeId,
+              bestRank: sql<number>`MIN(${episodeTopics.topicRank})`,
+              topTopic: sql<string>`(array_agg(${episodeTopics.topic} ORDER BY ${episodeTopics.topicRank}))[1]`,
+            })
+            .from(episodeTopics)
+            .where(
+              and(
+                inArray(episodeTopics.episodeId, episodeIds),
+                isNotNull(episodeTopics.topicRank)
+              )
+            )
+            .groupBy(episodeTopics.episodeId)
+        : [];
+
+    const rankMap = new Map(
+      topicRankRows.map((r) => [r.episodeId, { bestRank: r.bestRank, topTopic: r.topTopic }])
+    );
+
+    const enriched = results.map((r) => {
+      const rankData = rankMap.get(r.id);
+      return {
+        ...r,
+        bestTopicRank: rankData?.bestRank ?? null,
+        topRankedTopic: rankData?.topTopic ?? null,
+      };
+    });
+
+    return { episodes: enriched, error: null };
   } catch (error) {
     console.error("Error fetching episode recommendations:", error);
     return { episodes: [], error: "Failed to load recommendations" };
