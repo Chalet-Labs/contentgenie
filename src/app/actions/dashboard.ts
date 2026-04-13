@@ -231,23 +231,27 @@ export async function getRecommendedEpisodes(
 
     // Separate query to avoid aggregation expanding the outer LIMIT result set
     const episodeIds = results.map((r) => r.id);
-    const topicRankRows =
-      episodeIds.length > 0
-        ? await db
-            .select({
-              episodeId: episodeTopics.episodeId,
-              bestRank: sql<number>`MIN(${episodeTopics.topicRank})`,
-              topTopic: sql<string>`(array_agg(${episodeTopics.topic} ORDER BY ${episodeTopics.topicRank}))[1]`,
-            })
-            .from(episodeTopics)
-            .where(
-              and(
-                inArray(episodeTopics.episodeId, episodeIds),
-                isNotNull(episodeTopics.topicRank)
-              )
+    let topicRankRows: Array<{ episodeId: number; bestRank: number; topTopic: string }> = [];
+    if (episodeIds.length > 0) {
+      try {
+        topicRankRows = await db
+          .select({
+            episodeId: episodeTopics.episodeId,
+            bestRank: sql<number>`MIN(${episodeTopics.topicRank})::integer`,
+            topTopic: sql<string>`(array_agg(${episodeTopics.topic} ORDER BY ${episodeTopics.topicRank}))[1]`,
+          })
+          .from(episodeTopics)
+          .where(
+            and(
+              inArray(episodeTopics.episodeId, episodeIds),
+              isNotNull(episodeTopics.topicRank)
             )
-            .groupBy(episodeTopics.episodeId)
-        : [];
+          )
+          .groupBy(episodeTopics.episodeId);
+      } catch (err) {
+        console.error("Failed to fetch topic rank enrichment; returning episodes without rank data:", err);
+      }
+    }
 
     const rankMap = new Map(
       topicRankRows.map((r) => [r.episodeId, r])

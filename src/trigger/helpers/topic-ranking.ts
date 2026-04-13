@@ -68,7 +68,7 @@ export function aggregateWinCounts(
   }));
 }
 
-// Re-export parseScore from its canonical location for backward compatibility
+// Convenience re-export so callers can import all ranking utilities from one place
 export { parseScore } from "@/lib/score-utils";
 
 /**
@@ -79,5 +79,5 @@ export function getEpisodeCap(topicCount: number): number {
   return topicCount <= ADAPTIVE_THRESHOLD ? EPISODES_CAP_HIGH : EPISODES_CAP_LOW;
 }
 
-// Re-export prompts from their canonical location for backward compatibility
+// Convenience re-export so callers can import all ranking utilities from one place
 export { TOPIC_RANKING_SYSTEM_PROMPT, getTopicComparisonPrompt } from "@/lib/prompts";

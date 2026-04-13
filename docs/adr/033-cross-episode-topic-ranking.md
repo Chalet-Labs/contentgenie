@@ -1,6 +1,6 @@
 # ADR-033: Cross-Episode Topic Ranking via Pairwise LLM Comparison
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-04-13
 **Issue:** [#261](https://github.com/Chalet-Labs/contentgenie/issues/261)
 
@@ -95,7 +95,7 @@ These are nullable because existing rows start unranked. The ranking task popula
 
 - **Schema migration required.** `bun run db:push` must run against production before deploying. The columns are nullable so no backfill is needed — existing rows simply have `topic_rank = NULL`.
 - **LLM cost.** Worst case: 50 topics x 10 comparisons = 500 calls (adaptive cap), or 20 topics x 45 comparisons = 900 calls. Using a lighter model and `maxTokens: 256` keeps per-call cost minimal. Daily schedule limits total spend.
-- **Dashboard query can now sort by `topicRank`.** `getRecommendedEpisodes()` gains an optional join to surface rank data. No UI changes in this issue.
+- **Dashboard query enriched with ranking data.** `getRecommendedEpisodes()` gains a secondary aggregation query to surface `bestTopicRank` and `topRankedTopic` per episode. These fields are available for display and future sorting but do not yet affect the primary ordering. No UI changes in this issue.
 - **Ranking staleness.** Rankings are recomputed daily. New episodes summarized mid-day won't be ranked until the next run. This is acceptable — the same pattern as trending topics (ADR-022).
 
 ## Related ADRs
