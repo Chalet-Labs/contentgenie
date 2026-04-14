@@ -119,7 +119,7 @@ export function EpisodeRecommendations({ episodes }: EpisodeRecommendationsProps
                 {episode.overlapLabel && (
                   <p
                     className={`mt-1 text-xs font-medium ${
-                      episode.overlapLabel.startsWith("You've heard")
+                      episode.overlapLabelKind === "high-overlap"
                         ? "text-amber-600 dark:text-amber-400"
                         : "text-green-600 dark:text-green-400"
                     }`}

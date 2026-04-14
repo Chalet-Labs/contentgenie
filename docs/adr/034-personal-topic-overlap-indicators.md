@@ -79,7 +79,7 @@ These are optional so existing consumers (tests, other call sites) don't break. 
 
 Three display surfaces:
 1. **`episode-recommendations.tsx`**: Compact label below the WorthItBadge — colored text with no icon, matching existing metadata density
-2. **`summary-display.tsx`**: Overlap indicator card section below the Worth-It Score card, only on the episode detail page. Uses the same Card pattern as existing sections.
+2. **`summary-display.tsx`**: Overlap label rendered inside the Worth-It Score card, below the score progress bar. Uses a colored `<p>` element matching existing metadata density.
 3. **`worth-it-badge.tsx`**: No change — the badge shows the score only. Adding overlap to the badge would conflate two different signals.
 
 ### Episode detail page overlap
@@ -89,7 +89,7 @@ The episode detail page (`/episode/[id]`) loads data via the `/api/episodes/[id]
 ## Consequences
 
 - **No schema migration.** No new columns or tables.
-- **Two additional queries per dashboard load.** The consumed-episodes + topic-profile queries add ~10-30ms. Both are indexed (`listen_history_user_id_idx`, `user_library_user_id_idx`, `episode_topics_topic_idx`).
+- **Three additional queries per dashboard load** (consumed-episodes UNION, topic-profile GROUP BY, candidate-episode topics IN). The consumed-episodes and topic-profile queries add ~10-30ms; the candidate-topics query is bounded by the result limit. All are indexed (`listen_history_user_id_idx`, `user_library_user_id_idx`, `episode_topics_topic_idx`).
 - **Graceful degradation.** Episodes without topic tags (pre-#259) produce empty topic lists, so `overlapCount = 0` and no indicator is shown. Users with <3 consumed episodes see no indicators.
 - **No impact on stored data.** `worth_it_score`, `episode_topics`, `listen_history`, and `user_library` are all read-only from this feature's perspective.
 

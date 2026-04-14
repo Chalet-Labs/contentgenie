@@ -20,7 +20,8 @@ import {
 import {
   buildUserTopicProfile,
   computeTopicOverlap,
-  type TopicOverlapResult,
+  EMPTY_OVERLAP_RESULT,
+  HIGH_OVERLAP_THRESHOLD,
 } from "@/lib/topic-overlap";
 
 // Maximum episodes to include per podcast for variety in the dashboard feed
@@ -336,13 +337,14 @@ export async function getRecommendedEpisodes(
           overlapCount: overlap.overlapCount,
           overlapTopic: overlap.topOverlapTopic,
           overlapLabel: overlap.label,
+          overlapLabelKind: overlap.labelKind,
         };
       });
 
       // Stable partition sort: non-overlapping (overlapCount < 3) first, overlapping last.
       // Within each partition, original order (worthItScore DESC) is preserved.
-      const nonOverlapping = withOverlap.filter((r) => (r.overlapCount ?? 0) < 3);
-      const overlapping = withOverlap.filter((r) => (r.overlapCount ?? 0) >= 3);
+      const nonOverlapping = withOverlap.filter((r) => (r.overlapCount ?? 0) < HIGH_OVERLAP_THRESHOLD);
+      const overlapping = withOverlap.filter((r) => (r.overlapCount ?? 0) >= HIGH_OVERLAP_THRESHOLD);
       overlapEnriched = [...nonOverlapping, ...overlapping];
     } catch (err) {
       console.error("Failed to compute topic overlap; returning recommendations without overlap data:", err);
@@ -358,19 +360,14 @@ export async function getRecommendedEpisodes(
 // Get topic overlap for a single episode — used by the episode detail page.
 export async function getEpisodeTopicOverlap(
   podcastIndexEpisodeId: string
-): Promise<TopicOverlapResult> {
-  const nullResult: TopicOverlapResult = {
-    overlapCount: 0,
-    topOverlapTopic: null,
-    isNewTopic: false,
-    label: null,
-  };
+) {
+  if (!podcastIndexEpisodeId) return EMPTY_OVERLAP_RESULT;
 
   const { userId } = await auth();
-  if (!userId) return nullResult;
+  if (!userId) return EMPTY_OVERLAP_RESULT;
 
   try {
-    // Look up the DB episode by podcastIndexId to get its internal ID and topic rank
+    // Look up the DB episode by podcastIndexId to get its internal ID
     const episodeRow = await db
       .select({
         id: episodes.id,
@@ -379,7 +376,7 @@ export async function getEpisodeTopicOverlap(
       .where(eq(episodes.podcastIndexId, podcastIndexEpisodeId))
       .limit(1);
 
-    if (episodeRow.length === 0) return nullResult;
+    if (episodeRow.length === 0) return EMPTY_OVERLAP_RESULT;
     const episodeDbId = episodeRow[0].id;
 
     // Batch-query consumed episode IDs for profile construction
@@ -431,7 +428,7 @@ export async function getEpisodeTopicOverlap(
     return computeTopicOverlap(userProfile, epTopics, totalConsumed, bestRank);
   } catch (err) {
     console.error("Failed to compute episode topic overlap:", err);
-    return nullResult;
+    return EMPTY_OVERLAP_RESULT;
   }
 }
 

@@ -142,6 +142,7 @@ export default function EpisodePage({ params }: EpisodePageProps) {
   const [transcriptStatus, setTranscriptStatus] = useState<TranscriptStatus | null>(null);
   const [episodeDbId, setEpisodeDbId] = useState<number | null>(null);
   const [overlapLabel, setOverlapLabel] = useState<string | null>(null);
+  const [overlapLabelKind, setOverlapLabelKind] = useState<"high-overlap" | "top-pick" | "new-topic" | null>(null);
 
   const isAdmin = isLoaded && has?.({ role: ADMIN_ROLE });
 
@@ -327,9 +328,14 @@ export default function EpisodePage({ params }: EpisodePageProps) {
   // Fires only when online and episode data is present.
   useEffect(() => {
     if (!isOnline || !episode) return;
-    void getEpisodeTopicOverlap(episodeId).then((result) => {
-      setOverlapLabel(result.label);
-    });
+    getEpisodeTopicOverlap(episodeId)
+      .then((result) => {
+        setOverlapLabel(result.label);
+        setOverlapLabelKind(result.labelKind);
+      })
+      .catch(() => {
+        // Non-critical: overlap label is a presentation-only enhancement
+      });
   }, [isOnline, episode, episodeId]);
 
   // Generate summary — triggers a background task and subscribes to realtime updates
@@ -754,6 +760,7 @@ export default function EpisodePage({ params }: EpisodePageProps) {
           }
           onGenerateSummary={isOnline ? generateSummary : undefined}
           overlapLabel={overlapLabel}
+          overlapLabelKind={overlapLabelKind}
         />
       </div>
     </div>

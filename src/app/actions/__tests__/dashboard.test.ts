@@ -126,10 +126,14 @@ vi.mock("drizzle-orm", () => ({
 // Mock topic-overlap — keeps dashboard tests focused on wiring, not overlap logic
 const mockComputeTopicOverlap = vi.fn();
 const mockBuildUserTopicProfile = vi.fn();
-vi.mock("@/lib/topic-overlap", () => ({
-  computeTopicOverlap: (...args: unknown[]) => mockComputeTopicOverlap(...args),
-  buildUserTopicProfile: (...args: unknown[]) => mockBuildUserTopicProfile(...args),
-}));
+vi.mock("@/lib/topic-overlap", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/lib/topic-overlap")>();
+  return {
+    ...actual,
+    computeTopicOverlap: (...args: unknown[]) => mockComputeTopicOverlap(...args),
+    buildUserTopicProfile: (...args: unknown[]) => mockBuildUserTopicProfile(...args),
+  };
+});
 
 // Mock podcastindex — used by getRecentEpisodesFromSubscriptions
 const mockGetEpisodesByFeedId = vi.fn();
@@ -324,7 +328,7 @@ describe("getRecommendedEpisodes", () => {
     mockUnion.mockResolvedValue([]);
     mockWhere.mockResolvedValue([]);
     mockBuildUserTopicProfile.mockReturnValue(new Map());
-    mockComputeTopicOverlap.mockReturnValue({ overlapCount: 0, topOverlapTopic: null, isNewTopic: false, label: null });
+    mockComputeTopicOverlap.mockReturnValue({ overlapCount: 0, topOverlapTopic: null, isNewTopic: false, label: null, labelKind: null });
   });
 
   afterEach(() => {
@@ -482,6 +486,7 @@ describe("getRecommendedEpisodes", () => {
       topOverlapTopic: "AI Ethics",
       isNewTopic: false,
       label: "You've heard 4 similar episodes",
+      labelKind: "high-overlap",
     });
 
     const { getRecommendedEpisodes } = await import("@/app/actions/dashboard");
@@ -537,9 +542,9 @@ describe("getRecommendedEpisodes", () => {
     mockBuildUserTopicProfile.mockReturnValue(new Map([["AI Ethics", 4]]));
     // ep-1 has high overlap, ep-2 and ep-3 have none
     mockComputeTopicOverlap
-      .mockReturnValueOnce({ overlapCount: 4, topOverlapTopic: "AI Ethics", isNewTopic: false, label: "You've heard 4 similar episodes" })
-      .mockReturnValueOnce({ overlapCount: 0, topOverlapTopic: null, isNewTopic: false, label: null })
-      .mockReturnValueOnce({ overlapCount: 0, topOverlapTopic: null, isNewTopic: false, label: null });
+      .mockReturnValueOnce({ overlapCount: 4, topOverlapTopic: "AI Ethics", isNewTopic: false, label: "You've heard 4 similar episodes", labelKind: "high-overlap" })
+      .mockReturnValueOnce({ overlapCount: 0, topOverlapTopic: null, isNewTopic: false, label: null, labelKind: null })
+      .mockReturnValueOnce({ overlapCount: 0, topOverlapTopic: null, isNewTopic: false, label: null, labelKind: null });
 
     const { getRecommendedEpisodes } = await import("@/app/actions/dashboard");
     const result = await getRecommendedEpisodes();
@@ -574,10 +579,10 @@ describe("getRecommendedEpisodes", () => {
     mockBuildUserTopicProfile.mockReturnValue(new Map());
     // ep-1 and ep-3 have high overlap; ep-2 and ep-4 have none
     mockComputeTopicOverlap
-      .mockReturnValueOnce({ overlapCount: 5, topOverlapTopic: "X", isNewTopic: false, label: "You've heard 5 similar episodes" })
-      .mockReturnValueOnce({ overlapCount: 0, topOverlapTopic: null, isNewTopic: false, label: null })
-      .mockReturnValueOnce({ overlapCount: 3, topOverlapTopic: "Y", isNewTopic: false, label: "You've heard 3 similar episodes" })
-      .mockReturnValueOnce({ overlapCount: 0, topOverlapTopic: null, isNewTopic: false, label: null });
+      .mockReturnValueOnce({ overlapCount: 5, topOverlapTopic: "X", isNewTopic: false, label: "You've heard 5 similar episodes", labelKind: "high-overlap" })
+      .mockReturnValueOnce({ overlapCount: 0, topOverlapTopic: null, isNewTopic: false, label: null, labelKind: null })
+      .mockReturnValueOnce({ overlapCount: 3, topOverlapTopic: "Y", isNewTopic: false, label: "You've heard 3 similar episodes", labelKind: "high-overlap" })
+      .mockReturnValueOnce({ overlapCount: 0, topOverlapTopic: null, isNewTopic: false, label: null, labelKind: null });
 
     const { getRecommendedEpisodes } = await import("@/app/actions/dashboard");
     const result = await getRecommendedEpisodes();
@@ -605,7 +610,7 @@ describe("getRecommendedEpisodes", () => {
     // User has only 2 consumed episodes
     mockUnion.mockResolvedValue([{ episodeId: 1 }, { episodeId: 2 }]);
     mockBuildUserTopicProfile.mockReturnValue(new Map());
-    mockComputeTopicOverlap.mockReturnValue({ overlapCount: 0, topOverlapTopic: null, isNewTopic: false, label: null });
+    mockComputeTopicOverlap.mockReturnValue({ overlapCount: 0, topOverlapTopic: null, isNewTopic: false, label: null, labelKind: null });
 
     const { getRecommendedEpisodes } = await import("@/app/actions/dashboard");
     const result = await getRecommendedEpisodes();
@@ -656,7 +661,7 @@ describe("getEpisodeTopicOverlap", () => {
     mockGroupBy.mockResolvedValue([]);
     mockLimit.mockResolvedValue([]);
     mockBuildUserTopicProfile.mockReturnValue(new Map());
-    mockComputeTopicOverlap.mockReturnValue({ overlapCount: 0, topOverlapTopic: null, isNewTopic: false, label: null });
+    mockComputeTopicOverlap.mockReturnValue({ overlapCount: 0, topOverlapTopic: null, isNewTopic: false, label: null, labelKind: null });
   });
 
   afterEach(() => {
@@ -703,6 +708,7 @@ describe("getEpisodeTopicOverlap", () => {
       topOverlapTopic: "Leadership",
       isNewTopic: false,
       label: "You've heard 4 similar episodes",
+      labelKind: "high-overlap",
     });
 
     const { getEpisodeTopicOverlap } = await import("@/app/actions/dashboard");
@@ -719,7 +725,7 @@ describe("getEpisodeTopicOverlap", () => {
     mockBuildUserTopicProfile.mockReturnValue(new Map());
     // No topics for this episode
     mockWhere.mockResolvedValue([]);
-    mockComputeTopicOverlap.mockReturnValue({ overlapCount: 0, topOverlapTopic: null, isNewTopic: false, label: null });
+    mockComputeTopicOverlap.mockReturnValue({ overlapCount: 0, topOverlapTopic: null, isNewTopic: false, label: null, labelKind: null });
 
     const { getEpisodeTopicOverlap } = await import("@/app/actions/dashboard");
     const result = await getEpisodeTopicOverlap("ep-42");

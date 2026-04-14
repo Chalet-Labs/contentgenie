@@ -85,4 +85,5 @@ export interface RecommendedEpisodeDTO extends EpisodeListDTO {
   overlapCount?: number;
   overlapTopic?: string | null;
   overlapLabel?: string | null;
+  overlapLabelKind?: "high-overlap" | "top-pick" | "new-topic" | null;
 }

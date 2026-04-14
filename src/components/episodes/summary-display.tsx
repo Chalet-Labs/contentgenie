@@ -32,6 +32,7 @@ interface SummaryDisplayProps {
   currentStep?: SummarizationStep | null;
   onGenerateSummary?: () => void;
   overlapLabel?: string | null;
+  overlapLabelKind?: "high-overlap" | "top-pick" | "new-topic" | null;
 }
 
 const STEP_LABELS: Record<SummarizationStep, string> = {
@@ -101,6 +102,7 @@ export function SummaryDisplay({
   currentStep = null,
   onGenerateSummary,
   overlapLabel,
+  overlapLabelKind,
 }: SummaryDisplayProps) {
   const [showFullSummary, setShowFullSummary] = useState(false);
 
@@ -284,7 +286,7 @@ export function SummaryDisplay({
             {overlapLabel && (
               <p
                 className={`mt-3 text-sm font-medium ${
-                  overlapLabel.startsWith("You've heard")
+                  overlapLabelKind === "high-overlap"
                     ? "text-amber-600 dark:text-amber-400"
                     : "text-green-600 dark:text-green-400"
                 }`}
