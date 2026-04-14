@@ -31,6 +31,7 @@ interface SummaryDisplayProps {
   error?: string | null;
   currentStep?: SummarizationStep | null;
   onGenerateSummary?: () => void;
+  overlapLabel?: string | null;
 }
 
 const STEP_LABELS: Record<SummarizationStep, string> = {
@@ -99,6 +100,7 @@ export function SummaryDisplay({
   error = null,
   currentStep = null,
   onGenerateSummary,
+  overlapLabel,
 }: SummaryDisplayProps) {
   const [showFullSummary, setShowFullSummary] = useState(false);
 
@@ -279,6 +281,17 @@ export function SummaryDisplay({
                 <span>10</span>
               </div>
             </div>
+            {overlapLabel && (
+              <p
+                className={`mt-3 text-sm font-medium ${
+                  overlapLabel.startsWith("You've heard")
+                    ? "text-amber-600 dark:text-amber-400"
+                    : "text-green-600 dark:text-green-400"
+                }`}
+              >
+                {overlapLabel}
+              </p>
+            )}
             {isSignalFormat && worthItDimensions.kind === "signals" && (
               <div className="mt-4 space-y-2 border-t pt-4">
                 <p className="text-sm font-medium text-foreground">Quality Signals</p>

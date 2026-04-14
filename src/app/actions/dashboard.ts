@@ -17,6 +17,11 @@ import {
   getEpisodesByFeedId,
   type PodcastIndexEpisode,
 } from "@/lib/podcastindex";
+import {
+  buildUserTopicProfile,
+  computeTopicOverlap,
+  type TopicOverlapResult,
+} from "@/lib/topic-overlap";
 
 // Maximum episodes to include per podcast for variety in the dashboard feed
 const MAX_EPISODES_PER_PODCAST = 3;
@@ -258,7 +263,7 @@ export async function getRecommendedEpisodes(
       topicRankRows.map((r) => [r.episodeId, r])
     );
 
-    const enriched = results.map((r) => {
+    const baseEnriched = results.map((r) => {
       const rankData = rankMap.get(r.id);
       return {
         ...r,
@@ -267,10 +272,166 @@ export async function getRecommendedEpisodes(
       };
     });
 
-    return { episodes: enriched, error: null };
+    // Overlap enrichment — batch query, no N+1. Wrapped in try/catch for graceful degradation.
+    let overlapEnriched: RecommendedEpisodeDTO[] = baseEnriched;
+    try {
+      // Batch-query all consumed episode IDs for this user
+      const consumedRows = await db
+        .select({ episodeId: listenHistory.episodeId })
+        .from(listenHistory)
+        .where(eq(listenHistory.userId, userId))
+        .union(
+          db
+            .select({ episodeId: userLibrary.episodeId })
+            .from(userLibrary)
+            .where(eq(userLibrary.userId, userId))
+        );
+
+      const totalConsumed = consumedRows.length;
+      const consumedIds = consumedRows.map((r) => r.episodeId);
+
+      // Batch-query topic counts for all consumed episodes
+      let topicCountRows: Array<{ topic: string; count: number }> = [];
+      if (consumedIds.length > 0) {
+        topicCountRows = await db
+          .select({
+            topic: episodeTopics.topic,
+            count: sql<number>`COUNT(DISTINCT ${episodeTopics.episodeId})::integer`,
+          })
+          .from(episodeTopics)
+          .where(inArray(episodeTopics.episodeId, consumedIds))
+          .groupBy(episodeTopics.topic);
+      }
+
+      const userProfile = buildUserTopicProfile(topicCountRows);
+
+      // Batch-query topics for all candidate episodes
+      const candidateIds = baseEnriched.map((r) => r.id);
+      let candidateTopicRows: Array<{ episodeId: number; topic: string; relevance: string }> = [];
+      if (candidateIds.length > 0) {
+        candidateTopicRows = await db
+          .select({
+            episodeId: episodeTopics.episodeId,
+            topic: episodeTopics.topic,
+            relevance: episodeTopics.relevance,
+          })
+          .from(episodeTopics)
+          .where(inArray(episodeTopics.episodeId, candidateIds));
+      }
+
+      // Group candidate topics by episode
+      const candidateTopicMap = new Map<number, Array<{ topic: string; relevance: string }>>();
+      for (const row of candidateTopicRows) {
+        const existing = candidateTopicMap.get(row.episodeId) ?? [];
+        existing.push({ topic: row.topic, relevance: row.relevance });
+        candidateTopicMap.set(row.episodeId, existing);
+      }
+
+      // Compute overlap for each candidate and attach to DTO
+      const withOverlap: RecommendedEpisodeDTO[] = baseEnriched.map((r) => {
+        const epTopics = candidateTopicMap.get(r.id) ?? [];
+        const overlap = computeTopicOverlap(userProfile, epTopics, totalConsumed, r.bestTopicRank);
+        return {
+          ...r,
+          overlapCount: overlap.overlapCount,
+          overlapTopic: overlap.topOverlapTopic,
+          overlapLabel: overlap.label,
+        };
+      });
+
+      // Stable partition sort: non-overlapping (overlapCount < 3) first, overlapping last.
+      // Within each partition, original order (worthItScore DESC) is preserved.
+      const nonOverlapping = withOverlap.filter((r) => (r.overlapCount ?? 0) < 3);
+      const overlapping = withOverlap.filter((r) => (r.overlapCount ?? 0) >= 3);
+      overlapEnriched = [...nonOverlapping, ...overlapping];
+    } catch (err) {
+      console.error("Failed to compute topic overlap; returning recommendations without overlap data:", err);
+    }
+
+    return { episodes: overlapEnriched, error: null };
   } catch (error) {
     console.error("Error fetching episode recommendations:", error);
     return { episodes: [], error: "Failed to load recommendations" };
+  }
+}
+
+// Get topic overlap for a single episode — used by the episode detail page.
+export async function getEpisodeTopicOverlap(
+  podcastIndexEpisodeId: string
+): Promise<TopicOverlapResult> {
+  const nullResult: TopicOverlapResult = {
+    overlapCount: 0,
+    topOverlapTopic: null,
+    isNewTopic: false,
+    label: null,
+  };
+
+  const { userId } = await auth();
+  if (!userId) return nullResult;
+
+  try {
+    // Look up the DB episode by podcastIndexId to get its internal ID and topic rank
+    const episodeRow = await db
+      .select({
+        id: episodes.id,
+      })
+      .from(episodes)
+      .where(eq(episodes.podcastIndexId, podcastIndexEpisodeId))
+      .limit(1);
+
+    if (episodeRow.length === 0) return nullResult;
+    const episodeDbId = episodeRow[0].id;
+
+    // Batch-query consumed episode IDs for profile construction
+    const consumedRows = await db
+      .select({ episodeId: listenHistory.episodeId })
+      .from(listenHistory)
+      .where(eq(listenHistory.userId, userId))
+      .union(
+        db
+          .select({ episodeId: userLibrary.episodeId })
+          .from(userLibrary)
+          .where(eq(userLibrary.userId, userId))
+      );
+
+    const totalConsumed = consumedRows.length;
+    const consumedIds = consumedRows.map((r) => r.episodeId);
+
+    let topicCountRows: Array<{ topic: string; count: number }> = [];
+    if (consumedIds.length > 0) {
+      topicCountRows = await db
+        .select({
+          topic: episodeTopics.topic,
+          count: sql<number>`COUNT(DISTINCT ${episodeTopics.episodeId})::integer`,
+        })
+        .from(episodeTopics)
+        .where(inArray(episodeTopics.episodeId, consumedIds))
+        .groupBy(episodeTopics.topic);
+    }
+
+    const userProfile = buildUserTopicProfile(topicCountRows);
+
+    // Fetch topics and best rank for this episode
+    const epTopicRows = await db
+      .select({
+        topic: episodeTopics.topic,
+        relevance: episodeTopics.relevance,
+        topicRank: episodeTopics.topicRank,
+      })
+      .from(episodeTopics)
+      .where(eq(episodeTopics.episodeId, episodeDbId));
+
+    const epTopics = epTopicRows.map((r) => ({ topic: r.topic, relevance: r.relevance }));
+    const bestRank = epTopicRows.reduce<number | null>((best, r) => {
+      if (r.topicRank === null) return best;
+      if (best === null) return r.topicRank;
+      return Math.min(best, r.topicRank);
+    }, null);
+
+    return computeTopicOverlap(userProfile, epTopics, totalConsumed, bestRank);
+  } catch (err) {
+    console.error("Failed to compute episode topic overlap:", err);
+    return nullResult;
   }
 }
 

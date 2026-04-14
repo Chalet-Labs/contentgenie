@@ -41,6 +41,7 @@ import { WorthItBadge } from "@/components/episodes/worth-it-badge";
 import { EpisodeTranscriptFetchButton } from "@/components/episodes/episode-transcript-fetch-button";
 import { CommunityRating } from "@/components/episodes/community-rating";
 import { isEpisodeSaved, revalidatePodcastPage } from "@/app/actions/library";
+import { getEpisodeTopicOverlap } from "@/app/actions/dashboard";
 import { useOnlineStatus } from "@/hooks/use-online-status";
 import { OfflineBanner } from "@/components/ui/offline-banner";
 import { cacheEpisode, getCachedEpisode } from "@/lib/offline-cache";
@@ -140,6 +141,7 @@ export default function EpisodePage({ params }: EpisodePageProps) {
   const [transcriptSource, setTranscriptSource] = useState<string | null>(null);
   const [transcriptStatus, setTranscriptStatus] = useState<TranscriptStatus | null>(null);
   const [episodeDbId, setEpisodeDbId] = useState<number | null>(null);
+  const [overlapLabel, setOverlapLabel] = useState<string | null>(null);
 
   const isAdmin = isLoaded && has?.({ role: ADMIN_ROLE });
 
@@ -320,6 +322,15 @@ export default function EpisodePage({ params }: EpisodePageProps) {
       loadFromCache();
     }
   }, [isOnline, fetchEpisodeData, loadFromCache]);
+
+  // Non-blocking: fetch topic overlap indicator after episode data loads.
+  // Fires only when online and episode data is present.
+  useEffect(() => {
+    if (!isOnline || !episode) return;
+    void getEpisodeTopicOverlap(episodeId).then((result) => {
+      setOverlapLabel(result.label);
+    });
+  }, [isOnline, episode, episodeId]);
 
   // Generate summary — triggers a background task and subscribes to realtime updates
   const generateSummary = useCallback(async () => {
@@ -742,6 +753,7 @@ export default function EpisodePage({ params }: EpisodePageProps) {
             (run?.metadata?.step as SummarizationStep | undefined) ?? null
           }
           onGenerateSummary={isOnline ? generateSummary : undefined}
+          overlapLabel={overlapLabel}
         />
       </div>
     </div>

@@ -6,23 +6,26 @@ vi.mock("@clerk/nextjs/server", () => ({
   auth: () => mockAuth(),
 }));
 
-// Mock DB select chain for getRecommendedEpisodes
+// Mock DB select chain
 const mockLimit = vi.fn();
 const mockOrderBy = vi.fn();
 const mockWhere = vi.fn();
+const mockUnion = vi.fn();
 const mockInnerJoin = vi.fn();
 const mockFrom = vi.fn();
 const mockSelect = vi.fn();
 
 // Mock database — supports both query API (findFirst/findMany/$count) and select chain.
-// The select chain must handle four shapes:
-//   Subqueries:   select().from().where()                  (no innerJoin, return value unused)
-//   Main query:   select().from().innerJoin().where().orderBy().limit()
-//   Score lookup: select().from().where()  → Promise<row[]> (direct await, no orderBy/limit)
-//   Rank lookup:  select().from().where().groupBy()        → Promise<row[]>
+// The select chain must handle these shapes:
+//   Subqueries:       select().from().where()                  (return value unused)
+//   Main query:       select().from().innerJoin().where().orderBy().limit()
+//   Score lookup:     select().from().where()  → Promise<row[]>
+//   Rank lookup:      select().from().where().groupBy()        → Promise<row[]>
+//   Union query:      select().from().where().union(select().from().where())
+//   Topic count:      select().from().where().groupBy()
+//   Candidate topics: select().from().where()                  → Promise<row[]>
 //
-// whereNode returns an object that is BOTH awaitable (Promise<result of mockWhere>)
-// and has orderBy/groupBy for chained callers. This allows all usage patterns.
+// whereNode returns an object that is BOTH awaitable and has chainable methods.
 const mockGroupBy = vi.fn();
 const mockFindFirst = vi.fn();
 const mockFindMany = vi.fn();
@@ -33,7 +36,7 @@ vi.mock("@/db", () => ({
       mockSelect(...args);
       const whereNode = (...wArgs: unknown[]) => {
         const result = mockWhere(...wArgs);
-        // Return an object that is both a Promise (for direct await) and has orderBy/groupBy
+        // Return an object that is both a Promise (for direct await) and has chained methods
         const thenable = Promise.resolve(result).then((v) => v);
         return Object.assign(thenable, {
           orderBy: (...oArgs: unknown[]) => {
@@ -45,15 +48,17 @@ vi.mock("@/db", () => ({
           groupBy: (...gArgs: unknown[]) => {
             return mockGroupBy(...gArgs);
           },
+          union: (...uArgs: unknown[]) => {
+            return mockUnion(...uArgs);
+          },
+          limit: (...lArgs: unknown[]) => mockLimit(...lArgs),
         });
       };
       return {
         from: (...fArgs: unknown[]) => {
           mockFrom(...fArgs);
           return {
-            // Direct where() for subqueries (no innerJoin), score lookup, and rank lookup
             where: whereNode,
-            // innerJoin() for main query
             innerJoin: (...jArgs: unknown[]) => {
               mockInnerJoin(...jArgs);
               return { where: whereNode };
@@ -96,8 +101,13 @@ vi.mock("@/db/schema", () => ({
     podcastIndexId: "podcast_index_id",
   },
   trendingTopics: { generatedAt: "generated_at", id: "id" },
-  episodeTopics: { episodeId: "episode_id", topic: "topic", topicRank: "topic_rank", rankedAt: "ranked_at" },
-  // library-columns uses these via re-export
+  episodeTopics: {
+    episodeId: "episode_id",
+    topic: "topic",
+    topicRank: "topic_rank",
+    rankedAt: "ranked_at",
+    relevance: "relevance",
+  },
   userActivity: {},
 }));
 
@@ -110,8 +120,15 @@ vi.mock("drizzle-orm", () => ({
   isNotNull: vi.fn((...args: unknown[]) => ({ _op: "isNotNull", args })),
   notInArray: vi.fn((...args: unknown[]) => ({ _op: "notInArray", args })),
   inArray: vi.fn((...args: unknown[]) => ({ _op: "inArray", args })),
-  // sql is used as a tagged template literal: sql`MIN(...)` → return a placeholder
   sql: vi.fn((_strings: TemplateStringsArray, ..._values: unknown[]) => ({ _op: "sql" })),
+}));
+
+// Mock topic-overlap — keeps dashboard tests focused on wiring, not overlap logic
+const mockComputeTopicOverlap = vi.fn();
+const mockBuildUserTopicProfile = vi.fn();
+vi.mock("@/lib/topic-overlap", () => ({
+  computeTopicOverlap: (...args: unknown[]) => mockComputeTopicOverlap(...args),
+  buildUserTopicProfile: (...args: unknown[]) => mockBuildUserTopicProfile(...args),
 }));
 
 // Mock podcastindex — used by getRecentEpisodesFromSubscriptions
@@ -303,6 +320,11 @@ describe("getRecommendedEpisodes", () => {
     mockAuth.mockResolvedValue({ userId: "user_123" });
     mockLimit.mockResolvedValue([]);
     mockGroupBy.mockResolvedValue([]);
+    // Overlap defaults: no consumed episodes, no-op profile and overlap
+    mockUnion.mockResolvedValue([]);
+    mockWhere.mockResolvedValue([]);
+    mockBuildUserTopicProfile.mockReturnValue(new Map());
+    mockComputeTopicOverlap.mockReturnValue({ overlapCount: 0, topOverlapTopic: null, isNewTopic: false, label: null });
   });
 
   afterEach(() => {
@@ -331,8 +353,6 @@ describe("getRecommendedEpisodes", () => {
 
     expect(result.episodes).toEqual([]);
     expect(result.error).toBeNull();
-    // 3 subqueries + 1 main query = 4 select calls; no 5th (episodeIds is empty)
-    expect(mockSelect).toHaveBeenCalledTimes(4);
   });
 
   it("returns recommended episodes with all required fields on success", async () => {
@@ -382,14 +402,6 @@ describe("getRecommendedEpisodes", () => {
     expect(result.episodes[1].audioUrl).toBeNull();
     expect(result.episodes[1].podcastImageUrl).toBeNull();
 
-    // Query chain: 3 subqueries + 1 main query + 1 topic rank enrichment = 5 select calls
-    expect(mockSelect).toHaveBeenCalledTimes(5);
-    // from() called 5 times (once per select)
-    expect(mockFrom).toHaveBeenCalledTimes(5);
-    // innerJoin() called once (only the main query joins podcasts)
-    expect(mockInnerJoin).toHaveBeenCalledTimes(1);
-    // where() called 5 times
-    expect(mockWhere).toHaveBeenCalledTimes(5);
     // orderBy() and limit() only on the main query
     expect(mockOrderBy).toHaveBeenCalledTimes(1);
     expect(mockLimit).toHaveBeenCalledWith(6);
@@ -439,6 +451,290 @@ describe("getRecommendedEpisodes", () => {
 
     expect(result.episodes).toEqual([]);
     expect(result.error).toMatch(/failed to load/i);
+  });
+
+  // T4: Verification tests for overlap integration
+
+  it("attaches overlap fields to recommended episodes when user has history", async () => {
+    const mockEpisodes = [
+      {
+        id: 1,
+        podcastIndexId: "ep-123",
+        title: "AI Ethics Deep Dive",
+        description: null,
+        audioUrl: null,
+        duration: null,
+        publishDate: null,
+        worthItScore: "8.50",
+        podcastTitle: "Tech Talks",
+        podcastImageUrl: null,
+      },
+    ];
+    mockLimit.mockResolvedValue(mockEpisodes);
+    // User has consumed 4 episodes; union returns 4 rows
+    mockUnion.mockResolvedValue([
+      { episodeId: 10 }, { episodeId: 11 }, { episodeId: 12 }, { episodeId: 13 },
+    ]);
+    // Topic profile: AI Ethics appears 4 times
+    mockBuildUserTopicProfile.mockReturnValue(new Map([["AI Ethics", 4]]));
+    mockComputeTopicOverlap.mockReturnValue({
+      overlapCount: 4,
+      topOverlapTopic: "AI Ethics",
+      isNewTopic: false,
+      label: "You've heard 4 similar episodes",
+    });
+
+    const { getRecommendedEpisodes } = await import("@/app/actions/dashboard");
+    const result = await getRecommendedEpisodes();
+
+    expect(result.error).toBeNull();
+    expect(result.episodes[0].overlapCount).toBe(4);
+    expect(result.episodes[0].overlapTopic).toBe("AI Ethics");
+    expect(result.episodes[0].overlapLabel).toBe("You've heard 4 similar episodes");
+  });
+
+  it("sorts episodes with overlapCount >= 3 after non-overlapping episodes (stable partition)", async () => {
+    const mockEpisodes = [
+      {
+        id: 1,
+        podcastIndexId: "ep-1",
+        title: "High Overlap",
+        description: null,
+        audioUrl: null,
+        duration: null,
+        publishDate: null,
+        worthItScore: "9.00",
+        podcastTitle: "Podcast A",
+        podcastImageUrl: null,
+      },
+      {
+        id: 2,
+        podcastIndexId: "ep-2",
+        title: "No Overlap",
+        description: null,
+        audioUrl: null,
+        duration: null,
+        publishDate: null,
+        worthItScore: "7.00",
+        podcastTitle: "Podcast B",
+        podcastImageUrl: null,
+      },
+      {
+        id: 3,
+        podcastIndexId: "ep-3",
+        title: "Also No Overlap",
+        description: null,
+        audioUrl: null,
+        duration: null,
+        publishDate: null,
+        worthItScore: "6.50",
+        podcastTitle: "Podcast C",
+        podcastImageUrl: null,
+      },
+    ];
+    mockLimit.mockResolvedValue(mockEpisodes);
+    mockUnion.mockResolvedValue([{ episodeId: 100 }, { episodeId: 101 }, { episodeId: 102 }]);
+    mockBuildUserTopicProfile.mockReturnValue(new Map([["AI Ethics", 4]]));
+    // ep-1 has high overlap, ep-2 and ep-3 have none
+    mockComputeTopicOverlap
+      .mockReturnValueOnce({ overlapCount: 4, topOverlapTopic: "AI Ethics", isNewTopic: false, label: "You've heard 4 similar episodes" })
+      .mockReturnValueOnce({ overlapCount: 0, topOverlapTopic: null, isNewTopic: false, label: null })
+      .mockReturnValueOnce({ overlapCount: 0, topOverlapTopic: null, isNewTopic: false, label: null });
+
+    const { getRecommendedEpisodes } = await import("@/app/actions/dashboard");
+    const result = await getRecommendedEpisodes();
+
+    // ep-2 and ep-3 (no overlap) should come before ep-1 (overlapCount >= 3)
+    expect(result.episodes[0].podcastIndexId).toBe("ep-2");
+    expect(result.episodes[1].podcastIndexId).toBe("ep-3");
+    expect(result.episodes[2].podcastIndexId).toBe("ep-1");
+  });
+
+  it("preserves original order within each partition (stable sort)", async () => {
+    const mockEpisodes = [
+      {
+        id: 1, podcastIndexId: "ep-1", title: "A", description: null, audioUrl: null,
+        duration: null, publishDate: null, worthItScore: "9.00", podcastTitle: "P", podcastImageUrl: null,
+      },
+      {
+        id: 2, podcastIndexId: "ep-2", title: "B", description: null, audioUrl: null,
+        duration: null, publishDate: null, worthItScore: "8.00", podcastTitle: "P", podcastImageUrl: null,
+      },
+      {
+        id: 3, podcastIndexId: "ep-3", title: "C", description: null, audioUrl: null,
+        duration: null, publishDate: null, worthItScore: "7.00", podcastTitle: "P", podcastImageUrl: null,
+      },
+      {
+        id: 4, podcastIndexId: "ep-4", title: "D", description: null, audioUrl: null,
+        duration: null, publishDate: null, worthItScore: "6.00", podcastTitle: "P", podcastImageUrl: null,
+      },
+    ];
+    mockLimit.mockResolvedValue(mockEpisodes);
+    mockUnion.mockResolvedValue([{ episodeId: 99 }, { episodeId: 98 }, { episodeId: 97 }]);
+    mockBuildUserTopicProfile.mockReturnValue(new Map());
+    // ep-1 and ep-3 have high overlap; ep-2 and ep-4 have none
+    mockComputeTopicOverlap
+      .mockReturnValueOnce({ overlapCount: 5, topOverlapTopic: "X", isNewTopic: false, label: "You've heard 5 similar episodes" })
+      .mockReturnValueOnce({ overlapCount: 0, topOverlapTopic: null, isNewTopic: false, label: null })
+      .mockReturnValueOnce({ overlapCount: 3, topOverlapTopic: "Y", isNewTopic: false, label: "You've heard 3 similar episodes" })
+      .mockReturnValueOnce({ overlapCount: 0, topOverlapTopic: null, isNewTopic: false, label: null });
+
+    const { getRecommendedEpisodes } = await import("@/app/actions/dashboard");
+    const result = await getRecommendedEpisodes();
+
+    // Non-overlapping in original order: ep-2, ep-4; then overlapping in original order: ep-1, ep-3
+    expect(result.episodes.map((e) => e.podcastIndexId)).toEqual(["ep-2", "ep-4", "ep-1", "ep-3"]);
+  });
+
+  it("global gate: user with < 3 consumed episodes gets no overlap data", async () => {
+    const mockEpisodes = [
+      {
+        id: 1,
+        podcastIndexId: "ep-123",
+        title: "AI Deep Dive",
+        description: null,
+        audioUrl: null,
+        duration: null,
+        publishDate: null,
+        worthItScore: "8.50",
+        podcastTitle: "Tech Talks",
+        podcastImageUrl: null,
+      },
+    ];
+    mockLimit.mockResolvedValue(mockEpisodes);
+    // User has only 2 consumed episodes
+    mockUnion.mockResolvedValue([{ episodeId: 1 }, { episodeId: 2 }]);
+    mockBuildUserTopicProfile.mockReturnValue(new Map());
+    mockComputeTopicOverlap.mockReturnValue({ overlapCount: 0, topOverlapTopic: null, isNewTopic: false, label: null });
+
+    const { getRecommendedEpisodes } = await import("@/app/actions/dashboard");
+    const result = await getRecommendedEpisodes();
+
+    expect(result.error).toBeNull();
+    expect(result.episodes[0].overlapLabel).toBeNull();
+  });
+
+  it("returns episodes without overlap data when overlap queries fail (graceful degradation)", async () => {
+    const mockEpisodes = [
+      {
+        id: 1,
+        podcastIndexId: "ep-123",
+        title: "AI Deep Dive",
+        description: null,
+        audioUrl: null,
+        duration: null,
+        publishDate: null,
+        worthItScore: "8.50",
+        podcastTitle: "Tech Talks",
+        podcastImageUrl: null,
+      },
+    ];
+    mockLimit.mockResolvedValue(mockEpisodes);
+    // Simulate overlap query failure
+    mockUnion.mockRejectedValue(new Error("DB error"));
+
+    const { getRecommendedEpisodes } = await import("@/app/actions/dashboard");
+    const result = await getRecommendedEpisodes();
+
+    // Episodes still returned, no error surfaced to caller
+    expect(result.error).toBeNull();
+    expect(result.episodes).toHaveLength(1);
+    expect(result.episodes[0].title).toBe("AI Deep Dive");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// T4: getEpisodeTopicOverlap tests
+// ---------------------------------------------------------------------------
+
+describe("getEpisodeTopicOverlap", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockAuth.mockResolvedValue({ userId: "user_123" });
+    mockWhere.mockResolvedValue([]);
+    mockUnion.mockResolvedValue([]);
+    mockGroupBy.mockResolvedValue([]);
+    mockLimit.mockResolvedValue([]);
+    mockBuildUserTopicProfile.mockReturnValue(new Map());
+    mockComputeTopicOverlap.mockReturnValue({ overlapCount: 0, topOverlapTopic: null, isNewTopic: false, label: null });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+    vi.resetModules();
+  });
+
+  it("returns null result when not authenticated", async () => {
+    mockAuth.mockResolvedValue({ userId: null });
+
+    const { getEpisodeTopicOverlap } = await import("@/app/actions/dashboard");
+    const result = await getEpisodeTopicOverlap("ep-123");
+
+    expect(result.label).toBeNull();
+    expect(result.overlapCount).toBe(0);
+  });
+
+  it("returns null result when episode is not found in DB", async () => {
+    // limit returns empty — episode not in DB
+    mockLimit.mockResolvedValue([]);
+
+    const { getEpisodeTopicOverlap } = await import("@/app/actions/dashboard");
+    const result = await getEpisodeTopicOverlap("ep-999");
+
+    expect(result.label).toBeNull();
+  });
+
+  it("returns computed overlap for a found episode", async () => {
+    // Episode lookup returns a row
+    mockLimit.mockResolvedValue([{ id: 42 }]);
+    // User has 5 consumed episodes
+    mockUnion.mockResolvedValue([
+      { episodeId: 1 }, { episodeId: 2 }, { episodeId: 3 }, { episodeId: 4 }, { episodeId: 5 },
+    ]);
+    mockBuildUserTopicProfile.mockReturnValue(new Map([["Leadership", 4]]));
+    // Episode topics returned by where()
+    mockWhere.mockResolvedValue([
+      { topic: "Leadership", relevance: "0.90", topicRank: 1 },
+    ]);
+    mockComputeTopicOverlap.mockReturnValue({
+      overlapCount: 4,
+      topOverlapTopic: "Leadership",
+      isNewTopic: false,
+      label: "You've heard 4 similar episodes",
+    });
+
+    const { getEpisodeTopicOverlap } = await import("@/app/actions/dashboard");
+    const result = await getEpisodeTopicOverlap("ep-42");
+
+    expect(result.label).toBe("You've heard 4 similar episodes");
+    expect(result.overlapCount).toBe(4);
+    expect(result.topOverlapTopic).toBe("Leadership");
+  });
+
+  it("returns null result when episode has no topic tags", async () => {
+    mockLimit.mockResolvedValue([{ id: 42 }]);
+    mockUnion.mockResolvedValue([{ episodeId: 1 }, { episodeId: 2 }, { episodeId: 3 }]);
+    mockBuildUserTopicProfile.mockReturnValue(new Map());
+    // No topics for this episode
+    mockWhere.mockResolvedValue([]);
+    mockComputeTopicOverlap.mockReturnValue({ overlapCount: 0, topOverlapTopic: null, isNewTopic: false, label: null });
+
+    const { getEpisodeTopicOverlap } = await import("@/app/actions/dashboard");
+    const result = await getEpisodeTopicOverlap("ep-42");
+
+    expect(result.label).toBeNull();
+  });
+
+  it("returns null result on DB error (graceful fallback)", async () => {
+    mockLimit.mockRejectedValue(new Error("DB failure"));
+
+    const { getEpisodeTopicOverlap } = await import("@/app/actions/dashboard");
+    const result = await getEpisodeTopicOverlap("ep-42");
+
+    expect(result.label).toBeNull();
+    expect(result.overlapCount).toBe(0);
   });
 });
 

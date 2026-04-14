@@ -116,6 +116,17 @@ export function EpisodeRecommendations({ episodes }: EpisodeRecommendationsProps
                     )}
                   </span>
                 </div>
+                {episode.overlapLabel && (
+                  <p
+                    className={`mt-1 text-xs font-medium ${
+                      episode.overlapLabel.startsWith("You've heard")
+                        ? "text-amber-600 dark:text-amber-400"
+                        : "text-green-600 dark:text-green-400"
+                    }`}
+                  >
+                    {episode.overlapLabel}
+                  </p>
+                )}
               </div>
             </Link>
           ))}

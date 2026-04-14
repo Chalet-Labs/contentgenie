@@ -82,4 +82,7 @@ export interface RecommendedEpisodeDTO extends EpisodeListDTO {
   podcastImageUrl: string | null;
   bestTopicRank: number | null;
   topRankedTopic: string | null;
+  overlapCount?: number;
+  overlapTopic?: string | null;
+  overlapLabel?: string | null;
 }
