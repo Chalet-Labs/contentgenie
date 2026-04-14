@@ -42,6 +42,7 @@ import { EpisodeTranscriptFetchButton } from "@/components/episodes/episode-tran
 import { CommunityRating } from "@/components/episodes/community-rating";
 import { isEpisodeSaved, revalidatePodcastPage } from "@/app/actions/library";
 import { getEpisodeTopicOverlap } from "@/app/actions/dashboard";
+import type { OverlapLabelKind } from "@/lib/topic-overlap";
 import { useOnlineStatus } from "@/hooks/use-online-status";
 import { OfflineBanner } from "@/components/ui/offline-banner";
 import { cacheEpisode, getCachedEpisode } from "@/lib/offline-cache";
@@ -141,8 +142,7 @@ export default function EpisodePage({ params }: EpisodePageProps) {
   const [transcriptSource, setTranscriptSource] = useState<string | null>(null);
   const [transcriptStatus, setTranscriptStatus] = useState<TranscriptStatus | null>(null);
   const [episodeDbId, setEpisodeDbId] = useState<number | null>(null);
-  const [overlapLabel, setOverlapLabel] = useState<string | null>(null);
-  const [overlapLabelKind, setOverlapLabelKind] = useState<"high-overlap" | "top-pick" | "new-topic" | null>(null);
+  const [overlapResult, setOverlapResult] = useState<{ label: string | null; labelKind: OverlapLabelKind | null }>({ label: null, labelKind: null });
 
   const isAdmin = isLoaded && has?.({ role: ADMIN_ROLE });
 
@@ -324,19 +324,19 @@ export default function EpisodePage({ params }: EpisodePageProps) {
     }
   }, [isOnline, fetchEpisodeData, loadFromCache]);
 
-  // Non-blocking: fetch topic overlap indicator after episode data loads.
-  // Fires only when online and episode data is present.
+  const episodeLoaded = episode !== null;
   useEffect(() => {
-    if (!isOnline || !episode) return;
+    if (!isOnline || !episodeLoaded) return;
+    let ignore = false;
     getEpisodeTopicOverlap(episodeId)
       .then((result) => {
-        setOverlapLabel(result.label);
-        setOverlapLabelKind(result.labelKind);
+        if (!ignore) setOverlapResult({ label: result.label, labelKind: result.labelKind });
       })
       .catch(() => {
         // Non-critical: overlap label is a presentation-only enhancement
       });
-  }, [isOnline, episode, episodeId]);
+    return () => { ignore = true; };
+  }, [isOnline, episodeLoaded, episodeId]);
 
   // Generate summary — triggers a background task and subscribes to realtime updates
   const generateSummary = useCallback(async () => {
@@ -759,8 +759,8 @@ export default function EpisodePage({ params }: EpisodePageProps) {
             (run?.metadata?.step as SummarizationStep | undefined) ?? null
           }
           onGenerateSummary={isOnline ? generateSummary : undefined}
-          overlapLabel={overlapLabel}
-          overlapLabelKind={overlapLabelKind}
+          overlapLabel={overlapResult.label}
+          overlapLabelKind={overlapResult.labelKind}
         />
       </div>
     </div>

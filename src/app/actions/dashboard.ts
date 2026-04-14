@@ -27,6 +27,37 @@ import {
 // Maximum episodes to include per podcast for variety in the dashboard feed
 const MAX_EPISODES_PER_PODCAST = 3;
 
+/** Fetch consumed episode IDs and build the user's topic profile in 2 batch queries. */
+async function fetchUserTopicProfile(userId: string) {
+  const consumedRows = await db
+    .select({ episodeId: listenHistory.episodeId })
+    .from(listenHistory)
+    .where(eq(listenHistory.userId, userId))
+    .union(
+      db
+        .select({ episodeId: userLibrary.episodeId })
+        .from(userLibrary)
+        .where(eq(userLibrary.userId, userId))
+    );
+
+  const totalConsumed = consumedRows.length;
+  const consumedIds = consumedRows.map((r) => r.episodeId);
+
+  let topicCountRows: Array<{ topic: string; count: number }> = [];
+  if (consumedIds.length > 0) {
+    topicCountRows = await db
+      .select({
+        topic: episodeTopics.topic,
+        count: sql<number>`COUNT(DISTINCT ${episodeTopics.episodeId})::integer`,
+      })
+      .from(episodeTopics)
+      .where(inArray(episodeTopics.episodeId, consumedIds))
+      .groupBy(episodeTopics.topic);
+  }
+
+  return { profile: buildUserTopicProfile(topicCountRows), totalConsumed };
+}
+
 // Lightweight check for first-run detection — avoids loading full subscription data
 export async function hasAnySubscriptions(): Promise<boolean> {
   const { userId } = await auth();
@@ -273,38 +304,9 @@ export async function getRecommendedEpisodes(
       };
     });
 
-    // Overlap enrichment — batch query, no N+1. Wrapped in try/catch for graceful degradation.
     let overlapEnriched: RecommendedEpisodeDTO[] = baseEnriched;
     try {
-      // Batch-query all consumed episode IDs for this user
-      const consumedRows = await db
-        .select({ episodeId: listenHistory.episodeId })
-        .from(listenHistory)
-        .where(eq(listenHistory.userId, userId))
-        .union(
-          db
-            .select({ episodeId: userLibrary.episodeId })
-            .from(userLibrary)
-            .where(eq(userLibrary.userId, userId))
-        );
-
-      const totalConsumed = consumedRows.length;
-      const consumedIds = consumedRows.map((r) => r.episodeId);
-
-      // Batch-query topic counts for all consumed episodes
-      let topicCountRows: Array<{ topic: string; count: number }> = [];
-      if (consumedIds.length > 0) {
-        topicCountRows = await db
-          .select({
-            topic: episodeTopics.topic,
-            count: sql<number>`COUNT(DISTINCT ${episodeTopics.episodeId})::integer`,
-          })
-          .from(episodeTopics)
-          .where(inArray(episodeTopics.episodeId, consumedIds))
-          .groupBy(episodeTopics.topic);
-      }
-
-      const userProfile = buildUserTopicProfile(topicCountRows);
+      const { profile: userProfile, totalConsumed } = await fetchUserTopicProfile(userId);
 
       // Batch-query topics for all candidate episodes
       const candidateIds = baseEnriched.map((r) => r.id);
@@ -367,48 +369,20 @@ export async function getEpisodeTopicOverlap(
   if (!userId) return EMPTY_OVERLAP_RESULT;
 
   try {
-    // Look up the DB episode by podcastIndexId to get its internal ID
-    const episodeRow = await db
-      .select({
-        id: episodes.id,
-      })
-      .from(episodes)
-      .where(eq(episodes.podcastIndexId, podcastIndexEpisodeId))
-      .limit(1);
+    // Parallelize: episode lookup and user profile construction are independent
+    const [episodeRow, profileResult] = await Promise.all([
+      db
+        .select({ id: episodes.id })
+        .from(episodes)
+        .where(eq(episodes.podcastIndexId, podcastIndexEpisodeId))
+        .limit(1),
+      fetchUserTopicProfile(userId),
+    ]);
 
     if (episodeRow.length === 0) return EMPTY_OVERLAP_RESULT;
     const episodeDbId = episodeRow[0].id;
+    const { profile: userProfile, totalConsumed } = profileResult;
 
-    // Batch-query consumed episode IDs for profile construction
-    const consumedRows = await db
-      .select({ episodeId: listenHistory.episodeId })
-      .from(listenHistory)
-      .where(eq(listenHistory.userId, userId))
-      .union(
-        db
-          .select({ episodeId: userLibrary.episodeId })
-          .from(userLibrary)
-          .where(eq(userLibrary.userId, userId))
-      );
-
-    const totalConsumed = consumedRows.length;
-    const consumedIds = consumedRows.map((r) => r.episodeId);
-
-    let topicCountRows: Array<{ topic: string; count: number }> = [];
-    if (consumedIds.length > 0) {
-      topicCountRows = await db
-        .select({
-          topic: episodeTopics.topic,
-          count: sql<number>`COUNT(DISTINCT ${episodeTopics.episodeId})::integer`,
-        })
-        .from(episodeTopics)
-        .where(inArray(episodeTopics.episodeId, consumedIds))
-        .groupBy(episodeTopics.topic);
-    }
-
-    const userProfile = buildUserTopicProfile(topicCountRows);
-
-    // Fetch topics and best rank for this episode
     const epTopicRows = await db
       .select({
         topic: episodeTopics.topic,

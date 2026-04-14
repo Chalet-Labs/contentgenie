@@ -18,6 +18,7 @@ import {
 import { getScoreColor, getScoreLabel } from "@/lib/score-utils";
 import { WORTH_IT_SIGNAL_KEYS, SIGNAL_LABELS, type WorthItDimensionsData } from "@/lib/openrouter";
 import type { SummarizationStep } from "@/trigger/types";
+import type { OverlapLabelKind } from "@/lib/topic-overlap";
 
 export type { SummarizationStep } from "@/trigger/types";
 
@@ -32,7 +33,7 @@ interface SummaryDisplayProps {
   currentStep?: SummarizationStep | null;
   onGenerateSummary?: () => void;
   overlapLabel?: string | null;
-  overlapLabelKind?: "high-overlap" | "top-pick" | "new-topic" | null;
+  overlapLabelKind?: OverlapLabelKind | null;
 }
 
 const STEP_LABELS: Record<SummarizationStep, string> = {
