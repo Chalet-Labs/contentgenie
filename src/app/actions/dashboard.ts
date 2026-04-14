@@ -319,7 +319,8 @@ export async function getRecommendedEpisodes(
             relevance: episodeTopics.relevance,
           })
           .from(episodeTopics)
-          .where(inArray(episodeTopics.episodeId, candidateIds));
+          .where(inArray(episodeTopics.episodeId, candidateIds))
+          .orderBy(desc(episodeTopics.relevance));
       }
 
       // Group candidate topics by episode
@@ -390,7 +391,8 @@ export async function getEpisodeTopicOverlap(
         topicRank: episodeTopics.topicRank,
       })
       .from(episodeTopics)
-      .where(eq(episodeTopics.episodeId, episodeDbId));
+      .where(eq(episodeTopics.episodeId, episodeDbId))
+      .orderBy(desc(episodeTopics.relevance));
 
     const epTopics = epTopicRows.map((r) => ({ topic: r.topic, relevance: r.relevance }));
     const bestRank = epTopicRows.reduce<number | null>((best, r) => {

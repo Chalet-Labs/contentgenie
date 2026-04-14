@@ -40,10 +40,11 @@ vi.mock("@/db", () => ({
         const thenable = Promise.resolve(result).then((v) => v);
         return Object.assign(thenable, {
           orderBy: (...oArgs: unknown[]) => {
-            mockOrderBy(...oArgs);
-            return {
+            const orderResult = mockOrderBy(...oArgs);
+            const orderThenable = Promise.resolve(orderResult).then((v) => v);
+            return Object.assign(orderThenable, {
               limit: (...lArgs: unknown[]) => mockLimit(...lArgs),
-            };
+            });
           },
           groupBy: (...gArgs: unknown[]) => {
             return mockGroupBy(...gArgs);
@@ -327,6 +328,7 @@ describe("getRecommendedEpisodes", () => {
     // Overlap defaults: no consumed episodes, no-op profile and overlap
     mockUnion.mockResolvedValue([]);
     mockWhere.mockResolvedValue([]);
+    mockOrderBy.mockReturnValue([]);
     mockBuildUserTopicProfile.mockReturnValue(new Map());
     mockComputeTopicOverlap.mockReturnValue({ overlapCount: 0, topOverlapTopic: null, isNewTopic: false, label: null, labelKind: null });
   });
@@ -407,7 +409,7 @@ describe("getRecommendedEpisodes", () => {
     expect(result.episodes[1].podcastImageUrl).toBeNull();
 
     // orderBy() and limit() only on the main query
-    expect(mockOrderBy).toHaveBeenCalledTimes(1);
+    expect(mockOrderBy).toHaveBeenCalledTimes(2);
     expect(mockLimit).toHaveBeenCalledWith(6);
   });
 
@@ -660,6 +662,7 @@ describe("getEpisodeTopicOverlap", () => {
     mockUnion.mockResolvedValue([]);
     mockGroupBy.mockResolvedValue([]);
     mockLimit.mockResolvedValue([]);
+    mockOrderBy.mockReturnValue([]);
     mockBuildUserTopicProfile.mockReturnValue(new Map());
     mockComputeTopicOverlap.mockReturnValue({ overlapCount: 0, topOverlapTopic: null, isNewTopic: false, label: null, labelKind: null });
   });
@@ -699,8 +702,8 @@ describe("getEpisodeTopicOverlap", () => {
       { episodeId: 1 }, { episodeId: 2 }, { episodeId: 3 }, { episodeId: 4 }, { episodeId: 5 },
     ]);
     mockBuildUserTopicProfile.mockReturnValue(new Map([["Leadership", 4]]));
-    // Episode topics returned by where()
-    mockWhere.mockResolvedValue([
+    // Episode topics returned by where().orderBy()
+    mockOrderBy.mockReturnValue([
       { topic: "Leadership", relevance: "0.90", topicRank: 1 },
     ]);
     mockComputeTopicOverlap.mockReturnValue({

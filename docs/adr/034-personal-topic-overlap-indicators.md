@@ -45,6 +45,7 @@ interface TopicOverlapResult {
   topOverlapTopic: string | null;  // the topic with highest overlap
   isNewTopic: boolean;         // true if ALL episode topics are new to the user
   label: string | null;        // pre-computed display label, null if no indicator
+  labelKind: "high-overlap" | "top-pick" | "new-topic" | null; // discriminator for UI styling
 }
 ```
 
@@ -71,6 +72,7 @@ This is a stable partition, not a re-sort. Episodes with heavy topic overlap flo
 overlapCount?: number;
 overlapTopic?: string | null;
 overlapLabel?: string | null;
+overlapLabelKind?: "high-overlap" | "top-pick" | "new-topic" | null;
 ```
 
 These are optional so existing consumers (tests, other call sites) don't break. The `RecentEpisode` type from the PodcastIndex feed does not get overlap — those episodes come from an external API and may not have topic tags in our DB. The issue focuses on recommendations and the episode detail page.
