@@ -1,5 +1,7 @@
 /** Shared column selections and DTO types for library/episode/podcast queries. */
 
+import { type OverlapLabelKind } from "@/lib/topic-overlap";
+
 // -- Column selection constants (Drizzle `columns` allowlist) --
 
 export const LIBRARY_ENTRY_COLUMNS = {
@@ -82,4 +84,8 @@ export interface RecommendedEpisodeDTO extends EpisodeListDTO {
   podcastImageUrl: string | null;
   bestTopicRank: number | null;
   topRankedTopic: string | null;
+  overlapCount?: number;
+  overlapTopic?: string | null;
+  overlapLabel?: string | null;
+  overlapLabelKind?: OverlapLabelKind | null;
 }

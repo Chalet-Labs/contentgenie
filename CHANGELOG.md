@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- Personal topic overlap indicators — shows contextual labels (e.g. "You've heard 3 similar episodes", "New topic for you") based on listen history and saved episodes. Recommendations deprioritize heavily-consumed topics (#262)
 - `rank-episode-topics` daily Trigger.dev scheduled task (7 AM UTC) that ranks episodes within each topic via exhaustive pairwise LLM comparison; win-count aggregation with worthItScore tiebreaker; adaptive episode cap (10/topic for ≤20 topics, 5/topic for >20); up to 50 topics per run (#261)
 - `topicRank` (integer, nullable) and `rankedAt` (timestamp, nullable) columns on `episode_topics` — rank 1 = best coverage of that topic (#261)
 - `bestTopicRank` and `topRankedTopic` fields on `RecommendedEpisodeDTO` and `getRecommendedEpisodes()` response (#261)

@@ -41,6 +41,8 @@ import { WorthItBadge } from "@/components/episodes/worth-it-badge";
 import { EpisodeTranscriptFetchButton } from "@/components/episodes/episode-transcript-fetch-button";
 import { CommunityRating } from "@/components/episodes/community-rating";
 import { isEpisodeSaved, revalidatePodcastPage } from "@/app/actions/library";
+import { getEpisodeTopicOverlap } from "@/app/actions/dashboard";
+import type { OverlapLabelKind } from "@/lib/topic-overlap";
 import { useOnlineStatus } from "@/hooks/use-online-status";
 import { OfflineBanner } from "@/components/ui/offline-banner";
 import { cacheEpisode, getCachedEpisode } from "@/lib/offline-cache";
@@ -140,6 +142,7 @@ export default function EpisodePage({ params }: EpisodePageProps) {
   const [transcriptSource, setTranscriptSource] = useState<string | null>(null);
   const [transcriptStatus, setTranscriptStatus] = useState<TranscriptStatus | null>(null);
   const [episodeDbId, setEpisodeDbId] = useState<number | null>(null);
+  const [overlapResult, setOverlapResult] = useState<{ label: string | null; labelKind: OverlapLabelKind | null }>({ label: null, labelKind: null });
 
   const isAdmin = isLoaded && has?.({ role: ADMIN_ROLE });
 
@@ -320,6 +323,20 @@ export default function EpisodePage({ params }: EpisodePageProps) {
       loadFromCache();
     }
   }, [isOnline, fetchEpisodeData, loadFromCache]);
+
+  const episodeLoaded = episode !== null;
+  useEffect(() => {
+    if (!isOnline || !episodeLoaded) return;
+    let ignore = false;
+    getEpisodeTopicOverlap(episodeId)
+      .then((result) => {
+        if (!ignore) setOverlapResult({ label: result.label, labelKind: result.labelKind });
+      })
+      .catch(() => {
+        // Non-critical: overlap label is a presentation-only enhancement
+      });
+    return () => { ignore = true; };
+  }, [isOnline, episodeLoaded, episodeId]);
 
   // Generate summary — triggers a background task and subscribes to realtime updates
   const generateSummary = useCallback(async () => {
@@ -742,6 +759,8 @@ export default function EpisodePage({ params }: EpisodePageProps) {
             (run?.metadata?.step as SummarizationStep | undefined) ?? null
           }
           onGenerateSummary={isOnline ? generateSummary : undefined}
+          overlapLabel={overlapResult.label}
+          overlapLabelKind={overlapResult.labelKind}
         />
       </div>
     </div>
