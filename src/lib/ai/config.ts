@@ -9,7 +9,13 @@ export const DEFAULT_AI_CONFIG: AiConfig = {
   summarizationPrompt: null,
 };
 
-export async function getActiveAiConfig(): Promise<AiConfig> {
+interface GetActiveAiConfigOptions {
+  throwOnDbError?: boolean;
+}
+
+export async function getActiveAiConfig(
+  options?: GetActiveAiConfigOptions,
+): Promise<AiConfig> {
   try {
     const row = await db.query.aiConfig.findFirst({
       where: eq(aiConfig.id, 1),
@@ -25,7 +31,18 @@ export async function getActiveAiConfig(): Promise<AiConfig> {
       summarizationPrompt: row.summarizationPrompt ?? null,
     };
   } catch (error) {
-    console.error("Failed to read AI config from database, using default:", error);
+    if (options?.throwOnDbError) {
+      throw error;
+    }
+
+    console.warn(
+      JSON.stringify({
+        level: "warn",
+        event: "ai_config_db_error",
+        message: "Failed to read AI config from database, using default",
+        error: error instanceof Error ? error.message : String(error),
+      }),
+    );
     return DEFAULT_AI_CONFIG;
   }
 }
