@@ -519,6 +519,7 @@ export interface TrendingTopic {
   description: string;
   episodeCount: number;
   episodeIds: number[];
+  slug: string;
 }
 
 export type TrendingTopicsRow = typeof trendingTopics.$inferSelect;

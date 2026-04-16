@@ -8,6 +8,7 @@ import {
   getTrendingTopicsPrompt,
 } from "@/lib/prompts";
 import { parseJsonResponse } from "@/lib/openrouter";
+import { slugify } from "@/lib/utils";
 
 const LOOKBACK_DAYS = 7;
 const MAX_EPISODES = 500;
@@ -156,11 +157,22 @@ export const generateTrendingTopics = schedules.task({
           description: topic.description,
           episodeIds: filteredIds,
           episodeCount: filteredIds.length,
+          slug: slugify(topic.name),
         };
       })
       .filter((topic) => topic.episodeCount > 0)
+      .filter((topic) => topic.slug !== "")
       .sort((a, b) => b.episodeCount - a.episodeCount)
       .slice(0, MAX_TOPICS);
+
+    // Disambiguate duplicate slugs in sort order
+    const seenSlugs = new Map<string, number>();
+    for (const topic of validatedTopics) {
+      const base = topic.slug;
+      const count = seenSlugs.get(base) ?? 0;
+      if (count > 0) topic.slug = `${base}-${count + 1}`;
+      seenSlugs.set(base, count + 1);
+    }
 
     if (validatedTopics.length === 0 && topics.length > 0) {
       logger.warn("All LLM topics referenced invalid episode IDs, storing empty snapshot", {

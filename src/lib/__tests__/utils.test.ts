@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { cn, stripHtml, formatDate, formatDuration } from "@/lib/utils";
+import { cn, stripHtml, formatDate, formatDuration, slugify } from "@/lib/utils";
 
 describe("cn", () => {
   it("merges class names", () => {
@@ -100,5 +100,70 @@ describe("formatDate", () => {
   it("handles null/undefined", () => {
     expect(formatDate(null)).toBe("");
     expect(formatDate(undefined)).toBe("");
+  });
+});
+
+describe("slugify", () => {
+  it("handles basic alphanumeric with special chars", () => {
+    expect(slugify("AI Models & Capabilities")).toBe("ai-models-capabilities");
+  });
+
+  it("handles slashes and em-dashes", () => {
+    expect(slugify("Crypto/Blockchain — On-chain")).toBe("crypto-blockchain-on-chain");
+  });
+
+  it("returns empty string for empty input", () => {
+    expect(slugify("")).toBe("");
+  });
+
+  it("returns empty string for whitespace-only input", () => {
+    expect(slugify("   ")).toBe("");
+  });
+
+  it("returns empty string for all-punctuation input", () => {
+    expect(slugify("!!!")).toBe("");
+  });
+
+  it("strips diacritics via NFKD normalization", () => {
+    expect(slugify("Café Français")).toBe("cafe-francais");
+  });
+
+  it("strips diacritics on mixed accent chars", () => {
+    expect(slugify("Naïve résumé")).toBe("naive-resume");
+  });
+
+  it("trims and collapses whitespace", () => {
+    expect(slugify("  Hello  World  ")).toBe("hello-world");
+  });
+
+  it("collapses runs of non-alnum to single hyphen", () => {
+    expect(slugify("a--b---c")).toBe("a-b-c");
+  });
+
+  it("is idempotent on already-slugged input", () => {
+    expect(slugify("already-slugged")).toBe("already-slugged");
+  });
+
+  it("handles underscores and mixed case with digits", () => {
+    expect(slugify("UPPER_case_123")).toBe("upper-case-123");
+  });
+
+  it("is idempotent for all non-empty samples", () => {
+    const samples = [
+      "AI Models & Capabilities",
+      "Crypto/Blockchain — On-chain",
+      "Café Français",
+      "Naïve résumé",
+      "  Hello  World  ",
+      "a--b---c",
+      "already-slugged",
+      "UPPER_case_123",
+    ];
+    for (const s of samples) {
+      const once = slugify(s);
+      if (once !== "") {
+        expect(slugify(once)).toBe(once);
+      }
+    }
   });
 });

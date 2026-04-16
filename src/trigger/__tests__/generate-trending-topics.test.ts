@@ -184,7 +184,16 @@ describe("generate-trending-topics task", () => {
     ]);
     expect(mockValues).toHaveBeenCalledWith(
       expect.objectContaining({
-        topics: mockTopics,
+        topics: [
+          expect.objectContaining({
+            name: "AI & Machine Learning",
+            slug: "ai-machine-learning",
+          }),
+          expect.objectContaining({
+            name: "Leadership",
+            slug: "leadership",
+          }),
+        ],
         episodeCount: 3,
       })
     );
@@ -242,6 +251,7 @@ describe("generate-trending-topics task", () => {
             name: "Valid Topic",
             episodeIds: [1, 2],
             episodeCount: 2,
+            slug: "valid-topic",
           }),
         ],
       })
@@ -336,9 +346,143 @@ describe("generate-trending-topics task", () => {
             name: "Mixed Topic",
             episodeIds: [1, 2],
             episodeCount: 2,
+            slug: "mixed-topic",
           }),
         ],
       })
     );
+  });
+
+  it("every persisted topic has a non-empty slug in clamped results", async () => {
+    const episodeRows = Array.from({ length: 20 }, (_, i) => ({
+      id: i + 1,
+      title: `Episode ${i + 1}`,
+      keyTakeaways: [`Takeaway ${i + 1}`],
+    }));
+    mockDbSelect(episodeRows);
+
+    const mockTopics = Array.from({ length: 12 }, (_, i) => ({
+      name: `Topic ${i + 1}`,
+      description: `Description ${i + 1}`,
+      episodeCount: i + 1,
+      episodeIds: Array.from({ length: i + 1 }, (_, j) => j + 1),
+    }));
+
+    mockGenerateCompletion.mockResolvedValue("mock completion");
+    mockParseJsonResponse.mockReturnValue({ topics: mockTopics });
+
+    await taskConfig.run();
+
+    const storedTopics = mockValues.mock.calls[0][0].topics;
+    for (const topic of storedTopics) {
+      expect(typeof topic.slug).toBe("string");
+      expect(topic.slug.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("disambiguates duplicate slugs deterministically in sort order", async () => {
+    mockDbSelect([
+      { id: 1, title: "Ep 1", keyTakeaways: ["Takeaway 1"] },
+      { id: 2, title: "Ep 2", keyTakeaways: ["Takeaway 2"] },
+    ]);
+
+    const mockTopics = [
+      {
+        name: "AI Models",
+        description: "First AI Models topic",
+        episodeCount: 2,
+        episodeIds: [1, 2],
+      },
+      {
+        name: "AI Models",
+        description: "Second AI Models topic",
+        episodeCount: 1,
+        episodeIds: [2],
+      },
+    ];
+
+    mockGenerateCompletion.mockResolvedValue("mock completion");
+    mockParseJsonResponse.mockReturnValue({ topics: mockTopics });
+
+    await taskConfig.run();
+
+    const storedTopics = mockValues.mock.calls[0][0].topics;
+    expect(storedTopics).toHaveLength(2);
+    expect(storedTopics[0].slug).toBe("ai-models");
+    expect(storedTopics[1].slug).toBe("ai-models-2");
+  });
+
+  it("drops topics whose name slugifies to empty", async () => {
+    mockDbSelect([
+      { id: 1, title: "Ep 1", keyTakeaways: ["Takeaway 1"] },
+      { id: 2, title: "Ep 2", keyTakeaways: ["Takeaway 2"] },
+      { id: 3, title: "Ep 3", keyTakeaways: ["Takeaway 3"] },
+    ]);
+
+    const mockTopics = [
+      {
+        name: "!!!",
+        description: "All punctuation name",
+        episodeCount: 1,
+        episodeIds: [1],
+      },
+      {
+        name: "Valid",
+        description: "A valid topic",
+        episodeCount: 2,
+        episodeIds: [2, 3],
+      },
+    ];
+
+    mockGenerateCompletion.mockResolvedValue("mock completion");
+    mockParseJsonResponse.mockReturnValue({ topics: mockTopics });
+
+    const result = await taskConfig.run();
+
+    expect(result).toEqual({ episodeCount: 3, topicCount: 1 });
+    const storedTopics = mockValues.mock.calls[0][0].topics;
+    expect(storedTopics).toHaveLength(1);
+    expect(storedTopics[0].slug).toBe("valid");
+  });
+
+  it("applies dedupe AFTER sort+slice, not before", async () => {
+    const episodeRows = Array.from({ length: 10 }, (_, i) => ({
+      id: i + 1,
+      title: `Episode ${i + 1}`,
+      keyTakeaways: [`Takeaway ${i + 1}`],
+    }));
+    mockDbSelect(episodeRows);
+
+    // Two topics that share the same slug but differ in episodeCount
+    // Lower-ranked (lower episodeCount) gets -2 only if it survives slice
+    // We create 9 distinct topics + 2 that collide, total 11 > MAX_TOPICS(8)
+    const mockTopics = [
+      { name: "A Topic", description: "D", episodeCount: 10, episodeIds: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] },
+      { name: "B Topic", description: "D", episodeCount: 9, episodeIds: [1, 2, 3, 4, 5, 6, 7, 8, 9] },
+      { name: "C Topic", description: "D", episodeCount: 8, episodeIds: [1, 2, 3, 4, 5, 6, 7, 8] },
+      { name: "D Topic", description: "D", episodeCount: 7, episodeIds: [1, 2, 3, 4, 5, 6, 7] },
+      { name: "E Topic", description: "D", episodeCount: 6, episodeIds: [1, 2, 3, 4, 5, 6] },
+      { name: "F Topic", description: "D", episodeCount: 5, episodeIds: [1, 2, 3, 4, 5] },
+      // These two share the slug "g-topic" after slugify; higher-count ranks first
+      { name: "G Topic", description: "D", episodeCount: 4, episodeIds: [1, 2, 3, 4] },
+      { name: "G-Topic", description: "D", episodeCount: 3, episodeIds: [1, 2, 3] },
+      // This one won't make the cut (rank 9, beyond MAX_TOPICS=8)
+      { name: "H Topic", description: "D", episodeCount: 2, episodeIds: [1, 2] },
+    ];
+
+    mockGenerateCompletion.mockResolvedValue("mock completion");
+    mockParseJsonResponse.mockReturnValue({ topics: mockTopics });
+
+    await taskConfig.run();
+
+    const storedTopics = mockValues.mock.calls[0][0].topics;
+    expect(storedTopics).toHaveLength(8);
+    // Find the two colliding topics
+    const gTopics = storedTopics.filter((t: { slug: string }) => t.slug.startsWith("g-topic"));
+    expect(gTopics).toHaveLength(2);
+    // Higher-count gets bare slug; lower-count gets -2
+    const sorted = [...gTopics].sort((a: { episodeCount: number }, b: { episodeCount: number }) => b.episodeCount - a.episodeCount);
+    expect(sorted[0].slug).toBe("g-topic");
+    expect(sorted[1].slug).toBe("g-topic-2");
   });
 });
