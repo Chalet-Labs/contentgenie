@@ -64,6 +64,20 @@ describe("parseJsonResponse", () => {
     expect(err.message).toMatch(/Unexpected|Expected|Token|JSON/i);
   });
 
+  it("truncates raw response snippet to 200 chars in error", () => {
+    const rawResponse = "x".repeat(300);
+    let thrownError: unknown;
+    try {
+      parseJsonResponse(rawResponse);
+    } catch (e) {
+      thrownError = e;
+    }
+    expect(thrownError).toBeInstanceOf(Error);
+    const err = thrownError as Error;
+    expect(err.message).toContain("x".repeat(200));
+    expect(err.message).not.toContain("x".repeat(201));
+  });
+
   it("throws on empty string", () => {
     expect(() => parseJsonResponse("")).toThrow();
   });
