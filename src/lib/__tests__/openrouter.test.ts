@@ -47,6 +47,23 @@ describe("parseJsonResponse", () => {
     expect(() => parseJsonResponse("not json")).toThrow();
   });
 
+  it("includes raw response snippet and parse reason in error when JSON.parse fails", () => {
+    const rawResponse = "This is not valid JSON at all, the LLM hallucinated something completely wrong here";
+    let thrownError: unknown;
+    try {
+      parseJsonResponse(rawResponse);
+    } catch (e) {
+      thrownError = e;
+    }
+    expect(thrownError).toBeDefined();
+    expect(thrownError).toBeInstanceOf(Error);
+    const err = thrownError as Error;
+    // Must include the first 200 chars of the raw response for debugging
+    expect(err.message).toContain(rawResponse.slice(0, 200));
+    // Must include the original SyntaxError parse reason (not just a bare re-throw)
+    expect(err.message).toMatch(/Unexpected|Expected|Token|JSON/i);
+  });
+
   it("throws on empty string", () => {
     expect(() => parseJsonResponse("")).toThrow();
   });
