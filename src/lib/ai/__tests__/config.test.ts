@@ -44,6 +44,7 @@ describe("getActiveAiConfig", () => {
   });
 
   it("returns DEFAULT_AI_CONFIG on DB error", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
     vi.mocked(db.query.aiConfig.findFirst).mockRejectedValue(
       new Error("Connection refused")
     );
@@ -52,23 +53,29 @@ describe("getActiveAiConfig", () => {
     expect(config).toEqual(DEFAULT_AI_CONFIG);
   });
 
-  // Regression tests for issue #269: DB errors should be distinguishable from
-  // "no custom config" and must not be silently swallowed via console.error.
+  // Regression tests for issue #269: DB errors must not be silently swallowed
+  // and must produce structured log output distinguishable from "no custom config".
 
-  it("does not use console.error on DB failure — uses structured logging", async () => {
-    const consoleSpy = vi.spyOn(console, "error");
+  it("emits structured console.error with context on DB failure", async () => {
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     vi.mocked(db.query.aiConfig.findFirst).mockRejectedValue(
       new Error("Connection refused")
     );
 
     await getActiveAiConfig();
 
-    // console.error is a sign of unstructured, unsearchable error swallowing.
-    // Structured logging (e.g., a logger.error call) must be used instead.
-    expect(consoleSpy).not.toHaveBeenCalled();
+    expect(errorSpy).toHaveBeenCalledOnce();
+    expect(errorSpy.mock.calls[0][0]).toBe(
+      "[ai-config] Failed to read AI config from database, using default"
+    );
+    expect(errorSpy.mock.calls[0][1]).toMatchObject({
+      event: "ai_config_db_error",
+      error: "Connection refused",
+    });
   });
 
   it("throws on DB error when throwOnDbError option is set", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => {});
     const dbError = new Error("Connection refused");
     vi.mocked(db.query.aiConfig.findFirst).mockRejectedValue(dbError);
 
