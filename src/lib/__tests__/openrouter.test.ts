@@ -47,6 +47,20 @@ describe("parseJsonResponse", () => {
     expect(() => parseJsonResponse("not json")).toThrow();
   });
 
+  it("includes raw response snippet and parse reason in error when JSON.parse fails", () => {
+    const rawResponse = "This is not valid JSON at all, the LLM hallucinated something completely wrong here";
+    expect(() => parseJsonResponse(rawResponse)).toThrow(rawResponse);
+  });
+
+  it("truncates raw response snippet to 200 chars in error", () => {
+    const rawResponse = "x".repeat(300);
+    expect(() => parseJsonResponse(rawResponse)).toThrow("x".repeat(200));
+    // Negative assertion requires catching — verify actual truncation
+    try { parseJsonResponse(rawResponse); } catch (e) {
+      expect((e as Error).message).not.toContain("x".repeat(201));
+    }
+  });
+
   it("throws on empty string", () => {
     expect(() => parseJsonResponse("")).toThrow();
   });
