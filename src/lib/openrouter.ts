@@ -73,5 +73,13 @@ export function parseJsonResponse<T>(content: string): T {
 
   cleanedContent = cleanedContent.trim();
 
-  return JSON.parse(cleanedContent) as T;
+  try {
+    return JSON.parse(cleanedContent) as T;
+  } catch (error) {
+    const snippet = cleanedContent.slice(0, 200);
+    const reason = error instanceof Error ? error.message : String(error);
+    throw new Error(
+      `Failed to parse LLM response as JSON: ${reason}\nRaw response (first 200 chars): ${snippet}`
+    );
+  }
 }
