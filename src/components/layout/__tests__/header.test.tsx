@@ -42,25 +42,12 @@ vi.mock("@/components/ui/sheet", () => {
   const SheetStateContext = createContext<{
     open: boolean
     setOpen: (v: boolean) => void
-  }>({ open: true, setOpen: () => {} })
+  }>({ open: false, setOpen: () => {} })
 
-  const Sheet = ({
-    children,
-    open: controlledOpen,
-    onOpenChange,
-  }: {
-    children: React.ReactNode
-    open?: boolean
-    onOpenChange?: (open: boolean) => void
-  }) => {
-    const [internalOpen, setInternalOpen] = useState(false)
-    const isOpen = controlledOpen !== undefined ? controlledOpen : internalOpen
-    const setOpen = (v: boolean) => {
-      setInternalOpen(v)
-      onOpenChange?.(v)
-    }
+  const Sheet = ({ children }: { children: React.ReactNode }) => {
+    const [open, setOpen] = useState(false)
     return (
-      <SheetStateContext.Provider value={{ open: isOpen, setOpen }}>
+      <SheetStateContext.Provider value={{ open, setOpen }}>
         {children}
       </SheetStateContext.Provider>
     )
