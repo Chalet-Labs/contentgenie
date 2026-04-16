@@ -43,13 +43,40 @@ describe("getActiveAiConfig", () => {
     expect(config).toEqual(DEFAULT_AI_CONFIG);
   });
 
-  it("returns DEFAULT_AI_CONFIG on DB error", async () => {
-    vi.mocked(db.query.aiConfig.findFirst).mockRejectedValue(
-      new Error("Connection refused")
-    );
+  // Regression: #269
+  describe("DB error handling", () => {
+    let errorSpy: ReturnType<typeof vi.spyOn>;
 
-    const config = await getActiveAiConfig();
-    expect(config).toEqual(DEFAULT_AI_CONFIG);
+    beforeEach(() => {
+      errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+      vi.mocked(db.query.aiConfig.findFirst).mockRejectedValue(
+        new Error("Connection refused")
+      );
+    });
+
+    it("returns DEFAULT_AI_CONFIG on DB error", async () => {
+      const config = await getActiveAiConfig();
+      expect(config).toEqual(DEFAULT_AI_CONFIG);
+    });
+
+    it("emits structured console.error with context on DB failure", async () => {
+      await getActiveAiConfig();
+
+      expect(errorSpy).toHaveBeenCalledOnce();
+      expect(errorSpy.mock.calls[0][0]).toBe(
+        "[ai-config] Failed to read AI config from database, using default"
+      );
+      expect(errorSpy.mock.calls[0][1]).toMatchObject({
+        event: "ai_config_db_error",
+        error: "Connection refused",
+      });
+    });
+
+    it("throws on DB error when throwOnDbError option is set", async () => {
+      await expect(getActiveAiConfig({ throwOnDbError: true })).rejects.toThrow(
+        "Connection refused"
+      );
+    });
   });
 
   it("DEFAULT_AI_CONFIG has expected values", () => {
