@@ -30,6 +30,7 @@ export async function getActiveAiConfig(
       event: "ai_config_db_error",
       error: error instanceof Error ? error.message : String(error),
       stack: error instanceof Error ? error.stack : undefined,
+      fallbackConfig: DEFAULT_AI_CONFIG,
     });
     return DEFAULT_AI_CONFIG;
   }
