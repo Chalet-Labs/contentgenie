@@ -12,5 +12,5 @@ export function isTrendingSnapshotStale(generatedAt: Date | null | undefined): b
 // Pre-#279 JSON rows lack a slug key at runtime even though the TS type claims
 // it is required; derive it from the name for backward compatibility.
 export function getTopicSlug(topic: TrendingTopic): string {
-  return topic.slug ?? slugify(topic.name);
+  return topic.slug || slugify(topic.name);
 }
