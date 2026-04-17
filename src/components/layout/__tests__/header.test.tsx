@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
-import { render, screen, fireEvent } from "@testing-library/react"
+import { render, screen, fireEvent, within } from "@testing-library/react"
 import { Header } from "@/components/layout/header"
 import React from "react"
 
@@ -74,13 +74,24 @@ vi.mock("@/components/ui/sheet", () => {
 
   const SheetClose = ({
     children,
+    asChild,
   }: {
     children: React.ReactNode
     asChild?: boolean
   }) => {
     const { setOpen } = useContext(SheetStateContext)
+    const close = () => setOpen(false)
+    if (asChild && React.isValidElement(children)) {
+      const child = children as React.ReactElement<{ onClick?: (e: unknown) => void }>
+      return React.cloneElement(child, {
+        onClick: (e: unknown) => {
+          child.props.onClick?.(e)
+          close()
+        },
+      })
+    }
     return (
-      <div data-testid="sheet-close" onClick={() => setOpen(false)}>
+      <div data-testid="sheet-close" onClick={close}>
         {children}
       </div>
     )
@@ -128,8 +139,7 @@ describe("Header mobile menu — sheet closes on nav tap (regression #276)", () 
     const sheetContent = screen.getByTestId("sheet-content")
     expect(sheetContent).toBeInTheDocument()
 
-    // Click a nav link inside the sheet (scope to avoid matching the desktop nav)
-    const dashboardLink = sheetContent.querySelector("a[href='/dashboard']")!
+    const dashboardLink = within(sheetContent).getByRole("link", { name: /dashboard/i })
     fireEvent.click(dashboardLink)
 
     // The sheet must close — sheet-content should no longer be in the DOM
