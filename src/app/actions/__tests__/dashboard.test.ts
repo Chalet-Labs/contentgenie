@@ -1015,7 +1015,21 @@ describe("getTrendingTopicBySlug", () => {
     const { getTrendingTopicBySlug } = await import("@/app/actions/dashboard");
 
     await expect(getTrendingTopicBySlug("artificial-intelligence")).rejects.toThrow(/NEXT_REDIRECT/);
-    expect(mockRedirect).toHaveBeenCalledWith("/sign-in?redirect_url=/trending/artificial-intelligence");
+    expect(mockRedirect).toHaveBeenCalledWith(
+      `/sign-in?redirect_url=${encodeURIComponent("/trending/artificial-intelligence")}`,
+    );
+  });
+
+  it("encodes the slug in the sign-in redirect URL to prevent query-param injection", async () => {
+    mockAuth.mockResolvedValue({ userId: null });
+
+    const { getTrendingTopicBySlug } = await import("@/app/actions/dashboard");
+
+    // A slug with reserved URL chars: `&` would break the /sign-in querystring without encoding.
+    await expect(getTrendingTopicBySlug("foo&evil=injected")).rejects.toThrow(/NEXT_REDIRECT/);
+    const redirectedTo = mockRedirect.mock.calls[0][0] as string;
+    expect(redirectedTo).not.toContain("&evil=injected");
+    expect(redirectedTo).toBe(`/sign-in?redirect_url=${encodeURIComponent("/trending/foo&evil=injected")}`);
   });
 
   it("returns { kind: 'no-snapshot' } when no snapshot exists", async () => {

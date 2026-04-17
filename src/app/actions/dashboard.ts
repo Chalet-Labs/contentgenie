@@ -490,7 +490,9 @@ export type TrendingTopicDetailResult =
 export async function getTrendingTopicBySlug(slug: string): Promise<TrendingTopicDetailResult> {
   const { userId } = await auth();
   if (!userId) {
-    redirect(`/sign-in?redirect_url=/trending/${slug}`);
+    // Encode the slug so a value like `foo&evil=injected` can't smuggle extra
+    // query parameters into the /sign-in URL.
+    redirect(`/sign-in?redirect_url=${encodeURIComponent(`/trending/${slug}`)}`);
   }
 
   try {
