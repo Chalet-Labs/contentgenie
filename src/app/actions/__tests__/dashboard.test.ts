@@ -1046,7 +1046,9 @@ describe("getTrendingTopicBySlug", () => {
   it("returns { kind: 'found', ... } with episodes when slug matches a topic", async () => {
     mockAuth.mockResolvedValue({ userId: "user_123" });
     mockFindFirst.mockResolvedValue(makeSnapshot([aiTopic, climateTopic]));
-    mockOrderBy.mockResolvedValue([mockEpisodeRow, mockEpisodeRowNullScore]);
+    // Chain now terminates with .limit() at the DB layer so the display cap
+    // respects sort order over the full candidate set.
+    mockLimit.mockResolvedValue([mockEpisodeRow, mockEpisodeRowNullScore]);
 
     const { getTrendingTopicBySlug } = await import("@/app/actions/dashboard");
     const result = await getTrendingTopicBySlug("artificial-intelligence");
@@ -1071,6 +1073,10 @@ describe("getTrendingTopicBySlug", () => {
       )
       .map((arg) => arg.raw);
     expect(rawSqlClauses.join(" ")).toContain("DESC NULLS LAST");
+
+    // Display cap must run at the DB layer (after orderBy) so top-scored
+    // episodes can't be silently dropped by an LLM-order truncation.
+    expect(mockLimit).toHaveBeenCalledWith(50);
   });
 
   it("returns { kind: 'found', episodes: [] } when matched topic has no episodeIds", async () => {

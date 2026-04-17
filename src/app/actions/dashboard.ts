@@ -513,10 +513,11 @@ export async function getTrendingTopicBySlug(slug: string): Promise<TrendingTopi
       return { kind: "found", topic, allTopics, episodes: [], generatedAt: latest.generatedAt };
     }
 
-    // Display cap for the page (tighter than the upstream 500-candidate ceiling):
-    // 50 is plenty for a scroll-without-pagination view and bounds both the IN clause
-    // and the render cost against corrupted snapshots with huge episodeIds arrays.
-    const episodeIds = topic.episodeIds.slice(0, 50);
+    // Safety cap against corrupted/malicious snapshots with huge episodeIds arrays.
+    // The display limit below runs at the DB layer so ordering applies to the full
+    // candidate set — truncating by LLM-output order here would silently drop
+    // high-scored episodes at positions beyond the cap.
+    const episodeIds = topic.episodeIds.slice(0, 500);
 
     const rows = await db
       .select({
@@ -536,7 +537,10 @@ export async function getTrendingTopicBySlug(slug: string): Promise<TrendingTopi
       .where(inArray(episodes.id, episodeIds))
       // Postgres defaults DESC to NULLS FIRST; we want unscored episodes at the
       // bottom, and drizzle's desc() helper doesn't expose the nulls-ordering flag.
-      .orderBy(sql`${episodes.worthItScore} DESC NULLS LAST`, desc(episodes.publishDate));
+      .orderBy(sql`${episodes.worthItScore} DESC NULLS LAST`, desc(episodes.publishDate))
+      // Display cap — bounds page render cost. Sort runs over the full candidate
+      // set above so top-scored episodes can't be missed beyond this limit.
+      .limit(50);
 
     const episodesList: RecommendedEpisodeDTO[] = rows.map((r) => ({
       ...r,
