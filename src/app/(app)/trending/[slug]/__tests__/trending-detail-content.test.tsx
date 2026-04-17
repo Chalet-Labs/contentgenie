@@ -133,7 +133,7 @@ describe("TrendingDetailContent", () => {
 
     render(await TrendingDetailContent({ slug: "artificial-intelligence" }));
 
-    expect(screen.getByText(/these trending topics may be out of date/i)).toBeInTheDocument();
+    expect(screen.getByText(/this trending topic may be out of date/i)).toBeInTheDocument();
   });
 
   it("renders found + empty-episodes message when episodes is []", async () => {

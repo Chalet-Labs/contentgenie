@@ -38,7 +38,7 @@ function EpisodeCard({ episode }: { episode: RecommendedEpisodeDTO }) {
         {episode.podcastImageUrl ? (
           <Image
             src={episode.podcastImageUrl}
-            alt={episode.podcastTitle}
+            alt=""
             fill
             className="object-cover"
             sizes="56px"
@@ -94,15 +94,19 @@ export async function TrendingDetailContent({ slug }: { slug: string }) {
         />
       );
 
-    case "unknown-slug":
+    case "unknown-slug": {
+      const staleNotice = isTrendingSnapshotStale(result.generatedAt)
+        ? " These trending topics may be out of date."
+        : "";
       return (
         <FallbackCard
           heading="This topic is no longer trending"
-          body="This topic didn't make the latest trending snapshot. Browse other topics below."
+          body={`This topic didn't make the latest trending snapshot. Browse other topics below.${staleNotice}`}
         >
           <TopicSwitcher topics={result.allTopics} activeSlug={slug} />
         </FallbackCard>
       );
+    }
 
     case "found": {
       const { topic, allTopics, episodes, generatedAt } = result;
@@ -119,7 +123,7 @@ export async function TrendingDetailContent({ slug }: { slug: string }) {
             </p>
             {isTrendingSnapshotStale(generatedAt) && (
               <p className="text-sm text-muted-foreground">
-                These trending topics may be out of date.
+                This trending topic may be out of date.
               </p>
             )}
           </div>
