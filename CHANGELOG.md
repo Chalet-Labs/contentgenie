@@ -30,6 +30,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Admin link in sidebar (visible to `org:admin` users only)
 
 ### Changed
+- Trending topic snapshots now include a stable `slug` per topic, used as the URL identifier for topic detail pages.
 - Replace 3-dimension numeric worth-it scoring with boolean signal hybrid (8 yes/no quality signals + ±1 adjustment) for more stable, interpretable episode scores (#260)
 - Score and status badge components migrated from hardcoded Tailwind colors to semantic design tokens (#256)
 - Empty state icons standardized to consistent `rounded-full bg-muted p-3` container pattern across 7 components (#256)

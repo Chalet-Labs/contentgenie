@@ -8,6 +8,7 @@ import {
   getTrendingTopicsPrompt,
 } from "@/lib/prompts";
 import { parseJsonResponse } from "@/lib/openrouter";
+import { slugify } from "@/lib/utils";
 
 const LOOKBACK_DAYS = 7;
 const MAX_EPISODES = 500;
@@ -146,7 +147,7 @@ export const generateTrendingTopics = schedules.task({
 
     // Validate: filter out topics referencing invalid episode IDs
     const validEpisodeIds = new Set(episodesWithTakeaways.map((ep) => ep.id));
-    const validatedTopics = topics
+    const mappedTopics = topics
       .map((topic) => {
         const filteredIds = Array.from(new Set(topic.episodeIds)).filter((id) =>
           validEpisodeIds.has(id)
@@ -156,11 +157,43 @@ export const generateTrendingTopics = schedules.task({
           description: topic.description,
           episodeIds: filteredIds,
           episodeCount: filteredIds.length,
+          slug: slugify(topic.name),
         };
       })
-      .filter((topic) => topic.episodeCount > 0)
+      .filter((topic) => topic.episodeCount > 0);
+
+    const keptTopics: typeof mappedTopics = [];
+    const droppedNames: string[] = [];
+    for (const topic of mappedTopics) {
+      if (topic.slug === "") droppedNames.push(topic.name);
+      else keptTopics.push(topic);
+    }
+    if (droppedNames.length > 0) {
+      logger.warn("Dropped trending topics with empty slug (non-ASCII or punctuation-only names)", {
+        droppedCount: droppedNames.length,
+        droppedNames: droppedNames.slice(0, 10),
+      });
+    }
+
+    const validatedTopics = keptTopics
       .sort((a, b) => b.episodeCount - a.episodeCount)
       .slice(0, MAX_TOPICS);
+
+    // Disambiguate duplicate slugs. Track already-assigned final slugs (not
+    // just bases) so a disambiguated form like "foo-2" cannot collide with
+    // another topic whose natural slug is also "foo-2".
+    const assignedSlugs = new Set<string>();
+    for (const topic of validatedTopics) {
+      const base = topic.slug;
+      let candidate = base;
+      let n = 2;
+      while (assignedSlugs.has(candidate)) {
+        candidate = `${base}-${n}`;
+        n++;
+      }
+      topic.slug = candidate;
+      assignedSlugs.add(candidate);
+    }
 
     if (validatedTopics.length === 0 && topics.length > 0) {
       logger.warn("All LLM topics referenced invalid episode IDs, storing empty snapshot", {

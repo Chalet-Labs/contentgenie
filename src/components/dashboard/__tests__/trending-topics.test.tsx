@@ -16,6 +16,7 @@ function makeTopic(overrides: Partial<TrendingTopic> = {}): TrendingTopic {
     description: "A test topic description",
     episodeCount: 5,
     episodeIds: [1, 2, 3, 4, 5],
+    slug: "test-topic",
     ...overrides,
   }
 }
