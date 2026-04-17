@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
-import { render, screen } from "@testing-library/react"
+import { render, screen, fireEvent, within } from "@testing-library/react"
 import { Header } from "@/components/layout/header"
+import React from "react"
 
 const mockUseSidebarCounts = vi.fn()
 vi.mock("@/contexts/sidebar-counts-context", () => ({
@@ -32,14 +33,72 @@ vi.mock("@/components/notifications/notification-bell", () => ({
   NotificationBell: () => null,
 }))
 
-// shadcn Sheet — render SheetContent inline so mobile nav is visible in tests
-vi.mock("@/components/ui/sheet", () => ({
-  Sheet: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-  SheetTrigger: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-  SheetContent: ({ children }: { children: React.ReactNode }) => (
-    <div data-testid="sheet-content">{children}</div>
-  ),
-}))
+// shadcn Sheet — stateful mock so open/close behaviour can be asserted.
+// Sheet owns internal useState; SheetTrigger opens it, SheetClose closes it.
+// SheetContent renders only when open. This mirrors real Radix Dialog behaviour.
+vi.mock("@/components/ui/sheet", () => {
+  const { useState, createContext, useContext } = require("react") as typeof React
+
+  const SheetStateContext = createContext<{
+    open: boolean
+    setOpen: (v: boolean) => void
+  }>({ open: false, setOpen: () => {} })
+
+  const Sheet = ({ children }: { children: React.ReactNode }) => {
+    const [open, setOpen] = useState(false)
+    return (
+      <SheetStateContext.Provider value={{ open, setOpen }}>
+        {children}
+      </SheetStateContext.Provider>
+    )
+  }
+
+  const SheetTrigger = ({
+    children,
+  }: {
+    children: React.ReactNode
+    asChild?: boolean
+  }) => {
+    const { setOpen } = useContext(SheetStateContext)
+    return (
+      <div data-testid="sheet-trigger" onClick={() => setOpen(true)}>
+        {children}
+      </div>
+    )
+  }
+
+  const SheetContent = ({ children }: { children: React.ReactNode }) => {
+    const { open } = useContext(SheetStateContext)
+    return open ? <div data-testid="sheet-content">{children}</div> : null
+  }
+
+  const SheetClose = ({
+    children,
+    asChild,
+  }: {
+    children: React.ReactNode
+    asChild?: boolean
+  }) => {
+    const { setOpen } = useContext(SheetStateContext)
+    const close = () => setOpen(false)
+    if (asChild && React.isValidElement(children)) {
+      const child = children as React.ReactElement<{ onClick?: (e: unknown) => void }>
+      return React.cloneElement(child, {
+        onClick: (e: unknown) => {
+          child.props.onClick?.(e)
+          close()
+        },
+      })
+    }
+    return (
+      <div data-testid="sheet-close" onClick={close}>
+        {children}
+      </div>
+    )
+  }
+
+  return { Sheet, SheetTrigger, SheetContent, SheetClose }
+})
 
 vi.mock("@/components/ui/button", () => ({
   Button: ({ children, ...rest }: { children: React.ReactNode; [key: string]: unknown }) => (
@@ -60,6 +119,34 @@ vi.mock("@/components/ui/separator", () => ({
   Separator: () => <hr />,
 }))
 
+describe("Header mobile menu — sheet closes on nav tap (regression #276)", () => {
+  beforeEach(() => {
+    mockUseSidebarCounts.mockReturnValue({
+      subscriptionCount: 0,
+      savedCount: 0,
+      isLoading: false,
+    })
+  })
+
+  it("closes the sheet when a nav link inside the mobile menu is tapped", () => {
+    render(<Header />)
+
+    // Open the sheet by clicking the hamburger trigger
+    const trigger = screen.getByTestId("sheet-trigger")
+    fireEvent.click(trigger)
+
+    // Sheet should now be open and show nav content
+    const sheetContent = screen.getByTestId("sheet-content")
+    expect(sheetContent).toBeInTheDocument()
+
+    const dashboardLink = within(sheetContent).getByRole("link", { name: /dashboard/i })
+    fireEvent.click(dashboardLink)
+
+    // The sheet must close — sheet-content should no longer be in the DOM
+    expect(screen.queryByTestId("sheet-content")).not.toBeInTheDocument()
+  })
+})
+
 describe("Header mobile menu", () => {
   beforeEach(() => {
     mockUseSidebarCounts.mockReturnValue({
@@ -77,6 +164,7 @@ describe("Header mobile menu", () => {
     })
 
     render(<Header />)
+    fireEvent.click(screen.getByTestId("sheet-trigger"))
 
     const sheet = screen.getByTestId("sheet-content")
     const links = sheet.querySelectorAll("a")
@@ -96,6 +184,7 @@ describe("Header mobile menu", () => {
     })
 
     render(<Header />)
+    fireEvent.click(screen.getByTestId("sheet-trigger"))
 
     const sheet = screen.getByTestId("sheet-content")
     const links = sheet.querySelectorAll("a")
@@ -115,6 +204,7 @@ describe("Header mobile menu", () => {
     })
 
     render(<Header />)
+    fireEvent.click(screen.getByTestId("sheet-trigger"))
 
     const sheet = screen.getByTestId("sheet-content")
     const links = sheet.querySelectorAll("a")
@@ -138,6 +228,7 @@ describe("Header mobile menu", () => {
     })
 
     render(<Header />)
+    fireEvent.click(screen.getByTestId("sheet-trigger"))
 
     const sheet = screen.getByTestId("sheet-content")
     const links = sheet.querySelectorAll("a")

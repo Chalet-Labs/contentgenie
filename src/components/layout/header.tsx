@@ -11,7 +11,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
+import { Sheet, SheetClose, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { Separator } from "@/components/ui/separator"
 import { Menu, Moon, Sun, Headphones } from "lucide-react"
 import { NotificationBell } from "@/components/notifications/notification-bell"
@@ -51,23 +51,26 @@ export function Header() {
                 const badge = getBadgeCount(link.href, counts)
 
                 return (
-                  <Link
-                    key={link.href}
-                    href={link.href}
-                    className="flex items-center px-3 py-3 text-sm font-medium rounded-md hover:bg-accent hover:text-accent-foreground transition-colors"
-                  >
-                    {link.label}
-                    {badge !== null && <NavBadge count={badge} />}
-                  </Link>
+                  <SheetClose key={link.href} asChild>
+                    <Link
+                      href={link.href}
+                      className="flex items-center px-3 py-3 text-sm font-medium rounded-md hover:bg-accent hover:text-accent-foreground transition-colors"
+                    >
+                      {link.label}
+                      {badge !== null && <NavBadge count={badge} />}
+                    </Link>
+                  </SheetClose>
                 )
               })}
               <Separator className="my-2" />
-              <Link
-                href="/settings"
-                className="flex items-center px-3 py-3 text-sm font-medium rounded-md hover:bg-accent hover:text-accent-foreground transition-colors"
-              >
-                Settings
-              </Link>
+              <SheetClose asChild>
+                <Link
+                  href="/settings"
+                  className="flex items-center px-3 py-3 text-sm font-medium rounded-md hover:bg-accent hover:text-accent-foreground transition-colors"
+                >
+                  Settings
+                </Link>
+              </SheetClose>
               <Separator className="my-2" />
               <OrganizationSwitcher
                 hidePersonal={false}
