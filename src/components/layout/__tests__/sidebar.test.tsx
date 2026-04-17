@@ -3,12 +3,10 @@ import { render, screen, within, fireEvent } from "@testing-library/react"
 import { Sidebar } from "@/components/layout/sidebar"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { ADMIN_ROLE } from "@/lib/auth-roles"
-import React from "react"
 
 const mockUseSidebarCounts = vi.fn()
 const mockUsePathname = vi.fn(() => "/")
 
-// Override the global next/navigation mock so tests can control pathname.
 vi.mock("next/navigation", () => ({
   usePathname: () => mockUsePathname(),
   useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn(), forward: vi.fn(), refresh: vi.fn(), prefetch: vi.fn() }),
@@ -42,76 +40,24 @@ vi.mock("@clerk/nextjs", () => ({
   }),
 }))
 
-// Stateful Sheet mock — needed for inSheet tests (SheetClose behaviour).
-vi.mock("@/components/ui/sheet", () => {
-  const { useState, createContext, useContext } = require("react") as typeof React
+vi.mock("@/components/ui/sheet", async () => {
+  const { createSheetMock } = await vi.importActual<typeof import("@/test/mocks/sheet")>(
+    "@/test/mocks/sheet"
+  )
+  return createSheetMock()
+})
 
-  const SheetStateContext = createContext<{
-    open: boolean
-    setOpen: (v: boolean) => void
-  }>({ open: false, setOpen: () => {} })
-
-  const Sheet = ({ children }: { children: React.ReactNode }) => {
-    const [open, setOpen] = useState(false)
-    return (
-      <SheetStateContext.Provider value={{ open, setOpen }}>
-        {children}
-      </SheetStateContext.Provider>
-    )
-  }
-
-  const SheetTrigger = ({ children }: { children: React.ReactNode; asChild?: boolean }) => {
-    const { setOpen } = useContext(SheetStateContext)
-    return (
-      <div data-testid="sheet-trigger" onClick={() => setOpen(true)}>
-        {children}
-      </div>
-    )
-  }
-
-  const SheetContent = ({ children }: { children: React.ReactNode }) => {
-    const { open } = useContext(SheetStateContext)
-    return open ? <div data-testid="sheet-content">{children}</div> : null
-  }
-
-  const SheetClose = ({
-    children,
-    asChild,
-  }: {
-    children: React.ReactNode
-    asChild?: boolean
-  }) => {
-    const { setOpen } = useContext(SheetStateContext)
-    const close = () => setOpen(false)
-    if (asChild && React.isValidElement(children)) {
-      const child = children as React.ReactElement<{ onClick?: (e: unknown) => void }>
-      return React.cloneElement(child, {
-        onClick: (e: unknown) => {
-          child.props.onClick?.(e)
-          close()
-        },
-      })
-    }
-    return (
-      <div data-testid="sheet-close" onClick={close}>
-        {children}
-      </div>
-    )
-  }
-
-  return { Sheet, SheetTrigger, SheetContent, SheetClose }
+beforeEach(() => {
+  mockUseSidebarCounts.mockReturnValue({
+    subscriptionCount: 0,
+    savedCount: 0,
+    isLoading: false,
+  })
+  mockHas.mockReturnValue(false)
+  mockUsePathname.mockReturnValue("/")
 })
 
 describe("Sidebar — inline aside mode", () => {
-  beforeEach(() => {
-    mockUseSidebarCounts.mockReturnValue({
-      subscriptionCount: 0,
-      savedCount: 0,
-      isLoading: false,
-    })
-    mockHas.mockReturnValue(false)
-  })
-
   it("shows badge on Subscriptions link when subscriptionCount > 0", () => {
     mockUseSidebarCounts.mockReturnValue({
       subscriptionCount: 5,
@@ -182,58 +128,30 @@ describe("Sidebar — inline aside mode", () => {
   })
 })
 
+const renderSidebarInOpenSheet = () => {
+  const result = render(
+    <Sheet>
+      <SheetTrigger>open</SheetTrigger>
+      <SheetContent>
+        <Sidebar inSheet />
+      </SheetContent>
+    </Sheet>
+  )
+  fireEvent.click(screen.getByTestId("sheet-trigger"))
+  return result
+}
+
 describe("Sidebar — inSheet mode", () => {
-  beforeEach(() => {
-    mockUseSidebarCounts.mockReturnValue({
-      subscriptionCount: 0,
-      savedCount: 0,
-      isLoading: false,
-    })
-    mockHas.mockReturnValue(false)
-  })
-
-  // Helper: open the Sheet, then render the real Sidebar inside it so SheetClose
-  // wrappers have a real provider and setOpen handler from the mock's context.
-  const renderSidebarInOpenSheet = () => {
-    const result = render(
-      <Sheet>
-        <SheetTrigger>open</SheetTrigger>
-        <SheetContent>
-          <Sidebar inSheet />
-        </SheetContent>
-      </Sheet>
-    )
-    fireEvent.click(screen.getByTestId("sheet-trigger"))
-    return result
-  }
-
-  it("tapping Dashboard closes the sheet via SheetClose (regression #276)", () => {
+  it.each([
+    { name: "Dashboard", matcher: /dashboard/i, admin: false },
+    { name: "Settings", matcher: /settings/i, admin: false },
+    { name: "Admin", matcher: /admin/i, admin: true },
+  ])("tapping $name closes the sheet via SheetClose", ({ matcher, admin }) => {
+    if (admin) mockHas.mockImplementation((arg) => arg?.role === ADMIN_ROLE)
     renderSidebarInOpenSheet()
-    const sheetContent = screen.getByTestId("sheet-content")
-    const dashboardLink = within(sheetContent).getByRole("link", { name: /dashboard/i })
 
-    fireEvent.click(dashboardLink)
-
-    expect(screen.queryByTestId("sheet-content")).not.toBeInTheDocument()
-  })
-
-  it("tapping Settings closes the sheet via SheetClose", () => {
-    renderSidebarInOpenSheet()
-    const sheetContent = screen.getByTestId("sheet-content")
-    const settingsLink = within(sheetContent).getByRole("link", { name: /settings/i })
-
-    fireEvent.click(settingsLink)
-
-    expect(screen.queryByTestId("sheet-content")).not.toBeInTheDocument()
-  })
-
-  it("tapping Admin closes the sheet via SheetClose", () => {
-    mockHas.mockImplementation((arg) => arg?.role === ADMIN_ROLE)
-    renderSidebarInOpenSheet()
-    const sheetContent = screen.getByTestId("sheet-content")
-    const adminLink = within(sheetContent).getByRole("link", { name: /admin/i })
-
-    fireEvent.click(adminLink)
+    const link = within(screen.getByTestId("sheet-content")).getByRole("link", { name: matcher })
+    fireEvent.click(link)
 
     expect(screen.queryByTestId("sheet-content")).not.toBeInTheDocument()
   })
