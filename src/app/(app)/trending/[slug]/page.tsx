@@ -5,7 +5,7 @@ import { Rss } from "lucide-react";
 import { getTrendingTopicBySlug } from "@/app/actions/dashboard";
 import { TopicSwitcher } from "@/components/trending/topic-switcher";
 import { WorthItBadge } from "@/components/episodes/worth-it-badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatDate, formatDuration, formatRelativeTime, stripHtml } from "@/lib/utils";
 import type { RecommendedEpisodeDTO } from "@/db/library-columns";
@@ -15,6 +15,7 @@ const STALE_THRESHOLD_MS = 48 * 60 * 60 * 1000;
 function TrendingDetailLoading() {
   return (
     <div className="space-y-6">
+      <Skeleton className="h-9 w-64" />
       <div className="flex gap-2 overflow-x-auto pb-2">
         {[1, 2, 3, 4, 5].map((i) => (
           <Skeleton key={i} className="h-8 w-28 shrink-0 rounded-full" />
@@ -93,11 +94,9 @@ async function TrendingDetailContent({ slug }: { slug: string }) {
 
     return (
       <div className="space-y-6">
+        <h1 className="text-3xl font-bold tracking-tight">{heading}</h1>
         <Card>
-          <CardHeader>
-            <CardTitle>{heading}</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="space-y-4 pt-6">
             <p className="text-sm text-muted-foreground">{body}</p>
             <TopicSwitcher topics={allTopics} activeSlug={slug} />
             <Link href="/dashboard" className="text-sm text-primary underline-offset-4 hover:underline">
@@ -113,6 +112,8 @@ async function TrendingDetailContent({ slug }: { slug: string }) {
 
   return (
     <div className="space-y-6">
+      <h1 className="text-3xl font-bold tracking-tight">{topic.name}</h1>
+
       {isStale && (
         <p className="text-sm text-muted-foreground">
           These trending topics may be out of date.
@@ -144,11 +145,6 @@ async function TrendingDetailContent({ slug }: { slug: string }) {
 export default async function TrendingDetailPage({ params }: { params: { slug: string } }) {
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight capitalize">
-          {params.slug.replace(/-/g, " ")}
-        </h1>
-      </div>
       <Suspense fallback={<TrendingDetailLoading />}>
         <TrendingDetailContent slug={params.slug} />
       </Suspense>
