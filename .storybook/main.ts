@@ -12,8 +12,9 @@ const config: StorybookConfig = {
     config.resolve = config.resolve || {};
     // Use array format so specific aliases are checked before the general "@" prefix
     config.resolve.alias = [
-      // Stub out server-only modules that break Storybook's browser build
+      // Stub out server-only and provider-dependent modules for Storybook's browser build
       { find: "@clerk/nextjs/server", replacement: path.resolve(__dirname, "mocks/clerk-server.ts") },
+      { find: "@clerk/nextjs", replacement: path.resolve(__dirname, "mocks/clerk.ts") },
       { find: "@/db/schema", replacement: path.resolve(__dirname, "mocks/db-schema.ts") },
       { find: "@/db/helpers", replacement: path.resolve(__dirname, "mocks/db-helpers.ts") },
       { find: "@/db", replacement: path.resolve(__dirname, "mocks/db.ts") },

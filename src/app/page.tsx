@@ -1,13 +1,13 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Header } from "@/components/layout/header";
+import { LandingHeader } from "@/components/layout/landing-header";
 import Link from "next/link";
 
 export default function Home() {
   return (
     <div className="min-h-screen bg-background">
-      <Header />
+      <LandingHeader />
       <main className="flex flex-col items-center justify-center px-6 py-24">
         <div className="text-center max-w-3xl">
           <Badge variant="secondary" className="mb-4">AI-Powered</Badge>
