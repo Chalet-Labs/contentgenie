@@ -1,4 +1,4 @@
-import type React from "react"
+import React from "react"
 
 // Factory for mocking @/components/ui/sheet in Vitest suites. Returns a stateful
 // drop-in replacement with a throw-guard so any primitive rendered outside a
@@ -6,18 +6,16 @@ import type React from "react"
 // regressions where `inSheet` is accidentally true on the desktop path.
 //
 // Usage (inside a test file):
-//   vi.mock("@/components/ui/sheet", () => {
-//     const { createSheetMock } = require("@/test/mocks/sheet")
+//   vi.mock("@/components/ui/sheet", async () => {
+//     const { createSheetMock } = await vi.importActual<typeof import("@/test/mocks/sheet")>(
+//       "@/test/mocks/sheet"
+//     )
 //     return createSheetMock()
 //   })
 //
 // Pass { includeSheetTitle: true } for suites that render AppHeader's sheet,
 // which uses <SheetTitle className="sr-only"> for Radix a11y compliance.
 export function createSheetMock(options: { includeSheetTitle?: boolean } = {}) {
-  // require("react") is intentional — Vitest hoists vi.mock factories above
-  // top-level imports, so the file's React binding isn't available when this
-  // runs. Do not convert to an `import` at the call site.
-  const React = require("react") as typeof import("react")
   const { useState, createContext, useContext } = React
 
   const SheetStateContext = createContext<{
@@ -44,13 +42,25 @@ export function createSheetMock(options: { includeSheetTitle?: boolean } = {}) {
 
   const SheetTrigger = ({
     children,
+    asChild,
   }: {
     children: React.ReactNode
     asChild?: boolean
   }) => {
     const { setOpen } = useSheetContext()
+    const open = () => setOpen(true)
+    if (asChild && React.isValidElement(children)) {
+      const child = children as React.ReactElement<{ onClick?: (e: unknown) => void }>
+      return React.cloneElement(child, {
+        "data-testid": "sheet-trigger",
+        onClick: (e: unknown) => {
+          child.props.onClick?.(e)
+          open()
+        },
+      } as Record<string, unknown>)
+    }
     return (
-      <div data-testid="sheet-trigger" onClick={() => setOpen(true)}>
+      <div data-testid="sheet-trigger" onClick={open}>
         {children}
       </div>
     )

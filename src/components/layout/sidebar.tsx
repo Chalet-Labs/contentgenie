@@ -119,7 +119,7 @@ function SidebarNav({ inSheet }: { inSheet: boolean }) {
                     : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
                 )}
               >
-                <Shield className="size-4" />
+                <Shield className="h-4 w-4" />
                 Admin
               </Link>
             </MaybeSheetClose>
