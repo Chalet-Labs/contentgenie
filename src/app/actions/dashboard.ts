@@ -1,6 +1,7 @@
 "use server";
 
 import { auth } from "@clerk/nextjs/server";
+import { redirect } from "next/navigation";
 import { eq, desc, and, gte, isNotNull, notInArray, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
@@ -265,7 +266,9 @@ export async function getRecommendedEpisodes(
           notInArray(episodes.id, listenedEpisodeIds)
         )
       )
-      .orderBy(desc(episodes.worthItScore), desc(episodes.publishDate))
+      // isNotNull above filters null scores, but NULLS LAST is used for consistency
+      // with the rest of the codebase and to stay correct if the filter is ever dropped.
+      .orderBy(sql`${episodes.worthItScore} DESC NULLS LAST`, desc(episodes.publishDate))
       .limit(limit);
 
     // Separate query to avoid aggregation expanding the outer LIMIT result set
@@ -472,17 +475,22 @@ export async function getTrendingTopics() {
   }
 }
 
-export async function getTrendingTopicBySlug(slug: string): Promise<{
-  topic: TrendingTopic | null;
-  allTopics: TrendingTopic[];
-  episodes: RecommendedEpisodeDTO[];
-  generatedAt: Date | null;
-  error: string | null;
-}> {
-  const { userId } = await auth();
+export type TrendingTopicDetailResult =
+  | { kind: "no-snapshot" }
+  | { kind: "unknown-slug"; allTopics: TrendingTopic[]; generatedAt: Date }
+  | {
+      kind: "found";
+      topic: TrendingTopic;
+      allTopics: TrendingTopic[];
+      episodes: RecommendedEpisodeDTO[];
+      generatedAt: Date;
+    }
+  | { kind: "error"; message: string };
 
+export async function getTrendingTopicBySlug(slug: string): Promise<TrendingTopicDetailResult> {
+  const { userId } = await auth();
   if (!userId) {
-    return { topic: null, allTopics: [], episodes: [], generatedAt: null, error: "You must be signed in" };
+    redirect(`/sign-in?redirect_url=/trending/${slug}`);
   }
 
   try {
@@ -490,15 +498,17 @@ export async function getTrendingTopicBySlug(slug: string): Promise<{
       orderBy: [desc(trendingTopics.generatedAt), desc(trendingTopics.id)],
     });
 
-    if (!latest) {
-      return { topic: null, allTopics: [], episodes: [], generatedAt: null, error: null };
-    }
+    if (!latest) return { kind: "no-snapshot" };
 
     const allTopics = latest.topics;
-    const topic = allTopics.find((t) => getTopicSlug(t) === slug) ?? null;
+    const topic = allTopics.find((t) => getTopicSlug(t) === slug);
 
-    if (!topic || topic.episodeIds.length === 0) {
-      return { topic, allTopics, episodes: [], generatedAt: latest.generatedAt, error: null };
+    if (!topic) {
+      return { kind: "unknown-slug", allTopics, generatedAt: latest.generatedAt };
+    }
+
+    if (topic.episodeIds.length === 0) {
+      return { kind: "found", topic, allTopics, episodes: [], generatedAt: latest.generatedAt };
     }
 
     // Cap to defend against a corrupted/malicious snapshot blowing up the IN clause.
@@ -525,16 +535,16 @@ export async function getTrendingTopicBySlug(slug: string): Promise<{
       // bottom, and drizzle's desc() helper doesn't expose the nulls-ordering flag.
       .orderBy(sql`${episodes.worthItScore} DESC NULLS LAST`, desc(episodes.publishDate));
 
-    const episodeResults: RecommendedEpisodeDTO[] = rows.map((r) => ({
+    const episodesList: RecommendedEpisodeDTO[] = rows.map((r) => ({
       ...r,
       bestTopicRank: null,
       topRankedTopic: null,
     }));
 
-    return { topic, allTopics, episodes: episodeResults, generatedAt: latest.generatedAt, error: null };
+    return { kind: "found", topic, allTopics, episodes: episodesList, generatedAt: latest.generatedAt };
   } catch (error) {
     console.error("Error fetching trending topic by slug:", { slug, error });
-    return { topic: null, allTopics: [], episodes: [], generatedAt: null, error: "Failed to load topic" };
+    return { kind: "error", message: "Failed to load topic" };
   }
 }
 

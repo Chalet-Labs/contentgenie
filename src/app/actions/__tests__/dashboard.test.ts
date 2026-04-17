@@ -6,6 +6,16 @@ vi.mock("@clerk/nextjs/server", () => ({
   auth: () => mockAuth(),
 }));
 
+// Mock next/navigation — mirrors Next's behavior (redirect throws NEXT_REDIRECT).
+const mockRedirect = vi.fn((url: string) => {
+  const err = new Error(`NEXT_REDIRECT: ${url}`);
+  (err as Error & { digest?: string }).digest = `NEXT_REDIRECT;${url}`;
+  throw err;
+});
+vi.mock("next/navigation", () => ({
+  redirect: (url: string) => mockRedirect(url),
+}));
+
 // Mock DB select chain
 const mockLimit = vi.fn();
 const mockOrderBy = vi.fn();
@@ -999,34 +1009,26 @@ describe("getTrendingTopicBySlug", () => {
     vi.resetModules();
   });
 
-  it("returns signed-in error when userId is null", async () => {
+  it("redirects to /sign-in when userId is null", async () => {
     mockAuth.mockResolvedValue({ userId: null });
 
     const { getTrendingTopicBySlug } = await import("@/app/actions/dashboard");
-    const result = await getTrendingTopicBySlug("artificial-intelligence");
 
-    expect(result.topic).toBeNull();
-    expect(result.allTopics).toEqual([]);
-    expect(result.episodes).toEqual([]);
-    expect(result.generatedAt).toBeNull();
-    expect(result.error).toMatch(/signed in/i);
+    await expect(getTrendingTopicBySlug("artificial-intelligence")).rejects.toThrow(/NEXT_REDIRECT/);
+    expect(mockRedirect).toHaveBeenCalledWith("/sign-in?redirect_url=/trending/artificial-intelligence");
   });
 
-  it("returns empty result when no snapshot exists", async () => {
+  it("returns { kind: 'no-snapshot' } when no snapshot exists", async () => {
     mockAuth.mockResolvedValue({ userId: "user_123" });
     mockFindFirst.mockResolvedValue(undefined);
 
     const { getTrendingTopicBySlug } = await import("@/app/actions/dashboard");
     const result = await getTrendingTopicBySlug("artificial-intelligence");
 
-    expect(result.topic).toBeNull();
-    expect(result.allTopics).toEqual([]);
-    expect(result.episodes).toEqual([]);
-    expect(result.generatedAt).toBeNull();
-    expect(result.error).toBeNull();
+    expect(result).toEqual({ kind: "no-snapshot" });
   });
 
-  it("returns topic and episodes when slug matches a topic with episodeIds", async () => {
+  it("returns { kind: 'found', ... } with episodes when slug matches a topic", async () => {
     mockAuth.mockResolvedValue({ userId: "user_123" });
     mockFindFirst.mockResolvedValue(makeSnapshot([aiTopic, climateTopic]));
     mockOrderBy.mockResolvedValue([mockEpisodeRow, mockEpisodeRowNullScore]);
@@ -1034,7 +1036,8 @@ describe("getTrendingTopicBySlug", () => {
     const { getTrendingTopicBySlug } = await import("@/app/actions/dashboard");
     const result = await getTrendingTopicBySlug("artificial-intelligence");
 
-    expect(result.error).toBeNull();
+    expect(result.kind).toBe("found");
+    if (result.kind !== "found") throw new Error("expected found");
     expect(result.topic).toMatchObject({ name: "Artificial Intelligence", slug: "artificial-intelligence" });
     expect(result.allTopics).toHaveLength(2);
     expect(result.generatedAt).toEqual(GENERATED_AT);
@@ -1055,7 +1058,7 @@ describe("getTrendingTopicBySlug", () => {
     expect(rawSqlClauses.join(" ")).toContain("DESC NULLS LAST");
   });
 
-  it("returns topic with empty episodes when matched topic has no episodeIds", async () => {
+  it("returns { kind: 'found', episodes: [] } when matched topic has no episodeIds", async () => {
     mockAuth.mockResolvedValue({ userId: "user_123" });
     const emptyTopic = { ...aiTopic, episodeIds: [] };
     mockFindFirst.mockResolvedValue(makeSnapshot([emptyTopic, climateTopic]));
@@ -1063,27 +1066,27 @@ describe("getTrendingTopicBySlug", () => {
     const { getTrendingTopicBySlug } = await import("@/app/actions/dashboard");
     const result = await getTrendingTopicBySlug("artificial-intelligence");
 
-    expect(result.error).toBeNull();
+    expect(result.kind).toBe("found");
+    if (result.kind !== "found") throw new Error("expected found");
     expect(result.topic).toMatchObject({ name: "Artificial Intelligence" });
     expect(result.episodes).toEqual([]);
   });
 
-  it("returns topic:null and allTopics when slug is unknown", async () => {
+  it("returns { kind: 'unknown-slug' } when slug is unknown", async () => {
     mockAuth.mockResolvedValue({ userId: "user_123" });
     mockFindFirst.mockResolvedValue(makeSnapshot([aiTopic, climateTopic]));
 
     const { getTrendingTopicBySlug } = await import("@/app/actions/dashboard");
     const result = await getTrendingTopicBySlug("unknown-slug-garbage");
 
-    expect(result.topic).toBeNull();
+    expect(result.kind).toBe("unknown-slug");
+    if (result.kind !== "unknown-slug") throw new Error("expected unknown-slug");
     expect(result.allTopics).toHaveLength(2);
-    expect(result.episodes).toEqual([]);
-    expect(result.error).toBeNull();
+    expect(result.generatedAt).toEqual(GENERATED_AT);
   });
 
   it("matches legacy topic without slug via slugify(name)", async () => {
     mockAuth.mockResolvedValue({ userId: "user_123" });
-    // Legacy row: no slug field
     const legacyTopic = {
       name: "Space Exploration",
       description: "Space news",
@@ -1095,11 +1098,12 @@ describe("getTrendingTopicBySlug", () => {
     const { getTrendingTopicBySlug } = await import("@/app/actions/dashboard");
     const result = await getTrendingTopicBySlug("space-exploration");
 
+    expect(result.kind).toBe("found");
+    if (result.kind !== "found") throw new Error("expected found");
     expect(result.topic).toMatchObject({ name: "Space Exploration" });
-    expect(result.error).toBeNull();
   });
 
-  it("returns error on DB failure and logs the slug context", async () => {
+  it("returns { kind: 'error' } on DB failure and logs the slug context", async () => {
     mockAuth.mockResolvedValue({ userId: "user_123" });
     mockFindFirst.mockRejectedValue(new Error("DB connection failed"));
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
@@ -1107,11 +1111,9 @@ describe("getTrendingTopicBySlug", () => {
     const { getTrendingTopicBySlug } = await import("@/app/actions/dashboard");
     const result = await getTrendingTopicBySlug("artificial-intelligence");
 
-    expect(result.topic).toBeNull();
-    expect(result.allTopics).toEqual([]);
-    expect(result.episodes).toEqual([]);
-    expect(result.generatedAt).toBeNull();
-    expect(result.error).toMatch(/failed to load/i);
+    expect(result.kind).toBe("error");
+    if (result.kind !== "error") throw new Error("expected error");
+    expect(result.message).toMatch(/failed to load/i);
 
     // The log must carry the slug so ops can correlate failures to requests.
     const loggedSlug = errorSpy.mock.calls.some((args) =>

@@ -70,68 +70,68 @@ function EpisodeCard({ episode }: { episode: RecommendedEpisodeDTO }) {
 }
 
 export async function TrendingDetailContent({ slug }: { slug: string }) {
-  const { topic, allTopics, episodes, generatedAt, error } = await getTrendingTopicBySlug(slug);
+  const result = await getTrendingTopicBySlug(slug);
 
-  if (error) {
-    // Action already logs the underlying error with full context; no duplicate log here.
-    return (
-      <FallbackCard
-        heading="Trending topics unavailable"
-        body="We couldn't load trending topics right now. Refresh the page or try again in a moment."
-      />
-    );
-  }
+  switch (result.kind) {
+    case "error":
+      // Action already logs the underlying error with full context.
+      return (
+        <FallbackCard
+          heading="Trending topics unavailable"
+          body="We couldn't load trending topics right now. Refresh the page or try again in a moment."
+        />
+      );
 
-  if (!topic) {
-    // Two empty states: no snapshot at all (allTopics empty) vs. a current
-    // snapshot that just doesn't include this slug (topic fell out of the run).
-    const isEmpty = allTopics.length === 0;
-    return (
-      <FallbackCard
-        heading={isEmpty ? "No trending topics right now" : "This topic is no longer trending"}
-        body={
-          isEmpty
-            ? "Check back soon — new trending topics are generated daily."
-            : "This topic didn't make the latest trending snapshot. Browse other topics below."
-        }
-      >
-        <TopicSwitcher topics={allTopics} activeSlug={slug} />
-      </FallbackCard>
-    );
-  }
+    case "no-snapshot":
+      return (
+        <FallbackCard
+          heading="No trending topics right now"
+          body="Check back soon — new trending topics are generated daily."
+        />
+      );
 
-  // Invariant: when topic is non-null, the action returns it with the same
-  // snapshot row's generatedAt, so generatedAt is guaranteed non-null here.
-  const snapshotTime = generatedAt as Date;
+    case "unknown-slug":
+      return (
+        <FallbackCard
+          heading="This topic is no longer trending"
+          body="This topic didn't make the latest trending snapshot. Browse other topics below."
+        >
+          <TopicSwitcher topics={result.allTopics} activeSlug={slug} />
+        </FallbackCard>
+      );
 
-  return (
-    <div className="space-y-6">
-      <h1 className="text-3xl font-bold tracking-tight">{topic.name}</h1>
+    case "found": {
+      const { topic, allTopics, episodes, generatedAt } = result;
+      return (
+        <div className="space-y-6">
+          <h1 className="text-3xl font-bold tracking-tight">{topic.name}</h1>
 
-      {isTrendingSnapshotStale(snapshotTime) && (
-        <p className="text-sm text-muted-foreground">
-          These trending topics may be out of date.
-        </p>
-      )}
+          {isTrendingSnapshotStale(generatedAt) && (
+            <p className="text-sm text-muted-foreground">
+              These trending topics may be out of date.
+            </p>
+          )}
 
-      <TopicSwitcher topics={allTopics} activeSlug={slug} />
+          <TopicSwitcher topics={allTopics} activeSlug={slug} />
 
-      <div>
-        <p className="mb-1 text-sm text-muted-foreground">{topic.description}</p>
-        <p className="text-sm text-muted-foreground">
-          Past 7 days &middot; Updated {formatRelativeTime(snapshotTime)}
-        </p>
-      </div>
+          <div>
+            <p className="mb-1 text-sm text-muted-foreground">{topic.description}</p>
+            <p className="text-sm text-muted-foreground">
+              Past 7 days &middot; Updated {formatRelativeTime(generatedAt)}
+            </p>
+          </div>
 
-      {episodes.length === 0 ? (
-        <p className="text-sm text-muted-foreground">No episodes available for this topic yet.</p>
-      ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {episodes.map((episode) => (
-            <EpisodeCard key={episode.id} episode={episode} />
-          ))}
+          {episodes.length === 0 ? (
+            <p className="text-sm text-muted-foreground">No episodes available for this topic yet.</p>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {episodes.map((episode) => (
+                <EpisodeCard key={episode.id} episode={episode} />
+              ))}
+            </div>
+          )}
         </div>
-      )}
-    </div>
-  );
+      );
+    }
+  }
 }

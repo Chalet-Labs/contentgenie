@@ -51,14 +51,8 @@ describe("TrendingDetailContent", () => {
     vi.restoreAllMocks();
   });
 
-  it("renders error card when action returns error", async () => {
-    mockGetTrendingTopicBySlug.mockResolvedValue({
-      topic: null,
-      allTopics: [],
-      episodes: [],
-      generatedAt: null,
-      error: "Failed to load topic",
-    });
+  it("renders error card when action returns kind=error", async () => {
+    mockGetTrendingTopicBySlug.mockResolvedValue({ kind: "error", message: "Failed to load topic" });
 
     render(await TrendingDetailContent({ slug: "artificial-intelligence" }));
 
@@ -71,14 +65,8 @@ describe("TrendingDetailContent", () => {
     expect(screen.queryByRole("heading", { name: "No trending topics right now" })).not.toBeInTheDocument();
   });
 
-  it("renders empty-snapshot fallback when allTopics is empty", async () => {
-    mockGetTrendingTopicBySlug.mockResolvedValue({
-      topic: null,
-      allTopics: [],
-      episodes: [],
-      generatedAt: null,
-      error: null,
-    });
+  it("renders no-snapshot fallback without a switcher", async () => {
+    mockGetTrendingTopicBySlug.mockResolvedValue({ kind: "no-snapshot" });
 
     render(await TrendingDetailContent({ slug: "anything" }));
 
@@ -88,15 +76,14 @@ describe("TrendingDetailContent", () => {
       "href",
       "/dashboard",
     );
+    expect(screen.queryByRole("navigation", { name: "Trending topics" })).not.toBeInTheDocument();
   });
 
-  it("renders unknown-slug fallback with switcher when snapshot has other topics", async () => {
+  it("renders unknown-slug fallback with switcher", async () => {
     mockGetTrendingTopicBySlug.mockResolvedValue({
-      topic: null,
+      kind: "unknown-slug",
       allTopics: [aiTopic, climateTopic],
-      episodes: [],
       generatedAt: new Date(),
-      error: null,
     });
 
     render(await TrendingDetailContent({ slug: "unknown-slug" }));
@@ -115,14 +102,14 @@ describe("TrendingDetailContent", () => {
     );
   });
 
-  it("renders happy path without stale notice for a fresh snapshot", async () => {
+  it("renders found happy path without stale notice for a fresh snapshot", async () => {
     const freshGeneratedAt = new Date(Date.now() - 60 * 60 * 1000);
     mockGetTrendingTopicBySlug.mockResolvedValue({
+      kind: "found",
       topic: aiTopic,
       allTopics: [aiTopic, climateTopic],
       episodes: [mockEpisode],
       generatedAt: freshGeneratedAt,
-      error: null,
     });
 
     render(await TrendingDetailContent({ slug: "artificial-intelligence" }));
@@ -134,14 +121,14 @@ describe("TrendingDetailContent", () => {
     expect(screen.getByText(mockEpisode.title)).toBeInTheDocument();
   });
 
-  it("renders stale notice when snapshot is older than STALE_THRESHOLD_MS", async () => {
+  it("renders found + stale notice when snapshot is older than STALE_THRESHOLD_MS", async () => {
     const staleGeneratedAt = new Date(Date.now() - STALE_THRESHOLD_MS - 60_000);
     mockGetTrendingTopicBySlug.mockResolvedValue({
+      kind: "found",
       topic: aiTopic,
       allTopics: [aiTopic],
       episodes: [mockEpisode],
       generatedAt: staleGeneratedAt,
-      error: null,
     });
 
     render(await TrendingDetailContent({ slug: "artificial-intelligence" }));
@@ -149,13 +136,13 @@ describe("TrendingDetailContent", () => {
     expect(screen.getByText(/these trending topics may be out of date/i)).toBeInTheDocument();
   });
 
-  it("renders happy path with empty-episodes message when episodes is []", async () => {
+  it("renders found + empty-episodes message when episodes is []", async () => {
     mockGetTrendingTopicBySlug.mockResolvedValue({
+      kind: "found",
       topic: aiTopic,
       allTopics: [aiTopic],
       episodes: [],
       generatedAt: new Date(),
-      error: null,
     });
 
     render(await TrendingDetailContent({ slug: "artificial-intelligence" }));
