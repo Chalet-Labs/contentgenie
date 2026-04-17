@@ -25,10 +25,23 @@ vi.mock("@/components/ui/sheet", () => {
   // inside this closure. Do not convert to an `import` or the suite breaks.
   const { useState, createContext, useContext } = require("react") as typeof React
 
+  // Default context is null so any Sheet primitive rendered outside a Sheet
+  // provider throws — mirroring real Radix behaviour, which is the exact
+  // failure mode that broke the /library prerender on the first attempt at
+  // this fix. A silent no-op default would let a desktop regression (inSheet
+  // accidentally flipped to true) pass this suite.
   const SheetStateContext = createContext<{
     open: boolean
     setOpen: (v: boolean) => void
-  }>({ open: false, setOpen: () => {} })
+  } | null>(null)
+
+  const useSheetContext = () => {
+    const ctx = useContext(SheetStateContext)
+    if (ctx === null) {
+      throw new Error("Sheet primitive used outside <Sheet> provider")
+    }
+    return ctx
+  }
 
   const Sheet = ({ children }: { children: React.ReactNode }) => {
     const [open, setOpen] = useState(false)
@@ -40,7 +53,7 @@ vi.mock("@/components/ui/sheet", () => {
   }
 
   const SheetTrigger = ({ children }: { children: React.ReactNode; asChild?: boolean }) => {
-    const { setOpen } = useContext(SheetStateContext)
+    const { setOpen } = useSheetContext()
     return (
       <div data-testid="sheet-trigger" onClick={() => setOpen(true)}>
         {children}
@@ -49,7 +62,7 @@ vi.mock("@/components/ui/sheet", () => {
   }
 
   const SheetContent = ({ children }: { children: React.ReactNode }) => {
-    const { open } = useContext(SheetStateContext)
+    const { open } = useSheetContext()
     return open ? <div data-testid="sheet-content">{children}</div> : null
   }
 
@@ -60,7 +73,7 @@ vi.mock("@/components/ui/sheet", () => {
     children: React.ReactNode
     asChild?: boolean
   }) => {
-    const { setOpen } = useContext(SheetStateContext)
+    const { setOpen } = useSheetContext()
     const close = () => setOpen(false)
     if (asChild && React.isValidElement(children)) {
       const child = children as React.ReactElement<{ onClick?: (e: unknown) => void }>
