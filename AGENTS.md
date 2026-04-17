@@ -67,8 +67,8 @@ bun run trigger:deploy # Deploy tasks to Trigger.dev Cloud
 - The pre-commit hook (Husky) automatically runs lint and tests on commit.
 - ADRs live in `docs/adr/` — read the relevant ADR before modifying areas it covers.
 - **UI verification (agents):** Vitest/RTL runs in jsdom and can't catch real rendering, layout, or interaction bugs. For any UI work, **invoke the `agent-browser` skill** to test the web app in a real browser:
-  - **App flows / pages:** start `bun run dev` (port 3000), then use `agent-browser` to navigate, click through the flow, fill forms, and take screenshots.
-  - **Isolated components:** start `bun run storybook` (port 6006), then use `agent-browser` to open the relevant story and screenshot it.
+  - **App flows / pages:** start `bun run dev` (port 3000), then use `agent-browser` to navigate to `http://localhost:3000`, click through the flow, fill forms, and take screenshots.
+  - **Isolated components:** start `bun run storybook` (port 6006), then use `agent-browser` to open `http://localhost:6006`, navigate to the relevant story, and screenshot it.
   - Exercise the golden path **and** edge cases; attach screenshots when reporting status. If you can't run a browser check, say so explicitly — don't claim UI success from type-checks alone.
 
 ## PR and commit instructions
