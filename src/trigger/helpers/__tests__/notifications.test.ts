@@ -181,7 +181,7 @@ describe("trigger/helpers/notifications", () => {
       );
     });
 
-    it("dispatches push with tag=episode-${episodeId} for realtime users", async () => {
+    it("dispatches push with tag=episode-${episodeId} for realtime users whose row was inserted", async () => {
       mockUserSubsFindMany.mockResolvedValueOnce([{ userId: "user-realtime" }]);
       mockUsersFindMany.mockResolvedValueOnce([
         {
@@ -190,7 +190,7 @@ describe("trigger/helpers/notifications", () => {
         },
       ]);
 
-      const mockReturning = vi.fn().mockResolvedValue([]);
+      const mockReturning = vi.fn().mockResolvedValue([{ userId: "user-realtime" }]);
       const mockOnConflict = vi.fn().mockReturnValue({ returning: mockReturning });
       const mockValues = vi.fn().mockReturnValue({ onConflictDoNothing: mockOnConflict });
       mockInsert.mockReturnValue({ values: mockValues });
@@ -216,7 +216,7 @@ describe("trigger/helpers/notifications", () => {
         },
       ]);
 
-      const mockReturning = vi.fn().mockResolvedValue([]);
+      const mockReturning = vi.fn().mockResolvedValue([{ userId: "user-realtime" }]);
       const mockOnConflict = vi.fn().mockReturnValue({ returning: mockReturning });
       const mockValues = vi.fn().mockReturnValue({ onConflictDoNothing: mockOnConflict });
       mockInsert.mockReturnValue({ values: mockValues });
@@ -230,6 +230,82 @@ describe("trigger/helpers/notifications", () => {
         "user-realtime",
         expect.objectContaining({ data: expect.objectContaining({ url: "/episode/PI-999" }) }),
         expect.anything()
+      );
+    });
+
+    it("skips push entirely when all rows conflict (empty .returning())", async () => {
+      // All subscribers' rows already exist from a prior poll — onConflictDoNothing
+      // swallows the inserts, .returning() is empty, no push should fire.
+      mockUserSubsFindMany.mockResolvedValueOnce([{ userId: "user-realtime" }]);
+      mockUsersFindMany.mockResolvedValueOnce([
+        {
+          id: "user-realtime",
+          preferences: { digestFrequency: "realtime", pushEnabled: true },
+        },
+      ]);
+
+      const mockReturning = vi.fn().mockResolvedValue([]);
+      const mockOnConflict = vi.fn().mockReturnValue({ returning: mockReturning });
+      const mockValues = vi.fn().mockReturnValue({ onConflictDoNothing: mockOnConflict });
+      mockInsert.mockReturnValue({ values: mockValues });
+
+      const { createEpisodeNotifications } = await import(
+        "@/trigger/helpers/notifications"
+      );
+      await createEpisodeNotifications(1, 100, "PI-100", "Test Podcast", "New episode: Test Episode");
+
+      expect(mockSendPushToUser).not.toHaveBeenCalled();
+    });
+
+    it("only pushes to users whose row was actually inserted (partial conflict)", async () => {
+      // user-a and user-b both subscribe; only user-a's row is new this poll.
+      mockUserSubsFindMany.mockResolvedValueOnce([
+        { userId: "user-a" },
+        { userId: "user-b" },
+      ]);
+      mockUsersFindMany.mockResolvedValueOnce([
+        { id: "user-a", preferences: { digestFrequency: "realtime", pushEnabled: true } },
+        { id: "user-b", preferences: { digestFrequency: "realtime", pushEnabled: true } },
+      ]);
+
+      const mockReturning = vi.fn().mockResolvedValue([{ userId: "user-a" }]);
+      const mockOnConflict = vi.fn().mockReturnValue({ returning: mockReturning });
+      const mockValues = vi.fn().mockReturnValue({ onConflictDoNothing: mockOnConflict });
+      mockInsert.mockReturnValue({ values: mockValues });
+
+      const { createEpisodeNotifications } = await import(
+        "@/trigger/helpers/notifications"
+      );
+      await createEpisodeNotifications(1, 100, "PI-100", "Test Podcast", "New episode: Test Episode");
+
+      expect(mockSendPushToUser).toHaveBeenCalledTimes(1);
+      expect(mockSendPushToUser).toHaveBeenCalledWith(
+        "user-a",
+        expect.anything(),
+        expect.anything()
+      );
+    });
+
+    it("passes the partial-index where predicate to onConflictDoNothing", async () => {
+      // Postgres requires an explicit index_predicate matching the partial unique
+      // index (WHERE episode_id IS NOT NULL) to infer it as the conflict arbiter.
+      mockUserSubsFindMany.mockResolvedValueOnce([{ userId: "user-1" }]);
+      mockUsersFindMany.mockResolvedValueOnce([
+        { id: "user-1", preferences: {} },
+      ]);
+
+      const mockReturning = vi.fn().mockResolvedValue([]);
+      const mockOnConflict = vi.fn().mockReturnValue({ returning: mockReturning });
+      const mockValues = vi.fn().mockReturnValue({ onConflictDoNothing: mockOnConflict });
+      mockInsert.mockReturnValue({ values: mockValues });
+
+      const { createEpisodeNotifications } = await import(
+        "@/trigger/helpers/notifications"
+      );
+      await createEpisodeNotifications(1, 100, "PI-100", "Test Podcast", "New episode: Test Episode");
+
+      expect(mockOnConflict).toHaveBeenCalledWith(
+        expect.objectContaining({ where: expect.anything() })
       );
     });
 
@@ -316,6 +392,34 @@ describe("trigger/helpers/notifications", () => {
       expect(mockSet).toHaveBeenCalledWith(
         expect.objectContaining({ title: "Test Podcast" })
       );
+    });
+
+    it("set() contains exactly body/title/isRead — no updatedAt or other stray keys", async () => {
+      // Schema invariant (ADR-035): the `notifications` table has no `updatedAt`
+      // column. Adding it to the set clause would crash production silently —
+      // this strict assertion pins the three allowed keys and will fail if a
+      // future refactor reintroduces `updatedAt` or adds any other field.
+      mockUserSubsFindMany.mockResolvedValueOnce([{ userId: "user-1" }]);
+      mockUsersFindMany.mockResolvedValueOnce([
+        { id: "user-1", preferences: {} },
+      ]);
+
+      const mockReturning = vi.fn().mockResolvedValue([{ userId: "user-1" }]);
+      const mockWhere = vi.fn().mockReturnValue({ returning: mockReturning });
+      const mockSet = vi.fn().mockReturnValue({ where: mockWhere });
+      mockUpdate.mockReturnValue({ set: mockSet });
+
+      const { markSummaryReady } = await import(
+        "@/trigger/helpers/notifications"
+      );
+      await markSummaryReady(1, 100, "PI-100", "Test Podcast", "Summary ready: Test Episode");
+
+      expect(mockSet).toHaveBeenCalledTimes(1);
+      expect(mockSet.mock.calls[0][0]).toEqual({
+        body: "Summary ready: Test Episode",
+        title: "Test Podcast",
+        isRead: false,
+      });
     });
 
     it("dispatches push with tag=episode-${episodeId} for realtime users whose row was updated", async () => {

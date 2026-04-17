@@ -111,24 +111,30 @@ export async function pollSingleFeed(podcast: typeof podcasts.$inferSelect) {
         .returning({ id: episodes.id, podcastIndexId: episodes.podcastIndexId });
 
       // Create discovery notifications for newly-inserted episodes.
-      // Wrapped in try/catch so a notification failure never blocks batchTrigger.
-      try {
-        for (const row of inserted) {
-          const ep = newEpisodes.find((e) => String(e.id) === row.podcastIndexId);
-          const title = ep?.title ?? row.podcastIndexId;
+      // Per-episode try/catch so one failure doesn't abort remaining rows or
+      // block the downstream batchTrigger — notifications are best-effort, the
+      // transcript/summarize pipeline is the critical path.
+      for (const row of inserted) {
+        const ep = newEpisodes.find((e) => String(e.id) === row.podcastIndexId);
+        const episodeTitle = ep?.title ?? row.podcastIndexId;
+        try {
           await createEpisodeNotifications(
             podcast.id,
             row.id,
             row.podcastIndexId,
             podcast.title,
-            `New episode: ${title}`
+            `New episode: ${episodeTitle}`
           );
+        } catch (notifErr) {
+          logger.error("Failed to create episode notifications", {
+            feedId: podcast.podcastIndexId,
+            podcastTitle: podcast.title,
+            episodeId: row.id,
+            podcastIndexEpisodeId: row.podcastIndexId,
+            error: notifErr instanceof Error ? notifErr.message : String(notifErr),
+            stack: notifErr instanceof Error ? notifErr.stack : undefined,
+          });
         }
-      } catch (notifErr) {
-        logger.error("Failed to create episode notifications", {
-          feedId: podcast.podcastIndexId,
-          error: notifErr instanceof Error ? notifErr.message : String(notifErr),
-        });
       }
 
       const batchItems = newEpisodes.map((ep) => ({

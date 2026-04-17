@@ -1,5 +1,5 @@
 import { logger } from "@trigger.dev/sdk";
-import { eq, and, inArray } from "drizzle-orm";
+import { eq, and, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { sendPushToUser } from "@/lib/push";
 import { ROUTES } from "@/lib/routes";
@@ -76,20 +76,33 @@ export async function createEpisodeNotifications(
     body,
   }));
 
-  await db
+  // `where` predicate mirrors the partial unique index (drizzle/0019):
+  // `UNIQUE (user_id, episode_id) WHERE episode_id IS NOT NULL`.
+  // Postgres requires an explicit `index_predicate` to infer a partial index as
+  // the conflict arbiter — without it, ON CONFLICT raises at runtime.
+  const insertedRows = await db
     .insert(notifications)
     .values(records)
-    .onConflictDoNothing({ target: [notifications.userId, notifications.episodeId] })
+    .onConflictDoNothing({
+      target: [notifications.userId, notifications.episodeId],
+      where: sql`${notifications.episodeId} is not null`,
+    })
     .returning({ userId: notifications.userId });
 
   logger.info("Created episode notifications for subscribers", {
     podcastId,
     episodeId,
-    count: records.length,
+    intended: records.length,
+    inserted: insertedRows.length,
   });
 
+  if (insertedRows.length === 0) return;
+
+  const insertedUserIds = new Set(insertedRows.map((r) => r.userId));
   const subscriberIds = subscribers.map((s) => s.userId);
-  const realtimeUserIds = await getRealtimeUserIds(subscriberIds);
+  const realtimeUserIds = (await getRealtimeUserIds(subscriberIds)).filter((id) =>
+    insertedUserIds.has(id)
+  );
   const episodePushUrl = ROUTES.episode(podcastIndexEpisodeId);
   const tag = `episode-${episodeId}`;
 
