@@ -110,12 +110,6 @@ export async function TrendingDetailContent({ slug }: { slug: string }) {
         <div className="space-y-6">
           <h1 className="text-3xl font-bold tracking-tight">{topic.name}</h1>
 
-          {isTrendingSnapshotStale(generatedAt) && (
-            <p className="text-sm text-muted-foreground">
-              These trending topics may be out of date.
-            </p>
-          )}
-
           <TopicSwitcher topics={allTopics} activeSlug={slug} />
 
           <div>
@@ -123,6 +117,11 @@ export async function TrendingDetailContent({ slug }: { slug: string }) {
             <p className="text-sm text-muted-foreground">
               Past 7 days &middot; Updated {formatRelativeTime(generatedAt)}
             </p>
+            {isTrendingSnapshotStale(generatedAt) && (
+              <p className="text-sm text-muted-foreground">
+                These trending topics may be out of date.
+              </p>
+            )}
           </div>
 
           {episodes.length === 0 ? (
@@ -136,6 +135,13 @@ export async function TrendingDetailContent({ slug }: { slug: string }) {
           )}
         </div>
       );
+    }
+
+    default: {
+      // Exhaustiveness guard: if TrendingTopicDetailResult gains a new kind,
+      // TypeScript will reject this assignment so the case gets handled.
+      const _exhaustive: never = result;
+      return _exhaustive;
     }
   }
 }

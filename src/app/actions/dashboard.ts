@@ -517,6 +517,13 @@ export async function getTrendingTopicBySlug(slug: string): Promise<TrendingTopi
     // The display limit below runs at the DB layer so ordering applies to the full
     // candidate set — truncating by LLM-output order here would silently drop
     // high-scored episodes at positions beyond the cap.
+    if (topic.episodeIds.length > 500) {
+      console.warn("Trending topic exceeded 500-episode safety cap:", {
+        slug,
+        name: topic.name,
+        actualLength: topic.episodeIds.length,
+      });
+    }
     const episodeIds = topic.episodeIds.slice(0, 500);
 
     const rows = await db
