@@ -1,7 +1,13 @@
 "use client"
 
 import Link from "next/link"
-import { SignedIn, SignedOut, UserButton } from "@clerk/nextjs"
+import {
+  SignInButton,
+  SignUpButton,
+  SignedIn,
+  SignedOut,
+  UserButton,
+} from "@clerk/nextjs"
 import { Button } from "@/components/ui/button"
 import { Headphones } from "lucide-react"
 import { ThemeToggle } from "@/components/layout/theme-toggle"
@@ -22,16 +28,14 @@ export function LandingHeader() {
           </SignedIn>
           <SignedOut>
             <div className="flex gap-2">
-              <Button variant="ghost" size="sm" asChild>
-                <Link href={process.env.NEXT_PUBLIC_CLERK_SIGN_IN_URL ?? "/sign-in"}>
+              <SignInButton>
+                <Button variant="ghost" size="sm">
                   Sign In
-                </Link>
-              </Button>
-              <Button size="sm" asChild>
-                <Link href={process.env.NEXT_PUBLIC_CLERK_SIGN_UP_URL ?? "/sign-up"}>
-                  Sign Up
-                </Link>
-              </Button>
+                </Button>
+              </SignInButton>
+              <SignUpButton>
+                <Button size="sm">Sign Up</Button>
+              </SignUpButton>
             </div>
           </SignedOut>
         </div>

@@ -14,8 +14,9 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
   const { isVisible } = useAudioPlayerState()
   // Compute admin status once at the AppShell level and pass down, so SidebarNav
   // instances (desktop aside + mobile sheet) share a single Clerk hook call.
-  const { has } = useAuth()
-  const isAdmin = has?.({ role: ADMIN_ROLE }) ?? false
+  // Gate on isLoaded to avoid a false-negative flash while Clerk is hydrating.
+  const { isLoaded, has } = useAuth()
+  const isAdmin = isLoaded ? (has?.({ role: ADMIN_ROLE }) ?? false) : false
 
   return (
     <div className="min-h-screen bg-background">

@@ -3,7 +3,7 @@ import type { ReactNode } from "react"
 import { SidebarCountsProvider } from "@/contexts/sidebar-counts-context"
 import { Sheet, SheetContent } from "@/components/ui/sheet"
 import { Sidebar } from "@/components/layout/sidebar"
-import { setStorybookIsAdmin } from "../../../.storybook/mocks/clerk"
+import { setStorybookIsAdmin } from "@storybook-mocks/clerk"
 
 // ---------------------------------------------------------------------------
 // Provider decorator — wraps stories that need SidebarCountsProvider.

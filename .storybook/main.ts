@@ -12,6 +12,8 @@ const config: StorybookConfig = {
     config.resolve = config.resolve || {};
     // Use array format so specific aliases are checked before the general "@" prefix
     config.resolve.alias = [
+      // Storybook-mock alias so stories can import helpers without relative paths escaping src/
+      { find: "@storybook-mocks", replacement: path.resolve(__dirname, "mocks") },
       // Stub out server-only and provider-dependent modules for Storybook's browser build
       { find: "@clerk/nextjs/server", replacement: path.resolve(__dirname, "mocks/clerk-server.ts") },
       { find: "@clerk/nextjs", replacement: path.resolve(__dirname, "mocks/clerk.ts") },

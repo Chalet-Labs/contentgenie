@@ -11,6 +11,8 @@ vi.mock("@clerk/nextjs", () => ({
   SignedIn: () => null,
   SignedOut: ({ children }: { children: React.ReactNode }) => <>{children}</>,
   UserButton: () => <div data-testid="user-button" />,
+  SignInButton: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  SignUpButton: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }))
 
 vi.mock("@/components/ui/button", () => ({
@@ -47,10 +49,10 @@ describe("LandingHeader — signed out", () => {
     expect(logoLink).toHaveAttribute("href", "/")
   })
 
-  it("renders Sign In and Sign Up links when signed out", () => {
+  it("renders Sign In and Sign Up CTAs when signed out", () => {
     render(<LandingHeader />)
-    expect(screen.getByRole("link", { name: /sign in/i })).toBeInTheDocument()
-    expect(screen.getByRole("link", { name: /sign up/i })).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: /sign in/i })).toBeInTheDocument()
+    expect(screen.getByRole("button", { name: /sign up/i })).toBeInTheDocument()
   })
 
   it("does not render a hamburger or sheet trigger", () => {
