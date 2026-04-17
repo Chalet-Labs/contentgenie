@@ -14,7 +14,7 @@ import {
   type TrendingTopic,
 } from "@/db/schema";
 import { type RecommendedEpisodeDTO } from "@/db/library-columns";
-import { slugify } from "@/lib/utils";
+import { getTopicSlug } from "@/lib/trending";
 import {
   getEpisodesByFeedId,
   type PodcastIndexEpisode,
@@ -495,9 +495,7 @@ export async function getTrendingTopicBySlug(slug: string): Promise<{
     }
 
     const allTopics = latest.topics;
-    // Pre-#279 snapshot rows don't have a slug key in the JSON payload even
-    // though the TS type says string; fall back to deriving it from the name.
-    const topic = allTopics.find((t) => (t.slug ?? slugify(t.name)) === slug) ?? null;
+    const topic = allTopics.find((t) => getTopicSlug(t) === slug) ?? null;
 
     if (!topic || topic.episodeIds.length === 0) {
       return { topic, allTopics, episodes: [], generatedAt: latest.generatedAt, error: null };

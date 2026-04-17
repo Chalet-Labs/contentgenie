@@ -8,7 +8,8 @@ vi.mock("@/app/actions/dashboard", () => ({
   getTrendingTopicBySlug: (slug: string) => mockGetTrendingTopicBySlug(slug),
 }));
 
-import { TrendingDetailContent, STALE_THRESHOLD_MS } from "../trending-detail-content";
+import { TrendingDetailContent } from "../trending-detail-content";
+import { STALE_THRESHOLD_MS } from "@/lib/trending";
 
 const aiTopic: TrendingTopic = {
   name: "Artificial Intelligence",
@@ -41,12 +42,6 @@ const mockEpisode: RecommendedEpisodeDTO = {
   topRankedTopic: null,
 };
 
-// Helper — render an async server component
-async function renderAsync(slug: string) {
-  const ui = await TrendingDetailContent({ slug });
-  return render(ui);
-}
-
 describe("TrendingDetailContent", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -65,7 +60,7 @@ describe("TrendingDetailContent", () => {
       error: "Failed to load topic",
     });
 
-    await renderAsync("artificial-intelligence");
+    render(await TrendingDetailContent({ slug: "artificial-intelligence" }));
 
     expect(screen.getByRole("heading", { name: "Trending topics unavailable" })).toBeInTheDocument();
     expect(screen.getByText(/refresh the page or try again/i)).toBeInTheDocument();
@@ -73,7 +68,6 @@ describe("TrendingDetailContent", () => {
       "href",
       "/dashboard",
     );
-    // The empty-state heading must NOT appear when an error is surfaced.
     expect(screen.queryByRole("heading", { name: "No trending topics right now" })).not.toBeInTheDocument();
   });
 
@@ -86,7 +80,7 @@ describe("TrendingDetailContent", () => {
       error: null,
     });
 
-    await renderAsync("anything");
+    render(await TrendingDetailContent({ slug: "anything" }));
 
     expect(screen.getByRole("heading", { name: "No trending topics right now" })).toBeInTheDocument();
     expect(screen.getByText(/new trending topics are generated daily/i)).toBeInTheDocument();
@@ -105,13 +99,12 @@ describe("TrendingDetailContent", () => {
       error: null,
     });
 
-    await renderAsync("unknown-slug");
+    render(await TrendingDetailContent({ slug: "unknown-slug" }));
 
     expect(
       screen.getByRole("heading", { name: "This topic is no longer trending" }),
     ).toBeInTheDocument();
     expect(screen.getByText(/didn't make the latest trending snapshot/i)).toBeInTheDocument();
-    // Both topics appear in the switcher.
     expect(screen.getByRole("link", { name: "Artificial Intelligence" })).toHaveAttribute(
       "href",
       "/trending/artificial-intelligence",
@@ -123,7 +116,7 @@ describe("TrendingDetailContent", () => {
   });
 
   it("renders happy path without stale notice for a fresh snapshot", async () => {
-    const freshGeneratedAt = new Date(Date.now() - 60 * 60 * 1000); // 1h ago
+    const freshGeneratedAt = new Date(Date.now() - 60 * 60 * 1000);
     mockGetTrendingTopicBySlug.mockResolvedValue({
       topic: aiTopic,
       allTopics: [aiTopic, climateTopic],
@@ -132,7 +125,7 @@ describe("TrendingDetailContent", () => {
       error: null,
     });
 
-    await renderAsync("artificial-intelligence");
+    render(await TrendingDetailContent({ slug: "artificial-intelligence" }));
 
     expect(screen.getByRole("heading", { level: 1, name: aiTopic.name })).toBeInTheDocument();
     expect(screen.queryByText(/may be out of date/i)).not.toBeInTheDocument();
@@ -142,7 +135,7 @@ describe("TrendingDetailContent", () => {
   });
 
   it("renders stale notice when snapshot is older than STALE_THRESHOLD_MS", async () => {
-    const staleGeneratedAt = new Date(Date.now() - STALE_THRESHOLD_MS - 60_000); // just past threshold
+    const staleGeneratedAt = new Date(Date.now() - STALE_THRESHOLD_MS - 60_000);
     mockGetTrendingTopicBySlug.mockResolvedValue({
       topic: aiTopic,
       allTopics: [aiTopic],
@@ -151,7 +144,7 @@ describe("TrendingDetailContent", () => {
       error: null,
     });
 
-    await renderAsync("artificial-intelligence");
+    render(await TrendingDetailContent({ slug: "artificial-intelligence" }));
 
     expect(screen.getByText(/these trending topics may be out of date/i)).toBeInTheDocument();
   });
@@ -165,7 +158,7 @@ describe("TrendingDetailContent", () => {
       error: null,
     });
 
-    await renderAsync("artificial-intelligence");
+    render(await TrendingDetailContent({ slug: "artificial-intelligence" }));
 
     expect(screen.getByText(/no episodes available for this topic yet/i)).toBeInTheDocument();
   });

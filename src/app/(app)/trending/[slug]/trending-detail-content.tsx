@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { Rss } from "lucide-react";
@@ -6,10 +7,25 @@ import { TopicSwitcher } from "@/components/trending/topic-switcher";
 import { WorthItBadge } from "@/components/episodes/worth-it-badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { formatDate, formatDuration, formatRelativeTime, stripHtml } from "@/lib/utils";
+import { isTrendingSnapshotStale } from "@/lib/trending";
 import type { RecommendedEpisodeDTO } from "@/db/library-columns";
 
-// Two daily-cron cycles missed; trending snapshots are generated once per day.
-export const STALE_THRESHOLD_MS = 48 * 60 * 60 * 1000;
+function FallbackCard({ heading, body, children }: { heading: string; body: string; children?: ReactNode }) {
+  return (
+    <div className="space-y-6">
+      <h1 className="text-3xl font-bold tracking-tight">{heading}</h1>
+      <Card>
+        <CardContent className="space-y-4 pt-6">
+          <p className="text-sm text-muted-foreground">{body}</p>
+          {children}
+          <Link href="/dashboard" className="text-sm text-primary underline-offset-4 hover:underline">
+            Back to dashboard
+          </Link>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
 
 function EpisodeCard({ episode }: { episode: RecommendedEpisodeDTO }) {
   return (
@@ -58,54 +74,36 @@ export async function TrendingDetailContent({ slug }: { slug: string }) {
   if (error) {
     console.error("[TrendingDetailContent] slug=%s error=%s", slug, error);
     return (
-      <div className="space-y-6">
-        <h1 className="text-3xl font-bold tracking-tight">Trending topics unavailable</h1>
-        <Card>
-          <CardContent className="space-y-4 pt-6">
-            <p className="text-sm text-muted-foreground">
-              We couldn&apos;t load trending topics right now. Refresh the page or try again in a moment.
-            </p>
-            <Link href="/dashboard" className="text-sm text-primary underline-offset-4 hover:underline">
-              Back to dashboard
-            </Link>
-          </CardContent>
-        </Card>
-      </div>
+      <FallbackCard
+        heading="Trending topics unavailable"
+        body="We couldn't load trending topics right now. Refresh the page or try again in a moment."
+      />
     );
   }
 
   if (!topic) {
-    // Two empty states: no snapshot at all vs. a current snapshot that just
-    // doesn't include this slug (e.g. the topic fell out of the latest run).
-    const heading = allTopics.length === 0 ? "No trending topics right now" : "This topic is no longer trending";
-    const body =
-      allTopics.length === 0
-        ? "Check back soon — new trending topics are generated daily."
-        : "This topic didn't make the latest trending snapshot. Browse other topics below.";
-
+    // Two empty states: no snapshot at all (allTopics empty) vs. a current
+    // snapshot that just doesn't include this slug (topic fell out of the run).
+    const isEmpty = allTopics.length === 0;
     return (
-      <div className="space-y-6">
-        <h1 className="text-3xl font-bold tracking-tight">{heading}</h1>
-        <Card>
-          <CardContent className="space-y-4 pt-6">
-            <p className="text-sm text-muted-foreground">{body}</p>
-            <TopicSwitcher topics={allTopics} activeSlug={slug} />
-            <Link href="/dashboard" className="text-sm text-primary underline-offset-4 hover:underline">
-              Back to dashboard
-            </Link>
-          </CardContent>
-        </Card>
-      </div>
+      <FallbackCard
+        heading={isEmpty ? "No trending topics right now" : "This topic is no longer trending"}
+        body={
+          isEmpty
+            ? "Check back soon — new trending topics are generated daily."
+            : "This topic didn't make the latest trending snapshot. Browse other topics below."
+        }
+      >
+        <TopicSwitcher topics={allTopics} activeSlug={slug} />
+      </FallbackCard>
     );
   }
-
-  const isStale = generatedAt != null && Date.now() - generatedAt.getTime() > STALE_THRESHOLD_MS;
 
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-bold tracking-tight">{topic.name}</h1>
 
-      {isStale && (
+      {isTrendingSnapshotStale(generatedAt) && (
         <p className="text-sm text-muted-foreground">
           These trending topics may be out of date.
         </p>
