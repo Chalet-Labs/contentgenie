@@ -144,8 +144,10 @@ export async function TrendingDetailContent({ slug }: { slug: string }) {
     default: {
       // Exhaustiveness guard: if TrendingTopicDetailResult gains a new kind,
       // TypeScript will reject this assignment so the case gets handled.
+      // Throw rather than return so any bypass of type-checking fails loudly
+      // at runtime instead of rendering nothing.
       const _exhaustive: never = result;
-      return _exhaustive;
+      throw new Error(`Unhandled TrendingTopicDetailResult kind: ${JSON.stringify(_exhaustive)}`);
     }
   }
 }
