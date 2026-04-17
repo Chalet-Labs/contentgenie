@@ -28,6 +28,16 @@ const bottomLinks = [
   { href: "/settings", label: "Settings", icon: Settings },
 ]
 
+function MaybeSheetClose({
+  inSheet,
+  children,
+}: {
+  inSheet: boolean
+  children: React.ReactElement
+}) {
+  return inSheet ? <SheetClose asChild>{children}</SheetClose> : children
+}
+
 function SidebarNav({ inSheet }: { inSheet: boolean }) {
   const pathname = usePathname()
   const counts = useSidebarCounts()
@@ -42,26 +52,22 @@ function SidebarNav({ inSheet }: { inSheet: boolean }) {
             const Icon = link.icon
             const isActive = pathname === link.href || pathname?.startsWith(`${link.href}/`)
             const badge = getBadgeCount(link.href, counts)
-            const anchor = (
-              <Link
-                href={link.href}
-                className={cn(
-                  "flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors",
-                  isActive
-                    ? "bg-accent text-accent-foreground"
-                    : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                )}
-              >
-                <Icon className="h-4 w-4" />
-                {link.label}
-                {badge !== null && <NavBadge count={badge} />}
-              </Link>
-            )
-
-            return inSheet ? (
-              <SheetClose key={link.href} asChild>{anchor}</SheetClose>
-            ) : (
-              <React.Fragment key={link.href}>{anchor}</React.Fragment>
+            return (
+              <MaybeSheetClose key={link.href} inSheet={inSheet}>
+                <Link
+                  href={link.href}
+                  className={cn(
+                    "flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors",
+                    isActive
+                      ? "bg-accent text-accent-foreground"
+                      : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                  )}
+                >
+                  <Icon className="h-4 w-4" />
+                  {link.label}
+                  {badge !== null && <NavBadge count={badge} />}
+                </Link>
+              </MaybeSheetClose>
             )
           })}
         </nav>
@@ -85,28 +91,25 @@ function SidebarNav({ inSheet }: { inSheet: boolean }) {
           {bottomLinks.map((link) => {
             const Icon = link.icon
             const isActive = pathname === link.href
-            const anchor = (
-              <Link
-                href={link.href}
-                className={cn(
-                  "flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors",
-                  isActive
-                    ? "bg-accent text-accent-foreground"
-                    : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-                )}
-              >
-                <Icon className="h-4 w-4" />
-                {link.label}
-              </Link>
-            )
-            return inSheet ? (
-              <SheetClose key={link.href} asChild>{anchor}</SheetClose>
-            ) : (
-              <React.Fragment key={link.href}>{anchor}</React.Fragment>
+            return (
+              <MaybeSheetClose key={link.href} inSheet={inSheet}>
+                <Link
+                  href={link.href}
+                  className={cn(
+                    "flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors",
+                    isActive
+                      ? "bg-accent text-accent-foreground"
+                      : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                  )}
+                >
+                  <Icon className="h-4 w-4" />
+                  {link.label}
+                </Link>
+              </MaybeSheetClose>
             )
           })}
-          {isAdmin && (() => {
-            const adminAnchor = (
+          {isAdmin && (
+            <MaybeSheetClose inSheet={inSheet}>
               <Link
                 href="/admin"
                 className={cn(
@@ -119,11 +122,8 @@ function SidebarNav({ inSheet }: { inSheet: boolean }) {
                 <Shield className="size-4" />
                 Admin
               </Link>
-            )
-            return inSheet ? (
-              <SheetClose asChild>{adminAnchor}</SheetClose>
-            ) : adminAnchor
-          })()}
+            </MaybeSheetClose>
+          )}
         </nav>
       </div>
     </>

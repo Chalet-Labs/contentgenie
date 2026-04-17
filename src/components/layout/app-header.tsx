@@ -38,7 +38,7 @@ export function AppHeader() {
               <Menu className="h-5 w-5" />
             </Button>
           </SheetTrigger>
-          <SheetContent side="left" className="w-[280px] sm:w-[320px] p-0">
+          <SheetContent side="left" className="w-[280px] sm:w-[320px] p-0 flex flex-col">
             <SheetTitle className="sr-only">Navigation</SheetTitle>
             <Sidebar inSheet />
           </SheetContent>

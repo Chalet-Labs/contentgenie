@@ -88,7 +88,7 @@ export const InSheet: Story = {
   decorators: [
     (Story) => (
       <Sheet defaultOpen>
-        <SheetContent side="left" className="w-[280px] sm:w-[320px] p-0">
+        <SheetContent side="left" className="w-[280px] sm:w-[320px] p-0 flex flex-col">
           <Story />
         </SheetContent>
       </Sheet>
@@ -101,7 +101,7 @@ export const InSheetWithAdmin: Story = {
   decorators: [
     (Story) => (
       <Sheet defaultOpen>
-        <SheetContent side="left" className="w-[280px] sm:w-[320px] p-0">
+        <SheetContent side="left" className="w-[280px] sm:w-[320px] p-0 flex flex-col">
           <Story />
         </SheetContent>
       </Sheet>
