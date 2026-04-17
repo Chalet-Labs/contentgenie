@@ -2,22 +2,43 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 import { render, screen, fireEvent, within } from "@testing-library/react"
 import { AppHeader } from "@/components/layout/app-header"
 import React, { createContext, useState, useContext } from "react"
+import { ADMIN_ROLE } from "@/lib/auth-roles"
 
-const mockUseAuth = vi.fn()
+const mockHas = vi.fn()
+const mockUsePathname = vi.fn(() => "/dashboard")
+const mockCounts = { subscriptionCount: 0, savedCount: 0, isLoading: false }
+
+// Leaf-level mocks only — real Sidebar renders through these so the integration
+// (AppHeader → Sheet → Sidebar → SheetClose → setOpen) is exercised end-to-end.
+vi.mock("next/navigation", () => ({
+  usePathname: () => mockUsePathname(),
+}))
 
 vi.mock("@/contexts/sidebar-counts-context", () => ({
-  useSidebarCounts: () => ({ subscriptionCount: 0, savedCount: 0, isLoading: false }),
-  useSidebarCountsOptional: () => ({ subscriptionCount: 0, savedCount: 0, isLoading: false }),
-  getBadgeCount: () => null,
-  NavBadge: ({ count }: { count: number }) => <span>{count}</span>,
+  useSidebarCounts: () => mockCounts,
+  getBadgeCount: (
+    href: string,
+    counts: { subscriptionCount: number; savedCount: number; isLoading: boolean }
+  ): number | null => {
+    if (counts.isLoading) return null
+    if (href === "/subscriptions" && counts.subscriptionCount > 0) return counts.subscriptionCount
+    if (href === "/library" && counts.savedCount > 0) return counts.savedCount
+    return null
+  },
+  NavBadge: ({ count }: { count: number }) => <span>{count > 99 ? "99+" : count}</span>,
 }))
 
 vi.mock("@clerk/nextjs", () => ({
   SignedIn: ({ children }: { children: React.ReactNode }) => <>{children}</>,
   SignedOut: () => null,
   UserButton: () => <div data-testid="user-button" />,
-  OrganizationSwitcher: () => null,
-  useAuth: () => mockUseAuth(),
+  OrganizationSwitcher: () => <div data-testid="org-switcher" />,
+  useAuth: () => ({
+    isLoaded: true,
+    isSignedIn: true,
+    userId: "test-user-id",
+    has: mockHas,
+  }),
 }))
 
 vi.mock("next-themes", () => ({
@@ -59,18 +80,13 @@ vi.mock("@/components/ui/separator", () => ({
   Separator: () => <hr />,
 }))
 
-// --- Shared Sheet state context ---
-// Created at module level so both the Sheet mock and the Sidebar mock can access it.
+// Stateful Sheet mock — mirrors header.test.tsx pattern.
+// SheetClose wraps children via cloneElement so the REAL Sidebar's SheetClose
+// wrappers actually trigger setOpen(false) when a link is clicked.
 type SheetState = { open: boolean; setOpen: (v: boolean) => void }
 const SheetStateContext = createContext<SheetState>({ open: false, setOpen: () => {} })
 
-// Stateful Sheet mock — mirrors header.test.tsx pattern.
 vi.mock("@/components/ui/sheet", () => {
-  // We import from the test module's outer scope via a factory pattern.
-  // The context is defined outside so the Sidebar mock can share it.
-  // vi.mock factories can't close over module-level vars directly, so
-  // we create a local alias that references the top-level context via
-  // a getter attached to globalThis.
   const getCtx = () =>
     (globalThis as { __SheetStateContext?: typeof SheetStateContext }).__SheetStateContext!
 
@@ -84,12 +100,7 @@ vi.mock("@/components/ui/sheet", () => {
     )
   }
 
-  const SheetTrigger = ({
-    children,
-  }: {
-    children: React.ReactNode
-    asChild?: boolean
-  }) => {
+  const SheetTrigger = ({ children }: { children: React.ReactNode; asChild?: boolean }) => {
     const { setOpen } = useContext(getCtx())
     return (
       <div data-testid="sheet-trigger" onClick={() => setOpen(true)}>
@@ -135,48 +146,14 @@ vi.mock("@/components/ui/sheet", () => {
   return { Sheet, SheetTrigger, SheetContent, SheetClose, SheetTitle }
 })
 
-// Sidebar mock — renders nav links; wraps in SheetClose when inSheet.
-// Uses the same SheetStateContext as the Sheet mock via globalThis.
-vi.mock("@/components/layout/sidebar", () => {
-  const getCtx = () =>
-    (globalThis as { __SheetStateContext?: typeof SheetStateContext }).__SheetStateContext!
-
-  const SidebarMock = ({ inSheet }: { inSheet?: boolean }) => {
-    const { setOpen } = useContext(getCtx())
-
-    const links = [
-      { href: "/dashboard", label: "Dashboard" },
-      { href: "/discover", label: "Discover" },
-      { href: "/subscriptions", label: "Subscriptions" },
-      { href: "/library", label: "Library" },
-      { href: "/settings", label: "Settings" },
-      ...(inSheet ? [{ href: "/admin", label: "Admin" }] : []),
-    ]
-
-    return (
-      <div data-testid="sidebar-mock" data-in-sheet={String(Boolean(inSheet))}>
-        {links.map(({ href, label }) => (
-          <a
-            key={href}
-            href={href}
-            onClick={inSheet ? () => setOpen(false) : undefined}
-          >
-            {label}
-          </a>
-        ))}
-      </div>
-    )
-  }
-  return { Sidebar: SidebarMock }
-})
-
-// Register the context on globalThis before tests run so mocks can access it.
+// Register context on globalThis so the Sheet mock can access it from its factory.
 ;(globalThis as { __SheetStateContext?: typeof SheetStateContext }).__SheetStateContext =
   SheetStateContext
 
 describe("AppHeader — hamburger accessible label", () => {
   beforeEach(() => {
-    mockUseAuth.mockReturnValue({ has: () => false })
+    mockHas.mockReturnValue(false)
+    mockUsePathname.mockReturnValue("/dashboard")
   })
 
   it("hamburger button has accessible label 'Open navigation menu'", () => {
@@ -187,9 +164,10 @@ describe("AppHeader — hamburger accessible label", () => {
   })
 })
 
-describe("AppHeader — mobile sheet", () => {
+describe("AppHeader — mobile sheet (real Sidebar integration)", () => {
   beforeEach(() => {
-    mockUseAuth.mockReturnValue({ has: () => false })
+    mockHas.mockReturnValue(false)
+    mockUsePathname.mockReturnValue("/dashboard")
   })
 
   it("hamburger SheetTrigger is present and opens the sheet", () => {
@@ -201,16 +179,27 @@ describe("AppHeader — mobile sheet", () => {
     expect(screen.getByTestId("sheet-content")).toBeInTheDocument()
   })
 
-  it("sheet content renders Sidebar with inSheet prop", () => {
+  it("sheet content renders the real Sidebar nav links", () => {
     render(<AppHeader />)
     fireEvent.click(screen.getByTestId("sheet-trigger"))
 
     const sheetContent = screen.getByTestId("sheet-content")
-    const sidebar = within(sheetContent).getByTestId("sidebar-mock")
-    expect(sidebar).toHaveAttribute("data-in-sheet", "true")
+    expect(within(sheetContent).getByRole("link", { name: /dashboard/i })).toBeInTheDocument()
+    expect(within(sheetContent).getByRole("link", { name: /discover/i })).toBeInTheDocument()
+    expect(within(sheetContent).getByRole("link", { name: /subscriptions/i })).toBeInTheDocument()
+    expect(within(sheetContent).getByRole("link", { name: /library/i })).toBeInTheDocument()
+    expect(within(sheetContent).getByRole("link", { name: /settings/i })).toBeInTheDocument()
   })
 
-  it("tapping a nav link (Dashboard) inside the sheet closes the sheet", () => {
+  it("sheet content renders the OrganizationSwitcher from Sidebar", () => {
+    render(<AppHeader />)
+    fireEvent.click(screen.getByTestId("sheet-trigger"))
+
+    const sheetContent = screen.getByTestId("sheet-content")
+    expect(within(sheetContent).getByTestId("org-switcher")).toBeInTheDocument()
+  })
+
+  it("tapping Dashboard closes the sheet via SheetClose (regression #276)", () => {
     render(<AppHeader />)
     fireEvent.click(screen.getByTestId("sheet-trigger"))
 
@@ -221,7 +210,7 @@ describe("AppHeader — mobile sheet", () => {
     expect(screen.queryByTestId("sheet-content")).not.toBeInTheDocument()
   })
 
-  it("tapping the /settings link inside the sheet closes the sheet", () => {
+  it("tapping Settings closes the sheet via SheetClose", () => {
     render(<AppHeader />)
     fireEvent.click(screen.getByTestId("sheet-trigger"))
 
@@ -232,17 +221,18 @@ describe("AppHeader — mobile sheet", () => {
     expect(screen.queryByTestId("sheet-content")).not.toBeInTheDocument()
   })
 
-  it("admin link is visible inside the sheet when user has admin role", () => {
-    mockUseAuth.mockReturnValue({ has: () => true })
+  it("admin link is visible inside the sheet when useAuth().has returns true for ADMIN_ROLE", () => {
+    mockHas.mockImplementation((arg) => arg?.role === ADMIN_ROLE)
     render(<AppHeader />)
     fireEvent.click(screen.getByTestId("sheet-trigger"))
 
     const sheetContent = screen.getByTestId("sheet-content")
     expect(within(sheetContent).getByRole("link", { name: /admin/i })).toBeInTheDocument()
+    expect(mockHas).toHaveBeenCalledWith({ role: ADMIN_ROLE })
   })
 
-  it("tapping the admin link inside the sheet closes the sheet", () => {
-    mockUseAuth.mockReturnValue({ has: () => true })
+  it("tapping admin link closes the sheet via SheetClose", () => {
+    mockHas.mockImplementation((arg) => arg?.role === ADMIN_ROLE)
     render(<AppHeader />)
     fireEvent.click(screen.getByTestId("sheet-trigger"))
 
@@ -252,20 +242,60 @@ describe("AppHeader — mobile sheet", () => {
 
     expect(screen.queryByTestId("sheet-content")).not.toBeInTheDocument()
   })
+
+  it("admin link is NOT visible when useAuth().has returns false", () => {
+    mockHas.mockReturnValue(false)
+    render(<AppHeader />)
+    fireEvent.click(screen.getByTestId("sheet-trigger"))
+
+    const sheetContent = screen.getByTestId("sheet-content")
+    expect(within(sheetContent).queryByRole("link", { name: /admin/i })).not.toBeInTheDocument()
+  })
+
+  it("active Dashboard link has active styling when pathname matches", () => {
+    mockUsePathname.mockReturnValue("/dashboard")
+    render(<AppHeader />)
+    fireEvent.click(screen.getByTestId("sheet-trigger"))
+
+    const sheetContent = screen.getByTestId("sheet-content")
+    const dashboardLink = within(sheetContent).getByRole("link", { name: /dashboard/i })
+    expect(dashboardLink.className).toContain("bg-accent")
+    expect(dashboardLink.className).toContain("text-accent-foreground")
+  })
+
+  it("renders badges on Subscriptions/Library in sheet when counts are provided", () => {
+    mockCounts.subscriptionCount = 5
+    mockCounts.savedCount = 12
+    try {
+      render(<AppHeader />)
+      fireEvent.click(screen.getByTestId("sheet-trigger"))
+
+      const sheetContent = screen.getByTestId("sheet-content")
+      const subscriptionsLink = within(sheetContent).getByRole("link", { name: /subscriptions/i })
+      const libraryLink = within(sheetContent).getByRole("link", { name: /library/i })
+      expect(subscriptionsLink).toHaveTextContent("5")
+      expect(libraryLink).toHaveTextContent("12")
+    } finally {
+      mockCounts.subscriptionCount = 0
+      mockCounts.savedCount = 0
+    }
+  })
 })
 
 describe("AppHeader — utility bar (no inline nav links)", () => {
   beforeEach(() => {
-    mockUseAuth.mockReturnValue({ has: () => false })
+    mockHas.mockReturnValue(false)
+    mockUsePathname.mockReturnValue("/dashboard")
   })
 
-  it("does not render nav links (Dashboard/Discover/etc.) outside the sheet", () => {
+  it("does not render nav links outside the (closed) sheet", () => {
     render(<AppHeader />)
-    // Sheet is closed — these links should not be in the DOM at all
+    // Sheet is closed — Sidebar content not rendered at all
     expect(screen.queryByRole("link", { name: /dashboard/i })).not.toBeInTheDocument()
     expect(screen.queryByRole("link", { name: /discover/i })).not.toBeInTheDocument()
     expect(screen.queryByRole("link", { name: /subscriptions/i })).not.toBeInTheDocument()
     expect(screen.queryByRole("link", { name: /library/i })).not.toBeInTheDocument()
+    expect(screen.queryByRole("link", { name: /settings/i })).not.toBeInTheDocument()
   })
 
   it("header element is present", () => {

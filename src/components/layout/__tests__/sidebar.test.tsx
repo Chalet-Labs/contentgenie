@@ -1,9 +1,21 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
-import { render, screen, within } from "@testing-library/react"
+import { render, screen, within, fireEvent } from "@testing-library/react"
 import { Sidebar } from "@/components/layout/sidebar"
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
+import { ADMIN_ROLE } from "@/lib/auth-roles"
 import React from "react"
 
 const mockUseSidebarCounts = vi.fn()
+const mockUsePathname = vi.fn(() => "/")
+
+// Override the global next/navigation mock so tests can control pathname.
+vi.mock("next/navigation", () => ({
+  usePathname: () => mockUsePathname(),
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn(), forward: vi.fn(), refresh: vi.fn(), prefetch: vi.fn() }),
+  useSearchParams: () => new URLSearchParams(),
+  useParams: () => ({}),
+}))
+
 vi.mock("@/contexts/sidebar-counts-context", () => ({
   useSidebarCounts: () => mockUseSidebarCounts(),
   getBadgeCount: (
@@ -180,69 +192,97 @@ describe("Sidebar — inSheet mode", () => {
     mockHas.mockReturnValue(false)
   })
 
-  it("tapping a nav link (Dashboard) in sheet mode closes the sheet via SheetClose", () => {
-    // Wrap Sidebar in a Sheet so SheetClose has a provider
-    const { getByTestId } = render(
-      // We simulate the Sheet wrapper that AppHeader would provide
-      <div>
-        <div data-testid="sheet-trigger-wrapper">
-          {/* Manually open the sheet by rendering Sidebar directly in open state */}
-        </div>
-        <div data-testid="sheet-content">
+  // Helper: open the Sheet, then render the real Sidebar inside it so SheetClose
+  // wrappers have a real provider and setOpen handler from the mock's context.
+  const renderSidebarInOpenSheet = () => {
+    const result = render(
+      <Sheet>
+        <SheetTrigger>open</SheetTrigger>
+        <SheetContent>
           <Sidebar inSheet />
-        </div>
-      </div>
+        </SheetContent>
+      </Sheet>
     )
+    fireEvent.click(screen.getByTestId("sheet-trigger"))
+    return result
+  }
 
-    // The links should be in the DOM (sheet-content is rendered)
-    const sheetContent = getByTestId("sheet-content")
+  it("tapping Dashboard closes the sheet via SheetClose (regression #276)", () => {
+    renderSidebarInOpenSheet()
+    const sheetContent = screen.getByTestId("sheet-content")
     const dashboardLink = within(sheetContent).getByRole("link", { name: /dashboard/i })
 
-    // SheetClose mock wraps the link and calls setOpen(false) on click.
-    // Since we're not inside a real Sheet provider here, SheetClose falls through
-    // to the non-asChild branch — but the link is still clickable and rendered.
-    expect(dashboardLink).toBeInTheDocument()
+    fireEvent.click(dashboardLink)
+
+    expect(screen.queryByTestId("sheet-content")).not.toBeInTheDocument()
   })
 
-  it("renders admin link in inSheet mode when user has admin role", () => {
-    mockHas.mockReturnValue(true)
-    render(
-      <div data-testid="sheet-content">
-        <Sidebar inSheet />
-      </div>
-    )
-    expect(screen.getByRole("link", { name: /admin/i })).toBeInTheDocument()
+  it("tapping Settings closes the sheet via SheetClose", () => {
+    renderSidebarInOpenSheet()
+    const sheetContent = screen.getByTestId("sheet-content")
+    const settingsLink = within(sheetContent).getByRole("link", { name: /settings/i })
+
+    fireEvent.click(settingsLink)
+
+    expect(screen.queryByTestId("sheet-content")).not.toBeInTheDocument()
   })
 
-  it("does not render admin link in inSheet mode when user is not admin", () => {
+  it("tapping Admin closes the sheet via SheetClose", () => {
+    mockHas.mockImplementation((arg) => arg?.role === ADMIN_ROLE)
+    renderSidebarInOpenSheet()
+    const sheetContent = screen.getByTestId("sheet-content")
+    const adminLink = within(sheetContent).getByRole("link", { name: /admin/i })
+
+    fireEvent.click(adminLink)
+
+    expect(screen.queryByTestId("sheet-content")).not.toBeInTheDocument()
+  })
+
+  it("admin link is visible when useAuth().has is called with { role: ADMIN_ROLE }", () => {
+    mockHas.mockImplementation((arg) => arg?.role === ADMIN_ROLE)
+    renderSidebarInOpenSheet()
+    expect(
+      within(screen.getByTestId("sheet-content")).getByRole("link", { name: /admin/i })
+    ).toBeInTheDocument()
+    expect(mockHas).toHaveBeenCalledWith({ role: ADMIN_ROLE })
+  })
+
+  it("does not render admin link when useAuth().has returns false", () => {
     mockHas.mockReturnValue(false)
-    render(<Sidebar inSheet />)
-    expect(screen.queryByRole("link", { name: /admin/i })).not.toBeInTheDocument()
+    renderSidebarInOpenSheet()
+    expect(
+      within(screen.getByTestId("sheet-content")).queryByRole("link", { name: /admin/i })
+    ).not.toBeInTheDocument()
   })
 
   it("renders OrganizationSwitcher in inSheet mode", () => {
-    render(<Sidebar inSheet />)
-    expect(screen.getByTestId("org-switcher")).toBeInTheDocument()
+    renderSidebarInOpenSheet()
+    expect(
+      within(screen.getByTestId("sheet-content")).getByTestId("org-switcher")
+    ).toBeInTheDocument()
   })
 
-  it("tapping Dashboard closes the sheet when inside a Sheet provider", () => {
-    const Wrapper = () => {
-      const [open, setOpen] = React.useState(true)
-      return (
-        <div>
-          {open && (
-            <div data-testid="sheet-content">
-              <Sidebar inSheet />
-            </div>
-          )}
-        </div>
-      )
-    }
+  it("active link has active styling (bg-accent) when pathname matches", () => {
+    mockUsePathname.mockReturnValue("/library")
+    renderSidebarInOpenSheet()
+    const libraryLink = within(screen.getByTestId("sheet-content")).getByRole("link", {
+      name: /library/i,
+    })
+    expect(libraryLink.className).toContain("bg-accent")
+    expect(libraryLink.className).toContain("text-accent-foreground")
+  })
 
-    render(<Wrapper />)
-    // The SheetClose mock wraps the link — clicking it calls setOpen(false) in the
-    // mock Sheet context. Here we verify the link renders inside the sheet content.
+  it("renders badges on Subscriptions/Library when counts are provided in inSheet mode", () => {
+    mockUseSidebarCounts.mockReturnValue({
+      subscriptionCount: 7,
+      savedCount: 42,
+      isLoading: false,
+    })
+    renderSidebarInOpenSheet()
     const sheetContent = screen.getByTestId("sheet-content")
-    expect(within(sheetContent).getByRole("link", { name: /dashboard/i })).toBeInTheDocument()
+    expect(within(sheetContent).getByRole("link", { name: /subscriptions/i })).toHaveTextContent(
+      "7"
+    )
+    expect(within(sheetContent).getByRole("link", { name: /library/i })).toHaveTextContent("42")
   })
 })
