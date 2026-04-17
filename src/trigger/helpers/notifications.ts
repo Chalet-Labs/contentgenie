@@ -22,6 +22,7 @@ async function getSubscribers(podcastId: number) {
 }
 
 async function getRealtimeUserIds(userIds: string[]) {
+  if (userIds.length === 0) return [];
   const usersWithPrefs = await db.query.users.findMany({
     where: inArray(users.id, userIds),
     columns: { id: true, preferences: true },
@@ -50,45 +51,54 @@ async function dispatchPush(
   );
 }
 
-// Intersect realtime subscribers with the userIds whose rows were actually
-// touched by INSERT/UPDATE (.returning()) so we only push for rows that
-// changed — avoiding duplicate pushes on conflict and updates to stale rows.
+// Query realtime prefs directly for the userIds whose rows were actually
+// touched (INSERT/UPDATE `.returning()`), avoiding a fan-out fetch across
+// every subscriber followed by a post-filter.
 async function realtimePushTargets(
-  subscriberIds: string[],
   affectedRows: { userId: string }[]
 ): Promise<string[]> {
-  const affected = new Set(affectedRows.map((r) => r.userId));
-  const realtime = await getRealtimeUserIds(subscriberIds);
-  return realtime.filter((id) => affected.has(id));
+  if (affectedRows.length === 0) return [];
+  const uniqueUserIds = Array.from(new Set(affectedRows.map((r) => r.userId)));
+  return getRealtimeUserIds(uniqueUserIds);
 }
 
 const episodeTag = (episodeId: number) => `episode-${episodeId}`;
 
+export type NewEpisodeInput = {
+  episodeId: number;
+  podcastIndexEpisodeId: string;
+  title: string;
+  body: string;
+};
+
 /**
- * INSERT a notification row per subscriber on episode discovery.
- * Uses onConflictDoNothing so poller retries are safe.
+ * INSERT a notification row per subscriber for each newly-discovered episode,
+ * in a single batched statement. Idempotent via the partial unique index on
+ * `(user_id, episode_id) WHERE episode_id IS NOT NULL AND type = 'new_episode'`
+ * — on retry, only genuinely-new `(user, episode)` pairs are inserted and
+ * pushed.
  */
 export async function createEpisodeNotifications(
   podcastId: number,
-  episodeId: number,
-  podcastIndexEpisodeId: string,
-  title: string,
-  body: string
+  episodes: NewEpisodeInput[]
 ): Promise<void> {
-  const subscribers = await getSubscribers(podcastId);
+  if (episodes.length === 0) return;
 
+  const subscribers = await getSubscribers(podcastId);
   if (subscribers.length === 0) {
     logger.info("No subscribers with notifications enabled", { podcastId });
     return;
   }
 
-  const records: NewNotification[] = subscribers.map((sub) => ({
-    type: "new_episode" as const,
-    userId: sub.userId,
-    episodeId,
-    title,
-    body,
-  }));
+  const records: NewNotification[] = subscribers.flatMap((sub) =>
+    episodes.map((ep) => ({
+      type: "new_episode" as const,
+      userId: sub.userId,
+      episodeId: ep.episodeId,
+      title: ep.title,
+      body: ep.body,
+    }))
+  );
 
   // `where` predicate mirrors the partial unique index (drizzle/0019):
   // `UNIQUE (user_id, episode_id) WHERE episode_id IS NOT NULL AND type = 'new_episode'`.
@@ -103,27 +113,46 @@ export async function createEpisodeNotifications(
       target: [notifications.userId, notifications.episodeId],
       where: sql`${notifications.episodeId} is not null and ${notifications.type} = 'new_episode'`,
     })
-    .returning({ userId: notifications.userId });
+    .returning({
+      userId: notifications.userId,
+      episodeId: notifications.episodeId,
+    });
 
   logger.info("Created episode notifications for subscribers", {
     podcastId,
-    episodeId,
+    episodeCount: episodes.length,
     intended: records.length,
     inserted: insertedRows.length,
   });
 
   if (insertedRows.length === 0) return;
 
-  const subscriberIds = subscribers.map((s) => s.userId);
-  const targets = await realtimePushTargets(subscriberIds, insertedRows);
+  const realtimeUserIds = new Set(await realtimePushTargets(insertedRows));
+  if (realtimeUserIds.size === 0) return;
 
-  await dispatchPush(
-    targets,
-    title,
-    body,
-    episodeTag(episodeId),
-    ROUTES.episode(podcastIndexEpisodeId)
-  );
+  // Group inserted rows by episode so each push carries the right tag + URL.
+  const targetsByEpisode = new Map<number, string[]>();
+  for (const row of insertedRows) {
+    if (row.episodeId == null || !realtimeUserIds.has(row.userId)) continue;
+    const list = targetsByEpisode.get(row.episodeId);
+    if (list) {
+      list.push(row.userId);
+    } else {
+      targetsByEpisode.set(row.episodeId, [row.userId]);
+    }
+  }
+
+  for (const ep of episodes) {
+    const targets = targetsByEpisode.get(ep.episodeId);
+    if (!targets || targets.length === 0) continue;
+    await dispatchPush(
+      targets,
+      ep.title,
+      ep.body,
+      episodeTag(ep.episodeId),
+      ROUTES.episode(ep.podcastIndexEpisodeId)
+    );
+  }
 }
 
 /**
@@ -175,7 +204,7 @@ export async function markSummaryReady(
     count: updatedRows.length,
   });
 
-  const targets = await realtimePushTargets(subscriberIds, updatedRows);
+  const targets = await realtimePushTargets(updatedRows);
 
   await dispatchPush(
     targets,

@@ -108,50 +108,58 @@ describe("trigger/helpers/notifications", () => {
   });
 
   describe("createEpisodeNotifications", () => {
-    it("inserts one row per subscriber with notificationsEnabled=true", async () => {
+    const singleEpisode = [
+      {
+        episodeId: 100,
+        podcastIndexEpisodeId: "PI-100",
+        title: "Test Podcast",
+        body: "New episode: Test Episode",
+      },
+    ];
+
+    const stubInsertChain = (returning: unknown[]) => {
+      const mockReturning = vi.fn().mockResolvedValue(returning);
+      const mockOnConflict = vi.fn().mockReturnValue({ returning: mockReturning });
+      const mockValues = vi.fn().mockReturnValue({ onConflictDoNothing: mockOnConflict });
+      mockInsert.mockReturnValue({ values: mockValues });
+      return { mockReturning, mockOnConflict, mockValues };
+    };
+
+    it("inserts one row per (subscriber, episode) pair across the batch", async () => {
       mockUserSubsFindMany.mockResolvedValueOnce([
         { userId: "user-1" },
         { userId: "user-2" },
       ]);
-      mockUsersFindMany.mockResolvedValueOnce([
-        { id: "user-1", preferences: {} },
-        { id: "user-2", preferences: {} },
-      ]);
-
-      const mockReturning = vi.fn().mockResolvedValue([]);
-      const mockOnConflict = vi.fn().mockReturnValue({ returning: mockReturning });
-      const mockValues = vi.fn().mockReturnValue({ onConflictDoNothing: mockOnConflict });
-      mockInsert.mockReturnValue({ values: mockValues });
+      const { mockValues } = stubInsertChain([]);
 
       const { createEpisodeNotifications } = await import(
         "@/trigger/helpers/notifications"
       );
-      await createEpisodeNotifications(1, 100, "PI-100", "Test Podcast", "New episode: Test Episode");
+      await createEpisodeNotifications(1, [
+        { episodeId: 100, podcastIndexEpisodeId: "PI-100", title: "Test Podcast", body: "New episode: Ep X" },
+        { episodeId: 101, podcastIndexEpisodeId: "PI-101", title: "Test Podcast", body: "New episode: Ep Y" },
+      ]);
 
+      // 2 subscribers × 2 episodes = 4 records
+      expect(mockValues.mock.calls[0][0]).toHaveLength(4);
       expect(mockValues).toHaveBeenCalledWith(
         expect.arrayContaining([
-          expect.objectContaining({ userId: "user-1", type: "new_episode" }),
-          expect.objectContaining({ userId: "user-2", type: "new_episode" }),
+          expect.objectContaining({ userId: "user-1", episodeId: 100, type: "new_episode" }),
+          expect.objectContaining({ userId: "user-1", episodeId: 101, type: "new_episode" }),
+          expect.objectContaining({ userId: "user-2", episodeId: 100, type: "new_episode" }),
+          expect.objectContaining({ userId: "user-2", episodeId: 101, type: "new_episode" }),
         ])
       );
-      expect(mockValues.mock.calls[0][0]).toHaveLength(2);
     });
 
     it("body starts with 'New episode: '", async () => {
       mockUserSubsFindMany.mockResolvedValueOnce([{ userId: "user-1" }]);
-      mockUsersFindMany.mockResolvedValueOnce([
-        { id: "user-1", preferences: {} },
-      ]);
-
-      const mockReturning = vi.fn().mockResolvedValue([]);
-      const mockOnConflict = vi.fn().mockReturnValue({ returning: mockReturning });
-      const mockValues = vi.fn().mockReturnValue({ onConflictDoNothing: mockOnConflict });
-      mockInsert.mockReturnValue({ values: mockValues });
+      const { mockValues } = stubInsertChain([]);
 
       const { createEpisodeNotifications } = await import(
         "@/trigger/helpers/notifications"
       );
-      await createEpisodeNotifications(1, 100, "PI-100", "Test Podcast", "New episode: Test Episode");
+      await createEpisodeNotifications(1, singleEpisode);
 
       expect(mockValues).toHaveBeenCalledWith(
         expect.arrayContaining([
@@ -162,19 +170,12 @@ describe("trigger/helpers/notifications", () => {
 
     it("uses onConflictDoNothing with userId and episodeId as target", async () => {
       mockUserSubsFindMany.mockResolvedValueOnce([{ userId: "user-1" }]);
-      mockUsersFindMany.mockResolvedValueOnce([
-        { id: "user-1", preferences: {} },
-      ]);
-
-      const mockReturning = vi.fn().mockResolvedValue([]);
-      const mockOnConflict = vi.fn().mockReturnValue({ returning: mockReturning });
-      const mockValues = vi.fn().mockReturnValue({ onConflictDoNothing: mockOnConflict });
-      mockInsert.mockReturnValue({ values: mockValues });
+      const { mockOnConflict } = stubInsertChain([]);
 
       const { createEpisodeNotifications } = await import(
         "@/trigger/helpers/notifications"
       );
-      await createEpisodeNotifications(1, 100, "PI-100", "Test Podcast", "New episode: Test Episode");
+      await createEpisodeNotifications(1, singleEpisode);
 
       expect(mockOnConflict).toHaveBeenCalledWith(
         expect.objectContaining({ target: expect.arrayContaining(["userId", "episodeId"]) })
@@ -189,16 +190,12 @@ describe("trigger/helpers/notifications", () => {
           preferences: { digestFrequency: "realtime", pushEnabled: true },
         },
       ]);
-
-      const mockReturning = vi.fn().mockResolvedValue([{ userId: "user-realtime" }]);
-      const mockOnConflict = vi.fn().mockReturnValue({ returning: mockReturning });
-      const mockValues = vi.fn().mockReturnValue({ onConflictDoNothing: mockOnConflict });
-      mockInsert.mockReturnValue({ values: mockValues });
+      stubInsertChain([{ userId: "user-realtime", episodeId: 100 }]);
 
       const { createEpisodeNotifications } = await import(
         "@/trigger/helpers/notifications"
       );
-      await createEpisodeNotifications(1, 100, "PI-100", "Test Podcast", "New episode: Test Episode");
+      await createEpisodeNotifications(1, singleEpisode);
 
       expect(mockSendPushToUser).toHaveBeenCalledWith(
         "user-realtime",
@@ -207,7 +204,7 @@ describe("trigger/helpers/notifications", () => {
       );
     });
 
-    it("push URL derives from podcastIndexEpisodeId without a DB lookup", async () => {
+    it("push URL derives from each episode's podcastIndexEpisodeId", async () => {
       mockUserSubsFindMany.mockResolvedValueOnce([{ userId: "user-realtime" }]);
       mockUsersFindMany.mockResolvedValueOnce([
         {
@@ -215,16 +212,14 @@ describe("trigger/helpers/notifications", () => {
           preferences: { digestFrequency: "realtime", pushEnabled: true },
         },
       ]);
-
-      const mockReturning = vi.fn().mockResolvedValue([{ userId: "user-realtime" }]);
-      const mockOnConflict = vi.fn().mockReturnValue({ returning: mockReturning });
-      const mockValues = vi.fn().mockReturnValue({ onConflictDoNothing: mockOnConflict });
-      mockInsert.mockReturnValue({ values: mockValues });
+      stubInsertChain([{ userId: "user-realtime", episodeId: 100 }]);
 
       const { createEpisodeNotifications } = await import(
         "@/trigger/helpers/notifications"
       );
-      await createEpisodeNotifications(1, 100, "PI-999", "Test Podcast", "New episode: Test");
+      await createEpisodeNotifications(1, [
+        { episodeId: 100, podcastIndexEpisodeId: "PI-999", title: "Test Podcast", body: "New episode: Test" },
+      ]);
 
       expect(mockSendPushToUser).toHaveBeenCalledWith(
         "user-realtime",
@@ -235,22 +230,12 @@ describe("trigger/helpers/notifications", () => {
 
     it("skips push entirely when all rows conflict (empty .returning())", async () => {
       mockUserSubsFindMany.mockResolvedValueOnce([{ userId: "user-realtime" }]);
-      mockUsersFindMany.mockResolvedValueOnce([
-        {
-          id: "user-realtime",
-          preferences: { digestFrequency: "realtime", pushEnabled: true },
-        },
-      ]);
-
-      const mockReturning = vi.fn().mockResolvedValue([]);
-      const mockOnConflict = vi.fn().mockReturnValue({ returning: mockReturning });
-      const mockValues = vi.fn().mockReturnValue({ onConflictDoNothing: mockOnConflict });
-      mockInsert.mockReturnValue({ values: mockValues });
+      stubInsertChain([]);
 
       const { createEpisodeNotifications } = await import(
         "@/trigger/helpers/notifications"
       );
-      await createEpisodeNotifications(1, 100, "PI-100", "Test Podcast", "New episode: Test Episode");
+      await createEpisodeNotifications(1, singleEpisode);
 
       expect(mockSendPushToUser).not.toHaveBeenCalled();
     });
@@ -264,16 +249,12 @@ describe("trigger/helpers/notifications", () => {
         { id: "user-a", preferences: { digestFrequency: "realtime", pushEnabled: true } },
         { id: "user-b", preferences: { digestFrequency: "realtime", pushEnabled: true } },
       ]);
-
-      const mockReturning = vi.fn().mockResolvedValue([{ userId: "user-a" }]);
-      const mockOnConflict = vi.fn().mockReturnValue({ returning: mockReturning });
-      const mockValues = vi.fn().mockReturnValue({ onConflictDoNothing: mockOnConflict });
-      mockInsert.mockReturnValue({ values: mockValues });
+      stubInsertChain([{ userId: "user-a", episodeId: 100 }]);
 
       const { createEpisodeNotifications } = await import(
         "@/trigger/helpers/notifications"
       );
-      await createEpisodeNotifications(1, 100, "PI-100", "Test Podcast", "New episode: Test Episode");
+      await createEpisodeNotifications(1, singleEpisode);
 
       expect(mockSendPushToUser).toHaveBeenCalledTimes(1);
       expect(mockSendPushToUser).toHaveBeenCalledWith(
@@ -283,26 +264,61 @@ describe("trigger/helpers/notifications", () => {
       );
     });
 
-    it("passes the partial-index where predicate to onConflictDoNothing", async () => {
-      // Postgres requires index_predicate to infer a partial unique index.
+    it("groups pushes by episode — each recipient gets the right tag+url per episode", async () => {
       mockUserSubsFindMany.mockResolvedValueOnce([{ userId: "user-1" }]);
       mockUsersFindMany.mockResolvedValueOnce([
-        { id: "user-1", preferences: {} },
+        { id: "user-1", preferences: { digestFrequency: "realtime", pushEnabled: true } },
       ]);
-
-      const mockReturning = vi.fn().mockResolvedValue([]);
-      const mockOnConflict = vi.fn().mockReturnValue({ returning: mockReturning });
-      const mockValues = vi.fn().mockReturnValue({ onConflictDoNothing: mockOnConflict });
-      mockInsert.mockReturnValue({ values: mockValues });
+      stubInsertChain([
+        { userId: "user-1", episodeId: 100 },
+        { userId: "user-1", episodeId: 101 },
+      ]);
 
       const { createEpisodeNotifications } = await import(
         "@/trigger/helpers/notifications"
       );
-      await createEpisodeNotifications(1, 100, "PI-100", "Test Podcast", "New episode: Test Episode");
+      await createEpisodeNotifications(1, [
+        { episodeId: 100, podcastIndexEpisodeId: "PI-100", title: "Show", body: "New episode: A" },
+        { episodeId: 101, podcastIndexEpisodeId: "PI-101", title: "Show", body: "New episode: B" },
+      ]);
+
+      expect(mockSendPushToUser).toHaveBeenCalledTimes(2);
+      expect(mockSendPushToUser).toHaveBeenCalledWith(
+        "user-1",
+        expect.objectContaining({ tag: "episode-100", data: { url: "/episode/PI-100" } }),
+        expect.anything()
+      );
+      expect(mockSendPushToUser).toHaveBeenCalledWith(
+        "user-1",
+        expect.objectContaining({ tag: "episode-101", data: { url: "/episode/PI-101" } }),
+        expect.anything()
+      );
+    });
+
+    it("passes the partial-index where predicate to onConflictDoNothing", async () => {
+      // Postgres requires index_predicate to infer a partial unique index.
+      mockUserSubsFindMany.mockResolvedValueOnce([{ userId: "user-1" }]);
+      const { mockOnConflict } = stubInsertChain([]);
+
+      const { createEpisodeNotifications } = await import(
+        "@/trigger/helpers/notifications"
+      );
+      await createEpisodeNotifications(1, singleEpisode);
 
       expect(mockOnConflict).toHaveBeenCalledWith(
         expect.objectContaining({ where: expect.anything() })
       );
+    });
+
+    it("no-ops when episodes array is empty", async () => {
+      const { createEpisodeNotifications } = await import(
+        "@/trigger/helpers/notifications"
+      );
+      await createEpisodeNotifications(1, []);
+
+      expect(mockUserSubsFindMany).not.toHaveBeenCalled();
+      expect(mockInsert).not.toHaveBeenCalled();
+      expect(mockSendPushToUser).not.toHaveBeenCalled();
     });
 
     it("no-ops when no subscribers have notifications enabled", async () => {
@@ -311,34 +327,52 @@ describe("trigger/helpers/notifications", () => {
       const { createEpisodeNotifications } = await import(
         "@/trigger/helpers/notifications"
       );
-      await createEpisodeNotifications(1, 100, "PI-100", "Test Podcast", "New episode: Test");
+      await createEpisodeNotifications(1, singleEpisode);
 
       expect(mockInsert).not.toHaveBeenCalled();
       expect(mockSendPushToUser).not.toHaveBeenCalled();
     });
 
-    it("does not dispatch push for non-realtime users", async () => {
-      mockUserSubsFindMany.mockResolvedValueOnce([
-        { userId: "user-daily" },
-      ]);
+    it("does not dispatch push for non-realtime users (prefs filter)", async () => {
+      mockUserSubsFindMany.mockResolvedValueOnce([{ userId: "user-daily" }]);
       mockUsersFindMany.mockResolvedValueOnce([
         {
           id: "user-daily",
           preferences: { digestFrequency: "daily", pushEnabled: true },
         },
       ]);
-
-      const mockReturning = vi.fn().mockResolvedValue([]);
-      const mockOnConflict = vi.fn().mockReturnValue({ returning: mockReturning });
-      const mockValues = vi.fn().mockReturnValue({ onConflictDoNothing: mockOnConflict });
-      mockInsert.mockReturnValue({ values: mockValues });
+      stubInsertChain([{ userId: "user-daily", episodeId: 100 }]);
 
       const { createEpisodeNotifications } = await import(
         "@/trigger/helpers/notifications"
       );
-      await createEpisodeNotifications(1, 100, "PI-100", "Test Podcast", "New episode: Test");
+      await createEpisodeNotifications(1, singleEpisode);
 
       expect(mockSendPushToUser).not.toHaveBeenCalled();
+    });
+
+    it("queries prefs only for inserted userIds, not all subscribers", async () => {
+      // realtimePushTargets now takes only affected rows — confirm prefs
+      // lookup scope matches .returning() users, not the full subscriber set.
+      mockUserSubsFindMany.mockResolvedValueOnce([
+        { userId: "user-inserted" },
+        { userId: "user-conflicted" },
+      ]);
+      mockUsersFindMany.mockResolvedValueOnce([
+        { id: "user-inserted", preferences: { digestFrequency: "realtime", pushEnabled: true } },
+      ]);
+      stubInsertChain([{ userId: "user-inserted", episodeId: 100 }]);
+
+      const { createEpisodeNotifications } = await import(
+        "@/trigger/helpers/notifications"
+      );
+      await createEpisodeNotifications(1, singleEpisode);
+
+      expect(mockUsersFindMany).toHaveBeenCalledTimes(1);
+      // prefs query received only the inserted userId, not both subscribers
+      const callArg = mockUsersFindMany.mock.calls[0][0];
+      expect(JSON.stringify(callArg)).toContain("user-inserted");
+      expect(JSON.stringify(callArg)).not.toContain("user-conflicted");
     });
   });
 
@@ -465,13 +499,12 @@ describe("trigger/helpers/notifications", () => {
         { userId: "user-updated" },
         { userId: "user-not-updated" },
       ]);
+      // realtimePushTargets now queries prefs only for the updated userIds,
+      // so the mock returns only user-updated — matching what `IN (...)`
+      // filtered on .returning() would yield in real DB.
       mockUsersFindMany.mockResolvedValueOnce([
         {
           id: "user-updated",
-          preferences: { digestFrequency: "realtime", pushEnabled: true },
-        },
-        {
-          id: "user-not-updated",
           preferences: { digestFrequency: "realtime", pushEnabled: true },
         },
       ]);
