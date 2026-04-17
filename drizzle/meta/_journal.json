@@ -134,6 +134,13 @@
       "when": 1776355910966,
       "tag": "0018_broken_emma_frost",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1776458963778,
+      "tag": "0019_lumpy_overlord",
+      "breakpoints": true
     }
   ]
 }

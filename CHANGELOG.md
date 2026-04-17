@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+- Notifications: one row per episode per subscriber. The poller creates the notification on discovery ("New episode: …"); the summarizer updates it in place when the summary lands ("Summary ready: …", unread resets). Push uses a shared `tag=episode-${episodeId}` so devices replace rather than stack. Admin-triggered re-summarization no longer produces duplicate notification rows. (#289)
+
 ### Added
 - Trending topic detail page at /trending/<slug> with horizontal topic switcher and ranked episode list sorted by worth-it score (#280)
 - Personal topic overlap indicators — shows contextual labels (e.g. "You've heard 3 similar episodes", "New topic for you") based on listen history and saved episodes. Recommendations deprioritize heavily-consumed topics (#262)

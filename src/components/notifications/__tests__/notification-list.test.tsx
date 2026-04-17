@@ -106,4 +106,19 @@ describe("NotificationList", () => {
 
     expect(onItemClick).toHaveBeenCalledTimes(1);
   });
+
+  it.each([
+    ["new_episode"],
+    ["summary_completed"],
+  ])("renders Podcast icon (not FileText) for type=%s", (type) => {
+    const { container } = render(
+      <NotificationList
+        notifications={[makeNotification({ type })]}
+      />
+    );
+
+    // Podcast icon has lucide-podcast class; FileText icon has lucide-file-text
+    expect(container.querySelector(".lucide-podcast")).toBeTruthy();
+    expect(container.querySelector(".lucide-file-text")).toBeNull();
+  });
 });

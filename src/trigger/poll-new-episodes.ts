@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { podcasts, episodes, userSubscriptions } from "@/db/schema";
 import { getEpisodesByFeedId } from "./helpers/podcastindex";
 import { fetchTranscriptTask } from "./fetch-transcript";
+import { createEpisodeNotifications } from "./helpers/notifications";
 
 /**
  * Queries podcasts that have at least one active subscriber and are sourced
@@ -89,7 +90,8 @@ export async function pollSingleFeed(podcast: typeof podcasts.$inferSelect) {
     if (newEpisodes.length > 0) {
       // Batch-insert episode stubs so persistTranscript has a row to UPDATE.
       // onConflictDoNothing guards against races with other insert paths.
-      await db
+      // .returning() yields only the rows actually inserted (conflicts excluded).
+      const inserted = await db
         .insert(episodes)
         .values(
           newEpisodes.map((ep) => ({
@@ -105,7 +107,29 @@ export async function pollSingleFeed(podcast: typeof podcasts.$inferSelect) {
             transcriptStatus: "fetching" as const,
           }))
         )
-        .onConflictDoNothing({ target: episodes.podcastIndexId });
+        .onConflictDoNothing({ target: episodes.podcastIndexId })
+        .returning({ id: episodes.id, podcastIndexId: episodes.podcastIndexId });
+
+      // Create discovery notifications for newly-inserted episodes.
+      // Wrapped in try/catch so a notification failure never blocks batchTrigger.
+      try {
+        for (const row of inserted) {
+          const ep = newEpisodes.find((e) => String(e.id) === row.podcastIndexId);
+          const title = ep?.title ?? row.podcastIndexId;
+          await createEpisodeNotifications(
+            podcast.id,
+            row.id,
+            row.podcastIndexId,
+            podcast.title,
+            `New episode: ${title}`
+          );
+        }
+      } catch (notifErr) {
+        logger.error("Failed to create episode notifications", {
+          feedId: podcast.podcastIndexId,
+          error: notifErr instanceof Error ? notifErr.message : String(notifErr),
+        });
+      }
 
       const batchItems = newEpisodes.map((ep) => ({
         payload: {

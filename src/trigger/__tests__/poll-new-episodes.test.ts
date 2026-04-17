@@ -52,7 +52,12 @@ vi.mock("@/db", () => ({
     insert: vi.fn().mockReturnValue({
       values: (...args: unknown[]) => {
         mockInsertValues(...args);
-        return { onConflictDoNothing: (...cdArgs: unknown[]) => mockOnConflictDoNothing(...cdArgs) };
+        return {
+          onConflictDoNothing: (...cdArgs: unknown[]) => {
+            mockOnConflictDoNothing(...cdArgs);
+            return { returning: (...rArgs: unknown[]) => mockOnConflictDoNothing(...rArgs) };
+          },
+        };
       },
     }),
   },
@@ -73,6 +78,12 @@ vi.mock("drizzle-orm", () => ({
 const mockGetEpisodesByFeedId = vi.fn();
 vi.mock("@/trigger/helpers/podcastindex", () => ({
   getEpisodesByFeedId: (...args: unknown[]) => mockGetEpisodesByFeedId(...args),
+}));
+
+// Mock notifications helper
+const mockCreateEpisodeNotifications = vi.fn();
+vi.mock("@/trigger/helpers/notifications", () => ({
+  createEpisodeNotifications: (...args: unknown[]) => mockCreateEpisodeNotifications(...args),
 }));
 
 import { getSubscribedPodcasts, pollSingleFeed, pollNewEpisodes } from "@/trigger/poll-new-episodes";
@@ -112,6 +123,7 @@ describe("poll-new-episodes", () => {
     mockBatchTrigger.mockResolvedValue({ id: "batch_default" });
     mockUpdateWhere.mockResolvedValue(undefined);
     mockOnConflictDoNothing.mockResolvedValue(undefined);
+    mockCreateEpisodeNotifications.mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -221,6 +233,79 @@ describe("poll-new-episodes", () => {
           options: { idempotencyKey: "poll-fetch-transcript-2002" },
         },
       ]);
+    });
+
+    it("calls createEpisodeNotifications once per newly-inserted episode row", async () => {
+      const podcast = makePodcast({ id: 1, podcastIndexId: "456", title: "My Podcast" });
+
+      mockGetEpisodesByFeedId.mockResolvedValue({
+        status: "true",
+        items: [
+          { id: 5001, title: "Episode X", enclosureUrl: "https://example.com/x.mp3", description: "Dx", duration: 600, datePublished: 1700000000, transcripts: [] },
+          { id: 5002, title: "Episode Y", enclosureUrl: "https://example.com/y.mp3", description: "Dy", duration: 900, datePublished: 1700000001, transcripts: [] },
+        ],
+        count: 2,
+      });
+
+      // No existing episodes
+      mockWhere.mockResolvedValue([]);
+
+      // Simulate .returning() returning the two newly-inserted rows
+      mockOnConflictDoNothing.mockResolvedValue([
+        { id: 10, podcastIndexId: "5001" },
+        { id: 11, podcastIndexId: "5002" },
+      ]);
+
+      await pollSingleFeed(podcast);
+
+      expect(mockCreateEpisodeNotifications).toHaveBeenCalledTimes(2);
+      expect(mockCreateEpisodeNotifications).toHaveBeenCalledWith(
+        1, 10, "5001", "My Podcast", "New episode: Episode X"
+      );
+      expect(mockCreateEpisodeNotifications).toHaveBeenCalledWith(
+        1, 11, "5002", "My Podcast", "New episode: Episode Y"
+      );
+    });
+
+    it("does not call createEpisodeNotifications when insert returns empty (all conflicts)", async () => {
+      const podcast = makePodcast({ id: 1, podcastIndexId: "456" });
+
+      mockGetEpisodesByFeedId.mockResolvedValue({
+        status: "true",
+        items: [
+          { id: 6001, title: "Episode Z", enclosureUrl: "https://example.com/z.mp3", description: "Dz", transcripts: [] },
+        ],
+        count: 1,
+      });
+
+      mockWhere.mockResolvedValue([]);
+
+      // .returning() returns empty (all rows conflicted)
+      mockOnConflictDoNothing.mockResolvedValue([]);
+
+      await pollSingleFeed(podcast);
+
+      expect(mockCreateEpisodeNotifications).not.toHaveBeenCalled();
+    });
+
+    it("still calls batchTrigger even when createEpisodeNotifications throws", async () => {
+      const podcast = makePodcast({ id: 1, podcastIndexId: "456" });
+
+      mockGetEpisodesByFeedId.mockResolvedValue({
+        status: "true",
+        items: [
+          { id: 7001, title: "Episode Fail", enclosureUrl: "https://example.com/fail.mp3", description: "Dfail", transcripts: [] },
+        ],
+        count: 1,
+      });
+
+      mockWhere.mockResolvedValue([]);
+      mockOnConflictDoNothing.mockResolvedValue([{ id: 20, podcastIndexId: "7001" }]);
+      mockCreateEpisodeNotifications.mockRejectedValue(new Error("push service down"));
+
+      // Should NOT throw — notification failure must not block batchTrigger
+      await expect(pollSingleFeed(podcast)).resolves.not.toThrow();
+      expect(mockBatchTrigger).toHaveBeenCalled();
     });
 
     it("handles API errors gracefully (error isolation)", async () => {

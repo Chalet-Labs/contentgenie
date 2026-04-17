@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Bell, FileText, Podcast } from "lucide-react";
+import { Bell, Podcast } from "lucide-react";
 import { markNotificationRead } from "@/app/actions/notifications";
 import { formatRelativeTime, cn } from "@/lib/utils";
 import { ROUTES } from "@/lib/routes";
@@ -18,10 +18,7 @@ interface NotificationItem {
   podcastTitle: string | null;
 }
 
-function NotificationIcon({ type }: { type: string }) {
-  if (type === "summary_completed") {
-    return <FileText className="h-4 w-4 text-green-500 shrink-0" />;
-  }
+function NotificationIcon() {
   return <Podcast className="h-4 w-4 text-blue-500 shrink-0" />;
 }
 
@@ -72,7 +69,7 @@ export function NotificationList({
             !notification.isRead && "bg-accent/20"
           )}
         >
-          <NotificationIcon type={notification.type} />
+          <NotificationIcon />
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium truncate">
               {notification.title}
