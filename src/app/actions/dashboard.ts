@@ -501,6 +501,10 @@ export async function getTrendingTopicBySlug(slug: string): Promise<{
       return { topic, allTopics, episodes: [], generatedAt: latest.generatedAt, error: null };
     }
 
+    // Cap to defend against a corrupted/malicious snapshot blowing up the IN clause.
+    // Upstream trending generation is bounded near 500 per topic.
+    const episodeIds = topic.episodeIds.slice(0, 500);
+
     const rows = await db
       .select({
         id: episodes.id,
@@ -516,7 +520,7 @@ export async function getTrendingTopicBySlug(slug: string): Promise<{
       })
       .from(episodes)
       .innerJoin(podcasts, eq(episodes.podcastId, podcasts.id))
-      .where(inArray(episodes.id, topic.episodeIds))
+      .where(inArray(episodes.id, episodeIds))
       // Postgres defaults DESC to NULLS FIRST; we want unscored episodes at the
       // bottom, and drizzle's desc() helper doesn't expose the nulls-ordering flag.
       .orderBy(sql`${episodes.worthItScore} DESC NULLS LAST`, desc(episodes.publishDate));

@@ -1099,9 +1099,10 @@ describe("getTrendingTopicBySlug", () => {
     expect(result.error).toBeNull();
   });
 
-  it("returns error on DB failure", async () => {
+  it("returns error on DB failure and logs the slug context", async () => {
     mockAuth.mockResolvedValue({ userId: "user_123" });
     mockFindFirst.mockRejectedValue(new Error("DB connection failed"));
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
     const { getTrendingTopicBySlug } = await import("@/app/actions/dashboard");
     const result = await getTrendingTopicBySlug("artificial-intelligence");
@@ -1111,5 +1112,11 @@ describe("getTrendingTopicBySlug", () => {
     expect(result.episodes).toEqual([]);
     expect(result.generatedAt).toBeNull();
     expect(result.error).toMatch(/failed to load/i);
+
+    // The log must carry the slug so ops can correlate failures to requests.
+    const loggedSlug = errorSpy.mock.calls.some((args) =>
+      args.some((arg) => typeof arg === "object" && arg !== null && (arg as { slug?: string }).slug === "artificial-intelligence"),
+    );
+    expect(loggedSlug).toBe(true);
   });
 });

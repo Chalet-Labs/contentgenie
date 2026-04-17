@@ -65,14 +65,17 @@ describe("TopicSwitcher", () => {
     expect(container.firstChild).toBeNull()
   })
 
-  it("dedupes topics with the same name", () => {
-    const duped = [
-      makeTopic({ name: "AI", slug: "ai-1" }),
-      makeTopic({ name: "AI", slug: "ai-2" }),
+  it("dedupes topics with the same slug and keeps distinct slugs separate", () => {
+    const topics = [
+      makeTopic({ name: "AI", slug: "ai" }),
+      makeTopic({ name: "AI", slug: "ai" }), // same slug → dedupe
+      makeTopic({ name: "AI", slug: "ai-regulation" }), // same name, different slug → keep
       makeTopic({ name: "Climate", slug: "climate" }),
     ]
-    render(<TopicSwitcher topics={duped} activeSlug="climate" />)
+    render(<TopicSwitcher topics={topics} activeSlug="climate" />)
     const aiLinks = screen.getAllByRole("link", { name: "AI" })
-    expect(aiLinks).toHaveLength(1)
+    expect(aiLinks).toHaveLength(2)
+    expect(aiLinks[0]).toHaveAttribute("href", "/trending/ai")
+    expect(aiLinks[1]).toHaveAttribute("href", "/trending/ai-regulation")
   })
 })

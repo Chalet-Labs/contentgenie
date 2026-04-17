@@ -31,6 +31,7 @@ function EpisodeCard({ episode }: { episode: RecommendedEpisodeDTO }) {
   return (
     <Link
       href={`/episode/${episode.podcastIndexId}`}
+      aria-label={`${episode.title} from ${episode.podcastTitle}`}
       className="flex gap-3 rounded-lg p-2 transition-colors hover:bg-accent"
     >
       <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-md bg-muted">
@@ -72,7 +73,7 @@ export async function TrendingDetailContent({ slug }: { slug: string }) {
   const { topic, allTopics, episodes, generatedAt, error } = await getTrendingTopicBySlug(slug);
 
   if (error) {
-    console.error("[TrendingDetailContent] slug=%s error=%s", slug, error);
+    // Action already logs the underlying error with full context; no duplicate log here.
     return (
       <FallbackCard
         heading="Trending topics unavailable"
@@ -99,11 +100,15 @@ export async function TrendingDetailContent({ slug }: { slug: string }) {
     );
   }
 
+  // Invariant: when topic is non-null, the action returns it with the same
+  // snapshot row's generatedAt, so generatedAt is guaranteed non-null here.
+  const snapshotTime = generatedAt as Date;
+
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-bold tracking-tight">{topic.name}</h1>
 
-      {isTrendingSnapshotStale(generatedAt) && (
+      {isTrendingSnapshotStale(snapshotTime) && (
         <p className="text-sm text-muted-foreground">
           These trending topics may be out of date.
         </p>
@@ -113,11 +118,9 @@ export async function TrendingDetailContent({ slug }: { slug: string }) {
 
       <div>
         <p className="mb-1 text-sm text-muted-foreground">{topic.description}</p>
-        {generatedAt && (
-          <p className="text-sm text-muted-foreground">
-            Past 7 days &middot; Updated {formatRelativeTime(generatedAt)}
-          </p>
-        )}
+        <p className="text-sm text-muted-foreground">
+          Past 7 days &middot; Updated {formatRelativeTime(snapshotTime)}
+        </p>
       </div>
 
       {episodes.length === 0 ? (
