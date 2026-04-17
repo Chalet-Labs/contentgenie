@@ -11,6 +11,7 @@ Podcast discovery, AI-powered summarization, and library management for busy pro
 ## Dev environment tips
 
 - Run `doppler setup` once after cloning to configure secrets injection. After that, `bun run dev` just works (scripts already wrap `doppler run --`).
+- Run `bun install` to install dependencies during first-time setup.
 - Use `doppler run -- <command>` if you need to run a one-off command that needs env vars outside of the bun scripts.
 - The `@/*` path alias maps to `./src/*` — use it for all imports.
 - shadcn/ui components live in `src/components/ui/`. Add new ones with `bunx shadcn@latest add <component>`.
@@ -18,15 +19,36 @@ Podcast discovery, AI-powered summarization, and library management for busy pro
 - Server actions use `"use server"` and live in `src/app/actions/`. They handle all data mutations.
 - API routes in `src/app/api/` are for proxying external services and orchestrating Trigger.dev background tasks.
 
+## Architecture map
+
+| Path | Purpose |
+|------|---------|
+| `src/app/` | Next.js App Router pages, route groups `(app)` and `(auth)` |
+| `src/app/actions/` | Server actions — all mutations (`"use server"`) |
+| `src/app/api/` | Route handlers for external API proxying & Trigger.dev orchestration |
+| `src/components/` | Shared React components (feature + UI) |
+| `src/components/ui/` | shadcn/ui primitives (do not edit by hand) |
+| `src/lib/` | Shared domain logic |
+| `src/db/` | Drizzle schema and client — the database schema is defined in `@/db/schema.ts`. Reference it anytime you need to understand the structure of data stored in the database. |
+| `src/trigger/` | Trigger.dev task definitions (background jobs) |
+| `src/hooks/`, `src/contexts/` | Client-side React hooks and context providers |
+| `src/types/` | Shared TypeScript types and type helpers |
+| `src/test/` | Test setup (`src/test/setup.ts`) and global fixtures |
+| `src/middleware.ts` | Next.js middleware (request-time auth/session) |
+| `docs/adr/` | 30+ ADRs — grep by topic before modifying related code |
+
+Coverage: Vitest enforces an 80% line-coverage threshold globally across `src/app/api/`, `src/app/actions/`, `src/components/` (excluding `ui/`), `src/lib/`, and `src/trigger/`. See `vitest.config.ts` for the exact include/exclude lists.
+
 ## Development commands
 
 ```bash
 bun run dev            # Start dev server (port 3000, Turbopack)
 bun run build          # Production build
+bun run start          # Serve the production build locally (run `bun run build` first)
 bun run lint           # ESLint (next lint)
 bun run test           # Run Vitest unit tests
 bun run test:watch     # Run tests in watch mode
-bun run test:coverage  # Run tests with coverage (80% threshold on src/lib/)
+bun run test:coverage  # Run tests with coverage (80% line threshold, see vitest.config.ts)
 bun run storybook      # Launch Storybook dev server (port 6006)
 bun run build-storybook # Build static Storybook
 bun run db:generate    # Generate Drizzle migrations
