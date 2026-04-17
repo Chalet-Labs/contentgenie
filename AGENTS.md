@@ -11,6 +11,7 @@ Podcast discovery, AI-powered summarization, and library management for busy pro
 ## Dev environment tips
 
 - Run `doppler setup` once after cloning to configure secrets injection. After that, `bun run dev` just works (scripts already wrap `doppler run --`).
+- First-time setup also needs `bun install`.
 - Use `doppler run -- <command>` if you need to run a one-off command that needs env vars outside of the bun scripts.
 - The `@/*` path alias maps to `./src/*` — use it for all imports.
 - shadcn/ui components live in `src/components/ui/`. Add new ones with `bunx shadcn@latest add <component>`.
@@ -18,11 +19,26 @@ Podcast discovery, AI-powered summarization, and library management for busy pro
 - Server actions use `"use server"` and live in `src/app/actions/`. They handle all data mutations.
 - API routes in `src/app/api/` are for proxying external services and orchestrating Trigger.dev background tasks.
 
+## Architecture map
+
+| Path | Purpose |
+|------|---------|
+| `src/app/` | Next.js App Router pages, route groups `(app)` and `(auth)` |
+| `src/app/actions/` | Server actions — all mutations (`"use server"`) |
+| `src/app/api/` | Route handlers for external API proxying & Trigger.dev orchestration |
+| `src/components/ui/` | shadcn/ui primitives (do not edit by hand) |
+| `src/lib/` | Shared domain logic — **80% coverage threshold enforced here** |
+| `src/db/` | Drizzle schema and client — the database schema is defined in `@/db/schema.ts`. Reference it anytime you need to understand the structure of data stored in the database. |
+| `src/trigger/` | Trigger.dev task definitions (background jobs) |
+| `src/hooks/`, `src/contexts/` | Client-side React hooks and context providers |
+| `docs/adr/` | 30+ ADRs — grep by topic before modifying related code |
+
 ## Development commands
 
 ```bash
 bun run dev            # Start dev server (port 3000, Turbopack)
 bun run build          # Production build
+bun run start          # Run production build locally
 bun run lint           # ESLint (next lint)
 bun run test           # Run Vitest unit tests
 bun run test:watch     # Run tests in watch mode
