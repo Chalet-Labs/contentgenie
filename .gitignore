@@ -61,3 +61,6 @@ tests/visual/.story-ids.json
 venv
 clerk-nextjs-guide
 .cache
+
+# Emdash worktree artifacts
+.emdash/
