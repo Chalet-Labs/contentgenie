@@ -932,3 +932,167 @@ describe("getRecentEpisodesFromSubscriptions", () => {
     expect(result.error).toMatch(/failed to load/i);
   });
 });
+
+describe("getTrendingTopicBySlug", () => {
+  const GENERATED_AT = new Date("2026-04-17T06:00:00Z");
+
+  const makeSnapshot = (topics: object[]) => ({
+    id: 1,
+    topics,
+    generatedAt: GENERATED_AT,
+    periodStart: new Date("2026-04-10T06:00:00Z"),
+    periodEnd: GENERATED_AT,
+    episodeCount: topics.length,
+    createdAt: GENERATED_AT,
+  });
+
+  const aiTopic = {
+    name: "Artificial Intelligence",
+    description: "AI trends",
+    episodeCount: 3,
+    episodeIds: [10, 20, 30],
+    slug: "artificial-intelligence",
+  };
+
+  const climateTopic = {
+    name: "Climate Policy",
+    description: "Climate news",
+    episodeCount: 2,
+    episodeIds: [40, 50],
+    slug: "climate-policy",
+  };
+
+  const mockEpisodeRow = {
+    id: 10,
+    podcastIndexId: "pod-10",
+    title: "AI Episode",
+    description: "About AI",
+    audioUrl: "https://example.com/ai.mp3",
+    duration: 3600,
+    publishDate: new Date("2026-04-01T00:00:00Z"),
+    worthItScore: "8.50",
+    podcastTitle: "AI Podcast",
+    podcastImageUrl: "https://example.com/ai.jpg",
+  };
+
+  const mockEpisodeRowNullScore = {
+    ...mockEpisodeRow,
+    id: 20,
+    worthItScore: null,
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+    vi.resetModules();
+  });
+
+  it("returns signed-in error when userId is null", async () => {
+    mockAuth.mockResolvedValue({ userId: null });
+
+    const { getTrendingTopicBySlug } = await import("@/app/actions/dashboard");
+    const result = await getTrendingTopicBySlug("artificial-intelligence");
+
+    expect(result.topic).toBeNull();
+    expect(result.allTopics).toEqual([]);
+    expect(result.episodes).toEqual([]);
+    expect(result.generatedAt).toBeNull();
+    expect(result.error).toMatch(/signed in/i);
+  });
+
+  it("returns empty result when no snapshot exists", async () => {
+    mockAuth.mockResolvedValue({ userId: "user_123" });
+    mockFindFirst.mockResolvedValue(undefined);
+
+    const { getTrendingTopicBySlug } = await import("@/app/actions/dashboard");
+    const result = await getTrendingTopicBySlug("artificial-intelligence");
+
+    expect(result.topic).toBeNull();
+    expect(result.allTopics).toEqual([]);
+    expect(result.episodes).toEqual([]);
+    expect(result.generatedAt).toBeNull();
+    expect(result.error).toBeNull();
+  });
+
+  it("returns topic and episodes when slug matches a topic with episodeIds", async () => {
+    mockAuth.mockResolvedValue({ userId: "user_123" });
+    mockFindFirst.mockResolvedValue(makeSnapshot([aiTopic, climateTopic]));
+    mockOrderBy.mockResolvedValue([mockEpisodeRow, mockEpisodeRowNullScore]);
+
+    const { getTrendingTopicBySlug } = await import("@/app/actions/dashboard");
+    const result = await getTrendingTopicBySlug("artificial-intelligence");
+
+    expect(result.error).toBeNull();
+    expect(result.topic).toMatchObject({ name: "Artificial Intelligence", slug: "artificial-intelligence" });
+    expect(result.allTopics).toHaveLength(2);
+    expect(result.generatedAt).toEqual(GENERATED_AT);
+    expect(result.episodes).toHaveLength(2);
+    expect(result.episodes[0].bestTopicRank).toBeNull();
+    expect(result.episodes[0].topRankedTopic).toBeNull();
+    // null-score row should still be returned (ordering is DB-side)
+    expect(result.episodes[1].worthItScore).toBeNull();
+  });
+
+  it("returns topic with empty episodes when matched topic has no episodeIds", async () => {
+    mockAuth.mockResolvedValue({ userId: "user_123" });
+    const emptyTopic = { ...aiTopic, episodeIds: [] };
+    mockFindFirst.mockResolvedValue(makeSnapshot([emptyTopic, climateTopic]));
+
+    const { getTrendingTopicBySlug } = await import("@/app/actions/dashboard");
+    const result = await getTrendingTopicBySlug("artificial-intelligence");
+
+    expect(result.error).toBeNull();
+    expect(result.topic).toMatchObject({ name: "Artificial Intelligence" });
+    expect(result.episodes).toEqual([]);
+  });
+
+  it("returns topic:null and allTopics when slug is unknown", async () => {
+    mockAuth.mockResolvedValue({ userId: "user_123" });
+    mockFindFirst.mockResolvedValue(makeSnapshot([aiTopic, climateTopic]));
+
+    const { getTrendingTopicBySlug } = await import("@/app/actions/dashboard");
+    const result = await getTrendingTopicBySlug("unknown-slug-garbage");
+
+    expect(result.topic).toBeNull();
+    expect(result.allTopics).toHaveLength(2);
+    expect(result.episodes).toEqual([]);
+    expect(result.error).toBeNull();
+  });
+
+  it("matches legacy topic without slug via slugify(name)", async () => {
+    mockAuth.mockResolvedValue({ userId: "user_123" });
+    // Legacy row: no slug field
+    const legacyTopic = {
+      name: "Space Exploration",
+      description: "Space news",
+      episodeCount: 1,
+      episodeIds: [],
+    };
+    mockFindFirst.mockResolvedValue(makeSnapshot([legacyTopic]));
+
+    const { getTrendingTopicBySlug } = await import("@/app/actions/dashboard");
+    const result = await getTrendingTopicBySlug("space-exploration");
+
+    expect(result.topic).toMatchObject({ name: "Space Exploration" });
+    expect(result.error).toBeNull();
+  });
+
+  it("returns error on DB failure", async () => {
+    mockAuth.mockResolvedValue({ userId: "user_123" });
+    mockFindFirst.mockRejectedValue(new Error("DB connection failed"));
+
+    const { getTrendingTopicBySlug } = await import("@/app/actions/dashboard");
+    const result = await getTrendingTopicBySlug("artificial-intelligence");
+
+    expect(result.topic).toBeNull();
+    expect(result.allTopics).toEqual([]);
+    expect(result.episodes).toEqual([]);
+    expect(result.generatedAt).toBeNull();
+    expect(result.error).toMatch(/failed to load/i);
+  });
+});

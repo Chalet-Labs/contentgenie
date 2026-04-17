@@ -11,8 +11,10 @@ import {
   podcasts,
   trendingTopics,
   episodeTopics,
+  type TrendingTopic,
 } from "@/db/schema";
 import { type RecommendedEpisodeDTO } from "@/db/library-columns";
+import { slugify } from "@/lib/utils";
 import {
   getEpisodesByFeedId,
   type PodcastIndexEpisode,
@@ -467,6 +469,66 @@ export async function getTrendingTopics() {
   } catch (error) {
     console.error("Error fetching trending topics:", error);
     return { topics: null, error: "Failed to load trending topics" };
+  }
+}
+
+export async function getTrendingTopicBySlug(slug: string): Promise<{
+  topic: TrendingTopic | null;
+  allTopics: TrendingTopic[];
+  episodes: RecommendedEpisodeDTO[];
+  generatedAt: Date | null;
+  error: string | null;
+}> {
+  const { userId } = await auth();
+
+  if (!userId) {
+    return { topic: null, allTopics: [], episodes: [], generatedAt: null, error: "You must be signed in" };
+  }
+
+  try {
+    const latest = await db.query.trendingTopics.findFirst({
+      orderBy: [desc(trendingTopics.generatedAt), desc(trendingTopics.id)],
+    });
+
+    if (!latest) {
+      return { topic: null, allTopics: [], episodes: [], generatedAt: null, error: null };
+    }
+
+    const allTopics = latest.topics;
+    const topic = allTopics.find((t) => (t.slug ?? slugify(t.name)) === slug) ?? null;
+
+    if (!topic || topic.episodeIds.length === 0) {
+      return { topic, allTopics, episodes: [], generatedAt: latest.generatedAt, error: null };
+    }
+
+    const rows = await db
+      .select({
+        id: episodes.id,
+        podcastIndexId: episodes.podcastIndexId,
+        title: episodes.title,
+        description: episodes.description,
+        audioUrl: episodes.audioUrl,
+        duration: episodes.duration,
+        publishDate: episodes.publishDate,
+        worthItScore: episodes.worthItScore,
+        podcastTitle: podcasts.title,
+        podcastImageUrl: podcasts.imageUrl,
+      })
+      .from(episodes)
+      .innerJoin(podcasts, eq(episodes.podcastId, podcasts.id))
+      .where(inArray(episodes.id, topic.episodeIds))
+      .orderBy(sql`${episodes.worthItScore} DESC NULLS LAST`, desc(episodes.publishDate));
+
+    const episodeResults: RecommendedEpisodeDTO[] = rows.map((r) => ({
+      ...r,
+      bestTopicRank: null,
+      topRankedTopic: null,
+    }));
+
+    return { topic, allTopics, episodes: episodeResults, generatedAt: latest.generatedAt, error: null };
+  } catch (error) {
+    console.error("Error fetching trending topic by slug:", error);
+    return { topic: null, allTopics: [], episodes: [], generatedAt: null, error: "Failed to load topic" };
   }
 }
 
