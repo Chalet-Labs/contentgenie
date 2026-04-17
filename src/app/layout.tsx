@@ -37,6 +37,7 @@ export default function RootLayout({
 }>) {
   return (
     <ClerkProvider
+      afterSignOutUrl="/"
       allowedRedirectOrigins={[
         (() => {
           try {

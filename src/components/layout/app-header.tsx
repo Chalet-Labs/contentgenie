@@ -47,7 +47,7 @@ export function AppHeader() {
           <ThemeToggle />
           <SignedIn>
             <NotificationBell />
-            <UserButton afterSignOutUrl="/" />
+            <UserButton />
           </SignedIn>
         </div>
       </div>

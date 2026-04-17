@@ -18,7 +18,7 @@ export function LandingHeader() {
         <div className="flex items-center gap-2 ml-auto">
           <ThemeToggle />
           <SignedIn>
-            <UserButton afterSignOutUrl="/" />
+            <UserButton />
           </SignedIn>
           <SignedOut>
             <div className="flex gap-2">
