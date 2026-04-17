@@ -2,9 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 import { render, screen, fireEvent, within } from "@testing-library/react"
 import { AppHeader } from "@/components/layout/app-header"
 import React from "react"
-import { ADMIN_ROLE } from "@/lib/auth-roles"
 
-const mockHas = vi.fn()
 const mockUsePathname = vi.fn(() => "/dashboard")
 const mockCounts = { subscriptionCount: 0, savedCount: 0, isLoading: false }
 
@@ -32,12 +30,6 @@ vi.mock("@clerk/nextjs", () => ({
   SignedOut: () => null,
   UserButton: () => <div data-testid="user-button" />,
   OrganizationSwitcher: () => <div data-testid="org-switcher" />,
-  useAuth: () => ({
-    isLoaded: true,
-    isSignedIn: true,
-    userId: "test-user-id",
-    has: mockHas,
-  }),
 }))
 
 vi.mock("next-themes", () => ({
@@ -87,15 +79,14 @@ vi.mock("@/components/ui/sheet", async () => {
 })
 
 beforeEach(() => {
-  mockHas.mockReturnValue(false)
   mockUsePathname.mockReturnValue("/dashboard")
   mockCounts.subscriptionCount = 0
   mockCounts.savedCount = 0
   mockCounts.isLoading = false
 })
 
-const renderAndOpenSheet = () => {
-  const result = render(<AppHeader />)
+const renderAndOpenSheet = ({ isAdmin = false }: { isAdmin?: boolean } = {}) => {
+  const result = render(<AppHeader isAdmin={isAdmin} />)
   fireEvent.click(screen.getByTestId("sheet-trigger"))
   return result
 }
@@ -104,7 +95,7 @@ const getSheetContent = () => screen.getByTestId("sheet-content")
 
 describe("AppHeader — hamburger accessible label", () => {
   it("hamburger button has accessible label 'Open navigation menu'", () => {
-    render(<AppHeader />)
+    render(<AppHeader isAdmin={false} />)
     expect(
       screen.getByRole("button", { name: /open navigation menu/i })
     ).toBeInTheDocument()
@@ -113,7 +104,7 @@ describe("AppHeader — hamburger accessible label", () => {
 
 describe("AppHeader — mobile sheet (real Sidebar integration)", () => {
   it("hamburger SheetTrigger is present and opens the sheet", () => {
-    render(<AppHeader />)
+    render(<AppHeader isAdmin={false} />)
     const trigger = screen.getByTestId("sheet-trigger")
     expect(trigger).toBeInTheDocument()
 
@@ -142,8 +133,7 @@ describe("AppHeader — mobile sheet (real Sidebar integration)", () => {
     { name: "Settings", matcher: /settings/i, admin: false },
     { name: "Admin", matcher: /admin/i, admin: true },
   ])("tapping $name closes the sheet via SheetClose", ({ matcher, admin }) => {
-    if (admin) mockHas.mockImplementation((arg) => arg?.role === ADMIN_ROLE)
-    renderAndOpenSheet()
+    renderAndOpenSheet({ isAdmin: admin })
 
     const link = within(getSheetContent()).getByRole("link", { name: matcher })
     fireEvent.click(link)
@@ -151,16 +141,13 @@ describe("AppHeader — mobile sheet (real Sidebar integration)", () => {
     expect(screen.queryByTestId("sheet-content")).not.toBeInTheDocument()
   })
 
-  it("admin link is visible inside the sheet when useAuth().has returns true for ADMIN_ROLE", () => {
-    mockHas.mockImplementation((arg) => arg?.role === ADMIN_ROLE)
-    renderAndOpenSheet()
-
+  it("admin link is visible inside the sheet when isAdmin is true", () => {
+    renderAndOpenSheet({ isAdmin: true })
     expect(within(getSheetContent()).getByRole("link", { name: /admin/i })).toBeInTheDocument()
-    expect(mockHas).toHaveBeenCalledWith({ role: ADMIN_ROLE })
   })
 
-  it("admin link is NOT visible when useAuth().has returns false", () => {
-    renderAndOpenSheet()
+  it("admin link is NOT visible when isAdmin is false", () => {
+    renderAndOpenSheet({ isAdmin: false })
     expect(within(getSheetContent()).queryByRole("link", { name: /admin/i })).not.toBeInTheDocument()
   })
 
@@ -188,7 +175,7 @@ describe("AppHeader — mobile sheet (real Sidebar integration)", () => {
 
 describe("AppHeader — utility bar (no inline nav links)", () => {
   it("does not render nav links outside the (closed) sheet", () => {
-    render(<AppHeader />)
+    render(<AppHeader isAdmin={false} />)
     expect(screen.queryByRole("link", { name: /dashboard/i })).not.toBeInTheDocument()
     expect(screen.queryByRole("link", { name: /discover/i })).not.toBeInTheDocument()
     expect(screen.queryByRole("link", { name: /subscriptions/i })).not.toBeInTheDocument()
@@ -197,7 +184,7 @@ describe("AppHeader — utility bar (no inline nav links)", () => {
   })
 
   it("header element is present", () => {
-    const { container } = render(<AppHeader />)
+    const { container } = render(<AppHeader isAdmin={false} />)
     expect(container.querySelector("header")).toBeInTheDocument()
   })
 })

@@ -26,21 +26,22 @@ const meta: Meta<typeof Sidebar> = {
   parameters: {
     layout: "fullscreen",
   },
+  // Reset admin state before every story so Docs view doesn't leak between renders.
+  // WithAdmin / InSheetWithAdmin re-enable it via their own decorators.
+  beforeEach: () => {
+    setStorybookIsAdmin(false)
+  },
   decorators: [
-    (Story) => {
-      // Default each story to non-admin; WithAdmin / InSheetWithAdmin override via their own decorator.
-      setStorybookIsAdmin(false)
-      return (
-        <CountsProvider>
-          <div className="flex h-screen bg-background">
-            <Story />
-            <div className="flex-1 p-6">
-              <p className="text-muted-foreground text-sm">App content area</p>
-            </div>
+    (Story) => (
+      <CountsProvider>
+        <div className="flex h-screen bg-background">
+          <Story />
+          <div className="flex-1 p-6">
+            <p className="text-muted-foreground text-sm">App content area</p>
           </div>
-        </CountsProvider>
-      )
-    },
+        </div>
+      </CountsProvider>
+    ),
   ],
 }
 

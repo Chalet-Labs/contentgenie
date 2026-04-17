@@ -2,7 +2,6 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 import { render, screen, within, fireEvent } from "@testing-library/react"
 import { Sidebar } from "@/components/layout/sidebar"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
-import { ADMIN_ROLE } from "@/lib/auth-roles"
 
 const mockUseSidebarCounts = vi.fn()
 const mockUsePathname = vi.fn(() => "/")
@@ -29,16 +28,8 @@ vi.mock("@/contexts/sidebar-counts-context", () => ({
   NavBadge: ({ count }: { count: number }) => <span>{count > 99 ? "99+" : count}</span>,
 }))
 
-const mockHas = vi.fn()
-
 vi.mock("@clerk/nextjs", () => ({
   OrganizationSwitcher: () => <div data-testid="org-switcher" />,
-  useAuth: () => ({
-    isLoaded: true,
-    isSignedIn: true,
-    userId: "test-user-id",
-    has: mockHas,
-  }),
 }))
 
 vi.mock("@/components/ui/sheet", async () => {
@@ -54,7 +45,6 @@ beforeEach(() => {
     savedCount: 0,
     isLoading: false,
   })
-  mockHas.mockReturnValue(false)
   mockUsePathname.mockReturnValue("/")
 })
 
@@ -66,7 +56,7 @@ describe("Sidebar — inline aside mode", () => {
       isLoading: false,
     })
 
-    render(<Sidebar />)
+    render(<Sidebar isAdmin={false} />)
 
     const subscriptionsLink = screen.getByRole("link", { name: /subscriptions/i })
     expect(subscriptionsLink).toHaveTextContent("5")
@@ -79,14 +69,14 @@ describe("Sidebar — inline aside mode", () => {
       isLoading: false,
     })
 
-    render(<Sidebar />)
+    render(<Sidebar isAdmin={false} />)
 
     const libraryLink = screen.getByRole("link", { name: /library/i })
     expect(libraryLink).toHaveTextContent("12")
   })
 
   it("does not show badge when counts are 0", () => {
-    render(<Sidebar />)
+    render(<Sidebar isAdmin={false} />)
 
     const subscriptionsLink = screen.getByRole("link", { name: /subscriptions/i })
     const libraryLink = screen.getByRole("link", { name: /library/i })
@@ -102,7 +92,7 @@ describe("Sidebar — inline aside mode", () => {
       isLoading: true,
     })
 
-    render(<Sidebar />)
+    render(<Sidebar isAdmin={false} />)
 
     const subscriptionsLink = screen.getByRole("link", { name: /subscriptions/i })
     const libraryLink = screen.getByRole("link", { name: /library/i })
@@ -111,30 +101,28 @@ describe("Sidebar — inline aside mode", () => {
     expect(libraryLink.querySelector("span")).toBeNull()
   })
 
-  it("shows Admin link when user has admin role", () => {
-    mockHas.mockReturnValue(true)
-    render(<Sidebar />)
+  it("shows Admin link when isAdmin is true", () => {
+    render(<Sidebar isAdmin={true} />)
     expect(screen.getByRole("link", { name: /admin/i })).toBeInTheDocument()
   })
 
-  it("does not show Admin link when user is not admin", () => {
-    mockHas.mockReturnValue(false)
-    render(<Sidebar />)
+  it("does not show Admin link when isAdmin is false", () => {
+    render(<Sidebar isAdmin={false} />)
     expect(screen.queryByRole("link", { name: /admin/i })).not.toBeInTheDocument()
   })
 
   it("renders OrganizationSwitcher in inline mode", () => {
-    render(<Sidebar />)
+    render(<Sidebar isAdmin={false} />)
     expect(screen.getByTestId("org-switcher")).toBeInTheDocument()
   })
 })
 
-const renderSidebarInOpenSheet = () => {
+const renderSidebarInOpenSheet = ({ isAdmin = false }: { isAdmin?: boolean } = {}) => {
   const result = render(
     <Sheet>
       <SheetTrigger>open</SheetTrigger>
       <SheetContent>
-        <Sidebar inSheet />
+        <Sidebar inSheet isAdmin={isAdmin} />
       </SheetContent>
     </Sheet>
   )
@@ -148,8 +136,7 @@ describe("Sidebar — inSheet mode", () => {
     { name: "Settings", matcher: /settings/i, admin: false },
     { name: "Admin", matcher: /admin/i, admin: true },
   ])("tapping $name closes the sheet via SheetClose", ({ matcher, admin }) => {
-    if (admin) mockHas.mockImplementation((arg) => arg?.role === ADMIN_ROLE)
-    renderSidebarInOpenSheet()
+    renderSidebarInOpenSheet({ isAdmin: admin })
 
     const link = within(screen.getByTestId("sheet-content")).getByRole("link", { name: matcher })
     fireEvent.click(link)
@@ -157,18 +144,15 @@ describe("Sidebar — inSheet mode", () => {
     expect(screen.queryByTestId("sheet-content")).not.toBeInTheDocument()
   })
 
-  it("admin link is visible when useAuth().has is called with { role: ADMIN_ROLE }", () => {
-    mockHas.mockImplementation((arg) => arg?.role === ADMIN_ROLE)
-    renderSidebarInOpenSheet()
+  it("admin link is visible when isAdmin is true", () => {
+    renderSidebarInOpenSheet({ isAdmin: true })
     expect(
       within(screen.getByTestId("sheet-content")).getByRole("link", { name: /admin/i })
     ).toBeInTheDocument()
-    expect(mockHas).toHaveBeenCalledWith({ role: ADMIN_ROLE })
   })
 
-  it("does not render admin link when useAuth().has returns false", () => {
-    mockHas.mockReturnValue(false)
-    renderSidebarInOpenSheet()
+  it("does not render admin link when isAdmin is false", () => {
+    renderSidebarInOpenSheet({ isAdmin: false })
     expect(
       within(screen.getByTestId("sheet-content")).queryByRole("link", { name: /admin/i })
     ).not.toBeInTheDocument()

@@ -14,7 +14,7 @@ import { NotificationBell } from "@/components/notifications/notification-bell"
 import { Sidebar } from "@/components/layout/sidebar"
 import { ThemeToggle } from "@/components/layout/theme-toggle"
 
-export function AppHeader() {
+export function AppHeader({ isAdmin }: { isAdmin: boolean }) {
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-14 items-center">
@@ -32,7 +32,7 @@ export function AppHeader() {
           </SheetTrigger>
           <SheetContent side="left" className="w-[280px] sm:w-[320px] p-0 flex flex-col">
             <SheetTitle className="sr-only">Navigation</SheetTitle>
-            <Sidebar inSheet />
+            <Sidebar inSheet isAdmin={isAdmin} />
           </SheetContent>
         </Sheet>
 

@@ -3,7 +3,7 @@
 import React from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { OrganizationSwitcher, useAuth } from "@clerk/nextjs"
+import { OrganizationSwitcher } from "@clerk/nextjs"
 import { cn } from "@/lib/utils"
 import {
   LayoutDashboard,
@@ -15,7 +15,6 @@ import {
 } from "lucide-react"
 import { SheetClose } from "@/components/ui/sheet"
 import { useSidebarCountsOptional, getBadgeCount, NavBadge } from "@/contexts/sidebar-counts-context"
-import { ADMIN_ROLE } from "@/lib/auth-roles"
 
 const sidebarLinks = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -38,11 +37,9 @@ function MaybeSheetClose({
   return inSheet ? <SheetClose asChild>{children}</SheetClose> : children
 }
 
-function SidebarNav({ inSheet }: { inSheet: boolean }) {
+function SidebarNav({ inSheet, isAdmin }: { inSheet: boolean; isAdmin: boolean }) {
   const pathname = usePathname()
   const counts = useSidebarCountsOptional()
-  const { has } = useAuth()
-  const isAdmin = has?.({ role: ADMIN_ROLE }) ?? false
 
   return (
     <div className="flex flex-col h-full">
@@ -130,14 +127,20 @@ function SidebarNav({ inSheet }: { inSheet: boolean }) {
   )
 }
 
-export function Sidebar({ inSheet = false }: { inSheet?: boolean }) {
+export function Sidebar({
+  inSheet = false,
+  isAdmin,
+}: {
+  inSheet?: boolean
+  isAdmin: boolean
+}) {
   if (inSheet) {
-    return <SidebarNav inSheet />
+    return <SidebarNav inSheet isAdmin={isAdmin} />
   }
 
   return (
     <aside className="hidden md:flex flex-col w-64 border-r bg-background h-[calc(100vh-3.5rem)]">
-      <SidebarNav inSheet={false} />
+      <SidebarNav inSheet={false} isAdmin={isAdmin} />
     </aside>
   )
 }

@@ -23,10 +23,14 @@ export function LandingHeader() {
           <SignedOut>
             <div className="flex gap-2">
               <Button variant="ghost" size="sm" asChild>
-                <Link href="/sign-in">Sign In</Link>
+                <Link href={process.env.NEXT_PUBLIC_CLERK_SIGN_IN_URL ?? "/sign-in"}>
+                  Sign In
+                </Link>
               </Button>
               <Button size="sm" asChild>
-                <Link href="/sign-up">Sign Up</Link>
+                <Link href={process.env.NEXT_PUBLIC_CLERK_SIGN_UP_URL ?? "/sign-up"}>
+                  Sign Up
+                </Link>
               </Button>
             </div>
           </SignedOut>
