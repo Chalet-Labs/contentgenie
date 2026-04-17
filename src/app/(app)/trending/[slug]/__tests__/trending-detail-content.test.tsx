@@ -102,6 +102,19 @@ describe("TrendingDetailContent", () => {
     );
   });
 
+  it("appends stale notice to unknown-slug fallback when snapshot is stale", async () => {
+    const staleGeneratedAt = new Date(Date.now() - STALE_THRESHOLD_MS - 60_000);
+    mockGetTrendingTopicBySlug.mockResolvedValue({
+      kind: "unknown-slug",
+      allTopics: [aiTopic],
+      generatedAt: staleGeneratedAt,
+    });
+
+    render(await TrendingDetailContent({ slug: "unknown-slug" }));
+
+    expect(screen.getByText(/may be out of date/i)).toBeInTheDocument();
+  });
+
   it("renders found happy path without stale notice for a fresh snapshot", async () => {
     const freshGeneratedAt = new Date(Date.now() - 60 * 60 * 1000);
     mockGetTrendingTopicBySlug.mockResolvedValue({
