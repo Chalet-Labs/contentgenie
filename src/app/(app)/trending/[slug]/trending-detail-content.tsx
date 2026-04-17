@@ -60,8 +60,12 @@ function EpisodeCard({ episode }: { episode: RecommendedEpisodeDTO }) {
         <div className="mt-1 flex flex-wrap items-center gap-2">
           <WorthItBadge score={episode.worthItScore != null ? Number(episode.worthItScore) : null} />
           <span className="text-xs text-muted-foreground">
-            {formatDuration(episode.duration)}
-            {episode.publishDate && <> &middot; {formatDate(episode.publishDate)}</>}
+            {[
+              formatDuration(episode.duration),
+              episode.publishDate ? formatDate(episode.publishDate) : "",
+            ]
+              .filter(Boolean)
+              .join(" · ")}
           </span>
         </div>
       </div>

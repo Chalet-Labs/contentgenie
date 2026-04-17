@@ -136,7 +136,8 @@ vi.mock("drizzle-orm", () => ({
     _op: "sql",
     // Join the raw template parts so tests can assert the generated SQL text
     // (e.g. `DESC NULLS LAST` can't be derived from Drizzle's desc() helper).
-    raw: Array.from(strings).join("?"),
+    // Placeholder `$_` avoids collisions with literal `?` characters in templates.
+    raw: Array.from(strings).join("$_"),
     values,
   })),
 }));
