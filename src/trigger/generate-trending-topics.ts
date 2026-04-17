@@ -162,18 +162,20 @@ export const generateTrendingTopics = schedules.task({
       })
       .filter((topic) => topic.episodeCount > 0);
 
-    const droppedForEmptySlug = mappedTopics
-      .filter((topic) => topic.slug === "")
-      .map((topic) => topic.name);
-    if (droppedForEmptySlug.length > 0) {
+    const keptTopics: typeof mappedTopics = [];
+    const droppedNames: string[] = [];
+    for (const topic of mappedTopics) {
+      if (topic.slug === "") droppedNames.push(topic.name);
+      else keptTopics.push(topic);
+    }
+    if (droppedNames.length > 0) {
       logger.warn("Dropped trending topics with empty slug (non-ASCII or punctuation-only names)", {
-        droppedCount: droppedForEmptySlug.length,
-        droppedNames: droppedForEmptySlug.slice(0, 10),
+        droppedCount: droppedNames.length,
+        droppedNames: droppedNames.slice(0, 10),
       });
     }
 
-    const validatedTopics = mappedTopics
-      .filter((topic) => topic.slug !== "")
+    const validatedTopics = keptTopics
       .sort((a, b) => b.episodeCount - a.episodeCount)
       .slice(0, MAX_TOPICS);
 
