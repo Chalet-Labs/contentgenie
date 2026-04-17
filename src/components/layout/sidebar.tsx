@@ -45,7 +45,7 @@ function SidebarNav({ inSheet }: { inSheet: boolean }) {
   const isAdmin = has?.({ role: ADMIN_ROLE }) ?? false
 
   return (
-    <>
+    <div className="flex flex-col h-full">
       <div className="flex-1 py-4">
         <nav className="space-y-1 px-3">
           {sidebarLinks.map((link) => {
@@ -126,7 +126,7 @@ function SidebarNav({ inSheet }: { inSheet: boolean }) {
           )}
         </nav>
       </div>
-    </>
+    </div>
   )
 }
 
