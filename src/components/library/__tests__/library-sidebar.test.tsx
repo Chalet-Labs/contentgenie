@@ -16,82 +16,11 @@ vi.mock("@/components/library/collection-dialog", () => ({
   CollectionDialog: () => null,
 }))
 
-// Stateful Sheet mock mirroring the header test pattern. SheetClose honors
-// asChild via cloneElement so a regression dropping asChild would fail the
-// suite.
-vi.mock("@/components/ui/sheet", () => {
-  // require("react") is intentional — Vitest hoists vi.mock factories above
-  // the top-level imports, so the module-level React binding isn't available
-  // inside this closure. Do not convert to an `import` or the suite breaks.
-  const { useState, createContext, useContext } = require("react") as typeof React
-
-  // Default context is null so any Sheet primitive rendered outside a Sheet
-  // provider throws — mirroring real Radix behaviour, which is the exact
-  // failure mode that broke the /library prerender on the first attempt at
-  // this fix. A silent no-op default would let a desktop regression (inSheet
-  // accidentally flipped to true) pass this suite.
-  const SheetStateContext = createContext<{
-    open: boolean
-    setOpen: (v: boolean) => void
-  } | null>(null)
-
-  const useSheetContext = () => {
-    const ctx = useContext(SheetStateContext)
-    if (ctx === null) {
-      throw new Error("Sheet primitive used outside <Sheet> provider")
-    }
-    return ctx
-  }
-
-  const Sheet = ({ children }: { children: React.ReactNode }) => {
-    const [open, setOpen] = useState(false)
-    return (
-      <SheetStateContext.Provider value={{ open, setOpen }}>
-        {children}
-      </SheetStateContext.Provider>
-    )
-  }
-
-  const SheetTrigger = ({ children }: { children: React.ReactNode; asChild?: boolean }) => {
-    const { setOpen } = useSheetContext()
-    return (
-      <div data-testid="sheet-trigger" onClick={() => setOpen(true)}>
-        {children}
-      </div>
-    )
-  }
-
-  const SheetContent = ({ children }: { children: React.ReactNode }) => {
-    const { open } = useSheetContext()
-    return open ? <div data-testid="sheet-content">{children}</div> : null
-  }
-
-  const SheetClose = ({
-    children,
-    asChild,
-  }: {
-    children: React.ReactNode
-    asChild?: boolean
-  }) => {
-    const { setOpen } = useSheetContext()
-    const close = () => setOpen(false)
-    if (asChild && React.isValidElement(children)) {
-      const child = children as React.ReactElement<{ onClick?: (e: unknown) => void }>
-      return React.cloneElement(child, {
-        onClick: (e: unknown) => {
-          child.props.onClick?.(e)
-          close()
-        },
-      })
-    }
-    return (
-      <div data-testid="sheet-close" onClick={close}>
-        {children}
-      </div>
-    )
-  }
-
-  return { Sheet, SheetTrigger, SheetContent, SheetClose }
+vi.mock("@/components/ui/sheet", async () => {
+  const { createSheetMock } = await vi.importActual<typeof import("@/test/mocks/sheet")>(
+    "@/test/mocks/sheet"
+  )
+  return createSheetMock()
 })
 
 vi.mock("@/components/ui/button", () => ({
