@@ -20,6 +20,9 @@ vi.mock("@/components/library/collection-dialog", () => ({
 // asChild via cloneElement so a regression dropping asChild would fail the
 // suite.
 vi.mock("@/components/ui/sheet", () => {
+  // require("react") is intentional — Vitest hoists vi.mock factories above
+  // the top-level imports, so the module-level React binding isn't available
+  // inside this closure. Do not convert to an `import` or the suite breaks.
   const { useState, createContext, useContext } = require("react") as typeof React
 
   const SheetStateContext = createContext<{

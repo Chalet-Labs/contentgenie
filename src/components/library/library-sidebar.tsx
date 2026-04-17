@@ -177,7 +177,7 @@ export function LibrarySidebar() {
           collections={collections}
           isLoading={isLoading}
           loadError={loadError}
-          onCreateClick={() => setShowCreateDialog(true)}
+          onCreateClick={handleCreateClick}
           inSheet={false}
         />
       </aside>
