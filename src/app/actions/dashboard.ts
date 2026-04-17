@@ -513,9 +513,10 @@ export async function getTrendingTopicBySlug(slug: string): Promise<TrendingTopi
       return { kind: "found", topic, allTopics, episodes: [], generatedAt: latest.generatedAt };
     }
 
-    // Cap to defend against a corrupted/malicious snapshot blowing up the IN clause.
-    // Upstream trending generation is bounded near 500 per topic.
-    const episodeIds = topic.episodeIds.slice(0, 500);
+    // Display cap for the page (tighter than the upstream 500-candidate ceiling):
+    // 50 is plenty for a scroll-without-pagination view and bounds both the IN clause
+    // and the render cost against corrupted snapshots with huge episodeIds arrays.
+    const episodeIds = topic.episodeIds.slice(0, 50);
 
     const rows = await db
       .select({
