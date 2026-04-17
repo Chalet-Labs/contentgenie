@@ -3,11 +3,12 @@ import { TrendingUp } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatRelativeTime } from "@/lib/utils";
+import { getTopicSlug } from "@/lib/trending";
 import type { TrendingTopic } from "@/db/schema";
 
 function TopicPill({ topic }: { topic: TrendingTopic }) {
   return (
-    <Link href={`/discover?q=${encodeURIComponent(topic.name)}`}>
+    <Link href={`/trending/${getTopicSlug(topic)}`}>
       <Badge variant="secondary" className="px-3 py-1 max-w-[200px] hover:bg-secondary/80 transition-colors">
         <span className="min-w-0 flex-1 truncate text-sm" title={topic.name}>{topic.name}</span>
         <span className="ml-1.5 text-muted-foreground font-normal shrink-0">({topic.episodeCount})</span>
@@ -23,6 +24,7 @@ interface TrendingTopicsProps {
 
 export function TrendingTopics({ topics, generatedAt }: TrendingTopicsProps) {
   const updatedAgo = formatRelativeTime(generatedAt);
+  const deduped = Array.from(new Map(topics.map((t) => [getTopicSlug(t), t])).values());
 
   return (
     <div>
@@ -33,8 +35,8 @@ export function TrendingTopics({ topics, generatedAt }: TrendingTopicsProps) {
         </span>
       </div>
       <div className="flex flex-wrap gap-2">
-        {Array.from(new Map(topics.map((t) => [t.name, t])).values()).map((topic) => (
-          <TopicPill key={topic.name} topic={topic} />
+        {deduped.map((topic) => (
+          <TopicPill key={getTopicSlug(topic)} topic={topic} />
         ))}
       </div>
     </div>

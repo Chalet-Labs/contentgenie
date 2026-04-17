@@ -6,6 +6,16 @@ vi.mock("@clerk/nextjs/server", () => ({
   auth: () => mockAuth(),
 }));
 
+// Mock next/navigation — mirrors Next's behavior (redirect throws NEXT_REDIRECT).
+const mockRedirect = vi.fn((url: string) => {
+  const err = new Error(`NEXT_REDIRECT: ${url}`);
+  (err as Error & { digest?: string }).digest = `NEXT_REDIRECT;${url}`;
+  throw err;
+});
+vi.mock("next/navigation", () => ({
+  redirect: (url: string) => mockRedirect(url),
+}));
+
 // Mock DB select chain
 const mockLimit = vi.fn();
 const mockOrderBy = vi.fn();
@@ -19,6 +29,7 @@ const mockSelect = vi.fn();
 // The select chain must handle these shapes:
 //   Subqueries:       select().from().where()                  (return value unused)
 //   Main query:       select().from().innerJoin().where().orderBy().limit()
+//   Trending by-slug: select().from().innerJoin().where().orderBy()   → Promise<row[]>
 //   Score lookup:     select().from().where()  → Promise<row[]>
 //   Rank lookup:      select().from().where().groupBy()        → Promise<row[]>
 //   Union query:      select().from().where().union(select().from().where())
@@ -121,7 +132,14 @@ vi.mock("drizzle-orm", () => ({
   isNotNull: vi.fn((...args: unknown[]) => ({ _op: "isNotNull", args })),
   notInArray: vi.fn((...args: unknown[]) => ({ _op: "notInArray", args })),
   inArray: vi.fn((...args: unknown[]) => ({ _op: "inArray", args })),
-  sql: vi.fn((_strings: TemplateStringsArray, ..._values: unknown[]) => ({ _op: "sql" })),
+  sql: vi.fn((strings: TemplateStringsArray, ...values: unknown[]) => ({
+    _op: "sql",
+    // Join the raw template parts so tests can assert the generated SQL text
+    // (e.g. `DESC NULLS LAST` can't be derived from Drizzle's desc() helper).
+    // Placeholder `$_` avoids collisions with literal `?` characters in templates.
+    raw: Array.from(strings).join("$_"),
+    values,
+  })),
 }));
 
 // Mock topic-overlap — keeps dashboard tests focused on wiring, not overlap logic
@@ -930,5 +948,198 @@ describe("getRecentEpisodesFromSubscriptions", () => {
 
     expect(result.episodes).toEqual([]);
     expect(result.error).toMatch(/failed to load/i);
+  });
+});
+
+describe("getTrendingTopicBySlug", () => {
+  const GENERATED_AT = new Date("2026-04-17T06:00:00Z");
+
+  const makeSnapshot = (topics: object[]) => ({
+    id: 1,
+    topics,
+    generatedAt: GENERATED_AT,
+    periodStart: new Date("2026-04-10T06:00:00Z"),
+    periodEnd: GENERATED_AT,
+    episodeCount: topics.length,
+    createdAt: GENERATED_AT,
+  });
+
+  const aiTopic = {
+    name: "Artificial Intelligence",
+    description: "AI trends",
+    episodeCount: 3,
+    episodeIds: [10, 20, 30],
+    slug: "artificial-intelligence",
+  };
+
+  const climateTopic = {
+    name: "Climate Policy",
+    description: "Climate news",
+    episodeCount: 2,
+    episodeIds: [40, 50],
+    slug: "climate-policy",
+  };
+
+  const mockEpisodeRow = {
+    id: 10,
+    podcastIndexId: "pod-10",
+    title: "AI Episode",
+    description: "About AI",
+    audioUrl: "https://example.com/ai.mp3",
+    duration: 3600,
+    publishDate: new Date("2026-04-01T00:00:00Z"),
+    worthItScore: "8.50",
+    podcastTitle: "AI Podcast",
+    podcastImageUrl: "https://example.com/ai.jpg",
+  };
+
+  const mockEpisodeRowNullScore = {
+    ...mockEpisodeRow,
+    id: 20,
+    worthItScore: null,
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+    vi.resetModules();
+  });
+
+  it("redirects to /sign-in when userId is null", async () => {
+    mockAuth.mockResolvedValue({ userId: null });
+
+    const { getTrendingTopicBySlug } = await import("@/app/actions/dashboard");
+
+    await expect(getTrendingTopicBySlug("artificial-intelligence")).rejects.toThrow(/NEXT_REDIRECT/);
+    expect(mockRedirect).toHaveBeenCalledWith(
+      `/sign-in?redirect_url=${encodeURIComponent("/trending/artificial-intelligence")}`,
+    );
+  });
+
+  it("encodes the slug in the sign-in redirect URL to prevent query-param injection", async () => {
+    mockAuth.mockResolvedValue({ userId: null });
+
+    const { getTrendingTopicBySlug } = await import("@/app/actions/dashboard");
+
+    // A slug with reserved URL chars: `&` would break the /sign-in querystring without encoding.
+    await expect(getTrendingTopicBySlug("foo&evil=injected")).rejects.toThrow(/NEXT_REDIRECT/);
+    const redirectedTo = mockRedirect.mock.calls[0][0] as string;
+    expect(redirectedTo).not.toContain("&evil=injected");
+    expect(redirectedTo).toBe(`/sign-in?redirect_url=${encodeURIComponent("/trending/foo&evil=injected")}`);
+  });
+
+  it("returns { kind: 'no-snapshot' } when no snapshot exists", async () => {
+    mockAuth.mockResolvedValue({ userId: "user_123" });
+    mockFindFirst.mockResolvedValue(undefined);
+
+    const { getTrendingTopicBySlug } = await import("@/app/actions/dashboard");
+    const result = await getTrendingTopicBySlug("artificial-intelligence");
+
+    expect(result).toEqual({ kind: "no-snapshot" });
+  });
+
+  it("returns { kind: 'found', ... } with episodes when slug matches a topic", async () => {
+    mockAuth.mockResolvedValue({ userId: "user_123" });
+    mockFindFirst.mockResolvedValue(makeSnapshot([aiTopic, climateTopic]));
+    // Chain now terminates with .limit() at the DB layer so the display cap
+    // respects sort order over the full candidate set.
+    mockLimit.mockResolvedValue([mockEpisodeRow, mockEpisodeRowNullScore]);
+
+    const { getTrendingTopicBySlug } = await import("@/app/actions/dashboard");
+    const result = await getTrendingTopicBySlug("artificial-intelligence");
+
+    expect(result.kind).toBe("found");
+    if (result.kind !== "found") throw new Error("expected found");
+    expect(result.topic).toMatchObject({ name: "Artificial Intelligence", slug: "artificial-intelligence" });
+    expect(result.allTopics).toHaveLength(2);
+    expect(result.generatedAt).toEqual(GENERATED_AT);
+    expect(result.episodes).toHaveLength(2);
+    expect(result.episodes[0].bestTopicRank).toBeNull();
+    expect(result.episodes[0].topRankedTopic).toBeNull();
+    expect(result.episodes[1].worthItScore).toBeNull();
+
+    // Guard against regression to plain desc(): pg defaults DESC to NULLS FIRST,
+    // so unscored episodes would float to the top without the raw-SQL override.
+    const orderArgs = mockOrderBy.mock.calls[0];
+    expect(orderArgs).toBeDefined();
+    const rawSqlClauses = orderArgs
+      .filter((arg: unknown): arg is { _op: "sql"; raw: string } =>
+        typeof arg === "object" && arg !== null && (arg as { _op?: string })._op === "sql",
+      )
+      .map((arg) => arg.raw);
+    expect(rawSqlClauses.join(" ")).toContain("DESC NULLS LAST");
+
+    // Display cap must run at the DB layer (after orderBy) so top-scored
+    // episodes can't be silently dropped by an LLM-order truncation.
+    expect(mockLimit).toHaveBeenCalledWith(50);
+  });
+
+  it("returns { kind: 'found', episodes: [] } when matched topic has no episodeIds", async () => {
+    mockAuth.mockResolvedValue({ userId: "user_123" });
+    const emptyTopic = { ...aiTopic, episodeIds: [] };
+    mockFindFirst.mockResolvedValue(makeSnapshot([emptyTopic, climateTopic]));
+
+    const { getTrendingTopicBySlug } = await import("@/app/actions/dashboard");
+    const result = await getTrendingTopicBySlug("artificial-intelligence");
+
+    expect(result.kind).toBe("found");
+    if (result.kind !== "found") throw new Error("expected found");
+    expect(result.topic).toMatchObject({ name: "Artificial Intelligence" });
+    expect(result.episodes).toEqual([]);
+  });
+
+  it("returns { kind: 'unknown-slug' } when slug is unknown", async () => {
+    mockAuth.mockResolvedValue({ userId: "user_123" });
+    mockFindFirst.mockResolvedValue(makeSnapshot([aiTopic, climateTopic]));
+
+    const { getTrendingTopicBySlug } = await import("@/app/actions/dashboard");
+    const result = await getTrendingTopicBySlug("unknown-slug-garbage");
+
+    expect(result.kind).toBe("unknown-slug");
+    if (result.kind !== "unknown-slug") throw new Error("expected unknown-slug");
+    expect(result.allTopics).toHaveLength(2);
+    expect(result.generatedAt).toEqual(GENERATED_AT);
+  });
+
+  it("matches legacy topic without slug via slugify(name)", async () => {
+    mockAuth.mockResolvedValue({ userId: "user_123" });
+    const legacyTopic = {
+      name: "Space Exploration",
+      description: "Space news",
+      episodeCount: 1,
+      episodeIds: [],
+    };
+    mockFindFirst.mockResolvedValue(makeSnapshot([legacyTopic]));
+
+    const { getTrendingTopicBySlug } = await import("@/app/actions/dashboard");
+    const result = await getTrendingTopicBySlug("space-exploration");
+
+    expect(result.kind).toBe("found");
+    if (result.kind !== "found") throw new Error("expected found");
+    expect(result.topic).toMatchObject({ name: "Space Exploration" });
+  });
+
+  it("returns { kind: 'error' } on DB failure and logs the slug context", async () => {
+    mockAuth.mockResolvedValue({ userId: "user_123" });
+    mockFindFirst.mockRejectedValue(new Error("DB connection failed"));
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    const { getTrendingTopicBySlug } = await import("@/app/actions/dashboard");
+    const result = await getTrendingTopicBySlug("artificial-intelligence");
+
+    expect(result.kind).toBe("error");
+    if (result.kind !== "error") throw new Error("expected error");
+    expect(result.message).toMatch(/failed to load/i);
+
+    // The log must carry the slug so ops can correlate failures to requests.
+    const loggedSlug = errorSpy.mock.calls.some((args) =>
+      args.some((arg) => typeof arg === "object" && arg !== null && (arg as { slug?: string }).slug === "artificial-intelligence"),
+    );
+    expect(loggedSlug).toBe(true);
   });
 });

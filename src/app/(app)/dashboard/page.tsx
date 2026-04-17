@@ -16,6 +16,7 @@ import { QueueSection } from "@/components/dashboard/queue-section";
 import { TrendingTopics, TrendingTopicsLoading } from "@/components/dashboard/trending-topics";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { isTrendingSnapshotStale } from "@/lib/trending";
 
 // Loading skeleton for recent episodes (inline — presentational file is "use client")
 function RecentEpisodesLoading() {
@@ -67,15 +68,12 @@ async function RecentEpisodesSection() {
   );
 }
 
-const STALE_THRESHOLD_MS = 48 * 60 * 60 * 1000;
-
 // Server component for trending topics
 async function TrendingTopicsSection() {
   const { topics, error } = await getTrendingTopics();
   if (error) console.error("[TrendingTopicsSection]", error);
   if (!topics || topics.items.length === 0) return null;
-  const isStale = Date.now() - topics.generatedAt.getTime() > STALE_THRESHOLD_MS;
-  if (isStale) return null;
+  if (isTrendingSnapshotStale(topics.generatedAt)) return null;
   return <TrendingTopics topics={topics.items} generatedAt={topics.generatedAt} />;
 }
 

@@ -519,7 +519,9 @@ export interface TrendingTopic {
   description: string;
   episodeCount: number;
   episodeIds: number[];
-  slug: string;
+  // Pre-#279 snapshot rows lack a slug key at runtime; consumers should call
+  // `getTopicSlug()` from @/lib/trending rather than accessing this field directly.
+  slug?: string;
 }
 
 export type TrendingTopicsRow = typeof trendingTopics.$inferSelect;
