@@ -445,6 +445,35 @@ describe("generate-trending-topics task", () => {
     expect(storedTopics[0].slug).toBe("valid");
   });
 
+  it("dedupe does not collide with another topic's natural suffixed slug", async () => {
+    // Reproduces the collision case: a disambiguated form (e.g. "season-2")
+    // must not clash with another topic whose natural slug is already "season-2".
+    // Input: [Season 2 (ep 3), Season (ep 2), Season (ep 1)] — sorted desc by episodeCount.
+    // Without the fix, walk yields [season-2, season, season-2] (collision).
+    // With the fix, it yields [season-2, season, season-3].
+    mockDbSelect([
+      { id: 1, title: "Ep 1", keyTakeaways: ["Takeaway 1"] },
+      { id: 2, title: "Ep 2", keyTakeaways: ["Takeaway 2"] },
+      { id: 3, title: "Ep 3", keyTakeaways: ["Takeaway 3"] },
+    ]);
+
+    const mockTopics = [
+      { name: "Season 2", description: "A", episodeCount: 3, episodeIds: [1, 2, 3] },
+      { name: "Season", description: "B", episodeCount: 2, episodeIds: [1, 2] },
+      { name: "Season", description: "C", episodeCount: 1, episodeIds: [1] },
+    ];
+
+    mockGenerateCompletion.mockResolvedValue("mock completion");
+    mockParseJsonResponse.mockReturnValue({ topics: mockTopics });
+
+    await taskConfig.run();
+
+    const storedTopics = mockValues.mock.calls[0][0].topics;
+    const slugs = storedTopics.map((t: { slug: string }) => t.slug);
+    expect(slugs).toEqual(["season-2", "season", "season-3"]);
+    expect(new Set(slugs).size).toBe(slugs.length); // all unique
+  });
+
   it("applies dedupe AFTER sort+slice, not before", async () => {
     const episodeRows = Array.from({ length: 10 }, (_, i) => ({
       id: i + 1,

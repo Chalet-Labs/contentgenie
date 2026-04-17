@@ -147,7 +147,7 @@ export const generateTrendingTopics = schedules.task({
 
     // Validate: filter out topics referencing invalid episode IDs
     const validEpisodeIds = new Set(episodesWithTakeaways.map((ep) => ep.id));
-    const validatedTopics = topics
+    const mappedTopics = topics
       .map((topic) => {
         const filteredIds = Array.from(new Set(topic.episodeIds)).filter((id) =>
           validEpisodeIds.has(id)
@@ -160,18 +160,37 @@ export const generateTrendingTopics = schedules.task({
           slug: slugify(topic.name),
         };
       })
-      .filter((topic) => topic.episodeCount > 0)
+      .filter((topic) => topic.episodeCount > 0);
+
+    const droppedForEmptySlug = mappedTopics
+      .filter((topic) => topic.slug === "")
+      .map((topic) => topic.name);
+    if (droppedForEmptySlug.length > 0) {
+      logger.warn("Dropped trending topics with empty slug (non-ASCII or punctuation-only names)", {
+        droppedCount: droppedForEmptySlug.length,
+        droppedNames: droppedForEmptySlug.slice(0, 10),
+      });
+    }
+
+    const validatedTopics = mappedTopics
       .filter((topic) => topic.slug !== "")
       .sort((a, b) => b.episodeCount - a.episodeCount)
       .slice(0, MAX_TOPICS);
 
-    // Disambiguate duplicate slugs in sort order
-    const seenSlugs = new Map<string, number>();
+    // Disambiguate duplicate slugs. Track already-assigned final slugs (not
+    // just bases) so a disambiguated form like "foo-2" cannot collide with
+    // another topic whose natural slug is also "foo-2".
+    const assignedSlugs = new Set<string>();
     for (const topic of validatedTopics) {
       const base = topic.slug;
-      const count = seenSlugs.get(base) ?? 0;
-      if (count > 0) topic.slug = `${base}-${count + 1}`;
-      seenSlugs.set(base, count + 1);
+      let candidate = base;
+      let n = 2;
+      while (assignedSlugs.has(candidate)) {
+        candidate = `${base}-${n}`;
+        n++;
+      }
+      topic.slug = candidate;
+      assignedSlugs.add(candidate);
     }
 
     if (validatedTopics.length === 0 && topics.length > 0) {
