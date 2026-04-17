@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { Fragment, useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Folder, Plus, Bookmark, Library } from "lucide-react";
@@ -14,35 +14,30 @@ import { cn } from "@/lib/utils";
 
 type CollectionWithCount = Collection & { episodeCount: number };
 
-// SheetClose relies on Radix Dialog context and throws outside of one. Since
-// SidebarNav renders in both the mobile Sheet and the desktop aside, the mobile
-// path passes SheetCloseWrapper to auto-dismiss on nav tap while the desktop
-// path gets the identity wrapper.
-type LinkWrapperProps = { children: React.ReactElement };
-type LinkWrapperComponent = React.ComponentType<LinkWrapperProps>;
-
-const IdentityWrapper: LinkWrapperComponent = ({ children }) => children;
-
-const SheetCloseWrapper: LinkWrapperComponent = ({ children }) => (
-  <SheetClose asChild>{children}</SheetClose>
-);
-
 function SidebarNav({
   pathname,
   collections,
   isLoading,
+  loadError,
   onCreateClick,
-  LinkWrapper = IdentityWrapper,
+  inSheet,
 }: {
   pathname: string;
   collections: CollectionWithCount[];
   isLoading: boolean;
+  loadError: string | null;
   onCreateClick: () => void;
-  LinkWrapper?: LinkWrapperComponent;
+  inSheet: boolean;
 }) {
+  // SheetClose is Radix DialogPrimitive.Close — it throws outside a Sheet/Dialog
+  // context. This component renders in both the mobile Sheet and the desktop
+  // aside, so only the mobile path opts into SheetClose wrapping.
+  const wrap = (link: React.ReactElement) =>
+    inSheet ? <SheetClose asChild>{link}</SheetClose> : link;
+
   return (
     <nav className="space-y-1">
-      <LinkWrapper>
+      {wrap(
         <Link
           href="/library"
           className={cn(
@@ -53,7 +48,7 @@ function SidebarNav({
           <Bookmark className="h-4 w-4" />
           All Saved
         </Link>
-      </LinkWrapper>
+      )}
 
       <div className="pt-4">
         <div className="mb-2 flex items-center justify-between px-3">
@@ -65,6 +60,7 @@ function SidebarNav({
             size="icon"
             className="h-6 w-6"
             onClick={onCreateClick}
+            aria-label="New collection"
           >
             <Plus className="h-4 w-4" />
           </Button>
@@ -79,6 +75,10 @@ function SidebarNav({
               </div>
             ))}
           </div>
+        ) : loadError ? (
+          <p role="alert" className="px-3 py-2 text-xs text-destructive">
+            {loadError}
+          </p>
         ) : collections.length === 0 ? (
           <p className="px-3 py-2 text-xs text-muted-foreground">
             No collections yet. Create one to organize your episodes.
@@ -86,24 +86,26 @@ function SidebarNav({
         ) : (
           <div className="space-y-1">
             {collections.map((collection) => (
-              <LinkWrapper key={collection.id}>
-                <Link
-                  href={`/library/collection/${collection.id}`}
-                  className={cn(
-                    "flex items-center justify-between gap-3 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-accent",
-                    pathname === `/library/collection/${collection.id}` &&
-                      "bg-accent font-medium"
-                  )}
-                >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <Folder className="h-4 w-4 shrink-0" />
-                    <span className="truncate">{collection.name}</span>
-                  </div>
-                  <span className="text-xs text-muted-foreground">
-                    {collection.episodeCount}
-                  </span>
-                </Link>
-              </LinkWrapper>
+              <Fragment key={collection.id}>
+                {wrap(
+                  <Link
+                    href={`/library/collection/${collection.id}`}
+                    className={cn(
+                      "flex items-center justify-between gap-3 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-accent",
+                      pathname === `/library/collection/${collection.id}` &&
+                        "bg-accent font-medium"
+                    )}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <Folder className="h-4 w-4 shrink-0" />
+                      <span className="truncate">{collection.name}</span>
+                    </div>
+                    <span className="text-xs text-muted-foreground">
+                      {collection.episodeCount}
+                    </span>
+                  </Link>
+                )}
+              </Fragment>
             ))}
           </div>
         )}
@@ -116,12 +118,19 @@ export function LibrarySidebar() {
   const pathname = usePathname();
   const [collections, setCollections] = useState<CollectionWithCount[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
 
   const loadCollections = useCallback(async () => {
     setIsLoading(true);
     const result = await getUserCollections();
-    setCollections(result.collections as CollectionWithCount[]);
+    if (result.error) {
+      setLoadError(result.error);
+      setCollections([]);
+    } else {
+      setLoadError(null);
+      setCollections(result.collections);
+    }
     setIsLoading(false);
   }, []);
 
@@ -150,8 +159,9 @@ export function LibrarySidebar() {
                 pathname={pathname}
                 collections={collections}
                 isLoading={isLoading}
+                loadError={loadError}
                 onCreateClick={() => setShowCreateDialog(true)}
-                LinkWrapper={SheetCloseWrapper}
+                inSheet
               />
             </div>
           </SheetContent>
@@ -164,7 +174,9 @@ export function LibrarySidebar() {
           pathname={pathname}
           collections={collections}
           isLoading={isLoading}
+          loadError={loadError}
           onCreateClick={() => setShowCreateDialog(true)}
+          inSheet={false}
         />
       </aside>
 

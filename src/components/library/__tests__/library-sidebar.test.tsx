@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
-import { render, screen, fireEvent, within, waitFor } from "@testing-library/react"
+import { render, screen, fireEvent, within } from "@testing-library/react"
 import React from "react"
 import { LibrarySidebar } from "@/components/library/library-sidebar"
 
@@ -16,9 +16,9 @@ vi.mock("@/components/library/collection-dialog", () => ({
   CollectionDialog: () => null,
 }))
 
-// shadcn Sheet — stateful mock mirroring the header test pattern.
-// SheetClose with asChild cloneElement behaviour ensures the regression
-// test fails if the fix omits asChild.
+// Stateful Sheet mock mirroring the header test pattern. SheetClose honors
+// asChild via cloneElement so a regression dropping asChild would fail the
+// suite.
 vi.mock("@/components/ui/sheet", () => {
   const { useState, createContext, useContext } = require("react") as typeof React
 
@@ -79,7 +79,15 @@ vi.mock("@/components/ui/sheet", () => {
 })
 
 vi.mock("@/components/ui/button", () => ({
-  Button: ({ children, onClick, ...rest }: { children: React.ReactNode; onClick?: () => void; [key: string]: unknown }) => (
+  Button: ({
+    children,
+    onClick,
+    ...rest
+  }: {
+    children: React.ReactNode
+    onClick?: () => void
+    [key: string]: unknown
+  }) => (
     <button onClick={onClick} {...(rest as React.ButtonHTMLAttributes<HTMLButtonElement>)}>
       {children}
     </button>
@@ -90,7 +98,7 @@ vi.mock("@/components/ui/skeleton", () => ({
   Skeleton: () => <div data-testid="skeleton" />,
 }))
 
-describe("LibrarySidebar mobile sheet — closes on link tap (regression #284)", () => {
+describe("LibrarySidebar mobile sheet — closes on link tap", () => {
   beforeEach(() => {
     mockGetUserCollections.mockResolvedValue({
       collections: [
@@ -111,13 +119,9 @@ describe("LibrarySidebar mobile sheet — closes on link tap (regression #284)",
   it("closes the sheet when 'All Saved' is tapped", async () => {
     render(<LibrarySidebar />)
 
-    // Open the mobile sheet via the Collections trigger
-    const triggers = screen.getAllByTestId("sheet-trigger")
-    fireEvent.click(triggers[0])
+    fireEvent.click(screen.getAllByTestId("sheet-trigger")[0])
 
     const sheetContent = screen.getByTestId("sheet-content")
-    // Await async getUserCollections resolution so the subsequent setState
-    // settles inside act before we assert.
     await within(sheetContent).findByRole("link", { name: /fake collection/i })
 
     const allSavedLink = within(sheetContent).getByRole("link", { name: /all saved/i })
@@ -132,7 +136,6 @@ describe("LibrarySidebar mobile sheet — closes on link tap (regression #284)",
     fireEvent.click(screen.getAllByTestId("sheet-trigger")[0])
 
     const sheetContent = screen.getByTestId("sheet-content")
-    // Collection list loads asynchronously after getUserCollections resolves.
     const collectionLink = await within(sheetContent).findByRole("link", {
       name: /fake collection/i,
     })
@@ -147,19 +150,65 @@ describe("LibrarySidebar mobile sheet — closes on link tap (regression #284)",
     fireEvent.click(screen.getAllByTestId("sheet-trigger")[0])
 
     const sheetContent = screen.getByTestId("sheet-content")
-    // Wait for collections to load so the '+' button is findable alongside them.
     await within(sheetContent).findByRole("link", { name: /fake collection/i })
 
-    // The '+' button is the only icon-only button inside the sheet (no accessible name
-    // beyond the Plus icon). Scope to the sheet and pick the single button that is NOT
-    // the SheetTrigger's outer wrapper.
-    const buttons = within(sheetContent).getAllByRole("button")
-    // The first button inside SheetContent is the "+" create button (Sheet trigger lives outside).
-    fireEvent.click(buttons[0])
-
-    // Sheet must remain open: SheetClose was not wrapped around the '+' control.
-    await waitFor(() => {
-      expect(screen.getByTestId("sheet-content")).toBeInTheDocument()
+    const newCollectionButtons = within(sheetContent).getAllByRole("button", {
+      name: /new collection/i,
     })
+    fireEvent.click(newCollectionButtons[0])
+
+    expect(screen.getByTestId("sheet-content")).toBeInTheDocument()
+  })
+})
+
+describe("LibrarySidebar desktop aside", () => {
+  beforeEach(() => {
+    mockGetUserCollections.mockResolvedValue({
+      collections: [
+        {
+          id: "col-1",
+          userId: "user-1",
+          name: "Fake Collection",
+          description: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          episodeCount: 3,
+        },
+      ],
+      error: null,
+    })
+  })
+
+  // The desktop aside renders SidebarNav with inSheet={false}, so no SheetClose
+  // wrapping. This guards against a regression that unconditionally wraps links
+  // with SheetClose — which would crash the /library prerender at build time
+  // (SheetClose throws outside a Radix Dialog context).
+  it("renders links with correct hrefs and clicking does not throw", async () => {
+    render(<LibrarySidebar />)
+
+    // Sheet starts closed, so the only mounted nav is the desktop aside.
+    const allSaved = await screen.findByRole("link", { name: /all saved/i })
+    expect(allSaved).toHaveAttribute("href", "/library")
+
+    const collection = screen.getByRole("link", { name: /fake collection/i })
+    expect(collection).toHaveAttribute("href", "/library/collection/col-1")
+
+    expect(() => fireEvent.click(allSaved)).not.toThrow()
+    expect(() => fireEvent.click(collection)).not.toThrow()
+  })
+})
+
+describe("LibrarySidebar error state", () => {
+  it("surfaces loadCollections error instead of rendering the empty state", async () => {
+    mockGetUserCollections.mockResolvedValue({
+      collections: [],
+      error: "Failed to load collections",
+    })
+
+    render(<LibrarySidebar />)
+
+    const alert = await screen.findByRole("alert")
+    expect(alert).toHaveTextContent(/failed to load collections/i)
+    expect(screen.queryByText(/no collections yet/i)).not.toBeInTheDocument()
   })
 })
