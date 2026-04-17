@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import { Folder, Plus, Bookmark, Library } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetClose, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { CollectionDialog } from "./collection-dialog";
 import { getUserCollections } from "@/app/actions/collections";
 import type { Collection } from "@/db/schema";
@@ -14,29 +14,46 @@ import { cn } from "@/lib/utils";
 
 type CollectionWithCount = Collection & { episodeCount: number };
 
+// SheetClose relies on Radix Dialog context and throws outside of one. Since
+// SidebarNav renders in both the mobile Sheet and the desktop aside, the mobile
+// path passes SheetCloseWrapper to auto-dismiss on nav tap while the desktop
+// path gets the identity wrapper.
+type LinkWrapperProps = { children: React.ReactElement };
+type LinkWrapperComponent = React.ComponentType<LinkWrapperProps>;
+
+const IdentityWrapper: LinkWrapperComponent = ({ children }) => children;
+
+const SheetCloseWrapper: LinkWrapperComponent = ({ children }) => (
+  <SheetClose asChild>{children}</SheetClose>
+);
+
 function SidebarNav({
   pathname,
   collections,
   isLoading,
   onCreateClick,
+  LinkWrapper = IdentityWrapper,
 }: {
   pathname: string;
   collections: CollectionWithCount[];
   isLoading: boolean;
   onCreateClick: () => void;
+  LinkWrapper?: LinkWrapperComponent;
 }) {
   return (
     <nav className="space-y-1">
-      <Link
-        href="/library"
-        className={cn(
-          "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-accent",
-          pathname === "/library" && "bg-accent font-medium"
-        )}
-      >
-        <Bookmark className="h-4 w-4" />
-        All Saved
-      </Link>
+      <LinkWrapper>
+        <Link
+          href="/library"
+          className={cn(
+            "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-accent",
+            pathname === "/library" && "bg-accent font-medium"
+          )}
+        >
+          <Bookmark className="h-4 w-4" />
+          All Saved
+        </Link>
+      </LinkWrapper>
 
       <div className="pt-4">
         <div className="mb-2 flex items-center justify-between px-3">
@@ -69,23 +86,24 @@ function SidebarNav({
         ) : (
           <div className="space-y-1">
             {collections.map((collection) => (
-              <Link
-                key={collection.id}
-                href={`/library/collection/${collection.id}`}
-                className={cn(
-                  "flex items-center justify-between gap-3 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-accent",
-                  pathname === `/library/collection/${collection.id}` &&
-                    "bg-accent font-medium"
-                )}
-              >
-                <div className="flex items-center gap-3 min-w-0">
-                  <Folder className="h-4 w-4 shrink-0" />
-                  <span className="truncate">{collection.name}</span>
-                </div>
-                <span className="text-xs text-muted-foreground">
-                  {collection.episodeCount}
-                </span>
-              </Link>
+              <LinkWrapper key={collection.id}>
+                <Link
+                  href={`/library/collection/${collection.id}`}
+                  className={cn(
+                    "flex items-center justify-between gap-3 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-accent",
+                    pathname === `/library/collection/${collection.id}` &&
+                      "bg-accent font-medium"
+                  )}
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <Folder className="h-4 w-4 shrink-0" />
+                    <span className="truncate">{collection.name}</span>
+                  </div>
+                  <span className="text-xs text-muted-foreground">
+                    {collection.episodeCount}
+                  </span>
+                </Link>
+              </LinkWrapper>
             ))}
           </div>
         )}
@@ -133,6 +151,7 @@ export function LibrarySidebar() {
                 collections={collections}
                 isLoading={isLoading}
                 onCreateClick={() => setShowCreateDialog(true)}
+                LinkWrapper={SheetCloseWrapper}
               />
             </div>
           </SheetContent>
