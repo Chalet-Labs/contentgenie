@@ -14,6 +14,7 @@ vi.mock("next/navigation", () => ({
 
 vi.mock("@/contexts/sidebar-counts-context", () => ({
   useSidebarCounts: () => mockCounts,
+  useSidebarCountsOptional: () => mockCounts,
   getBadgeCount: (
     href: string,
     counts: { subscriptionCount: number; savedCount: number; isLoading: boolean }

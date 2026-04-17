@@ -3,7 +3,7 @@ import React from "react"
 
 export const ClerkProvider = ({ children }: { children: React.ReactNode }) => children
 export const SignedIn = ({ children }: { children: React.ReactNode }) => children
-export const SignedOut = () => null
+export const SignedOut = ({ children }: { children: React.ReactNode }) => children
 export const UserButton = () => null
 export const OrganizationSwitcher = () => null
 export const useAuth = () => ({

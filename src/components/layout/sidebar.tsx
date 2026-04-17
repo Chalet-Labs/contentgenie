@@ -14,7 +14,7 @@ import {
   Shield,
 } from "lucide-react"
 import { SheetClose } from "@/components/ui/sheet"
-import { useSidebarCounts, getBadgeCount, NavBadge } from "@/contexts/sidebar-counts-context"
+import { useSidebarCountsOptional, getBadgeCount, NavBadge } from "@/contexts/sidebar-counts-context"
 import { ADMIN_ROLE } from "@/lib/auth-roles"
 
 const sidebarLinks = [
@@ -40,7 +40,7 @@ function MaybeSheetClose({
 
 function SidebarNav({ inSheet }: { inSheet: boolean }) {
   const pathname = usePathname()
-  const counts = useSidebarCounts()
+  const counts = useSidebarCountsOptional()
   const { has } = useAuth()
   const isAdmin = has?.({ role: ADMIN_ROLE }) ?? false
 
