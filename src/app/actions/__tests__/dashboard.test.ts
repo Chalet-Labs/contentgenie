@@ -19,6 +19,7 @@ const mockSelect = vi.fn();
 // The select chain must handle these shapes:
 //   Subqueries:       select().from().where()                  (return value unused)
 //   Main query:       select().from().innerJoin().where().orderBy().limit()
+//   Trending by-slug: select().from().innerJoin().where().orderBy()   → Promise<row[]>
 //   Score lookup:     select().from().where()  → Promise<row[]>
 //   Rank lookup:      select().from().where().groupBy()        → Promise<row[]>
 //   Union query:      select().from().where().union(select().from().where())
@@ -121,7 +122,13 @@ vi.mock("drizzle-orm", () => ({
   isNotNull: vi.fn((...args: unknown[]) => ({ _op: "isNotNull", args })),
   notInArray: vi.fn((...args: unknown[]) => ({ _op: "notInArray", args })),
   inArray: vi.fn((...args: unknown[]) => ({ _op: "inArray", args })),
-  sql: vi.fn((_strings: TemplateStringsArray, ..._values: unknown[]) => ({ _op: "sql" })),
+  sql: vi.fn((strings: TemplateStringsArray, ...values: unknown[]) => ({
+    _op: "sql",
+    // Join the raw template parts so tests can assert the generated SQL text
+    // (e.g. `DESC NULLS LAST` can't be derived from Drizzle's desc() helper).
+    raw: Array.from(strings).join("?"),
+    values,
+  })),
 }));
 
 // Mock topic-overlap — keeps dashboard tests focused on wiring, not overlap logic
@@ -1034,8 +1041,18 @@ describe("getTrendingTopicBySlug", () => {
     expect(result.episodes).toHaveLength(2);
     expect(result.episodes[0].bestTopicRank).toBeNull();
     expect(result.episodes[0].topRankedTopic).toBeNull();
-    // null-score row should still be returned (ordering is DB-side)
     expect(result.episodes[1].worthItScore).toBeNull();
+
+    // Guard against regression to plain desc(): pg defaults DESC to NULLS FIRST,
+    // so unscored episodes would float to the top without the raw-SQL override.
+    const orderArgs = mockOrderBy.mock.calls[0];
+    expect(orderArgs).toBeDefined();
+    const rawSqlClauses = orderArgs
+      .filter((arg: unknown): arg is { _op: "sql"; raw: string } =>
+        typeof arg === "object" && arg !== null && (arg as { _op?: string })._op === "sql",
+      )
+      .map((arg) => arg.raw);
+    expect(rawSqlClauses.join(" ")).toContain("DESC NULLS LAST");
   });
 
   it("returns topic with empty episodes when matched topic has no episodeIds", async () => {

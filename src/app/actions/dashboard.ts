@@ -495,6 +495,8 @@ export async function getTrendingTopicBySlug(slug: string): Promise<{
     }
 
     const allTopics = latest.topics;
+    // Pre-#279 snapshot rows don't have a slug key in the JSON payload even
+    // though the TS type says string; fall back to deriving it from the name.
     const topic = allTopics.find((t) => (t.slug ?? slugify(t.name)) === slug) ?? null;
 
     if (!topic || topic.episodeIds.length === 0) {
@@ -517,6 +519,8 @@ export async function getTrendingTopicBySlug(slug: string): Promise<{
       .from(episodes)
       .innerJoin(podcasts, eq(episodes.podcastId, podcasts.id))
       .where(inArray(episodes.id, topic.episodeIds))
+      // Postgres defaults DESC to NULLS FIRST; we want unscored episodes at the
+      // bottom, and drizzle's desc() helper doesn't expose the nulls-ordering flag.
       .orderBy(sql`${episodes.worthItScore} DESC NULLS LAST`, desc(episodes.publishDate));
 
     const episodeResults: RecommendedEpisodeDTO[] = rows.map((r) => ({
@@ -527,7 +531,7 @@ export async function getTrendingTopicBySlug(slug: string): Promise<{
 
     return { topic, allTopics, episodes: episodeResults, generatedAt: latest.generatedAt, error: null };
   } catch (error) {
-    console.error("Error fetching trending topic by slug:", error);
+    console.error("Error fetching trending topic by slug:", { slug, error });
     return { topic: null, allTopics: [], episodes: [], generatedAt: null, error: "Failed to load topic" };
   }
 }

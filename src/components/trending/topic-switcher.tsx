@@ -16,6 +16,8 @@ export function TopicSwitcher({ topics, activeSlug }: TopicSwitcherProps) {
     <nav className="overflow-x-auto">
       <div className="flex gap-2 whitespace-nowrap pb-2">
         {deduped.map((t) => {
+          // Mirrors the fallback in getTrendingTopicBySlug: legacy JSON rows may
+          // lack a slug key even though the TS type claims it is required.
           const slug = t.slug ?? slugify(t.name);
           const isActive = slug === activeSlug;
           return (
