@@ -270,7 +270,7 @@ export const notifications = pgTable(
     ),
     uniqueIndex("notifications_user_episode_unique_idx")
       .on(table.userId, table.episodeId)
-      .where(sql`episode_id IS NOT NULL`),
+      .where(sql`episode_id IS NOT NULL AND type = 'new_episode'`),
   ]
 );
 

@@ -895,7 +895,7 @@
             }
           ],
           "isUnique": true,
-          "where": "episode_id IS NOT NULL",
+          "where": "episode_id IS NOT NULL AND type = 'new_episode'",
           "concurrently": false,
           "method": "btree",
           "with": {}

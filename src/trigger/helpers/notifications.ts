@@ -91,15 +91,17 @@ export async function createEpisodeNotifications(
   }));
 
   // `where` predicate mirrors the partial unique index (drizzle/0019):
-  // `UNIQUE (user_id, episode_id) WHERE episode_id IS NOT NULL`.
+  // `UNIQUE (user_id, episode_id) WHERE episode_id IS NOT NULL AND type = 'new_episode'`.
   // Postgres requires an explicit `index_predicate` to infer a partial index as
   // the conflict arbiter — without it, ON CONFLICT raises at runtime.
+  // The `type = 'new_episode'` scope also lets legacy `summary_completed` rows
+  // coexist with the new single-row model without tripping the unique index.
   const insertedRows = await db
     .insert(notifications)
     .values(records)
     .onConflictDoNothing({
       target: [notifications.userId, notifications.episodeId],
-      where: sql`${notifications.episodeId} is not null`,
+      where: sql`${notifications.episodeId} is not null and ${notifications.type} = 'new_episode'`,
     })
     .returning({ userId: notifications.userId });
 
@@ -144,10 +146,19 @@ export async function markSummaryReady(
 
   const subscriberIds = subscribers.map((s) => s.userId);
 
+  // `type = 'new_episode'` filter scopes the UPDATE to single-row-model rows
+  // only. Without it, admin re-summarization would reset `isRead` on legacy
+  // `summary_completed` rows, inflating unread counts.
   const updatedRows = await db
     .update(notifications)
     .set({ body, title, isRead: false })
-    .where(and(eq(notifications.episodeId, episodeId), inArray(notifications.userId, subscriberIds)))
+    .where(
+      and(
+        eq(notifications.episodeId, episodeId),
+        eq(notifications.type, "new_episode"),
+        inArray(notifications.userId, subscriberIds)
+      )
+    )
     .returning({ userId: notifications.userId });
 
   if (updatedRows.length === 0) {

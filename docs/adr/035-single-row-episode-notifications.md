@@ -47,7 +47,7 @@ Add `notification_status: 'pending_summary' | 'summary_ready'` and transition vi
 
 ### Key Design Decisions
 
-1. **Partial unique index.** Add `uniqueIndex("notifications_user_episode_unique_idx").on(userId, episodeId).where(sql\`episode_id IS NOT NULL\`)` to the Drizzle schema. The partial predicate is required because `episodeId` is nullable on `notifications` (ADR-009 left the door open for future non-episode types such as `collection_shared` or `weekly_digest`). Postgres partial unique indexes support `ON CONFLICT` targeting.
+1. **Partial unique index.** Add `` uniqueIndex("notifications_user_episode_unique_idx").on(userId, episodeId).where(sql`episode_id IS NOT NULL AND type = 'new_episode'`) `` to the Drizzle schema. The partial predicate is required because `episodeId` is nullable on `notifications` (ADR-009 left the door open for future non-episode types such as `collection_shared` or `weekly_digest`). Scoping the index to `type = 'new_episode'` lets legacy `summary_completed` rows coexist without tripping the unique constraint — so the migration succeeds even when production still has the pre-refactor two-row pairs. Postgres partial unique indexes support `ON CONFLICT` targeting when the same predicate is supplied.
 
 2. **Two focused helpers replace one overloaded helper.** `src/trigger/helpers/notifications.ts` splits `createNotificationsForSubscribers` into:
    - `createEpisodeNotifications(podcastId, episodeId, podcastIndexEpisodeId, title, body)` — bulk INSERT keyed on the partial index; `onConflictDoNothing({ target: [userId, episodeId] })` makes it idempotent across poller retries. Called by the poller at discovery. Writes `type='new_episode'`.
@@ -62,7 +62,7 @@ Add `notification_status: 'pending_summary' | 'summary_ready'` and transition vi
 
 6. **UI drops type branching.** `NotificationList` renders a single `Podcast` icon regardless of `type`. The component no longer inspects `type` at all.
 
-7. **No production data cleanup.** Existing `new_episode` + `summary_completed` duplicate row pairs remain in the DB until their natural TTL (notifications are user-visible but not indexed on dashboards that would break). New-model rows interleave with legacy rows; the UI renders them identically.
+7. **No production data cleanup.** Existing `new_episode` + `summary_completed` duplicate row pairs remain in the DB until their natural TTL (notifications are user-visible but not indexed on dashboards that would break). The `type = 'new_episode'` scope on the partial unique index (Decision 1) and on `markSummaryReady`'s WHERE clause (Decision 2) ensures these legacy rows coexist with the new model without migration failure or stray `isRead` resets. New-model rows interleave with legacy rows; the UI renders them identically.
 
 8. **Send-notification-digests unchanged.** The digest task counts unread notifications per user. Under the new model, an episode rediscovered by summarization resets `isRead=false`, so unread count reflects episodes with pending user attention — semantically correct.
 

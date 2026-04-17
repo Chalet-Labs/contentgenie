@@ -1,1 +1,1 @@
-CREATE UNIQUE INDEX "notifications_user_episode_unique_idx" ON "notifications" USING btree ("user_id","episode_id") WHERE episode_id IS NOT NULL;
+CREATE UNIQUE INDEX "notifications_user_episode_unique_idx" ON "notifications" USING btree ("user_id","episode_id") WHERE episode_id IS NOT NULL AND type = 'new_episode';

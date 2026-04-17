@@ -2,9 +2,9 @@ import { schedules, logger, retry } from "@trigger.dev/sdk";
 import { eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { podcasts, episodes, userSubscriptions } from "@/db/schema";
-import { getEpisodesByFeedId } from "./helpers/podcastindex";
-import { fetchTranscriptTask } from "./fetch-transcript";
-import { createEpisodeNotifications } from "./helpers/notifications";
+import { getEpisodesByFeedId } from "@/trigger/helpers/podcastindex";
+import { fetchTranscriptTask } from "@/trigger/fetch-transcript";
+import { createEpisodeNotifications } from "@/trigger/helpers/notifications";
 
 /**
  * Queries podcasts that have at least one active subscriber and are sourced
@@ -114,8 +114,11 @@ export async function pollSingleFeed(podcast: typeof podcasts.$inferSelect) {
       // Per-episode try/catch so one failure doesn't abort remaining rows or
       // block the downstream batchTrigger — notifications are best-effort, the
       // transcript/summarize pipeline is the critical path.
+      const episodeByPiid = new Map(
+        newEpisodes.map((e) => [String(e.id), e])
+      );
       for (const row of inserted) {
-        const ep = newEpisodes.find((e) => String(e.id) === row.podcastIndexId);
+        const ep = episodeByPiid.get(row.podcastIndexId);
         const episodeTitle = ep?.title ?? row.podcastIndexId;
         try {
           await createEpisodeNotifications(
