@@ -2,6 +2,12 @@ import { Suspense } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TrendingDetailContent } from "./trending-detail-content";
 
+interface TrendingDetailPageProps {
+  params: {
+    slug: string;
+  };
+}
+
 function TrendingDetailLoading() {
   return (
     <div className="space-y-6">
@@ -26,7 +32,7 @@ function TrendingDetailLoading() {
   );
 }
 
-export default async function TrendingDetailPage({ params }: { params: { slug: string } }) {
+export default async function TrendingDetailPage({ params }: TrendingDetailPageProps) {
   return (
     <div className="space-y-6">
       <Suspense fallback={<TrendingDetailLoading />}>
