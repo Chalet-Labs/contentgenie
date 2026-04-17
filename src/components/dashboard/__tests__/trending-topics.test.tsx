@@ -123,10 +123,19 @@ describe("TrendingTopics", () => {
   })
 
   it("defensive fallback: empty slug falls back to slugify(name) for href", () => {
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {})
     const topics = [makeTopic({ name: "No Slug Topic", slug: "" })]
     render(<TrendingTopics topics={topics} generatedAt={fixedDate} />)
     const link = screen.getByRole("link", { name: /No Slug Topic/ })
     expect(link).toHaveAttribute("href", "/trending/no-slug-topic")
+    expect(warnSpy).toHaveBeenCalled()
+    warnSpy.mockRestore()
+  })
+
+  it("renders nothing when topics array is empty", () => {
+    const { container } = render(<TrendingTopics topics={[]} generatedAt={fixedDate} />)
+    expect(container.firstChild).toBeNull()
+    expect(screen.queryByText("Trending Topics")).not.toBeInTheDocument()
   })
 })
 

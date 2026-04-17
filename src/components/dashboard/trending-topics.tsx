@@ -15,6 +15,8 @@ export function TrendingTopics({ topics, generatedAt }: TrendingTopicsProps) {
   const updatedAgo = formatRelativeTime(generatedAt);
   const deduped = Array.from(new Map(topics.map((t) => [getTopicSlug(t), t])).values());
 
+  if (deduped.length === 0) return null;
+
   return (
     <Card>
       <CardHeader>
