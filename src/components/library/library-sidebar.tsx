@@ -127,15 +127,21 @@ export function LibrarySidebar() {
 
   const loadCollections = useCallback(async () => {
     setIsLoading(true);
-    const result = await getUserCollections();
-    if (result.error) {
-      setLoadError(result.error);
+    try {
+      const result = await getUserCollections();
+      if (result.error) {
+        setLoadError(result.error);
+        setCollections([]);
+      } else {
+        setLoadError(null);
+        setCollections(result.collections);
+      }
+    } catch {
+      setLoadError("Failed to load collections");
       setCollections([]);
-    } else {
-      setLoadError(null);
-      setCollections(result.collections);
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(false);
   }, []);
 
   useEffect(() => {
