@@ -234,8 +234,6 @@ describe("trigger/helpers/notifications", () => {
     });
 
     it("skips push entirely when all rows conflict (empty .returning())", async () => {
-      // All subscribers' rows already exist from a prior poll — onConflictDoNothing
-      // swallows the inserts, .returning() is empty, no push should fire.
       mockUserSubsFindMany.mockResolvedValueOnce([{ userId: "user-realtime" }]);
       mockUsersFindMany.mockResolvedValueOnce([
         {
@@ -258,7 +256,6 @@ describe("trigger/helpers/notifications", () => {
     });
 
     it("only pushes to users whose row was actually inserted (partial conflict)", async () => {
-      // user-a and user-b both subscribe; only user-a's row is new this poll.
       mockUserSubsFindMany.mockResolvedValueOnce([
         { userId: "user-a" },
         { userId: "user-b" },
@@ -287,8 +284,7 @@ describe("trigger/helpers/notifications", () => {
     });
 
     it("passes the partial-index where predicate to onConflictDoNothing", async () => {
-      // Postgres requires an explicit index_predicate matching the partial unique
-      // index (WHERE episode_id IS NOT NULL) to infer it as the conflict arbiter.
+      // Postgres requires index_predicate to infer a partial unique index.
       mockUserSubsFindMany.mockResolvedValueOnce([{ userId: "user-1" }]);
       mockUsersFindMany.mockResolvedValueOnce([
         { id: "user-1", preferences: {} },
@@ -395,10 +391,7 @@ describe("trigger/helpers/notifications", () => {
     });
 
     it("set() contains exactly body/title/isRead — no updatedAt or other stray keys", async () => {
-      // Schema invariant (ADR-035): the `notifications` table has no `updatedAt`
-      // column. Adding it to the set clause would crash production silently —
-      // this strict assertion pins the three allowed keys and will fail if a
-      // future refactor reintroduces `updatedAt` or adds any other field.
+      // `notifications` has no `updatedAt` column (ADR-035).
       mockUserSubsFindMany.mockResolvedValueOnce([{ userId: "user-1" }]);
       mockUsersFindMany.mockResolvedValueOnce([
         { id: "user-1", preferences: {} },

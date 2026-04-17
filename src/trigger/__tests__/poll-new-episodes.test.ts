@@ -122,8 +122,6 @@ describe("poll-new-episodes", () => {
     vi.clearAllMocks();
     mockBatchTrigger.mockResolvedValue({ id: "batch_default" });
     mockUpdateWhere.mockResolvedValue(undefined);
-    // Default to [] so the `for (const row of inserted)` loop is iterable.
-    // Tests that exercise per-row notification behavior override this.
     mockOnConflictDoNothing.mockResolvedValue([]);
     mockCreateEpisodeNotifications.mockResolvedValue(undefined);
   });

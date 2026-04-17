@@ -50,6 +50,20 @@ async function dispatchPush(
   );
 }
 
+// Intersect realtime subscribers with the userIds whose rows were actually
+// touched by INSERT/UPDATE (.returning()) so we only push for rows that
+// changed — avoiding duplicate pushes on conflict and updates to stale rows.
+async function realtimePushTargets(
+  subscriberIds: string[],
+  affectedRows: { userId: string }[]
+): Promise<string[]> {
+  const affected = new Set(affectedRows.map((r) => r.userId));
+  const realtime = await getRealtimeUserIds(subscriberIds);
+  return realtime.filter((id) => affected.has(id));
+}
+
+const episodeTag = (episodeId: number) => `episode-${episodeId}`;
+
 /**
  * INSERT a notification row per subscriber on episode discovery.
  * Uses onConflictDoNothing so poller retries are safe.
@@ -98,15 +112,16 @@ export async function createEpisodeNotifications(
 
   if (insertedRows.length === 0) return;
 
-  const insertedUserIds = new Set(insertedRows.map((r) => r.userId));
   const subscriberIds = subscribers.map((s) => s.userId);
-  const realtimeUserIds = (await getRealtimeUserIds(subscriberIds)).filter((id) =>
-    insertedUserIds.has(id)
-  );
-  const episodePushUrl = ROUTES.episode(podcastIndexEpisodeId);
-  const tag = `episode-${episodeId}`;
+  const targets = await realtimePushTargets(subscriberIds, insertedRows);
 
-  await dispatchPush(realtimeUserIds, title, body, tag, episodePushUrl);
+  await dispatchPush(
+    targets,
+    title,
+    body,
+    episodeTag(episodeId),
+    ROUTES.episode(podcastIndexEpisodeId)
+  );
 }
 
 /**
@@ -149,15 +164,15 @@ export async function markSummaryReady(
     count: updatedRows.length,
   });
 
-  const updatedUserIds = new Set(updatedRows.map((r) => r.userId));
-  const realtimeUserIds = (await getRealtimeUserIds(subscriberIds)).filter((id) =>
-    updatedUserIds.has(id)
+  const targets = await realtimePushTargets(subscriberIds, updatedRows);
+
+  await dispatchPush(
+    targets,
+    title,
+    body,
+    episodeTag(episodeId),
+    ROUTES.episode(podcastIndexEpisodeId)
   );
-
-  const episodePushUrl = ROUTES.episode(podcastIndexEpisodeId);
-  const tag = `episode-${episodeId}`;
-
-  await dispatchPush(realtimeUserIds, title, body, tag, episodePushUrl);
 }
 
 /**
