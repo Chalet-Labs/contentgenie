@@ -121,6 +121,10 @@ export function LibrarySidebar() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
 
+  const handleCreateClick = useCallback(() => {
+    setShowCreateDialog(true);
+  }, []);
+
   const loadCollections = useCallback(async () => {
     setIsLoading(true);
     const result = await getUserCollections();
@@ -144,7 +148,6 @@ export function LibrarySidebar() {
 
   return (
     <>
-      {/* Mobile: Sheet trigger */}
       <div className="md:hidden mb-4">
         <Sheet>
           <SheetTrigger asChild>
@@ -160,7 +163,7 @@ export function LibrarySidebar() {
                 collections={collections}
                 isLoading={isLoading}
                 loadError={loadError}
-                onCreateClick={() => setShowCreateDialog(true)}
+                onCreateClick={handleCreateClick}
                 inSheet
               />
             </div>
@@ -168,7 +171,6 @@ export function LibrarySidebar() {
         </Sheet>
       </div>
 
-      {/* Desktop: inline sidebar */}
       <aside className="hidden md:block w-64 shrink-0 border-r pr-6">
         <SidebarNav
           pathname={pathname}

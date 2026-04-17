@@ -119,7 +119,7 @@ describe("LibrarySidebar mobile sheet — closes on link tap", () => {
   it("closes the sheet when 'All Saved' is tapped", async () => {
     render(<LibrarySidebar />)
 
-    fireEvent.click(screen.getAllByTestId("sheet-trigger")[0])
+    fireEvent.click(screen.getByRole("button", { name: /collections/i }))
 
     const sheetContent = screen.getByTestId("sheet-content")
     await within(sheetContent).findByRole("link", { name: /fake collection/i })
@@ -133,7 +133,7 @@ describe("LibrarySidebar mobile sheet — closes on link tap", () => {
   it("closes the sheet when a collection row is tapped", async () => {
     render(<LibrarySidebar />)
 
-    fireEvent.click(screen.getAllByTestId("sheet-trigger")[0])
+    fireEvent.click(screen.getByRole("button", { name: /collections/i }))
 
     const sheetContent = screen.getByTestId("sheet-content")
     const collectionLink = await within(sheetContent).findByRole("link", {
@@ -147,15 +147,14 @@ describe("LibrarySidebar mobile sheet — closes on link tap", () => {
   it("does NOT close the sheet when the '+' new-collection button is tapped", async () => {
     render(<LibrarySidebar />)
 
-    fireEvent.click(screen.getAllByTestId("sheet-trigger")[0])
+    fireEvent.click(screen.getByRole("button", { name: /collections/i }))
 
     const sheetContent = screen.getByTestId("sheet-content")
     await within(sheetContent).findByRole("link", { name: /fake collection/i })
 
-    const newCollectionButtons = within(sheetContent).getAllByRole("button", {
-      name: /new collection/i,
-    })
-    fireEvent.click(newCollectionButtons[0])
+    fireEvent.click(
+      within(sheetContent).getByRole("button", { name: /new collection/i })
+    )
 
     expect(screen.getByTestId("sheet-content")).toBeInTheDocument()
   })
