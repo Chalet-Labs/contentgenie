@@ -119,6 +119,38 @@ describe("loadQueue", () => {
     expect(loadQueue()).toEqual([])
   })
 
+  it("accepts items with a valid chaptersUrl string", () => {
+    const withChapters: AudioEpisode = {
+      ...validEpisode,
+      chaptersUrl: "https://example.com/chapters.json",
+    }
+    window.localStorage.setItem(
+      "contentgenie-player-queue",
+      JSON.stringify([withChapters])
+    )
+    const result = loadQueue()
+    expect(result).toHaveLength(1)
+    expect(result[0].chaptersUrl).toBe("https://example.com/chapters.json")
+  })
+
+  it("filters out items with empty-string chaptersUrl", () => {
+    const items = [{ ...validEpisode, chaptersUrl: "" }]
+    window.localStorage.setItem(
+      "contentgenie-player-queue",
+      JSON.stringify(items)
+    )
+    expect(loadQueue()).toEqual([])
+  })
+
+  it("filters out items with non-string chaptersUrl", () => {
+    const items = [{ ...validEpisode, chaptersUrl: 42 }]
+    window.localStorage.setItem(
+      "contentgenie-player-queue",
+      JSON.stringify(items)
+    )
+    expect(loadQueue()).toEqual([])
+  })
+
   it("filters out null items in the array", () => {
     const items = [null, validEpisode, undefined, 42, "string"]
     window.localStorage.setItem(

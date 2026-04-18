@@ -5,8 +5,10 @@ import { eq } from "drizzle-orm"
 import { db } from "@/db"
 import { ensureUserExists } from "@/db/helpers"
 import { userPlayerSession } from "@/db/schema"
-import { savePlayerSessionSchema } from "@/lib/schemas/listening-queue"
-import type { AudioEpisode } from "@/contexts/audio-player-context"
+import {
+  savePlayerSessionSchema,
+  type AudioEpisode,
+} from "@/lib/schemas/listening-queue"
 
 export async function getPlayerSession(): Promise<
   | { success: true; data: { episode: AudioEpisode; currentTime: number } | null }
@@ -51,7 +53,8 @@ export async function savePlayerSession(
 
   const parsed = savePlayerSessionSchema.safeParse({ episode, currentTime })
   if (!parsed.success) {
-    return { success: false, error: parsed.error.message }
+    console.warn("[savePlayerSession] validation failed", parsed.error.issues)
+    return { success: false, error: "Invalid session data" }
   }
 
   const { episode: validEpisode, currentTime: validCurrentTime } = parsed.data

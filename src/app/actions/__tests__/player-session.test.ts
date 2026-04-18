@@ -187,6 +187,14 @@ describe("savePlayerSession", () => {
     expect(mockEnsureUserExists).not.toHaveBeenCalled()
   })
 
+  it("Zod-rejects currentTime above the upper bound without touching the DB", async () => {
+    const { savePlayerSession } = await import("@/app/actions/player-session")
+    const result = await savePlayerSession(validEpisode, 1_000_001)
+    expect(result.success).toBe(false)
+    expect(mockInsert).not.toHaveBeenCalled()
+    expect(mockEnsureUserExists).not.toHaveBeenCalled()
+  })
+
   it("calls ensureUserExists before the insert", async () => {
     const { savePlayerSession } = await import("@/app/actions/player-session")
     await savePlayerSession(validEpisode, 120)

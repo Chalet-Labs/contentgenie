@@ -5,8 +5,10 @@ import { eq, asc } from "drizzle-orm"
 import { db } from "@/db"
 import { ensureUserExists } from "@/db/helpers"
 import { userQueueItems } from "@/db/schema"
-import { queueSchema } from "@/lib/schemas/listening-queue"
-import type { AudioEpisode } from "@/contexts/audio-player-context"
+import {
+  queueSchema,
+  type AudioEpisode,
+} from "@/lib/schemas/listening-queue"
 
 export async function getQueue(): Promise<
   { success: true; data: AudioEpisode[] } | { success: false; error: string }
@@ -48,7 +50,8 @@ export async function setQueue(
 
   const parsed = queueSchema.safeParse(episodes)
   if (!parsed.success) {
-    return { success: false, error: parsed.error.message }
+    console.warn("[setQueue] validation failed", parsed.error.issues)
+    return { success: false, error: "Invalid queue data" }
   }
 
   try {

@@ -1672,4 +1672,163 @@ describe("Cross-device sync: hydration and reconcile", () => {
     vi.useRealTimers()
     expect(mockSavePlayerSessionAction).toHaveBeenCalled()
   })
+
+  it("does not write local queue back to server on cold boot when server has a different queue (local-wins regression)", async () => {
+    const localQueue: AudioEpisode[] = [
+      { id: "local-1", title: "Local Ep", podcastTitle: "Podcast", audioUrl: "https://example.com/l1.mp3" },
+    ]
+    const serverQueue: AudioEpisode[] = [
+      { id: "server-1", title: "Server Ep", podcastTitle: "Podcast", audioUrl: "https://example.com/s1.mp3" },
+    ]
+    mockLoadQueue.mockReturnValue(localQueue)
+    mockGetQueue.mockResolvedValue({ success: true, data: serverQueue })
+
+    render(
+      <AudioPlayerProvider>
+        <TestConsumer />
+      </AudioPlayerProvider>
+    )
+
+    // Wait long enough for the debounce window (1500ms) to elapse — if the bug
+    // were present, setQueueAction would have fired with localQueue by now.
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 1700))
+    })
+
+    await waitFor(() => {
+      expect(screen.getByTestId("queueIds")).toHaveTextContent("server-1")
+    }, { timeout: 5000 })
+
+    // setQueueAction must NOT have been called — no user mutation happened;
+    // the server provided an authoritative state and no write should go back.
+    expect(mockSetQueueAction).not.toHaveBeenCalled()
+  })
+
+  it("refetches on visibilitychange when document becomes visible", async () => {
+    render(
+      <AudioPlayerProvider>
+        <TestConsumer />
+      </AudioPlayerProvider>
+    )
+
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 50))
+    })
+    mockGetQueue.mockClear()
+    mockGetPlayerSession.mockClear()
+
+    // Simulate a visibility change to "visible"
+    await act(async () => {
+      Object.defineProperty(document, "visibilityState", {
+        configurable: true,
+        get: () => "visible",
+      })
+      document.dispatchEvent(new Event("visibilitychange"))
+      await new Promise((r) => setTimeout(r, 300))
+    })
+
+    expect(mockGetQueue).toHaveBeenCalled()
+    expect(mockGetPlayerSession).toHaveBeenCalled()
+  })
+
+  it("calls clearPlayerSession server action when the user closes the player", async () => {
+    render(
+      <AudioPlayerProvider>
+        <TestConsumer />
+      </AudioPlayerProvider>
+    )
+
+    const user = userEvent.setup()
+    await user.click(screen.getByText("Play Episode"))
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 50))
+    })
+    mockClearPlayerSessionAction.mockClear()
+
+    await user.click(screen.getByText("Close"))
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 50))
+    })
+
+    expect(mockClearPlayerSessionAction).toHaveBeenCalled()
+  })
+
+  it("calls savePlayerSession server action on beforeunload", async () => {
+    render(
+      <AudioPlayerProvider>
+        <TestConsumer />
+      </AudioPlayerProvider>
+    )
+
+    const user = userEvent.setup()
+    await user.click(screen.getByText("Play Episode"))
+
+    // Let session restoration flip isSessionRestored
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 50))
+      fireAudioEvent("durationchange")
+    })
+
+    const audio = getAudioElement()!
+    audio.currentTime = 42
+    mockSavePlayerSessionAction.mockClear()
+
+    await act(async () => {
+      window.dispatchEvent(new Event("beforeunload"))
+      await new Promise((r) => setTimeout(r, 50))
+    })
+
+    expect(mockSavePlayerSessionAction).toHaveBeenCalled()
+  })
+
+  it("calls savePlayerSession server action on pause (alongside the localStorage cache)", async () => {
+    render(
+      <AudioPlayerProvider>
+        <TestConsumer />
+      </AudioPlayerProvider>
+    )
+
+    const user = userEvent.setup()
+    await user.click(screen.getByText("Play Episode"))
+
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 50))
+      fireAudioEvent("durationchange")
+    })
+
+    const audio = getAudioElement()!
+    audio.currentTime = 77
+    mockSavePlayerSessionAction.mockClear()
+
+    await act(async () => {
+      fireAudioEvent("pause")
+      await new Promise((r) => setTimeout(r, 50))
+    })
+
+    expect(mockSavePlayerSessionAction).toHaveBeenCalled()
+  })
+
+  it("fires a toast when the migration upload fails", async () => {
+    const localQueue: AudioEpisode[] = [
+      { id: "local-1", title: "Local Ep", podcastTitle: "Podcast", audioUrl: "https://example.com/l1.mp3" },
+    ]
+    mockLoadQueue.mockReturnValue(localQueue)
+    mockGetQueue.mockResolvedValue({ success: true, data: [] })
+    mockSetQueueAction.mockResolvedValueOnce({ success: false, error: "DB error" })
+
+    const { toast } = await import("sonner")
+    ;(toast.error as ReturnType<typeof vi.fn>).mockClear?.()
+
+    render(
+      <AudioPlayerProvider>
+        <TestConsumer />
+      </AudioPlayerProvider>
+    )
+
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 100))
+    })
+
+    expect(toast.error).toHaveBeenCalled()
+  })
 })

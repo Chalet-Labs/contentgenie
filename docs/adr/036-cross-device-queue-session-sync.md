@@ -1,6 +1,6 @@
 # ADR-036: Cross-Device Queue & Player Session Sync
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-04-18
 **Issue:** [#282](https://github.com/Chalet-Labs/contentgenie/issues/282)
 **Supersedes:** [ADR-014](014-episode-queue-client-side.md) (client-side queue with localStorage)
