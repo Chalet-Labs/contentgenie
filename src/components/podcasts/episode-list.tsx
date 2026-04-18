@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Search } from "lucide-react";
 import { EpisodeCard } from "./episode-card";
 import { Input } from "@/components/ui/input";
@@ -18,6 +18,14 @@ interface EpisodeListProps {
 
 export function EpisodeList({ episodes, isLoading, error, statusMap, scoreMap }: EpisodeListProps) {
   const [query, setQuery] = useState("");
+  const trimmedQuery = query.trim();
+  const normalizedQuery = trimmedQuery.toLowerCase();
+  const filteredEpisodes = useMemo(() => {
+    if (!normalizedQuery) return episodes;
+    return episodes.filter((episode) =>
+      (episode.title ?? "").toLowerCase().includes(normalizedQuery),
+    );
+  }, [episodes, normalizedQuery]);
 
   if (isLoading) {
     return (
@@ -46,14 +54,6 @@ export function EpisodeList({ episodes, isLoading, error, statusMap, scoreMap }:
       </div>
     );
   }
-
-  const trimmedQuery = query.trim();
-  const normalizedQuery = trimmedQuery.toLowerCase();
-  const filteredEpisodes = normalizedQuery
-    ? episodes.filter((episode) =>
-        (episode.title ?? "").toLowerCase().includes(normalizedQuery),
-      )
-    : episodes;
 
   return (
     <div className="space-y-4">
