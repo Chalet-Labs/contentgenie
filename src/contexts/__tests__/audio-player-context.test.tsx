@@ -55,9 +55,6 @@ const playMock = vi.fn().mockResolvedValue(undefined)
 const pauseMock = vi.fn()
 const loadMock = vi.fn()
 
-// Track event listeners on audio elements
-const audioListeners: Record<string, EventListener[]> = {}
-
 function getAudioElement(): HTMLAudioElement | null {
   return document.querySelector("audio")
 }

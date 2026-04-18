@@ -34,7 +34,6 @@ import { recordListenEvent } from "@/app/actions/listen-history"
 import {
   getQueue,
   setQueue as setQueueAction,
-  clearQueue as clearQueueAction,
 } from "@/app/actions/listening-queue"
 import {
   getPlayerSession,
