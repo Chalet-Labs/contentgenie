@@ -189,14 +189,169 @@ describe("ZaiProvider", () => {
       })
     );
 
+    let caught: Error | null = null;
+    try {
+      await provider.generateCompletion(
+        [{ role: "user", content: "test" }],
+        { model: "glm-5.1" }
+      );
+    } catch (err) {
+      caught = err as Error;
+    }
+    expect(caught).not.toBeNull();
+    const msg = caught!.message;
+    expect(msg).toContain("Invalid response format from Z.AI");
+    expect(msg).toContain("finish_reason=length");
+    expect(msg).toContain("completion_tokens=50");
+    expect(msg).toContain("reasoning_tokens=50");
+    // reasoning_content snippet must NOT appear in the thrown Error (PII /
+    // log-injection risk) — it only goes to console.warn behind a debug flag.
+    expect(msg).not.toContain("reasoning_snippet");
+    expect(msg).not.toContain("Step 1");
+  });
+
+  it("renders 'unknown' tokens when usage object is missing", async () => {
+    vi.stubEnv("ZAI_API_KEY", "zai-test-key");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            choices: [{ message: { content: "" }, finish_reason: "stop" }],
+          }),
+      })
+    );
+
     await expect(
       provider.generateCompletion(
         [{ role: "user", content: "test" }],
         { model: "glm-5.1" }
       )
     ).rejects.toThrow(
-      /Invalid response format from Z\.AI.*finish_reason=length.*completion_tokens=50.*reasoning_tokens=50.*reasoning_snippet="Step 1: understand/
+      "Invalid response format from Z.AI: empty content (finish_reason=stop, completion_tokens=unknown, reasoning_tokens=unknown).",
     );
+  });
+
+  it.each([
+    { label: "undefined", value: undefined },
+    { label: "null", value: null },
+    { label: "empty string", value: "" },
+  ])("does not emit debug log when reasoning_content is $label (even with debug flag)", async ({ value }) => {
+    vi.stubEnv("ZAI_API_KEY", "zai-test-key");
+    vi.stubEnv("ZAI_DEBUG_REASONING", "1");
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              choices: [
+                {
+                  message: { content: "", reasoning_content: value },
+                  finish_reason: "length",
+                },
+              ],
+              usage: { completion_tokens: 10 },
+            }),
+        })
+      );
+
+      await expect(
+        provider.generateCompletion(
+          [{ role: "user", content: "test" }],
+          { model: "glm-5.1" }
+        )
+      ).rejects.toThrow(/Invalid response format/);
+
+      expect(warnSpy).not.toHaveBeenCalled();
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
+  it("emits debug log with reasoning snippet only when ZAI_DEBUG_REASONING=1", async () => {
+    vi.stubEnv("ZAI_API_KEY", "zai-test-key");
+    vi.stubEnv("ZAI_DEBUG_REASONING", "1");
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              choices: [
+                {
+                  message: {
+                    content: "",
+                    reasoning_content: "Long reasoning trace here",
+                  },
+                  finish_reason: "length",
+                },
+              ],
+              usage: {
+                completion_tokens: 50,
+                completion_tokens_details: { reasoning_tokens: 50 },
+              },
+            }),
+        })
+      );
+
+      await expect(
+        provider.generateCompletion(
+          [{ role: "user", content: "test" }],
+          { model: "glm-5.1" }
+        )
+      ).rejects.toThrow();
+
+      expect(warnSpy).toHaveBeenCalledWith(
+        "[zai] empty content with reasoning_content present",
+        expect.objectContaining({
+          finish_reason: "length",
+          reasoning_snippet: "Long reasoning trace here",
+        })
+      );
+    } finally {
+      warnSpy.mockRestore();
+    }
+  });
+
+  it("does not emit debug log when ZAI_DEBUG_REASONING is unset", async () => {
+    vi.stubEnv("ZAI_API_KEY", "zai-test-key");
+    vi.stubEnv("ZAI_DEBUG_REASONING", "");
+    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn().mockResolvedValue({
+          ok: true,
+          json: () =>
+            Promise.resolve({
+              choices: [
+                {
+                  message: { content: "", reasoning_content: "trace" },
+                  finish_reason: "length",
+                },
+              ],
+              usage: { completion_tokens: 50 },
+            }),
+        })
+      );
+
+      await expect(
+        provider.generateCompletion(
+          [{ role: "user", content: "test" }],
+          { model: "glm-5.1" }
+        )
+      ).rejects.toThrow();
+
+      expect(warnSpy).not.toHaveBeenCalled();
+    } finally {
+      warnSpy.mockRestore();
+    }
   });
 
   it("uses default params when not specified", async () => {

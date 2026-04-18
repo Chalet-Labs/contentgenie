@@ -3,7 +3,6 @@ import { currentUser } from "@clerk/nextjs/server";
 import {
   getRecentEpisodesFromSubscriptions,
   getRecommendedEpisodes,
-  getTrendingTopics,
   hasAnySubscriptions,
 } from "@/app/actions/dashboard";
 import { WelcomeCard } from "@/components/dashboard/welcome-card";
@@ -13,10 +12,10 @@ import {
   EpisodeRecommendationsLoading,
 } from "@/components/dashboard/episode-recommendations";
 import { QueueSection } from "@/components/dashboard/queue-section";
-import { TrendingTopics, TrendingTopicsLoading } from "@/components/dashboard/trending-topics";
+import { TrendingTopicsLoading } from "@/components/dashboard/trending-topics";
+import { TrendingTopicsSection } from "@/app/(app)/dashboard/trending-topics-section";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { isTrendingSnapshotStale } from "@/lib/trending";
 
 // Loading skeleton for recent episodes (inline — presentational file is "use client")
 function RecentEpisodesLoading() {
@@ -64,24 +63,6 @@ async function RecentEpisodesSection() {
       initialEpisodes={episodes}
       sinceLastLogin={sinceLastLogin}
       hasSubscriptions={hasSubscriptions}
-    />
-  );
-}
-
-// Server component for trending topics
-async function TrendingTopicsSection() {
-  const { topics, error } = await getTrendingTopics();
-  if (error) console.error("[TrendingTopicsSection]", error);
-  // No snapshot at all → hide the section entirely (first-run dashboards).
-  if (!topics) return null;
-  // Snapshot exists but is empty or stale → render the card so the header
-  // (with "Updated N days ago" / empty-state copy) makes the feature's status
-  // visible, instead of silently disappearing.
-  return (
-    <TrendingTopics
-      topics={topics.items}
-      generatedAt={topics.generatedAt}
-      isStale={isTrendingSnapshotStale(topics.generatedAt)}
     />
   );
 }

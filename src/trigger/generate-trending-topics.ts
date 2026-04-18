@@ -13,10 +13,9 @@ import { slugify } from "@/lib/utils";
 const LOOKBACK_DAYS = 7;
 const MAX_EPISODES = 200;
 const MAX_TOPICS = 8;
-// Reasoning-capable Z.AI models (GLM-4.6/5.x) burn tokens on chain-of-thought
-// before emitting `content`; 16k leaves headroom after reasoning so the topic
-// JSON isn't truncated mid-output.
-const TRENDING_MAX_TOKENS = 16000;
+// Reasoning models spend token budget on chain-of-thought before emitting
+// `content`; 16k leaves headroom so the topic JSON isn't truncated mid-output.
+export const TRENDING_MAX_TOKENS = 16000;
 
 /**
  * Daily scheduled task that analyzes recent episode summaries via LLM
@@ -107,10 +106,10 @@ export const generateTrendingTopics = schedules.task({
       return { episodeCount: recentEpisodes.length, topicCount: 0 };
     }
 
-    // Generate topic clusters via LLM. Wrapped so provider failures (Z.AI
-    // balance, reasoning-token exhaustion, etc.) persist an empty snapshot
-    // instead of crashing the run — the dashboard's empty-state + stale
-    // banner then make the outage visible to users.
+    // Generate topic clusters via LLM. On provider failure we persist an empty
+    // snapshot so the dashboard's empty-state + stale banner surface the
+    // outage to users, then re-throw so Trigger.dev still marks the run
+    // failed, triggers retries, and fires operator alerts.
     const prompt = getTrendingTopicsPrompt(episodesWithSummary);
     let completion: string;
     try {
@@ -126,7 +125,7 @@ export const generateTrendingTopics = schedules.task({
         error: err instanceof Error ? err.message : String(err),
       });
       await persistSnapshot([], recentEpisodes.length);
-      return { episodeCount: recentEpisodes.length, topicCount: 0 };
+      throw err;
     }
 
     let topics: TrendingTopic[];

@@ -3,6 +3,7 @@ import {
   SYSTEM_PROMPT,
   getSummarizationPrompt,
   getQuickSummaryPrompt,
+  getTrendingTopicsPrompt,
 } from "@/lib/prompts";
 
 describe("SYSTEM_PROMPT", () => {
@@ -113,6 +114,52 @@ describe("getSummarizationPrompt", () => {
     );
     expect(prompt).toContain("Boolean Quality Signals");
     expect(prompt).toContain("Adjustment (-1, 0, or +1)");
+  });
+});
+
+describe("getTrendingTopicsPrompt", () => {
+  it("serializes the summary field (not keyTakeaways) in the payload", () => {
+    const prompt = getTrendingTopicsPrompt([
+      { id: 1, title: "AI in Healthcare", summary: "A deep dive into medical LLMs." },
+    ]);
+    expect(prompt).toContain('"summary": "A deep dive into medical LLMs."');
+    expect(prompt).not.toContain("keyTakeaways");
+  });
+
+  it("includes every episode's id and title in the serialized payload", () => {
+    const prompt = getTrendingTopicsPrompt([
+      { id: 42, title: "Ep 42", summary: "s1" },
+      { id: 99, title: "Ep 99", summary: "s2" },
+    ]);
+    expect(prompt).toContain('"id": 42');
+    expect(prompt).toContain('"title": "Ep 42"');
+    expect(prompt).toContain('"id": 99');
+    expect(prompt).toContain('"title": "Ep 99"');
+  });
+
+  it("JSON-escapes markdown summaries with quotes, newlines, and backticks", () => {
+    const summary = `## TL;DR\nUses \`fetch()\` with "retry" logic.\n\n- bullet`;
+    const prompt = getTrendingTopicsPrompt([
+      { id: 1, title: "Ep", summary },
+    ]);
+    // JSON serialization must escape the embedded quotes + preserve content
+    expect(prompt).toContain('\\"retry\\"');
+    expect(prompt).toContain("\\n");
+    // Payload must round-trip back to the original
+    const payloadMatch = prompt.match(/<episodes>\n([\s\S]*?)\n<\/episodes>/);
+    expect(payloadMatch).not.toBeNull();
+    const parsed = JSON.parse(payloadMatch![1]);
+    expect(parsed[0].summary).toBe(summary);
+  });
+
+  it("reports the provided episode count in the prompt header", () => {
+    const episodes = Array.from({ length: 7 }, (_, i) => ({
+      id: i + 1,
+      title: `Ep ${i + 1}`,
+      summary: `Summary ${i + 1}`,
+    }));
+    const prompt = getTrendingTopicsPrompt(episodes);
+    expect(prompt).toContain("Analyze these 7 recently summarized podcast episodes");
   });
 });
 

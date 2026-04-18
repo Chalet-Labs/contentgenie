@@ -52,22 +52,32 @@ export class ZaiProvider implements AiProvider {
     }
 
     if (!choice.message?.content) {
-      // GLM-4.6 / GLM-5.x are reasoning models: chain-of-thought goes into
-      // `reasoning_content`, and `content` stays empty until reasoning
-      // completes. If `max_tokens` is too small for the prompt, reasoning
-      // burns the entire budget (finish_reason = "length") with no content.
-      // Surface the diagnostic fields so future regressions aren't a mystery.
+      // Z.AI reasoning models stream chain-of-thought into `reasoning_content`
+      // and leave `content` empty until reasoning finishes; if `max_tokens`
+      // is too small the budget is spent on reasoning (finish_reason=length)
+      // with no content. Token counts + finish_reason are always safe to
+      // surface; reasoning_content can echo prompt PII, so it only goes to
+      // logs (never the thrown Error) and only when explicitly enabled.
       const reasoningTokens =
         data.usage?.completion_tokens_details?.reasoning_tokens;
       const completionTokens = data.usage?.completion_tokens;
       const reasoningContent: string | undefined =
         choice.message?.reasoning_content;
-      const reasoningSnippet =
-        typeof reasoningContent === "string" && reasoningContent.length > 0
-          ? ` reasoning_snippet="${reasoningContent.slice(0, 200).replace(/\s+/g, " ")}"`
-          : "";
+      if (
+        process.env.ZAI_DEBUG_REASONING === "1" &&
+        typeof reasoningContent === "string" &&
+        reasoningContent.length > 0
+      ) {
+        console.warn("[zai] empty content with reasoning_content present", {
+          finish_reason: finishReason ?? null,
+          completion_tokens: completionTokens ?? null,
+          reasoning_tokens: reasoningTokens ?? null,
+          reasoning_length: reasoningContent.length,
+          reasoning_snippet: reasoningContent.slice(0, 200),
+        });
+      }
       throw new Error(
-        `Invalid response format from Z.AI: empty content (finish_reason=${finishReason ?? "unknown"}, completion_tokens=${completionTokens ?? "unknown"}, reasoning_tokens=${reasoningTokens ?? "unknown"}).${reasoningSnippet}`
+        `Invalid response format from Z.AI: empty content (finish_reason=${finishReason ?? "unknown"}, completion_tokens=${completionTokens ?? "unknown"}, reasoning_tokens=${reasoningTokens ?? "unknown"}).`
       );
     }
 

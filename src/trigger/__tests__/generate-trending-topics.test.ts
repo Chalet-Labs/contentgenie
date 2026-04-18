@@ -58,7 +58,7 @@ vi.mock("@/lib/prompts", () => ({
   getTrendingTopicsPrompt: vi.fn().mockReturnValue("mock prompt"),
 }));
 
-import { generateTrendingTopics } from "@/trigger/generate-trending-topics";
+import { generateTrendingTopics, TRENDING_MAX_TOKENS } from "@/trigger/generate-trending-topics";
 
 const taskConfig = generateTrendingTopics as unknown as {
   run: () => Promise<{ episodeCount: number; topicCount: number }>;
@@ -183,7 +183,7 @@ describe("generate-trending-topics task", () => {
         { role: "system", content: "You are a podcast trend analyst." },
         { role: "user", content: "mock prompt" },
       ],
-      { maxTokens: 16000 }
+      { maxTokens: TRENDING_MAX_TOKENS }
     );
     expect(mockValues).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -202,20 +202,37 @@ describe("generate-trending-topics task", () => {
     );
   });
 
-  it("persists empty snapshot when the LLM provider itself throws", async () => {
+  it("persists empty snapshot then re-throws when the LLM provider throws", async () => {
     mockDbSelect([
       { id: 1, title: "Episode 1", summary: "Summary 1" },
     ]);
 
-    mockGenerateCompletion.mockRejectedValue(new Error("Invalid response format from Z.AI"));
+    const providerError = new Error("Invalid response format from Z.AI");
+    mockGenerateCompletion.mockRejectedValue(providerError);
 
-    const result = await taskConfig.run();
+    // Re-throw preserves Trigger.dev retry + failure alerting
+    await expect(taskConfig.run()).rejects.toThrow("Invalid response format from Z.AI");
 
-    expect(result).toEqual({ episodeCount: 1, topicCount: 0 });
+    // ...but we still persisted an empty snapshot first so the dashboard
+    // stale/empty affordances surface the outage to users.
     expect(mockValues).toHaveBeenCalledWith(
       expect.objectContaining({ topics: [], episodeCount: 1 })
     );
     expect(mockParseJsonResponse).not.toHaveBeenCalled();
+  });
+
+  it("still passes maxTokens on the failing LLM call", async () => {
+    mockDbSelect([
+      { id: 1, title: "Episode 1", summary: "Summary 1" },
+    ]);
+    mockGenerateCompletion.mockRejectedValue(new Error("boom"));
+
+    await expect(taskConfig.run()).rejects.toThrow("boom");
+
+    expect(mockGenerateCompletion).toHaveBeenCalledWith(
+      expect.any(Array),
+      { maxTokens: TRENDING_MAX_TOKENS }
+    );
   });
 
   it("stores empty topics when LLM response fails to parse", async () => {
