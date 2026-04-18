@@ -610,3 +610,43 @@ export type NewUserQueueItem = typeof userQueueItems.$inferInsert;
 
 export type UserPlayerSession = typeof userPlayerSession.$inferSelect;
 export type NewUserPlayerSession = typeof userPlayerSession.$inferInsert;
+
+// ---------------------------------------------------------------------------
+// Denormalization bridge check (ADR-036)
+//
+// `user_queue_items` and `user_player_session` intentionally denormalize the
+// episode metadata instead of joining to `episodes`. ADR-036 accepts cosmetic
+// drift on retitle — but silently losing a field when someone adds one to
+// `AudioEpisode` without adding a column is not acceptable. The type-level
+// assertion below fails the build if the denormalized columns stop being a
+// superset of `AudioEpisode` (key-wise; column nullability does not have to
+// match `?` optionality).
+// ---------------------------------------------------------------------------
+
+type _AudioEpisodeNonIdKeys = keyof Omit<
+  import("@/lib/schemas/listening-queue").AudioEpisode,
+  "id"
+>;
+
+type _QueueDenormKeys = keyof Omit<
+  UserQueueItem,
+  "id" | "userId" | "position" | "updatedAt" | "episodeId"
+>;
+
+type _SessionDenormKeys = keyof Omit<
+  UserPlayerSession,
+  "userId" | "episodeId" | "currentTime" | "updatedAt"
+>;
+
+type _Assert<T extends true> = T;
+type _KeysMatch<A, B> = [A, B] extends [B, A] ? true : false;
+
+// If either of these fails to compile, the denormalized columns and
+// AudioEpisode have drifted. Fix by adding/removing a column on
+// user_queue_items / user_player_session to match AudioEpisode's shape.
+export type _QueueDenormInvariant = _Assert<
+  _KeysMatch<_QueueDenormKeys, _AudioEpisodeNonIdKeys>
+>;
+export type _SessionDenormInvariant = _Assert<
+  _KeysMatch<_SessionDenormKeys, _AudioEpisodeNonIdKeys>
+>;

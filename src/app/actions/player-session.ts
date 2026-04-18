@@ -44,6 +44,16 @@ export async function getPlayerSession(): Promise<
   }
 }
 
+/**
+ * Upserts the per-user resume-position row. Client is expected to throttle
+ * calls (~5s) so we are not hammering Neon on every `timeupdate` tick.
+ *
+ * Conflict strategy is last-write-wins on the row — per ADR-036. Two devices
+ * writing concurrently resolve to whichever `savePlayerSession` commits last.
+ * The context's `never-rewind-active-playback` guard prevents the losing
+ * write's stale `currentTime` from ever being applied on the still-playing
+ * device.
+ */
 export async function savePlayerSession(
   episode: AudioEpisode,
   currentTime: number

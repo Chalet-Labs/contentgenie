@@ -42,6 +42,17 @@ export async function getQueue(): Promise<
   }
 }
 
+/**
+ * Replaces the entire queue for the authenticated user with the provided
+ * array. There is no `addToQueue` / `removeFromQueue` partial-update action
+ * by design: atomic replace-all eliminates ordering races between concurrent
+ * optimistic mutations. Positions are derived from array index. Passing an
+ * empty array is equivalent to `clearQueue`.
+ *
+ * Conflict strategy is last-commit-wins. No version token, no merge — per
+ * ADR-036. Two devices mutating concurrently will resolve to whichever
+ * commit arrives last on the database.
+ */
 export async function setQueue(
   episodes: AudioEpisode[]
 ): Promise<{ success: true } | { success: false; error: string }> {

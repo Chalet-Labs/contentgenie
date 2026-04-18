@@ -3,8 +3,15 @@
  * Source of truth is the server — see `src/app/actions/player-session.ts`.
  * No TTL: the server has no TTL either. `savedAt` is kept for debugging /
  * cache-invalidation telemetry only.
+ *
+ * Episode validation is delegated to `audioEpisodeSchema` so the cache and
+ * the server agree on shape (see ADR-036).
  */
-import type { AudioEpisode } from "@/contexts/audio-player-context"
+import { z } from "zod"
+import {
+  audioEpisodeSchema,
+  type AudioEpisode,
+} from "@/lib/schemas/listening-queue"
 
 const STORAGE_KEY = "contentgenie-player-session"
 
@@ -14,57 +21,13 @@ interface PlayerSession {
   savedAt: number
 }
 
-function isValidSession(data: unknown): data is PlayerSession {
-  if (typeof data !== "object" || data === null) return false
-  const obj = data as Record<string, unknown>
-
-  const ep = obj.episode
-  if (typeof ep !== "object" || ep === null) return false
-  const episode = ep as Record<string, unknown>
-
-  const requiredFields = ["id", "title", "podcastTitle", "audioUrl"] as const
-  if (
-    !requiredFields.every(
-      (field) => typeof episode[field] === "string" && episode[field] !== ""
-    )
-  ) {
-    return false
-  }
-
-  if (Object.hasOwn(episode, "artwork") && episode.artwork !== undefined) {
-    if (typeof episode.artwork !== "string" || episode.artwork === "") return false
-  }
-  if (Object.hasOwn(episode, "duration") && episode.duration !== undefined) {
-    if (
-      typeof episode.duration !== "number" ||
-      !Number.isFinite(episode.duration) ||
-      episode.duration < 0
-    )
-      return false
-  }
-  if (Object.hasOwn(episode, "chaptersUrl") && episode.chaptersUrl !== undefined) {
-    if (typeof episode.chaptersUrl !== "string" || episode.chaptersUrl === "")
-      return false
-  }
-
-  if (
-    typeof obj.currentTime !== "number" ||
-    !Number.isFinite(obj.currentTime) ||
-    obj.currentTime < 0
-  ) {
-    return false
-  }
-
-  if (
-    typeof obj.savedAt !== "number" ||
-    !Number.isFinite(obj.savedAt) ||
-    obj.savedAt <= 0
-  ) {
-    return false
-  }
-
-  return true
-}
+const storedSessionSchema = z
+  .object({
+    episode: audioEpisodeSchema,
+    currentTime: z.number().nonnegative().finite(),
+    savedAt: z.number().positive().finite(),
+  })
+  .strip()
 
 export function loadPlayerSession(): {
   episode: AudioEpisode
@@ -77,12 +40,16 @@ export function loadPlayerSession(): {
     if (!raw) return null
 
     const parsed: unknown = JSON.parse(raw)
-    if (!isValidSession(parsed)) {
+    const result = storedSessionSchema.safeParse(parsed)
+    if (!result.success) {
       clearPlayerSession()
       return null
     }
 
-    return { episode: parsed.episode, currentTime: parsed.currentTime }
+    return {
+      episode: result.data.episode,
+      currentTime: result.data.currentTime,
+    }
   } catch {
     clearPlayerSession()
     return null
