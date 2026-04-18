@@ -42,9 +42,11 @@ export function TrendingTopics({ topics, generatedAt }: TrendingTopicsProps) {
               className="flex items-start gap-3 rounded-md p-3 transition-colors hover:bg-accent"
             >
               <div className="min-w-0 flex-1">
-                <p className="font-semibold">{topic.name}</p>
+                <p className="break-words font-semibold">{topic.name}</p>
                 {topic.description && (
-                  <p className="line-clamp-2 text-sm text-muted-foreground">{topic.description}</p>
+                  <p className="line-clamp-2 break-words text-sm text-muted-foreground">
+                    {topic.description}
+                  </p>
                 )}
               </div>
               <div className="flex shrink-0 items-center gap-1 text-sm text-muted-foreground">

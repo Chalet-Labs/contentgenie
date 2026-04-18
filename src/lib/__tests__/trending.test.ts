@@ -124,11 +124,20 @@ describe("dedupeTopics", () => {
     expect(dedupeTopics([])).toEqual([]);
   });
 
-  it("computes each topic's slug exactly once (no duplicate warn for empty-slug topics)", () => {
+  it("warns exactly once per empty-slug topic across duplicate entries (no extra call from dedup map)", () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const topics = [makeTopic({ name: "Empty Slug Topic", slug: "" })];
-    dedupeTopics(topics);
-    expect(warnSpy).toHaveBeenCalledTimes(1);
-    warnSpy.mockRestore();
+    try {
+      const topics = [
+        makeTopic({ name: "Empty Slug Topic", slug: "" }),
+        makeTopic({ name: "Empty Slug Topic", slug: "" }),
+      ];
+      const result = dedupeTopics(topics);
+      // Two entries, same computed slug → collapse to one, and each topic's
+      // slug was computed exactly once (2 calls, not 4).
+      expect(result).toHaveLength(1);
+      expect(warnSpy).toHaveBeenCalledTimes(2);
+    } finally {
+      warnSpy.mockRestore();
+    }
   });
 });
