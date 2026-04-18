@@ -43,6 +43,32 @@ import {
 } from "@/app/actions/player-session"
 
 // ---------------------------------------------------------------------------
+// Server-sync helpers (fire-and-forget; best-effort with warn-on-failure)
+// ---------------------------------------------------------------------------
+
+type SessionSaveSite = "throttle" | "pause" | "beforeunload"
+
+function persistSessionToServer(
+  episode: AudioEpisode,
+  currentTime: number,
+  site: SessionSaveSite
+): void {
+  savePlayerSessionAction(episode, currentTime)
+    .then((r) => {
+      if (!r.success) console.warn("[player] save failed", { site, error: r.error })
+    })
+    .catch((err) => console.warn("[player] save threw", { site, err }))
+}
+
+function clearSessionOnServer(): void {
+  clearPlayerSessionAction()
+    .then((r) => {
+      if (!r.success) console.warn("[player] clear failed:", r.error)
+    })
+    .catch((err) => console.warn("[player] clear threw:", err))
+}
+
+// ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
@@ -400,15 +426,11 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
             pendingQueueWriteRef.current--
           }
         } else if (serverQueue.length > 0) {
-          // Server has data — reconcile only if no pending local write.
-          // `lastAckedQueueRef` is updated BEFORE dispatch so the persist
-          // effect's id comparison sees a match and skips the server write.
           if (!pendingQueueWriteRef.current) {
             lastAckedQueueRef.current = serverQueue
             dispatch({ type: "INIT_QUEUE", queue: serverQueue })
           }
         } else {
-          // Both empty — set lastAcked to empty
           lastAckedQueueRef.current = []
         }
       } else {
@@ -419,31 +441,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
 
       // Reconcile session
       if (sessionResult.success && sessionResult.data) {
-        const serverSession = sessionResult.data
-        const currentEp = stateRef.current.currentEpisode
-        const audio = audioRef.current
-        const isActivelyPlaying = audio ? !audio.paused : stateRef.current.isPlaying
-        const sameEpisode = currentEp && currentEp.id === serverSession.episode.id
-
-        if (sameEpisode && isActivelyPlaying) {
-          // Never rewind active playback
-        } else if (sameEpisode && !isActivelyPlaying) {
-          // Same episode, paused — safe to seek to server currentTime
-          if (audio && Number.isFinite(serverSession.currentTime)) {
-            pendingSeekRef.current = serverSession.currentTime
-            if (audio.duration > 0 && !isNaN(audio.duration)) {
-              audio.currentTime = Math.min(serverSession.currentTime, audio.duration)
-              pendingSeekRef.current = null
-            }
-          }
-        } else {
-          // Different episode OR no episode — load server session (no auto-play)
-          isRestoringSession.current = true
-          loadEpisodeIntoPlayer(serverSession.episode, {
-            andPlay: false,
-            startAt: serverSession.currentTime,
-          })
-        }
+        reconcileServerSession(sessionResult.data)
       } else if (!sessionResult.success) {
         console.warn("Mount getPlayerSession failed:", sessionResult.error)
       }
@@ -451,6 +449,9 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
 
     void syncOnMount()
     return () => { cancelled = true }
+  // Runs once on mount. `reconcileServerSession`, `loadEpisodeIntoPlayer`, and
+  // the imported server actions are referenced via closure; re-running on
+  // their identity churn would re-trigger cross-device fetch every render.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -485,31 +486,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
 
         // Session reconcile
         if (sessionResult.success && sessionResult.data) {
-          const serverSession = sessionResult.data
-          const currentEp = stateRef.current.currentEpisode
-          const audio = audioRef.current
-          const isActivelyPlaying = audio ? !audio.paused : stateRef.current.isPlaying
-          const sameEpisode = currentEp && currentEp.id === serverSession.episode.id
-
-          if (sameEpisode && isActivelyPlaying) {
-            // Never rewind active playback
-          } else if (sameEpisode && !isActivelyPlaying) {
-            // Same episode, paused — safe to seek to server currentTime
-            if (audio && Number.isFinite(serverSession.currentTime)) {
-              pendingSeekRef.current = serverSession.currentTime
-              if (audio.duration > 0 && !isNaN(audio.duration)) {
-                audio.currentTime = Math.min(serverSession.currentTime, audio.duration)
-                pendingSeekRef.current = null
-              }
-            }
-          } else {
-            // Different episode OR no episode — load server session (no auto-play)
-            isRestoringSession.current = true
-            loadEpisodeIntoPlayer(serverSession.episode, {
-              andPlay: false,
-              startAt: serverSession.currentTime,
-            })
-          }
+          reconcileServerSession(sessionResult.data)
         } else if (!sessionResult.success) {
           console.warn("Focus getPlayerSession failed:", sessionResult.error)
         }
@@ -530,6 +507,9 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
         focusDebounceTimerRef.current = null
       }
     }
+  // Mount-only: registers focus + visibilitychange listeners once. The
+  // `reconcileServerSession` closure captures refs only, so listener
+  // reinstallation on every render would thrash for no behavior change.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -587,15 +567,15 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       if (queueDebounceTimerRef.current) {
         clearTimeout(queueDebounceTimerRef.current)
         queueDebounceTimerRef.current = null
-        // pendingQueueWriteRef is a plain counter, not a DOM ref. The lint
-        // warning about stale-closure ref values in cleanup does not apply —
-        // we explicitly want to decrement the live counter here to balance the
-        // increment that ran when this effect body scheduled the debounced
-        // write above.
+        // Balance the increment that scheduled this debounced write. The
+        // lint rule assumes refs point to DOM nodes that may unmount; this
+        // one is a plain counter, so reading the live value is intentional.
         // eslint-disable-next-line react-hooks/exhaustive-deps
         pendingQueueWriteRef.current--
       }
     }
+  // Only `state.queue` is a reactive dep. `setQueueAction` is a stable import,
+  // and the refs / `dispatch` are stable by React contract.
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.queue])
 
@@ -802,6 +782,45 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  // ---- Reconcile a server-fetched session into the player ----
+  // Shared by mount-sync and focus-refetch. Preserves the never-rewind
+  // invariant: if the same episode is actively playing, server currentTime
+  // is ignored.
+  const reconcileServerSession = (serverSession: {
+    episode: AudioEpisode
+    currentTime: number
+  }) => {
+    const currentEp = stateRef.current.currentEpisode
+    const audio = audioRef.current
+    const isActivelyPlaying = audio
+      ? !audio.paused
+      : stateRef.current.isPlaying
+    const sameEpisode =
+      currentEp && currentEp.id === serverSession.episode.id
+
+    if (sameEpisode && isActivelyPlaying) {
+      return
+    }
+    if (sameEpisode && !isActivelyPlaying) {
+      if (audio && Number.isFinite(serverSession.currentTime)) {
+        pendingSeekRef.current = serverSession.currentTime
+        if (audio.duration > 0 && !isNaN(audio.duration)) {
+          audio.currentTime = Math.min(
+            serverSession.currentTime,
+            audio.duration
+          )
+          pendingSeekRef.current = null
+        }
+      }
+      return
+    }
+    isRestoringSession.current = true
+    loadEpisodeIntoPlayer(serverSession.episode, {
+      andPlay: false,
+      startAt: serverSession.currentTime,
+    })
+  }
+
   // ---- Shared player teardown ----
   // Resets the audio element and all player state. Only clears the persisted
   // session when the user explicitly closes the player (not on auto-advance errors).
@@ -819,11 +838,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       cancelFade()
       if (options?.clearSession) {
         clearPlayerSession() // localStorage cache
-        clearPlayerSessionAction() // server source of truth
-          .then((r) => {
-            if (!r.success) console.warn("clearPlayerSession failed:", r.error)
-          })
-          .catch((err) => console.warn("clearPlayerSession threw:", err))
+        clearSessionOnServer() // server source of truth
       }
       if (sessionSaveTimerRef.current) {
         clearTimeout(sessionSaveTimerRef.current)
@@ -1030,14 +1045,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
           const ep = stateRef.current.currentEpisode
           if (ep) {
             savePlayerSession(ep, audio.currentTime) // localStorage cache
-            savePlayerSessionAction(ep, audio.currentTime) // server source of truth
-              .then((r) => {
-                if (!r.success)
-                  console.warn("savePlayerSession failed:", r.error)
-              })
-              .catch((err) =>
-                console.warn("savePlayerSession threw:", err)
-              )
+            persistSessionToServer(ep, audio.currentTime, "throttle")
           }
         }, 5000)
       }
@@ -1127,14 +1135,15 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       clearStallTimer()
       // Save exact pause position immediately (locally AND to the server so a
       // pause on Device A reflects on Device B without waiting for the 5s throttle).
+      // Clear any pending throttled save — the immediate pause save supersedes it.
+      if (sessionSaveTimerRef.current) {
+        clearTimeout(sessionSaveTimerRef.current)
+        sessionSaveTimerRef.current = null
+      }
       if (isSessionRestored.current && stateRef.current.currentEpisode) {
         const ep = stateRef.current.currentEpisode
         savePlayerSession(ep, audio.currentTime) // localStorage cache
-        savePlayerSessionAction(ep, audio.currentTime) // server source of truth
-          .then((r) => {
-            if (!r.success) console.warn("savePlayerSession (pause) failed:", r.error)
-          })
-          .catch((err) => console.warn("savePlayerSession (pause) threw:", err))
+        persistSessionToServer(ep, audio.currentTime, "pause")
       }
     }
 
@@ -1252,9 +1261,9 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       const audio = audioRef.current
       if (ep && audio && isSessionRestored.current) {
         savePlayerSession(ep, audio.currentTime) // localStorage cache
-        // beforeunload can't await; the browser may drop the request, but we
-        // still attach a catch so a synchronous rejection isn't unhandled.
-        savePlayerSessionAction(ep, audio.currentTime).catch(() => {})
+        // beforeunload can't await; the browser may drop the request, but
+        // the helper attaches its own .catch so rejections aren't unhandled.
+        persistSessionToServer(ep, audio.currentTime, "beforeunload")
       }
     }
     window.addEventListener("beforeunload", onBeforeUnload)

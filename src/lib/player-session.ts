@@ -15,12 +15,6 @@ import {
 
 const STORAGE_KEY = "contentgenie-player-session"
 
-interface PlayerSession {
-  episode: AudioEpisode
-  currentTime: number
-  savedAt: number
-}
-
 const storedSessionSchema = z
   .object({
     episode: audioEpisodeSchema,
@@ -28,6 +22,8 @@ const storedSessionSchema = z
     savedAt: z.number().positive().finite(),
   })
   .strip()
+
+type PlayerSession = z.infer<typeof storedSessionSchema>
 
 export function loadPlayerSession(): {
   episode: AudioEpisode

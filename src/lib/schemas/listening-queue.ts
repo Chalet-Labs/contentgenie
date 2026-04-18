@@ -29,3 +29,31 @@ export const savePlayerSessionSchema = z
   .strip();
 
 export type AudioEpisode = z.infer<typeof audioEpisodeSchema>;
+
+/**
+ * Denormalized row shared by `userQueueItems` and `userPlayerSession`.
+ * The compile-time `_QueueDenormInvariant` / `_SessionDenormInvariant`
+ * assertions in `@/db/schema` guarantee these field sets stay aligned.
+ */
+export interface EpisodeDenormRow {
+  episodeId: string;
+  title: string;
+  podcastTitle: string;
+  audioUrl: string;
+  artwork: string | null;
+  duration: number | null;
+  chaptersUrl: string | null;
+}
+
+export function toAudioEpisode(row: EpisodeDenormRow): AudioEpisode {
+  const episode: AudioEpisode = {
+    id: row.episodeId,
+    title: row.title,
+    podcastTitle: row.podcastTitle,
+    audioUrl: row.audioUrl,
+  };
+  if (row.artwork != null) episode.artwork = row.artwork;
+  if (row.duration != null) episode.duration = row.duration;
+  if (row.chaptersUrl != null) episode.chaptersUrl = row.chaptersUrl;
+  return episode;
+}

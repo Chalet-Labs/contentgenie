@@ -7,6 +7,7 @@ import { ensureUserExists } from "@/db/helpers"
 import { userPlayerSession } from "@/db/schema"
 import {
   savePlayerSessionSchema,
+  toAudioEpisode,
   type AudioEpisode,
 } from "@/lib/schemas/listening-queue"
 
@@ -24,19 +25,12 @@ export async function getPlayerSession(): Promise<
 
     if (!row) return { success: true, data: null }
 
-    const episode: AudioEpisode = {
-      id: row.episodeId,
-      title: row.title,
-      podcastTitle: row.podcastTitle,
-      audioUrl: row.audioUrl,
-    }
-    if (row.artwork != null) episode.artwork = row.artwork
-    if (row.duration != null) episode.duration = row.duration
-    if (row.chaptersUrl != null) episode.chaptersUrl = row.chaptersUrl
-
     return {
       success: true,
-      data: { episode, currentTime: Number(row.currentTime) },
+      data: {
+        episode: toAudioEpisode(row),
+        currentTime: Number(row.currentTime),
+      },
     }
   } catch (e) {
     console.error("Failed to get player session:", e)
@@ -72,33 +66,25 @@ export async function savePlayerSession(
   try {
     await ensureUserExists(userId)
 
+    const sessionValues = {
+      userId,
+      episodeId: validEpisode.id,
+      title: validEpisode.title,
+      podcastTitle: validEpisode.podcastTitle,
+      audioUrl: validEpisode.audioUrl,
+      artwork: validEpisode.artwork ?? null,
+      duration: validEpisode.duration ?? null,
+      chaptersUrl: validEpisode.chaptersUrl ?? null,
+      currentTime: String(validCurrentTime),
+      updatedAt: new Date(),
+    }
+
     await db
       .insert(userPlayerSession)
-      .values({
-        userId,
-        episodeId: validEpisode.id,
-        title: validEpisode.title,
-        podcastTitle: validEpisode.podcastTitle,
-        audioUrl: validEpisode.audioUrl,
-        artwork: validEpisode.artwork ?? null,
-        duration: validEpisode.duration ?? null,
-        chaptersUrl: validEpisode.chaptersUrl ?? null,
-        currentTime: String(validCurrentTime),
-        updatedAt: new Date(),
-      })
+      .values(sessionValues)
       .onConflictDoUpdate({
         target: userPlayerSession.userId,
-        set: {
-          episodeId: validEpisode.id,
-          title: validEpisode.title,
-          podcastTitle: validEpisode.podcastTitle,
-          audioUrl: validEpisode.audioUrl,
-          artwork: validEpisode.artwork ?? null,
-          duration: validEpisode.duration ?? null,
-          chaptersUrl: validEpisode.chaptersUrl ?? null,
-          currentTime: String(validCurrentTime),
-          updatedAt: new Date(),
-        },
+        set: sessionValues,
       })
 
     return { success: true }

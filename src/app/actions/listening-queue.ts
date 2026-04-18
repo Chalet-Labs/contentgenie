@@ -7,6 +7,7 @@ import { ensureUserExists } from "@/db/helpers"
 import { userQueueItems } from "@/db/schema"
 import {
   queueSchema,
+  toAudioEpisode,
   type AudioEpisode,
 } from "@/lib/schemas/listening-queue"
 
@@ -22,18 +23,7 @@ export async function getQueue(): Promise<
       orderBy: [asc(userQueueItems.position)],
     })
 
-    const data: AudioEpisode[] = rows.map((row) => {
-      const episode: AudioEpisode = {
-        id: row.episodeId,
-        title: row.title,
-        podcastTitle: row.podcastTitle,
-        audioUrl: row.audioUrl,
-      }
-      if (row.artwork != null) episode.artwork = row.artwork
-      if (row.duration != null) episode.duration = row.duration
-      if (row.chaptersUrl != null) episode.chaptersUrl = row.chaptersUrl
-      return episode
-    })
+    const data: AudioEpisode[] = rows.map(toAudioEpisode)
 
     return { success: true, data }
   } catch (e) {
