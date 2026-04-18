@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from "@storybook/react";
+import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { SubscriptionCard } from "./subscription-card";
 import type { Podcast } from "@/db/schema";
 

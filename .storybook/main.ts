@@ -1,11 +1,15 @@
-import type { StorybookConfig } from "@storybook/react-vite";
-import path from "path";
+import { fileURLToPath } from "node:url";
+import type { StorybookConfig } from "@storybook/nextjs-vite";
+import path, { dirname } from "path";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 const config: StorybookConfig = {
   stories: ["../src/**/*.stories.@(js|jsx|ts|tsx)"],
-  addons: ["@storybook/addon-essentials"],
+  addons: ["@storybook/addon-docs"],
   framework: {
-    name: "@storybook/react-vite",
+    name: "@storybook/nextjs-vite",
     options: {},
   },
   viteFinal: async (config) => {
@@ -27,6 +31,7 @@ const config: StorybookConfig = {
       { find: "@/app/actions/queue-scores", replacement: path.resolve(__dirname, "mocks/actions.ts") },
       { find: "@trigger.dev/react-hooks", replacement: path.resolve(__dirname, "mocks/trigger-react-hooks.ts") },
       { find: "@/lib/podcastindex", replacement: path.resolve(__dirname, "mocks/podcastindex.ts") },
+      { find: "@/hooks/use-sync-queue", replacement: path.resolve(__dirname, "mocks/use-sync-queue.ts") },
       // General path alias — must come last
       { find: "@", replacement: path.resolve(__dirname, "../src") },
     ];

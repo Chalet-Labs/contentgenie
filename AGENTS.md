@@ -61,7 +61,7 @@ bun run trigger:deploy # Deploy tasks to Trigger.dev Cloud
 ## Testing instructions
 
 - **Test framework:** Vitest with React Testing Library. Config: `vitest.config.ts`, setup: `src/test/setup.ts`.
-- **Component stories:** Storybook 8 (`@storybook/react-vite`). Config: `.storybook/main.ts`.
+- **Component stories:** Storybook 10 (`@storybook/nextjs-vite`). Config: `.storybook/main.ts`.
 - Always run `bun run lint`, `bun run test`, and `bun run build` before committing.
 - Unit tests live in `__tests__/` directories co-located with source. Stories live alongside components as `*.stories.tsx` files.
 - The pre-commit hook (Husky) automatically runs lint and tests on commit.

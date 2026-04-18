@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from "@storybook/react";
+import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { EpisodeCard } from "./episode-card";
 import type { PodcastIndexEpisode } from "@/lib/podcastindex";
 import {

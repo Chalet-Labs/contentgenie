@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from "@storybook/react"
+import type { Meta, StoryObj } from "@storybook/nextjs-vite"
 import type { ReactNode } from "react"
 import { SidebarCountsProvider } from "@/contexts/sidebar-counts-context"
 import { Sheet, SheetContent } from "@/components/ui/sheet"

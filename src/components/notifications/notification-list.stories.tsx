@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from "@storybook/react";
+import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { NotificationList } from "@/components/notifications/notification-list";
 import { STORY_NOW } from "@/test/story-fixtures";
 

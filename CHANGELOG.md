@@ -63,6 +63,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Summarization step progress UI removes `"fetching-transcript"` and `"transcribing-audio"` steps — summarization no longer fetches transcripts
 
 ### Fixed
+- Upgrade Storybook 8.6.15 → 10.3.5 and swap framework from `@storybook/react-vite` to `@storybook/nextjs-vite` so stories that import `next/link`, `next/image`, or `next/navigation` render without `process is not defined` / `React is not defined` runtime errors (#298)
 - Close mobile library sidebar sheet when tapping a collection or "All Saved" link, matching the site header fix from #283 (#284)
 - Restore episode topic persistence on production by adding the missing `topic_rank`/`ranked_at` migration; PR #266 added the columns to the schema but never generated a migration, so production INSERTs into `episode_topics` failed (#275)
 - Mobile nav touch targets increased from `py-2` to `py-3` for WCAG 2.1 AA 44px minimum (#256)
