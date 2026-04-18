@@ -148,10 +148,11 @@ describe("EpisodeList", () => {
     expect(card).toHaveAttribute("data-score", "0.85");
   });
 
-  it("does not throw when an episode title is missing", () => {
+  it("does not throw when an episode title is missing or null", () => {
     const withMissingTitle = [
       ...fixtures,
       { ...makeEpisode(99, ""), title: undefined as unknown as string },
+      { ...makeEpisode(100, ""), title: null as unknown as string },
     ];
     render(<EpisodeList episodes={withMissingTitle} />);
     const input = screen.getByLabelText(/search episodes by title/i);

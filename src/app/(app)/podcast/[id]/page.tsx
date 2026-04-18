@@ -9,6 +9,7 @@ import { stripHtml } from "@/lib/utils";
 import { EpisodeList } from "@/components/podcasts/episode-list";
 import { SubscribeButton } from "@/components/podcasts/subscribe-button";
 import { BatchSummarizeButton } from "@/components/podcasts/batch-summarize-button";
+import { BATCH_SUMMARIZE_LIMIT } from "@/lib/batch-summarize";
 import { ShareButton } from "@/components/ui/share-button";
 import {
   getPodcastById,
@@ -225,7 +226,9 @@ export default async function PodcastPage({ params, searchParams }: PodcastPageP
                 </Button>
               )}
               <BatchSummarizeButton
-                episodeIds={episodes.map((e) => e.id)}
+                episodeIds={episodes
+                  .slice(0, BATCH_SUMMARIZE_LIMIT)
+                  .map((e) => e.id)}
               />
               {process.env.NEXT_PUBLIC_APP_URL && (
                 <ShareButton
@@ -389,7 +392,9 @@ export default async function PodcastPage({ params, searchParams }: PodcastPageP
                 </Button>
               )}
               <BatchSummarizeButton
-                episodeIds={episodes.map((e) => e.id)}
+                episodeIds={episodes
+                  .slice(0, BATCH_SUMMARIZE_LIMIT)
+                  .map((e) => e.id)}
               />
               {process.env.NEXT_PUBLIC_APP_URL && (
                 <ShareButton

@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Fixed
+- `BatchSummarizeButton` on the podcast detail page now slices the passed-in episode list to the API's 20-episode batch limit before calling `/api/episodes/batch-summarize`, preventing 400 "Maximum 20 episodes per batch" errors when the page loads up to 200 episodes (#291).
 - Dashboard Trending Topics card no longer disappears silently when the daily snapshot cron misses a run or returns zero topics. Stale snapshots (>48h) now render with an amber "Out of date" indicator, and empty snapshots render a "No trending topics yet — check back tomorrow" empty state. The section is only hidden when no snapshot has ever been generated.
 - Trending topics trigger task now persists an empty snapshot when the LLM provider itself throws, so a failed cron run updates `generatedAt` and lets the dashboard empty-state surface the problem instead of keeping a week-old row.
 - `ZaiProvider` now includes `finish_reason`, `completion_tokens`, `reasoning_tokens`, and a `reasoning_content` snippet in the "Invalid response format" error. Reasoning-capable Z.AI models (GLM-4.6 / GLM-5.x) burn tokens on chain-of-thought before emitting `content`; without these diagnostics, max-token exhaustion looked identical to an API-shape regression.

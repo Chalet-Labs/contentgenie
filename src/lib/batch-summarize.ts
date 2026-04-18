@@ -1,0 +1,1 @@
+export const BATCH_SUMMARIZE_LIMIT = 20;
