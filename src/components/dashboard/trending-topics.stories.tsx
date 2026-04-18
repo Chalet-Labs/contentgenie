@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite"
 import { TrendingTopics, TrendingTopicsLoading } from "@/components/dashboard/trending-topics"
 import type { TrendingTopic } from "@/db/schema"
-import { STORY_TWO_HOURS_AGO, STORY_THIRTY_MIN_AGO } from "@/test/story-fixtures"
+import { STORY_TWO_HOURS_AGO, STORY_THIRTY_MIN_AGO, STORY_THREE_DAYS_AGO } from "@/test/story-fixtures"
 
 // ---------------------------------------------------------------------------
 // Sample data
@@ -80,6 +80,29 @@ export const SingleTopic: Story = {
   args: {
     topics: [baseTopics[0]],
     generatedAt: STORY_TWO_HOURS_AGO,
+  },
+}
+
+export const Stale: Story = {
+  args: {
+    topics: baseTopics,
+    generatedAt: STORY_THREE_DAYS_AGO,
+    isStale: true,
+  },
+}
+
+export const Empty: Story = {
+  args: {
+    topics: [],
+    generatedAt: STORY_TWO_HOURS_AGO,
+  },
+}
+
+export const EmptyAndStale: Story = {
+  args: {
+    topics: [],
+    generatedAt: STORY_THREE_DAYS_AGO,
+    isStale: true,
   },
 }
 

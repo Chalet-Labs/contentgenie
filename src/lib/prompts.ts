@@ -94,14 +94,20 @@ export const TRENDING_TOPICS_SYSTEM_PROMPT = `You are a podcast trend analyst. Y
 
 Always respond in valid JSON format.`;
 
+// Per-episode summary cap for the trending payload. Full summaries run
+// 600–1200 words; at 200 episodes that blows past most LLM context windows
+// and inflates cost. 1500 chars keeps the TL;DR + early sections, which is
+// all the clustering prompt needs. Exported for tests.
+export const TRENDING_SUMMARY_SNIPPET_CHARS = 1500;
+
 export function getTrendingTopicsPrompt(
-  episodes: Array<{ id: number; title: string; keyTakeaways: string[] }>
+  episodes: Array<{ id: number; title: string; summary: string }>
 ): string {
   const episodePayload = JSON.stringify(
     episodes.map((ep) => ({
       id: ep.id,
       title: ep.title,
-      keyTakeaways: ep.keyTakeaways,
+      summary: ep.summary.slice(0, TRENDING_SUMMARY_SNIPPET_CHARS),
     })),
     null,
     2

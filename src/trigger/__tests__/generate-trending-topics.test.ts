@@ -27,7 +27,7 @@ vi.mock("@/db/schema", () => ({
   episodes: {
     id: "id",
     title: "title",
-    keyTakeaways: "key_takeaways",
+    summary: "summary",
     summaryStatus: "summary_status",
     processedAt: "processed_at",
   },
@@ -61,7 +61,10 @@ vi.mock("@/lib/prompts", () => ({
 import { generateTrendingTopics } from "@/trigger/generate-trending-topics";
 
 const taskConfig = generateTrendingTopics as unknown as {
-  run: () => Promise<{ episodeCount: number; topicCount: number }>;
+  run: (
+    payload?: unknown,
+    options?: { ctx?: { attempt?: { number?: number } } }
+  ) => Promise<{ episodeCount: number; topicCount: number }>;
 };
 
 // Helper to set up the db.select chain
@@ -112,10 +115,10 @@ describe("generate-trending-topics task", () => {
 
   it("logs warning when MAX_EPISODES cap is reached", async () => {
     const { logger } = await import("@trigger.dev/sdk");
-    const episodeRows = Array.from({ length: 500 }, (_, i) => ({
+    const episodeRows = Array.from({ length: 200 }, (_, i) => ({
       id: i + 1,
       title: `Episode ${i + 1}`,
-      keyTakeaways: [`Takeaway ${i + 1}`],
+      summary: `Summary for episode ${i + 1}`,
     }));
     mockDbSelect(episodeRows);
 
@@ -128,14 +131,14 @@ describe("generate-trending-topics task", () => {
 
     expect(logger.warn).toHaveBeenCalledWith(
       "Episode query hit MAX_EPISODES cap; snapshot may be incomplete",
-      { cap: 500 }
+      { cap: 200 }
     );
   });
 
-  it("stores empty topics when all episodes lack takeaways", async () => {
+  it("stores empty topics when all episodes lack a summary", async () => {
     mockDbSelect([
-      { id: 1, title: "Episode 1", keyTakeaways: null },
-      { id: 2, title: "Episode 2", keyTakeaways: [] },
+      { id: 1, title: "Episode 1", summary: null },
+      { id: 2, title: "Episode 2", summary: "   " },
     ]);
 
     const result = await taskConfig.run();
@@ -152,9 +155,9 @@ describe("generate-trending-topics task", () => {
 
   it("generates and stores topic clusters for valid episodes", async () => {
     mockDbSelect([
-      { id: 1, title: "AI in Healthcare", keyTakeaways: ["AI transforms diagnostics"] },
-      { id: 2, title: "Machine Learning 101", keyTakeaways: ["ML basics explained"] },
-      { id: 3, title: "Leadership Tips", keyTakeaways: ["Lead with empathy"] },
+      { id: 1, title: "AI in Healthcare", summary: "AI transforms diagnostics" },
+      { id: 2, title: "Machine Learning 101", summary: "ML basics explained" },
+      { id: 3, title: "Leadership Tips", summary: "Lead with empathy" },
     ]);
 
     const mockTopics = [
@@ -178,10 +181,13 @@ describe("generate-trending-topics task", () => {
     const result = await taskConfig.run();
 
     expect(result).toEqual({ episodeCount: 3, topicCount: 2 });
-    expect(mockGenerateCompletion).toHaveBeenCalledWith([
-      { role: "system", content: "You are a podcast trend analyst." },
-      { role: "user", content: "mock prompt" },
-    ]);
+    expect(mockGenerateCompletion).toHaveBeenCalledWith(
+      [
+        { role: "system", content: "You are a podcast trend analyst." },
+        { role: "user", content: "mock prompt" },
+      ],
+      expect.objectContaining({ maxTokens: expect.any(Number) })
+    );
     expect(mockValues).toHaveBeenCalledWith(
       expect.objectContaining({
         topics: [
@@ -199,9 +205,62 @@ describe("generate-trending-topics task", () => {
     );
   });
 
+  it("persists empty snapshot then re-throws on the final retry attempt", async () => {
+    mockDbSelect([
+      { id: 1, title: "Episode 1", summary: "Summary 1" },
+    ]);
+
+    const providerError = new Error("Invalid response format from Z.AI");
+    mockGenerateCompletion.mockRejectedValue(providerError);
+
+    // attempt.number === maxAttempts — terminal failure, persist + re-throw
+    await expect(
+      taskConfig.run(undefined, { ctx: { attempt: { number: 2 } } })
+    ).rejects.toThrow("Invalid response format from Z.AI");
+
+    // ...we persist exactly one empty snapshot so the dashboard stale/empty
+    // affordances surface the outage to users.
+    expect(mockValues).toHaveBeenCalledTimes(1);
+    expect(mockValues).toHaveBeenCalledWith(
+      expect.objectContaining({ topics: [], episodeCount: 1 })
+    );
+    expect(mockParseJsonResponse).not.toHaveBeenCalled();
+  });
+
+  it("re-throws without persisting when the LLM fails on a non-final attempt", async () => {
+    mockDbSelect([
+      { id: 1, title: "Episode 1", summary: "Summary 1" },
+    ]);
+
+    mockGenerateCompletion.mockRejectedValue(new Error("transient"));
+
+    // attempt.number < maxAttempts — let Trigger.dev retry before we commit
+    // an empty row to the log so we don't accumulate duplicates per window.
+    await expect(
+      taskConfig.run(undefined, { ctx: { attempt: { number: 1 } } })
+    ).rejects.toThrow("transient");
+
+    expect(mockValues).not.toHaveBeenCalled();
+    expect(mockParseJsonResponse).not.toHaveBeenCalled();
+  });
+
+  it("still passes maxTokens on the failing LLM call", async () => {
+    mockDbSelect([
+      { id: 1, title: "Episode 1", summary: "Summary 1" },
+    ]);
+    mockGenerateCompletion.mockRejectedValue(new Error("boom"));
+
+    await expect(taskConfig.run()).rejects.toThrow("boom");
+
+    expect(mockGenerateCompletion).toHaveBeenCalledWith(
+      expect.any(Array),
+      expect.objectContaining({ maxTokens: expect.any(Number) })
+    );
+  });
+
   it("stores empty topics when LLM response fails to parse", async () => {
     mockDbSelect([
-      { id: 1, title: "Episode 1", keyTakeaways: ["Takeaway 1"] },
+      { id: 1, title: "Episode 1", summary: "Summary 1" },
     ]);
 
     mockGenerateCompletion.mockResolvedValue("not valid json");
@@ -219,8 +278,8 @@ describe("generate-trending-topics task", () => {
 
   it("filters out topics with invalid episode IDs", async () => {
     mockDbSelect([
-      { id: 1, title: "Episode 1", keyTakeaways: ["Takeaway 1"] },
-      { id: 2, title: "Episode 2", keyTakeaways: ["Takeaway 2"] },
+      { id: 1, title: "Episode 1", summary: "Summary 1" },
+      { id: 2, title: "Episode 2", summary: "Summary 2" },
     ]);
 
     const mockTopics = [
@@ -260,7 +319,7 @@ describe("generate-trending-topics task", () => {
 
   it("removes topics with zero valid episodes after ID filtering", async () => {
     mockDbSelect([
-      { id: 1, title: "Episode 1", keyTakeaways: ["Takeaway 1"] },
+      { id: 1, title: "Episode 1", summary: "Summary 1" },
     ]);
 
     const mockTopics = [
@@ -287,7 +346,7 @@ describe("generate-trending-topics task", () => {
     const episodeRows = Array.from({ length: 20 }, (_, i) => ({
       id: i + 1,
       title: `Episode ${i + 1}`,
-      keyTakeaways: [`Takeaway ${i + 1}`],
+      summary: `Summary for episode ${i + 1}`,
     }));
     mockDbSelect(episodeRows);
 
@@ -320,8 +379,8 @@ describe("generate-trending-topics task", () => {
 
   it("corrects episodeCount to match filtered episodeIds length", async () => {
     mockDbSelect([
-      { id: 1, title: "Episode 1", keyTakeaways: ["Takeaway 1"] },
-      { id: 2, title: "Episode 2", keyTakeaways: ["Takeaway 2"] },
+      { id: 1, title: "Episode 1", summary: "Summary 1" },
+      { id: 2, title: "Episode 2", summary: "Summary 2" },
     ]);
 
     const mockTopics = [
@@ -357,7 +416,7 @@ describe("generate-trending-topics task", () => {
     const episodeRows = Array.from({ length: 20 }, (_, i) => ({
       id: i + 1,
       title: `Episode ${i + 1}`,
-      keyTakeaways: [`Takeaway ${i + 1}`],
+      summary: `Summary for episode ${i + 1}`,
     }));
     mockDbSelect(episodeRows);
 
@@ -382,8 +441,8 @@ describe("generate-trending-topics task", () => {
 
   it("disambiguates duplicate slugs deterministically in sort order", async () => {
     mockDbSelect([
-      { id: 1, title: "Ep 1", keyTakeaways: ["Takeaway 1"] },
-      { id: 2, title: "Ep 2", keyTakeaways: ["Takeaway 2"] },
+      { id: 1, title: "Ep 1", summary: "Summary 1" },
+      { id: 2, title: "Ep 2", summary: "Summary 2" },
     ]);
 
     const mockTopics = [
@@ -414,9 +473,9 @@ describe("generate-trending-topics task", () => {
 
   it("drops topics whose name slugifies to empty", async () => {
     mockDbSelect([
-      { id: 1, title: "Ep 1", keyTakeaways: ["Takeaway 1"] },
-      { id: 2, title: "Ep 2", keyTakeaways: ["Takeaway 2"] },
-      { id: 3, title: "Ep 3", keyTakeaways: ["Takeaway 3"] },
+      { id: 1, title: "Ep 1", summary: "Summary 1" },
+      { id: 2, title: "Ep 2", summary: "Summary 2" },
+      { id: 3, title: "Ep 3", summary: "Summary 3" },
     ]);
 
     const mockTopics = [
@@ -452,9 +511,9 @@ describe("generate-trending-topics task", () => {
     // Without the fix, walk yields [season-2, season, season-2] (collision).
     // With the fix, it yields [season-2, season, season-3].
     mockDbSelect([
-      { id: 1, title: "Ep 1", keyTakeaways: ["Takeaway 1"] },
-      { id: 2, title: "Ep 2", keyTakeaways: ["Takeaway 2"] },
-      { id: 3, title: "Ep 3", keyTakeaways: ["Takeaway 3"] },
+      { id: 1, title: "Ep 1", summary: "Summary 1" },
+      { id: 2, title: "Ep 2", summary: "Summary 2" },
+      { id: 3, title: "Ep 3", summary: "Summary 3" },
     ]);
 
     const mockTopics = [
@@ -478,7 +537,7 @@ describe("generate-trending-topics task", () => {
     const episodeRows = Array.from({ length: 10 }, (_, i) => ({
       id: i + 1,
       title: `Episode ${i + 1}`,
-      keyTakeaways: [`Takeaway ${i + 1}`],
+      summary: `Summary for episode ${i + 1}`,
     }));
     mockDbSelect(episodeRows);
 
