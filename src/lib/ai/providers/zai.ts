@@ -52,7 +52,23 @@ export class ZaiProvider implements AiProvider {
     }
 
     if (!choice.message?.content) {
-      throw new Error("Invalid response format from Z.AI");
+      // GLM-4.6 / GLM-5.x are reasoning models: chain-of-thought goes into
+      // `reasoning_content`, and `content` stays empty until reasoning
+      // completes. If `max_tokens` is too small for the prompt, reasoning
+      // burns the entire budget (finish_reason = "length") with no content.
+      // Surface the diagnostic fields so future regressions aren't a mystery.
+      const reasoningTokens =
+        data.usage?.completion_tokens_details?.reasoning_tokens;
+      const completionTokens = data.usage?.completion_tokens;
+      const reasoningContent: string | undefined =
+        choice.message?.reasoning_content;
+      const reasoningSnippet =
+        typeof reasoningContent === "string" && reasoningContent.length > 0
+          ? ` reasoning_snippet="${reasoningContent.slice(0, 200).replace(/\s+/g, " ")}"`
+          : "";
+      throw new Error(
+        `Invalid response format from Z.AI: empty content (finish_reason=${finishReason ?? "unknown"}, completion_tokens=${completionTokens ?? "unknown"}, reasoning_tokens=${reasoningTokens ?? "unknown"}).${reasoningSnippet}`
+      );
     }
 
     return choice.message.content;

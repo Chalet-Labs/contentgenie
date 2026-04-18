@@ -163,6 +163,42 @@ describe("ZaiProvider", () => {
     ).rejects.toThrow("Z.AI network error");
   });
 
+  it("throws with diagnostic detail when content is empty (reasoning model hit max_tokens)", async () => {
+    vi.stubEnv("ZAI_API_KEY", "zai-test-key");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            choices: [
+              {
+                message: {
+                  content: "",
+                  reasoning_content:
+                    "Step 1: understand the request. Step 2: formulate the output.",
+                },
+                finish_reason: "length",
+              },
+            ],
+            usage: {
+              completion_tokens: 50,
+              completion_tokens_details: { reasoning_tokens: 50 },
+            },
+          }),
+      })
+    );
+
+    await expect(
+      provider.generateCompletion(
+        [{ role: "user", content: "test" }],
+        { model: "glm-5.1" }
+      )
+    ).rejects.toThrow(
+      /Invalid response format from Z\.AI.*finish_reason=length.*completion_tokens=50.*reasoning_tokens=50.*reasoning_snippet="Step 1: understand/
+    );
+  });
+
   it("uses default params when not specified", async () => {
     vi.stubEnv("ZAI_API_KEY", "zai-test-key");
     const mockFetch = vi.fn().mockResolvedValue({

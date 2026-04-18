@@ -132,10 +132,34 @@ describe("TrendingTopics", () => {
     warnSpy.mockRestore()
   })
 
-  it("renders nothing when topics array is empty", () => {
-    const { container } = render(<TrendingTopics topics={[]} generatedAt={fixedDate} />)
-    expect(container.firstChild).toBeNull()
-    expect(screen.queryByText("Trending Topics")).not.toBeInTheDocument()
+  it("renders empty-state card when topics array is empty", () => {
+    render(<TrendingTopics topics={[]} generatedAt={fixedDate} />)
+    // Card chrome is still present so a missed cron isn't indistinguishable from a disabled feature
+    expect(screen.getByText("Trending Topics")).toBeInTheDocument()
+    expect(screen.getByText(/No trending topics yet/)).toBeInTheDocument()
+    expect(screen.queryAllByRole("link")).toHaveLength(0)
+  })
+
+  it("does not show stale copy or warning color when isStale is false (default)", () => {
+    const topics = [makeTopic({ name: "AI" })]
+    render(<TrendingTopics topics={topics} generatedAt={fixedDate} />)
+    const desc = screen.getByText(/Past 7 days · Updated 10m ago/)
+    expect(desc.textContent).not.toMatch(/Out of date/)
+    expect(desc.className).not.toContain("text-amber-600")
+  })
+
+  it("renders 'Out of date' suffix and amber warning color when isStale is true", () => {
+    const topics = [makeTopic({ name: "AI" })]
+    render(<TrendingTopics topics={topics} generatedAt={fixedDate} isStale />)
+    const desc = screen.getByText(/Past 7 days · Updated 10m ago · Out of date/)
+    expect(desc).toBeInTheDocument()
+    expect(desc.className).toContain("text-amber-600")
+  })
+
+  it("shows stale warning alongside empty-state when both conditions hold", () => {
+    render(<TrendingTopics topics={[]} generatedAt={fixedDate} isStale />)
+    expect(screen.getByText(/No trending topics yet/)).toBeInTheDocument()
+    expect(screen.getByText(/Out of date/)).toBeInTheDocument()
   })
 })
 

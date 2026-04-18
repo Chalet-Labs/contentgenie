@@ -13,3 +13,6 @@ export const STORY_TWO_HOURS_AGO = new Date("2026-01-15T08:00:00Z")
 
 /** Thirty minutes before STORY_NOW */
 export const STORY_THIRTY_MIN_AGO = new Date("2026-01-15T09:30:00Z")
+
+/** Three days before STORY_NOW — past the 48h trending-snapshot staleness threshold */
+export const STORY_THREE_DAYS_AGO = new Date("2026-01-12T10:00:00Z")

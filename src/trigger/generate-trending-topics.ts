@@ -11,8 +11,12 @@ import { parseJsonResponse } from "@/lib/openrouter";
 import { slugify } from "@/lib/utils";
 
 const LOOKBACK_DAYS = 7;
-const MAX_EPISODES = 500;
+const MAX_EPISODES = 200;
 const MAX_TOPICS = 8;
+// Reasoning-capable Z.AI models (GLM-4.6/5.x) burn tokens on chain-of-thought
+// before emitting `content`; 16k leaves headroom after reasoning so the topic
+// JSON isn't truncated mid-output.
+const TRENDING_MAX_TOKENS = 16000;
 
 /**
  * Daily scheduled task that analyzes recent episode summaries via LLM
@@ -48,12 +52,12 @@ export const generateTrendingTopics = schedules.task({
       periodEnd: periodEnd.toISOString(),
     });
 
-    // Query all completed episodes in the window (JS filters takeaways downstream for LLM input)
+    // Query all completed episodes in the window (JS filters summary downstream for LLM input)
     const recentEpisodes = await db
       .select({
         id: episodes.id,
         title: episodes.title,
-        keyTakeaways: episodes.keyTakeaways,
+        summary: episodes.summary,
       })
       .from(episodes)
       .where(
@@ -84,31 +88,46 @@ export const generateTrendingTopics = schedules.task({
       return { episodeCount: 0, topicCount: 0 };
     }
 
-    // Build LLM input (JS filters episodes without takeaways)
-    const episodesWithTakeaways = recentEpisodes
+    // Build LLM input (JS filters episodes without a usable summary)
+    const episodesWithSummary = recentEpisodes
       .filter(
-        (ep): ep is typeof ep & { keyTakeaways: string[] } =>
-          ep.keyTakeaways != null && ep.keyTakeaways.length > 0
+        (ep): ep is typeof ep & { summary: string } =>
+          typeof ep.summary === "string" && ep.summary.trim().length > 0
       )
       .map((ep) => ({
         id: ep.id,
         title: ep.title,
-        keyTakeaways: ep.keyTakeaways,
+        summary: ep.summary,
       }));
 
-    // If all episodes lack takeaways, store empty
-    if (episodesWithTakeaways.length === 0) {
+    // If no episodes have a summary, store empty
+    if (episodesWithSummary.length === 0) {
       await persistSnapshot([], recentEpisodes.length);
-      logger.info("All episodes lack takeaways, stored empty snapshot");
+      logger.info("No episodes with summary in window, stored empty snapshot");
       return { episodeCount: recentEpisodes.length, topicCount: 0 };
     }
 
-    // Generate topic clusters via LLM
-    const prompt = getTrendingTopicsPrompt(episodesWithTakeaways);
-    const completion = await generateCompletion([
-      { role: "system", content: TRENDING_TOPICS_SYSTEM_PROMPT },
-      { role: "user", content: prompt },
-    ]);
+    // Generate topic clusters via LLM. Wrapped so provider failures (Z.AI
+    // balance, reasoning-token exhaustion, etc.) persist an empty snapshot
+    // instead of crashing the run — the dashboard's empty-state + stale
+    // banner then make the outage visible to users.
+    const prompt = getTrendingTopicsPrompt(episodesWithSummary);
+    let completion: string;
+    try {
+      completion = await generateCompletion(
+        [
+          { role: "system", content: TRENDING_TOPICS_SYSTEM_PROMPT },
+          { role: "user", content: prompt },
+        ],
+        { maxTokens: TRENDING_MAX_TOKENS }
+      );
+    } catch (err) {
+      logger.error("LLM call failed in trending topics generation", {
+        error: err instanceof Error ? err.message : String(err),
+      });
+      await persistSnapshot([], recentEpisodes.length);
+      return { episodeCount: recentEpisodes.length, topicCount: 0 };
+    }
 
     let topics: TrendingTopic[];
     try {
@@ -146,7 +165,7 @@ export const generateTrendingTopics = schedules.task({
     }
 
     // Validate: filter out topics referencing invalid episode IDs
-    const validEpisodeIds = new Set(episodesWithTakeaways.map((ep) => ep.id));
+    const validEpisodeIds = new Set(episodesWithSummary.map((ep) => ep.id));
     const mappedTopics = topics
       .map((topic) => {
         const filteredIds = Array.from(new Set(topic.episodeIds)).filter((id) =>

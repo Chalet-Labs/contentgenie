@@ -95,13 +95,13 @@ export const TRENDING_TOPICS_SYSTEM_PROMPT = `You are a podcast trend analyst. Y
 Always respond in valid JSON format.`;
 
 export function getTrendingTopicsPrompt(
-  episodes: Array<{ id: number; title: string; keyTakeaways: string[] }>
+  episodes: Array<{ id: number; title: string; summary: string }>
 ): string {
   const episodePayload = JSON.stringify(
     episodes.map((ep) => ({
       id: ep.id,
       title: ep.title,
-      keyTakeaways: ep.keyTakeaways,
+      summary: ep.summary,
     })),
     null,
     2
