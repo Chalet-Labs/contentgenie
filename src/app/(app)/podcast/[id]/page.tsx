@@ -22,6 +22,8 @@ import { podcasts, episodes as episodesTable } from "@/db/schema";
 import type { SummaryStatus } from "@/db/schema";
 import { getBackNavigation } from "@/app/(app)/podcast/[id]/back-navigation";
 
+const PODCAST_PAGE_EPISODE_LIMIT = 200;
+
 interface PodcastPageProps {
   params: {
     id: string;
@@ -66,7 +68,7 @@ async function loadRssPodcast(podcastIndexId: string) {
   const dbEpisodes = await db.query.episodes.findMany({
     where: eq(episodesTable.podcastId, podcast.id),
     orderBy: [descOrder(episodesTable.publishDate)],
-    limit: 50,
+    limit: PODCAST_PAGE_EPISODE_LIMIT,
     // id omitted: RSS mapping uses podcastIndexId
     columns: {
       podcastIndexId: true,
@@ -265,7 +267,7 @@ export default async function PodcastPage({ params, searchParams }: PodcastPageP
   try {
     const [podcastResponse, episodesResponse] = await Promise.all([
       getPodcastById(feedId),
-      getEpisodesByFeedId(feedId, 20),
+      getEpisodesByFeedId(feedId, PODCAST_PAGE_EPISODE_LIMIT),
     ]);
 
     const podcast = podcastResponse.feed;
