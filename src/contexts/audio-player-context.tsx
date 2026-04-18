@@ -31,6 +31,16 @@ import {
 import { fadeOutAudio } from "@/lib/audio-fade"
 import type { Chapter } from "@/lib/chapters"
 import { recordListenEvent } from "@/app/actions/listen-history"
+import {
+  getQueue,
+  setQueue as setQueueAction,
+  clearQueue as clearQueueAction,
+} from "@/app/actions/listening-queue"
+import {
+  getPlayerSession,
+  savePlayerSession as savePlayerSessionAction,
+  clearPlayerSession as clearPlayerSessionAction,
+} from "@/app/actions/player-session"
 
 // ---------------------------------------------------------------------------
 // Types
@@ -290,6 +300,15 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
   // so re-firing after success would be a no-op server call.
   const listenHistoryFiredRef = useRef<Map<string, number>>(new Map())
 
+  // Cross-device sync refs
+  const pendingQueueWriteRef = useRef(false)
+  const lastAckedQueueRef = useRef<AudioEpisode[]>([])
+  const queueDebounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const focusDebounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Set to true when dispatching INIT_QUEUE from a server reconcile; prevents the
+  // queue-persist effect from scheduling a write back to the server for that change.
+  const suppressQueueWriteRef = useRef(false)
+
   const [state, dispatch] = useReducer(reducer, initialState)
 
   const progressRef = useRef<AudioPlayerProgress>({ currentTime: 0, buffered: 0 })
@@ -334,10 +353,175 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
     isSessionRestored.current = true
   }, [])
 
-  // ---- Persist queue to localStorage on changes ----
+  // ---- Server-sync on mount: parallel getQueue + getPlayerSession, reconcile, migrate ----
+  useEffect(() => {
+    let cancelled = false
+
+    async function syncOnMount() {
+      const [queueResult, sessionResult] = await Promise.all([
+        getQueue(),
+        getPlayerSession(),
+      ])
+
+      if (cancelled) return
+
+      // Reconcile queue
+      const localQueue = loadQueue()
+      if (queueResult.success) {
+        const serverQueue = queueResult.data
+        if (serverQueue.length === 0 && localQueue.length > 0) {
+          // One-time migration: upload local queue to server
+          pendingQueueWriteRef.current = true
+          try {
+            await setQueueAction(localQueue)
+            lastAckedQueueRef.current = localQueue
+          } finally {
+            pendingQueueWriteRef.current = false
+          }
+        } else if (serverQueue.length > 0) {
+          // Server has data — reconcile only if no pending local write
+          if (!pendingQueueWriteRef.current) {
+            lastAckedQueueRef.current = serverQueue
+            dispatch({ type: "INIT_QUEUE", queue: serverQueue })
+          }
+        } else {
+          // Both empty — set lastAcked to empty
+          lastAckedQueueRef.current = []
+        }
+      }
+
+      if (cancelled) return
+
+      // Reconcile session (cold boot always applies server session if no local session)
+      if (sessionResult.success && sessionResult.data) {
+        const serverSession = sessionResult.data
+        const currentEp = stateRef.current.currentEpisode
+        if (currentEp && currentEp.id === serverSession.episode.id) {
+          // Never rewind active playback
+        } else if (!currentEp) {
+          // Cold boot with no session playing — apply server session
+          isRestoringSession.current = true
+          loadEpisodeIntoPlayer(serverSession.episode, {
+            andPlay: false,
+            startAt: serverSession.currentTime,
+          })
+        }
+      }
+    }
+
+    void syncOnMount()
+    return () => { cancelled = true }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // ---- Focus/visibilitychange refetch: reconcile server state (200ms debounce) ----
+  useEffect(() => {
+    function scheduleRefetch() {
+      if (focusDebounceTimerRef.current) {
+        clearTimeout(focusDebounceTimerRef.current)
+      }
+      focusDebounceTimerRef.current = setTimeout(async () => {
+        focusDebounceTimerRef.current = null
+
+        const [queueResult, sessionResult] = await Promise.all([
+          getQueue(),
+          getPlayerSession(),
+        ])
+
+        // Queue reconcile: skip if a local write is pending
+        if (queueResult.success && !pendingQueueWriteRef.current) {
+          lastAckedQueueRef.current = queueResult.data
+          dispatch({ type: "INIT_QUEUE", queue: queueResult.data })
+        }
+
+        // Session reconcile: never rewind active playback
+        if (sessionResult.success && sessionResult.data) {
+          const serverSession = sessionResult.data
+          const currentEp = stateRef.current.currentEpisode
+          if (currentEp && currentEp.id === serverSession.episode.id) {
+            // Active episode matches — do not overwrite currentTime
+          } else if (!currentEp) {
+            isRestoringSession.current = true
+            loadEpisodeIntoPlayer(serverSession.episode, {
+              andPlay: false,
+              startAt: serverSession.currentTime,
+            })
+          }
+        }
+      }, 200)
+    }
+
+    const onVisibilityFocus = () => {
+      if (document.visibilityState === "visible") scheduleRefetch()
+    }
+
+    window.addEventListener("focus", scheduleRefetch)
+    document.addEventListener("visibilitychange", onVisibilityFocus)
+    return () => {
+      window.removeEventListener("focus", scheduleRefetch)
+      document.removeEventListener("visibilitychange", onVisibilityFocus)
+      if (focusDebounceTimerRef.current) {
+        clearTimeout(focusDebounceTimerRef.current)
+        focusDebounceTimerRef.current = null
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // ---- Persist queue to localStorage + debounced server write ----
   useEffect(() => {
     if (!isQueueHydrated.current) return
+
     saveQueue(state.queue)
+
+    // Skip server write if the queue matches the last server-acked state (no user mutation)
+    const currentIds = state.queue.map((ep) => ep.id).join(",")
+    const ackedIds = lastAckedQueueRef.current.map((ep) => ep.id).join(",")
+    if (currentIds === ackedIds) return
+
+    // Skip server write if this queue change originated from a server reconcile
+    if (suppressQueueWriteRef.current) {
+      suppressQueueWriteRef.current = false
+      return
+    }
+
+    // Trailing-edge 1500ms debounce: collapses rapid reorders into a single setQueue call
+    if (queueDebounceTimerRef.current) {
+      clearTimeout(queueDebounceTimerRef.current)
+    }
+    const snapshot = state.queue.slice()
+    pendingQueueWriteRef.current = true
+    queueDebounceTimerRef.current = setTimeout(async () => {
+      queueDebounceTimerRef.current = null
+      try {
+        const result = await setQueueAction(snapshot)
+        if (result.success) {
+          lastAckedQueueRef.current = snapshot
+        } else {
+          toast.error("Couldn't sync queue", {
+            description: "Your queue change couldn't be saved. Rolling back.",
+          })
+          suppressQueueWriteRef.current = true
+          dispatch({ type: "INIT_QUEUE", queue: lastAckedQueueRef.current })
+        }
+      } catch {
+        toast.error("Couldn't sync queue", {
+          description: "Your queue change couldn't be saved. Rolling back.",
+        })
+        suppressQueueWriteRef.current = true
+        dispatch({ type: "INIT_QUEUE", queue: lastAckedQueueRef.current })
+      } finally {
+        pendingQueueWriteRef.current = false
+      }
+    }, 1500)
+
+    return () => {
+      if (queueDebounceTimerRef.current) {
+        clearTimeout(queueDebounceTimerRef.current)
+        queueDebounceTimerRef.current = null
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.queue])
 
   // ---- Sync volume & speed to audio element ----
@@ -559,7 +743,8 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       clearSleepTimerInterval()
       cancelFade()
       if (options?.clearSession) {
-        clearPlayerSession()
+        clearPlayerSession() // localStorage cache
+        void clearPlayerSessionAction() // server source of truth
       }
       if (sessionSaveTimerRef.current) {
         clearTimeout(sessionSaveTimerRef.current)
@@ -765,7 +950,8 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
           sessionSaveTimerRef.current = null
           const ep = stateRef.current.currentEpisode
           if (ep) {
-            savePlayerSession(ep, audio.currentTime)
+            savePlayerSession(ep, audio.currentTime) // localStorage cache
+            void savePlayerSessionAction(ep, audio.currentTime) // server source of truth
           }
         }, 5000)
       }
@@ -972,7 +1158,8 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       const ep = stateRef.current.currentEpisode
       const audio = audioRef.current
       if (ep && audio && isSessionRestored.current) {
-        savePlayerSession(ep, audio.currentTime)
+        savePlayerSession(ep, audio.currentTime) // localStorage cache
+        void savePlayerSessionAction(ep, audio.currentTime) // fire-and-forget to server
       }
     }
     window.addEventListener("beforeunload", onBeforeUnload)

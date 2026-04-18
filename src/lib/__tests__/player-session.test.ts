@@ -187,14 +187,15 @@ describe("loadPlayerSession", () => {
     expect(loadPlayerSession()).toBeNull()
   })
 
-  it("returns null and clears storage when session expired", () => {
-    const expiredAt = Date.now() - 25 * 60 * 60 * 1000 // 25 hours ago
-    storeSession(validEpisode, 120, expiredAt)
-    expect(loadPlayerSession()).toBeNull()
-    expect(window.localStorage.getItem(STORAGE_KEY)).toBeNull()
+  it("returns valid session regardless of how old savedAt is (no TTL)", () => {
+    const oldAt = Date.now() - 25 * 60 * 60 * 1000 // 25 hours ago
+    storeSession(validEpisode, 120, oldAt)
+    const result = loadPlayerSession()
+    expect(result).not.toBeNull()
+    expect(result!.currentTime).toBe(120)
   })
 
-  it("returns valid session when savedAt is within 24h", () => {
+  it("returns valid session when savedAt is recent", () => {
     const recentAt = Date.now() - 23 * 60 * 60 * 1000 // 23 hours ago
     storeSession(validEpisode, 120, recentAt)
     const result = loadPlayerSession()

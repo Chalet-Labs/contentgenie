@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
-import { render, screen, act } from "@testing-library/react"
+import { render, screen, act, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import {
   AudioPlayerProvider,
@@ -1161,6 +1161,28 @@ describe("Chapter state management", () => {
 })
 
 // ---------------------------------------------------------------------------
+// Cross-device sync: server action mocks (T8)
+// ---------------------------------------------------------------------------
+
+const mockGetQueue = vi.fn().mockResolvedValue({ success: true, data: [] })
+const mockSetQueueAction = vi.fn().mockResolvedValue({ success: true })
+const mockClearQueueAction = vi.fn().mockResolvedValue({ success: true })
+vi.mock("@/app/actions/listening-queue", () => ({
+  getQueue: (...args: unknown[]) => mockGetQueue(...args),
+  setQueue: (...args: unknown[]) => mockSetQueueAction(...args),
+  clearQueue: (...args: unknown[]) => mockClearQueueAction(...args),
+}))
+
+const mockGetPlayerSession = vi.fn().mockResolvedValue({ success: true, data: null })
+const mockSavePlayerSessionAction = vi.fn().mockResolvedValue({ success: true })
+const mockClearPlayerSessionAction = vi.fn().mockResolvedValue({ success: true })
+vi.mock("@/app/actions/player-session", () => ({
+  getPlayerSession: (...args: unknown[]) => mockGetPlayerSession(...args),
+  savePlayerSession: (...args: unknown[]) => mockSavePlayerSessionAction(...args),
+  clearPlayerSession: (...args: unknown[]) => mockClearPlayerSessionAction(...args),
+}))
+
+// ---------------------------------------------------------------------------
 // Listen history recording (T3.1)
 // ---------------------------------------------------------------------------
 
@@ -1310,5 +1332,280 @@ describe("Listen history recording", () => {
     )
     const callArgs = mockRecordListenEvent.mock.calls[0][0]
     expect(callArgs.durationSeconds).toBeUndefined()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Cross-device sync: hydration, reconcile, migration (T8)
+// ---------------------------------------------------------------------------
+
+describe("Cross-device sync: hydration and reconcile", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    playMock.mockResolvedValue(undefined)
+    mockLoadPrefs.mockReturnValue({ volume: 0.8, playbackSpeed: 1.5 })
+    mockLoadQueue.mockReturnValue([])
+    mockLoadSession.mockReturnValue(null)
+    mockGetQueue.mockResolvedValue({ success: true, data: [] })
+    mockGetPlayerSession.mockResolvedValue({ success: true, data: null })
+    mockSetQueueAction.mockResolvedValue({ success: true })
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it("calls getQueue and getPlayerSession on mount (after loadQueue/loadPlayerSession)", async () => {
+    render(
+      <AudioPlayerProvider>
+        <TestConsumer />
+      </AudioPlayerProvider>
+    )
+
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 50))
+    })
+
+    expect(mockGetQueue).toHaveBeenCalled()
+    expect(mockGetPlayerSession).toHaveBeenCalled()
+    // Server calls must happen after (or concurrent with) local cache reads
+    const loadQueueOrder = mockLoadQueue.mock.invocationCallOrder[0]
+    const getQueueOrder = mockGetQueue.mock.invocationCallOrder[0]
+    expect(loadQueueOrder).toBeLessThanOrEqual(getQueueOrder)
+  })
+
+  it("replaces queue with server state when server returns a non-empty queue different from local", async () => {
+    const serverQueue: AudioEpisode[] = [
+      { id: "server-1", title: "Server Ep 1", podcastTitle: "Podcast", audioUrl: "https://example.com/s1.mp3" },
+    ]
+    mockGetQueue.mockResolvedValue({ success: true, data: serverQueue })
+
+    render(
+      <AudioPlayerProvider>
+        <TestConsumer />
+      </AudioPlayerProvider>
+    )
+
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 100))
+    })
+
+    await waitFor(() => {
+      expect(screen.getByTestId("queueIds")).toHaveTextContent("server-1")
+    }, { timeout: 5000 })
+  })
+
+  it("calls setQueue(localQueue) exactly once when server is empty and local cache is non-empty (migration)", async () => {
+    const localQueue: AudioEpisode[] = [
+      { id: "local-1", title: "Local Ep", podcastTitle: "Podcast", audioUrl: "https://example.com/l1.mp3" },
+    ]
+    mockLoadQueue.mockReturnValue(localQueue)
+    mockGetQueue.mockResolvedValue({ success: true, data: [] })
+
+    render(
+      <AudioPlayerProvider>
+        <TestConsumer />
+      </AudioPlayerProvider>
+    )
+
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 50))
+    })
+
+    expect(mockSetQueueAction).toHaveBeenCalledTimes(1)
+    expect(mockSetQueueAction).toHaveBeenCalledWith(localQueue)
+  })
+
+  it("does not overwrite currentTime on focus when active episode matches server session", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    const serverSession = {
+      episode: { ...mockEpisode },
+      currentTime: 999, // stale server time
+    }
+    mockGetPlayerSession.mockResolvedValue({ success: true, data: serverSession })
+
+    render(
+      <AudioPlayerProvider>
+        <TestConsumer />
+      </AudioPlayerProvider>
+    )
+
+    // Play the episode
+    await user.click(screen.getByText("Play Episode"))
+    const audio = getAudioElement()!
+    audio.currentTime = 300 // actively playing at 300s
+
+    await act(async () => {
+      await vi.runAllTimersAsync()
+    })
+
+    // Simulate focus event to trigger reconcile
+    await act(async () => {
+      window.dispatchEvent(new Event("focus"))
+      await vi.runAllTimersAsync()
+    })
+
+    vi.useRealTimers()
+    // Audio currentTime should NOT have been reset to 999 (server stale time)
+    expect(audio.currentTime).toBe(300)
+  })
+
+  it("does not dispatch INIT_QUEUE with server state when a local queue mutation is pending (debounce timer active)", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    const serverQueue: AudioEpisode[] = [
+      { id: "server-1", title: "Server Ep", podcastTitle: "Podcast", audioUrl: "https://example.com/s1.mp3" },
+    ]
+    mockGetQueue.mockResolvedValue({ success: true, data: serverQueue })
+
+    render(
+      <AudioPlayerProvider>
+        <TestConsumer />
+      </AudioPlayerProvider>
+    )
+
+    // Play episode first so queue state is active
+    await user.click(screen.getByText("Play Episode"))
+
+    // Add to queue to trigger local mutation (debounce timer starts)
+    await user.click(screen.getByText("Add Q1"))
+    // Queue now has q-1 pending write; don't advance timers so debounce is still active
+
+    // Fire focus event which should trigger getQueue
+    await act(async () => {
+      window.dispatchEvent(new Event("focus"))
+      // Advance only the focus debounce (200ms), NOT the queue debounce (1500ms)
+      vi.advanceTimersByTime(200)
+      await Promise.resolve()
+    })
+
+    vi.useRealTimers()
+    // Queue should still be q-1 (local mutation), NOT replaced by server-1
+    expect(screen.getByTestId("queueIds")).toHaveTextContent("q-1")
+  })
+
+  it("migration race: in-flight setQueue suppresses concurrent focus INIT_QUEUE dispatch", async () => {
+    const localQueue: AudioEpisode[] = [
+      { id: "local-1", title: "Local Ep", podcastTitle: "Podcast", audioUrl: "https://example.com/l1.mp3" },
+    ]
+    mockLoadQueue.mockReturnValue(localQueue)
+
+    // Server starts empty (triggers migration)
+    let resolveMigration!: (value: { success: true }) => void
+    const migrationPromise = new Promise<{ success: true }>((resolve) => {
+      resolveMigration = resolve
+    })
+    mockGetQueue
+      .mockResolvedValueOnce({ success: true, data: [] }) // mount: empty → triggers migration
+      .mockResolvedValueOnce({ success: true, data: [] }) // focus: still empty (migration not done)
+    mockSetQueueAction.mockReturnValueOnce(migrationPromise)
+
+    render(
+      <AudioPlayerProvider>
+        <TestConsumer />
+      </AudioPlayerProvider>
+    )
+
+    // Wait for mount fetch to resolve (triggers migration, but migration upload is pending)
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 50))
+    })
+
+    // Simulate focus event while migration upload is still in-flight
+    // The focus debounce is 200ms — wait for it to fire
+    await act(async () => {
+      window.dispatchEvent(new Event("focus"))
+      await new Promise((r) => setTimeout(r, 300))
+    })
+
+    // Queue must still be the local snapshot (not wiped by server empty state)
+    expect(screen.getByTestId("queueIds")).toHaveTextContent("local-1")
+
+    // Resolve migration upload
+    await act(async () => {
+      resolveMigration({ success: true })
+      await new Promise((r) => setTimeout(r, 50))
+    })
+  })
+
+  it("dispatches INIT_QUEUE with lastAckedQueue and fires toast on setQueue server failure", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+    // Start with server returning an initial queue (lastAcked = this)
+    const initialServerQueue: AudioEpisode[] = [
+      { id: "acked-1", title: "Acked Ep", podcastTitle: "Podcast", audioUrl: "https://example.com/a1.mp3" },
+    ]
+    mockGetQueue.mockResolvedValue({ success: true, data: initialServerQueue })
+    // Subsequent setQueue calls fail
+    mockSetQueueAction.mockResolvedValue({ success: false, error: "DB error" })
+
+    const { toast } = await import("sonner")
+
+    render(
+      <AudioPlayerProvider>
+        <TestConsumer />
+      </AudioPlayerProvider>
+    )
+
+    // Wait for mount reconcile (lastAckedQueue = initialServerQueue)
+    await act(async () => {
+      await vi.runAllTimersAsync()
+    })
+
+    // Play episode first so we can add to queue
+    await user.click(screen.getByText("Play Episode"))
+
+    // Add an episode to trigger debounced setQueue
+    await user.click(screen.getByText("Add Q1"))
+
+    // Advance debounce timer to fire setQueue (which fails)
+    await act(async () => {
+      vi.advanceTimersByTime(1500)
+      await vi.runAllTimersAsync()
+    })
+
+    vi.useRealTimers()
+
+    // After failure, queue should be rolled back to lastAckedQueue
+    await waitFor(() => {
+      expect(screen.getByTestId("queueIds")).toHaveTextContent("acked-1")
+    }, { timeout: 2000 })
+    expect(toast.error).toHaveBeenCalled()
+  })
+
+  it("savePlayerSession server action is called on the 5s throttle tick", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })
+
+    render(
+      <AudioPlayerProvider>
+        <TestConsumer />
+      </AudioPlayerProvider>
+    )
+
+    await user.click(screen.getByText("Play Episode"))
+
+    // Need to set isSessionRestored first by advancing timers for the session restore
+    await act(async () => {
+      await vi.runAllTimersAsync()
+    })
+
+    const audio = getAudioElement()!
+    audio.currentTime = 60
+
+    // Fire timeupdate events to trigger the 5s throttle
+    act(() => fireAudioEvent("timeupdate"))
+    await act(async () => {
+      vi.advanceTimersByTime(5000)
+    })
+    act(() => fireAudioEvent("timeupdate"))
+
+    await act(async () => {
+      await vi.runAllTimersAsync()
+    })
+
+    vi.useRealTimers()
+    expect(mockSavePlayerSessionAction).toHaveBeenCalled()
   })
 })

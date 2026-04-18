@@ -1,11 +1,13 @@
+/**
+ * localStorage cache for the listening queue.
+ * Source of truth is the server — see `src/app/actions/listening-queue.ts`.
+ * This module is write-through cache only: reads hydrate the UI instantly on
+ * mount; writes are a best-effort local mirror of the server state.
+ */
 import type { AudioEpisode } from "@/contexts/audio-player-context"
 
 const STORAGE_KEY = "contentgenie-player-queue"
 
-/**
- * Required fields every queue item must have.
- * Items missing any of these are silently dropped.
- */
 const REQUIRED_FIELDS: (keyof AudioEpisode)[] = [
   "id",
   "title",
@@ -24,11 +26,14 @@ function isValidQueueItem(item: unknown): item is AudioEpisode {
     return false
   }
   // Validate optional fields from untrusted localStorage
-  if ("artwork" in obj && obj.artwork !== undefined) {
+  if (Object.hasOwn(obj, "artwork") && obj.artwork !== undefined) {
     if (typeof obj.artwork !== "string" || obj.artwork === "") return false
   }
-  if ("duration" in obj && obj.duration !== undefined) {
+  if (Object.hasOwn(obj, "duration") && obj.duration !== undefined) {
     if (typeof obj.duration !== "number" || !Number.isFinite(obj.duration) || obj.duration < 0) return false
+  }
+  if (Object.hasOwn(obj, "chaptersUrl") && obj.chaptersUrl !== undefined) {
+    if (typeof obj.chaptersUrl !== "string" || obj.chaptersUrl === "") return false
   }
   return true
 }

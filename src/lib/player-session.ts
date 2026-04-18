@@ -1,7 +1,12 @@
+/**
+ * localStorage cache for the player session (resume position).
+ * Source of truth is the server — see `src/app/actions/player-session.ts`.
+ * No TTL: the server has no TTL either. `savedAt` is kept for debugging /
+ * cache-invalidation telemetry only.
+ */
 import type { AudioEpisode } from "@/contexts/audio-player-context"
 
 const STORAGE_KEY = "contentgenie-player-session"
-const SESSION_TTL_MS = 24 * 60 * 60 * 1000 // 24 hours
 
 interface PlayerSession {
   episode: AudioEpisode
@@ -13,7 +18,6 @@ function isValidSession(data: unknown): data is PlayerSession {
   if (typeof data !== "object" || data === null) return false
   const obj = data as Record<string, unknown>
 
-  // Validate episode
   const ep = obj.episode
   if (typeof ep !== "object" || ep === null) return false
   const episode = ep as Record<string, unknown>
@@ -27,11 +31,10 @@ function isValidSession(data: unknown): data is PlayerSession {
     return false
   }
 
-  // Validate optional episode fields
-  if ("artwork" in episode && episode.artwork !== undefined) {
+  if (Object.hasOwn(episode, "artwork") && episode.artwork !== undefined) {
     if (typeof episode.artwork !== "string" || episode.artwork === "") return false
   }
-  if ("duration" in episode && episode.duration !== undefined) {
+  if (Object.hasOwn(episode, "duration") && episode.duration !== undefined) {
     if (
       typeof episode.duration !== "number" ||
       !Number.isFinite(episode.duration) ||
@@ -39,12 +42,11 @@ function isValidSession(data: unknown): data is PlayerSession {
     )
       return false
   }
-  if ("chaptersUrl" in episode && episode.chaptersUrl !== undefined) {
+  if (Object.hasOwn(episode, "chaptersUrl") && episode.chaptersUrl !== undefined) {
     if (typeof episode.chaptersUrl !== "string" || episode.chaptersUrl === "")
       return false
   }
 
-  // Validate currentTime
   if (
     typeof obj.currentTime !== "number" ||
     !Number.isFinite(obj.currentTime) ||
@@ -53,7 +55,6 @@ function isValidSession(data: unknown): data is PlayerSession {
     return false
   }
 
-  // Validate savedAt
   if (
     typeof obj.savedAt !== "number" ||
     !Number.isFinite(obj.savedAt) ||
@@ -61,9 +62,6 @@ function isValidSession(data: unknown): data is PlayerSession {
   ) {
     return false
   }
-
-  // TTL check
-  if (Date.now() - obj.savedAt >= SESSION_TTL_MS) return false
 
   return true
 }
