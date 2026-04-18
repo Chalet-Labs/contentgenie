@@ -64,7 +64,7 @@ vi.mock("@/trigger/helpers/database", () => ({
 }));
 
 vi.mock("@/trigger/helpers/notifications", () => ({
-  createNotificationsForSubscribers: vi.fn(),
+  markSummaryReady: vi.fn(),
   resolvePodcastId: vi.fn(),
 }));
 
@@ -79,7 +79,7 @@ vi.mock("@/lib/ai/config", () => ({
 import { getEpisodeById, getPodcastById } from "@/trigger/helpers/podcastindex";
 import { generateEpisodeSummary } from "@/trigger/helpers/ai-summary";
 import { persistEpisodeSummary, updateEpisodeStatus } from "@/trigger/helpers/database";
-import { createNotificationsForSubscribers, resolvePodcastId } from "@/trigger/helpers/notifications";
+import { markSummaryReady, resolvePodcastId } from "@/trigger/helpers/notifications";
 import { summarizeEpisode } from "@/trigger/summarize-episode";
 
 // The task mock returns the raw config object, so `.run` and `.onFailure` are available at runtime
@@ -356,66 +356,42 @@ describe("summarize-episode task", () => {
     expect(mockMetadataRootIncrement).toHaveBeenCalledWith("failed", 1);
   });
 
-  it("isNewEpisode=true sends both new_episode and summary_completed notifications", async () => {
+  it("calls markSummaryReady on the happy path with correct args", async () => {
     vi.mocked(getEpisodeById).mockResolvedValue({ episode: mockEpisode } as never);
     vi.mocked(getPodcastById).mockResolvedValue({ feed: mockPodcast } as never);
     vi.mocked(generateEpisodeSummary).mockResolvedValue(mockSummary);
     vi.mocked(persistEpisodeSummary).mockResolvedValue(undefined);
     vi.mocked(resolvePodcastId).mockResolvedValue(99);
-    // Calls in order:
-    // 1. transcript + summary read (no prior summary → first-time)
-    // 2. episodeDbId lookup for notifications
+    // Calls in order: transcript lookup, then episodeDbId lookup for notifications
     mockFindFirst
       .mockResolvedValueOnce({ transcription: "Full transcript text" })
       .mockResolvedValueOnce({ id: 42 });
 
     await taskConfig.run({ episodeId: 123 }, mockCtx);
 
-    expect(createNotificationsForSubscribers).toHaveBeenCalledWith(
+    expect(markSummaryReady).toHaveBeenCalledWith(
       99,
       42,
-      "new_episode",
+      "123",
       mockPodcast.title,
-      `New episode: ${mockEpisode.title}`,
-      { podcastIndexEpisodeId: "123" }
+      `Summary ready: ${mockEpisode.title}`
     );
-    expect(createNotificationsForSubscribers).toHaveBeenCalledWith(
-      99,
-      42,
-      "summary_completed",
-      mockPodcast.title,
-      `Summary ready: ${mockEpisode.title}`,
-      { podcastIndexEpisodeId: "123" }
-    );
-    expect(createNotificationsForSubscribers).toHaveBeenCalledTimes(2);
+    expect(markSummaryReady).toHaveBeenCalledTimes(1);
   });
 
-  it("isNewEpisode=false skips new_episode notification on re-summarization", async () => {
+  it("only calls markSummaryReady once — no separate new_episode notification on re-summarization", async () => {
     vi.mocked(getEpisodeById).mockResolvedValue({ episode: mockEpisode } as never);
     vi.mocked(getPodcastById).mockResolvedValue({ feed: mockPodcast } as never);
     vi.mocked(generateEpisodeSummary).mockResolvedValue(mockSummary);
     vi.mocked(persistEpisodeSummary).mockResolvedValue(undefined);
     vi.mocked(resolvePodcastId).mockResolvedValue(99);
-    // Calls in order:
-    // 1. transcript + summary read (existing summary → re-summarization)
-    // 2. episodeDbId lookup for notifications
+    // Even with an existing summary (re-summarization), markSummaryReady is still the only call
     mockFindFirst
-      .mockResolvedValueOnce({ transcription: "Full transcript text", summary: "Existing summary" })
+      .mockResolvedValueOnce({ transcription: "Full transcript text" })
       .mockResolvedValueOnce({ id: 42 });
 
-    const result = await taskConfig.run({ episodeId: 123 }, mockCtx);
+    await taskConfig.run({ episodeId: 123 }, mockCtx);
 
-    expect(result).toEqual(mockSummary);
-    const newEpisodeCalls = vi.mocked(createNotificationsForSubscribers).mock.calls
-      .filter(([, , type]) => type === "new_episode");
-    expect(newEpisodeCalls).toHaveLength(0);
-    expect(createNotificationsForSubscribers).toHaveBeenCalledWith(
-      99,
-      42,
-      "summary_completed",
-      mockPodcast.title,
-      `Summary ready: ${mockEpisode.title}`,
-      { podcastIndexEpisodeId: "123" }
-    );
+    expect(markSummaryReady).toHaveBeenCalledTimes(1);
   });
 });

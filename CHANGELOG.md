@@ -31,6 +31,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Admin link in sidebar (visible to `org:admin` users only)
 
 ### Changed
+- Notifications: one row per episode per subscriber. The poller creates the notification on discovery ("New episode: …"); the summarizer updates it in place when the summary lands ("Summary ready: …", unread resets). Push uses a shared `tag=episode-${episodeId}` so devices replace rather than stack. Admin-triggered re-summarization no longer produces duplicate notification rows. (#289)
 - Unified in-app navigation — `Sidebar` is now the single source of truth for authenticated nav (desktop aside + mobile sheet); `Header` split into `AppHeader` (utility bar: logo, theme toggle, notifications, user menu, mobile hamburger) and `LandingHeader` (marketing: logo, theme, auth CTAs). Admin link is now reachable from mobile. Desktop aside breakpoint widened from `lg:` to `md:`. (#286)
 - Trending topic snapshots now include a stable `slug` per topic, used as the URL identifier for topic detail pages.
 - Replace 3-dimension numeric worth-it scoring with boolean signal hybrid (8 yes/no quality signals + ±1 adjustment) for more stable, interpretable episode scores (#260)

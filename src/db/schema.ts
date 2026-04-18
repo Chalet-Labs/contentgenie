@@ -268,6 +268,9 @@ export const notifications = pgTable(
       "notification_type_enum",
       sql`${table.type} IN ('new_episode', 'summary_completed')`
     ),
+    uniqueIndex("notifications_user_episode_unique_idx")
+      .on(table.userId, table.episodeId)
+      .where(sql`episode_id IS NOT NULL AND type = 'new_episode'`),
   ]
 );
 
