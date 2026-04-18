@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from "@storybook/react"
+import type { Meta, StoryObj } from "@storybook/nextjs-vite"
 import { TrendingTopics, TrendingTopicsLoading } from "@/components/dashboard/trending-topics"
 import type { TrendingTopic } from "@/db/schema"
 import { STORY_TWO_HOURS_AGO, STORY_THIRTY_MIN_AGO } from "@/test/story-fixtures"

@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from "@storybook/react";
+import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { Bell } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
