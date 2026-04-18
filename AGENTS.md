@@ -4,10 +4,10 @@ Podcast discovery, AI-powered summarization, and library management for busy pro
 
 ## Workflow
 
-- Before planning any work, always pull the latest `main` (`git fetch origin && git merge origin/main` or equivalent).
+- Before planning any work, always update local `main` by checking it out first (`git checkout main && git pull origin main` or equivalent).
 - Before editing any code, always create a new branch from an up-to-date `main`.
 - Single remote: `origin` = `Chalet-Labs/contentgenie`.
-- Push feature branches to `origin` and open PRs against `origin/main`.
+- Push feature branches to `origin` and open PRs against `main` in `Chalet-Labs/contentgenie`.
 
 ## Dev environment tips
 
