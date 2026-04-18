@@ -1,5 +1,6 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server";
 
 const isPublicRoute = createRouteMatcher([
   "/",
@@ -9,6 +10,15 @@ const isPublicRoute = createRouteMatcher([
   "/api/webhooks(.*)",
 ]);
 
+function isPublicEpisodePageRequest(req: NextRequest): boolean {
+  return /^\/episode\/[^/]+$/.test(req.nextUrl.pathname);
+}
+
+function isPublicEpisodeApiRequest(req: NextRequest): boolean {
+  if (req.method !== "GET") return false;
+  return /^\/api\/episodes\/(?:\d+|rss-[^/]+)$/.test(req.nextUrl.pathname);
+}
+
 export default clerkMiddleware(async (auth, req) => {
   const { userId } = await auth();
 
@@ -17,7 +27,11 @@ export default clerkMiddleware(async (auth, req) => {
     return NextResponse.redirect(new URL("/dashboard", req.url));
   }
 
-  if (!isPublicRoute(req)) {
+  if (
+    !isPublicRoute(req) &&
+    !isPublicEpisodePageRequest(req) &&
+    !isPublicEpisodeApiRequest(req)
+  ) {
     await auth.protect();
   }
 });

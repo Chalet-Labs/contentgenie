@@ -90,4 +90,41 @@ describe("middleware", () => {
 
     expect(mockProtect).toHaveBeenCalled();
   });
+
+  it("allows anonymous access to public episode pages", async () => {
+    const mockProtect = vi.fn();
+    vi.doMock("@clerk/nextjs/server", () => createClerkMock(null, mockProtect));
+
+    const { default: middleware } = await import("@/middleware");
+    const req = new NextRequest("http://localhost:3000/episode/123");
+    await middleware(req, stubEvent);
+
+    expect(mockProtect).not.toHaveBeenCalled();
+  });
+
+  it("allows anonymous GET access to the public episode API", async () => {
+    const mockProtect = vi.fn();
+    vi.doMock("@clerk/nextjs/server", () => createClerkMock(null, mockProtect));
+
+    const { default: middleware } = await import("@/middleware");
+    const req = new NextRequest("http://localhost:3000/api/episodes/123", {
+      method: "GET",
+    });
+    await middleware(req, stubEvent);
+
+    expect(mockProtect).not.toHaveBeenCalled();
+  });
+
+  it("keeps the summarize API protected for anonymous users", async () => {
+    const mockProtect = vi.fn();
+    vi.doMock("@clerk/nextjs/server", () => createClerkMock(null, mockProtect));
+
+    const { default: middleware } = await import("@/middleware");
+    const req = new NextRequest("http://localhost:3000/api/episodes/summarize", {
+      method: "GET",
+    });
+    await middleware(req, stubEvent);
+
+    expect(mockProtect).toHaveBeenCalled();
+  });
 });

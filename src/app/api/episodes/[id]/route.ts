@@ -4,9 +4,35 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { episodes, podcasts } from "@/db/schema";
 import { getEpisodeById, getPodcastById } from "@/lib/podcastindex";
+import { createRateLimitChecker } from "@/lib/rate-limit";
+
+const PUBLIC_CACHE_CONTROL = "public, s-maxage=300, stale-while-revalidate=600";
+const checkPublicEpisodeRateLimit = createRateLimitChecker({
+  points: 60,
+  duration: 300,
+  keyPrefix: "public-episode-read",
+});
 
 function isRssSourced(id: string): boolean {
   return id.startsWith("rss-");
+}
+
+function getClientIp(request: NextRequest): string {
+  const forwardedFor = request.headers.get("x-forwarded-for");
+  if (forwardedFor) {
+    const firstIp = forwardedFor.split(",")[0]?.trim();
+    if (firstIp) return firstIp;
+  }
+
+  const realIp = request.headers.get("x-real-ip");
+  if (realIp) return realIp.trim();
+
+  return "unknown";
+}
+
+function withPublicCache(response: NextResponse): NextResponse {
+  response.headers.set("Cache-Control", PUBLIC_CACHE_CONTROL);
+  return response;
 }
 
 export async function GET(
@@ -14,10 +40,19 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    // Verify authentication
     const { userId } = await auth();
+
     if (!userId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      const rateLimit = await checkPublicEpisodeRateLimit(getClientIp(request));
+      if (!rateLimit.allowed) {
+        return NextResponse.json(
+          {
+            error: "Rate limit exceeded. Please try again later.",
+            retryAfterMs: rateLimit.retryAfterMs,
+          },
+          { status: 429 }
+        );
+      }
     }
 
     const id = params.id;
@@ -94,14 +129,16 @@ export async function GET(
         };
       }
 
-      return NextResponse.json({
-        episode,
-        podcast,
-        summary,
-        transcriptSource: dbEpisode.transcriptSource ?? null,
-        transcriptStatus: dbEpisode.transcriptStatus ?? null,
-        episodeDbId: dbEpisode.id,
-      });
+      return withPublicCache(
+        NextResponse.json({
+          episode,
+          podcast,
+          summary,
+          transcriptSource: dbEpisode.transcriptSource ?? null,
+          transcriptStatus: dbEpisode.transcriptStatus ?? null,
+          episodeDbId: dbEpisode.id,
+        })
+      );
     }
 
     // PodcastIndex-sourced episode (existing behavior)
@@ -186,14 +223,16 @@ export async function GET(
       // Continue without cached summary if DB query fails
     }
 
-    return NextResponse.json({
-      episode,
-      podcast,
-      summary,
-      transcriptSource,
-      transcriptStatus,
-      episodeDbId,
-    });
+    return withPublicCache(
+      NextResponse.json({
+        episode,
+        podcast,
+        summary,
+        transcriptSource,
+        transcriptStatus,
+        episodeDbId,
+      })
+    );
   } catch (error) {
     console.error("Error fetching episode:", error);
     return NextResponse.json(

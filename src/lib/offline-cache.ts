@@ -33,7 +33,7 @@ export interface CachedLibraryData {
 
 // Lightweight types matching the shapes used by the pages
 export interface EpisodeData {
-  id: number;
+  id: number | string;
   title: string;
   description: string;
   datePublished: number;
@@ -49,7 +49,7 @@ export interface EpisodeData {
 }
 
 export interface PodcastData {
-  id: number;
+  id: number | string;
   title: string;
   author: string;
   ownerName: string;
