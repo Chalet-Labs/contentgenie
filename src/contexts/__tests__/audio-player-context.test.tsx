@@ -1448,6 +1448,73 @@ describe("Cross-device sync: hydration and reconcile", () => {
     expect(audio.currentTime).toBe(300)
   })
 
+  it("applies server currentTime when same episode is paused (not active playback)", async () => {
+    const user = userEvent.setup()
+    const serverSession = {
+      episode: { ...mockEpisode },
+      currentTime: 250,
+    }
+    // Session is null on first call (no local cache) so mount sync won't load anything;
+    // on focus refetch, return the server session for the same episode
+    mockGetPlayerSession
+      .mockResolvedValueOnce({ success: true, data: null }) // mount: no session
+      .mockResolvedValue({ success: true, data: serverSession }) // focus: has session
+
+    render(
+      <AudioPlayerProvider>
+        <TestConsumer />
+      </AudioPlayerProvider>
+    )
+
+    // Wait for mount sync to complete
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 50))
+    })
+
+    // Play the episode, leave it paused (jsdom never truly plays)
+    await user.click(screen.getByText("Play Episode"))
+    const audio = getAudioElement()!
+    Object.defineProperty(audio, "duration", { value: 600, configurable: true })
+    audio.currentTime = 100
+
+    // Simulate focus event; wait for 200ms debounce + async fetch to complete
+    await act(async () => {
+      window.dispatchEvent(new Event("focus"))
+      await new Promise((r) => setTimeout(r, 300))
+    })
+
+    // currentTime should have been updated to server value since episode is paused
+    expect(audio.currentTime).toBe(250)
+  })
+
+  it("loads server session episode when a different episode is on device (cross-device sync)", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    const serverEpisode: AudioEpisode = {
+      id: "server-ep-x",
+      title: "Server Episode",
+      podcastTitle: "Podcast",
+      audioUrl: "https://example.com/server.mp3",
+    }
+    const serverSession = { episode: serverEpisode, currentTime: 120 }
+    mockGetPlayerSession.mockResolvedValue({ success: true, data: serverSession })
+
+    render(
+      <AudioPlayerProvider>
+        <TestConsumer />
+      </AudioPlayerProvider>
+    )
+
+    // Wait for mount sync — server session has different episode from local (none)
+    await act(async () => {
+      await vi.runAllTimersAsync()
+    })
+
+    vi.useRealTimers()
+    // Server episode should have been loaded (no auto-play)
+    expect(screen.getByTestId("episodeTitle")).toHaveTextContent("Server Episode")
+    expect(screen.getByTestId("isPlaying")).toHaveTextContent("false")
+  })
+
   it("does not dispatch INIT_QUEUE with server state when a local queue mutation is pending (debounce timer active)", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true })
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime })

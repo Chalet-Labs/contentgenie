@@ -300,7 +300,10 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
   const listenHistoryFiredRef = useRef<Map<string, number>>(new Map())
 
   // Cross-device sync refs
-  const pendingQueueWriteRef = useRef(false)
+  // Counter instead of boolean: stays > 0 while any debounce timer is scheduled OR
+  // any setQueueAction is in-flight, preventing a concurrent focus refetch from
+  // clobbering an unacked local mutation even across sequential writes.
+  const pendingQueueWriteRef = useRef(0)
   const lastAckedQueueRef = useRef<AudioEpisode[]>([])
   const queueDebounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const focusDebounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -370,12 +373,14 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
         const serverQueue = queueResult.data
         if (serverQueue.length === 0 && localQueue.length > 0) {
           // One-time migration: upload local queue to server
-          pendingQueueWriteRef.current = true
+          pendingQueueWriteRef.current++
           try {
-            await setQueueAction(localQueue)
-            lastAckedQueueRef.current = localQueue
+            const result = await setQueueAction(localQueue)
+            if (result.success) {
+              lastAckedQueueRef.current = localQueue
+            }
           } finally {
-            pendingQueueWriteRef.current = false
+            pendingQueueWriteRef.current--
           }
         } else if (serverQueue.length > 0) {
           // Server has data — reconcile only if no pending local write
@@ -391,14 +396,27 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
 
       if (cancelled) return
 
-      // Reconcile session (cold boot always applies server session if no local session)
+      // Reconcile session
       if (sessionResult.success && sessionResult.data) {
         const serverSession = sessionResult.data
         const currentEp = stateRef.current.currentEpisode
-        if (currentEp && currentEp.id === serverSession.episode.id) {
+        const audio = audioRef.current
+        const isActivelyPlaying = audio ? !audio.paused : stateRef.current.isPlaying
+        const sameEpisode = currentEp && currentEp.id === serverSession.episode.id
+
+        if (sameEpisode && isActivelyPlaying) {
           // Never rewind active playback
-        } else if (!currentEp) {
-          // Cold boot with no session playing — apply server session
+        } else if (sameEpisode && !isActivelyPlaying) {
+          // Same episode, paused — safe to seek to server currentTime
+          if (audio && Number.isFinite(serverSession.currentTime)) {
+            pendingSeekRef.current = serverSession.currentTime
+            if (audio.duration > 0 && !isNaN(audio.duration)) {
+              audio.currentTime = Math.min(serverSession.currentTime, audio.duration)
+              pendingSeekRef.current = null
+            }
+          }
+        } else {
+          // Different episode OR no episode — load server session (no auto-play)
           isRestoringSession.current = true
           loadEpisodeIntoPlayer(serverSession.episode, {
             andPlay: false,
@@ -433,13 +451,27 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
           dispatch({ type: "INIT_QUEUE", queue: queueResult.data })
         }
 
-        // Session reconcile: never rewind active playback
+        // Session reconcile
         if (sessionResult.success && sessionResult.data) {
           const serverSession = sessionResult.data
           const currentEp = stateRef.current.currentEpisode
-          if (currentEp && currentEp.id === serverSession.episode.id) {
-            // Active episode matches — do not overwrite currentTime
-          } else if (!currentEp) {
+          const audio = audioRef.current
+          const isActivelyPlaying = audio ? !audio.paused : stateRef.current.isPlaying
+          const sameEpisode = currentEp && currentEp.id === serverSession.episode.id
+
+          if (sameEpisode && isActivelyPlaying) {
+            // Never rewind active playback
+          } else if (sameEpisode && !isActivelyPlaying) {
+            // Same episode, paused — safe to seek to server currentTime
+            if (audio && Number.isFinite(serverSession.currentTime)) {
+              pendingSeekRef.current = serverSession.currentTime
+              if (audio.duration > 0 && !isNaN(audio.duration)) {
+                audio.currentTime = Math.min(serverSession.currentTime, audio.duration)
+                pendingSeekRef.current = null
+              }
+            }
+          } else {
+            // Different episode OR no episode — load server session (no auto-play)
             isRestoringSession.current = true
             loadEpisodeIntoPlayer(serverSession.episode, {
               andPlay: false,
@@ -484,12 +516,15 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       return
     }
 
-    // Trailing-edge 1500ms debounce: collapses rapid reorders into a single setQueue call
+    // Trailing-edge 1500ms debounce: collapses rapid reorders into a single setQueue call.
+    // Increment the counter when scheduling so the flag stays > 0 while any timer or
+    // in-flight write is outstanding (prevents focus-refetch from clobbering).
     if (queueDebounceTimerRef.current) {
       clearTimeout(queueDebounceTimerRef.current)
+      pendingQueueWriteRef.current-- // cancel the previously scheduled increment
     }
     const snapshot = state.queue.slice()
-    pendingQueueWriteRef.current = true
+    pendingQueueWriteRef.current++
     queueDebounceTimerRef.current = setTimeout(async () => {
       queueDebounceTimerRef.current = null
       try {
@@ -510,7 +545,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
         suppressQueueWriteRef.current = true
         dispatch({ type: "INIT_QUEUE", queue: lastAckedQueueRef.current })
       } finally {
-        pendingQueueWriteRef.current = false
+        pendingQueueWriteRef.current--
       }
     }, 1500)
 
@@ -518,6 +553,8 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       if (queueDebounceTimerRef.current) {
         clearTimeout(queueDebounceTimerRef.current)
         queueDebounceTimerRef.current = null
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- pendingQueueWriteRef is a plain counter ref, not a DOM ref; stale-value warning does not apply
+        pendingQueueWriteRef.current--
       }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
