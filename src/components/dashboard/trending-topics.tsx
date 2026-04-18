@@ -1,21 +1,16 @@
 import Link from "next/link";
-import { TrendingUp } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { TrendingUp, ChevronRight } from "lucide-react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatRelativeTime } from "@/lib/utils";
-import { getTopicSlug } from "@/lib/trending";
+import { dedupeTopics } from "@/lib/trending";
 import type { TrendingTopic } from "@/db/schema";
-
-function TopicPill({ topic }: { topic: TrendingTopic }) {
-  return (
-    <Link href={`/trending/${getTopicSlug(topic)}`}>
-      <Badge variant="secondary" className="px-3 py-1 max-w-[200px] hover:bg-secondary/80 transition-colors">
-        <span className="min-w-0 flex-1 truncate text-sm" title={topic.name}>{topic.name}</span>
-        <span className="ml-1.5 text-muted-foreground font-normal shrink-0">({topic.episodeCount})</span>
-      </Badge>
-    </Link>
-  );
-}
 
 interface TrendingTopicsProps {
   topics: TrendingTopic[];
@@ -24,34 +19,71 @@ interface TrendingTopicsProps {
 
 export function TrendingTopics({ topics, generatedAt }: TrendingTopicsProps) {
   const updatedAgo = formatRelativeTime(generatedAt);
-  const deduped = Array.from(new Map(topics.map((t) => [getTopicSlug(t), t])).values());
+  const deduped = dedupeTopics(topics);
+
+  if (deduped.length === 0) return null;
 
   return (
-    <div>
-      <div className="mb-3 flex items-center gap-2">
-        <TrendingUp className="h-4 w-4 text-muted-foreground" />
-        <span className="text-sm font-medium text-muted-foreground">
-          Trending · {updatedAgo}
-        </span>
-      </div>
-      <div className="flex flex-wrap gap-2">
-        {deduped.map((topic) => (
-          <TopicPill key={getTopicSlug(topic)} topic={topic} />
-        ))}
-      </div>
-    </div>
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <TrendingUp className="h-4 w-4" />
+          Trending Topics
+        </CardTitle>
+        <CardDescription>Past 7 days · Updated {updatedAgo}</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-1">
+        {deduped.map(({ topic, slug }) => {
+          const count = topic.episodeCount;
+          return (
+            <Link
+              key={slug}
+              href={`/trending/${slug}`}
+              className="flex items-start gap-3 rounded-md p-3 transition-colors hover:bg-accent"
+            >
+              <div className="min-w-0 flex-1">
+                <p className="break-words font-semibold">{topic.name}</p>
+                {topic.description && (
+                  <p className="line-clamp-2 break-words text-sm text-muted-foreground">
+                    {topic.description}
+                  </p>
+                )}
+              </div>
+              <div className="flex shrink-0 items-center gap-1 text-sm text-muted-foreground">
+                <span>{count} {count === 1 ? "episode" : "episodes"}</span>
+                <ChevronRight className="h-4 w-4" />
+              </div>
+            </Link>
+          );
+        })}
+      </CardContent>
+    </Card>
   );
 }
 
 export function TrendingTopicsLoading() {
   return (
-    <div>
-      <Skeleton className="mb-3 h-4 w-32" />
-      <div className="flex flex-wrap gap-2">
-        {[1, 2, 3, 4, 5, 6].map((i) => (
-          <Skeleton key={i} className="h-7 w-24 rounded-full" />
+    <Card>
+      <CardHeader>
+        <Skeleton className="h-5 w-40" />
+        <Skeleton className="h-3 w-56" />
+      </CardHeader>
+      <CardContent className="space-y-1">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <div
+            key={i}
+            data-testid="trending-loading-row"
+            className="flex items-start gap-3 p-3"
+          >
+            <div className="min-w-0 flex-1">
+              <Skeleton className="h-6 w-3/4" />
+              <Skeleton className="mt-1.5 h-4 w-full" />
+              <Skeleton className="mt-1 h-4 w-5/6" />
+            </div>
+            <Skeleton className="h-5 w-20 shrink-0" />
+          </div>
         ))}
-      </div>
-    </div>
+      </CardContent>
+    </Card>
   );
 }

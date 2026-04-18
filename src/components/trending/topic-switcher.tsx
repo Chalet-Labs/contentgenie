@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { cn } from "@/lib/utils";
-import { getTopicSlug } from "@/lib/trending";
+import { dedupeTopics } from "@/lib/trending";
 import type { TrendingTopic } from "@/db/schema";
 
 interface TopicSwitcherProps {
@@ -9,17 +9,14 @@ interface TopicSwitcherProps {
 }
 
 export function TopicSwitcher({ topics, activeSlug }: TopicSwitcherProps) {
-  // Dedupe by resolved slug so two topics sharing a display name but distinct
-  // slugs both remain reachable from the switcher.
-  const deduped = Array.from(new Map(topics.map((t) => [getTopicSlug(t), t])).values());
+  const deduped = dedupeTopics(topics);
 
   if (deduped.length === 0) return null;
 
   return (
     <nav aria-label="Trending topics" className="overflow-x-auto">
       <div className="flex gap-2 whitespace-nowrap pb-2">
-        {deduped.map((t) => {
-          const slug = getTopicSlug(t);
+        {deduped.map(({ topic, slug }) => {
           const isActive = slug === activeSlug;
           return (
             <Link
@@ -33,7 +30,7 @@ export function TopicSwitcher({ topics, activeSlug }: TopicSwitcherProps) {
                   : "bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground"
               )}
             >
-              {t.name}
+              {topic.name}
             </Link>
           );
         })}

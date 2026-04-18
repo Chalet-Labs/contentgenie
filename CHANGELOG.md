@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+- Dashboard Trending Topics card redesigned as a vertical list with topic name, AI description (2-line clamp), episode count, and per-row link to `/trending/<slug>` (#281)
+
 ### Added
 - Trending topic detail page at /trending/<slug> with horizontal topic switcher and ranked episode list sorted by worth-it score (#280)
 - Personal topic overlap indicators — shows contextual labels (e.g. "You've heard 3 similar episodes", "New topic for you") based on listen history and saved episodes. Recommendations deprioritize heavily-consumed topics (#262)
