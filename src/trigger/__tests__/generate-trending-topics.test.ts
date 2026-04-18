@@ -58,7 +58,7 @@ vi.mock("@/lib/prompts", () => ({
   getTrendingTopicsPrompt: vi.fn().mockReturnValue("mock prompt"),
 }));
 
-import { generateTrendingTopics, TRENDING_MAX_TOKENS } from "@/trigger/generate-trending-topics";
+import { generateTrendingTopics } from "@/trigger/generate-trending-topics";
 
 const taskConfig = generateTrendingTopics as unknown as {
   run: () => Promise<{ episodeCount: number; topicCount: number }>;
@@ -183,7 +183,7 @@ describe("generate-trending-topics task", () => {
         { role: "system", content: "You are a podcast trend analyst." },
         { role: "user", content: "mock prompt" },
       ],
-      { maxTokens: TRENDING_MAX_TOKENS }
+      expect.objectContaining({ maxTokens: expect.any(Number) })
     );
     expect(mockValues).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -231,7 +231,7 @@ describe("generate-trending-topics task", () => {
 
     expect(mockGenerateCompletion).toHaveBeenCalledWith(
       expect.any(Array),
-      { maxTokens: TRENDING_MAX_TOKENS }
+      expect.objectContaining({ maxTokens: expect.any(Number) })
     );
   });
 

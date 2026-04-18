@@ -1,27 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { render, screen } from "@testing-library/react"
 import { TrendingTopics, TrendingTopicsLoading } from "@/components/dashboard/trending-topics"
-import { slugify } from "@/lib/utils"
-import type { TrendingTopic } from "@/db/schema"
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
+import { makeTopic } from "@/test/trending-factories"
 
 const MOCK_NOW = new Date("2026-03-15T12:00:00.000Z")
 const fixedDate = new Date(MOCK_NOW.getTime() - 10 * 60 * 1000) // 10 minutes before MOCK_NOW
-
-function makeTopic(overrides: Partial<TrendingTopic> = {}): TrendingTopic {
-  const name = overrides.name ?? "Test Topic"
-  return {
-    name,
-    description: "A test topic description",
-    episodeCount: 5,
-    episodeIds: [1, 2, 3, 4, 5],
-    slug: slugify(name),
-    ...overrides,
-  }
-}
 
 // ---------------------------------------------------------------------------
 // TrendingTopics

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { ZaiProvider } from "../providers/zai";
+import { ZaiProvider, ZAI_DEBUG_REASONING_ENV } from "../providers/zai";
 
 describe("ZaiProvider", () => {
   let provider: ZaiProvider;
@@ -239,7 +239,7 @@ describe("ZaiProvider", () => {
     { label: "empty string", value: "" },
   ])("does not emit debug log when reasoning_content is $label (even with debug flag)", async ({ value }) => {
     vi.stubEnv("ZAI_API_KEY", "zai-test-key");
-    vi.stubEnv("ZAI_DEBUG_REASONING", "1");
+    vi.stubEnv(ZAI_DEBUG_REASONING_ENV, "1");
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     try {
       vi.stubGlobal(
@@ -274,7 +274,7 @@ describe("ZaiProvider", () => {
 
   it("emits debug log with reasoning snippet only when ZAI_DEBUG_REASONING=1", async () => {
     vi.stubEnv("ZAI_API_KEY", "zai-test-key");
-    vi.stubEnv("ZAI_DEBUG_REASONING", "1");
+    vi.stubEnv(ZAI_DEBUG_REASONING_ENV, "1");
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     try {
       vi.stubGlobal(
@@ -321,7 +321,7 @@ describe("ZaiProvider", () => {
 
   it("does not emit debug log when ZAI_DEBUG_REASONING is unset", async () => {
     vi.stubEnv("ZAI_API_KEY", "zai-test-key");
-    vi.stubEnv("ZAI_DEBUG_REASONING", "");
+    vi.stubEnv(ZAI_DEBUG_REASONING_ENV, "");
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     try {
       vi.stubGlobal(

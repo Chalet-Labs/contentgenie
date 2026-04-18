@@ -1,6 +1,10 @@
 import type { AiProvider, AiMessage, AiCompletionOptions } from "@/lib/ai/types";
 
 const ZAI_API_URL = "https://api.z.ai/api/coding/paas/v4/chat/completions";
+// Env-var name for opting into structured logs of reasoning_content snippets
+// on empty-content responses. Kept as a single constant so provider + tests
+// can't drift in name.
+export const ZAI_DEBUG_REASONING_ENV = "ZAI_DEBUG_REASONING";
 
 export class ZaiProvider implements AiProvider {
   readonly name = "zai";
@@ -64,7 +68,7 @@ export class ZaiProvider implements AiProvider {
       const reasoningContent: string | undefined =
         choice.message?.reasoning_content;
       if (
-        process.env.ZAI_DEBUG_REASONING === "1" &&
+        process.env[ZAI_DEBUG_REASONING_ENV] === "1" &&
         typeof reasoningContent === "string" &&
         reasoningContent.length > 0
       ) {

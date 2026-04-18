@@ -4,6 +4,7 @@ import {
   getSummarizationPrompt,
   getQuickSummaryPrompt,
   getTrendingTopicsPrompt,
+  TRENDING_SUMMARY_SNIPPET_CHARS,
 } from "@/lib/prompts";
 
 describe("SYSTEM_PROMPT", () => {
@@ -150,6 +151,17 @@ describe("getTrendingTopicsPrompt", () => {
     expect(payloadMatch).not.toBeNull();
     const parsed = JSON.parse(payloadMatch![1]);
     expect(parsed[0].summary).toBe(summary);
+  });
+
+  it("truncates oversized summaries so the payload fits a reasoning context window", () => {
+    const huge = "x".repeat(TRENDING_SUMMARY_SNIPPET_CHARS * 3);
+    const prompt = getTrendingTopicsPrompt([
+      { id: 1, title: "Ep", summary: huge },
+    ]);
+    const payloadMatch = prompt.match(/<episodes>\n([\s\S]*?)\n<\/episodes>/);
+    expect(payloadMatch).not.toBeNull();
+    const parsed = JSON.parse(payloadMatch![1]);
+    expect(parsed[0].summary.length).toBe(TRENDING_SUMMARY_SNIPPET_CHARS);
   });
 
   it("reports the provided episode count in the prompt header", () => {

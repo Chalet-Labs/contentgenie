@@ -15,7 +15,7 @@ const MAX_EPISODES = 200;
 const MAX_TOPICS = 8;
 // Reasoning models spend token budget on chain-of-thought before emitting
 // `content`; 16k leaves headroom so the topic JSON isn't truncated mid-output.
-export const TRENDING_MAX_TOKENS = 16000;
+const TRENDING_MAX_TOKENS = 16000;
 
 /**
  * Daily scheduled task that analyzes recent episode summaries via LLM

@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 import { render, screen } from "@testing-library/react"
 import { isValidElement } from "react"
 import type { TrendingTopic } from "@/db/schema"
+import { makeTopic } from "@/test/trending-factories"
 
 const mockGetTrendingTopics = vi.fn()
 
@@ -10,16 +11,6 @@ vi.mock("@/app/actions/dashboard", () => ({
 }))
 
 import { TrendingTopicsSection } from "@/app/(app)/dashboard/trending-topics-section"
-
-function makeTopic(name: string): TrendingTopic {
-  return {
-    name,
-    description: `${name} description`,
-    episodeCount: 3,
-    episodeIds: [1, 2, 3],
-    slug: name.toLowerCase(),
-  }
-}
 
 describe("TrendingTopicsSection", () => {
   beforeEach(() => {
@@ -60,7 +51,7 @@ describe("TrendingTopicsSection", () => {
     const generatedAt = new Date("2026-04-18T11:30:00Z") // 30 minutes ago
     mockGetTrendingTopics.mockResolvedValue({
       topics: {
-        items: [makeTopic("AI")],
+        items: [makeTopic({ name: "AI" })],
         generatedAt,
         periodStart: new Date("2026-04-11T11:30:00Z"),
         periodEnd: generatedAt,
@@ -81,7 +72,7 @@ describe("TrendingTopicsSection", () => {
     const generatedAt = new Date("2026-04-15T12:00:00Z") // 3 days ago
     mockGetTrendingTopics.mockResolvedValue({
       topics: {
-        items: [makeTopic("AI")],
+        items: [makeTopic({ name: "AI" })],
         generatedAt,
         periodStart: new Date("2026-04-08T12:00:00Z"),
         periodEnd: generatedAt,
