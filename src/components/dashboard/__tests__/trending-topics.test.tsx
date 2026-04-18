@@ -45,10 +45,10 @@ describe("TrendingTopics", () => {
     ]
     render(<TrendingTopics topics={topics} generatedAt={fixedDate} />)
     const links = screen.getAllByRole("link")
-    expect(links.length).toBeGreaterThanOrEqual(3)
-    for (const link of links) {
-      expect(link).toHaveAttribute("href", expect.stringMatching(/^\/trending\//))
-    }
+    expect(links).toHaveLength(3)
+    expect(links[0]).toHaveAttribute("href", "/trending/ai")
+    expect(links[1]).toHaveAttribute("href", "/trending/climate")
+    expect(links[2]).toHaveAttribute("href", "/trending/tech")
     expect(screen.getByText("AI")).toBeInTheDocument()
     expect(screen.getByText("Climate")).toBeInTheDocument()
     expect(screen.getByText("Tech")).toBeInTheDocument()
@@ -144,14 +144,8 @@ describe("TrendingTopics", () => {
 // ---------------------------------------------------------------------------
 
 describe("TrendingTopicsLoading", () => {
-  it("renders inside a Card with row-shaped skeleton placeholders (no rounded-full pills)", () => {
-    const { container } = render(<TrendingTopicsLoading />)
-    expect(container.firstChild).toBeInTheDocument()
-    // Must NOT have any rounded-full pill skeletons
-    const pillSkeletons = container.querySelectorAll("[class*='rounded-full']")
-    expect(pillSkeletons).toHaveLength(0)
-    // Must have at least one row-shaped placeholder group
-    const rowGroups = container.querySelectorAll("div.flex.items-start")
-    expect(rowGroups.length).toBeGreaterThanOrEqual(1)
+  it("renders exactly 5 row-shaped skeleton placeholders", () => {
+    render(<TrendingTopicsLoading />)
+    expect(screen.getAllByTestId("trending-loading-row")).toHaveLength(5)
   })
 })

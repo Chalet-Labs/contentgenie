@@ -24,3 +24,15 @@ export function getTopicSlug(topic: TrendingTopic): string {
   }
   return topic.slug || slugify(topic.name);
 }
+
+// Dedupe topics by their resolved slug so two topics with a shared display name
+// but distinct slugs both survive, and two topics with the same slug collapse
+// to one. Returns `{ topic, slug }` pairs so callers can reuse the computed
+// slug without calling `getTopicSlug` again (which would duplicate the
+// empty-slug console.warn per topic per render).
+export function dedupeTopics(
+  topics: TrendingTopic[],
+): Array<{ topic: TrendingTopic; slug: string }> {
+  const withSlugs = topics.map((topic) => ({ topic, slug: getTopicSlug(topic) }));
+  return Array.from(new Map(withSlugs.map((e) => [e.slug, e])).values());
+}
