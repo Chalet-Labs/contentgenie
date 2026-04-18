@@ -42,7 +42,7 @@ export function TrendingTopics({ topics, generatedAt, isStale = false }: Trendin
       <CardContent className="space-y-1">
         {deduped.length === 0 ? (
           <p className="px-3 py-6 text-center text-sm text-muted-foreground">
-            No trending topics yet — check back tomorrow.
+            No trending topics yet — check back soon.
           </p>
         ) : (
           deduped.map(({ topic, slug }) => {

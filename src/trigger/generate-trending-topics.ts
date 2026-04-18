@@ -16,6 +16,10 @@ const MAX_TOPICS = 8;
 // Reasoning models spend token budget on chain-of-thought before emitting
 // `content`; 16k leaves headroom so the topic JSON isn't truncated mid-output.
 const TRENDING_MAX_TOKENS = 16000;
+// Keep this aligned with the `retry.maxAttempts` below so the catch handler
+// can detect the final attempt and avoid writing duplicate empty snapshots on
+// every retry.
+const MAX_ATTEMPTS = 2;
 
 /**
  * Daily scheduled task that analyzes recent episode summaries via LLM
@@ -25,8 +29,12 @@ export const generateTrendingTopics = schedules.task({
   id: "generate-trending-topics",
   cron: "0 6 * * *", // Daily at 6 AM UTC
   maxDuration: 120,
-  retry: { maxAttempts: 2 },
-  run: async () => {
+  retry: { maxAttempts: MAX_ATTEMPTS },
+  run: async (
+    _payload: unknown,
+    options?: { ctx?: { attempt?: { number?: number } } }
+  ) => {
+    const attemptNumber = options?.ctx?.attempt?.number ?? MAX_ATTEMPTS;
     const now = new Date();
     const periodStart = new Date(
       now.getTime() - LOOKBACK_DAYS * 24 * 60 * 60 * 1000
@@ -106,10 +114,12 @@ export const generateTrendingTopics = schedules.task({
       return { episodeCount: recentEpisodes.length, topicCount: 0 };
     }
 
-    // Generate topic clusters via LLM. On provider failure we persist an empty
-    // snapshot so the dashboard's empty-state + stale banner surface the
-    // outage to users, then re-throw so Trigger.dev still marks the run
-    // failed, triggers retries, and fires operator alerts.
+    // Generate topic clusters via LLM. On provider failure we only persist an
+    // empty snapshot on the final retry attempt — otherwise every failed retry
+    // would insert another empty row for the same window. We always re-throw
+    // so Trigger.dev still marks the attempt failed, runs retries, and fires
+    // operator alerts; on the terminal attempt the dashboard's empty-state +
+    // stale banner surface the outage to users.
     const prompt = getTrendingTopicsPrompt(episodesWithSummary);
     let completion: string;
     try {
@@ -123,8 +133,12 @@ export const generateTrendingTopics = schedules.task({
     } catch (err) {
       logger.error("LLM call failed in trending topics generation", {
         error: err instanceof Error ? err.message : String(err),
+        attemptNumber,
+        maxAttempts: MAX_ATTEMPTS,
       });
-      await persistSnapshot([], recentEpisodes.length);
+      if (attemptNumber >= MAX_ATTEMPTS) {
+        await persistSnapshot([], recentEpisodes.length);
+      }
       throw err;
     }
 

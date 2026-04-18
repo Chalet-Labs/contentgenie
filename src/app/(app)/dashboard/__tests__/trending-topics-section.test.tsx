@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest"
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { render, screen } from "@testing-library/react"
 import { isValidElement } from "react"
 import type { TrendingTopic } from "@/db/schema"
@@ -17,6 +17,10 @@ describe("TrendingTopicsSection", () => {
     vi.clearAllMocks()
     vi.useFakeTimers()
     vi.setSystemTime(new Date("2026-04-18T12:00:00Z"))
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
   })
 
   it("returns null when no snapshot exists (first-run dashboard)", async () => {

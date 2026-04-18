@@ -5,6 +5,10 @@ const ZAI_API_URL = "https://api.z.ai/api/coding/paas/v4/chat/completions";
 // on empty-content responses. Kept as a single constant so provider + tests
 // can't drift in name.
 export const ZAI_DEBUG_REASONING_ENV = "ZAI_DEBUG_REASONING";
+// Cap on the reasoning_content snippet surfaced via the debug log. Keep the
+// log line bounded and use a code-point-safe slice so we never split a
+// surrogate pair at the boundary.
+const REASONING_SNIPPET_LOG_CHARS = 200;
 
 export class ZaiProvider implements AiProvider {
   readonly name = "zai";
@@ -77,7 +81,9 @@ export class ZaiProvider implements AiProvider {
           completion_tokens: completionTokens ?? null,
           reasoning_tokens: reasoningTokens ?? null,
           reasoning_length: reasoningContent.length,
-          reasoning_snippet: reasoningContent.slice(0, 200),
+          reasoning_snippet: Array.from(reasoningContent)
+            .slice(0, REASONING_SNIPPET_LOG_CHARS)
+            .join(""),
         });
       }
       throw new Error(

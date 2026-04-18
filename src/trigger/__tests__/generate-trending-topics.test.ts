@@ -61,7 +61,10 @@ vi.mock("@/lib/prompts", () => ({
 import { generateTrendingTopics } from "@/trigger/generate-trending-topics";
 
 const taskConfig = generateTrendingTopics as unknown as {
-  run: () => Promise<{ episodeCount: number; topicCount: number }>;
+  run: (
+    payload?: unknown,
+    options?: { ctx?: { attempt?: { number?: number } } }
+  ) => Promise<{ episodeCount: number; topicCount: number }>;
 };
 
 // Helper to set up the db.select chain
@@ -202,7 +205,7 @@ describe("generate-trending-topics task", () => {
     );
   });
 
-  it("persists empty snapshot then re-throws when the LLM provider throws", async () => {
+  it("persists empty snapshot then re-throws on the final retry attempt", async () => {
     mockDbSelect([
       { id: 1, title: "Episode 1", summary: "Summary 1" },
     ]);
@@ -210,14 +213,34 @@ describe("generate-trending-topics task", () => {
     const providerError = new Error("Invalid response format from Z.AI");
     mockGenerateCompletion.mockRejectedValue(providerError);
 
-    // Re-throw preserves Trigger.dev retry + failure alerting
-    await expect(taskConfig.run()).rejects.toThrow("Invalid response format from Z.AI");
+    // attempt.number === maxAttempts — terminal failure, persist + re-throw
+    await expect(
+      taskConfig.run(undefined, { ctx: { attempt: { number: 2 } } })
+    ).rejects.toThrow("Invalid response format from Z.AI");
 
-    // ...but we still persisted an empty snapshot first so the dashboard
-    // stale/empty affordances surface the outage to users.
+    // ...we persist exactly one empty snapshot so the dashboard stale/empty
+    // affordances surface the outage to users.
+    expect(mockValues).toHaveBeenCalledTimes(1);
     expect(mockValues).toHaveBeenCalledWith(
       expect.objectContaining({ topics: [], episodeCount: 1 })
     );
+    expect(mockParseJsonResponse).not.toHaveBeenCalled();
+  });
+
+  it("re-throws without persisting when the LLM fails on a non-final attempt", async () => {
+    mockDbSelect([
+      { id: 1, title: "Episode 1", summary: "Summary 1" },
+    ]);
+
+    mockGenerateCompletion.mockRejectedValue(new Error("transient"));
+
+    // attempt.number < maxAttempts — let Trigger.dev retry before we commit
+    // an empty row to the log so we don't accumulate duplicates per window.
+    await expect(
+      taskConfig.run(undefined, { ctx: { attempt: { number: 1 } } })
+    ).rejects.toThrow("transient");
+
+    expect(mockValues).not.toHaveBeenCalled();
     expect(mockParseJsonResponse).not.toHaveBeenCalled();
   });
 
