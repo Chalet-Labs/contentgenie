@@ -4,10 +4,10 @@ Podcast discovery, AI-powered summarization, and library management for busy pro
 
 ## Workflow
 
-- Before planning any work, always pull the latest `main` (`git fetch upstream && git merge upstream/main` or equivalent).
+- Before planning any work, always pull the latest `main` (`git fetch origin && git merge origin/main` or equivalent).
 - Before editing any code, always create a new branch from an up-to-date `main`.
-- This is a fork. Remotes: `origin` = `rube-de/contentgenie`, `upstream` = `Chalet-Labs/contentgenie`.
-- Push feature branches to `upstream` and open PRs against `upstream/main`.
+- Single remote: `origin` = `Chalet-Labs/contentgenie`.
+- Push feature branches to `origin` and open PRs against `origin/main`.
 
 ## Dev environment tips
 
