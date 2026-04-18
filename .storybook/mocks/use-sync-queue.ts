@@ -1,4 +1,3 @@
-// Stub for @/hooks/use-sync-queue in Storybook.
 // The real hook reads from SyncQueueProvider context; stories render components
 // in isolation without the provider, so return a no-op queue snapshot here.
 export const useSyncQueue = () => ({
