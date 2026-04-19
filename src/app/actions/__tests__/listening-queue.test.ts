@@ -2,6 +2,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import type { AudioEpisode } from "@/contexts/audio-player-context"
 import {
   createDrizzleOrmMock,
+  makeDeleteChain,
+  makeInsertChain,
   validEpisode,
   validEpisode2,
 } from "@/app/actions/__tests__/__fixtures"
@@ -19,44 +21,16 @@ const mockDelete = vi.fn()
 const mockDeleteWhere = vi.fn()
 const mockFindMany = vi.fn()
 const mockTx = {
-  insert: (...args: unknown[]) => {
-    mockInsert(...args)
-    return {
-      values: (...vArgs: unknown[]) => {
-        return mockInsertValues(...vArgs)
-      },
-    }
-  },
-  delete: (...args: unknown[]) => {
-    mockDelete(...args)
-    return {
-      where: (...wArgs: unknown[]) => {
-        return mockDeleteWhere(...wArgs)
-      },
-    }
-  },
+  insert: makeInsertChain(mockInsert, mockInsertValues),
+  delete: makeDeleteChain(mockDelete, mockDeleteWhere),
 }
 const mockTransaction = vi.fn()
 
 vi.mock("@/db", () => ({
   db: {
     transaction: (...args: unknown[]) => mockTransaction(...args),
-    insert: (...args: unknown[]) => {
-      mockInsert(...args)
-      return {
-        values: (...vArgs: unknown[]) => {
-          return mockInsertValues(...vArgs)
-        },
-      }
-    },
-    delete: (...args: unknown[]) => {
-      mockDelete(...args)
-      return {
-        where: (...wArgs: unknown[]) => {
-          return mockDeleteWhere(...wArgs)
-        },
-      }
-    },
+    insert: makeInsertChain(mockInsert, mockInsertValues),
+    delete: makeDeleteChain(mockDelete, mockDeleteWhere),
     query: {
       userQueueItems: {
         findMany: (...args: unknown[]) => mockFindMany(...args),

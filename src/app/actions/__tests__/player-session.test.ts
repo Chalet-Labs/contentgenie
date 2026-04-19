@@ -2,6 +2,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import type { AudioEpisode } from "@/contexts/audio-player-context"
 import {
   createDrizzleOrmMock,
+  makeDeleteChain,
+  makeInsertConflictChain,
   validEpisode,
 } from "@/app/actions/__tests__/__fixtures"
 
@@ -21,27 +23,12 @@ const mockFindFirst = vi.fn()
 
 vi.mock("@/db", () => ({
   db: {
-    insert: (...args: unknown[]) => {
-      mockInsert(...args)
-      return {
-        values: (...vArgs: unknown[]) => {
-          mockInsertValues(...vArgs)
-          return {
-            onConflictDoUpdate: (opts: unknown) => {
-              return mockOnConflictDoUpdate(opts)
-            },
-          }
-        },
-      }
-    },
-    delete: (...args: unknown[]) => {
-      mockDelete(...args)
-      return {
-        where: (...wArgs: unknown[]) => {
-          return mockDeleteWhere(...wArgs)
-        },
-      }
-    },
+    insert: makeInsertConflictChain(
+      mockInsert,
+      mockInsertValues,
+      mockOnConflictDoUpdate,
+    ),
+    delete: makeDeleteChain(mockDelete, mockDeleteWhere),
     query: {
       userPlayerSession: {
         findFirst: (...args: unknown[]) => mockFindFirst(...args),
