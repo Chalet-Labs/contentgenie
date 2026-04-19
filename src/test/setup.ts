@@ -1,5 +1,20 @@
 import "@testing-library/jest-dom/vitest";
-import { vi } from "vitest";
+import { beforeEach, vi } from "vitest";
+
+// Clear localStorage between tests so per-user migration markers, cached
+// queue/session blobs, and other persisted state can't leak across tests in
+// the same worker. Some test files install their own mock localStorage via
+// `Object.defineProperty(window, "localStorage", ...)`; this guard only
+// touches the currently-installed storage, whichever that is.
+beforeEach(() => {
+  try {
+    if (typeof window !== "undefined" && window.localStorage) {
+      window.localStorage.clear();
+    }
+  } catch {
+    // ignore — some tests install a read-only or missing-clear mock
+  }
+});
 
 // Mock next/navigation
 vi.mock("next/navigation", () => ({
