@@ -52,12 +52,17 @@ One mutation endpoint for the queue:
 setQueue(episodes: AudioEpisode[]): Promise<{ success: true } | { success: false; error: string }>
 ```
 
-The server transaction deletes all rows for the user and inserts the supplied
-array; `position = array_index`. No per-operation `add` / `remove` / `reorder`
-actions. Client optimistic reducer dispatches remain instant; a trailing-edge
-1500ms debounce collapses rapid reorders into a single write whose payload is
-the latest committed state. Conflict resolution is commit-order: the last
-`setQueue` wins; no version token, no merge.
+The server action atomically replaces the queue via
+`db.batch([delete, insert])`; `position = array_index`. `drizzle-orm/neon-http`
+executes the batch as a single HTTP round-trip with implicit-transaction
+semantics (DELETE + INSERT either both land or both roll back). **`db.transaction(...)`
+is not supported on the `neon-http` driver** — do not reintroduce it without
+first migrating the project to `drizzle-orm/neon-serverless` (WebSocket pool).
+No per-operation `add` / `remove` / `reorder` actions. Client optimistic
+reducer dispatches remain instant; a trailing-edge 1500ms debounce collapses
+rapid reorders into a single write whose payload is the latest committed
+state. Conflict resolution is commit-order: the last `setQueue` wins; no
+version token, no merge.
 
 Session uses a single-row upsert per user; same last-write-wins semantics with
 the existing 5s client-side throttle.

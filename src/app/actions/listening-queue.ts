@@ -54,19 +54,24 @@ export async function setQueue(
     try {
       await ensureUserExists(userId)
 
-      await db.transaction(async (tx) => {
-        await tx.delete(userQueueItems).where(eq(userQueueItems.userId, userId))
-
-        if (parsed.data.length > 0) {
-          const rows = parsed.data.map((ep, index) => ({
-            userId,
-            position: index,
-            ...toEpisodeDenormRow(ep),
-            updatedAt: new Date(),
-          }))
-          await tx.insert(userQueueItems).values(rows)
-        }
-      })
+      if (parsed.data.length > 0) {
+        const rows = parsed.data.map((ep, index) => ({
+          userId,
+          position: index,
+          ...toEpisodeDenormRow(ep),
+          updatedAt: new Date(),
+        }))
+        // `drizzle-orm/neon-http` has no interactive transaction support
+        // (stateless HTTP driver). `db.batch` ships the statements in a
+        // single HTTP round-trip with implicit-transaction semantics, so
+        // the DELETE is rolled back if the INSERT fails.
+        await db.batch([
+          db.delete(userQueueItems).where(eq(userQueueItems.userId, userId)),
+          db.insert(userQueueItems).values(rows),
+        ])
+      } else {
+        await db.delete(userQueueItems).where(eq(userQueueItems.userId, userId))
+      }
 
       return { success: true as const }
     } catch (e) {
