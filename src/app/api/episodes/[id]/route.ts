@@ -46,9 +46,12 @@ export async function GET(
         );
       }
 
-      // Map to the shape the episode detail page expects
+      // Map to the shape the episode detail page expects.
+      // Use podcastIndexId ("rss-...") as the id so save/library lookups —
+      // which key off podcastIndexId — match the API response. Matches the
+      // pattern in src/app/(app)/podcast/[id]/page.tsx:91.
       const episode = {
-        id: dbEpisode.id,
+        id: dbEpisode.podcastIndexId,
         title: dbEpisode.title,
         link: "",
         description: dbEpisode.description ?? "",
@@ -115,7 +118,7 @@ export async function GET(
     try {
       episodeResponse = await getEpisodeById(episodeId);
     } catch (error) {
-      console.error(`Error fetching episode ${episodeId} from PodcastIndex:`, error);
+      console.error("Error fetching episode from PodcastIndex:", { episodeId, error });
       return NextResponse.json(
         { error: "Episode not found" },
         { status: 404 }

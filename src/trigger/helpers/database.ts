@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { episodes, podcasts } from "@/db/schema";
+import { episodes, episodeTopics, podcasts } from "@/db/schema";
 import { upsertPodcast } from "@/db/helpers";
 import type { SummaryResult } from "@/lib/openrouter";
 import type { PodcastIndexPodcast, PodcastIndexEpisode } from "@/lib/podcastindex";
@@ -134,6 +134,26 @@ export async function persistTranscript(
   }
 }
 
+async function persistTopics(
+  episodeId: number,
+  topics: SummaryResult["topics"]
+): Promise<void> {
+  if (!topics || topics.length === 0) return;
+  // Delete-then-insert to reconcile stale topics on re-summarization.
+  // No transaction — benign failure mode matches the existing pattern
+  // (summary saved without topics; Trigger.dev retries self-heal).
+  await db.delete(episodeTopics).where(eq(episodeTopics.episodeId, episodeId));
+  await db
+    .insert(episodeTopics)
+    .values(
+      topics.map((t) => ({
+        episodeId,
+        topic: t.name,
+        relevance: t.relevance.toFixed(2),
+      }))
+    );
+}
+
 export async function persistEpisodeSummary(
   episode: PodcastIndexEpisode,
   podcast: PodcastIndexPodcast | undefined,
@@ -144,7 +164,7 @@ export async function persistEpisodeSummary(
     throw new Error("Could not find or create podcast in database");
   }
 
-  // Check for existing episode (may have been created by trackEpisodeRun)
+  // May have been created by trackEpisodeRun
   const existingEpisode = await db.query.episodes.findFirst({
     where: eq(episodes.podcastIndexId, episode.id.toString()),
   });
@@ -165,24 +185,33 @@ export async function persistEpisodeSummary(
         updatedAt: new Date(),
       })
       .where(eq(episodes.id, existingEpisode.id));
+
+    await persistTopics(existingEpisode.id, summary.topics);
   } else {
-    await db.insert(episodes).values({
-      podcastId,
-      podcastIndexId: episode.id.toString(),
-      title: episode.title,
-      description: episode.description,
-      audioUrl: episode.enclosureUrl,
-      duration: episode.duration,
-      publishDate: episode.datePublished
-        ? new Date(episode.datePublished * 1000)
-        : null,
-      summary: summary.summary,
-      keyTakeaways: summary.keyTakeaways,
-      worthItScore: summary.worthItScore.toFixed(2),
-      worthItReason: summary.worthItReason,
-      worthItDimensions: summary.worthItDimensions ?? null,
-      summaryStatus: "completed",
-      processedAt: new Date(),
-    });
+    const [inserted] = await db
+      .insert(episodes)
+      .values({
+        podcastId,
+        podcastIndexId: episode.id.toString(),
+        title: episode.title,
+        description: episode.description,
+        audioUrl: episode.enclosureUrl,
+        duration: episode.duration,
+        publishDate: episode.datePublished
+          ? new Date(episode.datePublished * 1000)
+          : null,
+        summary: summary.summary,
+        keyTakeaways: summary.keyTakeaways,
+        worthItScore: summary.worthItScore.toFixed(2),
+        worthItReason: summary.worthItReason,
+        worthItDimensions: summary.worthItDimensions ?? null,
+        summaryStatus: "completed",
+        processedAt: new Date(),
+      })
+      .returning({ id: episodes.id });
+
+    if (inserted) {
+      await persistTopics(inserted.id, summary.topics);
+    }
   }
 }

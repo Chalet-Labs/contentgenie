@@ -59,6 +59,30 @@ const config: Config = {
   				'3': 'hsl(var(--chart-3))',
   				'4': 'hsl(var(--chart-4))',
   				'5': 'hsl(var(--chart-5))'
+  			},
+  			score: {
+  				exceptional: 'hsl(var(--score-exceptional))',
+  				'exceptional-foreground': 'hsl(var(--score-exceptional-foreground))',
+  				above: 'hsl(var(--score-above))',
+  				'above-foreground': 'hsl(var(--score-above-foreground))',
+  				average: 'hsl(var(--score-average))',
+  				'average-foreground': 'hsl(var(--score-average-foreground))',
+  				below: 'hsl(var(--score-below))',
+  				'below-foreground': 'hsl(var(--score-below-foreground))',
+  				skip: 'hsl(var(--score-skip))',
+  				'skip-foreground': 'hsl(var(--score-skip-foreground))',
+  			},
+  			status: {
+  				'success-bg': 'hsl(var(--status-success-bg))',
+  				'success-text': 'hsl(var(--status-success-text))',
+  				'warning-bg': 'hsl(var(--status-warning-bg))',
+  				'warning-text': 'hsl(var(--status-warning-text))',
+  				'info-bg': 'hsl(var(--status-info-bg))',
+  				'info-text': 'hsl(var(--status-info-text))',
+  				'danger-bg': 'hsl(var(--status-danger-bg))',
+  				'danger-text': 'hsl(var(--status-danger-text))',
+  				'neutral-bg': 'hsl(var(--status-neutral-bg))',
+  				'neutral-text': 'hsl(var(--status-neutral-text))',
   			}
   		}
   	}

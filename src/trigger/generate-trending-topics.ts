@@ -8,10 +8,18 @@ import {
   getTrendingTopicsPrompt,
 } from "@/lib/prompts";
 import { parseJsonResponse } from "@/lib/openrouter";
+import { slugify } from "@/lib/utils";
 
 const LOOKBACK_DAYS = 7;
-const MAX_EPISODES = 500;
+const MAX_EPISODES = 200;
 const MAX_TOPICS = 8;
+// Reasoning models spend token budget on chain-of-thought before emitting
+// `content`; 16k leaves headroom so the topic JSON isn't truncated mid-output.
+const TRENDING_MAX_TOKENS = 16000;
+// Keep this aligned with the `retry.maxAttempts` below so the catch handler
+// can detect the final attempt and avoid writing duplicate empty snapshots on
+// every retry.
+const MAX_ATTEMPTS = 2;
 
 /**
  * Daily scheduled task that analyzes recent episode summaries via LLM
@@ -21,8 +29,12 @@ export const generateTrendingTopics = schedules.task({
   id: "generate-trending-topics",
   cron: "0 6 * * *", // Daily at 6 AM UTC
   maxDuration: 120,
-  retry: { maxAttempts: 2 },
-  run: async () => {
+  retry: { maxAttempts: MAX_ATTEMPTS },
+  run: async (
+    _payload: unknown,
+    options?: { ctx?: { attempt?: { number?: number } } }
+  ) => {
+    const attemptNumber = options?.ctx?.attempt?.number ?? MAX_ATTEMPTS;
     const now = new Date();
     const periodStart = new Date(
       now.getTime() - LOOKBACK_DAYS * 24 * 60 * 60 * 1000
@@ -47,12 +59,12 @@ export const generateTrendingTopics = schedules.task({
       periodEnd: periodEnd.toISOString(),
     });
 
-    // Query all completed episodes in the window (JS filters takeaways downstream for LLM input)
+    // Query all completed episodes in the window (JS filters summary downstream for LLM input)
     const recentEpisodes = await db
       .select({
         id: episodes.id,
         title: episodes.title,
-        keyTakeaways: episodes.keyTakeaways,
+        summary: episodes.summary,
       })
       .from(episodes)
       .where(
@@ -83,31 +95,52 @@ export const generateTrendingTopics = schedules.task({
       return { episodeCount: 0, topicCount: 0 };
     }
 
-    // Build LLM input (JS filters episodes without takeaways)
-    const episodesWithTakeaways = recentEpisodes
+    // Build LLM input (JS filters episodes without a usable summary)
+    const episodesWithSummary = recentEpisodes
       .filter(
-        (ep): ep is typeof ep & { keyTakeaways: string[] } =>
-          ep.keyTakeaways != null && ep.keyTakeaways.length > 0
+        (ep): ep is typeof ep & { summary: string } =>
+          typeof ep.summary === "string" && ep.summary.trim().length > 0
       )
       .map((ep) => ({
         id: ep.id,
         title: ep.title,
-        keyTakeaways: ep.keyTakeaways,
+        summary: ep.summary,
       }));
 
-    // If all episodes lack takeaways, store empty
-    if (episodesWithTakeaways.length === 0) {
+    // If no episodes have a summary, store empty
+    if (episodesWithSummary.length === 0) {
       await persistSnapshot([], recentEpisodes.length);
-      logger.info("All episodes lack takeaways, stored empty snapshot");
+      logger.info("No episodes with summary in window, stored empty snapshot");
       return { episodeCount: recentEpisodes.length, topicCount: 0 };
     }
 
-    // Generate topic clusters via LLM
-    const prompt = getTrendingTopicsPrompt(episodesWithTakeaways);
-    const completion = await generateCompletion([
-      { role: "system", content: TRENDING_TOPICS_SYSTEM_PROMPT },
-      { role: "user", content: prompt },
-    ]);
+    // Generate topic clusters via LLM. On provider failure we only persist an
+    // empty snapshot on the final retry attempt — otherwise every failed retry
+    // would insert another empty row for the same window. We always re-throw
+    // so Trigger.dev still marks the attempt failed, runs retries, and fires
+    // operator alerts; on the terminal attempt the dashboard's empty-state +
+    // stale banner surface the outage to users.
+    const prompt = getTrendingTopicsPrompt(episodesWithSummary);
+    let completion: string;
+    try {
+      completion = await generateCompletion(
+        [
+          { role: "system", content: TRENDING_TOPICS_SYSTEM_PROMPT },
+          { role: "user", content: prompt },
+        ],
+        { maxTokens: TRENDING_MAX_TOKENS }
+      );
+    } catch (err) {
+      logger.error("LLM call failed in trending topics generation", {
+        error: err instanceof Error ? err.message : String(err),
+        attemptNumber,
+        maxAttempts: MAX_ATTEMPTS,
+      });
+      if (attemptNumber >= MAX_ATTEMPTS) {
+        await persistSnapshot([], recentEpisodes.length);
+      }
+      throw err;
+    }
 
     let topics: TrendingTopic[];
     try {
@@ -145,8 +178,8 @@ export const generateTrendingTopics = schedules.task({
     }
 
     // Validate: filter out topics referencing invalid episode IDs
-    const validEpisodeIds = new Set(episodesWithTakeaways.map((ep) => ep.id));
-    const validatedTopics = topics
+    const validEpisodeIds = new Set(episodesWithSummary.map((ep) => ep.id));
+    const mappedTopics = topics
       .map((topic) => {
         const filteredIds = Array.from(new Set(topic.episodeIds)).filter((id) =>
           validEpisodeIds.has(id)
@@ -156,11 +189,43 @@ export const generateTrendingTopics = schedules.task({
           description: topic.description,
           episodeIds: filteredIds,
           episodeCount: filteredIds.length,
+          slug: slugify(topic.name),
         };
       })
-      .filter((topic) => topic.episodeCount > 0)
+      .filter((topic) => topic.episodeCount > 0);
+
+    const keptTopics: typeof mappedTopics = [];
+    const droppedNames: string[] = [];
+    for (const topic of mappedTopics) {
+      if (topic.slug === "") droppedNames.push(topic.name);
+      else keptTopics.push(topic);
+    }
+    if (droppedNames.length > 0) {
+      logger.warn("Dropped trending topics with empty slug (non-ASCII or punctuation-only names)", {
+        droppedCount: droppedNames.length,
+        droppedNames: droppedNames.slice(0, 10),
+      });
+    }
+
+    const validatedTopics = keptTopics
       .sort((a, b) => b.episodeCount - a.episodeCount)
       .slice(0, MAX_TOPICS);
+
+    // Disambiguate duplicate slugs. Track already-assigned final slugs (not
+    // just bases) so a disambiguated form like "foo-2" cannot collide with
+    // another topic whose natural slug is also "foo-2".
+    const assignedSlugs = new Set<string>();
+    for (const topic of validatedTopics) {
+      const base = topic.slug;
+      let candidate = base;
+      let n = 2;
+      while (assignedSlugs.has(candidate)) {
+        candidate = `${base}-${n}`;
+        n++;
+      }
+      topic.slug = candidate;
+      assignedSlugs.add(candidate);
+    }
 
     if (validatedTopics.length === 0 && topics.length > 0) {
       logger.warn("All LLM topics referenced invalid episode IDs, storing empty snapshot", {

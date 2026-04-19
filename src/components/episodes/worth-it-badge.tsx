@@ -7,7 +7,13 @@ interface WorthItBadgeProps {
 }
 
 export function WorthItBadge({ score }: WorthItBadgeProps) {
-  if (score === null) return null;
+  if (score === null || !Number.isFinite(score)) {
+    return (
+      <Badge variant="secondary" className="px-3 py-1 text-sm">
+        Not rated
+      </Badge>
+    );
+  }
 
   return (
     <Badge

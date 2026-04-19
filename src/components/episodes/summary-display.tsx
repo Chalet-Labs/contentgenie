@@ -9,13 +9,16 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   Sparkles,
   CheckCircle,
+  XCircle,
   Loader2,
   AlertCircle,
   ChevronDown,
   ChevronUp,
 } from "lucide-react";
 import { getScoreColor, getScoreLabel } from "@/lib/score-utils";
+import { WORTH_IT_SIGNAL_KEYS, SIGNAL_LABELS, type WorthItDimensionsData } from "@/lib/openrouter";
 import type { SummarizationStep } from "@/trigger/types";
+import type { OverlapLabelKind } from "@/lib/topic-overlap";
 
 export type { SummarizationStep } from "@/trigger/types";
 
@@ -24,15 +27,13 @@ interface SummaryDisplayProps {
   keyTakeaways: string[] | null;
   worthItScore: number | null;
   worthItReason?: string;
-  worthItDimensions?: {
-    uniqueness: number;
-    actionability: number;
-    timeValue: number;
-  } | null;
+  worthItDimensions?: WorthItDimensionsData | null;
   isLoading?: boolean;
   error?: string | null;
   currentStep?: SummarizationStep | null;
   onGenerateSummary?: () => void;
+  overlapLabel?: string | null;
+  overlapLabelKind?: OverlapLabelKind | null;
 }
 
 const STEP_LABELS: Record<SummarizationStep, string> = {
@@ -101,6 +102,8 @@ export function SummaryDisplay({
   error = null,
   currentStep = null,
   onGenerateSummary,
+  overlapLabel,
+  overlapLabelKind,
 }: SummaryDisplayProps) {
   const [showFullSummary, setShowFullSummary] = useState(false);
 
@@ -193,7 +196,9 @@ export function SummaryDisplay({
     return (
       <Card>
         <CardContent className="flex flex-col items-center gap-4 py-8">
-          <Sparkles className="h-12 w-12 text-muted-foreground" />
+          <div className="rounded-full bg-muted p-3">
+            <Sparkles className="h-5 w-5 text-muted-foreground" />
+          </div>
           <div className="text-center">
             <p className="font-medium">No Summary Available</p>
             <p className="mt-1 text-sm text-muted-foreground">
@@ -222,8 +227,13 @@ export function SummaryDisplay({
     isLongSummary && !showFullSummary
       ? summary.slice(0, 600) + "..."
       : summary;
-  const normalizedDimensionEntries = worthItDimensions
+  const isSignalFormat =
+    worthItDimensions != null && "kind" in worthItDimensions && worthItDimensions.kind === "signals";
+  const isLegacyDimensionFormat =
+    worthItDimensions != null && !isSignalFormat && "uniqueness" in worthItDimensions;
+  const normalizedDimensionEntries = isLegacyDimensionFormat && worthItDimensions
     ? Object.entries(worthItDimensions).reduce<[string, number][]>((acc, [key, raw]) => {
+        if (key === "kind") return acc;
         const num = typeof raw === "number" ? raw : typeof raw === "string" ? Number(raw) : NaN;
         if (!Number.isFinite(num)) return acc;
         acc.push([key, Math.min(10, Math.max(0, num))]);
@@ -245,7 +255,7 @@ export function SummaryDisplay({
           <CardContent>
             <div className="flex items-center gap-4">
               <div
-                className={`flex h-16 w-16 items-center justify-center rounded-full ${getScoreColor(worthItScore)} text-white shadow-lg`}
+                className={`flex h-16 w-16 items-center justify-center rounded-full ${getScoreColor(worthItScore)} shadow-lg`}
               >
                 <span className="text-2xl font-bold">
                   {worthItScore.toFixed(1)}
@@ -274,6 +284,39 @@ export function SummaryDisplay({
                 <span>10</span>
               </div>
             </div>
+            {overlapLabel && (
+              <p
+                className={`mt-3 text-sm font-medium ${
+                  overlapLabelKind === "high-overlap"
+                    ? "text-amber-600 dark:text-amber-400"
+                    : "text-green-600 dark:text-green-400"
+                }`}
+              >
+                {overlapLabel}
+              </p>
+            )}
+            {isSignalFormat && worthItDimensions.kind === "signals" && (
+              <div className="mt-4 space-y-2 border-t pt-4">
+                <p className="text-sm font-medium text-foreground">Quality Signals</p>
+                {WORTH_IT_SIGNAL_KEYS.map((key) => (
+                  <div key={key} className="flex items-center gap-2 text-sm">
+                    {worthItDimensions.signals[key] ? (
+                      <CheckCircle className="h-4 w-4 text-green-500" />
+                    ) : (
+                      <XCircle className="h-4 w-4 text-muted-foreground/40" />
+                    )}
+                    <span className={worthItDimensions.signals[key] ? "text-foreground" : "text-muted-foreground"}>
+                      {SIGNAL_LABELS[key]}
+                    </span>
+                  </div>
+                ))}
+                {worthItDimensions.adjustment !== 0 && (
+                  <p className="mt-2 text-xs text-muted-foreground italic">
+                    Adjustment: {worthItDimensions.adjustment > 0 ? "+1" : "-1"} — {worthItDimensions.adjustmentReason}
+                  </p>
+                )}
+              </div>
+            )}
             {normalizedDimensionEntries.length > 0 && (
               <div className="mt-4 space-y-3 border-t pt-4">
                 <p className="text-sm font-medium text-foreground">Score Breakdown</p>

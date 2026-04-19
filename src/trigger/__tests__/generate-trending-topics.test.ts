@@ -27,7 +27,7 @@ vi.mock("@/db/schema", () => ({
   episodes: {
     id: "id",
     title: "title",
-    keyTakeaways: "key_takeaways",
+    summary: "summary",
     summaryStatus: "summary_status",
     processedAt: "processed_at",
   },
@@ -61,7 +61,10 @@ vi.mock("@/lib/prompts", () => ({
 import { generateTrendingTopics } from "@/trigger/generate-trending-topics";
 
 const taskConfig = generateTrendingTopics as unknown as {
-  run: () => Promise<{ episodeCount: number; topicCount: number }>;
+  run: (
+    payload?: unknown,
+    options?: { ctx?: { attempt?: { number?: number } } }
+  ) => Promise<{ episodeCount: number; topicCount: number }>;
 };
 
 // Helper to set up the db.select chain
@@ -112,10 +115,10 @@ describe("generate-trending-topics task", () => {
 
   it("logs warning when MAX_EPISODES cap is reached", async () => {
     const { logger } = await import("@trigger.dev/sdk");
-    const episodeRows = Array.from({ length: 500 }, (_, i) => ({
+    const episodeRows = Array.from({ length: 200 }, (_, i) => ({
       id: i + 1,
       title: `Episode ${i + 1}`,
-      keyTakeaways: [`Takeaway ${i + 1}`],
+      summary: `Summary for episode ${i + 1}`,
     }));
     mockDbSelect(episodeRows);
 
@@ -128,14 +131,14 @@ describe("generate-trending-topics task", () => {
 
     expect(logger.warn).toHaveBeenCalledWith(
       "Episode query hit MAX_EPISODES cap; snapshot may be incomplete",
-      { cap: 500 }
+      { cap: 200 }
     );
   });
 
-  it("stores empty topics when all episodes lack takeaways", async () => {
+  it("stores empty topics when all episodes lack a summary", async () => {
     mockDbSelect([
-      { id: 1, title: "Episode 1", keyTakeaways: null },
-      { id: 2, title: "Episode 2", keyTakeaways: [] },
+      { id: 1, title: "Episode 1", summary: null },
+      { id: 2, title: "Episode 2", summary: "   " },
     ]);
 
     const result = await taskConfig.run();
@@ -152,9 +155,9 @@ describe("generate-trending-topics task", () => {
 
   it("generates and stores topic clusters for valid episodes", async () => {
     mockDbSelect([
-      { id: 1, title: "AI in Healthcare", keyTakeaways: ["AI transforms diagnostics"] },
-      { id: 2, title: "Machine Learning 101", keyTakeaways: ["ML basics explained"] },
-      { id: 3, title: "Leadership Tips", keyTakeaways: ["Lead with empathy"] },
+      { id: 1, title: "AI in Healthcare", summary: "AI transforms diagnostics" },
+      { id: 2, title: "Machine Learning 101", summary: "ML basics explained" },
+      { id: 3, title: "Leadership Tips", summary: "Lead with empathy" },
     ]);
 
     const mockTopics = [
@@ -178,21 +181,86 @@ describe("generate-trending-topics task", () => {
     const result = await taskConfig.run();
 
     expect(result).toEqual({ episodeCount: 3, topicCount: 2 });
-    expect(mockGenerateCompletion).toHaveBeenCalledWith([
-      { role: "system", content: "You are a podcast trend analyst." },
-      { role: "user", content: "mock prompt" },
-    ]);
+    expect(mockGenerateCompletion).toHaveBeenCalledWith(
+      [
+        { role: "system", content: "You are a podcast trend analyst." },
+        { role: "user", content: "mock prompt" },
+      ],
+      expect.objectContaining({ maxTokens: expect.any(Number) })
+    );
     expect(mockValues).toHaveBeenCalledWith(
       expect.objectContaining({
-        topics: mockTopics,
+        topics: [
+          expect.objectContaining({
+            name: "AI & Machine Learning",
+            slug: "ai-machine-learning",
+          }),
+          expect.objectContaining({
+            name: "Leadership",
+            slug: "leadership",
+          }),
+        ],
         episodeCount: 3,
       })
     );
   });
 
+  it("persists empty snapshot then re-throws on the final retry attempt", async () => {
+    mockDbSelect([
+      { id: 1, title: "Episode 1", summary: "Summary 1" },
+    ]);
+
+    const providerError = new Error("Invalid response format from Z.AI");
+    mockGenerateCompletion.mockRejectedValue(providerError);
+
+    // attempt.number === maxAttempts — terminal failure, persist + re-throw
+    await expect(
+      taskConfig.run(undefined, { ctx: { attempt: { number: 2 } } })
+    ).rejects.toThrow("Invalid response format from Z.AI");
+
+    // ...we persist exactly one empty snapshot so the dashboard stale/empty
+    // affordances surface the outage to users.
+    expect(mockValues).toHaveBeenCalledTimes(1);
+    expect(mockValues).toHaveBeenCalledWith(
+      expect.objectContaining({ topics: [], episodeCount: 1 })
+    );
+    expect(mockParseJsonResponse).not.toHaveBeenCalled();
+  });
+
+  it("re-throws without persisting when the LLM fails on a non-final attempt", async () => {
+    mockDbSelect([
+      { id: 1, title: "Episode 1", summary: "Summary 1" },
+    ]);
+
+    mockGenerateCompletion.mockRejectedValue(new Error("transient"));
+
+    // attempt.number < maxAttempts — let Trigger.dev retry before we commit
+    // an empty row to the log so we don't accumulate duplicates per window.
+    await expect(
+      taskConfig.run(undefined, { ctx: { attempt: { number: 1 } } })
+    ).rejects.toThrow("transient");
+
+    expect(mockValues).not.toHaveBeenCalled();
+    expect(mockParseJsonResponse).not.toHaveBeenCalled();
+  });
+
+  it("still passes maxTokens on the failing LLM call", async () => {
+    mockDbSelect([
+      { id: 1, title: "Episode 1", summary: "Summary 1" },
+    ]);
+    mockGenerateCompletion.mockRejectedValue(new Error("boom"));
+
+    await expect(taskConfig.run()).rejects.toThrow("boom");
+
+    expect(mockGenerateCompletion).toHaveBeenCalledWith(
+      expect.any(Array),
+      expect.objectContaining({ maxTokens: expect.any(Number) })
+    );
+  });
+
   it("stores empty topics when LLM response fails to parse", async () => {
     mockDbSelect([
-      { id: 1, title: "Episode 1", keyTakeaways: ["Takeaway 1"] },
+      { id: 1, title: "Episode 1", summary: "Summary 1" },
     ]);
 
     mockGenerateCompletion.mockResolvedValue("not valid json");
@@ -210,8 +278,8 @@ describe("generate-trending-topics task", () => {
 
   it("filters out topics with invalid episode IDs", async () => {
     mockDbSelect([
-      { id: 1, title: "Episode 1", keyTakeaways: ["Takeaway 1"] },
-      { id: 2, title: "Episode 2", keyTakeaways: ["Takeaway 2"] },
+      { id: 1, title: "Episode 1", summary: "Summary 1" },
+      { id: 2, title: "Episode 2", summary: "Summary 2" },
     ]);
 
     const mockTopics = [
@@ -242,6 +310,7 @@ describe("generate-trending-topics task", () => {
             name: "Valid Topic",
             episodeIds: [1, 2],
             episodeCount: 2,
+            slug: "valid-topic",
           }),
         ],
       })
@@ -250,7 +319,7 @@ describe("generate-trending-topics task", () => {
 
   it("removes topics with zero valid episodes after ID filtering", async () => {
     mockDbSelect([
-      { id: 1, title: "Episode 1", keyTakeaways: ["Takeaway 1"] },
+      { id: 1, title: "Episode 1", summary: "Summary 1" },
     ]);
 
     const mockTopics = [
@@ -277,7 +346,7 @@ describe("generate-trending-topics task", () => {
     const episodeRows = Array.from({ length: 20 }, (_, i) => ({
       id: i + 1,
       title: `Episode ${i + 1}`,
-      keyTakeaways: [`Takeaway ${i + 1}`],
+      summary: `Summary for episode ${i + 1}`,
     }));
     mockDbSelect(episodeRows);
 
@@ -310,8 +379,8 @@ describe("generate-trending-topics task", () => {
 
   it("corrects episodeCount to match filtered episodeIds length", async () => {
     mockDbSelect([
-      { id: 1, title: "Episode 1", keyTakeaways: ["Takeaway 1"] },
-      { id: 2, title: "Episode 2", keyTakeaways: ["Takeaway 2"] },
+      { id: 1, title: "Episode 1", summary: "Summary 1" },
+      { id: 2, title: "Episode 2", summary: "Summary 2" },
     ]);
 
     const mockTopics = [
@@ -336,9 +405,172 @@ describe("generate-trending-topics task", () => {
             name: "Mixed Topic",
             episodeIds: [1, 2],
             episodeCount: 2,
+            slug: "mixed-topic",
           }),
         ],
       })
     );
+  });
+
+  it("every persisted topic has a non-empty slug in clamped results", async () => {
+    const episodeRows = Array.from({ length: 20 }, (_, i) => ({
+      id: i + 1,
+      title: `Episode ${i + 1}`,
+      summary: `Summary for episode ${i + 1}`,
+    }));
+    mockDbSelect(episodeRows);
+
+    const mockTopics = Array.from({ length: 12 }, (_, i) => ({
+      name: `Topic ${i + 1}`,
+      description: `Description ${i + 1}`,
+      episodeCount: i + 1,
+      episodeIds: Array.from({ length: i + 1 }, (_, j) => j + 1),
+    }));
+
+    mockGenerateCompletion.mockResolvedValue("mock completion");
+    mockParseJsonResponse.mockReturnValue({ topics: mockTopics });
+
+    await taskConfig.run();
+
+    const storedTopics = mockValues.mock.calls[0][0].topics;
+    for (const topic of storedTopics) {
+      expect(typeof topic.slug).toBe("string");
+      expect(topic.slug.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("disambiguates duplicate slugs deterministically in sort order", async () => {
+    mockDbSelect([
+      { id: 1, title: "Ep 1", summary: "Summary 1" },
+      { id: 2, title: "Ep 2", summary: "Summary 2" },
+    ]);
+
+    const mockTopics = [
+      {
+        name: "AI Models",
+        description: "First AI Models topic",
+        episodeCount: 2,
+        episodeIds: [1, 2],
+      },
+      {
+        name: "AI Models",
+        description: "Second AI Models topic",
+        episodeCount: 1,
+        episodeIds: [2],
+      },
+    ];
+
+    mockGenerateCompletion.mockResolvedValue("mock completion");
+    mockParseJsonResponse.mockReturnValue({ topics: mockTopics });
+
+    await taskConfig.run();
+
+    const storedTopics = mockValues.mock.calls[0][0].topics;
+    expect(storedTopics).toHaveLength(2);
+    expect(storedTopics[0].slug).toBe("ai-models");
+    expect(storedTopics[1].slug).toBe("ai-models-2");
+  });
+
+  it("drops topics whose name slugifies to empty", async () => {
+    mockDbSelect([
+      { id: 1, title: "Ep 1", summary: "Summary 1" },
+      { id: 2, title: "Ep 2", summary: "Summary 2" },
+      { id: 3, title: "Ep 3", summary: "Summary 3" },
+    ]);
+
+    const mockTopics = [
+      {
+        name: "!!!",
+        description: "All punctuation name",
+        episodeCount: 1,
+        episodeIds: [1],
+      },
+      {
+        name: "Valid",
+        description: "A valid topic",
+        episodeCount: 2,
+        episodeIds: [2, 3],
+      },
+    ];
+
+    mockGenerateCompletion.mockResolvedValue("mock completion");
+    mockParseJsonResponse.mockReturnValue({ topics: mockTopics });
+
+    const result = await taskConfig.run();
+
+    expect(result).toEqual({ episodeCount: 3, topicCount: 1 });
+    const storedTopics = mockValues.mock.calls[0][0].topics;
+    expect(storedTopics).toHaveLength(1);
+    expect(storedTopics[0].slug).toBe("valid");
+  });
+
+  it("dedupe does not collide with another topic's natural suffixed slug", async () => {
+    // Reproduces the collision case: a disambiguated form (e.g. "season-2")
+    // must not clash with another topic whose natural slug is already "season-2".
+    // Input: [Season 2 (ep 3), Season (ep 2), Season (ep 1)] — sorted desc by episodeCount.
+    // Without the fix, walk yields [season-2, season, season-2] (collision).
+    // With the fix, it yields [season-2, season, season-3].
+    mockDbSelect([
+      { id: 1, title: "Ep 1", summary: "Summary 1" },
+      { id: 2, title: "Ep 2", summary: "Summary 2" },
+      { id: 3, title: "Ep 3", summary: "Summary 3" },
+    ]);
+
+    const mockTopics = [
+      { name: "Season 2", description: "A", episodeCount: 3, episodeIds: [1, 2, 3] },
+      { name: "Season", description: "B", episodeCount: 2, episodeIds: [1, 2] },
+      { name: "Season", description: "C", episodeCount: 1, episodeIds: [1] },
+    ];
+
+    mockGenerateCompletion.mockResolvedValue("mock completion");
+    mockParseJsonResponse.mockReturnValue({ topics: mockTopics });
+
+    await taskConfig.run();
+
+    const storedTopics = mockValues.mock.calls[0][0].topics;
+    const slugs = storedTopics.map((t: { slug: string }) => t.slug);
+    expect(slugs).toEqual(["season-2", "season", "season-3"]);
+    expect(new Set(slugs).size).toBe(slugs.length); // all unique
+  });
+
+  it("applies dedupe AFTER sort+slice, not before", async () => {
+    const episodeRows = Array.from({ length: 10 }, (_, i) => ({
+      id: i + 1,
+      title: `Episode ${i + 1}`,
+      summary: `Summary for episode ${i + 1}`,
+    }));
+    mockDbSelect(episodeRows);
+
+    // Two topics that share the same slug but differ in episodeCount
+    // Lower-ranked (lower episodeCount) gets -2 only if it survives slice
+    // We create 9 distinct topics + 2 that collide, total 11 > MAX_TOPICS(8)
+    const mockTopics = [
+      { name: "A Topic", description: "D", episodeCount: 10, episodeIds: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10] },
+      { name: "B Topic", description: "D", episodeCount: 9, episodeIds: [1, 2, 3, 4, 5, 6, 7, 8, 9] },
+      { name: "C Topic", description: "D", episodeCount: 8, episodeIds: [1, 2, 3, 4, 5, 6, 7, 8] },
+      { name: "D Topic", description: "D", episodeCount: 7, episodeIds: [1, 2, 3, 4, 5, 6, 7] },
+      { name: "E Topic", description: "D", episodeCount: 6, episodeIds: [1, 2, 3, 4, 5, 6] },
+      { name: "F Topic", description: "D", episodeCount: 5, episodeIds: [1, 2, 3, 4, 5] },
+      // These two share the slug "g-topic" after slugify; higher-count ranks first
+      { name: "G Topic", description: "D", episodeCount: 4, episodeIds: [1, 2, 3, 4] },
+      { name: "G-Topic", description: "D", episodeCount: 3, episodeIds: [1, 2, 3] },
+      // This one won't make the cut (rank 9, beyond MAX_TOPICS=8)
+      { name: "H Topic", description: "D", episodeCount: 2, episodeIds: [1, 2] },
+    ];
+
+    mockGenerateCompletion.mockResolvedValue("mock completion");
+    mockParseJsonResponse.mockReturnValue({ topics: mockTopics });
+
+    await taskConfig.run();
+
+    const storedTopics = mockValues.mock.calls[0][0].topics;
+    expect(storedTopics).toHaveLength(8);
+    // Find the two colliding topics
+    const gTopics = storedTopics.filter((t: { slug: string }) => t.slug.startsWith("g-topic"));
+    expect(gTopics).toHaveLength(2);
+    // Higher-count gets bare slug; lower-count gets -2
+    const sorted = [...gTopics].sort((a: { episodeCount: number }, b: { episodeCount: number }) => b.episodeCount - a.episodeCount);
+    expect(sorted[0].slug).toBe("g-topic");
+    expect(sorted[1].slug).toBe("g-topic-2");
   });
 });

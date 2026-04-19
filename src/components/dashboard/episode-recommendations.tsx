@@ -2,7 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ChevronRight, Sparkles, Mic } from "lucide-react";
+import { ChevronRight, Sparkles, Rss } from "lucide-react";
 import { WorthItBadge } from "@/components/episodes/worth-it-badge";
 import { formatDate, formatDuration, stripHtml } from "@/lib/utils";
 import type { RecommendedEpisodeDTO } from "@/db/library-columns";
@@ -17,7 +17,7 @@ export function EpisodeRecommendationsLoading() {
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {[1, 2, 3, 4, 5, 6].map((i) => (
             <div key={i} className="flex gap-3 p-2">
-              <Skeleton className="h-16 w-16 shrink-0 rounded-lg" />
+              <Skeleton className="h-14 w-14 shrink-0 rounded-md" />
               <div className="min-w-0 flex-1 space-y-2">
                 <Skeleton className="h-4 w-3/4" />
                 <Skeleton className="h-3 w-1/2" />
@@ -43,7 +43,9 @@ export function EpisodeRecommendations({ episodes }: EpisodeRecommendationsProps
         </CardHeader>
         <CardContent>
           <div className="flex flex-col items-center justify-center py-8 text-center">
-            <Sparkles className="h-12 w-12 text-muted-foreground/50" />
+            <div className="mb-2 rounded-full bg-muted p-3">
+              <Sparkles className="h-5 w-5 text-muted-foreground" />
+            </div>
             <p className="mt-2 text-sm text-muted-foreground">No recommendations yet</p>
             <p className="text-xs text-muted-foreground">
               Check back as more episodes are rated by the community
@@ -80,18 +82,18 @@ export function EpisodeRecommendations({ episodes }: EpisodeRecommendationsProps
               href={`/episode/${episode.podcastIndexId}`}
               className="flex gap-3 rounded-lg p-2 transition-colors hover:bg-accent"
             >
-              <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-muted">
+              <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-md bg-muted">
                 {episode.podcastImageUrl ? (
                   <Image
                     src={episode.podcastImageUrl}
                     alt={episode.podcastTitle}
                     fill
                     className="object-cover"
-                    sizes="64px"
+                    sizes="56px"
                   />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center text-muted-foreground">
-                    <Mic className="h-6 w-6" />
+                    <Rss className="h-6 w-6" />
                   </div>
                 )}
               </div>
@@ -101,15 +103,12 @@ export function EpisodeRecommendations({ episodes }: EpisodeRecommendationsProps
                   {episode.podcastTitle}
                 </p>
                 {episode.description && (
-                  <p className="line-clamp-2 text-xs text-muted-foreground/70">
+                  <p className="line-clamp-2 text-xs text-muted-foreground">
                     {stripHtml(episode.description)}
                   </p>
                 )}
                 <div className="mt-1 flex flex-wrap items-center gap-2">
-                  {episode.worthItScore !== null &&
-                    Number.isFinite(Number(episode.worthItScore)) && (
-                      <WorthItBadge score={Number(episode.worthItScore)} />
-                    )}
+                  <WorthItBadge score={episode.worthItScore != null ? Number(episode.worthItScore) : null} />
                   <span className="text-xs text-muted-foreground">
                     {formatDuration(episode.duration)}
                     {episode.publishDate && (
@@ -117,6 +116,17 @@ export function EpisodeRecommendations({ episodes }: EpisodeRecommendationsProps
                     )}
                   </span>
                 </div>
+                {episode.overlapLabel && (
+                  <p
+                    className={`mt-1 text-xs font-medium ${
+                      episode.overlapLabelKind === "high-overlap"
+                        ? "text-amber-600 dark:text-amber-400"
+                        : "text-green-600 dark:text-green-400"
+                    }`}
+                  >
+                    {episode.overlapLabel}
+                  </p>
+                )}
               </div>
             </Link>
           ))}

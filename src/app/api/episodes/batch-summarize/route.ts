@@ -5,6 +5,7 @@ import { inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { episodes } from "@/db/schema";
 import { checkRateLimit, checkDailyLimit, DAILY_SUMMARIZE_LIMIT } from "@/lib/rate-limit";
+import { BATCH_SUMMARIZE_LIMIT } from "@/lib/batch-summarize";
 import type { batchSummarizeEpisodes } from "@/trigger/batch-summarize-episodes";
 
 export async function POST(request: NextRequest) {
@@ -26,9 +27,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (episodeIds.length > 20) {
+    if (episodeIds.length > BATCH_SUMMARIZE_LIMIT) {
       return NextResponse.json(
-        { error: "Maximum 20 episodes per batch" },
+        { error: `Maximum ${BATCH_SUMMARIZE_LIMIT} episodes per batch` },
         { status: 400 }
       );
     }

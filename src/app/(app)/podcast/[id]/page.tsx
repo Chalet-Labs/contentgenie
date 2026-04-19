@@ -9,6 +9,7 @@ import { stripHtml } from "@/lib/utils";
 import { EpisodeList } from "@/components/podcasts/episode-list";
 import { SubscribeButton } from "@/components/podcasts/subscribe-button";
 import { BatchSummarizeButton } from "@/components/podcasts/batch-summarize-button";
+import { BATCH_SUMMARIZE_LIMIT } from "@/lib/batch-summarize";
 import { ShareButton } from "@/components/ui/share-button";
 import {
   getPodcastById,
@@ -21,6 +22,8 @@ import { db } from "@/db";
 import { podcasts, episodes as episodesTable } from "@/db/schema";
 import type { SummaryStatus } from "@/db/schema";
 import { getBackNavigation } from "@/app/(app)/podcast/[id]/back-navigation";
+
+const PODCAST_PAGE_EPISODE_LIMIT = 200;
 
 interface PodcastPageProps {
   params: {
@@ -66,7 +69,7 @@ async function loadRssPodcast(podcastIndexId: string) {
   const dbEpisodes = await db.query.episodes.findMany({
     where: eq(episodesTable.podcastId, podcast.id),
     orderBy: [descOrder(episodesTable.publishDate)],
-    limit: 50,
+    limit: PODCAST_PAGE_EPISODE_LIMIT,
     // id omitted: RSS mapping uses podcastIndexId
     columns: {
       podcastIndexId: true,
@@ -223,7 +226,9 @@ export default async function PodcastPage({ params, searchParams }: PodcastPageP
                 </Button>
               )}
               <BatchSummarizeButton
-                episodeIds={episodes.map((e) => e.id)}
+                episodeIds={episodes
+                  .slice(0, BATCH_SUMMARIZE_LIMIT)
+                  .map((e) => e.id)}
               />
               {process.env.NEXT_PUBLIC_APP_URL && (
                 <ShareButton
@@ -265,7 +270,7 @@ export default async function PodcastPage({ params, searchParams }: PodcastPageP
   try {
     const [podcastResponse, episodesResponse] = await Promise.all([
       getPodcastById(feedId),
-      getEpisodesByFeedId(feedId, 20),
+      getEpisodesByFeedId(feedId, PODCAST_PAGE_EPISODE_LIMIT),
     ]);
 
     const podcast = podcastResponse.feed;
@@ -387,7 +392,9 @@ export default async function PodcastPage({ params, searchParams }: PodcastPageP
                 </Button>
               )}
               <BatchSummarizeButton
-                episodeIds={episodes.map((e) => e.id)}
+                episodeIds={episodes
+                  .slice(0, BATCH_SUMMARIZE_LIMIT)
+                  .map((e) => e.id)}
               />
               {process.env.NEXT_PUBLIC_APP_URL && (
                 <ShareButton

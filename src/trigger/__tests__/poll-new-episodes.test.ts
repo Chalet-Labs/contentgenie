@@ -31,7 +31,8 @@ const mockWhere = vi.fn();
 const mockUpdateSet = vi.fn();
 const mockUpdateWhere = vi.fn();
 const mockInsertValues = vi.fn();
-const mockOnConflictDoNothing = vi.fn();
+const mockOnConflictDoUpdate = vi.fn();
+const mockInsertReturning = vi.fn();
 
 vi.mock("@/db", () => ({
   db: {
@@ -52,7 +53,12 @@ vi.mock("@/db", () => ({
     insert: vi.fn().mockReturnValue({
       values: (...args: unknown[]) => {
         mockInsertValues(...args);
-        return { onConflictDoNothing: (...cdArgs: unknown[]) => mockOnConflictDoNothing(...cdArgs) };
+        return {
+          onConflictDoUpdate: (...cdArgs: unknown[]) => {
+            mockOnConflictDoUpdate(...cdArgs);
+            return { returning: (...rArgs: unknown[]) => mockInsertReturning(...rArgs) };
+          },
+        };
       },
     }),
   },
@@ -67,12 +73,21 @@ vi.mock("@/db/schema", () => ({
 vi.mock("drizzle-orm", () => ({
   eq: vi.fn(),
   inArray: vi.fn(),
+  sql: Object.assign(vi.fn((...args: unknown[]) => args), {
+    raw: vi.fn((...args: unknown[]) => args),
+  }),
 }));
 
 // Mock PodcastIndex helper
 const mockGetEpisodesByFeedId = vi.fn();
 vi.mock("@/trigger/helpers/podcastindex", () => ({
   getEpisodesByFeedId: (...args: unknown[]) => mockGetEpisodesByFeedId(...args),
+}));
+
+// Mock notifications helper
+const mockCreateEpisodeNotifications = vi.fn();
+vi.mock("@/trigger/helpers/notifications", () => ({
+  createEpisodeNotifications: (...args: unknown[]) => mockCreateEpisodeNotifications(...args),
 }));
 
 import { getSubscribedPodcasts, pollSingleFeed, pollNewEpisodes } from "@/trigger/poll-new-episodes";
@@ -111,7 +126,8 @@ describe("poll-new-episodes", () => {
     vi.clearAllMocks();
     mockBatchTrigger.mockResolvedValue({ id: "batch_default" });
     mockUpdateWhere.mockResolvedValue(undefined);
-    mockOnConflictDoNothing.mockResolvedValue(undefined);
+    mockInsertReturning.mockResolvedValue([]);
+    mockCreateEpisodeNotifications.mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -208,7 +224,7 @@ describe("poll-new-episodes", () => {
           transcriptStatus: "fetching",
         }),
       ]);
-      expect(mockOnConflictDoNothing).toHaveBeenCalled();
+      expect(mockOnConflictDoUpdate).toHaveBeenCalled();
 
       // Verify fetch-transcript triggered with episode metadata
       expect(mockBatchTrigger).toHaveBeenCalledWith([
@@ -221,6 +237,104 @@ describe("poll-new-episodes", () => {
           options: { idempotencyKey: "poll-fetch-transcript-2002" },
         },
       ]);
+    });
+
+    it("calls createEpisodeNotifications once with a batch of all fetched episodes", async () => {
+      const podcast = makePodcast({ id: 1, podcastIndexId: "456", title: "My Podcast" });
+
+      mockGetEpisodesByFeedId.mockResolvedValue({
+        status: "true",
+        items: [
+          { id: 5001, title: "Episode X", enclosureUrl: "https://example.com/x.mp3", description: "Dx", duration: 600, datePublished: 1700000000, transcripts: [] },
+          { id: 5002, title: "Episode Y", enclosureUrl: "https://example.com/y.mp3", description: "Dy", duration: 900, datePublished: 1700000001, transcripts: [] },
+        ],
+        count: 2,
+      });
+
+      // No existing episodes
+      mockWhere.mockResolvedValue([]);
+
+      // Simulate .returning() yielding all upserted rows
+      mockInsertReturning.mockResolvedValue([
+        { id: 10, podcastIndexId: "5001" },
+        { id: 11, podcastIndexId: "5002" },
+      ]);
+
+      await pollSingleFeed(podcast);
+
+      // Single batch call — N+1 is eliminated.
+      expect(mockCreateEpisodeNotifications).toHaveBeenCalledTimes(1);
+      expect(mockCreateEpisodeNotifications).toHaveBeenCalledWith(1, [
+        {
+          episodeId: 10,
+          podcastIndexEpisodeId: "5001",
+          title: "My Podcast",
+          body: "New episode: Episode X",
+        },
+        {
+          episodeId: 11,
+          podcastIndexEpisodeId: "5002",
+          title: "My Podcast",
+          body: "New episode: Episode Y",
+        },
+      ]);
+    });
+
+    it("calls createEpisodeNotifications even when dedup filters out all episodes (retry safety)", async () => {
+      // Retry scenario: a prior poll inserted these episodes but crashed before
+      // creating notifications. The dedup query sees them as existing, so
+      // newEpisodes is empty, but the upsert still returns the rows — the
+      // notification batch fires and the helper's partial unique index keeps
+      // it idempotent.
+      const podcast = makePodcast({ id: 1, podcastIndexId: "456", title: "My Podcast" });
+
+      mockGetEpisodesByFeedId.mockResolvedValue({
+        status: "true",
+        items: [
+          { id: 6001, title: "Episode Z", enclosureUrl: "https://example.com/z.mp3", description: "Dz", transcripts: [] },
+        ],
+        count: 1,
+      });
+
+      // Episode already exists in DB (from a prior failed poll)
+      mockWhere.mockResolvedValue([{ podcastIndexId: "6001" }]);
+
+      // onConflictDoUpdate + returning yields the row anyway
+      mockInsertReturning.mockResolvedValue([{ id: 99, podcastIndexId: "6001" }]);
+
+      await pollSingleFeed(podcast);
+
+      expect(mockCreateEpisodeNotifications).toHaveBeenCalledTimes(1);
+      expect(mockCreateEpisodeNotifications).toHaveBeenCalledWith(1, [
+        {
+          episodeId: 99,
+          podcastIndexEpisodeId: "6001",
+          title: "My Podcast",
+          body: "New episode: Episode Z",
+        },
+      ]);
+      // But fetch-transcript is NOT re-triggered for already-existing episodes
+      expect(mockBatchTrigger).not.toHaveBeenCalled();
+    });
+
+    it("still calls batchTrigger even when createEpisodeNotifications throws", async () => {
+      const podcast = makePodcast({ id: 1, podcastIndexId: "456" });
+
+      mockGetEpisodesByFeedId.mockResolvedValue({
+        status: "true",
+        items: [
+          { id: 7001, title: "Episode Fail", enclosureUrl: "https://example.com/fail.mp3", description: "Dfail", transcripts: [] },
+        ],
+        count: 1,
+      });
+
+      mockWhere.mockResolvedValue([]);
+      mockInsertReturning.mockResolvedValue([{ id: 20, podcastIndexId: "7001" }]);
+      mockCreateEpisodeNotifications.mockRejectedValue(new Error("push service down"));
+
+      // Should NOT throw — notification failure must not block batchTrigger
+      await expect(pollSingleFeed(podcast)).resolves.not.toThrow();
+      expect(mockBatchTrigger).toHaveBeenCalled();
     });
 
     it("handles API errors gracefully (error isolation)", async () => {

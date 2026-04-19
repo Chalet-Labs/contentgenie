@@ -1,9 +1,10 @@
 import { schedules, logger, retry } from "@trigger.dev/sdk";
-import { eq, inArray } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { podcasts, episodes, userSubscriptions } from "@/db/schema";
-import { getEpisodesByFeedId } from "./helpers/podcastindex";
-import { fetchTranscriptTask } from "./fetch-transcript";
+import { getEpisodesByFeedId } from "@/trigger/helpers/podcastindex";
+import { fetchTranscriptTask } from "@/trigger/fetch-transcript";
+import { createEpisodeNotifications } from "@/trigger/helpers/notifications";
 
 /**
  * Queries podcasts that have at least one active subscriber and are sourced
@@ -63,7 +64,9 @@ export async function pollSingleFeed(podcast: typeof podcasts.$inferSelect) {
 
   let newEpisodes: typeof fetchedEpisodes = [];
   if (fetchedEpisodes.length > 0) {
-    // Deduplicate: find which episodes already exist in DB
+    // Deduplicate for the transcript pipeline: only genuinely-new episodes
+    // trigger fetch-transcript. Not used to gate the notification path — see
+    // the `upserted` block below for the retry-safe notification flow.
     const fetchedIds = fetchedEpisodes.map((ep) => String(ep.id));
     const existingEpisodes = await db
       .select({ podcastIndexId: episodes.podcastIndexId })
@@ -82,31 +85,67 @@ export async function pollSingleFeed(podcast: typeof podcasts.$inferSelect) {
       new: newEpisodes.length,
     });
 
-    // Create episode stubs and trigger transcript fetch for new episodes.
-    // fetch-transcript chains into summarize-episode once a transcript is
-    // persisted, closing the gap where the poller previously triggered
-    // summarize-episode directly (which always failed — no transcript yet).
-    if (newEpisodes.length > 0) {
-      // Batch-insert episode stubs so persistTranscript has a row to UPDATE.
-      // onConflictDoNothing guards against races with other insert paths.
-      await db
-        .insert(episodes)
-        .values(
-          newEpisodes.map((ep) => ({
-            podcastId: podcast.id,
-            podcastIndexId: String(ep.id),
-            title: ep.title,
-            description: ep.description,
-            audioUrl: ep.enclosureUrl,
-            duration: ep.duration,
-            publishDate: ep.datePublished
-              ? new Date(ep.datePublished * 1000)
-              : null,
-            transcriptStatus: "fetching" as const,
-          }))
-        )
-        .onConflictDoNothing({ target: episodes.podcastIndexId });
+    // Upsert ALL fetched episodes with onConflictDoUpdate (no-op self-set).
+    // .returning() then yields the row id for every fetched episode — new or
+    // previously-inserted. This closes a retry gap: if an earlier poll
+    // inserted episode stubs but crashed before creating notifications, the
+    // dedup query above would otherwise exclude those episodes on retry and
+    // orphan them without a notification row. createEpisodeNotifications
+    // remains idempotent via its partial unique index, so already-notified
+    // users get no duplicate push.
+    const upserted = await db
+      .insert(episodes)
+      .values(
+        fetchedEpisodes.map((ep) => ({
+          podcastId: podcast.id,
+          podcastIndexId: String(ep.id),
+          title: ep.title,
+          description: ep.description,
+          audioUrl: ep.enclosureUrl,
+          duration: ep.duration,
+          publishDate: ep.datePublished
+            ? new Date(ep.datePublished * 1000)
+            : null,
+          transcriptStatus: "fetching" as const,
+        }))
+      )
+      .onConflictDoUpdate({
+        target: episodes.podcastIndexId,
+        set: { podcastIndexId: sql`excluded.podcast_index_id` },
+      })
+      .returning({ id: episodes.id, podcastIndexId: episodes.podcastIndexId });
 
+    // Batch-create discovery notifications for every fetched episode. One
+    // subscriber lookup + one prefs lookup + one INSERT across the whole poll,
+    // instead of N queries per-episode. Idempotent — only genuinely-new
+    // (user, episode) pairs produce a row + push.
+    const episodeByPiid = new Map(fetchedEpisodes.map((e) => [String(e.id), e]));
+    const notificationBatch = upserted.map((row) => {
+      const ep = episodeByPiid.get(row.podcastIndexId);
+      return {
+        episodeId: row.id,
+        podcastIndexEpisodeId: row.podcastIndexId,
+        title: podcast.title,
+        body: `New episode: ${ep?.title ?? row.podcastIndexId}`,
+      };
+    });
+
+    try {
+      await createEpisodeNotifications(podcast.id, notificationBatch);
+    } catch (notifErr) {
+      logger.error("Failed to create episode notifications", {
+        feedId: podcast.podcastIndexId,
+        podcastTitle: podcast.title,
+        episodeCount: notificationBatch.length,
+        error: notifErr instanceof Error ? notifErr.message : String(notifErr),
+        stack: notifErr instanceof Error ? notifErr.stack : undefined,
+      });
+    }
+
+    // Trigger fetch-transcript only for genuinely-new episodes. Idempotency
+    // keys would make duplicates a no-op, but skipping them saves Trigger.dev
+    // API calls.
+    if (newEpisodes.length > 0) {
       const batchItems = newEpisodes.map((ep) => ({
         payload: {
           episodeId: Number(ep.id),

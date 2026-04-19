@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { getEpisodeById, getPodcastById } from "@/trigger/helpers/podcastindex";
 import { generateEpisodeSummary, type SummaryResult } from "@/trigger/helpers/ai-summary";
 import { trackEpisodeRun, persistEpisodeSummary, updateEpisodeStatus } from "@/trigger/helpers/database";
-import { createNotificationsForSubscribers, resolvePodcastId } from "@/trigger/helpers/notifications";
+import { markSummaryReady, resolvePodcastId } from "@/trigger/helpers/notifications";
 import { getActiveAiConfig } from "@/lib/ai/config";
 import { db } from "@/db";
 import { episodes } from "@/db/schema";
@@ -136,7 +136,7 @@ export const summarizeEpisode = task({
     const episodeRow = await retry.onThrow(
       async () => db.query.episodes.findFirst({
         where: eq(episodes.podcastIndexId, String(episodeId)),
-        columns: { transcription: true, summary: true },
+        columns: { transcription: true },
       }),
       { maxAttempts: 3 }
     );
@@ -191,9 +191,6 @@ export const summarizeEpisode = task({
     setStep("saving-results");
     logger.info("Persisting summary to database");
 
-    // Use the already-fetched episodeRow from Step 3 to check for prior summary
-    const isNewEpisode = !episodeRow?.summary;
-
     await retry.onThrow(
       async () => persistEpisodeSummary(episode, podcast, summary),
       { maxAttempts: 3 }
@@ -201,7 +198,8 @@ export const summarizeEpisode = task({
 
     logger.info("Summary persisted successfully");
 
-    // Create notifications for subscribers (episode row now exists in DB)
+    // Update the existing notification row in place (created by the poller on discovery).
+    // No-ops silently if no prior row exists (admin-triggered re-summarization).
     try {
       const podcastDbId = await resolvePodcastId(episode.feedId);
       if (podcastDbId) {
@@ -210,31 +208,20 @@ export const summarizeEpisode = task({
           columns: { id: true },
         });
         const episodeDbId = dbEpisode?.id ?? null;
-
-        // new_episode notification — only on first summarization, not re-runs
-        if (isNewEpisode) {
-          await createNotificationsForSubscribers(
+        if (episodeDbId != null) {
+          await markSummaryReady(
             podcastDbId,
             episodeDbId,
-            "new_episode",
+            String(episodeId),
             podcast?.title ?? episode.title,
-            `New episode: ${episode.title}`,
-            { podcastIndexEpisodeId: String(episodeId) }
+            `Summary ready: ${episode.title}`
           );
+        } else {
+          logger.warn("Could not resolve episode DB id for markSummaryReady", { episodeId });
         }
-
-        // summary_completed notification
-        await createNotificationsForSubscribers(
-          podcastDbId,
-          episodeDbId,
-          "summary_completed",
-          podcast?.title ?? episode.title,
-          `Summary ready: ${episode.title}`,
-          { podcastIndexEpisodeId: String(episodeId) }
-        );
       }
     } catch (notifErr) {
-      logger.warn("Failed to create notifications", {
+      logger.warn("Failed to update notifications", {
         episodeId,
         error:
           notifErr instanceof Error ? notifErr.message : String(notifErr),

@@ -14,6 +14,7 @@ import {
   bigint,
 } from "drizzle-orm/pg-core";
 import { relations, sql } from "drizzle-orm";
+import type { WorthItSignals } from "@/lib/openrouter";
 
 // Rate limits table (managed by rate-limiter-flexible, see ADR-001).
 // Defined here so drizzle-kit push doesn't try to drop it.
@@ -88,11 +89,10 @@ export const episodes = pgTable(
     keyTakeaways: json("key_takeaways").$type<string[]>(),
     worthItScore: decimal("worth_it_score", { precision: 4, scale: 2 }), // 0.00 - 10.00
     worthItReason: text("worth_it_reason"),
-    worthItDimensions: json("worth_it_dimensions").$type<{
-      uniqueness: number;
-      actionability: number;
-      timeValue: number;
-    }>(),
+    worthItDimensions: json("worth_it_dimensions").$type<
+      | { kind: "signals"; signals: WorthItSignals; adjustment: -1 | 0 | 1; adjustmentReason: string }
+      | { kind: "dimensions"; uniqueness: number; actionability: number; timeValue: number }
+    >(),
     processedAt: timestamp("processed_at"),
     summaryRunId: text("summary_run_id"),
     transcriptRunId: text("transcript_run_id"),
@@ -268,6 +268,9 @@ export const notifications = pgTable(
       "notification_type_enum",
       sql`${table.type} IN ('new_episode', 'summary_completed')`
     ),
+    uniqueIndex("notifications_user_episode_unique_idx")
+      .on(table.userId, table.episodeId)
+      .where(sql`episode_id IS NOT NULL AND type = 'new_episode'`),
   ]
 );
 
@@ -301,6 +304,29 @@ export const trendingTopics = pgTable(
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => [index("trending_topics_generated_at_idx").on(table.generatedAt)]
+);
+
+export const episodeTopics = pgTable(
+  "episode_topics",
+  {
+    id: serial("id").primaryKey(),
+    episodeId: integer("episode_id")
+      .references(() => episodes.id, { onDelete: "cascade" })
+      .notNull(),
+    topic: varchar("topic", { length: 100 }).notNull(),
+    relevance: decimal("relevance", { precision: 3, scale: 2 }).notNull(), // 0.00–1.00
+    topicRank: integer("topic_rank"), // 1 = best, NULL = unranked
+    rankedAt: timestamp("ranked_at"), // when ranking was last computed
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("episode_topics_episode_topic_idx").on(table.episodeId, table.topic),
+    index("episode_topics_topic_idx").on(table.topic),
+    index("episode_topics_topic_rank_idx").on(table.topicRank),
+    check("relevance_range", sql`${table.relevance} >= 0 AND ${table.relevance} <= 1`),
+    check("topic_not_blank", sql`length(btrim(${table.topic})) > 0`),
+    check("topic_rank_positive", sql`${table.topicRank} IS NULL OR ${table.topicRank} >= 1`),
+  ]
 );
 
 // Listen History table
@@ -356,6 +382,14 @@ export const episodesRelations = relations(episodes, ({ one, many }) => ({
   libraryEntries: many(userLibrary),
   notifications: many(notifications),
   listenHistory: many(listenHistory),
+  topics: many(episodeTopics),
+}));
+
+export const episodeTopicsRelations = relations(episodeTopics, ({ one }) => ({
+  episode: one(episodes, {
+    fields: [episodeTopics.episodeId],
+    references: [episodes.id],
+  }),
 }));
 
 export const userSubscriptionsRelations = relations(
@@ -479,12 +513,18 @@ export type NewPushSubscription = typeof pushSubscriptions.$inferInsert;
 export type ListenHistoryEntry = typeof listenHistory.$inferSelect;
 export type NewListenHistoryEntry = typeof listenHistory.$inferInsert;
 
+export type EpisodeTopic = typeof episodeTopics.$inferSelect;
+export type NewEpisodeTopic = typeof episodeTopics.$inferInsert;
+
 /** Shape of a single topic cluster in the trending_topics JSON column. */
 export interface TrendingTopic {
   name: string;
   description: string;
   episodeCount: number;
   episodeIds: number[];
+  // Pre-#279 snapshot rows lack a slug key at runtime; consumers should call
+  // `getTopicSlug()` from @/lib/trending rather than accessing this field directly.
+  slug?: string;
 }
 
 export type TrendingTopicsRow = typeof trendingTopics.$inferSelect;

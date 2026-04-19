@@ -3,12 +3,6 @@ name: Claude Code Review
 on:
   pull_request:
     types: [opened, synchronize, ready_for_review, reopened]
-    # Optional: Only run on specific file changes
-    # paths:
-    #   - "src/**/*.ts"
-    #   - "src/**/*.tsx"
-    #   - "src/**/*.js"
-    #   - "src/**/*.jsx"
 
 jobs:
   claude-review:
@@ -23,22 +17,35 @@ jobs:
     permissions:
       contents: read
       pull-requests: write
-      issues: write
+      issues: read
       id-token: write
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        uses: actions/checkout@v6
         with:
-          fetch-depth: 1
+          fetch-depth: 0 # Full history — required for git blame
 
-      - name: Run Claude Code Review
+      - name: Compute review flags
+        id: flags
+        env:
+          PR_ACTION: ${{ github.event.action }}
+        run: |
+          if [[ "$PR_ACTION" == "synchronize" ]]; then
+            echo "review_flags=--single" >> "$GITHUB_OUTPUT"
+          else
+            echo "review_flags=--agent" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run CI Review
         id: claude-review
-        uses: anthropics/claude-code-action@491e5eb471f4008dc0db76dfec54c56ff9f88bba # v1.0.70
+        uses: anthropics/claude-code-action@v1
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-          plugin_marketplaces: 'https://github.com/anthropics/claude-code.git'
-          plugins: 'code-review@claude-code-plugins'
-          prompt: '/code-review:code-review ${{ github.repository }}/pull/${{ github.event.pull_request.number }} --comment'
-          # See https://github.com/anthropics/claude-code-action/blob/main/docs/usage.md
-          # or https://code.claude.com/docs/en/cli-reference for available options
+          plugin_marketplaces: 'https://github.com/rube-de/cc-skills.git'
+          plugins: |
+            ci-review@rube-cc-skills
+          prompt: |
+            /ci-review ${{ github.event.pull_request.number }} ${{ steps.flags.outputs.review_flags }}
+          claude_args: |
+            --allowedTools "Read,Grep,Glob,Agent,Bash(gh auth status:*),Bash(gh pr:*),Bash(gh repo view:*),Bash(gh api repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/reviews:*),Bash(gh api repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/comments:*),Bash(gh api repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/comments:*),Bash(sh *scripts/fetch-pr-comments.sh:*),Bash(git branch:*),Bash(git rev-parse:*),Bash(git blame:*),Bash(jq:*),Bash(echo:*),Bash(cat:*)"

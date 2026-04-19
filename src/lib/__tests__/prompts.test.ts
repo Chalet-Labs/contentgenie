@@ -3,6 +3,8 @@ import {
   SYSTEM_PROMPT,
   getSummarizationPrompt,
   getQuickSummaryPrompt,
+  getTrendingTopicsPrompt,
+  TRENDING_SUMMARY_SNIPPET_CHARS,
 } from "@/lib/prompts";
 
 describe("SYSTEM_PROMPT", () => {
@@ -14,12 +16,12 @@ describe("SYSTEM_PROMPT", () => {
   it("contains key instructions", () => {
     expect(SYSTEM_PROMPT).toContain("critical");
     expect(SYSTEM_PROMPT).toContain("JSON format");
-    expect(SYSTEM_PROMPT).toContain("worth it");
+    expect(SYSTEM_PROMPT).toContain("signal");
   });
 
-  it("contains anti-inflation anchoring", () => {
-    expect(SYSTEM_PROMPT).toContain("5");
-    expect(SYSTEM_PROMPT).toContain("score inflation");
+  it("mentions signal-based evaluation", () => {
+    expect(SYSTEM_PROMPT).toContain("signal");
+    expect(SYSTEM_PROMPT).toContain("inflation");
   });
 });
 
@@ -71,10 +73,10 @@ describe("getSummarizationPrompt", () => {
     );
     expect(prompt).toContain('"summary"');
     expect(prompt).toContain('"keyTakeaways"');
-    expect(prompt).toContain('"worthItScore"');
+    expect(prompt).toContain('"worthItReason"');
   });
 
-  it("includes worthItDimensions in the prompt", () => {
+  it("includes worthItSignals in the prompt", () => {
     const prompt = getSummarizationPrompt(
       "Podcast",
       "Episode",
@@ -82,10 +84,10 @@ describe("getSummarizationPrompt", () => {
       3600,
       "Transcript content here"
     );
-    expect(prompt).toContain('"worthItDimensions"');
-    expect(prompt).toContain('"uniqueness"');
-    expect(prompt).toContain('"actionability"');
-    expect(prompt).toContain('"timeValue"');
+    expect(prompt).toContain('"worthItSignals"');
+    expect(prompt).toContain('"hasActionableInsights"');
+    expect(prompt).toContain('"staysFocused"');
+    expect(prompt).toContain('"worthItAdjustment"');
   });
 
   it("includes structured summary sections", () => {
@@ -103,7 +105,7 @@ describe("getSummarizationPrompt", () => {
     expect(prompt).toContain("Bottom Line");
   });
 
-  it("includes anti-inflation scoring guide", () => {
+  it("includes signal-based scoring instructions", () => {
     const prompt = getSummarizationPrompt(
       "Podcast",
       "Episode",
@@ -111,8 +113,65 @@ describe("getSummarizationPrompt", () => {
       3600,
       "Transcript content here"
     );
-    expect(prompt).toContain("5: Average");
-    expect(prompt).toContain("Justify every point above 5");
+    expect(prompt).toContain("Boolean Quality Signals");
+    expect(prompt).toContain("Adjustment (-1, 0, or +1)");
+  });
+});
+
+describe("getTrendingTopicsPrompt", () => {
+  it("serializes the summary field (not keyTakeaways) in the payload", () => {
+    const prompt = getTrendingTopicsPrompt([
+      { id: 1, title: "AI in Healthcare", summary: "A deep dive into medical LLMs." },
+    ]);
+    expect(prompt).toContain('"summary": "A deep dive into medical LLMs."');
+    expect(prompt).not.toContain("keyTakeaways");
+  });
+
+  it("includes every episode's id and title in the serialized payload", () => {
+    const prompt = getTrendingTopicsPrompt([
+      { id: 42, title: "Ep 42", summary: "s1" },
+      { id: 99, title: "Ep 99", summary: "s2" },
+    ]);
+    expect(prompt).toContain('"id": 42');
+    expect(prompt).toContain('"title": "Ep 42"');
+    expect(prompt).toContain('"id": 99');
+    expect(prompt).toContain('"title": "Ep 99"');
+  });
+
+  it("JSON-escapes markdown summaries with quotes, newlines, and backticks", () => {
+    const summary = `## TL;DR\nUses \`fetch()\` with "retry" logic.\n\n- bullet`;
+    const prompt = getTrendingTopicsPrompt([
+      { id: 1, title: "Ep", summary },
+    ]);
+    // JSON serialization must escape the embedded quotes + preserve content
+    expect(prompt).toContain('\\"retry\\"');
+    expect(prompt).toContain("\\n");
+    // Payload must round-trip back to the original
+    const payloadMatch = prompt.match(/<episodes>\n([\s\S]*?)\n<\/episodes>/);
+    expect(payloadMatch).not.toBeNull();
+    const parsed = JSON.parse(payloadMatch![1]);
+    expect(parsed[0].summary).toBe(summary);
+  });
+
+  it("truncates oversized summaries so the payload fits a reasoning context window", () => {
+    const huge = "x".repeat(TRENDING_SUMMARY_SNIPPET_CHARS * 3);
+    const prompt = getTrendingTopicsPrompt([
+      { id: 1, title: "Ep", summary: huge },
+    ]);
+    const payloadMatch = prompt.match(/<episodes>\n([\s\S]*?)\n<\/episodes>/);
+    expect(payloadMatch).not.toBeNull();
+    const parsed = JSON.parse(payloadMatch![1]);
+    expect(parsed[0].summary.length).toBe(TRENDING_SUMMARY_SNIPPET_CHARS);
+  });
+
+  it("reports the provided episode count in the prompt header", () => {
+    const episodes = Array.from({ length: 7 }, (_, i) => ({
+      id: i + 1,
+      title: `Ep ${i + 1}`,
+      summary: `Summary ${i + 1}`,
+    }));
+    const prompt = getTrendingTopicsPrompt(episodes);
+    expect(prompt).toContain("Analyze these 7 recently summarized podcast episodes");
   });
 });
 

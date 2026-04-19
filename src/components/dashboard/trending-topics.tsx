@@ -1,44 +1,74 @@
-import { TrendingUp } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import Link from "next/link";
+import { TrendingUp, ChevronRight } from "lucide-react";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { formatRelativeTime } from "@/lib/utils";
+import { cn, formatRelativeTime } from "@/lib/utils";
+import { dedupeTopics } from "@/lib/trending";
 import type { TrendingTopic } from "@/db/schema";
-
-function TopicPill({ topic }: { topic: TrendingTopic }) {
-  return (
-    <Badge variant="secondary" className="px-3 py-1 cursor-default max-w-[200px]">
-      <span className="min-w-0 flex-1 truncate text-sm" title={topic.name}>{topic.name}</span>
-      <span className="ml-1.5 text-muted-foreground font-normal shrink-0">({topic.episodeCount})</span>
-    </Badge>
-  );
-}
 
 interface TrendingTopicsProps {
   topics: TrendingTopic[];
   generatedAt: Date;
+  // When true, the snapshot is older than STALE_THRESHOLD_MS; surfaced in the
+  // header instead of hiding the card, so a missed cron doesn't look identical
+  // to a deliberately disabled feature.
+  isStale?: boolean;
 }
 
-export function TrendingTopics({ topics, generatedAt }: TrendingTopicsProps) {
+export function TrendingTopics({ topics, generatedAt, isStale = false }: TrendingTopicsProps) {
   const updatedAgo = formatRelativeTime(generatedAt);
+  const deduped = dedupeTopics(topics);
 
   return (
     <Card>
       <CardHeader>
-        <div className="flex items-center gap-2">
-          <TrendingUp className="h-5 w-5 text-muted-foreground" />
-          <CardTitle className="text-lg font-semibold">Trending Topics</CardTitle>
-        </div>
-        <p className="text-sm text-muted-foreground">
+        <CardTitle className="flex items-center gap-2 text-base">
+          <TrendingUp className="h-4 w-4" />
+          Trending Topics
+        </CardTitle>
+        <CardDescription
+          className={cn(isStale && "text-amber-600 dark:text-amber-500")}
+        >
           Past 7 days · Updated {updatedAgo}
-        </p>
+          {isStale && " · Out of date"}
+        </CardDescription>
       </CardHeader>
-      <CardContent>
-        <div className="flex flex-wrap gap-2">
-          {topics.map((topic, index) => (
-            <TopicPill key={index} topic={topic} />
-          ))}
-        </div>
+      <CardContent className="space-y-1">
+        {deduped.length === 0 ? (
+          <p className="px-3 py-6 text-center text-sm text-muted-foreground">
+            No trending topics yet — check back soon.
+          </p>
+        ) : (
+          deduped.map(({ topic, slug }) => {
+            const count = topic.episodeCount;
+            return (
+              <Link
+                key={slug}
+                href={`/trending/${slug}`}
+                className="flex items-start gap-3 rounded-md p-3 transition-colors hover:bg-accent"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="break-words font-semibold">{topic.name}</p>
+                  {topic.description && (
+                    <p className="line-clamp-2 break-words text-sm text-muted-foreground">
+                      {topic.description}
+                    </p>
+                  )}
+                </div>
+                <div className="flex shrink-0 items-center gap-1 text-sm text-muted-foreground">
+                  <span>{count} {count === 1 ? "episode" : "episodes"}</span>
+                  <ChevronRight className="h-4 w-4" />
+                </div>
+              </Link>
+            );
+          })
+        )}
       </CardContent>
     </Card>
   );
@@ -48,15 +78,24 @@ export function TrendingTopicsLoading() {
   return (
     <Card>
       <CardHeader>
-        <Skeleton className="h-5 w-48" />
-        <Skeleton className="h-3 w-32 mt-1" />
+        <Skeleton className="h-5 w-40" />
+        <Skeleton className="h-3 w-56" />
       </CardHeader>
-      <CardContent>
-        <div className="flex flex-wrap gap-2">
-          {[1, 2, 3, 4, 5, 6].map((i) => (
-            <Skeleton key={i} className="h-7 w-24 rounded-full" />
-          ))}
-        </div>
+      <CardContent className="space-y-1">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <div
+            key={i}
+            data-testid="trending-loading-row"
+            className="flex items-start gap-3 p-3"
+          >
+            <div className="min-w-0 flex-1">
+              <Skeleton className="h-6 w-3/4" />
+              <Skeleton className="mt-1.5 h-4 w-full" />
+              <Skeleton className="mt-1 h-4 w-5/6" />
+            </div>
+            <Skeleton className="h-5 w-20 shrink-0" />
+          </div>
+        ))}
       </CardContent>
     </Card>
   );

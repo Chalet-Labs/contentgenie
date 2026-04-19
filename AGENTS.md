@@ -4,14 +4,14 @@ Podcast discovery, AI-powered summarization, and library management for busy pro
 
 ## Workflow
 
-- Before planning any work, always update local `main` by checking it out first (`git checkout main && git pull origin main` or equivalent).
+- Before planning any work, always sync with `main` (`git fetch origin main && git rebase origin/main`). This works in worktrees and on feature branches with in-progress work.
 - Before editing any code, always create a new branch from an up-to-date `main`.
-- Single remote: `origin` = `Chalet-Labs/contentgenie`.
-- Push feature branches to `origin` and open PRs against `main` in `Chalet-Labs/contentgenie`.
+- Push feature branches to `origin` and open PRs against `main`.
 
 ## Dev environment tips
 
 - Run `doppler setup` once after cloning to configure secrets injection. After that, `bun run dev` just works (scripts already wrap `doppler run --`).
+- Run `bun install` to install dependencies during first-time setup.
 - Use `doppler run -- <command>` if you need to run a one-off command that needs env vars outside of the bun scripts.
 - The `@/*` path alias maps to `./src/*` — use it for all imports.
 - shadcn/ui components live in `src/components/ui/`. Add new ones with `bunx shadcn@latest add <component>`.
@@ -19,15 +19,36 @@ Podcast discovery, AI-powered summarization, and library management for busy pro
 - Server actions use `"use server"` and live in `src/app/actions/`. They handle all data mutations.
 - API routes in `src/app/api/` are for proxying external services and orchestrating Trigger.dev background tasks.
 
+## Architecture map
+
+| Path | Purpose |
+|------|---------|
+| `src/app/` | Next.js App Router pages, route groups `(app)` and `(auth)` |
+| `src/app/actions/` | Server actions — all mutations (`"use server"`) |
+| `src/app/api/` | Route handlers for external API proxying & Trigger.dev orchestration |
+| `src/components/` | Shared React components (feature + UI) |
+| `src/components/ui/` | shadcn/ui primitives (do not edit by hand) |
+| `src/lib/` | Shared domain logic |
+| `src/db/` | Drizzle schema and client — the database schema is defined in `@/db/schema.ts`. Reference it anytime you need to understand the structure of data stored in the database. |
+| `src/trigger/` | Trigger.dev task definitions (background jobs) |
+| `src/hooks/`, `src/contexts/` | Client-side React hooks and context providers |
+| `src/types/` | Shared TypeScript types and type helpers |
+| `src/test/` | Test setup (`src/test/setup.ts`) and global fixtures |
+| `src/middleware.ts` | Next.js middleware (request-time auth/session) |
+| `docs/adr/` | 30+ ADRs — grep by topic before modifying related code |
+
+Coverage: Vitest enforces an 80% line-coverage threshold globally across `src/app/api/`, `src/app/actions/`, `src/components/` (excluding `ui/`), `src/lib/`, and `src/trigger/`. See `vitest.config.ts` for the exact include/exclude lists.
+
 ## Development commands
 
 ```bash
 bun run dev            # Start dev server (port 3000, Turbopack)
 bun run build          # Production build
+bun run start          # Serve the production build locally (run `bun run build` first)
 bun run lint           # ESLint (next lint)
 bun run test           # Run Vitest unit tests
 bun run test:watch     # Run tests in watch mode
-bun run test:coverage  # Run tests with coverage (80% threshold on src/lib/)
+bun run test:coverage  # Run tests with coverage (80% line threshold, see vitest.config.ts)
 bun run storybook      # Launch Storybook dev server (port 6006)
 bun run build-storybook # Build static Storybook
 bun run db:generate    # Generate Drizzle migrations
@@ -40,11 +61,15 @@ bun run trigger:deploy # Deploy tasks to Trigger.dev Cloud
 ## Testing instructions
 
 - **Test framework:** Vitest with React Testing Library. Config: `vitest.config.ts`, setup: `src/test/setup.ts`.
-- **Component stories:** Storybook 8 (`@storybook/react-vite`). Config: `.storybook/main.ts`.
+- **Component stories:** Storybook 10 (`@storybook/nextjs-vite`). Config: `.storybook/main.ts`.
 - Always run `bun run lint`, `bun run test`, and `bun run build` before committing.
 - Unit tests live in `__tests__/` directories co-located with source. Stories live alongside components as `*.stories.tsx` files.
 - The pre-commit hook (Husky) automatically runs lint and tests on commit.
 - ADRs live in `docs/adr/` — read the relevant ADR before modifying areas it covers.
+- **UI verification (agents):** Vitest/RTL runs in jsdom and can't catch real rendering, layout, or interaction bugs. For any UI work, **invoke the `agent-browser` skill** to test the web app in a real browser:
+  - **App flows / pages:** start `bun run dev` (port 3000), then use `agent-browser` to navigate to `http://localhost:3000`, click through the flow, fill forms, and take screenshots.
+  - **Isolated components:** start `bun run storybook` (port 6006), then use `agent-browser` to open `http://localhost:6006`, navigate to the relevant story, and screenshot it.
+  - Exercise the golden path **and** edge cases; attach screenshots when reporting status. If you can't run a browser check, say so explicitly — don't claim UI success from type-checks alone.
 
 ## PR and commit instructions
 
@@ -53,6 +78,10 @@ bun run trigger:deploy # Deploy tasks to Trigger.dev Cloud
 - PR title: same format as commits, under 70 characters. PR body: `## Summary` bullets + `## Test plan` checklist.
 - Always run lint and build before pushing. The CI must pass.
 - Update `CHANGELOG.md` under the `[Unreleased]` section when adding features, fixing bugs, or making breaking changes. Use the appropriate subsection: `Added`, `Changed`, `Fixed`, or `Removed`.
+
+## Design
+
+See [.impeccable.md](.impeccable.md) for design context: users, brand personality, aesthetic direction, design principles, and accessibility targets.
 
 ## Code style
 

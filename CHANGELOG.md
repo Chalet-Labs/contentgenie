@@ -6,7 +6,31 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+- `BatchSummarizeButton` on the podcast detail page now slices the passed-in episode list to the API's 20-episode batch limit before calling `/api/episodes/batch-summarize`, preventing 400 "Maximum 20 episodes per batch" errors when the page loads up to 200 episodes (#291).
+- Dashboard Trending Topics card no longer disappears silently when the daily snapshot cron misses a run or returns zero topics. Stale snapshots (>48h) now render with an amber "Out of date" indicator, and empty snapshots render a "No trending topics yet — check back tomorrow" empty state. The section is only hidden when no snapshot has ever been generated.
+- Trending topics trigger task now persists an empty snapshot when the LLM provider itself throws, so a failed cron run updates `generatedAt` and lets the dashboard empty-state surface the problem instead of keeping a week-old row.
+- `ZaiProvider` now includes `finish_reason`, `completion_tokens`, `reasoning_tokens`, and a `reasoning_content` snippet in the "Invalid response format" error. Reasoning-capable Z.AI models (GLM-4.6 / GLM-5.x) burn tokens on chain-of-thought before emitting `content`; without these diagnostics, max-token exhaustion looked identical to an API-shape regression.
+
+### Changed
+- Trending topics trigger task: `MAX_EPISODES` lowered from 500 to 200, input field switched from `keyTakeaways` to `summary` for richer clustering context, and the LLM call now passes `maxTokens: 16000` so reasoning models (e.g. GLM-5.1) have headroom after chain-of-thought.
+
+### Changed
+- Podcast detail page now loads up to 200 episodes (raised from 20 for PodcastIndex-sourced and 50 for RSS-sourced) and supports client-side title search within the loaded window (#291)
+- Dashboard Trending Topics card redesigned as a vertical list with topic name, AI description (2-line clamp), episode count, and per-row link to `/trending/<slug>` (#281)
+
 ### Added
+- Trending topic detail page at /trending/<slug> with horizontal topic switcher and ranked episode list sorted by worth-it score (#280)
+- Personal topic overlap indicators — shows contextual labels (e.g. "You've heard 3 similar episodes", "New topic for you") based on listen history and saved episodes. Recommendations deprioritize heavily-consumed topics (#262)
+- `rank-episode-topics` daily Trigger.dev scheduled task (7 AM UTC) that ranks episodes within each topic via exhaustive pairwise LLM comparison; win-count aggregation with worthItScore tiebreaker; adaptive episode cap (10/topic for ≤20 topics, 5/topic for >20); up to 50 topics per run (#261)
+- `topicRank` (integer, nullable) and `rankedAt` (timestamp, nullable) columns on `episode_topics` — rank 1 = best coverage of that topic (#261)
+- `bestTopicRank` and `topRankedTopic` fields on `RecommendedEpisodeDTO` and `getRecommendedEpisodes()` response (#261)
+- Extract 1–5 topic tags per episode during summarization; stored in new `episode_topics` junction table with relevance scores (0–1) and a cross-episode index for efficient topic queries (#259)
+- Semantic CSS color tokens for score (`--score-exceptional` → `--score-skip`) and status indicators (`--status-success-*`, `--status-warning-*`, etc.) with light/dark mode variants and accessible foreground colors (#256)
+- Blue-indigo brand accent color replacing stock shadcn neutral defaults (#256)
+- Active nav link highlighting in desktop header (#256)
+- Global `prefers-reduced-motion: reduce` rule disabling animations/transitions for accessibility (#256)
+- Mobile Sheet-based collection navigation for library sidebar (#256)
 - ShareButton dropdown menu with native Share, Copy link, and Copy with summary options (#252)
 - Optional `summary` prop on ShareButton for richer share text (passes `worthItReason` on episodes)
 - shadcn Form component with react-hook-form + Zod validation (#234)
@@ -20,6 +44,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Admin link in sidebar (visible to `org:admin` users only)
 
 ### Changed
+- Notifications: one row per episode per subscriber. The poller creates the notification on discovery ("New episode: …"); the summarizer updates it in place when the summary lands ("Summary ready: …", unread resets). Push uses a shared `tag=episode-${episodeId}` so devices replace rather than stack. Admin-triggered re-summarization no longer produces duplicate notification rows. (#289)
+- Unified in-app navigation — `Sidebar` is now the single source of truth for authenticated nav (desktop aside + mobile sheet); `Header` split into `AppHeader` (utility bar: logo, theme toggle, notifications, user menu, mobile hamburger) and `LandingHeader` (marketing: logo, theme, auth CTAs). Admin link is now reachable from mobile. Desktop aside breakpoint widened from `lg:` to `md:`. (#286)
+- Trending topic snapshots now include a stable `slug` per topic, used as the URL identifier for topic detail pages.
+- Replace 3-dimension numeric worth-it scoring with boolean signal hybrid (8 yes/no quality signals + ±1 adjustment) for more stable, interpretable episode scores (#260)
+- Score and status badge components migrated from hardcoded Tailwind colors to semantic design tokens (#256)
+- Empty state icons standardized to consistent `rounded-full bg-muted p-3` container pattern across 7 components (#256)
+- `InstallBanner` uses semantic `bg-card`/`text-card-foreground` tokens instead of hardcoded zinc colors (#256)
+- Library sidebar hidden on mobile with Sheet-based collection fallback (#256)
+- `NotificationSettings` loading state uses `Skeleton` component instead of raw `animate-pulse` (#256)
+- Collection page back navigation unified to Link + ArrowLeft + text pattern (#256)
 - Share text across episode, podcast, and collection pages uses actual titles instead of generic "Check out..." text (#252)
 - Migrated URL search param management to nuqs for type-safe state in discover search and admin episode filters; admin filter arrays now use comma-separated format (`?transcriptStatus=available,failed`) instead of repeated keys (ADR-030, #247)
 - Admin status badge shows "unprocessed" instead of "none" for NULL `transcript_status` / `summary_status`, aligning with ADR-026 terminology (#239)
@@ -39,6 +73,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Summarization step progress UI removes `"fetching-transcript"` and `"transcribing-audio"` steps — summarization no longer fetches transcripts
 
 ### Fixed
+- Upgrade Storybook 8.6.15 → 10.3.5 and swap framework from `@storybook/react-vite` to `@storybook/nextjs-vite` so stories that import `next/link`, `next/image`, or `next/navigation` render without `process is not defined` / `React is not defined` runtime errors (#298)
+- Close mobile library sidebar sheet when tapping a collection or "All Saved" link, matching the site header fix from #283 (#284)
+- Restore episode topic persistence on production by adding the missing `topic_rank`/`ranked_at` migration; PR #266 added the columns to the schema but never generated a migration, so production INSERTs into `episode_topics` failed (#275)
+- Mobile nav touch targets increased from `py-2` to `py-3` for WCAG 2.1 AA 44px minimum (#256)
+- Score badge contrast on yellow/orange backgrounds — foreground color now adapts per tier instead of hardcoded white (#256)
 - Episode poller now triggers fetch-transcript before summarize-episode, fixing broken pipeline where newly discovered episodes always failed summarization due to missing transcript (#253)
 - Admin transcript buttons showing incorrect state (all disabled) for episodes with NULL `transcript_status` — NULL is now normalized to `"missing"` at the component boundary, enabling Fetch Transcript and Fetch & Summarize (#239)
 - Episode detail page transcript fetch button hidden for NULL-status episodes — NULL no longer short-circuits the early return in `EpisodeTranscriptFetchButton` (#239)

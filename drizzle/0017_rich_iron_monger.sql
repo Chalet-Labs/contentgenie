@@ -1,0 +1,2 @@
+ALTER TABLE "episode_topics" ALTER COLUMN "topic" SET DATA TYPE varchar(100);--> statement-breakpoint
+ALTER TABLE "episode_topics" ADD CONSTRAINT "topic_not_blank" CHECK (length(btrim("episode_topics"."topic")) > 0);
