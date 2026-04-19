@@ -5,16 +5,11 @@ import {
   clearPlayerSession,
 } from "@/lib/player-session"
 import type { AudioEpisode } from "@/contexts/audio-player-context"
-import { createLocalStorageMock } from "@/test/mocks/local-storage"
-
-const validEpisode: AudioEpisode = {
-  id: "ep-1",
-  title: "Test Episode",
-  podcastTitle: "Test Podcast",
-  audioUrl: "https://example.com/audio.mp3",
-  artwork: "https://example.com/art.jpg",
-  duration: 600,
-}
+import {
+  createLocalStorageMock,
+  installLocalStorageMock,
+} from "@/test/mocks/local-storage"
+import { validEpisode } from "@/test/fixtures/audio-episode"
 
 const STORAGE_KEY = "contentgenie-player-session"
 
@@ -35,11 +30,7 @@ function storeSession(
 
 describe("loadPlayerSession", () => {
   beforeEach(() => {
-    Object.defineProperty(window, "localStorage", {
-      value: createLocalStorageMock(),
-      writable: true,
-      configurable: true,
-    })
+    installLocalStorageMock()
   })
 
   it("returns null when nothing stored", () => {
@@ -283,11 +274,7 @@ describe("loadPlayerSession", () => {
 
 describe("savePlayerSession", () => {
   beforeEach(() => {
-    Object.defineProperty(window, "localStorage", {
-      value: createLocalStorageMock(),
-      writable: true,
-      configurable: true,
-    })
+    installLocalStorageMock()
   })
 
   it("saves session to localStorage with correct key", () => {
@@ -335,11 +322,7 @@ describe("savePlayerSession", () => {
 
 describe("clearPlayerSession", () => {
   beforeEach(() => {
-    Object.defineProperty(window, "localStorage", {
-      value: createLocalStorageMock(),
-      writable: true,
-      configurable: true,
-    })
+    installLocalStorageMock()
   })
 
   it("removes session from localStorage", () => {

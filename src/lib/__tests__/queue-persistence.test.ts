@@ -1,31 +1,15 @@
 import { describe, it, expect, beforeEach } from "vitest"
 import { loadQueue, saveQueue } from "@/lib/queue-persistence"
 import type { AudioEpisode } from "@/contexts/audio-player-context"
-import { createLocalStorageMock } from "@/test/mocks/local-storage"
-
-const validEpisode: AudioEpisode = {
-  id: "ep-1",
-  title: "Test Episode",
-  podcastTitle: "Test Podcast",
-  audioUrl: "https://example.com/audio.mp3",
-  artwork: "https://example.com/art.jpg",
-  duration: 600,
-}
-
-const validEpisode2: AudioEpisode = {
-  id: "ep-2",
-  title: "Second Episode",
-  podcastTitle: "Another Podcast",
-  audioUrl: "https://example.com/audio2.mp3",
-}
+import {
+  createLocalStorageMock,
+  installLocalStorageMock,
+} from "@/test/mocks/local-storage"
+import { validEpisode, validEpisode2 } from "@/test/fixtures/audio-episode"
 
 describe("loadQueue", () => {
   beforeEach(() => {
-    Object.defineProperty(window, "localStorage", {
-      value: createLocalStorageMock(),
-      writable: true,
-      configurable: true,
-    })
+    installLocalStorageMock()
   })
 
   it("returns empty array when nothing stored", () => {
@@ -157,11 +141,7 @@ describe("loadQueue", () => {
 
 describe("saveQueue", () => {
   beforeEach(() => {
-    Object.defineProperty(window, "localStorage", {
-      value: createLocalStorageMock(),
-      writable: true,
-      configurable: true,
-    })
+    installLocalStorageMock()
   })
 
   it("saves queue to localStorage", () => {

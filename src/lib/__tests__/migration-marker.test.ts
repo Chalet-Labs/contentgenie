@@ -8,15 +8,11 @@ import {
   markSessionMigrated,
   setLastUserId,
 } from "@/lib/migration-marker"
-import { createLocalStorageMock } from "@/test/mocks/local-storage"
+import { installLocalStorageMock } from "@/test/mocks/local-storage"
 
 describe("migration-marker", () => {
   beforeEach(() => {
-    Object.defineProperty(window, "localStorage", {
-      value: createLocalStorageMock(),
-      writable: true,
-      configurable: true,
-    })
+    installLocalStorageMock()
   })
 
   it("hasQueueMigrated returns false before markQueueMigrated", () => {

@@ -25,3 +25,18 @@ export function createLocalStorageMock(): Storage {
     key: (index: number) => Object.keys(store)[index] ?? null,
   }
 }
+
+/**
+ * Install a fresh in-memory localStorage mock on `window`. Returns the mock
+ * so callers can further customize it (e.g. make `setItem` throw for a quota
+ * test). Use in `beforeEach` to guarantee an isolated storage per case.
+ */
+export function installLocalStorageMock(): Storage {
+  const mock = createLocalStorageMock()
+  Object.defineProperty(window, "localStorage", {
+    value: mock,
+    writable: true,
+    configurable: true,
+  })
+  return mock
+}
