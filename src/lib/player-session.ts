@@ -10,6 +10,7 @@
 import { z } from "zod"
 import {
   audioEpisodeSchema,
+  MAX_TIME_SECONDS,
   type AudioEpisode,
 } from "@/lib/schemas/listening-queue"
 
@@ -18,7 +19,9 @@ const STORAGE_KEY = "contentgenie-player-session"
 const storedSessionSchema = z
   .object({
     episode: audioEpisodeSchema,
-    currentTime: z.number().nonnegative().finite(),
+    // Cap matches `savePlayerSessionSchema` so a tampered localStorage value
+    // can't hydrate locally and then fail the next server sync.
+    currentTime: z.number().nonnegative().finite().max(MAX_TIME_SECONDS),
     savedAt: z.number().nonnegative().finite().optional(),
   })
   .strip()

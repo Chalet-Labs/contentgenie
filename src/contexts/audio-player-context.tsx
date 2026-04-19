@@ -390,8 +390,17 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
     isSessionRestored.current = true
   }, [])
 
-  // ---- Server-sync on mount: parallel getQueue + getPlayerSession, reconcile, migrate ----
+  // ---- Server-sync: parallel getQueue + getPlayerSession, reconcile, migrate ----
+  // Runs whenever Clerk finishes loading OR `userId` changes. Without the
+  // `isAuthLoaded && userId` gate on the deps, a first-render pre-hydration
+  // pass would call the server actions, get Unauthorized, and never retry
+  // (the effect had `[]` deps), leaving cross-device state unsynced and
+  // — worse — letting an empty server response wipe a non-empty local queue.
   useEffect(() => {
+    if (!isAuthLoaded || !userId) return
+    // Bind the narrowed userId for the nested async closure — TypeScript
+    // doesn't propagate the guard across the function boundary.
+    const activeUserId = userId
     let cancelled = false
 
     async function syncOnMount() {
@@ -399,19 +408,17 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       // browser, wipe the prior user's localStorage BEFORE reconciling against
       // the server — otherwise User A's cached queue/session would leak into
       // User B's account on the first write.
-      if (isAuthLoaded && userId) {
-        const lastUserId = getLastUserId()
-        if (lastUserId && lastUserId !== userId) {
-          clearAllUserLocalData()
-          suppressQueueWriteRef.current = true
-          dispatch({ type: "INIT_QUEUE", queue: [] })
-          lastAckedQueueRef.current = []
-          // Reset player state (no clearSession flag — the server session
-          // belongs to the new user, we don't want to delete it).
-          teardownPlayer()
-        }
-        setLastUserId(userId)
+      const lastUserId = getLastUserId()
+      if (lastUserId && lastUserId !== activeUserId) {
+        clearAllUserLocalData()
+        suppressQueueWriteRef.current = true
+        dispatch({ type: "INIT_QUEUE", queue: [] })
+        lastAckedQueueRef.current = []
+        // Reset player state (no clearSession flag — the server session
+        // belongs to the new user, we don't want to delete it).
+        teardownPlayer()
       }
+      setLastUserId(activeUserId)
 
       let queueResult: Awaited<ReturnType<typeof getQueue>>
       let sessionResult: Awaited<ReturnType<typeof getPlayerSession>>
@@ -430,9 +437,9 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       // Reconcile queue — gated by per-user migration marker so a queue
       // cleared on another device isn't resurrected by this browser's cache.
       const localQueue = loadQueue()
-      if (queueResult.success && userId) {
+      if (queueResult.success) {
         const serverQueue = queueResult.data
-        const hasMigrated = hasQueueMigrated(userId)
+        const hasMigrated = hasQueueMigrated(activeUserId)
         if (serverQueue.length === 0) {
           if (localQueue.length > 0 && !hasMigrated) {
             // One-time upload of pre-sync local queue
@@ -441,7 +448,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
               const result = await setQueueAction(localQueue)
               if (result.success) {
                 lastAckedQueueRef.current = localQueue
-                markQueueMigrated(userId)
+                markQueueMigrated(activeUserId)
               } else {
                 console.error("Queue migration failed:", result.error)
                 toast.error("Couldn't sync your queue", {
@@ -466,16 +473,16 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
             saveQueue([])
           } else {
             lastAckedQueueRef.current = []
-            if (!hasMigrated) markQueueMigrated(userId)
+            if (!hasMigrated) markQueueMigrated(activeUserId)
           }
         } else if (serverQueue.length > 0) {
           if (!pendingQueueWriteRef.current) {
             lastAckedQueueRef.current = serverQueue
             dispatch({ type: "INIT_QUEUE", queue: serverQueue })
-            if (!hasMigrated) markQueueMigrated(userId)
+            if (!hasMigrated) markQueueMigrated(activeUserId)
           }
         }
-      } else if (!queueResult.success) {
+      } else {
         console.warn("Mount getQueue failed:", queueResult.error)
       }
 
@@ -487,12 +494,12 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       if (sessionResult.success) {
         if (sessionResult.data) {
           reconcileServerSession(sessionResult.data)
-          if (userId && !hasSessionMigrated(userId)) markSessionMigrated(userId)
-        } else if (userId) {
+          if (!hasSessionMigrated(activeUserId)) markSessionMigrated(activeUserId)
+        } else {
           const localEp = stateRef.current.currentEpisode
           const audio = audioRef.current
           const hasLocal = localEp !== null
-          const migrated = hasSessionMigrated(userId)
+          const migrated = hasSessionMigrated(activeUserId)
           if (hasLocal && !migrated) {
             // One-time upload of pre-sync local session
             const t = audio?.currentTime ?? 0
@@ -504,12 +511,12 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
               .catch((err) =>
                 console.warn("[player] session migration threw", err)
               )
-            markSessionMigrated(userId)
+            markSessionMigrated(activeUserId)
           } else if (hasLocal && migrated) {
             // Server authoritative empty — close the locally restored player.
             teardownPlayer({ clearSession: true })
           } else if (!hasLocal && !migrated) {
-            markSessionMigrated(userId)
+            markSessionMigrated(activeUserId)
           }
         }
       } else {
@@ -519,11 +526,12 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
 
     void syncOnMount()
     return () => { cancelled = true }
-  // Runs once on mount. `reconcileServerSession`, `loadEpisodeIntoPlayer`, and
-  // the imported server actions are referenced via closure; re-running on
-  // their identity churn would re-trigger cross-device fetch every render.
+  // Only `isAuthLoaded`/`userId` gate the effect. `reconcileServerSession`,
+  // `loadEpisodeIntoPlayer`, and the provider-scope helpers are closed over
+  // and change identity every render; re-running on those would re-trigger
+  // the cross-device fetch continuously.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [isAuthLoaded, userId])
 
   // ---- Focus/visibilitychange refetch: reconcile server state (200ms debounce) ----
   useEffect(() => {

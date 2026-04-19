@@ -7,22 +7,24 @@
  * `window.localStorage` with a fresh instance of this mock per test.
  */
 export function createLocalStorageMock(): Storage {
-  const store: Record<string, string> = {}
+  // Map (not plain object) so inherited prototype keys like `toString` can't
+  // be returned from getItem/length/key, and `__proto__` stays immutable.
+  const store = new Map<string, string>()
   return {
-    getItem: (key: string) => store[key] ?? null,
+    getItem: (key: string) => store.get(key) ?? null,
     setItem: (key: string, value: string) => {
-      store[key] = value
+      store.set(key, value)
     },
     removeItem: (key: string) => {
-      delete store[key]
+      store.delete(key)
     },
     clear: () => {
-      for (const key of Object.keys(store)) delete store[key]
+      store.clear()
     },
     get length() {
-      return Object.keys(store).length
+      return store.size
     },
-    key: (index: number) => Object.keys(store)[index] ?? null,
+    key: (index: number) => Array.from(store.keys())[index] ?? null,
   }
 }
 
@@ -49,7 +51,9 @@ export function installLocalStorageMock(): Storage {
 export function installQuotaExceededLocalStorage(): Storage {
   const mock = createLocalStorageMock()
   mock.setItem = () => {
-    throw new DOMException("QuotaExceededError")
+    // Pass the error name as the second argument so `error.name ===
+    // "QuotaExceededError"` checks in production code match.
+    throw new DOMException("Quota exceeded", "QuotaExceededError")
   }
   Object.defineProperty(window, "localStorage", {
     value: mock,

@@ -92,6 +92,11 @@ describe("getPlayerSession", () => {
     const { getPlayerSession } = await importAction()
     const result = await getPlayerSession()
     expect(result).toEqual({ success: true, data: null })
+    // Scope regression guard: findFirst must filter by the signed-in userId.
+    // `eq` is mocked to return `{ col, val }` so we can assert the predicate.
+    expect(mockFindFirst).toHaveBeenCalledWith({
+      where: { col: "userId", val: "user_123" },
+    })
   })
 
   it("does not call ensureUserExists (read-only path)", async () => {
@@ -235,6 +240,11 @@ describe("clearPlayerSession", () => {
     expect(result).toEqual({ success: true })
     expect(mockDelete).toHaveBeenCalledTimes(1)
     expect(mockDeleteWhere).toHaveBeenCalledTimes(1)
+    // Scope regression guard: the DELETE must filter by the signed-in userId.
+    expect(mockDeleteWhere).toHaveBeenCalledWith({
+      col: "userId",
+      val: "user_123",
+    })
   })
 
   it("does not call ensureUserExists (DELETE is no-op on nonexistent user)", async () => {
