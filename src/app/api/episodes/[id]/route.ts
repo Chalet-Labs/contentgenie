@@ -18,6 +18,15 @@ function isRssSourced(id: string): boolean {
 }
 
 function getClientIp(request: NextRequest): string {
+  // This route assumes Vercel-managed ingress. Vercel documents that it
+  // overwrites X-Forwarded-For with the client public IP unless Trusted Proxy
+  // is explicitly enabled, and exposes the same value via x-vercel-forwarded-for.
+  const vercelForwardedFor = request.headers.get("x-vercel-forwarded-for");
+  if (vercelForwardedFor) {
+    const firstIp = vercelForwardedFor.split(",")[0]?.trim();
+    if (firstIp) return firstIp;
+  }
+
   const forwardedFor = request.headers.get("x-forwarded-for");
   if (forwardedFor) {
     const firstIp = forwardedFor.split(",")[0]?.trim();

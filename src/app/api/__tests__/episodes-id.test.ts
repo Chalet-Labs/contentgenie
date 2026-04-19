@@ -229,6 +229,36 @@ describe("GET /api/episodes/[id]", () => {
     expect(data.retryAfterMs).toBe(120000);
   });
 
+  it("uses the Vercel-forwarded client IP for anonymous rate limiting when present", async () => {
+    vi.mocked(auth).mockResolvedValue({ userId: null } as never);
+
+    const mockEpisode = { id: 123, title: "Ep", feedId: 456 };
+    const mockPodcast = { id: 456, title: "Pod" };
+    vi.mocked(getEpisodeById).mockResolvedValue({
+      status: "true",
+      episode: mockEpisode as never,
+      description: "",
+    });
+    vi.mocked(getPodcastById).mockResolvedValue({
+      status: "true",
+      feed: mockPodcast as never,
+      description: "",
+    });
+    vi.mocked(db.query.episodes.findFirst).mockResolvedValue(undefined as never);
+
+    const request = new NextRequest("http://localhost:3000/api/episodes/123", {
+      headers: {
+        "x-forwarded-for": "203.0.113.9",
+        "x-real-ip": "203.0.113.10",
+        "x-vercel-forwarded-for": "198.51.100.24",
+      },
+    });
+    const response = await GET(request, { params: { id: "123" } });
+
+    expect(response.status).toBe(200);
+    expect(mockPublicEpisodeRateLimit).toHaveBeenCalledWith("198.51.100.24");
+  });
+
   it("returns 404 when episode not found", async () => {
     vi.mocked(auth).mockResolvedValue({ userId: "user-1" } as never);
 
