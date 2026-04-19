@@ -22,6 +22,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 - Cross-device sync for the listening queue and currently-playing episode. Queue and resume-position now round-trip through the server and reconcile on app mount or window focus. Concurrent mutations use last-commit-wins; active playback is never rewound by a server refetch. (#282)
+- Public episode share pages for anonymous viewers at `/episode/[id]`, with a signed-out shell, read-only episode details, share/external links, existing summaries, and sign-up redirects for save/queue/library actions (#293)
 - Trending topic detail page at /trending/<slug> with horizontal topic switcher and ranked episode list sorted by worth-it score (#280)
 - Personal topic overlap indicators — shows contextual labels (e.g. "You've heard 3 similar episodes", "New topic for you") based on listen history and saved episodes. Recommendations deprioritize heavily-consumed topics (#262)
 - `rank-episode-topics` daily Trigger.dev scheduled task (7 AM UTC) that ranks episodes within each topic via exhaustive pairwise LLM comparison; win-count aggregation with worthItScore tiebreaker; adaptive episode cap (10/topic for ≤20 topics, 5/topic for >20); up to 50 topics per run (#261)

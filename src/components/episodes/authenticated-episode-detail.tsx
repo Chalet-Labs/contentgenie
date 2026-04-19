@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { toast } from "sonner";
-import { useAuth } from "@clerk/nextjs";
 import { useRealtimeRun } from "@trigger.dev/react-hooks";
 import {
   ArrowLeft,
@@ -47,84 +46,32 @@ import { useOnlineStatus } from "@/hooks/use-online-status";
 import { OfflineBanner } from "@/components/ui/offline-banner";
 import { cacheEpisode, getCachedEpisode } from "@/lib/offline-cache";
 import { IN_PROGRESS_STATUSES, type TranscriptStatus } from "@/db/schema";
-import { ADMIN_ROLE } from "@/lib/auth-roles";
-import type { WorthItDimensionsData } from "@/lib/openrouter";
 import type { summarizeEpisode } from "@/trigger/summarize-episode";
+import type {
+  EpisodeData,
+  PodcastData,
+  SummaryData,
+} from "@/components/episodes/episode-detail-shared";
+import {
+  formatDuration,
+  formatPublishDate,
+  formatTranscriptSource,
+  getEpisodeArtworkUrl,
+  getSafeEpisodeLink,
+  supportsEpisodeProcessing,
+} from "@/components/episodes/episode-detail-shared";
 
-interface EpisodePageProps {
-  params: {
-    id: string;
-  };
+interface AuthenticatedEpisodeDetailProps {
+  episodeId: string;
+  userId: string;
+  isAdmin: boolean;
 }
 
-interface EpisodeData {
-  id: number;
-  title: string;
-  description: string;
-  datePublished: number;
-  duration: number;
-  enclosureUrl: string;
-  episode: number | null;
-  episodeType: string;
-  season: number;
-  feedId: number;
-  feedImage: string;
-  image: string;
-  link: string;
-  chaptersUrl?: string | null;
-}
-
-interface PodcastData {
-  id: number;
-  title: string;
-  author: string;
-  ownerName: string;
-  image: string;
-  artwork: string;
-  categories: Record<string, string>;
-}
-
-interface SummaryData {
-  summary: string;
-  keyTakeaways: string[];
-  worthItScore: number | null;
-  worthItReason?: string;
-  worthItDimensions?: WorthItDimensionsData | null;
-  cached: boolean;
-}
-
-function formatDuration(seconds: number): string {
-  if (!seconds || seconds <= 0) return "Unknown";
-  const hours = Math.floor(seconds / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  if (hours > 0) {
-    return `${hours}h ${minutes}m`;
-  }
-  return `${minutes}m`;
-}
-
-function formatTranscriptSource(source: string | null): string {
-  switch (source) {
-    case "podcastindex": return "PodcastIndex";
-    case "assemblyai": return "AI Transcribed";
-    case "description-url": return "Episode Page";
-    default: return source ?? "Unknown";
-  }
-}
-
-function formatPublishDate(timestamp: number): string {
-  if (!timestamp) return "Unknown";
-  const date = new Date(timestamp * 1000);
-  return date.toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
-}
-
-export default function EpisodePage({ params }: EpisodePageProps) {
-  const episodeId = params.id;
-  const { userId, has, isLoaded } = useAuth();
+export function AuthenticatedEpisodeDetail({
+  episodeId,
+  userId,
+  isAdmin,
+}: AuthenticatedEpisodeDetailProps) {
   const isOnline = useOnlineStatus();
   const playerState = useAudioPlayerState();
   const playerAPI = useAudioPlayerAPI();
@@ -143,8 +90,7 @@ export default function EpisodePage({ params }: EpisodePageProps) {
   const [transcriptStatus, setTranscriptStatus] = useState<TranscriptStatus | null>(null);
   const [episodeDbId, setEpisodeDbId] = useState<number | null>(null);
   const [overlapResult, setOverlapResult] = useState<{ label: string | null; labelKind: OverlapLabelKind | null }>({ label: null, labelKind: null });
-
-  const isAdmin = isLoaded && has?.({ role: ADMIN_ROLE });
+  const canRunEpisodeProcessing = supportsEpisodeProcessing(episodeId);
 
   // Realtime subscription to the Trigger.dev run
   const { run } = useRealtimeRun<typeof summarizeEpisode>(runId ?? "", {
@@ -166,7 +112,7 @@ export default function EpisodePage({ params }: EpisodePageProps) {
         cached: false,
       };
       setSummaryData(completedSummary);
-      if (userId && episode && podcast) {
+      if (episode && podcast) {
         void cacheEpisode(userId, episodeId, {
           episode,
           podcast,
@@ -199,7 +145,7 @@ export default function EpisodePage({ params }: EpisodePageProps) {
     try {
       // Fetch episode from PodcastIndex via API
       const response = await fetch(
-        `/api/episodes/${episodeId}`
+        `/api/episodes/${encodeURIComponent(episodeId)}`
       );
       const data = await response.json();
 
@@ -214,20 +160,18 @@ export default function EpisodePage({ params }: EpisodePageProps) {
       setEpisodeDbId(data.episodeDbId ?? null);
 
       // Cache episode data for offline use
-      if (userId) {
-        void cacheEpisode(userId, episodeId, {
-          episode: data.episode,
-          podcast: data.podcast,
-          summary: data.summary ? {
-            summary: data.summary.summary,
-            keyTakeaways: data.summary.keyTakeaways || [],
-            worthItScore: data.summary.worthItScore,
-            worthItReason: data.summary.worthItReason,
-            worthItDimensions: data.summary.worthItDimensions ?? null,
-            cached: true,
-          } : null,
-        });
-      }
+      void cacheEpisode(userId, episodeId, {
+        episode: data.episode,
+        podcast: data.podcast,
+        summary: data.summary ? {
+          summary: data.summary.summary,
+          keyTakeaways: data.summary.keyTakeaways || [],
+          worthItScore: data.summary.worthItScore,
+          worthItReason: data.summary.worthItReason,
+          worthItDimensions: data.summary.worthItDimensions ?? null,
+          cached: true,
+        } : null,
+      });
 
       // Check if summary exists
       if (data.summary) {
@@ -242,28 +186,30 @@ export default function EpisodePage({ params }: EpisodePageProps) {
       } else {
         setSummaryData(null);
         // Check for in-progress or failed summarization run
-        try {
-          const statusResponse = await fetch(
-            `/api/episodes/summarize?episodeId=${episodeId}`
-          );
-          const statusData = await statusResponse.json();
-          if (
-            statusData.runId &&
-            statusData.publicAccessToken &&
-            IN_PROGRESS_STATUSES.includes(statusData.status)
-          ) {
-            setRunId(statusData.runId);
-            setAccessToken(statusData.publicAccessToken);
-            setIsLoadingSummary(true);
-          } else if (statusData.status === "failed") {
-            setSummaryError(
-              statusData.processingError ||
-                "Summary generation failed. Please try again."
+        if (canRunEpisodeProcessing) {
+          try {
+            const statusResponse = await fetch(
+              `/api/episodes/summarize?episodeId=${encodeURIComponent(episodeId)}`
             );
-            setIsLoadingSummary(false);
+            const statusData = await statusResponse.json();
+            if (
+              statusData.runId &&
+              statusData.publicAccessToken &&
+              IN_PROGRESS_STATUSES.includes(statusData.status)
+            ) {
+              setRunId(statusData.runId);
+              setAccessToken(statusData.publicAccessToken);
+              setIsLoadingSummary(true);
+            } else if (statusData.status === "failed") {
+              setSummaryError(
+                statusData.processingError ||
+                  "Summary generation failed. Please try again."
+              );
+              setIsLoadingSummary(false);
+            }
+          } catch (error) {
+            console.warn("Failed to check for in-progress summary run:", error);
           }
-        } catch (error) {
-          console.warn("Failed to check for in-progress summary run:", error);
         }
       }
 
@@ -272,14 +218,12 @@ export default function EpisodePage({ params }: EpisodePageProps) {
       setIsSaved(saved);
     } catch (error) {
       console.error("Error fetching episode:", error);
-      if (userId) {
-        const cached = await getCachedEpisode(userId, episodeId);
-        if (cached) {
-          setEpisode(cached.episode);
-          setPodcast(cached.podcast);
-          setSummaryData(cached.summary ?? null);
-          return;
-        }
+      const cached = await getCachedEpisode(userId, episodeId);
+      if (cached) {
+        setEpisode(cached.episode);
+        setPodcast(cached.podcast);
+        setSummaryData(cached.summary ?? null);
+        return;
       }
       setEpisodeError(
         error instanceof Error ? error.message : "Failed to load episode"
@@ -287,16 +231,10 @@ export default function EpisodePage({ params }: EpisodePageProps) {
     } finally {
       setIsLoadingEpisode(false);
     }
-  }, [episodeId, userId]);
+  }, [canRunEpisodeProcessing, episodeId, userId]);
 
   // Load episode data from cache
   const loadFromCache = useCallback(async () => {
-    if (!userId) {
-      setIsLoadingEpisode(false);
-      setEpisodeError("This episode hasn't been cached for offline viewing. Visit it while online first.");
-      return;
-    }
-
     setIsLoadingEpisode(true);
     setEpisodeError(null);
 
@@ -472,16 +410,8 @@ export default function EpisodePage({ params }: EpisodePageProps) {
     );
   }
 
-  const artworkUrl = episode.image || episode.feedImage || podcast?.artwork || podcast?.image;
-  const safeEpisodeLink = (() => {
-    if (!episode.link) return null;
-    try {
-      const parsed = new URL(episode.link);
-      return parsed.protocol === "http:" || parsed.protocol === "https:" ? parsed.toString() : null;
-    } catch {
-      return null;
-    }
-  })();
+  const artworkUrl = getEpisodeArtworkUrl(episode, podcast);
+  const safeEpisodeLink = getSafeEpisodeLink(episode.link);
   const categories = podcast?.categories ? Object.values(podcast.categories) : [];
 
   const isCurrentEpisode = playerState.currentEpisode?.id === String(episode.id);
@@ -593,7 +523,7 @@ export default function EpisodePage({ params }: EpisodePageProps) {
             )}
             {episode.season > 0 && <span>Season {episode.season}</span>}
             {/* Admins with no transcript see the fetch button instead */}
-            {!(isAdmin && !transcriptSource) && (
+            {!(isAdmin && canRunEpisodeProcessing && !transcriptSource) && (
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -613,7 +543,7 @@ export default function EpisodePage({ params }: EpisodePageProps) {
                 </Tooltip>
               </TooltipProvider>
             )}
-            {isAdmin && (
+            {isAdmin && canRunEpisodeProcessing && (
               <EpisodeTranscriptFetchButton
                 episodeDbId={episodeDbId}
                 podcastIndexId={episodeId}
@@ -711,7 +641,7 @@ export default function EpisodePage({ params }: EpisodePageProps) {
               <ShareButton
                 title={episode.title}
                 text={episode.title}
-                url={`${process.env.NEXT_PUBLIC_APP_URL}/episode/${episodeId}`}
+                url={`${process.env.NEXT_PUBLIC_APP_URL}/episode/${encodeURIComponent(episodeId)}`}
                 summary={summaryData?.worthItReason ?? undefined}
                 size="lg"
               />
@@ -736,7 +666,7 @@ export default function EpisodePage({ params }: EpisodePageProps) {
       <div>
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-xl font-semibold">AI-Powered Insights</h2>
-          {isAdmin && summaryData?.summary && isOnline && !isLoadingSummary && (
+          {isAdmin && canRunEpisodeProcessing && summaryData?.summary && isOnline && !isLoadingSummary && (
             <Button
               variant="outline"
               size="sm"
@@ -758,7 +688,9 @@ export default function EpisodePage({ params }: EpisodePageProps) {
           currentStep={
             (run?.metadata?.step as SummarizationStep | undefined) ?? null
           }
-          onGenerateSummary={isOnline ? generateSummary : undefined}
+          onGenerateSummary={
+            isOnline && canRunEpisodeProcessing ? generateSummary : undefined
+          }
           overlapLabel={overlapResult.label}
           overlapLabelKind={overlapResult.labelKind}
         />

@@ -90,4 +90,89 @@ describe("middleware", () => {
 
     expect(mockProtect).toHaveBeenCalled();
   });
+
+  it("allows anonymous access to public episode pages", async () => {
+    const mockProtect = vi.fn();
+    vi.doMock("@clerk/nextjs/server", () => createClerkMock(null, mockProtect));
+
+    const { default: middleware } = await import("@/middleware");
+    const req = new NextRequest("http://localhost:3000/episode/123");
+    await middleware(req, stubEvent);
+
+    expect(mockProtect).not.toHaveBeenCalled();
+  });
+
+  it("allows anonymous access to public RSS episode pages", async () => {
+    const mockProtect = vi.fn();
+    vi.doMock("@clerk/nextjs/server", () => createClerkMock(null, mockProtect));
+
+    const { default: middleware } = await import("@/middleware");
+    const req = new NextRequest("http://localhost:3000/episode/rss-abc");
+    await middleware(req, stubEvent);
+
+    expect(mockProtect).not.toHaveBeenCalled();
+  });
+
+  it("keeps non-public episode slugs protected", async () => {
+    const mockProtect = vi.fn();
+    vi.doMock("@clerk/nextjs/server", () => createClerkMock(null, mockProtect));
+
+    const { default: middleware } = await import("@/middleware");
+    const req = new NextRequest("http://localhost:3000/episode/not-a-public-id");
+    await middleware(req, stubEvent);
+
+    expect(mockProtect).toHaveBeenCalled();
+  });
+
+  it("allows anonymous GET access to the public episode API", async () => {
+    const mockProtect = vi.fn();
+    vi.doMock("@clerk/nextjs/server", () => createClerkMock(null, mockProtect));
+
+    const { default: middleware } = await import("@/middleware");
+    const req = new NextRequest("http://localhost:3000/api/episodes/123", {
+      method: "GET",
+    });
+    await middleware(req, stubEvent);
+
+    expect(mockProtect).not.toHaveBeenCalled();
+  });
+
+  it("allows anonymous GET access to the public episode API for rss ids", async () => {
+    const mockProtect = vi.fn();
+    vi.doMock("@clerk/nextjs/server", () => createClerkMock(null, mockProtect));
+
+    const { default: middleware } = await import("@/middleware");
+    const req = new NextRequest("http://localhost:3000/api/episodes/rss-abc", {
+      method: "GET",
+    });
+    await middleware(req, stubEvent);
+
+    expect(mockProtect).not.toHaveBeenCalled();
+  });
+
+  it("keeps POST requests to the episode API protected", async () => {
+    const mockProtect = vi.fn();
+    vi.doMock("@clerk/nextjs/server", () => createClerkMock(null, mockProtect));
+
+    const { default: middleware } = await import("@/middleware");
+    const req = new NextRequest("http://localhost:3000/api/episodes/123", {
+      method: "POST",
+    });
+    await middleware(req, stubEvent);
+
+    expect(mockProtect).toHaveBeenCalled();
+  });
+
+  it("keeps the summarize API protected for anonymous users", async () => {
+    const mockProtect = vi.fn();
+    vi.doMock("@clerk/nextjs/server", () => createClerkMock(null, mockProtect));
+
+    const { default: middleware } = await import("@/middleware");
+    const req = new NextRequest("http://localhost:3000/api/episodes/summarize", {
+      method: "GET",
+    });
+    await middleware(req, stubEvent);
+
+    expect(mockProtect).toHaveBeenCalled();
+  });
 });

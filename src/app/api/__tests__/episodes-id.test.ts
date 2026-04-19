@@ -5,6 +5,10 @@ import { db } from "@/db";
 import { getEpisodeById, getPodcastById } from "@/lib/podcastindex";
 import { GET } from "@/app/api/episodes/[id]/route";
 
+const { mockPublicEpisodeRateLimit } = vi.hoisted(() => ({
+  mockPublicEpisodeRateLimit: vi.fn(),
+}));
+
 vi.mock("@clerk/nextjs/server", () => ({
   auth: vi.fn(),
 }));
@@ -28,9 +32,14 @@ vi.mock("@/lib/podcastindex", () => ({
   getPodcastById: vi.fn(),
 }));
 
+vi.mock("@/lib/rate-limit", () => ({
+  createRateLimitChecker: vi.fn(() => mockPublicEpisodeRateLimit),
+}));
+
 describe("GET /api/episodes/[id]", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockPublicEpisodeRateLimit.mockResolvedValue({ allowed: true });
   });
 
   afterEach(() => {
@@ -40,15 +49,59 @@ describe("GET /api/episodes/[id]", () => {
     vi.resetModules();
   });
 
-  it("returns 401 when unauthenticated", async () => {
+  it("allows unauthenticated requests for numeric episode IDs", async () => {
     vi.mocked(auth).mockResolvedValue({ userId: null } as never);
+
+    const mockEpisode = { id: 123, title: "Ep", feedId: 456 };
+    const mockPodcast = { id: 456, title: "Pod" };
+    vi.mocked(getEpisodeById).mockResolvedValue({
+      status: "true",
+      episode: mockEpisode as never,
+      description: "",
+    });
+    vi.mocked(getPodcastById).mockResolvedValue({
+      status: "true",
+      feed: mockPodcast as never,
+      description: "",
+    });
+    vi.mocked(db.query.episodes.findFirst).mockResolvedValue(undefined as never);
 
     const request = new NextRequest("http://localhost:3000/api/episodes/123");
     const response = await GET(request, { params: { id: "123" } });
     const data = await response.json();
 
-    expect(response.status).toBe(401);
-    expect(data.error).toBe("Unauthorized");
+    expect(response.status).toBe(200);
+    expect(data.episode).toEqual(mockEpisode);
+    expect(response.headers.get("cache-control")).toBe(
+      "public, s-maxage=300, stale-while-revalidate=600"
+    );
+    expect(response.headers.get("vary")?.split(/,\s*/)).toContain("Cookie");
+  });
+
+  it("does not apply shared-cache headers to authenticated numeric episode requests", async () => {
+    vi.mocked(auth).mockResolvedValue({ userId: "user-1" } as never);
+
+    const mockEpisode = { id: 123, title: "Ep", feedId: 456 };
+    const mockPodcast = { id: 456, title: "Pod" };
+    vi.mocked(getEpisodeById).mockResolvedValue({
+      status: "true",
+      episode: mockEpisode as never,
+      description: "",
+    });
+    vi.mocked(getPodcastById).mockResolvedValue({
+      status: "true",
+      feed: mockPodcast as never,
+      description: "",
+    });
+    vi.mocked(db.query.episodes.findFirst).mockResolvedValue(undefined as never);
+
+    const request = new NextRequest("http://localhost:3000/api/episodes/123");
+    const response = await GET(request, { params: { id: "123" } });
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).not.toBe(
+      "public, s-maxage=300, stale-while-revalidate=600"
+    );
   });
 
   it("returns 400 for non-numeric ID", async () => {
@@ -60,6 +113,150 @@ describe("GET /api/episodes/[id]", () => {
 
     expect(response.status).toBe(400);
     expect(data.error).toBe("Invalid episode ID");
+  });
+
+  it("allows unauthenticated requests for RSS-sourced episode IDs", async () => {
+    vi.mocked(auth).mockResolvedValue({ userId: null } as never);
+    vi.mocked(db.query.episodes.findFirst).mockResolvedValue({
+      id: 99,
+      title: "RSS Ep",
+      description: "desc",
+      publishDate: new Date("2024-01-01"),
+      audioUrl: "https://example.com/ep.mp3",
+      duration: 3600,
+      podcastId: 5,
+      podcastIndexId: "rss-abc",
+      rssGuid: "guid-123",
+      transcriptSource: "podcastindex",
+      transcriptStatus: "missing",
+      summary: null,
+      processedAt: null,
+      keyTakeaways: [],
+      worthItScore: null,
+      worthItReason: null,
+      worthItDimensions: null,
+      podcast: {
+        podcastIndexId: "rss-abc",
+        title: "RSS Pod",
+        publisher: "Author",
+        imageUrl: "https://example.com/img.png",
+      },
+    } as never);
+
+    const request = new NextRequest(
+      "http://localhost:3000/api/episodes/rss-abc"
+    );
+    const response = await GET(request, { params: { id: "rss-abc" } });
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.episode.id).toBe("rss-abc");
+    expect(response.headers.get("cache-control")).toBe(
+      "public, s-maxage=300, stale-while-revalidate=600"
+    );
+    expect(response.headers.get("vary")?.split(/,\s*/)).toContain("Cookie");
+  });
+
+  it("returns a generic 500 payload without internal error details", async () => {
+    vi.mocked(auth).mockRejectedValue(new Error("Clerk exploded") as never);
+
+    const request = new NextRequest("http://localhost:3000/api/episodes/123");
+    const response = await GET(request, { params: { id: "123" } });
+    const data = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(data).toEqual({
+      error: "Failed to fetch episode",
+    });
+  });
+
+  it("does not apply shared-cache headers to authenticated RSS episode requests", async () => {
+    vi.mocked(auth).mockResolvedValue({ userId: "user-1" } as never);
+    vi.mocked(db.query.episodes.findFirst).mockResolvedValue({
+      id: 99,
+      title: "RSS Ep",
+      description: "desc",
+      publishDate: new Date("2024-01-01"),
+      audioUrl: "https://example.com/ep.mp3",
+      duration: 3600,
+      podcastId: 5,
+      podcastIndexId: "rss-abc",
+      rssGuid: "guid-123",
+      transcriptSource: "podcastindex",
+      transcriptStatus: "missing",
+      summary: null,
+      processedAt: null,
+      keyTakeaways: [],
+      worthItScore: null,
+      worthItReason: null,
+      worthItDimensions: null,
+      podcast: {
+        podcastIndexId: "rss-abc",
+        title: "RSS Pod",
+        publisher: "Author",
+        imageUrl: "https://example.com/img.png",
+      },
+    } as never);
+
+    const request = new NextRequest(
+      "http://localhost:3000/api/episodes/rss-abc"
+    );
+    const response = await GET(request, { params: { id: "rss-abc" } });
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).not.toBe(
+      "public, s-maxage=300, stale-while-revalidate=600"
+    );
+  });
+
+  it("returns 429 when anonymous requests exceed the public episode rate limit", async () => {
+    vi.mocked(auth).mockResolvedValue({ userId: null } as never);
+    mockPublicEpisodeRateLimit.mockResolvedValue({
+      allowed: false,
+      retryAfterMs: 120000,
+    });
+
+    const request = new NextRequest("http://localhost:3000/api/episodes/123", {
+      headers: {
+        "x-forwarded-for": "203.0.113.9",
+      },
+    });
+    const response = await GET(request, { params: { id: "123" } });
+    const data = await response.json();
+
+    expect(response.status).toBe(429);
+    expect(data.error).toMatch(/rate limit/i);
+    expect(data.retryAfterMs).toBe(120000);
+  });
+
+  it("uses the Vercel-forwarded client IP for anonymous rate limiting when present", async () => {
+    vi.mocked(auth).mockResolvedValue({ userId: null } as never);
+
+    const mockEpisode = { id: 123, title: "Ep", feedId: 456 };
+    const mockPodcast = { id: 456, title: "Pod" };
+    vi.mocked(getEpisodeById).mockResolvedValue({
+      status: "true",
+      episode: mockEpisode as never,
+      description: "",
+    });
+    vi.mocked(getPodcastById).mockResolvedValue({
+      status: "true",
+      feed: mockPodcast as never,
+      description: "",
+    });
+    vi.mocked(db.query.episodes.findFirst).mockResolvedValue(undefined as never);
+
+    const request = new NextRequest("http://localhost:3000/api/episodes/123", {
+      headers: {
+        "x-forwarded-for": "203.0.113.9",
+        "x-real-ip": "203.0.113.10",
+        "x-vercel-forwarded-for": "198.51.100.24",
+      },
+    });
+    const response = await GET(request, { params: { id: "123" } });
+
+    expect(response.status).toBe(200);
+    expect(mockPublicEpisodeRateLimit).toHaveBeenCalledWith("198.51.100.24");
   });
 
   it("returns 404 when episode not found", async () => {

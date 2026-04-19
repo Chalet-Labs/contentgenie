@@ -2,11 +2,54 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { episodes, podcasts } from "@/db/schema";
+import { episodes } from "@/db/schema";
 import { getEpisodeById, getPodcastById } from "@/lib/podcastindex";
+import { createRateLimitChecker } from "@/lib/rate-limit";
+
+const PUBLIC_CACHE_CONTROL = "public, s-maxage=300, stale-while-revalidate=600";
+const checkPublicEpisodeRateLimit = createRateLimitChecker({
+  points: 60,
+  duration: 300,
+  keyPrefix: "public-episode-read",
+});
 
 function isRssSourced(id: string): boolean {
   return id.startsWith("rss-");
+}
+
+function getClientIp(request: NextRequest): string {
+  // This route assumes Vercel-managed ingress. Vercel documents that it
+  // overwrites X-Forwarded-For with the client public IP unless Trusted Proxy
+  // is explicitly enabled, and exposes the same value via x-vercel-forwarded-for.
+  const vercelForwardedFor = request.headers.get("x-vercel-forwarded-for");
+  if (vercelForwardedFor) {
+    const firstIp = vercelForwardedFor.split(",")[0]?.trim();
+    if (firstIp) return firstIp;
+  }
+
+  const forwardedFor = request.headers.get("x-forwarded-for");
+  if (forwardedFor) {
+    const firstIp = forwardedFor.split(",")[0]?.trim();
+    if (firstIp) return firstIp;
+  }
+
+  const realIp = request.headers.get("x-real-ip");
+  if (realIp) return realIp.trim();
+
+  return "unknown";
+}
+
+function withPublicCache(response: NextResponse): NextResponse {
+  response.headers.set("Cache-Control", PUBLIC_CACHE_CONTROL);
+  response.headers.set("Vary", "Cookie");
+  return response;
+}
+
+function withConditionalPublicCache(
+  response: NextResponse,
+  isAnonymousRequest: boolean
+): NextResponse {
+  return isAnonymousRequest ? withPublicCache(response) : response;
 }
 
 export async function GET(
@@ -14,10 +57,25 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    // Verify authentication
     const { userId } = await auth();
-    if (!userId) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    const isAnonymousRequest = !userId;
+
+    if (isAnonymousRequest) {
+      const rateLimit = await checkPublicEpisodeRateLimit(getClientIp(request));
+      if (!rateLimit.allowed) {
+        const retryAfterMs = rateLimit.retryAfterMs ?? 0;
+        const retryAfterSeconds = Math.max(1, Math.ceil(retryAfterMs / 1000));
+        return NextResponse.json(
+          {
+            error: "Rate limit exceeded. Please try again later.",
+            retryAfterMs,
+          },
+          {
+            status: 429,
+            headers: { "Retry-After": String(retryAfterSeconds) },
+          }
+        );
+      }
     }
 
     const id = params.id;
@@ -94,19 +152,28 @@ export async function GET(
         };
       }
 
-      return NextResponse.json({
-        episode,
-        podcast,
-        summary,
-        transcriptSource: dbEpisode.transcriptSource ?? null,
-        transcriptStatus: dbEpisode.transcriptStatus ?? null,
-        episodeDbId: dbEpisode.id,
-      });
+      return withConditionalPublicCache(
+        NextResponse.json({
+          episode,
+          podcast,
+          summary,
+          transcriptSource: dbEpisode.transcriptSource ?? null,
+          transcriptStatus: dbEpisode.transcriptStatus ?? null,
+          episodeDbId: dbEpisode.id,
+        }),
+        isAnonymousRequest
+      );
     }
 
     // PodcastIndex-sourced episode (existing behavior)
-    const episodeId = parseInt(id, 10);
-    if (isNaN(episodeId)) {
+    if (!/^\d+$/.test(id)) {
+      return NextResponse.json(
+        { error: "Invalid episode ID" },
+        { status: 400 }
+      );
+    }
+    const episodeId = Number(id);
+    if (!Number.isSafeInteger(episodeId)) {
       return NextResponse.json(
         { error: "Invalid episode ID" },
         { status: 400 }
@@ -186,21 +253,21 @@ export async function GET(
       // Continue without cached summary if DB query fails
     }
 
-    return NextResponse.json({
-      episode,
-      podcast,
-      summary,
-      transcriptSource,
-      transcriptStatus,
-      episodeDbId,
-    });
+    return withConditionalPublicCache(
+      NextResponse.json({
+        episode,
+        podcast,
+        summary,
+        transcriptSource,
+        transcriptStatus,
+        episodeDbId,
+      }),
+      isAnonymousRequest
+    );
   } catch (error) {
     console.error("Error fetching episode:", error);
     return NextResponse.json(
-      {
-        error: "Failed to fetch episode",
-        details: error instanceof Error ? error.message : "Unknown error",
-      },
+      { error: "Failed to fetch episode" },
       { status: 500 }
     );
   }
