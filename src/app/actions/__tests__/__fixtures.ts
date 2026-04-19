@@ -8,7 +8,9 @@
  * mocked module), by which time ESM imports have resolved.
  * Episode fixtures live in `@/test/fixtures/audio-episode`.
  */
-import { vi } from "vitest"
+import { expect, vi } from "vitest"
+
+type MockFn = ReturnType<typeof vi.fn>
 
 export { validEpisode, validEpisode2 } from "@/test/fixtures/audio-episode"
 
@@ -72,5 +74,85 @@ export function makeDeleteChain(
     return {
       where: (...wArgs: unknown[]) => whereSpy(...wArgs),
     }
+  }
+}
+
+/**
+ * Module shape for `@clerk/nextjs/server`. Intended for use inside
+ * `vi.mock("@clerk/nextjs/server", () => makeClerkAuthMock(() => mockAuth()))`.
+ * The global test setup already installs a happy-path Clerk mock; action tests
+ * override it so they can drive `userId` per test (e.g. null for the
+ * unauthenticated case).
+ */
+export function makeClerkAuthMock(authSpy: () => unknown) {
+  return { auth: authSpy }
+}
+
+/**
+ * Module shape for `@/db/helpers`. Intended for use inside
+ * `vi.mock("@/db/helpers", () => makeUserHelpersMock(mockEnsureUserExists))`.
+ */
+export function makeUserHelpersMock(
+  ensureUserExistsSpy: (...args: unknown[]) => unknown,
+) {
+  return { ensureUserExists: ensureUserExistsSpy }
+}
+
+/**
+ * Default "happy path" `beforeEach` body for server-action tests.
+ * Clears all mocks, signs in as `user_123`, makes `ensureUserExists` a no-op.
+ * Usage: `beforeEach(happyPathSetup(mockAuth, mockEnsureUserExists))`
+ * Call a second `beforeEach(...)` for describe-specific mock resets.
+ */
+export function happyPathSetup(authSpy: MockFn, ensureUserExistsSpy: MockFn) {
+  return () => {
+    vi.clearAllMocks()
+    authSpy.mockResolvedValue({ userId: "user_123" })
+    ensureUserExistsSpy.mockResolvedValue(undefined)
+  }
+}
+
+/**
+ * Test body for the canonical "returns { success: false } when
+ * unauthenticated" case. Sets the auth spy to return `{ userId: null }`,
+ * runs the action, and asserts the action failed AND that `blockedSpy`
+ * (the next-in-chain operation that should have been gated) was never
+ * called. Usage:
+ *
+ *   it("... when unauthenticated", testUnauthenticated(
+ *     mockAuth,
+ *     async () => (await import("...")).action(),
+ *     mockFindFirst,
+ *   ))
+ */
+export function testUnauthenticated(
+  authSpy: MockFn,
+  runAction: () => Promise<{ success: boolean }>,
+  blockedSpy: MockFn,
+) {
+  return async () => {
+    authSpy.mockResolvedValue({ userId: null })
+    const result = await runAction()
+    expect(result.success).toBe(false)
+    expect(blockedSpy).not.toHaveBeenCalled()
+  }
+}
+
+/**
+ * Test body for the canonical "returns { success: false } on DB error" case.
+ * Makes `failingSpy` reject with `new Error("DB failure")`, silences
+ * `console.error`, runs the action, and asserts failure + that
+ * `console.error` was invoked.
+ */
+export function testDbError(
+  failingSpy: MockFn,
+  runAction: () => Promise<{ success: boolean }>,
+) {
+  return async () => {
+    failingSpy.mockRejectedValue(new Error("DB failure"))
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {})
+    const result = await runAction()
+    expect(result.success).toBe(false)
+    expect(consoleSpy).toHaveBeenCalled()
   }
 }

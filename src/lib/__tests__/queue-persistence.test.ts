@@ -2,8 +2,9 @@ import { describe, it, expect, beforeEach } from "vitest"
 import { loadQueue, saveQueue } from "@/lib/queue-persistence"
 import type { AudioEpisode } from "@/contexts/audio-player-context"
 import {
-  createLocalStorageMock,
   installLocalStorageMock,
+  installQuotaExceededLocalStorage,
+  withoutWindow,
 } from "@/test/mocks/local-storage"
 import { validEpisode, validEpisode2 } from "@/test/fixtures/audio-episode"
 
@@ -128,14 +129,9 @@ describe("loadQueue", () => {
   })
 
   it("returns empty array in SSR environment", () => {
-    const originalWindow = globalThis.window
-    try {
-      // @ts-expect-error -- simulating SSR
-      delete globalThis.window
+    withoutWindow(() => {
       expect(loadQueue()).toEqual([])
-    } finally {
-      globalThis.window = originalWindow
-    }
+    })
   })
 })
 
@@ -160,26 +156,13 @@ describe("saveQueue", () => {
   })
 
   it("handles quota exceeded error gracefully", () => {
-    const mockStorage = createLocalStorageMock()
-    mockStorage.setItem = () => {
-      throw new DOMException("QuotaExceededError")
-    }
-    Object.defineProperty(window, "localStorage", {
-      value: mockStorage,
-      writable: true,
-      configurable: true,
-    })
+    installQuotaExceededLocalStorage()
     expect(() => saveQueue([validEpisode])).not.toThrow()
   })
 
   it("does nothing in SSR environment", () => {
-    const originalWindow = globalThis.window
-    try {
-      // @ts-expect-error -- simulating SSR
-      delete globalThis.window
+    withoutWindow(() => {
       expect(() => saveQueue([validEpisode])).not.toThrow()
-    } finally {
-      globalThis.window = originalWindow
-    }
+    })
   })
 })

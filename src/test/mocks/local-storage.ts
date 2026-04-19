@@ -40,3 +40,36 @@ export function installLocalStorageMock(): Storage {
   })
   return mock
 }
+
+/**
+ * Install a localStorage mock whose `setItem` always throws
+ * `QuotaExceededError`. Use to verify that save-side code handles quota
+ * gracefully without throwing.
+ */
+export function installQuotaExceededLocalStorage(): Storage {
+  const mock = createLocalStorageMock()
+  mock.setItem = () => {
+    throw new DOMException("QuotaExceededError")
+  }
+  Object.defineProperty(window, "localStorage", {
+    value: mock,
+    writable: true,
+    configurable: true,
+  })
+  return mock
+}
+
+/**
+ * Run `fn` with `globalThis.window` temporarily removed, simulating SSR.
+ * Restores the original `window` even if `fn` throws.
+ */
+export function withoutWindow(fn: () => void): void {
+  const originalWindow = globalThis.window
+  try {
+    // @ts-expect-error -- simulating SSR
+    delete globalThis.window
+    fn()
+  } finally {
+    globalThis.window = originalWindow
+  }
+}

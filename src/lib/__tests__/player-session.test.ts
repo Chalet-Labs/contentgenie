@@ -6,8 +6,9 @@ import {
 } from "@/lib/player-session"
 import type { AudioEpisode } from "@/contexts/audio-player-context"
 import {
-  createLocalStorageMock,
   installLocalStorageMock,
+  installQuotaExceededLocalStorage,
+  withoutWindow,
 } from "@/test/mocks/local-storage"
 import { validEpisode } from "@/test/fixtures/audio-episode"
 
@@ -176,14 +177,9 @@ describe("loadPlayerSession", () => {
   })
 
   it("returns null in SSR environment", () => {
-    const originalWindow = globalThis.window
-    try {
-      // @ts-expect-error -- simulating SSR
-      delete globalThis.window
+    withoutWindow(() => {
       expect(loadPlayerSession()).toBeNull()
-    } finally {
-      globalThis.window = originalWindow
-    }
+    })
   })
 
   it("returns null when artwork is invalid (non-string)", () => {
@@ -296,27 +292,14 @@ describe("savePlayerSession", () => {
   })
 
   it("handles quota exceeded error gracefully", () => {
-    const mockStorage = createLocalStorageMock()
-    mockStorage.setItem = () => {
-      throw new DOMException("QuotaExceededError")
-    }
-    Object.defineProperty(window, "localStorage", {
-      value: mockStorage,
-      writable: true,
-      configurable: true,
-    })
+    installQuotaExceededLocalStorage()
     expect(() => savePlayerSession(validEpisode, 300)).not.toThrow()
   })
 
   it("does nothing in SSR environment", () => {
-    const originalWindow = globalThis.window
-    try {
-      // @ts-expect-error -- simulating SSR
-      delete globalThis.window
+    withoutWindow(() => {
       expect(() => savePlayerSession(validEpisode, 300)).not.toThrow()
-    } finally {
-      globalThis.window = originalWindow
-    }
+    })
   })
 })
 
@@ -337,13 +320,8 @@ describe("clearPlayerSession", () => {
   })
 
   it("does nothing in SSR environment", () => {
-    const originalWindow = globalThis.window
-    try {
-      // @ts-expect-error -- simulating SSR
-      delete globalThis.window
+    withoutWindow(() => {
       expect(() => clearPlayerSession()).not.toThrow()
-    } finally {
-      globalThis.window = originalWindow
-    }
+    })
   })
 })

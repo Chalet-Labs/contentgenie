@@ -2,16 +2,21 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import type { AudioEpisode } from "@/contexts/audio-player-context"
 import {
   createDrizzleOrmMock,
+  happyPathSetup,
+  makeClerkAuthMock,
   makeDeleteChain,
   makeInsertConflictChain,
+  makeUserHelpersMock,
+  testDbError,
+  testUnauthenticated,
   validEpisode,
 } from "@/app/actions/__tests__/__fixtures"
 
 // Mock Clerk auth
 const mockAuth = vi.fn()
-vi.mock("@clerk/nextjs/server", () => ({
-  auth: () => mockAuth(),
-}))
+vi.mock("@clerk/nextjs/server", () =>
+  makeClerkAuthMock(() => mockAuth()),
+)
 
 // Mock database
 const mockInsert = vi.fn()
@@ -39,9 +44,9 @@ vi.mock("@/db", () => ({
 
 // Mock helpers
 const mockEnsureUserExists = vi.fn()
-vi.mock("@/db/helpers", () => ({
-  ensureUserExists: (...args: unknown[]) => mockEnsureUserExists(...args),
-}))
+vi.mock("@/db/helpers", () =>
+  makeUserHelpersMock((...args: unknown[]) => mockEnsureUserExists(...args)),
+)
 
 // Mock schema
 vi.mock("@/db/schema", () => ({
@@ -62,37 +67,35 @@ vi.mock("@/db/schema", () => ({
 // Mock drizzle-orm (shared factory lives in __fixtures.ts)
 vi.mock("drizzle-orm", () => createDrizzleOrmMock())
 
+const importAction = async () => import("@/app/actions/player-session")
+
 describe("getPlayerSession", () => {
+  beforeEach(happyPathSetup(mockAuth, mockEnsureUserExists))
   beforeEach(() => {
-    vi.clearAllMocks()
-    mockAuth.mockResolvedValue({ userId: "user_123" })
     mockFindFirst.mockResolvedValue(null)
-    mockEnsureUserExists.mockResolvedValue(undefined)
     mockOnConflictDoUpdate.mockResolvedValue(undefined)
     mockDeleteWhere.mockResolvedValue(undefined)
   })
+  afterEach(() => vi.restoreAllMocks())
 
-  afterEach(() => {
-    vi.restoreAllMocks()
-  })
-
-  it("returns { success: false, error } when unauthenticated", async () => {
-    mockAuth.mockResolvedValue({ userId: null })
-    const { getPlayerSession } = await import("@/app/actions/player-session")
-    const result = await getPlayerSession()
-    expect(result.success).toBe(false)
-    expect(mockFindFirst).not.toHaveBeenCalled()
-  })
+  it(
+    "returns { success: false, error } when unauthenticated",
+    testUnauthenticated(
+      mockAuth,
+      async () => (await importAction()).getPlayerSession(),
+      mockFindFirst,
+    ),
+  )
 
   it("returns { success: true, data: null } when no row exists", async () => {
     mockFindFirst.mockResolvedValue(null)
-    const { getPlayerSession } = await import("@/app/actions/player-session")
+    const { getPlayerSession } = await importAction()
     const result = await getPlayerSession()
     expect(result).toEqual({ success: true, data: null })
   })
 
   it("does not call ensureUserExists (read-only path)", async () => {
-    const { getPlayerSession } = await import("@/app/actions/player-session")
+    const { getPlayerSession } = await importAction()
     await getPlayerSession()
     expect(mockEnsureUserExists).not.toHaveBeenCalled()
   })
@@ -111,7 +114,7 @@ describe("getPlayerSession", () => {
       updatedAt: new Date(),
     }
     mockFindFirst.mockResolvedValue(dbRow)
-    const { getPlayerSession } = await import("@/app/actions/player-session")
+    const { getPlayerSession } = await importAction()
     const result = await getPlayerSession()
     expect(result.success).toBe(true)
     if (!result.success) throw new Error("should be success")
@@ -127,39 +130,34 @@ describe("getPlayerSession", () => {
     })
   })
 
-  it("returns { success: false, error } on DB error", async () => {
-    mockFindFirst.mockRejectedValue(new Error("DB failure"))
-    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {})
-    const { getPlayerSession } = await import("@/app/actions/player-session")
-    const result = await getPlayerSession()
-    expect(result.success).toBe(false)
-    expect(consoleSpy).toHaveBeenCalled()
-  })
+  it(
+    "returns { success: false, error } on DB error",
+    testDbError(
+      mockFindFirst,
+      async () => (await importAction()).getPlayerSession(),
+    ),
+  )
 })
 
 describe("savePlayerSession", () => {
+  beforeEach(happyPathSetup(mockAuth, mockEnsureUserExists))
   beforeEach(() => {
-    vi.clearAllMocks()
-    mockAuth.mockResolvedValue({ userId: "user_123" })
-    mockEnsureUserExists.mockResolvedValue(undefined)
     mockOnConflictDoUpdate.mockResolvedValue(undefined)
     mockDeleteWhere.mockResolvedValue(undefined)
   })
+  afterEach(() => vi.restoreAllMocks())
 
-  afterEach(() => {
-    vi.restoreAllMocks()
-  })
-
-  it("returns { success: false, error } when unauthenticated", async () => {
-    mockAuth.mockResolvedValue({ userId: null })
-    const { savePlayerSession } = await import("@/app/actions/player-session")
-    const result = await savePlayerSession(validEpisode, 120)
-    expect(result.success).toBe(false)
-    expect(mockInsert).not.toHaveBeenCalled()
-  })
+  it(
+    "returns { success: false, error } when unauthenticated",
+    testUnauthenticated(
+      mockAuth,
+      async () => (await importAction()).savePlayerSession(validEpisode, 120),
+      mockInsert,
+    ),
+  )
 
   it("Zod-rejects an invalid payload without touching the DB", async () => {
-    const { savePlayerSession } = await import("@/app/actions/player-session")
+    const { savePlayerSession } = await importAction()
     const badEpisode = { id: "ep-1", title: "T", podcastTitle: "P", audioUrl: "not-a-url" }
     const result = await savePlayerSession(badEpisode as AudioEpisode, 120)
     expect(result.success).toBe(false)
@@ -168,7 +166,7 @@ describe("savePlayerSession", () => {
   })
 
   it("Zod-rejects currentTime above the upper bound without touching the DB", async () => {
-    const { savePlayerSession } = await import("@/app/actions/player-session")
+    const { savePlayerSession } = await importAction()
     const result = await savePlayerSession(validEpisode, 1_000_001)
     expect(result.success).toBe(false)
     expect(mockInsert).not.toHaveBeenCalled()
@@ -176,7 +174,7 @@ describe("savePlayerSession", () => {
   })
 
   it("calls ensureUserExists before the insert", async () => {
-    const { savePlayerSession } = await import("@/app/actions/player-session")
+    const { savePlayerSession } = await importAction()
     await savePlayerSession(validEpisode, 120)
     expect(mockEnsureUserExists).toHaveBeenCalledWith("user_123")
     const ensureOrder = mockEnsureUserExists.mock.invocationCallOrder[0]
@@ -185,7 +183,7 @@ describe("savePlayerSession", () => {
   })
 
   it("uses onConflictDoUpdate targeting userPlayerSession.userId with updatedAt Date in set", async () => {
-    const { savePlayerSession } = await import("@/app/actions/player-session")
+    const { savePlayerSession } = await importAction()
     await savePlayerSession(validEpisode, 120)
     expect(mockOnConflictDoUpdate).toHaveBeenCalledTimes(1)
     const opts = mockOnConflictDoUpdate.mock.calls[0][0]
@@ -198,7 +196,7 @@ describe("savePlayerSession", () => {
   })
 
   it("persists currentTime as a decimal string", async () => {
-    const { savePlayerSession } = await import("@/app/actions/player-session")
+    const { savePlayerSession } = await importAction()
     await savePlayerSession(validEpisode, 123.456)
     expect(mockInsertValues).toHaveBeenCalledTimes(1)
     const insertedValues = mockInsertValues.mock.calls[0][0]
@@ -206,38 +204,33 @@ describe("savePlayerSession", () => {
     expect(insertedValues.currentTime).toMatch(/^\d+(\.\d+)?$/)
   })
 
-  it("returns { success: false, error } on DB error", async () => {
-    mockOnConflictDoUpdate.mockRejectedValue(new Error("DB failure"))
-    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {})
-    const { savePlayerSession } = await import("@/app/actions/player-session")
-    const result = await savePlayerSession(validEpisode, 120)
-    expect(result.success).toBe(false)
-    expect(consoleSpy).toHaveBeenCalled()
-  })
+  it(
+    "returns { success: false, error } on DB error",
+    testDbError(
+      mockOnConflictDoUpdate,
+      async () => (await importAction()).savePlayerSession(validEpisode, 120),
+    ),
+  )
 })
 
 describe("clearPlayerSession", () => {
+  beforeEach(happyPathSetup(mockAuth, mockEnsureUserExists))
   beforeEach(() => {
-    vi.clearAllMocks()
-    mockAuth.mockResolvedValue({ userId: "user_123" })
-    mockEnsureUserExists.mockResolvedValue(undefined)
     mockDeleteWhere.mockResolvedValue(undefined)
   })
+  afterEach(() => vi.restoreAllMocks())
 
-  afterEach(() => {
-    vi.restoreAllMocks()
-  })
-
-  it("returns { success: false, error } when unauthenticated", async () => {
-    mockAuth.mockResolvedValue({ userId: null })
-    const { clearPlayerSession } = await import("@/app/actions/player-session")
-    const result = await clearPlayerSession()
-    expect(result.success).toBe(false)
-    expect(mockDelete).not.toHaveBeenCalled()
-  })
+  it(
+    "returns { success: false, error } when unauthenticated",
+    testUnauthenticated(
+      mockAuth,
+      async () => (await importAction()).clearPlayerSession(),
+      mockDelete,
+    ),
+  )
 
   it("issues DELETE WHERE userId = $user on success", async () => {
-    const { clearPlayerSession } = await import("@/app/actions/player-session")
+    const { clearPlayerSession } = await importAction()
     const result = await clearPlayerSession()
     expect(result).toEqual({ success: true })
     expect(mockDelete).toHaveBeenCalledTimes(1)
@@ -245,17 +238,16 @@ describe("clearPlayerSession", () => {
   })
 
   it("does not call ensureUserExists (DELETE is no-op on nonexistent user)", async () => {
-    const { clearPlayerSession } = await import("@/app/actions/player-session")
+    const { clearPlayerSession } = await importAction()
     await clearPlayerSession()
     expect(mockEnsureUserExists).not.toHaveBeenCalled()
   })
 
-  it("returns { success: false, error } on DB error", async () => {
-    mockDeleteWhere.mockRejectedValue(new Error("DB failure"))
-    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {})
-    const { clearPlayerSession } = await import("@/app/actions/player-session")
-    const result = await clearPlayerSession()
-    expect(result.success).toBe(false)
-    expect(consoleSpy).toHaveBeenCalled()
-  })
+  it(
+    "returns { success: false, error } on DB error",
+    testDbError(
+      mockDeleteWhere,
+      async () => (await importAction()).clearPlayerSession(),
+    ),
+  )
 })

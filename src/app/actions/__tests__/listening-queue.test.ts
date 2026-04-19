@@ -2,17 +2,22 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import type { AudioEpisode } from "@/contexts/audio-player-context"
 import {
   createDrizzleOrmMock,
+  happyPathSetup,
+  makeClerkAuthMock,
   makeDeleteChain,
   makeInsertChain,
+  makeUserHelpersMock,
+  testDbError,
+  testUnauthenticated,
   validEpisode,
   validEpisode2,
 } from "@/app/actions/__tests__/__fixtures"
 
 // Mock Clerk auth
 const mockAuth = vi.fn()
-vi.mock("@clerk/nextjs/server", () => ({
-  auth: () => mockAuth(),
-}))
+vi.mock("@clerk/nextjs/server", () =>
+  makeClerkAuthMock(() => mockAuth()),
+)
 
 // Mock database
 const mockInsert = vi.fn()
@@ -41,9 +46,9 @@ vi.mock("@/db", () => ({
 
 // Mock helpers
 const mockEnsureUserExists = vi.fn()
-vi.mock("@/db/helpers", () => ({
-  ensureUserExists: (...args: unknown[]) => mockEnsureUserExists(...args),
-}))
+vi.mock("@/db/helpers", () =>
+  makeUserHelpersMock((...args: unknown[]) => mockEnsureUserExists(...args)),
+)
 
 // Mock schema
 vi.mock("@/db/schema", () => ({
@@ -64,37 +69,35 @@ vi.mock("@/db/schema", () => ({
 // Mock drizzle-orm (shared factory lives in __fixtures.ts)
 vi.mock("drizzle-orm", () => createDrizzleOrmMock())
 
+const importAction = async () => import("@/app/actions/listening-queue")
+
 describe("getQueue", () => {
+  beforeEach(happyPathSetup(mockAuth, mockEnsureUserExists))
   beforeEach(() => {
-    vi.clearAllMocks()
-    mockAuth.mockResolvedValue({ userId: "user_123" })
     mockFindMany.mockResolvedValue([])
-    mockEnsureUserExists.mockResolvedValue(undefined)
     mockInsertValues.mockResolvedValue(undefined)
     mockDeleteWhere.mockResolvedValue(undefined)
   })
+  afterEach(() => vi.restoreAllMocks())
 
-  afterEach(() => {
-    vi.restoreAllMocks()
-  })
-
-  it("returns { success: false, error } when unauthenticated", async () => {
-    mockAuth.mockResolvedValue({ userId: null })
-    const { getQueue } = await import("@/app/actions/listening-queue")
-    const result = await getQueue()
-    expect(result.success).toBe(false)
-    expect(mockFindMany).not.toHaveBeenCalled()
-  })
+  it(
+    "returns { success: false, error } when unauthenticated",
+    testUnauthenticated(
+      mockAuth,
+      async () => (await importAction()).getQueue(),
+      mockFindMany,
+    ),
+  )
 
   it("returns { success: true, data: [] } when user has no rows", async () => {
     mockFindMany.mockResolvedValue([])
-    const { getQueue } = await import("@/app/actions/listening-queue")
+    const { getQueue } = await importAction()
     const result = await getQueue()
     expect(result).toEqual({ success: true, data: [] })
   })
 
   it("does not call ensureUserExists (read-only path)", async () => {
-    const { getQueue } = await import("@/app/actions/listening-queue")
+    const { getQueue } = await importAction()
     await getQueue()
     expect(mockEnsureUserExists).not.toHaveBeenCalled()
   })
@@ -129,7 +132,7 @@ describe("getQueue", () => {
       },
     ]
     mockFindMany.mockResolvedValue(dbRows)
-    const { getQueue } = await import("@/app/actions/listening-queue")
+    const { getQueue } = await importAction()
     const result = await getQueue()
     expect(result.success).toBe(true)
     if (!result.success) throw new Error("should be success")
@@ -156,42 +159,37 @@ describe("getQueue", () => {
     ])
   })
 
-  it("returns { success: false, error } on DB error", async () => {
-    mockFindMany.mockRejectedValue(new Error("DB failure"))
-    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {})
-    const { getQueue } = await import("@/app/actions/listening-queue")
-    const result = await getQueue()
-    expect(result.success).toBe(false)
-    expect(consoleSpy).toHaveBeenCalled()
-  })
+  it(
+    "returns { success: false, error } on DB error",
+    testDbError(
+      mockFindMany,
+      async () => (await importAction()).getQueue(),
+    ),
+  )
 })
 
 describe("setQueue", () => {
+  beforeEach(happyPathSetup(mockAuth, mockEnsureUserExists))
   beforeEach(() => {
-    vi.clearAllMocks()
-    mockAuth.mockResolvedValue({ userId: "user_123" })
-    mockEnsureUserExists.mockResolvedValue(undefined)
     mockInsertValues.mockResolvedValue(undefined)
     mockDeleteWhere.mockResolvedValue(undefined)
     mockTransaction.mockImplementation(async (fn: (tx: typeof mockTx) => Promise<void>) => {
       await fn(mockTx)
     })
   })
+  afterEach(() => vi.restoreAllMocks())
 
-  afterEach(() => {
-    vi.restoreAllMocks()
-  })
-
-  it("returns { success: false, error } when unauthenticated", async () => {
-    mockAuth.mockResolvedValue({ userId: null })
-    const { setQueue } = await import("@/app/actions/listening-queue")
-    const result = await setQueue([validEpisode])
-    expect(result.success).toBe(false)
-    expect(mockTransaction).not.toHaveBeenCalled()
-  })
+  it(
+    "returns { success: false, error } when unauthenticated",
+    testUnauthenticated(
+      mockAuth,
+      async () => (await importAction()).setQueue([validEpisode]),
+      mockTransaction,
+    ),
+  )
 
   it("Zod-rejects an invalid payload without touching the DB", async () => {
-    const { setQueue } = await import("@/app/actions/listening-queue")
+    const { setQueue } = await importAction()
     // audioUrl is not a valid URL
     const badEpisode = { id: "ep-1", title: "T", podcastTitle: "P", audioUrl: "not-a-url" }
     const result = await setQueue([badEpisode as AudioEpisode])
@@ -201,7 +199,7 @@ describe("setQueue", () => {
   })
 
   it("rejects a queue containing duplicate episode IDs before touching the DB", async () => {
-    const { setQueue } = await import("@/app/actions/listening-queue")
+    const { setQueue } = await importAction()
     const result = await setQueue([validEpisode, { ...validEpisode }])
     expect(result.success).toBe(false)
     expect(mockTransaction).not.toHaveBeenCalled()
@@ -209,7 +207,7 @@ describe("setQueue", () => {
   })
 
   it("rejects a queue with a non-https audioUrl before touching the DB", async () => {
-    const { setQueue } = await import("@/app/actions/listening-queue")
+    const { setQueue } = await importAction()
     const jsUrl = {
       ...validEpisode,
       audioUrl: "javascript:alert(1)",
@@ -221,7 +219,7 @@ describe("setQueue", () => {
   })
 
   it("calls db.transaction, with DELETE before INSERT scoped to the signed-in user", async () => {
-    const { setQueue } = await import("@/app/actions/listening-queue")
+    const { setQueue } = await importAction()
     await setQueue([validEpisode, validEpisode2])
     expect(mockTransaction).toHaveBeenCalledTimes(1)
     const deleteOrder = mockDelete.mock.invocationCallOrder[0]
@@ -234,7 +232,7 @@ describe("setQueue", () => {
   })
 
   it("inserts rows with position = 0, 1, 2 and explicit updatedAt Date", async () => {
-    const { setQueue } = await import("@/app/actions/listening-queue")
+    const { setQueue } = await importAction()
     await setQueue([validEpisode, validEpisode2])
     expect(mockInsertValues).toHaveBeenCalledTimes(1)
     const rows = mockInsertValues.mock.calls[0][0]
@@ -246,7 +244,7 @@ describe("setQueue", () => {
   })
 
   it("with empty array produces only DELETE (no INSERT)", async () => {
-    const { setQueue } = await import("@/app/actions/listening-queue")
+    const { setQueue } = await importAction()
     await setQueue([])
     expect(mockTransaction).toHaveBeenCalledTimes(1)
     expect(mockDelete).toHaveBeenCalledTimes(1)
@@ -258,7 +256,7 @@ describe("setQueue", () => {
   })
 
   it("calls ensureUserExists before the transaction", async () => {
-    const { setQueue } = await import("@/app/actions/listening-queue")
+    const { setQueue } = await importAction()
     await setQueue([validEpisode])
     expect(mockEnsureUserExists).toHaveBeenCalledWith("user_123")
     const ensureOrder = mockEnsureUserExists.mock.invocationCallOrder[0]
@@ -266,38 +264,33 @@ describe("setQueue", () => {
     expect(ensureOrder).toBeLessThan(txOrder)
   })
 
-  it("returns { success: false, error } on DB error and calls console.error", async () => {
-    mockTransaction.mockRejectedValue(new Error("DB failure"))
-    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {})
-    const { setQueue } = await import("@/app/actions/listening-queue")
-    const result = await setQueue([validEpisode])
-    expect(result.success).toBe(false)
-    expect(consoleSpy).toHaveBeenCalled()
-  })
+  it(
+    "returns { success: false, error } on DB error and calls console.error",
+    testDbError(
+      mockTransaction,
+      async () => (await importAction()).setQueue([validEpisode]),
+    ),
+  )
 })
 
 describe("clearQueue", () => {
+  beforeEach(happyPathSetup(mockAuth, mockEnsureUserExists))
   beforeEach(() => {
-    vi.clearAllMocks()
-    mockAuth.mockResolvedValue({ userId: "user_123" })
-    mockEnsureUserExists.mockResolvedValue(undefined)
     mockDeleteWhere.mockResolvedValue(undefined)
   })
+  afterEach(() => vi.restoreAllMocks())
 
-  afterEach(() => {
-    vi.restoreAllMocks()
-  })
-
-  it("returns { success: false, error } when unauthenticated", async () => {
-    mockAuth.mockResolvedValue({ userId: null })
-    const { clearQueue } = await import("@/app/actions/listening-queue")
-    const result = await clearQueue()
-    expect(result.success).toBe(false)
-    expect(mockDelete).not.toHaveBeenCalled()
-  })
+  it(
+    "returns { success: false, error } when unauthenticated",
+    testUnauthenticated(
+      mockAuth,
+      async () => (await importAction()).clearQueue(),
+      mockDelete,
+    ),
+  )
 
   it("issues DELETE WHERE userId = $user on success", async () => {
-    const { clearQueue } = await import("@/app/actions/listening-queue")
+    const { clearQueue } = await importAction()
     const result = await clearQueue()
     expect(result).toEqual({ success: true })
     expect(mockDelete).toHaveBeenCalledTimes(1)
@@ -309,17 +302,16 @@ describe("clearQueue", () => {
   })
 
   it("does not call ensureUserExists (DELETE is no-op on nonexistent user)", async () => {
-    const { clearQueue } = await import("@/app/actions/listening-queue")
+    const { clearQueue } = await importAction()
     await clearQueue()
     expect(mockEnsureUserExists).not.toHaveBeenCalled()
   })
 
-  it("returns { success: false, error } on DB error", async () => {
-    mockDeleteWhere.mockRejectedValue(new Error("DB failure"))
-    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {})
-    const { clearQueue } = await import("@/app/actions/listening-queue")
-    const result = await clearQueue()
-    expect(result.success).toBe(false)
-    expect(consoleSpy).toHaveBeenCalled()
-  })
+  it(
+    "returns { success: false, error } on DB error",
+    testDbError(
+      mockDeleteWhere,
+      async () => (await importAction()).clearQueue(),
+    ),
+  )
 })
