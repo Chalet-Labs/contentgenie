@@ -641,7 +641,7 @@ export function AuthenticatedEpisodeDetail({
               <ShareButton
                 title={episode.title}
                 text={episode.title}
-                url={`${process.env.NEXT_PUBLIC_APP_URL}/episode/${episodeId}`}
+                url={`${process.env.NEXT_PUBLIC_APP_URL}/episode/${encodeURIComponent(episodeId)}`}
                 summary={summaryData?.worthItReason ?? undefined}
                 size="lg"
               />

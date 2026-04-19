@@ -150,6 +150,19 @@ describe("middleware", () => {
     expect(mockProtect).not.toHaveBeenCalled();
   });
 
+  it("keeps POST requests to the episode API protected", async () => {
+    const mockProtect = vi.fn();
+    vi.doMock("@clerk/nextjs/server", () => createClerkMock(null, mockProtect));
+
+    const { default: middleware } = await import("@/middleware");
+    const req = new NextRequest("http://localhost:3000/api/episodes/123", {
+      method: "POST",
+    });
+    await middleware(req, stubEvent);
+
+    expect(mockProtect).toHaveBeenCalled();
+  });
+
   it("keeps the summarize API protected for anonymous users", async () => {
     const mockProtect = vi.fn();
     vi.doMock("@clerk/nextjs/server", () => createClerkMock(null, mockProtect));

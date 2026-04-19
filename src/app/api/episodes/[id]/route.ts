@@ -161,8 +161,14 @@ export async function GET(
     }
 
     // PodcastIndex-sourced episode (existing behavior)
-    const episodeId = parseInt(id, 10);
-    if (isNaN(episodeId)) {
+    if (!/^\d+$/.test(id)) {
+      return NextResponse.json(
+        { error: "Invalid episode ID" },
+        { status: 400 }
+      );
+    }
+    const episodeId = Number(id);
+    if (!Number.isSafeInteger(episodeId)) {
       return NextResponse.json(
         { error: "Invalid episode ID" },
         { status: 400 }
