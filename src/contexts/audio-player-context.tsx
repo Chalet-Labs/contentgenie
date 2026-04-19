@@ -12,6 +12,16 @@ import {
 } from "react"
 import { toast } from "sonner"
 import { arrayMove } from "@dnd-kit/sortable"
+import { useAuth } from "@clerk/nextjs"
+import {
+  clearAllUserLocalData,
+  getLastUserId,
+  hasQueueMigrated,
+  hasSessionMigrated,
+  markQueueMigrated,
+  markSessionMigrated,
+  setLastUserId,
+} from "@/lib/migration-marker"
 import {
   updateMediaSessionMetadata,
   setupMediaSessionHandlers,
@@ -298,6 +308,7 @@ const initialState: AudioPlayerState = {
 }
 
 export function AudioPlayerProvider({ children }: { children: ReactNode }) {
+  const { userId, isLoaded: isAuthLoaded } = useAuth()
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const stallTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const ariaTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -384,6 +395,24 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
     let cancelled = false
 
     async function syncOnMount() {
+      // User-switch guard (ADR-036): if a different user is signed in on this
+      // browser, wipe the prior user's localStorage BEFORE reconciling against
+      // the server — otherwise User A's cached queue/session would leak into
+      // User B's account on the first write.
+      if (isAuthLoaded && userId) {
+        const lastUserId = getLastUserId()
+        if (lastUserId && lastUserId !== userId) {
+          clearAllUserLocalData()
+          suppressQueueWriteRef.current = true
+          dispatch({ type: "INIT_QUEUE", queue: [] })
+          lastAckedQueueRef.current = []
+          // Reset player state (no clearSession flag — the server session
+          // belongs to the new user, we don't want to delete it).
+          teardownPlayer()
+        }
+        setLastUserId(userId)
+      }
+
       let queueResult: Awaited<ReturnType<typeof getQueue>>
       let sessionResult: Awaited<ReturnType<typeof getPlayerSession>>
       try {
@@ -398,51 +427,92 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
 
       if (cancelled) return
 
-      // Reconcile queue
+      // Reconcile queue — gated by per-user migration marker so a queue
+      // cleared on another device isn't resurrected by this browser's cache.
       const localQueue = loadQueue()
-      if (queueResult.success) {
+      if (queueResult.success && userId) {
         const serverQueue = queueResult.data
-        if (serverQueue.length === 0 && localQueue.length > 0) {
-          // One-time migration: upload local queue to server
-          pendingQueueWriteRef.current++
-          try {
-            const result = await setQueueAction(localQueue)
-            if (result.success) {
-              lastAckedQueueRef.current = localQueue
-            } else {
-              console.error("Queue migration failed:", result.error)
+        const hasMigrated = hasQueueMigrated(userId)
+        if (serverQueue.length === 0) {
+          if (localQueue.length > 0 && !hasMigrated) {
+            // One-time upload of pre-sync local queue
+            pendingQueueWriteRef.current++
+            try {
+              const result = await setQueueAction(localQueue)
+              if (result.success) {
+                lastAckedQueueRef.current = localQueue
+                markQueueMigrated(userId)
+              } else {
+                console.error("Queue migration failed:", result.error)
+                toast.error("Couldn't sync your queue", {
+                  description:
+                    "Your local queue didn't upload. We'll try again on the next change.",
+                })
+              }
+            } catch (err) {
+              console.error("Queue migration threw:", err)
               toast.error("Couldn't sync your queue", {
                 description:
                   "Your local queue didn't upload. We'll try again on the next change.",
               })
+            } finally {
+              pendingQueueWriteRef.current--
             }
-          } catch (err) {
-            console.error("Queue migration threw:", err)
-            toast.error("Couldn't sync your queue", {
-              description:
-                "Your local queue didn't upload. We'll try again on the next change.",
-            })
-          } finally {
-            pendingQueueWriteRef.current--
+          } else if (localQueue.length > 0 && hasMigrated) {
+            // Server is authoritative empty — user cleared on another device.
+            suppressQueueWriteRef.current = true
+            lastAckedQueueRef.current = []
+            dispatch({ type: "INIT_QUEUE", queue: [] })
+            saveQueue([])
+          } else {
+            lastAckedQueueRef.current = []
+            if (!hasMigrated) markQueueMigrated(userId)
           }
         } else if (serverQueue.length > 0) {
           if (!pendingQueueWriteRef.current) {
             lastAckedQueueRef.current = serverQueue
             dispatch({ type: "INIT_QUEUE", queue: serverQueue })
+            if (!hasMigrated) markQueueMigrated(userId)
           }
-        } else {
-          lastAckedQueueRef.current = []
         }
-      } else {
+      } else if (!queueResult.success) {
         console.warn("Mount getQueue failed:", queueResult.error)
       }
 
       if (cancelled) return
 
-      // Reconcile session
-      if (sessionResult.success && sessionResult.data) {
-        reconcileServerSession(sessionResult.data)
-      } else if (!sessionResult.success) {
+      // Reconcile session — symmetric to queue. Empty server + migrated user
+      // means "explicitly cleared elsewhere"; empty server + unmigrated means
+      // "never synced before — upload local as one-time migration."
+      if (sessionResult.success) {
+        if (sessionResult.data) {
+          reconcileServerSession(sessionResult.data)
+          if (userId && !hasSessionMigrated(userId)) markSessionMigrated(userId)
+        } else if (userId) {
+          const localEp = stateRef.current.currentEpisode
+          const audio = audioRef.current
+          const hasLocal = localEp !== null
+          const migrated = hasSessionMigrated(userId)
+          if (hasLocal && !migrated) {
+            // One-time upload of pre-sync local session
+            const t = audio?.currentTime ?? 0
+            savePlayerSessionAction(localEp, t)
+              .then((r) => {
+                if (!r.success)
+                  console.warn("[player] session migration failed", r.error)
+              })
+              .catch((err) =>
+                console.warn("[player] session migration threw", err)
+              )
+            markSessionMigrated(userId)
+          } else if (hasLocal && migrated) {
+            // Server authoritative empty — close the locally restored player.
+            teardownPlayer({ clearSession: true })
+          } else if (!hasLocal && !migrated) {
+            markSessionMigrated(userId)
+          }
+        }
+      } else {
         console.warn("Mount getPlayerSession failed:", sessionResult.error)
       }
     }

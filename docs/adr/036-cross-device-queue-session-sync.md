@@ -177,6 +177,19 @@ fields on both tables, debounced by final state (1500ms trailing edge).
   under `setQueue` replace-all semantics; concurrent first-mount on two
   devices is the only racey case and resolves the same way as any concurrent
   mutation (commit-order wins).
+- **Per-user migration markers.** Migration is gated by localStorage keys
+  `contentgenie-queue-migrated-<userId>` / `contentgenie-session-migrated-<userId>`
+  (see `src/lib/migration-marker.ts`). Once set, "server empty" is treated
+  as authoritative — a queue cleared on Device A is no longer resurrected
+  by Device B's stale cache. The original ADR-036 draft accepted this
+  trade-off; the markers close it without changing the last-write-wins
+  write semantics.
+- **Cross-user browser guard.** localStorage key
+  `contentgenie-last-user-id` tracks the last signed-in user. On mount, if
+  it differs from the current `userId`, the entire local cache + all
+  per-user markers are wiped before the first server fetch. Prevents
+  User A's cached queue from leaking into User B's account when both use
+  the same browser.
 - **Supersedes ADR-014.** That ADR explicitly called out "If cross-device
   sync is desired in the future, the queue state shape is already an array
   of AudioEpisode objects that could be persisted server-side without
