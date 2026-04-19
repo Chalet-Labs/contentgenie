@@ -5,6 +5,7 @@ import {
   clearPlayerSession,
 } from "@/lib/player-session"
 import type { AudioEpisode } from "@/contexts/audio-player-context"
+import { createLocalStorageMock } from "@/test/mocks/local-storage"
 
 const validEpisode: AudioEpisode = {
   id: "ep-1",
@@ -16,26 +17,6 @@ const validEpisode: AudioEpisode = {
 }
 
 const STORAGE_KEY = "contentgenie-player-session"
-
-function createLocalStorageMock(): Storage {
-  const store: Record<string, string> = {}
-  return {
-    getItem: (key: string) => store[key] ?? null,
-    setItem: (key: string, value: string) => {
-      store[key] = value
-    },
-    removeItem: (key: string) => {
-      delete store[key]
-    },
-    clear: () => {
-      for (const key of Object.keys(store)) delete store[key]
-    },
-    get length() {
-      return Object.keys(store).length
-    },
-    key: (index: number) => Object.keys(store)[index] ?? null,
-  }
-}
 
 function storeSession(
   episode: AudioEpisode,

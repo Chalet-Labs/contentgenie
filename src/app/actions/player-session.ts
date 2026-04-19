@@ -1,10 +1,10 @@
 "use server"
 
-import { auth } from "@clerk/nextjs/server"
 import { eq } from "drizzle-orm"
 import { db } from "@/db"
 import { ensureUserExists } from "@/db/helpers"
 import { userPlayerSession } from "@/db/schema"
+import { withAuthAction } from "@/lib/auth-wrapper"
 import {
   savePlayerSessionSchema,
   toAudioEpisode,
@@ -16,27 +16,26 @@ export async function getPlayerSession(): Promise<
   | { success: true; data: { episode: AudioEpisode; currentTime: number } | null }
   | { success: false; error: string }
 > {
-  const { userId } = await auth()
-  if (!userId) return { success: false, error: "Unauthorized" }
+  return withAuthAction(async (userId) => {
+    try {
+      const row = await db.query.userPlayerSession.findFirst({
+        where: eq(userPlayerSession.userId, userId),
+      })
 
-  try {
-    const row = await db.query.userPlayerSession.findFirst({
-      where: eq(userPlayerSession.userId, userId),
-    })
+      if (!row) return { success: true as const, data: null }
 
-    if (!row) return { success: true, data: null }
-
-    return {
-      success: true,
-      data: {
-        episode: toAudioEpisode(row),
-        currentTime: Number(row.currentTime),
-      },
+      return {
+        success: true as const,
+        data: {
+          episode: toAudioEpisode(row),
+          currentTime: Number(row.currentTime),
+        },
+      }
+    } catch (e) {
+      console.error("Failed to get player session:", e)
+      return { success: false as const, error: "Failed to get player session" }
     }
-  } catch (e) {
-    console.error("Failed to get player session:", e)
-    return { success: false, error: "Failed to get player session" }
-  }
+  })
 }
 
 /**
@@ -53,54 +52,52 @@ export async function savePlayerSession(
   episode: AudioEpisode,
   currentTime: number
 ): Promise<{ success: true } | { success: false; error: string }> {
-  const { userId } = await auth()
-  if (!userId) return { success: false, error: "Unauthorized" }
-
-  const parsed = savePlayerSessionSchema.safeParse({ episode, currentTime })
-  if (!parsed.success) {
-    console.warn("[savePlayerSession] validation failed", parsed.error.issues)
-    return { success: false, error: "Invalid session data" }
-  }
-
-  const { episode: validEpisode, currentTime: validCurrentTime } = parsed.data
-
-  try {
-    await ensureUserExists(userId)
-
-    const updateValues = {
-      ...toEpisodeDenormRow(validEpisode),
-      currentTime: String(validCurrentTime),
-      updatedAt: new Date(),
+  return withAuthAction(async (userId) => {
+    const parsed = savePlayerSessionSchema.safeParse({ episode, currentTime })
+    if (!parsed.success) {
+      console.warn("[savePlayerSession] validation failed", parsed.error.issues)
+      return { success: false as const, error: "Invalid session data" }
     }
 
-    await db
-      .insert(userPlayerSession)
-      .values({ userId, ...updateValues })
-      .onConflictDoUpdate({
-        target: userPlayerSession.userId,
-        set: updateValues,
-      })
+    const { episode: validEpisode, currentTime: validCurrentTime } = parsed.data
 
-    return { success: true }
-  } catch (e) {
-    console.error("Failed to save player session:", e)
-    return { success: false, error: "Failed to save player session" }
-  }
+    try {
+      await ensureUserExists(userId)
+
+      const updateValues = {
+        ...toEpisodeDenormRow(validEpisode),
+        currentTime: String(validCurrentTime),
+        updatedAt: new Date(),
+      }
+
+      await db
+        .insert(userPlayerSession)
+        .values({ userId, ...updateValues })
+        .onConflictDoUpdate({
+          target: userPlayerSession.userId,
+          set: updateValues,
+        })
+
+      return { success: true as const }
+    } catch (e) {
+      console.error("Failed to save player session:", e)
+      return { success: false as const, error: "Failed to save player session" }
+    }
+  })
 }
 
 export async function clearPlayerSession(): Promise<
   { success: true } | { success: false; error: string }
 > {
-  const { userId } = await auth()
-  if (!userId) return { success: false, error: "Unauthorized" }
-
-  try {
-    await db
-      .delete(userPlayerSession)
-      .where(eq(userPlayerSession.userId, userId))
-    return { success: true }
-  } catch (e) {
-    console.error("Failed to clear player session:", e)
-    return { success: false, error: "Failed to clear player session" }
-  }
+  return withAuthAction(async (userId) => {
+    try {
+      await db
+        .delete(userPlayerSession)
+        .where(eq(userPlayerSession.userId, userId))
+      return { success: true as const }
+    } catch (e) {
+      console.error("Failed to clear player session:", e)
+      return { success: false as const, error: "Failed to clear player session" }
+    }
+  })
 }
