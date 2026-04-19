@@ -12,6 +12,16 @@ import {
 } from "react"
 import { toast } from "sonner"
 import { arrayMove } from "@dnd-kit/sortable"
+import { useAuth } from "@clerk/nextjs"
+import {
+  clearAllUserLocalData,
+  getLastUserId,
+  hasQueueMigrated,
+  hasSessionMigrated,
+  markQueueMigrated,
+  markSessionMigrated,
+  setLastUserId,
+} from "@/lib/migration-marker"
 import {
   updateMediaSessionMetadata,
   setupMediaSessionHandlers,
@@ -30,7 +40,43 @@ import {
 } from "@/lib/player-session"
 import { fadeOutAudio } from "@/lib/audio-fade"
 import type { Chapter } from "@/lib/chapters"
+import type { AudioEpisode } from "@/lib/schemas/listening-queue"
 import { recordListenEvent } from "@/app/actions/listen-history"
+import {
+  getQueue,
+  setQueue as setQueueAction,
+} from "@/app/actions/listening-queue"
+import {
+  getPlayerSession,
+  savePlayerSession as savePlayerSessionAction,
+  clearPlayerSession as clearPlayerSessionAction,
+} from "@/app/actions/player-session"
+
+// ---------------------------------------------------------------------------
+// Server-sync helpers (fire-and-forget; best-effort with warn-on-failure)
+// ---------------------------------------------------------------------------
+
+type SessionSaveSite = "throttle" | "pause" | "beforeunload"
+
+function persistSessionToServer(
+  episode: AudioEpisode,
+  currentTime: number,
+  site: SessionSaveSite
+): void {
+  savePlayerSessionAction(episode, currentTime)
+    .then((r) => {
+      if (!r.success) console.warn("[player] save failed", { site, error: r.error })
+    })
+    .catch((err) => console.warn("[player] save threw", { site, err }))
+}
+
+function clearSessionOnServer(): void {
+  clearPlayerSessionAction()
+    .then((r) => {
+      if (!r.success) console.warn("[player] clear failed:", r.error)
+    })
+    .catch((err) => console.warn("[player] clear threw:", err))
+}
 
 // ---------------------------------------------------------------------------
 // Types
@@ -44,15 +90,7 @@ export interface SleepTimerState {
   type: SleepTimerType
 }
 
-export interface AudioEpisode {
-  id: string
-  title: string
-  podcastTitle: string
-  audioUrl: string
-  artwork?: string
-  duration?: number
-  chaptersUrl?: string
-}
+export type { AudioEpisode }
 
 export interface AudioPlayerState {
   currentEpisode: AudioEpisode | null
@@ -270,6 +308,7 @@ const initialState: AudioPlayerState = {
 }
 
 export function AudioPlayerProvider({ children }: { children: ReactNode }) {
+  const { userId, isLoaded: isAuthLoaded } = useAuth()
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const stallTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const ariaTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -289,6 +328,19 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
   // Intentionally NOT cleared on replay — upsert COALESCE preserves first startedAt,
   // so re-firing after success would be a no-op server call.
   const listenHistoryFiredRef = useRef<Map<string, number>>(new Map())
+
+  // Cross-device sync refs
+  // Counter instead of boolean: stays > 0 while any debounce timer is scheduled OR
+  // any setQueueAction is in-flight, preventing a concurrent focus refetch from
+  // clobbering an unacked local mutation even across sequential writes.
+  // See ADR-036.
+  const pendingQueueWriteRef = useRef(0)
+  const lastAckedQueueRef = useRef<AudioEpisode[]>([])
+  const queueDebounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const focusDebounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  // Set to true when dispatching INIT_QUEUE from a server reconcile; prevents the
+  // queue-persist effect from scheduling a write back to the server for that change.
+  const suppressQueueWriteRef = useRef(false)
 
   const [state, dispatch] = useReducer(reducer, initialState)
 
@@ -314,6 +366,10 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
   // ---- Hydrate queue from localStorage on mount ----
   useEffect(() => {
     const persisted = loadQueue()
+    // Seed lastAckedQueueRef so the persist effect's first run sees currentIds ===
+    // ackedIds and skips scheduling a spurious setQueue write. Without this, the
+    // cached local queue would overwrite the server state on every cold boot.
+    lastAckedQueueRef.current = persisted
     dispatch({ type: "INIT_QUEUE", queue: persisted })
     isQueueHydrated.current = true
   }, [])
@@ -334,10 +390,275 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
     isSessionRestored.current = true
   }, [])
 
-  // ---- Persist queue to localStorage on changes ----
+  // ---- Server-sync: parallel getQueue + getPlayerSession, reconcile, migrate ----
+  // Runs whenever Clerk finishes loading OR `userId` changes. Without the
+  // `isAuthLoaded && userId` gate on the deps, a first-render pre-hydration
+  // pass would call the server actions, get Unauthorized, and never retry
+  // (the effect had `[]` deps), leaving cross-device state unsynced and
+  // — worse — letting an empty server response wipe a non-empty local queue.
+  useEffect(() => {
+    if (!isAuthLoaded || !userId) return
+    // Bind the narrowed userId for the nested async closure — TypeScript
+    // doesn't propagate the guard across the function boundary.
+    const activeUserId = userId
+    let cancelled = false
+
+    async function syncOnMount() {
+      // User-switch guard (ADR-036): if a different user is signed in on this
+      // browser, wipe the prior user's localStorage BEFORE reconciling against
+      // the server — otherwise User A's cached queue/session would leak into
+      // User B's account on the first write.
+      const lastUserId = getLastUserId()
+      if (lastUserId && lastUserId !== activeUserId) {
+        clearAllUserLocalData()
+        suppressQueueWriteRef.current = true
+        dispatch({ type: "INIT_QUEUE", queue: [] })
+        lastAckedQueueRef.current = []
+        // Reset player state (no clearSession flag — the server session
+        // belongs to the new user, we don't want to delete it).
+        teardownPlayer()
+      }
+      setLastUserId(activeUserId)
+
+      let queueResult: Awaited<ReturnType<typeof getQueue>>
+      let sessionResult: Awaited<ReturnType<typeof getPlayerSession>>
+      try {
+        ;[queueResult, sessionResult] = await Promise.all([
+          getQueue(),
+          getPlayerSession(),
+        ])
+      } catch (err) {
+        console.error("Failed to fetch cross-device sync state on mount:", err)
+        return
+      }
+
+      if (cancelled) return
+
+      // Reconcile queue — gated by per-user migration marker so a queue
+      // cleared on another device isn't resurrected by this browser's cache.
+      const localQueue = loadQueue()
+      if (queueResult.success) {
+        const serverQueue = queueResult.data
+        const hasMigrated = hasQueueMigrated(activeUserId)
+        if (serverQueue.length === 0) {
+          if (localQueue.length > 0 && !hasMigrated) {
+            // One-time upload of pre-sync local queue
+            pendingQueueWriteRef.current++
+            try {
+              const result = await setQueueAction(localQueue)
+              if (result.success) {
+                lastAckedQueueRef.current = localQueue
+                markQueueMigrated(activeUserId)
+              } else {
+                console.error("Queue migration failed:", result.error)
+                toast.error("Couldn't sync your queue", {
+                  description:
+                    "Your local queue didn't upload. We'll try again on the next change.",
+                })
+              }
+            } catch (err) {
+              console.error("Queue migration threw:", err)
+              toast.error("Couldn't sync your queue", {
+                description:
+                  "Your local queue didn't upload. We'll try again on the next change.",
+              })
+            } finally {
+              pendingQueueWriteRef.current--
+            }
+          } else if (localQueue.length > 0 && hasMigrated) {
+            // Server is authoritative empty — user cleared on another device.
+            suppressQueueWriteRef.current = true
+            lastAckedQueueRef.current = []
+            dispatch({ type: "INIT_QUEUE", queue: [] })
+            saveQueue([])
+          } else {
+            lastAckedQueueRef.current = []
+            if (!hasMigrated) markQueueMigrated(activeUserId)
+          }
+        } else if (serverQueue.length > 0) {
+          if (!pendingQueueWriteRef.current) {
+            lastAckedQueueRef.current = serverQueue
+            dispatch({ type: "INIT_QUEUE", queue: serverQueue })
+            if (!hasMigrated) markQueueMigrated(activeUserId)
+          }
+        }
+      } else {
+        console.warn("Mount getQueue failed:", queueResult.error)
+      }
+
+      if (cancelled) return
+
+      // Reconcile session — symmetric to queue. Empty server + migrated user
+      // means "explicitly cleared elsewhere"; empty server + unmigrated means
+      // "never synced before — upload local as one-time migration."
+      if (sessionResult.success) {
+        if (sessionResult.data) {
+          reconcileServerSession(sessionResult.data)
+          if (!hasSessionMigrated(activeUserId)) markSessionMigrated(activeUserId)
+        } else {
+          const localEp = stateRef.current.currentEpisode
+          const audio = audioRef.current
+          const hasLocal = localEp !== null
+          const migrated = hasSessionMigrated(activeUserId)
+          if (hasLocal && !migrated) {
+            // One-time upload of pre-sync local session
+            const t = audio?.currentTime ?? 0
+            savePlayerSessionAction(localEp, t)
+              .then((r) => {
+                if (!r.success)
+                  console.warn("[player] session migration failed", r.error)
+              })
+              .catch((err) =>
+                console.warn("[player] session migration threw", err)
+              )
+            markSessionMigrated(activeUserId)
+          } else if (hasLocal && migrated) {
+            // Server authoritative empty — close the locally restored player.
+            teardownPlayer({ clearSession: true })
+          } else if (!hasLocal && !migrated) {
+            markSessionMigrated(activeUserId)
+          }
+        }
+      } else {
+        console.warn("Mount getPlayerSession failed:", sessionResult.error)
+      }
+    }
+
+    void syncOnMount()
+    return () => { cancelled = true }
+  // Only `isAuthLoaded`/`userId` gate the effect. `reconcileServerSession`,
+  // `loadEpisodeIntoPlayer`, and the provider-scope helpers are closed over
+  // and change identity every render; re-running on those would re-trigger
+  // the cross-device fetch continuously.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthLoaded, userId])
+
+  // ---- Focus/visibilitychange refetch: reconcile server state (200ms debounce) ----
+  useEffect(() => {
+    function scheduleRefetch() {
+      if (focusDebounceTimerRef.current) {
+        clearTimeout(focusDebounceTimerRef.current)
+      }
+      focusDebounceTimerRef.current = setTimeout(async () => {
+        focusDebounceTimerRef.current = null
+
+        let queueResult: Awaited<ReturnType<typeof getQueue>>
+        let sessionResult: Awaited<ReturnType<typeof getPlayerSession>>
+        try {
+          ;[queueResult, sessionResult] = await Promise.all([
+            getQueue(),
+            getPlayerSession(),
+          ])
+        } catch (err) {
+          console.error("Focus refetch failed:", err)
+          return
+        }
+
+        // Queue reconcile: skip if a local write is pending
+        if (queueResult.success && !pendingQueueWriteRef.current) {
+          lastAckedQueueRef.current = queueResult.data
+          dispatch({ type: "INIT_QUEUE", queue: queueResult.data })
+        } else if (!queueResult.success) {
+          console.warn("Focus getQueue failed:", queueResult.error)
+        }
+
+        // Session reconcile
+        if (sessionResult.success && sessionResult.data) {
+          reconcileServerSession(sessionResult.data)
+        } else if (!sessionResult.success) {
+          console.warn("Focus getPlayerSession failed:", sessionResult.error)
+        }
+      }, 200)
+    }
+
+    const onVisibilityFocus = () => {
+      if (document.visibilityState === "visible") scheduleRefetch()
+    }
+
+    window.addEventListener("focus", scheduleRefetch)
+    document.addEventListener("visibilitychange", onVisibilityFocus)
+    return () => {
+      window.removeEventListener("focus", scheduleRefetch)
+      document.removeEventListener("visibilitychange", onVisibilityFocus)
+      if (focusDebounceTimerRef.current) {
+        clearTimeout(focusDebounceTimerRef.current)
+        focusDebounceTimerRef.current = null
+      }
+    }
+  // Mount-only: registers focus + visibilitychange listeners once. The
+  // `reconcileServerSession` closure captures refs only, so listener
+  // reinstallation on every render would thrash for no behavior change.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // ---- Persist queue to localStorage + debounced server write ----
   useEffect(() => {
     if (!isQueueHydrated.current) return
+
     saveQueue(state.queue)
+
+    // Skip server write if this queue change originated from a server reconcile
+    // or a rollback-triggered INIT_QUEUE. Check this BEFORE the acked-IDs
+    // early return — otherwise a rollback (which restores the acked queue by
+    // definition) would bail on ID equality and leave the suppress flag set,
+    // silently dropping the next real user mutation.
+    if (suppressQueueWriteRef.current) {
+      suppressQueueWriteRef.current = false
+      return
+    }
+
+    // Skip server write if the queue matches the last server-acked state (no user mutation)
+    const currentIds = state.queue.map((ep) => ep.id).join(",")
+    const ackedIds = lastAckedQueueRef.current.map((ep) => ep.id).join(",")
+    if (currentIds === ackedIds) return
+
+    // Trailing-edge 1500ms debounce: collapses rapid reorders into a single setQueue call.
+    // Increment the counter when scheduling so the flag stays > 0 while any timer or
+    // in-flight write is outstanding (prevents focus-refetch from clobbering).
+    if (queueDebounceTimerRef.current) {
+      clearTimeout(queueDebounceTimerRef.current)
+      pendingQueueWriteRef.current-- // cancel the previously scheduled increment
+    }
+    const snapshot = state.queue.slice()
+    pendingQueueWriteRef.current++
+    queueDebounceTimerRef.current = setTimeout(async () => {
+      queueDebounceTimerRef.current = null
+      try {
+        const result = await setQueueAction(snapshot)
+        if (result.success) {
+          lastAckedQueueRef.current = snapshot
+        } else {
+          toast.error("Couldn't sync queue", {
+            description: "Your queue change couldn't be saved. Rolling back.",
+          })
+          suppressQueueWriteRef.current = true
+          dispatch({ type: "INIT_QUEUE", queue: lastAckedQueueRef.current })
+        }
+      } catch {
+        toast.error("Couldn't sync queue", {
+          description: "Your queue change couldn't be saved. Rolling back.",
+        })
+        suppressQueueWriteRef.current = true
+        dispatch({ type: "INIT_QUEUE", queue: lastAckedQueueRef.current })
+      } finally {
+        pendingQueueWriteRef.current--
+      }
+    }, 1500)
+
+    return () => {
+      if (queueDebounceTimerRef.current) {
+        clearTimeout(queueDebounceTimerRef.current)
+        queueDebounceTimerRef.current = null
+        // Balance the increment that scheduled this debounced write. The
+        // lint rule assumes refs point to DOM nodes that may unmount; this
+        // one is a plain counter, so reading the live value is intentional.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        pendingQueueWriteRef.current--
+      }
+    }
+  // Only `state.queue` is a reactive dep. `setQueueAction` is a stable import,
+  // and the refs / `dispatch` are stable by React contract.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state.queue])
 
   // ---- Sync volume & speed to audio element ----
@@ -543,6 +864,45 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  // ---- Reconcile a server-fetched session into the player ----
+  // Shared by mount-sync and focus-refetch. Preserves the never-rewind
+  // invariant: if the same episode is actively playing, server currentTime
+  // is ignored.
+  const reconcileServerSession = (serverSession: {
+    episode: AudioEpisode
+    currentTime: number
+  }) => {
+    const currentEp = stateRef.current.currentEpisode
+    const audio = audioRef.current
+    const isActivelyPlaying = audio
+      ? !audio.paused
+      : stateRef.current.isPlaying
+    const sameEpisode =
+      currentEp && currentEp.id === serverSession.episode.id
+
+    if (sameEpisode && isActivelyPlaying) {
+      return
+    }
+    if (sameEpisode && !isActivelyPlaying) {
+      if (audio && Number.isFinite(serverSession.currentTime)) {
+        pendingSeekRef.current = serverSession.currentTime
+        if (audio.duration > 0 && !isNaN(audio.duration)) {
+          audio.currentTime = Math.min(
+            serverSession.currentTime,
+            audio.duration
+          )
+          pendingSeekRef.current = null
+        }
+      }
+      return
+    }
+    isRestoringSession.current = true
+    loadEpisodeIntoPlayer(serverSession.episode, {
+      andPlay: false,
+      startAt: serverSession.currentTime,
+    })
+  }
+
   // ---- Shared player teardown ----
   // Resets the audio element and all player state. Only clears the persisted
   // session when the user explicitly closes the player (not on auto-advance errors).
@@ -559,7 +919,8 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       clearSleepTimerInterval()
       cancelFade()
       if (options?.clearSession) {
-        clearPlayerSession()
+        clearPlayerSession() // localStorage cache
+        clearSessionOnServer() // server source of truth
       }
       if (sessionSaveTimerRef.current) {
         clearTimeout(sessionSaveTimerRef.current)
@@ -765,7 +1126,8 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
           sessionSaveTimerRef.current = null
           const ep = stateRef.current.currentEpisode
           if (ep) {
-            savePlayerSession(ep, audio.currentTime)
+            savePlayerSession(ep, audio.currentTime) // localStorage cache
+            persistSessionToServer(ep, audio.currentTime, "throttle")
           }
         }, 5000)
       }
@@ -853,9 +1215,17 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
     const onPause = () => {
       dispatch({ type: "SET_PLAYING", isPlaying: false })
       clearStallTimer()
-      // Save exact pause position immediately
+      // Save exact pause position immediately (locally AND to the server so a
+      // pause on Device A reflects on Device B without waiting for the 5s throttle).
+      // Clear any pending throttled save — the immediate pause save supersedes it.
+      if (sessionSaveTimerRef.current) {
+        clearTimeout(sessionSaveTimerRef.current)
+        sessionSaveTimerRef.current = null
+      }
       if (isSessionRestored.current && stateRef.current.currentEpisode) {
-        savePlayerSession(stateRef.current.currentEpisode, audio.currentTime)
+        const ep = stateRef.current.currentEpisode
+        savePlayerSession(ep, audio.currentTime) // localStorage cache
+        persistSessionToServer(ep, audio.currentTime, "pause")
       }
     }
 
@@ -972,7 +1342,10 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       const ep = stateRef.current.currentEpisode
       const audio = audioRef.current
       if (ep && audio && isSessionRestored.current) {
-        savePlayerSession(ep, audio.currentTime)
+        savePlayerSession(ep, audio.currentTime) // localStorage cache
+        // beforeunload can't await; the browser may drop the request, but
+        // the helper attaches its own .catch so rejections aren't unhandled.
+        persistSessionToServer(ep, audio.currentTime, "beforeunload")
       }
     }
     window.addEventListener("beforeunload", onBeforeUnload)

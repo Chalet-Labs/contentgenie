@@ -1,72 +1,32 @@
-import type { AudioEpisode } from "@/contexts/audio-player-context"
+/**
+ * localStorage cache for the player session (resume position).
+ * Source of truth is the server — see `src/app/actions/player-session.ts`.
+ * No TTL: the server has no TTL either. `savedAt` is kept for debugging /
+ * cache-invalidation telemetry only.
+ *
+ * Episode validation is delegated to `audioEpisodeSchema` so the cache and
+ * the server agree on shape (see ADR-036).
+ */
+import { z } from "zod"
+import {
+  audioEpisodeSchema,
+  MAX_TIME_SECONDS,
+  type AudioEpisode,
+} from "@/lib/schemas/listening-queue"
 
 const STORAGE_KEY = "contentgenie-player-session"
-const SESSION_TTL_MS = 24 * 60 * 60 * 1000 // 24 hours
 
-interface PlayerSession {
-  episode: AudioEpisode
-  currentTime: number
-  savedAt: number
-}
+const storedSessionSchema = z
+  .object({
+    episode: audioEpisodeSchema,
+    // Cap matches `savePlayerSessionSchema` so a tampered localStorage value
+    // can't hydrate locally and then fail the next server sync.
+    currentTime: z.number().nonnegative().finite().max(MAX_TIME_SECONDS),
+    savedAt: z.number().nonnegative().finite().optional(),
+  })
+  .strip()
 
-function isValidSession(data: unknown): data is PlayerSession {
-  if (typeof data !== "object" || data === null) return false
-  const obj = data as Record<string, unknown>
-
-  // Validate episode
-  const ep = obj.episode
-  if (typeof ep !== "object" || ep === null) return false
-  const episode = ep as Record<string, unknown>
-
-  const requiredFields = ["id", "title", "podcastTitle", "audioUrl"] as const
-  if (
-    !requiredFields.every(
-      (field) => typeof episode[field] === "string" && episode[field] !== ""
-    )
-  ) {
-    return false
-  }
-
-  // Validate optional episode fields
-  if ("artwork" in episode && episode.artwork !== undefined) {
-    if (typeof episode.artwork !== "string" || episode.artwork === "") return false
-  }
-  if ("duration" in episode && episode.duration !== undefined) {
-    if (
-      typeof episode.duration !== "number" ||
-      !Number.isFinite(episode.duration) ||
-      episode.duration < 0
-    )
-      return false
-  }
-  if ("chaptersUrl" in episode && episode.chaptersUrl !== undefined) {
-    if (typeof episode.chaptersUrl !== "string" || episode.chaptersUrl === "")
-      return false
-  }
-
-  // Validate currentTime
-  if (
-    typeof obj.currentTime !== "number" ||
-    !Number.isFinite(obj.currentTime) ||
-    obj.currentTime < 0
-  ) {
-    return false
-  }
-
-  // Validate savedAt
-  if (
-    typeof obj.savedAt !== "number" ||
-    !Number.isFinite(obj.savedAt) ||
-    obj.savedAt <= 0
-  ) {
-    return false
-  }
-
-  // TTL check
-  if (Date.now() - obj.savedAt >= SESSION_TTL_MS) return false
-
-  return true
-}
+type PlayerSession = z.infer<typeof storedSessionSchema>
 
 export function loadPlayerSession(): {
   episode: AudioEpisode
@@ -79,12 +39,16 @@ export function loadPlayerSession(): {
     if (!raw) return null
 
     const parsed: unknown = JSON.parse(raw)
-    if (!isValidSession(parsed)) {
+    const result = storedSessionSchema.safeParse(parsed)
+    if (!result.success) {
       clearPlayerSession()
       return null
     }
 
-    return { episode: parsed.episode, currentTime: parsed.currentTime }
+    return {
+      episode: result.data.episode,
+      currentTime: result.data.currentTime,
+    }
   } catch {
     clearPlayerSession()
     return null

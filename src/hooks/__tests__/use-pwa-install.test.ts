@@ -18,6 +18,7 @@ vi.mock("next/navigation", () => ({
 }));
 
 import { usePwaInstall } from "@/hooks/use-pwa-install";
+import { installLocalStorageMock } from "@/test/mocks/local-storage";
 
 function createMockMatchMedia(overrides: Record<string, boolean> = {}) {
   return (query: string): MediaQueryList => ({
@@ -45,27 +46,6 @@ function fireBeforeInstallPrompt(): BeforeInstallPromptEvent {
   return event;
 }
 
-// Simple in-memory localStorage mock that has all standard methods
-function createLocalStorageMock(): Storage {
-  const store: Record<string, string> = {};
-  return {
-    getItem: (key: string) => store[key] ?? null,
-    setItem: (key: string, value: string) => {
-      store[key] = value;
-    },
-    removeItem: (key: string) => {
-      delete store[key];
-    },
-    clear: () => {
-      for (const key of Object.keys(store)) delete store[key];
-    },
-    get length() {
-      return Object.keys(store).length;
-    },
-    key: (index: number) => Object.keys(store)[index] ?? null,
-  };
-}
-
 describe("usePwaInstall", () => {
   let originalMatchMedia: typeof window.matchMedia;
 
@@ -75,11 +55,7 @@ describe("usePwaInstall", () => {
     originalMatchMedia = window.matchMedia;
 
     // Install a proper localStorage mock
-    Object.defineProperty(window, "localStorage", {
-      value: createLocalStorageMock(),
-      writable: true,
-      configurable: true,
-    });
+    installLocalStorageMock();
 
     // Default: not standalone, is mobile
     window.matchMedia = createMockMatchMedia({

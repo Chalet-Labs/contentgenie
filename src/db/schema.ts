@@ -359,14 +359,62 @@ export const listenHistory = pgTable(
   ]
 );
 
+// User Queue Items table (denormalized episode fields for cross-device queue sync)
+export const userQueueItems = pgTable(
+  "user_queue_items",
+  {
+    id: serial("id").primaryKey(),
+    userId: text("user_id")
+      .references(() => users.id, { onDelete: "cascade" })
+      .notNull(),
+    position: integer("position").notNull(),
+    episodeId: text("episode_id").notNull(),
+    title: text("title").notNull(),
+    podcastTitle: text("podcast_title").notNull(),
+    audioUrl: text("audio_url").notNull(),
+    artwork: text("artwork"),
+    duration: integer("duration"),
+    chaptersUrl: text("chapters_url"),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("user_queue_items_user_episode_idx").on(
+      table.userId,
+      table.episodeId
+    ),
+    uniqueIndex("user_queue_items_user_position_idx").on(
+      table.userId,
+      table.position
+    ),
+  ]
+);
+
+// User Player Session table (per-user resume state, one row per user)
+export const userPlayerSession = pgTable("user_player_session", {
+  userId: text("user_id")
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  episodeId: text("episode_id").notNull(),
+  title: text("title").notNull(),
+  podcastTitle: text("podcast_title").notNull(),
+  audioUrl: text("audio_url").notNull(),
+  artwork: text("artwork"),
+  duration: integer("duration"),
+  chaptersUrl: text("chapters_url"),
+  currentTime: decimal("current_time", { precision: 12, scale: 3 }).notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 // Relations
-export const usersRelations = relations(users, ({ many }) => ({
+export const usersRelations = relations(users, ({ many, one }) => ({
   subscriptions: many(userSubscriptions),
   library: many(userLibrary),
   collections: many(collections),
   notifications: many(notifications),
   pushSubscriptions: many(pushSubscriptions),
   listenHistory: many(listenHistory),
+  queueItems: many(userQueueItems),
+  playerSession: one(userPlayerSession),
 }));
 
 export const podcastsRelations = relations(podcasts, ({ many }) => ({
@@ -476,6 +524,23 @@ export const listenHistoryRelations = relations(listenHistory, ({ one }) => ({
   }),
 }));
 
+export const userQueueItemsRelations = relations(userQueueItems, ({ one }) => ({
+  user: one(users, {
+    fields: [userQueueItems.userId],
+    references: [users.id],
+  }),
+}));
+
+export const userPlayerSessionRelations = relations(
+  userPlayerSession,
+  ({ one }) => ({
+    user: one(users, {
+      fields: [userPlayerSession.userId],
+      references: [users.id],
+    }),
+  })
+);
+
 // Type exports for use in the application
 export type RateLimit = typeof rateLimits.$inferSelect;
 export type NewRateLimit = typeof rateLimits.$inferInsert;
@@ -539,3 +604,49 @@ export const IN_PROGRESS_STATUSES: SummaryStatus[] = [
   "running",
   "summarizing",
 ];
+
+export type UserQueueItem = typeof userQueueItems.$inferSelect;
+export type NewUserQueueItem = typeof userQueueItems.$inferInsert;
+
+export type UserPlayerSession = typeof userPlayerSession.$inferSelect;
+export type NewUserPlayerSession = typeof userPlayerSession.$inferInsert;
+
+// ---------------------------------------------------------------------------
+// Denormalization bridge check (ADR-036)
+//
+// `user_queue_items` and `user_player_session` intentionally denormalize the
+// episode metadata instead of joining to `episodes`. ADR-036 accepts cosmetic
+// drift on retitle — but silently losing a field when someone adds one to
+// `AudioEpisode` without adding a column is not acceptable. The type-level
+// assertion below fails the build if the denormalized columns stop being a
+// superset of `AudioEpisode` (key-wise; column nullability does not have to
+// match `?` optionality).
+// ---------------------------------------------------------------------------
+
+type _AudioEpisodeNonIdKeys = keyof Omit<
+  import("@/lib/schemas/listening-queue").AudioEpisode,
+  "id"
+>;
+
+type _QueueDenormKeys = keyof Omit<
+  UserQueueItem,
+  "id" | "userId" | "position" | "updatedAt" | "episodeId"
+>;
+
+type _SessionDenormKeys = keyof Omit<
+  UserPlayerSession,
+  "userId" | "episodeId" | "currentTime" | "updatedAt"
+>;
+
+type _Assert<T extends true> = T;
+type _KeysMatch<A, B> = [A, B] extends [B, A] ? true : false;
+
+// If either of these fails to compile, the denormalized columns and
+// AudioEpisode have drifted. Fix by adding/removing a column on
+// user_queue_items / user_player_session to match AudioEpisode's shape.
+export type _QueueDenormInvariant = _Assert<
+  _KeysMatch<_QueueDenormKeys, _AudioEpisodeNonIdKeys>
+>;
+export type _SessionDenormInvariant = _Assert<
+  _KeysMatch<_SessionDenormKeys, _AudioEpisodeNonIdKeys>
+>;

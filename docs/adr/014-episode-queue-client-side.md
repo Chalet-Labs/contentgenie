@@ -1,6 +1,9 @@
 # ADR-014: Client-Side Episode Queue with localStorage Persistence
 
-**Status:** Proposed
+**Status:** Superseded by [ADR-036](036-cross-device-queue-session-sync.md)
+
+> Superseded by ADR-036 on 2026-04-18 — the client-side-only approach was replaced by server-backed cross-device sync. See ADR-036 for the current design.
+
 **Date:** 2026-03-03
 **Issue:** [#94](https://github.com/Chalet-Labs/contentgenie/issues/94)
 

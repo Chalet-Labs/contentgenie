@@ -1,50 +1,16 @@
 import { describe, it, expect, beforeEach } from "vitest"
 import { loadQueue, saveQueue } from "@/lib/queue-persistence"
 import type { AudioEpisode } from "@/contexts/audio-player-context"
-
-const validEpisode: AudioEpisode = {
-  id: "ep-1",
-  title: "Test Episode",
-  podcastTitle: "Test Podcast",
-  audioUrl: "https://example.com/audio.mp3",
-  artwork: "https://example.com/art.jpg",
-  duration: 600,
-}
-
-const validEpisode2: AudioEpisode = {
-  id: "ep-2",
-  title: "Second Episode",
-  podcastTitle: "Another Podcast",
-  audioUrl: "https://example.com/audio2.mp3",
-}
-
-function createLocalStorageMock(): Storage {
-  const store: Record<string, string> = {}
-  return {
-    getItem: (key: string) => store[key] ?? null,
-    setItem: (key: string, value: string) => {
-      store[key] = value
-    },
-    removeItem: (key: string) => {
-      delete store[key]
-    },
-    clear: () => {
-      for (const key of Object.keys(store)) delete store[key]
-    },
-    get length() {
-      return Object.keys(store).length
-    },
-    key: (index: number) => Object.keys(store)[index] ?? null,
-  }
-}
+import {
+  installLocalStorageMock,
+  installQuotaExceededLocalStorage,
+  withoutWindow,
+} from "@/test/mocks/local-storage"
+import { validEpisode, validEpisode2 } from "@/test/fixtures/audio-episode"
 
 describe("loadQueue", () => {
   beforeEach(() => {
-    Object.defineProperty(window, "localStorage", {
-      value: createLocalStorageMock(),
-      writable: true,
-      configurable: true,
-    })
+    installLocalStorageMock()
   })
 
   it("returns empty array when nothing stored", () => {
@@ -119,6 +85,38 @@ describe("loadQueue", () => {
     expect(loadQueue()).toEqual([])
   })
 
+  it("accepts items with a valid chaptersUrl string", () => {
+    const withChapters: AudioEpisode = {
+      ...validEpisode,
+      chaptersUrl: "https://example.com/chapters.json",
+    }
+    window.localStorage.setItem(
+      "contentgenie-player-queue",
+      JSON.stringify([withChapters])
+    )
+    const result = loadQueue()
+    expect(result).toHaveLength(1)
+    expect(result[0].chaptersUrl).toBe("https://example.com/chapters.json")
+  })
+
+  it("filters out items with empty-string chaptersUrl", () => {
+    const items = [{ ...validEpisode, chaptersUrl: "" }]
+    window.localStorage.setItem(
+      "contentgenie-player-queue",
+      JSON.stringify(items)
+    )
+    expect(loadQueue()).toEqual([])
+  })
+
+  it("filters out items with non-string chaptersUrl", () => {
+    const items = [{ ...validEpisode, chaptersUrl: 42 }]
+    window.localStorage.setItem(
+      "contentgenie-player-queue",
+      JSON.stringify(items)
+    )
+    expect(loadQueue()).toEqual([])
+  })
+
   it("filters out null items in the array", () => {
     const items = [null, validEpisode, undefined, 42, "string"]
     window.localStorage.setItem(
@@ -131,24 +129,15 @@ describe("loadQueue", () => {
   })
 
   it("returns empty array in SSR environment", () => {
-    const originalWindow = globalThis.window
-    try {
-      // @ts-expect-error -- simulating SSR
-      delete globalThis.window
+    withoutWindow(() => {
       expect(loadQueue()).toEqual([])
-    } finally {
-      globalThis.window = originalWindow
-    }
+    })
   })
 })
 
 describe("saveQueue", () => {
   beforeEach(() => {
-    Object.defineProperty(window, "localStorage", {
-      value: createLocalStorageMock(),
-      writable: true,
-      configurable: true,
-    })
+    installLocalStorageMock()
   })
 
   it("saves queue to localStorage", () => {
@@ -167,26 +156,13 @@ describe("saveQueue", () => {
   })
 
   it("handles quota exceeded error gracefully", () => {
-    const mockStorage = createLocalStorageMock()
-    mockStorage.setItem = () => {
-      throw new DOMException("QuotaExceededError")
-    }
-    Object.defineProperty(window, "localStorage", {
-      value: mockStorage,
-      writable: true,
-      configurable: true,
-    })
+    installQuotaExceededLocalStorage()
     expect(() => saveQueue([validEpisode])).not.toThrow()
   })
 
   it("does nothing in SSR environment", () => {
-    const originalWindow = globalThis.window
-    try {
-      // @ts-expect-error -- simulating SSR
-      delete globalThis.window
+    withoutWindow(() => {
       expect(() => saveQueue([validEpisode])).not.toThrow()
-    } finally {
-      globalThis.window = originalWindow
-    }
+    })
   })
 })

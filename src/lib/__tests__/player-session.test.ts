@@ -5,37 +5,14 @@ import {
   clearPlayerSession,
 } from "@/lib/player-session"
 import type { AudioEpisode } from "@/contexts/audio-player-context"
-
-const validEpisode: AudioEpisode = {
-  id: "ep-1",
-  title: "Test Episode",
-  podcastTitle: "Test Podcast",
-  audioUrl: "https://example.com/audio.mp3",
-  artwork: "https://example.com/art.jpg",
-  duration: 600,
-}
+import {
+  installLocalStorageMock,
+  installQuotaExceededLocalStorage,
+  withoutWindow,
+} from "@/test/mocks/local-storage"
+import { validEpisode } from "@/test/fixtures/audio-episode"
 
 const STORAGE_KEY = "contentgenie-player-session"
-
-function createLocalStorageMock(): Storage {
-  const store: Record<string, string> = {}
-  return {
-    getItem: (key: string) => store[key] ?? null,
-    setItem: (key: string, value: string) => {
-      store[key] = value
-    },
-    removeItem: (key: string) => {
-      delete store[key]
-    },
-    clear: () => {
-      for (const key of Object.keys(store)) delete store[key]
-    },
-    get length() {
-      return Object.keys(store).length
-    },
-    key: (index: number) => Object.keys(store)[index] ?? null,
-  }
-}
 
 function storeSession(
   episode: AudioEpisode,
@@ -54,11 +31,7 @@ function storeSession(
 
 describe("loadPlayerSession", () => {
   beforeEach(() => {
-    Object.defineProperty(window, "localStorage", {
-      value: createLocalStorageMock(),
-      writable: true,
-      configurable: true,
-    })
+    installLocalStorageMock()
   })
 
   it("returns null when nothing stored", () => {
@@ -187,14 +160,15 @@ describe("loadPlayerSession", () => {
     expect(loadPlayerSession()).toBeNull()
   })
 
-  it("returns null and clears storage when session expired", () => {
-    const expiredAt = Date.now() - 25 * 60 * 60 * 1000 // 25 hours ago
-    storeSession(validEpisode, 120, expiredAt)
-    expect(loadPlayerSession()).toBeNull()
-    expect(window.localStorage.getItem(STORAGE_KEY)).toBeNull()
+  it("returns valid session regardless of how old savedAt is (no TTL)", () => {
+    const oldAt = Date.now() - 25 * 60 * 60 * 1000 // 25 hours ago
+    storeSession(validEpisode, 120, oldAt)
+    const result = loadPlayerSession()
+    expect(result).not.toBeNull()
+    expect(result!.currentTime).toBe(120)
   })
 
-  it("returns valid session when savedAt is within 24h", () => {
+  it("returns valid session when savedAt is recent", () => {
     const recentAt = Date.now() - 23 * 60 * 60 * 1000 // 23 hours ago
     storeSession(validEpisode, 120, recentAt)
     const result = loadPlayerSession()
@@ -203,14 +177,9 @@ describe("loadPlayerSession", () => {
   })
 
   it("returns null in SSR environment", () => {
-    const originalWindow = globalThis.window
-    try {
-      // @ts-expect-error -- simulating SSR
-      delete globalThis.window
+    withoutWindow(() => {
       expect(loadPlayerSession()).toBeNull()
-    } finally {
-      globalThis.window = originalWindow
-    }
+    })
   })
 
   it("returns null when artwork is invalid (non-string)", () => {
@@ -301,11 +270,7 @@ describe("loadPlayerSession", () => {
 
 describe("savePlayerSession", () => {
   beforeEach(() => {
-    Object.defineProperty(window, "localStorage", {
-      value: createLocalStorageMock(),
-      writable: true,
-      configurable: true,
-    })
+    installLocalStorageMock()
   })
 
   it("saves session to localStorage with correct key", () => {
@@ -327,37 +292,20 @@ describe("savePlayerSession", () => {
   })
 
   it("handles quota exceeded error gracefully", () => {
-    const mockStorage = createLocalStorageMock()
-    mockStorage.setItem = () => {
-      throw new DOMException("QuotaExceededError")
-    }
-    Object.defineProperty(window, "localStorage", {
-      value: mockStorage,
-      writable: true,
-      configurable: true,
-    })
+    installQuotaExceededLocalStorage()
     expect(() => savePlayerSession(validEpisode, 300)).not.toThrow()
   })
 
   it("does nothing in SSR environment", () => {
-    const originalWindow = globalThis.window
-    try {
-      // @ts-expect-error -- simulating SSR
-      delete globalThis.window
+    withoutWindow(() => {
       expect(() => savePlayerSession(validEpisode, 300)).not.toThrow()
-    } finally {
-      globalThis.window = originalWindow
-    }
+    })
   })
 })
 
 describe("clearPlayerSession", () => {
   beforeEach(() => {
-    Object.defineProperty(window, "localStorage", {
-      value: createLocalStorageMock(),
-      writable: true,
-      configurable: true,
-    })
+    installLocalStorageMock()
   })
 
   it("removes session from localStorage", () => {
@@ -372,13 +320,8 @@ describe("clearPlayerSession", () => {
   })
 
   it("does nothing in SSR environment", () => {
-    const originalWindow = globalThis.window
-    try {
-      // @ts-expect-error -- simulating SSR
-      delete globalThis.window
+    withoutWindow(() => {
       expect(() => clearPlayerSession()).not.toThrow()
-    } finally {
-      globalThis.window = originalWindow
-    }
+    })
   })
 })
