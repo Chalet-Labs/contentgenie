@@ -164,4 +164,99 @@ describe("PublicEpisodeDetail", () => {
       screen.getByText(/sign up to request one/i)
     ).toBeInTheDocument();
   });
+
+  it("ignores stale fetch responses after episodeId changes", async () => {
+    type MockEpisodeResponse = {
+      ok: boolean;
+      json: () => Promise<unknown>;
+    };
+
+    let resolveFirstRequest: ((value: MockEpisodeResponse) => void) | null =
+      null;
+    const secondResponse = {
+      ok: true,
+      json: async () => ({
+        episode: {
+          id: 456,
+          title: "Second Episode",
+          description: "Episode description",
+          datePublished: 1711929600,
+          duration: 1800,
+          enclosureUrl: "https://example.com/second-episode.mp3",
+          episode: 11,
+          episodeType: "full",
+          season: 2,
+          feedId: 456,
+          feedImage: "https://example.com/feed.jpg",
+          image: "https://example.com/episode.jpg",
+          link: "https://publisher.example.com/second-episode",
+        },
+        podcast: null,
+        summary: null,
+        transcriptSource: null,
+        transcriptStatus: null,
+        episodeDbId: null,
+      }),
+    };
+
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockImplementation((input: string) => {
+        if (input === "/api/episodes/123") {
+          return new Promise((resolve) => {
+            resolveFirstRequest = resolve;
+          });
+        }
+
+        if (input === "/api/episodes/456") {
+          return Promise.resolve(secondResponse);
+        }
+
+        return Promise.reject(new Error(`Unexpected fetch call: ${input}`));
+      })
+    );
+
+    const { rerender } = render(<PublicEpisodeDetail episodeId="123" />);
+    rerender(<PublicEpisodeDetail episodeId="456" />);
+
+    await screen.findByRole("heading", { name: "Second Episode" });
+
+    expect(resolveFirstRequest).not.toBeNull();
+
+    resolveFirstRequest!({
+      ok: true,
+      json: async () => ({
+        episode: {
+          id: 123,
+          title: "First Episode",
+          description: "Episode description",
+          datePublished: 1711929600,
+          duration: 1800,
+          enclosureUrl: "https://example.com/first-episode.mp3",
+          episode: 10,
+          episodeType: "full",
+          season: 2,
+          feedId: 456,
+          feedImage: "https://example.com/feed.jpg",
+          image: "https://example.com/episode.jpg",
+          link: "https://publisher.example.com/first-episode",
+        },
+        podcast: null,
+        summary: null,
+        transcriptSource: null,
+        transcriptStatus: null,
+        episodeDbId: null,
+      }),
+    });
+
+    await waitFor(() => {
+      expect(
+        screen.getByRole("heading", { name: "Second Episode" })
+      ).toBeInTheDocument();
+    });
+
+    expect(
+      screen.queryByRole("heading", { name: "First Episode" })
+    ).not.toBeInTheDocument();
+  });
 });

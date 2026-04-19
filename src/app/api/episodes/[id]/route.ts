@@ -35,14 +35,22 @@ function withPublicCache(response: NextResponse): NextResponse {
   return response;
 }
 
+function withConditionalPublicCache(
+  response: NextResponse,
+  isAnonymousRequest: boolean
+): NextResponse {
+  return isAnonymousRequest ? withPublicCache(response) : response;
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
     const { userId } = await auth();
+    const isAnonymousRequest = !userId;
 
-    if (!userId) {
+    if (isAnonymousRequest) {
       const rateLimit = await checkPublicEpisodeRateLimit(getClientIp(request));
       if (!rateLimit.allowed) {
         return NextResponse.json(
@@ -129,7 +137,7 @@ export async function GET(
         };
       }
 
-      return withPublicCache(
+      return withConditionalPublicCache(
         NextResponse.json({
           episode,
           podcast,
@@ -137,7 +145,8 @@ export async function GET(
           transcriptSource: dbEpisode.transcriptSource ?? null,
           transcriptStatus: dbEpisode.transcriptStatus ?? null,
           episodeDbId: dbEpisode.id,
-        })
+        }),
+        isAnonymousRequest
       );
     }
 
@@ -223,7 +232,7 @@ export async function GET(
       // Continue without cached summary if DB query fails
     }
 
-    return withPublicCache(
+    return withConditionalPublicCache(
       NextResponse.json({
         episode,
         podcast,
@@ -231,7 +240,8 @@ export async function GET(
         transcriptSource,
         transcriptStatus,
         episodeDbId,
-      })
+      }),
+      isAnonymousRequest
     );
   } catch (error) {
     console.error("Error fetching episode:", error);

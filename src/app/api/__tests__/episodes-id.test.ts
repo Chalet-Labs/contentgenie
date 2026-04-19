@@ -77,6 +77,32 @@ describe("GET /api/episodes/[id]", () => {
     );
   });
 
+  it("does not apply shared-cache headers to authenticated numeric episode requests", async () => {
+    vi.mocked(auth).mockResolvedValue({ userId: "user-1" } as never);
+
+    const mockEpisode = { id: 123, title: "Ep", feedId: 456 };
+    const mockPodcast = { id: 456, title: "Pod" };
+    vi.mocked(getEpisodeById).mockResolvedValue({
+      status: "true",
+      episode: mockEpisode as never,
+      description: "",
+    });
+    vi.mocked(getPodcastById).mockResolvedValue({
+      status: "true",
+      feed: mockPodcast as never,
+      description: "",
+    });
+    vi.mocked(db.query.episodes.findFirst).mockResolvedValue(undefined as never);
+
+    const request = new NextRequest("http://localhost:3000/api/episodes/123");
+    const response = await GET(request, { params: { id: "123" } });
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).not.toBe(
+      "public, s-maxage=300, stale-while-revalidate=600"
+    );
+  });
+
   it("returns 400 for non-numeric ID", async () => {
     vi.mocked(auth).mockResolvedValue({ userId: "user-1" } as never);
 
@@ -125,6 +151,45 @@ describe("GET /api/episodes/[id]", () => {
     expect(response.status).toBe(200);
     expect(data.episode.id).toBe("rss-abc");
     expect(response.headers.get("cache-control")).toBe(
+      "public, s-maxage=300, stale-while-revalidate=600"
+    );
+  });
+
+  it("does not apply shared-cache headers to authenticated RSS episode requests", async () => {
+    vi.mocked(auth).mockResolvedValue({ userId: "user-1" } as never);
+    vi.mocked(db.query.episodes.findFirst).mockResolvedValue({
+      id: 99,
+      title: "RSS Ep",
+      description: "desc",
+      publishDate: new Date("2024-01-01"),
+      audioUrl: "https://example.com/ep.mp3",
+      duration: 3600,
+      podcastId: 5,
+      podcastIndexId: "rss-abc",
+      rssGuid: "guid-123",
+      transcriptSource: "podcastindex",
+      transcriptStatus: "missing",
+      summary: null,
+      processedAt: null,
+      keyTakeaways: [],
+      worthItScore: null,
+      worthItReason: null,
+      worthItDimensions: null,
+      podcast: {
+        podcastIndexId: "rss-abc",
+        title: "RSS Pod",
+        publisher: "Author",
+        imageUrl: "https://example.com/img.png",
+      },
+    } as never);
+
+    const request = new NextRequest(
+      "http://localhost:3000/api/episodes/rss-abc"
+    );
+    const response = await GET(request, { params: { id: "rss-abc" } });
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).not.toBe(
       "public, s-maxage=300, stale-while-revalidate=600"
     );
   });

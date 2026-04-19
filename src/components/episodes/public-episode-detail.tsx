@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -51,44 +51,59 @@ export function PublicEpisodeDetail({
   const [isLoadingEpisode, setIsLoadingEpisode] = useState(true);
   const [episodeError, setEpisodeError] = useState<string | null>(null);
 
-  const fetchEpisodeData = useCallback(async () => {
-    setIsLoadingEpisode(true);
-    setEpisodeError(null);
-
-    try {
-      const response = await fetch(`/api/episodes/${episodeId}`);
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to fetch episode");
-      }
-
-      setEpisode(data.episode);
-      setPodcast(data.podcast);
-      setSummaryData(
-        data.summary
-          ? {
-              summary: data.summary.summary,
-              keyTakeaways: data.summary.keyTakeaways || [],
-              worthItScore: data.summary.worthItScore,
-              worthItReason: data.summary.worthItReason,
-              worthItDimensions: data.summary.worthItDimensions ?? null,
-              cached: true,
-            }
-          : null
-      );
-    } catch (error) {
-      setEpisodeError(
-        error instanceof Error ? error.message : "Failed to load episode"
-      );
-    } finally {
-      setIsLoadingEpisode(false);
-    }
-  }, [episodeId]);
-
   useEffect(() => {
+    let ignore = false;
+
+    async function fetchEpisodeData() {
+      setIsLoadingEpisode(true);
+      setEpisodeError(null);
+
+      try {
+        const response = await fetch(`/api/episodes/${episodeId}`);
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error || "Failed to fetch episode");
+        }
+
+        if (ignore) return;
+
+        setEpisode(data.episode);
+        setPodcast(data.podcast);
+        setSummaryData(
+          data.summary
+            ? {
+                summary: data.summary.summary,
+                keyTakeaways: data.summary.keyTakeaways || [],
+                worthItScore: data.summary.worthItScore,
+                worthItReason: data.summary.worthItReason,
+                worthItDimensions: data.summary.worthItDimensions ?? null,
+                cached: true,
+              }
+            : null
+        );
+      } catch (error) {
+        if (ignore) return;
+
+        setEpisode(null);
+        setPodcast(null);
+        setSummaryData(null);
+        setEpisodeError(
+          error instanceof Error ? error.message : "Failed to load episode"
+        );
+      } finally {
+        if (!ignore) {
+          setIsLoadingEpisode(false);
+        }
+      }
+    }
+
     void fetchEpisodeData();
-  }, [fetchEpisodeData]);
+
+    return () => {
+      ignore = true;
+    };
+  }, [episodeId]);
 
   if (isLoadingEpisode) {
     return (
