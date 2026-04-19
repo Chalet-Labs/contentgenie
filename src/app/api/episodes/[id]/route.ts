@@ -32,6 +32,7 @@ function getClientIp(request: NextRequest): string {
 
 function withPublicCache(response: NextResponse): NextResponse {
   response.headers.set("Cache-Control", PUBLIC_CACHE_CONTROL);
+  response.headers.set("Vary", "Cookie");
   return response;
 }
 
@@ -246,10 +247,7 @@ export async function GET(
   } catch (error) {
     console.error("Error fetching episode:", error);
     return NextResponse.json(
-      {
-        error: "Failed to fetch episode",
-        details: error instanceof Error ? error.message : "Unknown error",
-      },
+      { error: "Failed to fetch episode" },
       { status: 500 }
     );
   }

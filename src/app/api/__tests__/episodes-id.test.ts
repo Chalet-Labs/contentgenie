@@ -75,6 +75,7 @@ describe("GET /api/episodes/[id]", () => {
     expect(response.headers.get("cache-control")).toBe(
       "public, s-maxage=300, stale-while-revalidate=600"
     );
+    expect(response.headers.get("vary")?.split(/,\s*/)).toContain("Cookie");
   });
 
   it("does not apply shared-cache headers to authenticated numeric episode requests", async () => {
@@ -153,6 +154,20 @@ describe("GET /api/episodes/[id]", () => {
     expect(response.headers.get("cache-control")).toBe(
       "public, s-maxage=300, stale-while-revalidate=600"
     );
+    expect(response.headers.get("vary")?.split(/,\s*/)).toContain("Cookie");
+  });
+
+  it("returns a generic 500 payload without internal error details", async () => {
+    vi.mocked(auth).mockRejectedValue(new Error("Clerk exploded") as never);
+
+    const request = new NextRequest("http://localhost:3000/api/episodes/123");
+    const response = await GET(request, { params: { id: "123" } });
+    const data = await response.json();
+
+    expect(response.status).toBe(500);
+    expect(data).toEqual({
+      error: "Failed to fetch episode",
+    });
   });
 
   it("does not apply shared-cache headers to authenticated RSS episode requests", async () => {
