@@ -55,11 +55,12 @@ export async function setQueue(
       await ensureUserExists(userId)
 
       if (parsed.data.length > 0) {
+        const updatedAt = new Date()
         const rows = parsed.data.map((ep, index) => ({
+          ...toEpisodeDenormRow(ep),
           userId,
           position: index,
-          ...toEpisodeDenormRow(ep),
-          updatedAt: new Date(),
+          updatedAt,
         }))
         // `drizzle-orm/neon-http` has no interactive transaction support
         // (stateless HTTP driver). `db.batch` ships the statements in a
