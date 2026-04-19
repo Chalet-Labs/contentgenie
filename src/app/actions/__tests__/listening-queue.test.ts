@@ -218,8 +218,6 @@ describe("setQueue", () => {
     expect(mockBatch).toHaveBeenCalledTimes(1)
     const [queries] = mockBatch.mock.calls[0]
     expect(queries).toHaveLength(2)
-    // The query builders run synchronously before db.batch is invoked,
-    // so invocationCallOrder reflects [delete, insert] construction order.
     const deleteOrder = mockDelete.mock.invocationCallOrder[0]
     const insertOrder = mockInsert.mock.invocationCallOrder[0]
     expect(deleteOrder).toBeLessThan(insertOrder)
@@ -262,6 +260,18 @@ describe("setQueue", () => {
     expect(ensureOrder).toBeLessThan(batchOrder)
   })
 
+  it("skips db.batch and returns error when ensureUserExists rejects", async () => {
+    mockEnsureUserExists.mockRejectedValueOnce(new Error("user provisioning failed"))
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {})
+    const { setQueue } = await importAction()
+    const result = await setQueue([validEpisode])
+    expect(result).toEqual({ success: false, error: "Failed to set queue" })
+    expect(mockBatch).not.toHaveBeenCalled()
+    expect(mockDelete).not.toHaveBeenCalled()
+    expect(mockInsert).not.toHaveBeenCalled()
+    expect(consoleSpy).toHaveBeenCalled()
+  })
+
   it("rolls back the DELETE when db.batch rejects (atomic replace-all)", async () => {
     mockBatch.mockRejectedValueOnce(new Error("unique violation"))
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {})
@@ -269,9 +279,6 @@ describe("setQueue", () => {
     const result = await setQueue([validEpisode])
     expect(result).toEqual({ success: false, error: "Failed to set queue" })
     expect(consoleSpy).toHaveBeenCalled()
-    // db.batch is the atomic unit: if it rejects, the DELETE + INSERT are
-    // rolled back together (neon-http executes batches in a single HTTP
-    // round-trip with implicit-transaction semantics).
   })
 
   it(
