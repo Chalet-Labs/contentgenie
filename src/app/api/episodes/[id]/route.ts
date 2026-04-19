@@ -63,12 +63,17 @@ export async function GET(
     if (isAnonymousRequest) {
       const rateLimit = await checkPublicEpisodeRateLimit(getClientIp(request));
       if (!rateLimit.allowed) {
+        const retryAfterMs = rateLimit.retryAfterMs ?? 0;
+        const retryAfterSeconds = Math.max(1, Math.ceil(retryAfterMs / 1000));
         return NextResponse.json(
           {
             error: "Rate limit exceeded. Please try again later.",
-            retryAfterMs: rateLimit.retryAfterMs,
+            retryAfterMs,
           },
-          { status: 429 }
+          {
+            status: 429,
+            headers: { "Retry-After": String(retryAfterSeconds) },
+          }
         );
       }
     }
