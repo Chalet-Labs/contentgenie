@@ -8,6 +8,7 @@ import { userPlayerSession } from "@/db/schema"
 import {
   savePlayerSessionSchema,
   toAudioEpisode,
+  toEpisodeDenormRow,
   type AudioEpisode,
 } from "@/lib/schemas/listening-queue"
 
@@ -67,13 +68,7 @@ export async function savePlayerSession(
     await ensureUserExists(userId)
 
     const updateValues = {
-      episodeId: validEpisode.id,
-      title: validEpisode.title,
-      podcastTitle: validEpisode.podcastTitle,
-      audioUrl: validEpisode.audioUrl,
-      artwork: validEpisode.artwork ?? null,
-      duration: validEpisode.duration ?? null,
-      chaptersUrl: validEpisode.chaptersUrl ?? null,
+      ...toEpisodeDenormRow(validEpisode),
       currentTime: String(validCurrentTime),
       updatedAt: new Date(),
     }

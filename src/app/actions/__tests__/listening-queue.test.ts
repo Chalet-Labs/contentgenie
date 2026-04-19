@@ -1,5 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import type { AudioEpisode } from "@/contexts/audio-player-context"
+import {
+  createDrizzleOrmMock,
+  validEpisode,
+  validEpisode2,
+} from "@/app/actions/__tests__/__fixtures"
 
 // Mock Clerk auth
 const mockAuth = vi.fn()
@@ -82,27 +87,8 @@ vi.mock("@/db/schema", () => ({
   },
 }))
 
-// Mock drizzle-orm
-vi.mock("drizzle-orm", () => ({
-  eq: vi.fn((col: unknown, val: unknown) => ({ col, val })),
-  asc: vi.fn((col: unknown) => ({ col, direction: "asc" })),
-}))
-
-const validEpisode: AudioEpisode = {
-  id: "ep-1",
-  title: "Test Episode",
-  podcastTitle: "Test Podcast",
-  audioUrl: "https://example.com/audio.mp3",
-  artwork: "https://example.com/art.jpg",
-  duration: 600,
-}
-
-const validEpisode2: AudioEpisode = {
-  id: "ep-2",
-  title: "Test Episode 2",
-  podcastTitle: "Test Podcast",
-  audioUrl: "https://example.com/audio2.mp3",
-}
+// Mock drizzle-orm (shared factory lives in __fixtures.ts)
+vi.mock("drizzle-orm", () => createDrizzleOrmMock())
 
 describe("getQueue", () => {
   beforeEach(() => {

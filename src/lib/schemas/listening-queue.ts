@@ -74,3 +74,21 @@ export function toAudioEpisode(row: EpisodeDenormRow): AudioEpisode {
   if (row.chaptersUrl != null) episode.chaptersUrl = row.chaptersUrl;
   return episode;
 }
+
+/**
+ * Reverse of `toAudioEpisode`: flattens an `AudioEpisode` into the
+ * denormalized shape shared by `userQueueItems` and `userPlayerSession`.
+ * Callers spread table-specific extras (`userId`, `position`, `currentTime`,
+ * `updatedAt`) on top.
+ */
+export function toEpisodeDenormRow(ep: AudioEpisode): EpisodeDenormRow {
+  return {
+    episodeId: ep.id,
+    title: ep.title,
+    podcastTitle: ep.podcastTitle,
+    audioUrl: ep.audioUrl,
+    artwork: ep.artwork ?? null,
+    duration: ep.duration ?? null,
+    chaptersUrl: ep.chaptersUrl ?? null,
+  };
+}

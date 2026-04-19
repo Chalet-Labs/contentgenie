@@ -8,6 +8,7 @@ import { userQueueItems } from "@/db/schema"
 import {
   queueSchema,
   toAudioEpisode,
+  toEpisodeDenormRow,
   type AudioEpisode,
 } from "@/lib/schemas/listening-queue"
 
@@ -65,13 +66,7 @@ export async function setQueue(
         const rows = parsed.data.map((ep, index) => ({
           userId,
           position: index,
-          episodeId: ep.id,
-          title: ep.title,
-          podcastTitle: ep.podcastTitle,
-          audioUrl: ep.audioUrl,
-          artwork: ep.artwork ?? null,
-          duration: ep.duration ?? null,
-          chaptersUrl: ep.chaptersUrl ?? null,
+          ...toEpisodeDenormRow(ep),
           updatedAt: new Date(),
         }))
         await tx.insert(userQueueItems).values(rows)
