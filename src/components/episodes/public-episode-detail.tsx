@@ -59,7 +59,9 @@ export function PublicEpisodeDetail({
       setEpisodeError(null);
 
       try {
-        const response = await fetch(`/api/episodes/${episodeId}`);
+        const response = await fetch(
+          `/api/episodes/${encodeURIComponent(episodeId)}`
+        );
         const data = await response.json();
 
         if (!response.ok) {

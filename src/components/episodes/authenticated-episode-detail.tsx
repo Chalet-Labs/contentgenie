@@ -58,6 +58,7 @@ import {
   formatTranscriptSource,
   getEpisodeArtworkUrl,
   getSafeEpisodeLink,
+  supportsEpisodeProcessing,
 } from "@/components/episodes/episode-detail-shared";
 
 interface AuthenticatedEpisodeDetailProps {
@@ -89,6 +90,7 @@ export function AuthenticatedEpisodeDetail({
   const [transcriptStatus, setTranscriptStatus] = useState<TranscriptStatus | null>(null);
   const [episodeDbId, setEpisodeDbId] = useState<number | null>(null);
   const [overlapResult, setOverlapResult] = useState<{ label: string | null; labelKind: OverlapLabelKind | null }>({ label: null, labelKind: null });
+  const canRunEpisodeProcessing = supportsEpisodeProcessing(episodeId);
 
   // Realtime subscription to the Trigger.dev run
   const { run } = useRealtimeRun<typeof summarizeEpisode>(runId ?? "", {
@@ -143,7 +145,7 @@ export function AuthenticatedEpisodeDetail({
     try {
       // Fetch episode from PodcastIndex via API
       const response = await fetch(
-        `/api/episodes/${episodeId}`
+        `/api/episodes/${encodeURIComponent(episodeId)}`
       );
       const data = await response.json();
 
@@ -184,28 +186,30 @@ export function AuthenticatedEpisodeDetail({
       } else {
         setSummaryData(null);
         // Check for in-progress or failed summarization run
-        try {
-          const statusResponse = await fetch(
-            `/api/episodes/summarize?episodeId=${episodeId}`
-          );
-          const statusData = await statusResponse.json();
-          if (
-            statusData.runId &&
-            statusData.publicAccessToken &&
-            IN_PROGRESS_STATUSES.includes(statusData.status)
-          ) {
-            setRunId(statusData.runId);
-            setAccessToken(statusData.publicAccessToken);
-            setIsLoadingSummary(true);
-          } else if (statusData.status === "failed") {
-            setSummaryError(
-              statusData.processingError ||
-                "Summary generation failed. Please try again."
+        if (canRunEpisodeProcessing) {
+          try {
+            const statusResponse = await fetch(
+              `/api/episodes/summarize?episodeId=${encodeURIComponent(episodeId)}`
             );
-            setIsLoadingSummary(false);
+            const statusData = await statusResponse.json();
+            if (
+              statusData.runId &&
+              statusData.publicAccessToken &&
+              IN_PROGRESS_STATUSES.includes(statusData.status)
+            ) {
+              setRunId(statusData.runId);
+              setAccessToken(statusData.publicAccessToken);
+              setIsLoadingSummary(true);
+            } else if (statusData.status === "failed") {
+              setSummaryError(
+                statusData.processingError ||
+                  "Summary generation failed. Please try again."
+              );
+              setIsLoadingSummary(false);
+            }
+          } catch (error) {
+            console.warn("Failed to check for in-progress summary run:", error);
           }
-        } catch (error) {
-          console.warn("Failed to check for in-progress summary run:", error);
         }
       }
 
@@ -227,7 +231,7 @@ export function AuthenticatedEpisodeDetail({
     } finally {
       setIsLoadingEpisode(false);
     }
-  }, [episodeId, userId]);
+  }, [canRunEpisodeProcessing, episodeId, userId]);
 
   // Load episode data from cache
   const loadFromCache = useCallback(async () => {
@@ -519,7 +523,7 @@ export function AuthenticatedEpisodeDetail({
             )}
             {episode.season > 0 && <span>Season {episode.season}</span>}
             {/* Admins with no transcript see the fetch button instead */}
-            {!(isAdmin && !transcriptSource) && (
+            {!(isAdmin && canRunEpisodeProcessing && !transcriptSource) && (
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -539,7 +543,7 @@ export function AuthenticatedEpisodeDetail({
                 </Tooltip>
               </TooltipProvider>
             )}
-            {isAdmin && (
+            {isAdmin && canRunEpisodeProcessing && (
               <EpisodeTranscriptFetchButton
                 episodeDbId={episodeDbId}
                 podcastIndexId={episodeId}
@@ -662,7 +666,7 @@ export function AuthenticatedEpisodeDetail({
       <div>
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-xl font-semibold">AI-Powered Insights</h2>
-          {isAdmin && summaryData?.summary && isOnline && !isLoadingSummary && (
+          {isAdmin && canRunEpisodeProcessing && summaryData?.summary && isOnline && !isLoadingSummary && (
             <Button
               variant="outline"
               size="sm"
@@ -684,7 +688,9 @@ export function AuthenticatedEpisodeDetail({
           currentStep={
             (run?.metadata?.step as SummarizationStep | undefined) ?? null
           }
-          onGenerateSummary={isOnline ? generateSummary : undefined}
+          onGenerateSummary={
+            isOnline && canRunEpisodeProcessing ? generateSummary : undefined
+          }
           overlapLabel={overlapResult.label}
           overlapLabelKind={overlapResult.labelKind}
         />

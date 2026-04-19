@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { episodes, podcasts } from "@/db/schema";
+import { episodes } from "@/db/schema";
 import { getEpisodeById, getPodcastById } from "@/lib/podcastindex";
 import { createRateLimitChecker } from "@/lib/rate-limit";
 

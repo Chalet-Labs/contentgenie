@@ -10,13 +10,19 @@ const isPublicRoute = createRouteMatcher([
   "/api/webhooks(.*)",
 ]);
 
+const PUBLIC_EPISODE_ID_PATTERN = "(?:\\d+|rss-[^/]+)";
+
 function isPublicEpisodePageRequest(req: NextRequest): boolean {
-  return /^\/episode\/[^/]+$/.test(req.nextUrl.pathname);
+  return new RegExp(`^/episode/${PUBLIC_EPISODE_ID_PATTERN}$`).test(
+    req.nextUrl.pathname
+  );
 }
 
 function isPublicEpisodeApiRequest(req: NextRequest): boolean {
   if (req.method !== "GET") return false;
-  return /^\/api\/episodes\/(?:\d+|rss-[^/]+)$/.test(req.nextUrl.pathname);
+  return new RegExp(`^/api/episodes/${PUBLIC_EPISODE_ID_PATTERN}$`).test(
+    req.nextUrl.pathname
+  );
 }
 
 export default clerkMiddleware(async (auth, req) => {

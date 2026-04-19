@@ -70,7 +70,15 @@ export function formatPublishDate(timestamp: number): string {
 }
 
 export function buildSignUpHref(redirectPath: string): string {
+  if (!redirectPath.startsWith("/") || redirectPath.startsWith("//")) {
+    return "/sign-up";
+  }
+
   return `/sign-up?redirect_url=${encodeURIComponent(redirectPath)}`;
+}
+
+export function supportsEpisodeProcessing(episodeId: string): boolean {
+  return /^\d+$/.test(episodeId);
 }
 
 export function getEpisodeArtworkUrl(
