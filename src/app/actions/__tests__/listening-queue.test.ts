@@ -25,15 +25,11 @@ const mockInsertValues = vi.fn()
 const mockDelete = vi.fn()
 const mockDeleteWhere = vi.fn()
 const mockFindMany = vi.fn()
-const mockTx = {
-  insert: makeInsertChain(mockInsert, mockInsertValues),
-  delete: makeDeleteChain(mockDelete, mockDeleteWhere),
-}
-const mockTransaction = vi.fn()
+const mockBatch = vi.fn()
 
 vi.mock("@/db", () => ({
   db: {
-    transaction: (...args: unknown[]) => mockTransaction(...args),
+    batch: (...args: unknown[]) => mockBatch(...args),
     insert: makeInsertChain(mockInsert, mockInsertValues),
     delete: makeDeleteChain(mockDelete, mockDeleteWhere),
     query: {
@@ -173,9 +169,7 @@ describe("setQueue", () => {
   beforeEach(() => {
     mockInsertValues.mockResolvedValue(undefined)
     mockDeleteWhere.mockResolvedValue(undefined)
-    mockTransaction.mockImplementation(async (fn: (tx: typeof mockTx) => Promise<void>) => {
-      await fn(mockTx)
-    })
+    mockBatch.mockResolvedValue([])
   })
   afterEach(() => vi.restoreAllMocks())
 
@@ -184,7 +178,7 @@ describe("setQueue", () => {
     testUnauthenticated(
       mockAuth,
       async () => (await importAction()).setQueue([validEpisode]),
-      mockTransaction,
+      mockBatch,
     ),
   )
 
@@ -194,7 +188,7 @@ describe("setQueue", () => {
     const badEpisode = { id: "ep-1", title: "T", podcastTitle: "P", audioUrl: "not-a-url" }
     const result = await setQueue([badEpisode as AudioEpisode])
     expect(result.success).toBe(false)
-    expect(mockTransaction).not.toHaveBeenCalled()
+    expect(mockBatch).not.toHaveBeenCalled()
     expect(mockEnsureUserExists).not.toHaveBeenCalled()
   })
 
@@ -202,7 +196,7 @@ describe("setQueue", () => {
     const { setQueue } = await importAction()
     const result = await setQueue([validEpisode, { ...validEpisode }])
     expect(result.success).toBe(false)
-    expect(mockTransaction).not.toHaveBeenCalled()
+    expect(mockBatch).not.toHaveBeenCalled()
     expect(mockEnsureUserExists).not.toHaveBeenCalled()
   })
 
@@ -214,14 +208,16 @@ describe("setQueue", () => {
     } as AudioEpisode
     const result = await setQueue([jsUrl])
     expect(result.success).toBe(false)
-    expect(mockTransaction).not.toHaveBeenCalled()
+    expect(mockBatch).not.toHaveBeenCalled()
     expect(mockEnsureUserExists).not.toHaveBeenCalled()
   })
 
-  it("calls db.transaction, with DELETE before INSERT scoped to the signed-in user", async () => {
+  it("calls db.batch with [DELETE, INSERT] scoped to the signed-in user", async () => {
     const { setQueue } = await importAction()
     await setQueue([validEpisode, validEpisode2])
-    expect(mockTransaction).toHaveBeenCalledTimes(1)
+    expect(mockBatch).toHaveBeenCalledTimes(1)
+    const [queries] = mockBatch.mock.calls[0]
+    expect(queries).toHaveLength(2)
     const deleteOrder = mockDelete.mock.invocationCallOrder[0]
     const insertOrder = mockInsert.mock.invocationCallOrder[0]
     expect(deleteOrder).toBeLessThan(insertOrder)
@@ -243,10 +239,10 @@ describe("setQueue", () => {
     expect(rows[1].updatedAt).toBeInstanceOf(Date)
   })
 
-  it("with empty array produces only DELETE (no INSERT)", async () => {
+  it("with empty array issues a single DELETE and skips db.batch", async () => {
     const { setQueue } = await importAction()
     await setQueue([])
-    expect(mockTransaction).toHaveBeenCalledTimes(1)
+    expect(mockBatch).not.toHaveBeenCalled()
     expect(mockDelete).toHaveBeenCalledTimes(1)
     expect(mockDeleteWhere).toHaveBeenCalledWith({
       col: "userId",
@@ -255,19 +251,40 @@ describe("setQueue", () => {
     expect(mockInsert).not.toHaveBeenCalled()
   })
 
-  it("calls ensureUserExists before the transaction", async () => {
+  it("calls ensureUserExists before db.batch", async () => {
     const { setQueue } = await importAction()
     await setQueue([validEpisode])
     expect(mockEnsureUserExists).toHaveBeenCalledWith("user_123")
     const ensureOrder = mockEnsureUserExists.mock.invocationCallOrder[0]
-    const txOrder = mockTransaction.mock.invocationCallOrder[0]
-    expect(ensureOrder).toBeLessThan(txOrder)
+    const batchOrder = mockBatch.mock.invocationCallOrder[0]
+    expect(ensureOrder).toBeLessThan(batchOrder)
+  })
+
+  it("skips db.batch and returns error when ensureUserExists rejects", async () => {
+    mockEnsureUserExists.mockRejectedValueOnce(new Error("user provisioning failed"))
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {})
+    const { setQueue } = await importAction()
+    const result = await setQueue([validEpisode])
+    expect(result).toEqual({ success: false, error: "Failed to set queue" })
+    expect(mockBatch).not.toHaveBeenCalled()
+    expect(mockDelete).not.toHaveBeenCalled()
+    expect(mockInsert).not.toHaveBeenCalled()
+    expect(consoleSpy).toHaveBeenCalled()
+  })
+
+  it("rolls back the DELETE when db.batch rejects (atomic replace-all)", async () => {
+    mockBatch.mockRejectedValueOnce(new Error("unique violation"))
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {})
+    const { setQueue } = await importAction()
+    const result = await setQueue([validEpisode])
+    expect(result).toEqual({ success: false, error: "Failed to set queue" })
+    expect(consoleSpy).toHaveBeenCalled()
   })
 
   it(
     "returns { success: false, error } on DB error and calls console.error",
     testDbError(
-      mockTransaction,
+      mockBatch,
       async () => (await importAction()).setQueue([validEpisode]),
     ),
   )
