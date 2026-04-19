@@ -19,7 +19,7 @@ const storedSessionSchema = z
   .object({
     episode: audioEpisodeSchema,
     currentTime: z.number().nonnegative().finite(),
-    savedAt: z.number().positive().finite(),
+    savedAt: z.number().nonnegative().finite().optional(),
   })
   .strip()
 

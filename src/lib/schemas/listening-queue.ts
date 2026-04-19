@@ -1,25 +1,42 @@
 import { z } from "zod";
 
 const trimmedNonEmpty = z.string().trim().min(1).max(500);
-const optionalUrl = z.url().max(2048).optional();
+
+// Restrict URL schemes to http/https so user-supplied payloads can't land
+// javascript:, data:, file:, ftp:, etc. into the denormalized columns.
+const httpsUrl = z.url({ protocol: /^https?$/ }).max(2048);
+const optionalHttpsUrl = httpsUrl.optional();
 
 // Cap duration and currentTime at 1,000,000 seconds (~11.5 days). Keeps Zod
 // rejections semantic rather than bubbling up from the decimal(12,3) column.
 const MAX_TIME_SECONDS = 1_000_000;
+
+// Server queue cap. Shared with `loadQueue()` so localStorage hydration
+// truncates before ever handing off to `setQueue`, which rejects oversized
+// arrays via `queueSchema.max(MAX_QUEUE_ITEMS)`.
+export const MAX_QUEUE_ITEMS = 200;
 
 export const audioEpisodeSchema = z
   .object({
     id: trimmedNonEmpty,
     title: trimmedNonEmpty,
     podcastTitle: trimmedNonEmpty,
-    audioUrl: z.url().max(2048),
-    artwork: optionalUrl,
-    duration: z.number().nonnegative().finite().max(MAX_TIME_SECONDS).optional(),
-    chaptersUrl: optionalUrl,
+    audioUrl: httpsUrl,
+    artwork: optionalHttpsUrl,
+    // Mirror the integer("duration") DB column — fractional seconds would be
+    // silently truncated on insert (or fail, depending on the driver).
+    duration: z.number().int().nonnegative().finite().max(MAX_TIME_SECONDS).optional(),
+    chaptersUrl: optionalHttpsUrl,
   })
   .strip();
 
-export const queueSchema = z.array(audioEpisodeSchema).max(200);
+export const queueSchema = z
+  .array(audioEpisodeSchema)
+  .max(MAX_QUEUE_ITEMS)
+  .refine(
+    (queue) => new Set(queue.map((ep) => ep.id)).size === queue.length,
+    { message: "Queue cannot contain duplicate episodes" },
+  );
 
 export const savePlayerSessionSchema = z
   .object({

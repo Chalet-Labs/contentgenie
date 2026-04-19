@@ -1349,6 +1349,7 @@ describe("Cross-device sync: hydration and reconcile", () => {
   })
 
   afterEach(() => {
+    vi.useRealTimers()
     vi.restoreAllMocks()
   })
 

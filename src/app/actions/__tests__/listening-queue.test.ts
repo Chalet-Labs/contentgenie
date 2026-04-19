@@ -188,9 +188,12 @@ describe("getQueue", () => {
       podcastTitle: "Test Podcast",
       audioUrl: "https://example.com/audio2.mp3",
     })
-    // Verify orderBy was passed with asc
+    // Verify rows are scoped to the signed-in user and ordered by position ASC
     const findManyCall = mockFindMany.mock.calls[0][0]
-    expect(findManyCall).toHaveProperty("orderBy")
+    expect(findManyCall.where).toEqual({ col: "userId", val: "user_123" })
+    expect(findManyCall.orderBy).toEqual([
+      { col: "position", direction: "asc" },
+    ])
   })
 
   it("returns { success: false, error } on DB error", async () => {
@@ -237,13 +240,37 @@ describe("setQueue", () => {
     expect(mockEnsureUserExists).not.toHaveBeenCalled()
   })
 
-  it("calls db.transaction, with DELETE before INSERT", async () => {
+  it("rejects a queue containing duplicate episode IDs before touching the DB", async () => {
+    const { setQueue } = await import("@/app/actions/listening-queue")
+    const result = await setQueue([validEpisode, { ...validEpisode }])
+    expect(result.success).toBe(false)
+    expect(mockTransaction).not.toHaveBeenCalled()
+    expect(mockEnsureUserExists).not.toHaveBeenCalled()
+  })
+
+  it("rejects a queue with a non-https audioUrl before touching the DB", async () => {
+    const { setQueue } = await import("@/app/actions/listening-queue")
+    const jsUrl = {
+      ...validEpisode,
+      audioUrl: "javascript:alert(1)",
+    } as AudioEpisode
+    const result = await setQueue([jsUrl])
+    expect(result.success).toBe(false)
+    expect(mockTransaction).not.toHaveBeenCalled()
+    expect(mockEnsureUserExists).not.toHaveBeenCalled()
+  })
+
+  it("calls db.transaction, with DELETE before INSERT scoped to the signed-in user", async () => {
     const { setQueue } = await import("@/app/actions/listening-queue")
     await setQueue([validEpisode, validEpisode2])
     expect(mockTransaction).toHaveBeenCalledTimes(1)
     const deleteOrder = mockDelete.mock.invocationCallOrder[0]
     const insertOrder = mockInsert.mock.invocationCallOrder[0]
     expect(deleteOrder).toBeLessThan(insertOrder)
+    expect(mockDeleteWhere).toHaveBeenCalledWith({
+      col: "userId",
+      val: "user_123",
+    })
   })
 
   it("inserts rows with position = 0, 1, 2 and explicit updatedAt Date", async () => {
@@ -263,6 +290,10 @@ describe("setQueue", () => {
     await setQueue([])
     expect(mockTransaction).toHaveBeenCalledTimes(1)
     expect(mockDelete).toHaveBeenCalledTimes(1)
+    expect(mockDeleteWhere).toHaveBeenCalledWith({
+      col: "userId",
+      val: "user_123",
+    })
     expect(mockInsert).not.toHaveBeenCalled()
   })
 
@@ -311,6 +342,10 @@ describe("clearQueue", () => {
     expect(result).toEqual({ success: true })
     expect(mockDelete).toHaveBeenCalledTimes(1)
     expect(mockDeleteWhere).toHaveBeenCalledTimes(1)
+    expect(mockDeleteWhere).toHaveBeenCalledWith({
+      col: "userId",
+      val: "user_123",
+    })
   })
 
   it("does not call ensureUserExists (DELETE is no-op on nonexistent user)", async () => {

@@ -66,8 +66,7 @@ export async function savePlayerSession(
   try {
     await ensureUserExists(userId)
 
-    const sessionValues = {
-      userId,
+    const updateValues = {
       episodeId: validEpisode.id,
       title: validEpisode.title,
       podcastTitle: validEpisode.podcastTitle,
@@ -81,10 +80,10 @@ export async function savePlayerSession(
 
     await db
       .insert(userPlayerSession)
-      .values(sessionValues)
+      .values({ userId, ...updateValues })
       .onConflictDoUpdate({
         target: userPlayerSession.userId,
-        set: sessionValues,
+        set: updateValues,
       })
 
     return { success: true }

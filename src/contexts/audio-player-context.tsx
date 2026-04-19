@@ -519,16 +519,20 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
 
     saveQueue(state.queue)
 
-    // Skip server write if the queue matches the last server-acked state (no user mutation)
-    const currentIds = state.queue.map((ep) => ep.id).join(",")
-    const ackedIds = lastAckedQueueRef.current.map((ep) => ep.id).join(",")
-    if (currentIds === ackedIds) return
-
     // Skip server write if this queue change originated from a server reconcile
+    // or a rollback-triggered INIT_QUEUE. Check this BEFORE the acked-IDs
+    // early return — otherwise a rollback (which restores the acked queue by
+    // definition) would bail on ID equality and leave the suppress flag set,
+    // silently dropping the next real user mutation.
     if (suppressQueueWriteRef.current) {
       suppressQueueWriteRef.current = false
       return
     }
+
+    // Skip server write if the queue matches the last server-acked state (no user mutation)
+    const currentIds = state.queue.map((ep) => ep.id).join(",")
+    const ackedIds = lastAckedQueueRef.current.map((ep) => ep.id).join(",")
+    if (currentIds === ackedIds) return
 
     // Trailing-edge 1500ms debounce: collapses rapid reorders into a single setQueue call.
     // Increment the counter when scheduling so the flag stays > 0 while any timer or

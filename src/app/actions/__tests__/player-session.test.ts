@@ -209,9 +209,12 @@ describe("savePlayerSession", () => {
     await savePlayerSession(validEpisode, 120)
     expect(mockOnConflictDoUpdate).toHaveBeenCalledTimes(1)
     const opts = mockOnConflictDoUpdate.mock.calls[0][0]
-    expect(opts).toHaveProperty("target")
+    expect(opts.target).toBe("userId")
     expect(opts).toHaveProperty("set")
     expect(opts.set.updatedAt).toBeInstanceOf(Date)
+    // The conflict update set must NOT include the userId key — that's the
+    // conflict target and re-setting it is a semantic no-op that muddies intent.
+    expect(opts.set).not.toHaveProperty("userId")
   })
 
   it("persists currentTime as a decimal string", async () => {

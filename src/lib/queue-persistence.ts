@@ -11,6 +11,7 @@
  */
 import {
   audioEpisodeSchema,
+  MAX_QUEUE_ITEMS,
   type AudioEpisode,
 } from "@/lib/schemas/listening-queue"
 
@@ -35,6 +36,9 @@ export function loadQueue(): AudioEpisode[] {
       if (seen.has(result.data.id)) continue
       seen.add(result.data.id)
       valid.push(result.data)
+      // Stop at the shared server cap — otherwise an oversized local queue
+      // would hydrate the UI but fail `setQueue` during migration.
+      if (valid.length >= MAX_QUEUE_ITEMS) break
     }
     return valid
   } catch {

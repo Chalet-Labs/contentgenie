@@ -155,9 +155,12 @@ fields on both tables, debounced by final state (1500ms trailing edge).
   per user, `userId` primary key).
 - Two new server-action modules: `src/app/actions/listening-queue.ts` and
   `src/app/actions/player-session.ts`. Both follow the existing return-shape
-  contract `{ success: true; data?: T } | { success: false; error: string }`,
-  call `auth()` then `ensureUserExists(userId)`, and use Zod validation on
-  the `AudioEpisode` payload (mirroring `src/lib/schemas/library.ts`).
+  contract `{ success: true; data?: T } | { success: false; error: string }`
+  and authenticate with `auth()`. The write actions (`setQueue`,
+  `savePlayerSession`) additionally call `ensureUserExists(userId)` before
+  persistence and run the `AudioEpisode` payload through Zod (mirroring
+  `src/lib/schemas/library.ts`); the read and clear actions skip
+  `ensureUserExists` because they never need to create a user row.
 - **Name explicitly:** the new modules are `listening-queue` / `player-session`.
   They are **not** the pre-existing `src/contexts/sync-queue-context.tsx` /
   `src/lib/sync-queue.ts` (IndexedDB-backed offline action replay for save /
