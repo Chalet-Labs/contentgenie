@@ -13,3 +13,5 @@ export const pushSubscriptions = {};
 export const trendingTopics = {};
 export const episodeTopics = {};
 export const listenHistory = {};
+export const userQueueItems = {};
+export const userPlayerSession = {};
