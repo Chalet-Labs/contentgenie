@@ -6,14 +6,12 @@ const { clerkState } = vi.hoisted(() => ({
   clerkState: { signedIn: false },
 }));
 
-vi.mock("@clerk/nextjs", () => ({
-  SignedIn: ({ children }: { children: React.ReactNode }) =>
-    clerkState.signedIn ? <>{children}</> : null,
-  SignedOut: ({ children }: { children: React.ReactNode }) =>
-    clerkState.signedIn ? null : <>{children}</>,
-  SignInButton: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-  SignUpButton: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-}));
+vi.mock("@clerk/nextjs", async () => {
+  const { createClerkMock } = await vi.importActual<typeof import("@/test/mocks/clerk-nextjs")>(
+    "@/test/mocks/clerk-nextjs",
+  );
+  return createClerkMock(clerkState);
+});
 
 import { Hero } from "@/components/landing/hero";
 import { HeroSurface } from "@/components/landing/hero-surface";

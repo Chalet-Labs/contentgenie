@@ -13,6 +13,9 @@ describe("MarketingFooter", () => {
       "href",
       "https://twitter.com/contentgenie",
     );
-    expect(screen.getByText(new RegExp(`${new Date().getFullYear()}`))).toBeInTheDocument();
+    const year = String(new Date().getFullYear());
+    expect(
+      screen.getByText((content) => content.includes(year)),
+    ).toBeInTheDocument();
   });
 });

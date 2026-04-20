@@ -15,15 +15,12 @@ vi.mock("next-themes", () => ({
   }),
 }));
 
-vi.mock("@clerk/nextjs", () => ({
-  SignedIn: ({ children }: { children: React.ReactNode }) =>
-    clerkState.signedIn ? <>{children}</> : null,
-  SignedOut: ({ children }: { children: React.ReactNode }) =>
-    clerkState.signedIn ? null : <>{children}</>,
-  UserButton: () => <div data-testid="user-button" />,
-  SignInButton: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-  SignUpButton: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-}));
+vi.mock("@clerk/nextjs", async () => {
+  const { createClerkMock } = await vi.importActual<typeof import("@/test/mocks/clerk-nextjs")>(
+    "@/test/mocks/clerk-nextjs",
+  );
+  return createClerkMock(clerkState);
+});
 
 import { MarketingHeader } from "@/components/layout/marketing-header";
 
