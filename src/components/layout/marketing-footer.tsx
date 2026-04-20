@@ -14,7 +14,7 @@ export function MarketingFooter() {
           <Link href="/privacy" prefetch={false}>Privacy</Link>
           <Link href="/terms" prefetch={false}>Terms</Link>
           <Link href="/changelog" prefetch={false}>Changelog</Link>
-          <a href="https://twitter.com/contentgenie" target="_blank" rel="noreferrer">
+          <a href="https://twitter.com/contentgenie" target="_blank" rel="noopener noreferrer">
             @contentgenie
           </a>
         </div>

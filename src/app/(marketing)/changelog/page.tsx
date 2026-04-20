@@ -19,7 +19,7 @@ export default function ChangelogPage() {
           className="underline underline-offset-4 hover:text-foreground"
           href="https://github.com/Chalet-Labs/contentgenie/blob/main/CHANGELOG.md"
           target="_blank"
-          rel="noreferrer"
+          rel="noopener noreferrer"
         >
           CHANGELOG on GitHub
         </a>
