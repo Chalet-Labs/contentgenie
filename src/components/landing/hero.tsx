@@ -28,9 +28,9 @@ export function Hero() {
             </Button>
           </div>
           <div className="lp-hero-meta">
-            <span><Check className="lp-check" size={13} strokeWidth={3} /> Free while in beta</span>
-            <span><Check className="lp-check" size={13} strokeWidth={3} /> 50% off forever</span>
-            <span><Check className="lp-check" size={13} strokeWidth={3} /> Cancel anytime</span>
+            <span><Check className="lp-check" size={13} strokeWidth={3} aria-hidden="true" /> Free while in beta</span>
+            <span><Check className="lp-check" size={13} strokeWidth={3} aria-hidden="true" /> 50% off forever</span>
+            <span><Check className="lp-check" size={13} strokeWidth={3} aria-hidden="true" /> Cancel anytime</span>
           </div>
         </div>
 

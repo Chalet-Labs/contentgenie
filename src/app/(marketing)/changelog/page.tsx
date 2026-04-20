@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Changelog — ContentGenie",
+  title: "Changelog",
   description: "Recent changes and improvements to ContentGenie.",
 };
 

@@ -10,16 +10,28 @@ import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"] });
 
+const APP_URL_FALLBACK = "https://contentgenie.app";
+
 function resolveAppUrl(): string {
   const explicit = process.env.NEXT_PUBLIC_APP_URL;
-  if (explicit) return explicit;
+  if (explicit) {
+    try {
+      return new URL(explicit).toString().replace(/\/$/, "");
+    } catch {
+      console.error(
+        `[layout] NEXT_PUBLIC_APP_URL is not a valid absolute URL (${JSON.stringify(explicit)}). ` +
+          `Falling back to ${APP_URL_FALLBACK}.`,
+      );
+      return APP_URL_FALLBACK;
+    }
+  }
   if (process.env.NODE_ENV !== "development") {
     console.warn(
       "[layout] NEXT_PUBLIC_APP_URL is not set in a non-development build. " +
-        "Falling back to https://contentgenie.app — metadataBase and OG tags may be wrong.",
+        `Falling back to ${APP_URL_FALLBACK} — metadataBase and OG tags may be wrong.`,
     );
   }
-  return "https://contentgenie.app";
+  return APP_URL_FALLBACK;
 }
 
 const APP_URL = resolveAppUrl();

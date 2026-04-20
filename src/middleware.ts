@@ -5,6 +5,7 @@ import type { NextRequest } from "next/server";
 const isPublicRoute = createRouteMatcher([
   "/",
   "/offline",
+  "/opengraph-image(.*)",
   "/privacy",
   "/terms",
   "/changelog",

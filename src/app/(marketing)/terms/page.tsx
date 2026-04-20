@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Terms of Service — ContentGenie",
+  title: "Terms of Service",
   description: "The terms under which you can use ContentGenie.",
 };
 

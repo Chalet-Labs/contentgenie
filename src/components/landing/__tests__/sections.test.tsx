@@ -61,9 +61,8 @@ describe("HowItWorks", () => {
   it("renders all four steps in order", () => {
     render(<HowItWorks />);
     expect(screen.getByText(/paste a feed/i)).toBeInTheDocument();
-    ["STEP.01", "STEP.02", "STEP.03", "STEP.04"].forEach((label) => {
-      expect(screen.getByText(label)).toBeInTheDocument();
-    });
+    const steps = screen.getAllByText(/^STEP\.0[1-4]$/).map((el) => el.textContent);
+    expect(steps).toEqual(["STEP.01", "STEP.02", "STEP.03", "STEP.04"]);
   });
 });
 
