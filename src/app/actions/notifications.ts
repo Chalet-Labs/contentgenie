@@ -63,23 +63,20 @@ export async function getUnreadCount(): Promise<number> {
   const { userId } = await auth();
   if (!userId) return 0;
 
-  try {
-    const [result] = await db
-      .select({ value: count() })
-      .from(notifications)
-      .where(
-        and(
-          eq(notifications.userId, userId),
-          eq(notifications.isRead, false),
-          eq(notifications.isDismissed, false)
-        )
-      );
+  // Let DB errors propagate so the caller can keep the last good count
+  // instead of showing a false "0 unread" after a transient failure.
+  const [result] = await db
+    .select({ value: count() })
+    .from(notifications)
+    .where(
+      and(
+        eq(notifications.userId, userId),
+        eq(notifications.isRead, false),
+        eq(notifications.isDismissed, false)
+      )
+    );
 
-    return result?.value ?? 0;
-  } catch (error) {
-    console.error("Error fetching unread count:", error);
-    return 0;
-  }
+  return result?.value ?? 0;
 }
 
 export async function markNotificationRead(notificationId: number) {

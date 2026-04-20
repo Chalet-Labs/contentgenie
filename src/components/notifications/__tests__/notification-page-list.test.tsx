@@ -362,4 +362,67 @@ describe("NotificationPageList", () => {
     // Button is still present for manual retry
     expect(screen.getByRole("button", { name: /load more/i })).toBeInTheDocument();
   });
+
+  // Regression: mark-all-read failure surfaces a toast with Retry (previously silent)
+  it("mark-all-read failure surfaces a toast with Retry", async () => {
+    mockMarkAllNotificationsRead.mockResolvedValue({
+      success: false,
+      error: "DB error",
+    });
+    const user = userEvent.setup();
+    render(<NotificationPageList {...defaultProps} />);
+
+    await user.click(screen.getByRole("button", { name: /mark all as read/i }));
+    await waitFor(() => {
+      expect(mockToastError).toHaveBeenCalledWith(
+        expect.stringMatching(/mark all as read|db error/i),
+        expect.objectContaining({
+          action: expect.objectContaining({ label: "Retry" }),
+        })
+      );
+    });
+    // Rows must NOT be flipped to read on failure
+    expect(screen.getAllByRole("article")[0]).toHaveAttribute("data-read", "false");
+  });
+
+  // Regression: row click that throws still navigates and toasts (not silent)
+  it("row click that throws still navigates and surfaces a toast", async () => {
+    mockMarkNotificationRead.mockRejectedValue(new Error("network"));
+    const user = userEvent.setup();
+    render(<NotificationPageList {...defaultProps} />);
+
+    const titleBtns = screen.getAllByRole("button", { name: /test episode|new episode/i });
+    await user.click(titleBtns[0]);
+
+    await waitFor(() => {
+      expect(mockToastError).toHaveBeenCalledWith(
+        expect.stringMatching(/couldn't mark as read|couldn’t mark as read/i)
+      );
+      expect(mockPush).toHaveBeenCalledWith("/episode/PI-42");
+    });
+  });
+
+  // Regression: Load more degrades gracefully when getEpisodeTopics throws
+  it("Load more appends rows even if getEpisodeTopics throws", async () => {
+    mockGetNotifications.mockResolvedValue({
+      notifications: [makeItem({ id: 77, episodeDbId: 77 })],
+      hasMore: false,
+      error: null,
+    });
+    mockGetEpisodeTopics.mockRejectedValue(new Error("topics down"));
+    const user = userEvent.setup();
+    render(
+      <NotificationPageList
+        initialItems={defaultProps.initialItems}
+        initialHasMore={true}
+        initialTopicsByEpisode={{}}
+      />
+    );
+
+    await user.click(screen.getByRole("button", { name: /load more/i }));
+    await waitFor(() => {
+      // One new row appended (2 initial + 1 loaded)
+      expect(screen.getAllByRole("article")).toHaveLength(3);
+    });
+  });
 });

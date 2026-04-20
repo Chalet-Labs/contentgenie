@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, useCallback } from "react";
+import { useState, useTransition, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Bell, X } from "lucide-react";
@@ -18,23 +18,11 @@ import { WorthItBadge } from "@/components/episodes/worth-it-badge";
 import { AddToQueueButton } from "@/components/audio-player/add-to-queue-button";
 import { formatRelativeTime } from "@/lib/utils";
 import { ROUTES } from "@/lib/routes";
+import { NOTIFICATIONS_PAGE_SIZE } from "@/lib/notifications-constants";
 
-type NotificationItem = {
-  id: number;
-  type: string;
-  title: string;
-  body: string;
-  isRead: boolean;
-  createdAt: Date;
-  episodeDbId: number | null;
-  episodePodcastIndexId: string | null;
-  episodeTitle: string | null;
-  podcastTitle: string | null;
-  worthItScore: string | null;
-  audioUrl: string | null;
-  artwork: string | null;
-  duration: number | null;
-};
+type NotificationItem = Awaited<
+  ReturnType<typeof getNotifications>
+>["notifications"][number];
 
 type Tab = "all" | "unread" | "read";
 
@@ -50,10 +38,9 @@ export function NotificationPageList({
   initialTopicsByEpisode,
 }: NotificationPageListProps) {
   const router = useRouter();
-  const PAGE_SIZE = 50;
   const [items, setItems] = useState<NotificationItem[]>(initialItems);
   const [hasMore, setHasMore] = useState(initialHasMore);
-  const [offset, setOffset] = useState(PAGE_SIZE);
+  const offsetRef = useRef(NOTIFICATIONS_PAGE_SIZE);
   const [activeTab, setActiveTab] = useState<Tab>("all");
   const [topicsByEpisode, setTopicsByEpisode] =
     useState<Record<number, string[]>>(initialTopicsByEpisode);
@@ -80,7 +67,7 @@ export function NotificationPageList({
         const result = await dismissNotification(id);
         if (result.success) {
           setItems((prev) => prev.filter((n) => n.id !== id));
-          setOffset((prev) => Math.max(0, prev - 1));
+          offsetRef.current = Math.max(0, offsetRef.current - 1);
           setOptimisticDismissed((prev) => {
             const next = new Set(prev);
             next.delete(id);
@@ -98,17 +85,22 @@ export function NotificationPageList({
         }
       });
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     []
   );
 
   const handleRowClick = async (item: NotificationItem) => {
     if (!item.isRead) {
-      const result = await markNotificationRead(item.id);
-      if (result.success) {
-        setItems((prev) =>
-          prev.map((n) => (n.id === item.id ? { ...n, isRead: true } : n))
-        );
+      try {
+        const result = await markNotificationRead(item.id);
+        if (result.success) {
+          setItems((prev) =>
+            prev.map((n) => (n.id === item.id ? { ...n, isRead: true } : n))
+          );
+        } else {
+          toast.error(result.error ?? "Couldn't mark as read");
+        }
+      } catch {
+        toast.error("Couldn't mark as read");
       }
     }
     router.push(
@@ -118,44 +110,67 @@ export function NotificationPageList({
     );
   };
 
-  const handleMarkAllRead = async () => {
-    const result = await markAllNotificationsRead();
-    if (result.success) {
-      setItems((prev) => prev.map((n) => ({ ...n, isRead: true })));
-    }
-  };
-
-  const handleLoadMore = () => {
-    startTransition(async () => {
-      const result = await getNotifications(50, offset);
-      if (result.error) {
-        toast.error("Failed to load more notifications", {
-          action: { label: "Retry", onClick: handleLoadMore },
+  const handleMarkAllRead = useCallback(async () => {
+    try {
+      const result = await markAllNotificationsRead();
+      if (result.success) {
+        setItems((prev) => prev.map((n) => ({ ...n, isRead: true })));
+      } else {
+        toast.error(result.error ?? "Failed to mark all as read", {
+          action: { label: "Retry", onClick: () => handleMarkAllRead() },
         });
-        return;
       }
-      if (result.notifications.length === 0) {
-        setHasMore(false);
-        return;
-      }
-      const newItems = result.notifications as NotificationItem[];
-      const newEpisodeIds = newItems
-        .map((n) => n.episodeDbId)
-        .filter((id): id is number => id !== null);
-      const newTopicsMap =
-        newEpisodeIds.length > 0
-          ? await getEpisodeTopics(newEpisodeIds)
-          : new Map<number, string[]>();
-      const newTopics: Record<number, string[]> = {};
-      newTopicsMap.forEach((topics, id) => {
-        newTopics[id] = topics;
+    } catch {
+      toast.error("Failed to mark all as read", {
+        action: { label: "Retry", onClick: () => handleMarkAllRead() },
       });
-      setItems((prev) => [...prev, ...newItems]);
-      setTopicsByEpisode((prev) => ({ ...prev, ...newTopics }));
-      setOffset((prev) => prev + PAGE_SIZE);
-      setHasMore(result.hasMore ?? false);
+    }
+  }, []);
+
+  const handleLoadMore = useCallback(() => {
+    startTransition(async () => {
+      try {
+        const result = await getNotifications(
+          NOTIFICATIONS_PAGE_SIZE,
+          offsetRef.current
+        );
+        if (result.error) {
+          toast.error("Failed to load more notifications", {
+            action: { label: "Retry", onClick: () => handleLoadMore() },
+          });
+          return;
+        }
+        if (result.notifications.length === 0) {
+          setHasMore(false);
+          return;
+        }
+        const newItems = result.notifications;
+        const newEpisodeIds = newItems
+          .map((n) => n.episodeDbId)
+          .filter((id): id is number => id !== null);
+        let newTopics: Record<number, string[]> = {};
+        if (newEpisodeIds.length > 0) {
+          try {
+            const newTopicsMap = await getEpisodeTopics(newEpisodeIds);
+            newTopicsMap.forEach((topics, id) => {
+              newTopics[id] = topics;
+            });
+          } catch {
+            // Degrade gracefully — append rows without topic chips.
+            newTopics = {};
+          }
+        }
+        setItems((prev) => [...prev, ...newItems]);
+        setTopicsByEpisode((prev) => ({ ...prev, ...newTopics }));
+        offsetRef.current = offsetRef.current + NOTIFICATIONS_PAGE_SIZE;
+        setHasMore(result.hasMore ?? false);
+      } catch {
+        toast.error("Failed to load more notifications", {
+          action: { label: "Retry", onClick: () => handleLoadMore() },
+        });
+      }
     });
-  };
+  }, []);
 
   const showEmptyState =
     filteredItems.length === 0 && (!hasMore || activeTab !== "all");

@@ -89,6 +89,17 @@ describe("notification server actions", () => {
       const count = await getUnreadCount();
       expect(count).toBe(5);
     });
+
+    it("lets DB errors propagate so the caller can keep the last good count", async () => {
+      const dbError = new Error("connection refused");
+      const mockFrom = vi.fn().mockReturnValue({
+        where: vi.fn().mockRejectedValue(dbError),
+      });
+      mockSelect.mockReturnValue({ from: mockFrom });
+
+      const { getUnreadCount } = await import("@/app/actions/notifications");
+      await expect(getUnreadCount()).rejects.toThrow("connection refused");
+    });
   });
 
   describe("markNotificationRead", () => {
