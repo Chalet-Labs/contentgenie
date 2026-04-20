@@ -10,7 +10,19 @@ import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"] });
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://contentgenie.app";
+function resolveAppUrl(): string {
+  const explicit = process.env.NEXT_PUBLIC_APP_URL;
+  if (explicit) return explicit;
+  if (process.env.NODE_ENV !== "development") {
+    console.warn(
+      "[layout] NEXT_PUBLIC_APP_URL is not set in a non-development build. " +
+        "Falling back to https://contentgenie.app — metadataBase and OG tags may be wrong.",
+    );
+  }
+  return "https://contentgenie.app";
+}
+
+const APP_URL = resolveAppUrl();
 
 export const metadata: Metadata = {
   metadataBase: new URL(APP_URL),
@@ -72,11 +84,15 @@ export default function RootLayout({
       afterSignOutUrl="/"
       allowedRedirectOrigins={[
         (() => {
+          const raw = process.env.NEXT_PUBLIC_APP_URL;
+          if (!raw) return undefined;
           try {
-            return process.env.NEXT_PUBLIC_APP_URL
-              ? new URL(process.env.NEXT_PUBLIC_APP_URL).origin
-              : undefined;
-          } catch {
+            return new URL(raw).origin;
+          } catch (err) {
+            console.error(
+              "[layout] Invalid NEXT_PUBLIC_APP_URL for Clerk allowedRedirectOrigins",
+              { url: raw, err },
+            );
             return undefined;
           }
         })(),

@@ -14,7 +14,7 @@ export default async function EpisodeLayout({
   }
 
   return (
-    <div className="lp min-h-screen bg-background">
+    <div className="min-h-screen bg-background">
       <MarketingHeader />
       <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6">{children}</main>
     </div>

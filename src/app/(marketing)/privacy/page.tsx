@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -18,9 +19,9 @@ export default function PrivacyPage() {
         create, and we use your email only for product updates. We do not sell your
         data. Analytics are aggregated and anonymized. AI summaries are generated
         via third-party providers (see{" "}
-        <a className="underline underline-offset-4 hover:text-foreground" href="/terms">
+        <Link className="underline underline-offset-4 hover:text-foreground" href="/terms">
           Terms
-        </a>
+        </Link>
         ) and not retained by them beyond the request.
       </p>
       <p className="text-[15px] leading-relaxed text-muted-foreground mt-6">

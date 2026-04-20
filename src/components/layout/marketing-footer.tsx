@@ -1,3 +1,4 @@
+import Link from "next/link";
 import "./marketing-footer.css";
 
 export function MarketingFooter() {
@@ -10,9 +11,9 @@ export function MarketingFooter() {
           ContentGenie
         </div>
         <div className="lp-foot-links">
-          <a href="/privacy">Privacy</a>
-          <a href="/terms">Terms</a>
-          <a href="/changelog">Changelog</a>
+          <Link href="/privacy">Privacy</Link>
+          <Link href="/terms">Terms</Link>
+          <Link href="/changelog">Changelog</Link>
           <a href="https://twitter.com/contentgenie" target="_blank" rel="noreferrer">
             @contentgenie
           </a>

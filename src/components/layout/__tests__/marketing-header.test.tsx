@@ -1,19 +1,40 @@
-import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
-import { MarketingHeader } from "@/components/layout/marketing-header";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { render, screen, fireEvent } from "@testing-library/react";
 import React from "react";
 
+const { setThemeMock, themeState } = vi.hoisted(() => ({
+  setThemeMock: vi.fn(),
+  themeState: { resolvedTheme: "light" as "light" | "dark" },
+}));
+
 vi.mock("next-themes", () => ({
-  useTheme: () => ({ resolvedTheme: "light", setTheme: vi.fn() }),
+  useTheme: () => ({
+    resolvedTheme: themeState.resolvedTheme,
+    setTheme: setThemeMock,
+  }),
+}));
+
+const { clerkState } = vi.hoisted(() => ({
+  clerkState: { signedIn: false },
 }));
 
 vi.mock("@clerk/nextjs", () => ({
-  SignedIn: () => null,
-  SignedOut: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  SignedIn: ({ children }: { children: React.ReactNode }) =>
+    clerkState.signedIn ? <>{children}</> : null,
+  SignedOut: ({ children }: { children: React.ReactNode }) =>
+    clerkState.signedIn ? null : <>{children}</>,
   UserButton: () => <div data-testid="user-button" />,
   SignInButton: ({ children }: { children: React.ReactNode }) => <>{children}</>,
   SignUpButton: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
+
+import { MarketingHeader } from "@/components/layout/marketing-header";
+
+beforeEach(() => {
+  setThemeMock.mockClear();
+  themeState.resolvedTheme = "light";
+  clerkState.signedIn = false;
+});
 
 describe("MarketingHeader — signed out", () => {
   it("renders brand link to /", () => {
@@ -41,5 +62,38 @@ describe("MarketingHeader — signed out", () => {
     expect(screen.queryByRole("link", { name: /dashboard/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /discover/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /library/i })).not.toBeInTheDocument();
+  });
+});
+
+describe("MarketingHeader — theme toggle", () => {
+  it("flips to dark when current theme is light", () => {
+    themeState.resolvedTheme = "light";
+    render(<MarketingHeader />);
+    fireEvent.click(screen.getByRole("button", { name: /toggle theme/i }));
+    expect(setThemeMock).toHaveBeenCalledWith("dark");
+  });
+
+  it("flips to light when current theme is dark", () => {
+    themeState.resolvedTheme = "dark";
+    render(<MarketingHeader />);
+    fireEvent.click(screen.getByRole("button", { name: /toggle theme/i }));
+    expect(setThemeMock).toHaveBeenCalledWith("light");
+  });
+});
+
+describe("MarketingHeader — signed in", () => {
+  it("renders the Open app link to /dashboard and UserButton", () => {
+    clerkState.signedIn = true;
+    render(<MarketingHeader />);
+    const openApp = screen.getByRole("link", { name: /open app/i });
+    expect(openApp).toHaveAttribute("href", "/dashboard");
+    expect(screen.getByTestId("user-button")).toBeInTheDocument();
+  });
+
+  it("does not render signed-out CTAs", () => {
+    clerkState.signedIn = true;
+    render(<MarketingHeader />);
+    expect(screen.queryByRole("button", { name: /sign in/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /join beta/i })).not.toBeInTheDocument();
   });
 });

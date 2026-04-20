@@ -1,6 +1,6 @@
-import { getScoreBand, getScoreLabel } from "@/lib/score-utils";
+import { getScoreBand, getScoreLabel, type ScoreBand } from "@/lib/score-utils";
 
-const BAND_TOKEN: Record<ReturnType<typeof getScoreBand>, string> = {
+const BAND_TOKEN: Record<ScoreBand, string> = {
   exceptional: "--score-exceptional",
   above: "--score-above",
   average: "--score-average",

@@ -1,10 +1,16 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import React from "react";
 
+const { clerkState } = vi.hoisted(() => ({
+  clerkState: { signedIn: false },
+}));
+
 vi.mock("@clerk/nextjs", () => ({
-  SignedIn: () => null,
-  SignedOut: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  SignedIn: ({ children }: { children: React.ReactNode }) =>
+    clerkState.signedIn ? <>{children}</> : null,
+  SignedOut: ({ children }: { children: React.ReactNode }) =>
+    clerkState.signedIn ? null : <>{children}</>,
   SignInButton: ({ children }: { children: React.ReactNode }) => <>{children}</>,
   SignUpButton: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
@@ -17,6 +23,10 @@ import { ExampleSummary } from "@/components/landing/example-summary";
 import { Pricing } from "@/components/landing/pricing";
 import { FinalCta } from "@/components/landing/final-cta";
 import { JoinBetaButton } from "@/components/landing/join-beta-button";
+
+beforeEach(() => {
+  clerkState.signedIn = false;
+});
 
 describe("Hero", () => {
   it("renders headline, subhead, and CTAs", () => {
@@ -32,7 +42,6 @@ describe("HeroSurface", () => {
   it("renders the inbox mock with derived score labels", () => {
     render(<HeroSurface />);
     expect(screen.getByText(/today's queue/i)).toBeInTheDocument();
-    // Scores use canonical labels from getScoreLabel
     expect(screen.getAllByText(/exceptional/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/above average/i).length).toBeGreaterThan(0);
     expect(screen.getByText(/skip/i)).toBeInTheDocument();
@@ -46,7 +55,6 @@ describe("Features", () => {
     expect(screen.getByRole("heading", { name: /key takeaways/i })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: /library that remembers/i })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: /discover, cross-indexed/i })).toBeInTheDocument();
-    // Labels derived via getScoreLabel — no "Above avg" compact form
     expect(screen.queryByText(/above avg\b/i)).not.toBeInTheDocument();
   });
 });
@@ -78,7 +86,6 @@ describe("Pricing", () => {
     expect(screen.getByText("$0")).toBeInTheDocument();
     expect(screen.getByText(/public beta · limited seats/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /claim your seat — free/i })).toBeInTheDocument();
-    // No stale numbers
     expect(screen.queryByText(/716/)).not.toBeInTheDocument();
     expect(screen.queryByText(/1,284/)).not.toBeInTheDocument();
   });
@@ -93,7 +100,7 @@ describe("FinalCta", () => {
   });
 });
 
-describe("JoinBetaButton", () => {
+describe("JoinBetaButton — signed out", () => {
   it("renders the signed-out SignUp button with default label and arrow", () => {
     render(<JoinBetaButton />);
     expect(screen.getByRole("button", { name: /join the beta/i })).toBeInTheDocument();
@@ -102,5 +109,15 @@ describe("JoinBetaButton", () => {
   it("accepts a custom label and arrow suppression", () => {
     render(<JoinBetaButton label="Claim your seat" withArrow={false} />);
     expect(screen.getByRole("button", { name: /claim your seat/i })).toBeInTheDocument();
+  });
+});
+
+describe("JoinBetaButton — signed in", () => {
+  it("renders a link to /dashboard instead of the SignUp button", () => {
+    clerkState.signedIn = true;
+    render(<JoinBetaButton />);
+    const link = screen.getByRole("link", { name: /join the beta/i });
+    expect(link).toHaveAttribute("href", "/dashboard");
+    expect(screen.queryByRole("button", { name: /join the beta/i })).not.toBeInTheDocument();
   });
 });

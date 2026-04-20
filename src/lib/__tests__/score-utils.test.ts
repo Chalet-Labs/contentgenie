@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   getScoreColor,
   getScoreLabel,
+  getScoreBand,
   clampAdjustment,
   coerceSignals,
   computeSignalScore,
@@ -79,6 +80,49 @@ describe("getScoreLabel", () => {
   it("returns 'Skip' for scores < 2", () => {
     expect(getScoreLabel(0)).toBe("Skip");
     expect(getScoreLabel(1.9)).toBe("Skip");
+  });
+});
+
+describe("getScoreBand", () => {
+  it("returns 'exceptional' for scores >= 8", () => {
+    expect(getScoreBand(8)).toBe("exceptional");
+    expect(getScoreBand(9.5)).toBe("exceptional");
+    expect(getScoreBand(10)).toBe("exceptional");
+  });
+
+  it("returns 'above' for scores >= 6 and < 8", () => {
+    expect(getScoreBand(6)).toBe("above");
+    expect(getScoreBand(7.9)).toBe("above");
+  });
+
+  it("returns 'average' for scores >= 4 and < 6", () => {
+    expect(getScoreBand(4)).toBe("average");
+    expect(getScoreBand(5.9)).toBe("average");
+  });
+
+  it("returns 'below' for scores >= 2 and < 4", () => {
+    expect(getScoreBand(2)).toBe("below");
+    expect(getScoreBand(3.9)).toBe("below");
+  });
+
+  it("returns 'skip' for scores < 2", () => {
+    expect(getScoreBand(0)).toBe("skip");
+    expect(getScoreBand(1.9)).toBe("skip");
+  });
+
+  it("agrees with getScoreColor and getScoreLabel on every band boundary", () => {
+    const boundaries = [10, 8, 7.9, 6, 5.9, 4, 3.9, 2, 1.9, 0];
+    for (const s of boundaries) {
+      const band = getScoreBand(s);
+      expect(getScoreColor(s)).toContain(`bg-score-${band}`);
+      expect(getScoreLabel(s)).toMatch(
+        band === "exceptional" ? /Exceptional/
+          : band === "above" ? /Above Average/
+          : band === "average" ? /^Average$/
+          : band === "below" ? /Below Average/
+          : /Skip/,
+      );
+    }
   });
 });
 
