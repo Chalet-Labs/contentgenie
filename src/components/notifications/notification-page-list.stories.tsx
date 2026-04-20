@@ -1,4 +1,10 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import {
+  AudioPlayerAPIContext,
+  AudioPlayerStateContext,
+  type AudioPlayerAPI,
+  type AudioPlayerState,
+} from "@/contexts/audio-player-context";
 import { NotificationPageList } from "@/components/notifications/notification-page-list";
 import {
   STORY_NOW,
@@ -7,14 +13,52 @@ import {
   STORY_THREE_DAYS_AGO,
 } from "@/test/story-fixtures";
 
+const noopAPI: AudioPlayerAPI = {
+  playEpisode: () => {},
+  togglePlay: () => {},
+  seek: () => {},
+  skipForward: () => {},
+  skipBack: () => {},
+  setVolume: () => {},
+  setPlaybackSpeed: () => {},
+  closePlayer: () => {},
+  addToQueue: () => {},
+  removeFromQueue: () => {},
+  reorderQueue: () => {},
+  clearQueue: () => {},
+  playNext: () => {},
+  setSleepTimer: () => {},
+  cancelSleepTimer: () => {},
+};
+
+const emptyPlayerState: AudioPlayerState = {
+  currentEpisode: null,
+  isPlaying: false,
+  isBuffering: false,
+  isVisible: false,
+  duration: 0,
+  volume: 1,
+  playbackSpeed: 1,
+  hasError: false,
+  errorMessage: null,
+  queue: [],
+  chapters: null,
+  chaptersLoading: false,
+  sleepTimer: null,
+};
+
 const meta: Meta<typeof NotificationPageList> = {
   title: "Notifications/NotificationPageList",
   component: NotificationPageList,
   decorators: [
     (Story) => (
-      <div className="max-w-2xl mx-auto p-4">
-        <Story />
-      </div>
+      <AudioPlayerAPIContext.Provider value={noopAPI}>
+        <AudioPlayerStateContext.Provider value={emptyPlayerState}>
+          <div className="max-w-2xl mx-auto p-4">
+            <Story />
+          </div>
+        </AudioPlayerStateContext.Provider>
+      </AudioPlayerAPIContext.Provider>
     ),
   ],
 };
