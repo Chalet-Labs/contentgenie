@@ -252,6 +252,7 @@ export const notifications = pgTable(
     title: text("title").notNull(),
     body: text("body").notNull(),
     isRead: boolean("is_read").default(false).notNull(),
+    isDismissed: boolean("is_dismissed").default(false).notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => [
