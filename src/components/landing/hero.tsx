@@ -1,7 +1,7 @@
 import { Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { HeroSurface } from "./hero-surface";
-import { JoinBetaButton } from "./join-beta-button";
+import { HeroSurface } from "@/components/landing/hero-surface";
+import { JoinBetaButton } from "@/components/landing/join-beta-button";
 
 export function Hero() {
   return (

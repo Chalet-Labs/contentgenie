@@ -30,7 +30,7 @@ export function HeroSurface() {
           </div>
           <span>contentgenie.app / inbox</span>
           <span className="lp-pill">
-            <ArrowRight size={10} strokeWidth={3} /> {episodes.length} to review
+            <ArrowRight size={10} strokeWidth={3} aria-hidden="true" /> {episodes.length} to review
           </span>
         </div>
         <div className="lp-surface-title">
@@ -62,7 +62,7 @@ export function HeroSurface() {
 
       <div className="lp-float-summary">
         <div className="lp-fs-head">
-          <Sparkle className="lp-spark" size={12} fill="currentColor" strokeWidth={0} />
+          <Sparkle className="lp-spark" size={12} fill="currentColor" strokeWidth={0} aria-hidden="true" />
           AI SUMMARY · 17S
         </div>
         <div className="lp-fs-title">The retention trap: why 6-month cohorts lie</div>

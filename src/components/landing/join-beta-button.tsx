@@ -15,7 +15,7 @@ export function JoinBetaButton({
   const content = (
     <>
       {label}
-      {withArrow ? <ArrowRight size={16} /> : null}
+      {withArrow ? <ArrowRight size={16} aria-hidden="true" /> : null}
     </>
   );
 

@@ -42,7 +42,7 @@ describe("HeroSurface", () => {
     expect(screen.getByText(/today's queue/i)).toBeInTheDocument();
     expect(screen.getAllByText(/exceptional/i).length).toBeGreaterThan(0);
     expect(screen.getAllByText(/above average/i).length).toBeGreaterThan(0);
-    expect(screen.getByText(/skip/i)).toBeInTheDocument();
+    expect(screen.getByText(/^skip$/i)).toBeInTheDocument();
   });
 });
 
@@ -91,7 +91,7 @@ describe("Pricing", () => {
 describe("FinalCta", () => {
   it("renders the closing CTA without stale seat counts", () => {
     render(<FinalCta />);
-    expect(screen.getByRole("heading")).toHaveTextContent(/join the beta/i);
+    expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent(/join the beta/i);
     expect(screen.getByRole("button", { name: /claim your seat/i })).toBeInTheDocument();
     expect(screen.queryByText(/716 seats/i)).not.toBeInTheDocument();
   });

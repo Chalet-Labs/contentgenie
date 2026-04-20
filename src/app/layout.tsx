@@ -12,11 +12,20 @@ const inter = Inter({ subsets: ["latin"] });
 
 const APP_URL_FALLBACK = "https://contentgenie.app";
 
+function isAllowedAppUrl(url: URL): boolean {
+  if (url.protocol === "https:") return true;
+  return process.env.NODE_ENV === "development" && url.protocol === "http:";
+}
+
 function resolveAppUrl(): string {
   const explicit = process.env.NEXT_PUBLIC_APP_URL;
   if (explicit) {
     try {
-      return new URL(explicit).toString().replace(/\/$/, "");
+      const url = new URL(explicit);
+      if (!isAllowedAppUrl(url)) {
+        throw new Error(`Unsupported protocol: ${url.protocol}`);
+      }
+      return url.toString().replace(/\/$/, "");
     } catch {
       console.error(
         `[layout] NEXT_PUBLIC_APP_URL is not a valid absolute URL (${JSON.stringify(explicit)}). ` +
@@ -40,7 +49,11 @@ function resolveAppOrigin(): string | undefined {
   const raw = process.env.NEXT_PUBLIC_APP_URL;
   if (!raw) return undefined;
   try {
-    return new URL(raw).origin;
+    const url = new URL(raw);
+    if (!isAllowedAppUrl(url)) {
+      throw new Error(`Unsupported protocol: ${url.protocol}`);
+    }
+    return url.origin;
   } catch (err) {
     console.error(
       "[layout] Invalid NEXT_PUBLIC_APP_URL for Clerk allowedRedirectOrigins",

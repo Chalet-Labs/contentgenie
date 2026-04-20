@@ -1,4 +1,4 @@
-import { JoinBetaButton } from "./join-beta-button";
+import { JoinBetaButton } from "@/components/landing/join-beta-button";
 
 const features = [
   "Unlimited AI summaries",
