@@ -1,69 +1,33 @@
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { LandingHeader } from "@/components/layout/landing-header";
-import Link from "next/link";
+import { JetBrains_Mono } from "next/font/google";
+import { MarketingHeader } from "@/components/layout/marketing-header";
+import { Hero } from "@/components/landing/hero";
+import { Features } from "@/components/landing/features";
+import { HowItWorks } from "@/components/landing/how-it-works";
+import { ExampleSummary } from "@/components/landing/example-summary";
+import { Pricing } from "@/components/landing/pricing";
+import { FinalCta } from "@/components/landing/final-cta";
+import { MarketingFooter } from "@/components/layout/marketing-footer";
+import "@/components/landing/landing.css";
+
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ["latin"],
+  variable: "--font-jetbrains-mono",
+  display: "swap",
+});
 
 export default function Home() {
   return (
-    <div className="min-h-screen bg-background">
-      <LandingHeader />
-      <main className="flex flex-col items-center justify-center px-6 py-24">
-        <div className="text-center max-w-3xl">
-          <Badge variant="secondary" className="mb-4">AI-Powered</Badge>
-          <h1 className="text-4xl font-bold tracking-tight sm:text-6xl">
-            ContentGenie
-          </h1>
-          <p className="mt-6 text-lg leading-8 text-muted-foreground">
-            Podcast summaries for busy professionals. Discover, summarize, and save
-            podcast content with AI-powered insights.
-          </p>
-          <div className="mt-10 flex items-center justify-center gap-x-4">
-            <Button asChild size="lg">
-              <Link href="/discover">Discover Podcasts</Link>
-            </Button>
-            <Button variant="outline" asChild size="lg">
-              <Link href="/dashboard">Go to Dashboard</Link>
-            </Button>
-          </div>
-
-          <div className="mt-16 grid grid-cols-1 md:grid-cols-3 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>AI Summaries</CardTitle>
-                <CardDescription>Get quick summaries of any podcast episode</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">
-                  Save time with AI-generated summaries and key takeaways.
-                </p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader>
-                <CardTitle>Smart Ratings</CardTitle>
-                <CardDescription>Know what&apos;s worth your time</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">
-                  AI-powered &quot;worth it&quot; scores help you decide what to listen to.
-                </p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader>
-                <CardTitle>Personal Library</CardTitle>
-                <CardDescription>Organize and save your favorites</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">
-                  Build your collection with notes and custom collections.
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
+    <div className={`lp ${jetbrainsMono.variable} min-h-screen bg-background text-foreground`}>
+      <MarketingHeader />
+      <main>
+        <Hero />
+        <Features />
+        <HowItWorks />
+        <ExampleSummary />
+        <Pricing />
+        <FinalCta />
       </main>
+      <MarketingFooter />
     </div>
   );
 }

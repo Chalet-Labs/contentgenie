@@ -1,5 +1,5 @@
 import { auth } from "@clerk/nextjs/server";
-import { LandingHeader } from "@/components/layout/landing-header";
+import { MarketingHeader } from "@/components/layout/marketing-header";
 import { AppShell } from "@/components/layout/app-shell";
 
 export default async function EpisodeLayout({
@@ -14,8 +14,8 @@ export default async function EpisodeLayout({
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <LandingHeader />
+    <div className="lp min-h-screen bg-background">
+      <MarketingHeader />
       <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6">{children}</main>
     </div>
   );

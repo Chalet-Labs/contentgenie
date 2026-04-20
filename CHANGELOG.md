@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Changed
+- Public marketing landing page (`/`) redesigned: editorial-clean hero with a live-feeling inbox surface + floating AI summary, four-feature bento grid (Worth-It Score, Key Takeaways, Library, Discover), four-step how-it-works flow, worked example summary, and a free-during-beta pricing card (50% off forever for grandfathered accounts). Adds JetBrains Mono alongside Inter via `next/font`. The previous minimal `LandingHeader` is replaced by `MarketingHeader` (brand mark, full nav, contrast CTA), which now also powers the signed-out public episode share page — share-link visitors can discover the product instead of hitting a nav-less dead end. Adds a `contrast` variant to shadcn `Button` for inverted-color marketing CTAs.
+
 ### Fixed
 - `setQueue` server action now uses `db.batch([delete, insert])` instead of `db.transaction`, which is unsupported on the `drizzle-orm/neon-http` driver. Every queue mutation (add/reorder/remove) in production was failing with "Couldn't sync queue — Rolling back" and reverting the optimistic UI (#309).
 - `BatchSummarizeButton` on the podcast detail page now slices the passed-in episode list to the API's 20-episode batch limit before calling `/api/episodes/batch-summarize`, preventing 400 "Maximum 20 episodes per batch" errors when the page loads up to 200 episodes (#291).

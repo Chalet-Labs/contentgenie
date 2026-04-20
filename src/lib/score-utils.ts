@@ -22,6 +22,16 @@ export function getScoreLabel(score: number): string {
   return "Skip";
 }
 
+export type ScoreBand = "exceptional" | "above" | "average" | "below" | "skip";
+
+export function getScoreBand(score: number): ScoreBand {
+  if (score >= 8) return "exceptional";
+  if (score >= 6) return "above";
+  if (score >= 4) return "average";
+  if (score >= 2) return "below";
+  return "skip";
+}
+
 /** Clamp a raw adjustment value to -1 | 0 | 1. Non-numbers and NaN → 0. */
 export function clampAdjustment(raw: unknown): -1 | 0 | 1 {
   if (typeof raw !== "number" || Number.isNaN(raw)) return 0;

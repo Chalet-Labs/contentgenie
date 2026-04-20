@@ -10,11 +10,43 @@ import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"] });
 
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "https://contentgenie.app";
+
 export const metadata: Metadata = {
-  title: "ContentGenie - Podcast Summaries for Busy Professionals",
+  metadataBase: new URL(APP_URL),
+  title: {
+    default: "ContentGenie — Triage the podcasts worth your time",
+    template: "%s · ContentGenie",
+  },
   description:
-    "Discover, summarize, and save podcast content with AI-powered insights",
+    "AI-generated Worth-It scores, distilled takeaways, and a library that remembers. Stop mining 90 minutes of podcast for 9.",
   applicationName: "ContentGenie",
+  keywords: [
+    "podcast summaries",
+    "AI podcast",
+    "podcast discovery",
+    "worth-it score",
+    "podcast library",
+    "podcast triage",
+  ],
+  authors: [{ name: "Chalet Labs" }],
+  creator: "Chalet Labs",
+  openGraph: {
+    type: "website",
+    siteName: "ContentGenie",
+    locale: "en_US",
+    url: APP_URL,
+    title: "ContentGenie — Triage the podcasts worth your time",
+    description:
+      "AI-generated Worth-It scores, distilled takeaways, and a library that remembers. Stop mining 90 minutes of podcast for 9.",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "ContentGenie — Triage the podcasts worth your time",
+    description:
+      "AI-generated Worth-It scores, distilled takeaways, and a library that remembers.",
+    creator: "@contentgenie",
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",
