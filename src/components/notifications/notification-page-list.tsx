@@ -24,6 +24,10 @@ type NotificationItem = Awaited<
   ReturnType<typeof getNotifications>
 >["notifications"][number];
 
+// Per-item optimistic flag: true while a dismiss is inflight and unconfirmed.
+// Server success drops the row; failure clears the flag so the row reappears.
+type LocalNotification = NotificationItem & { pendingDismiss?: boolean };
+
 function toastErrorWithRetry(message: string, retry: () => void) {
   toast.error(message, { action: { label: "Retry", onClick: retry } });
 }
@@ -42,47 +46,39 @@ export function NotificationPageList({
   initialTopicsByEpisode,
 }: NotificationPageListProps) {
   const router = useRouter();
-  const [items, setItems] = useState<NotificationItem[]>(initialItems);
+  const [items, setItems] = useState<LocalNotification[]>(initialItems);
   const [hasMore, setHasMore] = useState(initialHasMore);
   const offsetRef = useRef(NOTIFICATIONS_PAGE_SIZE);
   const [activeTab, setActiveTab] = useState<Tab>("all");
   const [topicsByEpisode, setTopicsByEpisode] =
     useState<Record<number, string[]>>(initialTopicsByEpisode);
   const [isPending, startTransition] = useTransition();
-  // Tracks ids that have been optimistically dismissed but not yet server-confirmed.
-  // On server failure, the id is removed from this set, restoring the row.
-  const [optimisticDismissed, setOptimisticDismissed] = useState<Set<number>>(
-    new Set()
-  );
 
-  const optimisticItems = items.filter((n) => !optimisticDismissed.has(n.id));
+  const visibleItems = items.filter((n) => !n.pendingDismiss);
 
   const filteredItems =
     activeTab === "unread"
-      ? optimisticItems.filter((n) => !n.isRead)
+      ? visibleItems.filter((n) => !n.isRead)
       : activeTab === "read"
-        ? optimisticItems.filter((n) => n.isRead)
-        : optimisticItems;
+        ? visibleItems.filter((n) => n.isRead)
+        : visibleItems;
 
   const handleDismiss = useCallback(
     (id: number) => {
       startTransition(async () => {
-        setOptimisticDismissed((prev) => new Set(Array.from(prev).concat(id)));
+        setItems((prev) =>
+          prev.map((n) => (n.id === id ? { ...n, pendingDismiss: true } : n))
+        );
         const result = await dismissNotification(id);
         if (result.success) {
           setItems((prev) => prev.filter((n) => n.id !== id));
           offsetRef.current = Math.max(0, offsetRef.current - 1);
-          setOptimisticDismissed((prev) => {
-            const next = new Set(prev);
-            next.delete(id);
-            return next;
-          });
         } else {
-          setOptimisticDismissed((prev) => {
-            const next = new Set(prev);
-            next.delete(id);
-            return next;
-          });
+          setItems((prev) =>
+            prev.map((n) =>
+              n.id === id ? { ...n, pendingDismiss: false } : n
+            )
+          );
           toastErrorWithRetry("Failed to dismiss notification", () =>
             handleDismiss(id)
           );

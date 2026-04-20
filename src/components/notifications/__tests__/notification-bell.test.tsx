@@ -121,4 +121,24 @@ describe("NotificationBell", () => {
 
     consoleError.mockRestore();
   });
+
+  it("shows a plain title before the first fetch resolves", () => {
+    mockGetUnreadCount.mockReturnValue(new Promise(() => {}));
+    render(<NotificationBell />);
+
+    const link = screen.getByRole("link", { name: /notifications/i });
+    expect(link).toHaveAttribute("title", "Notifications");
+  });
+
+  it("surfaces a last-updated timestamp in the link title after a successful fetch", async () => {
+    mockGetUnreadCount.mockResolvedValue(3);
+    render(<NotificationBell />);
+    await flushMicrotasks();
+
+    const link = screen.getByRole("link", { name: /notifications/i });
+    // "just now" is emitted by formatRelativeTime for sub-1m ages; accept any freshness label.
+    expect(link.getAttribute("title")).toMatch(
+      /^Notifications \u00b7 Updated (just now|\d+[mhd] ago|\d+\/\d+\/\d+)$/
+    );
+  });
 });

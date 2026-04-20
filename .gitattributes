@@ -2,3 +2,7 @@
 # Storybook visual regression baselines live here after CI generation.
 # See docs/adr/024-visual-regression-testing.md for baseline management policy.
 tests/visual/__screenshots__/** binary
+
+# Drizzle regenerates these snapshot files wholesale on every migration.
+# Flag as generated so GitHub collapses them in PR reviews and excludes them from stats.
+drizzle/meta/*.json linguist-generated=true
