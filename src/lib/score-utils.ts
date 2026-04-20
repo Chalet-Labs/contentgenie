@@ -1,8 +1,3 @@
-/**
- * Shared helpers for Worth It Score display.
- * Used by both SummaryDisplay (full card) and WorthItBadge (compact).
- */
-
 import type { WorthItSignals } from "@/lib/openrouter";
 import { WORTH_IT_SIGNAL_KEYS } from "@/lib/openrouter";
 

@@ -24,6 +24,25 @@ function resolveAppUrl(): string {
 
 const APP_URL = resolveAppUrl();
 
+function resolveAppOrigin(): string | undefined {
+  const raw = process.env.NEXT_PUBLIC_APP_URL;
+  if (!raw) return undefined;
+  try {
+    return new URL(raw).origin;
+  } catch (err) {
+    console.error(
+      "[layout] Invalid NEXT_PUBLIC_APP_URL for Clerk allowedRedirectOrigins",
+      { url: raw, err },
+    );
+    return undefined;
+  }
+}
+
+const ALLOWED_REDIRECT_ORIGINS = [
+  resolveAppOrigin(),
+  process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : undefined,
+].filter((v): v is string => Boolean(v));
+
 export const metadata: Metadata = {
   metadataBase: new URL(APP_URL),
   title: {
@@ -82,24 +101,7 @@ export default function RootLayout({
   return (
     <ClerkProvider
       afterSignOutUrl="/"
-      allowedRedirectOrigins={[
-        (() => {
-          const raw = process.env.NEXT_PUBLIC_APP_URL;
-          if (!raw) return undefined;
-          try {
-            return new URL(raw).origin;
-          } catch (err) {
-            console.error(
-              "[layout] Invalid NEXT_PUBLIC_APP_URL for Clerk allowedRedirectOrigins",
-              { url: raw, err },
-            );
-            return undefined;
-          }
-        })(),
-        process.env.VERCEL_URL
-          ? `https://${process.env.VERCEL_URL}`
-          : undefined,
-      ].filter((v): v is string => Boolean(v))}
+      allowedRedirectOrigins={ALLOWED_REDIRECT_ORIGINS}
     >
       <html lang="en" suppressHydrationWarning>
         <body className={inter.className}>

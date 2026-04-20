@@ -11,9 +11,9 @@ export function MarketingFooter() {
           ContentGenie
         </div>
         <div className="lp-foot-links">
-          <Link href="/privacy">Privacy</Link>
-          <Link href="/terms">Terms</Link>
-          <Link href="/changelog">Changelog</Link>
+          <Link href="/privacy" prefetch={false}>Privacy</Link>
+          <Link href="/terms" prefetch={false}>Terms</Link>
+          <Link href="/changelog" prefetch={false}>Changelog</Link>
           <a href="https://twitter.com/contentgenie" target="_blank" rel="noreferrer">
             @contentgenie
           </a>

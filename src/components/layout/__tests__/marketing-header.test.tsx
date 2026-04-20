@@ -2,9 +2,10 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import React from "react";
 
-const { setThemeMock, themeState } = vi.hoisted(() => ({
+const { setThemeMock, themeState, clerkState } = vi.hoisted(() => ({
   setThemeMock: vi.fn(),
   themeState: { resolvedTheme: "light" as "light" | "dark" },
+  clerkState: { signedIn: false },
 }));
 
 vi.mock("next-themes", () => ({
@@ -12,10 +13,6 @@ vi.mock("next-themes", () => ({
     resolvedTheme: themeState.resolvedTheme,
     setTheme: setThemeMock,
   }),
-}));
-
-const { clerkState } = vi.hoisted(() => ({
-  clerkState: { signedIn: false },
 }));
 
 vi.mock("@clerk/nextjs", () => ({

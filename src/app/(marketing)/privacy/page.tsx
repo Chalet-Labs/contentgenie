@@ -19,7 +19,7 @@ export default function PrivacyPage() {
         create, and we use your email only for product updates. We do not sell your
         data. Analytics are aggregated and anonymized. AI summaries are generated
         via third-party providers (see{" "}
-        <Link className="underline underline-offset-4 hover:text-foreground" href="/terms">
+        <Link className="underline underline-offset-4 hover:text-foreground" href="/terms" prefetch={false}>
           Terms
         </Link>
         ) and not retained by them beyond the request.

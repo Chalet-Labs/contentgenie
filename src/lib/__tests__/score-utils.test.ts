@@ -111,17 +111,18 @@ describe("getScoreBand", () => {
   });
 
   it("agrees with getScoreColor and getScoreLabel on every band boundary", () => {
+    const EXPECTED_LABEL = {
+      exceptional: "Exceptional",
+      above: "Above Average",
+      average: "Average",
+      below: "Below Average",
+      skip: "Skip",
+    } as const;
     const boundaries = [10, 8, 7.9, 6, 5.9, 4, 3.9, 2, 1.9, 0];
     for (const s of boundaries) {
       const band = getScoreBand(s);
       expect(getScoreColor(s)).toContain(`bg-score-${band}`);
-      expect(getScoreLabel(s)).toMatch(
-        band === "exceptional" ? /Exceptional/
-          : band === "above" ? /Above Average/
-          : band === "average" ? /^Average$/
-          : band === "below" ? /Below Average/
-          : /Skip/,
-      );
+      expect(getScoreLabel(s)).toBe(EXPECTED_LABEL[band]);
     }
   });
 });
