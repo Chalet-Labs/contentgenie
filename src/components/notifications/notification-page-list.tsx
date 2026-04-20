@@ -48,7 +48,10 @@ export function NotificationPageList({
   const router = useRouter();
   const [items, setItems] = useState<LocalNotification[]>(initialItems);
   const [hasMore, setHasMore] = useState(initialHasMore);
-  const offsetRef = useRef(NOTIFICATIONS_PAGE_SIZE);
+  // Derive from initialItems.length instead of a hardcoded page size so a
+  // partial first page (e.g., dismissals between SSR and hydration) doesn't
+  // cause "Load more" to skip unfetched rows.
+  const offsetRef = useRef(initialItems.length);
   const [activeTab, setActiveTab] = useState<Tab>("all");
   const [topicsByEpisode, setTopicsByEpisode] =
     useState<Record<number, string[]>>(initialTopicsByEpisode);

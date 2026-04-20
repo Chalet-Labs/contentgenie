@@ -264,15 +264,20 @@ describe("NotificationPageList", () => {
   // Load more: calls getNotifications with next offset
   it("Load more button calls getNotifications with offset 50", async () => {
     mockGetNotifications.mockResolvedValue({
-      notifications: [makeItem({ id: 99 })],
+      notifications: [makeItem({ id: 999 })],
       hasMore: false,
       error: null,
     });
     mockGetEpisodeTopics.mockResolvedValue({});
     const user = userEvent.setup();
+    // A full first page (50 items) mirrors the real server-component hydration
+    // and sets offsetRef to 50, matching the expected next-offset assertion.
+    const fullPage = Array.from({ length: 50 }, (_, i) =>
+      makeItem({ id: i + 1 })
+    );
     render(
       <NotificationPageList
-        initialItems={defaultProps.initialItems}
+        initialItems={fullPage}
         initialHasMore={true}
         initialTopicsByEpisode={{}}
       />
@@ -287,14 +292,17 @@ describe("NotificationPageList", () => {
   // Regression: dismiss success decrements offset so next Load more doesn't skip a row
   it("dismiss success decrements offset so Load more doesn't skip a server row", async () => {
     mockGetNotifications.mockResolvedValue({
-      notifications: [makeItem({ id: 99 })],
+      notifications: [makeItem({ id: 999 })],
       hasMore: false,
       error: null,
     });
     const user = userEvent.setup();
+    const fullPage = Array.from({ length: 50 }, (_, i) =>
+      makeItem({ id: i + 1 })
+    );
     render(
       <NotificationPageList
-        initialItems={defaultProps.initialItems}
+        initialItems={fullPage}
         initialHasMore={true}
         initialTopicsByEpisode={{}}
       />
@@ -303,7 +311,7 @@ describe("NotificationPageList", () => {
     // Dismiss the first row — offset should go from 50 to 49
     await user.click(screen.getAllByRole("button", { name: /dismiss/i })[0]);
     await waitFor(() => {
-      expect(screen.getAllByRole("article")).toHaveLength(1);
+      expect(screen.getAllByRole("article")).toHaveLength(49);
     });
 
     // Clicking Load more should now request offset 49, not 50
