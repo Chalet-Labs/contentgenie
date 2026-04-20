@@ -24,6 +24,10 @@ type NotificationItem = Awaited<
   ReturnType<typeof getNotifications>
 >["notifications"][number];
 
+function toastErrorWithRetry(message: string, retry: () => void) {
+  toast.error(message, { action: { label: "Retry", onClick: retry } });
+}
+
 type Tab = "all" | "unread" | "read";
 
 interface NotificationPageListProps {
@@ -79,9 +83,9 @@ export function NotificationPageList({
             next.delete(id);
             return next;
           });
-          toast.error("Failed to dismiss notification", {
-            action: { label: "Retry", onClick: () => handleDismiss(id) },
-          });
+          toastErrorWithRetry("Failed to dismiss notification", () =>
+            handleDismiss(id)
+          );
         }
       });
     },
@@ -111,23 +115,24 @@ export function NotificationPageList({
   };
 
   const handleMarkAllRead = useCallback(async () => {
+    const retry = () => handleMarkAllRead();
     try {
       const result = await markAllNotificationsRead();
       if (result.success) {
         setItems((prev) => prev.map((n) => ({ ...n, isRead: true })));
       } else {
-        toast.error(result.error ?? "Failed to mark all as read", {
-          action: { label: "Retry", onClick: () => handleMarkAllRead() },
-        });
+        toastErrorWithRetry(
+          result.error ?? "Failed to mark all as read",
+          retry
+        );
       }
     } catch {
-      toast.error("Failed to mark all as read", {
-        action: { label: "Retry", onClick: () => handleMarkAllRead() },
-      });
+      toastErrorWithRetry("Failed to mark all as read", retry);
     }
   }, []);
 
   const handleLoadMore = useCallback(() => {
+    const retry = () => handleLoadMore();
     startTransition(async () => {
       try {
         const result = await getNotifications(
@@ -135,9 +140,7 @@ export function NotificationPageList({
           offsetRef.current
         );
         if (result.error) {
-          toast.error("Failed to load more notifications", {
-            action: { label: "Retry", onClick: () => handleLoadMore() },
-          });
+          toastErrorWithRetry("Failed to load more notifications", retry);
           return;
         }
         if (result.notifications.length === 0) {
@@ -165,9 +168,7 @@ export function NotificationPageList({
         offsetRef.current = offsetRef.current + NOTIFICATIONS_PAGE_SIZE;
         setHasMore(result.hasMore ?? false);
       } catch {
-        toast.error("Failed to load more notifications", {
-          action: { label: "Retry", onClick: () => handleLoadMore() },
-        });
+        toastErrorWithRetry("Failed to load more notifications", retry);
       }
     });
   }, []);
