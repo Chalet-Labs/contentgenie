@@ -1,7 +1,7 @@
 "use server";
 
 import { auth } from "@clerk/nextjs/server";
-import { eq, and, desc, asc, sql, count, inArray } from "drizzle-orm";
+import { eq, and, desc, sql, count, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { notifications, episodes, podcasts, users, episodeTopics } from "@/db/schema";
 
@@ -189,7 +189,10 @@ export async function getEpisodeTopics(
       })
       .from(episodeTopics)
       .where(inArray(episodeTopics.episodeId, episodeIds))
-      .orderBy(asc(episodeTopics.topicRank), desc(episodeTopics.relevance));
+      .orderBy(
+        sql`${episodeTopics.topicRank} ASC NULLS LAST`,
+        desc(episodeTopics.relevance)
+      );
 
     const map = new Map<number, string[]>();
     for (const row of rows) {

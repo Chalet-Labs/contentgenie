@@ -453,6 +453,22 @@ describe("notification server actions", () => {
       await getEpisodeTopics([1, 2, 3]);
       expect(mockInArray).toHaveBeenCalledWith("episodeId", [1, 2, 3]);
     });
+
+    it("orders topicRank NULLS LAST so ranked topics win over unranked", async () => {
+      buildTopicChain([]);
+      const { sql: mockSql } = await import("drizzle-orm");
+      const { getEpisodeTopics } = await import("@/app/actions/notifications");
+      await getEpisodeTopics([1]);
+
+      const sqlCalls = (mockSql as unknown as { mock: { calls: unknown[][] } })
+        .mock.calls;
+      const hasNullsLast = sqlCalls.some((call) =>
+        (call[0] as readonly string[]).some((part) =>
+          part.includes("NULLS LAST")
+        )
+      );
+      expect(hasNullsLast).toBe(true);
+    });
   });
 
   describe("getNotificationPreferences", () => {

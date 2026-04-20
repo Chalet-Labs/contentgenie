@@ -3,7 +3,7 @@
 import { useState, useTransition, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { Bell, X, ListPlus } from "lucide-react";
+import { Bell, X } from "lucide-react";
 import {
   dismissNotification,
   markNotificationRead,
@@ -80,6 +80,7 @@ export function NotificationPageList({
         const result = await dismissNotification(id);
         if (result.success) {
           setItems((prev) => prev.filter((n) => n.id !== id));
+          setOffset((prev) => Math.max(0, prev - 1));
           setOptimisticDismissed((prev) => {
             const next = new Set(prev);
             next.delete(id);
@@ -103,10 +104,12 @@ export function NotificationPageList({
 
   const handleRowClick = async (item: NotificationItem) => {
     if (!item.isRead) {
-      await markNotificationRead(item.id);
-      setItems((prev) =>
-        prev.map((n) => (n.id === item.id ? { ...n, isRead: true } : n))
-      );
+      const result = await markNotificationRead(item.id);
+      if (result.success) {
+        setItems((prev) =>
+          prev.map((n) => (n.id === item.id ? { ...n, isRead: true } : n))
+        );
+      }
     }
     router.push(
       item.episodePodcastIndexId
@@ -125,26 +128,32 @@ export function NotificationPageList({
   const handleLoadMore = () => {
     startTransition(async () => {
       const result = await getNotifications(50, offset);
-      if (!result.error && result.notifications.length > 0) {
-        const newItems = result.notifications as NotificationItem[];
-        const newEpisodeIds = newItems
-          .map((n) => n.episodeDbId)
-          .filter((id): id is number => id !== null);
-        const newTopicsMap =
-          newEpisodeIds.length > 0
-            ? await getEpisodeTopics(newEpisodeIds)
-            : new Map<number, string[]>();
-        const newTopics: Record<number, string[]> = {};
-        newTopicsMap.forEach((topics, id) => {
-          newTopics[id] = topics;
+      if (result.error) {
+        toast.error("Failed to load more notifications", {
+          action: { label: "Retry", onClick: handleLoadMore },
         });
-        setItems((prev) => [...prev, ...newItems]);
-        setTopicsByEpisode((prev) => ({ ...prev, ...newTopics }));
-        setOffset((prev) => prev + PAGE_SIZE);
-        setHasMore(result.hasMore ?? false);
-      } else {
-        setHasMore(false);
+        return;
       }
+      if (result.notifications.length === 0) {
+        setHasMore(false);
+        return;
+      }
+      const newItems = result.notifications as NotificationItem[];
+      const newEpisodeIds = newItems
+        .map((n) => n.episodeDbId)
+        .filter((id): id is number => id !== null);
+      const newTopicsMap =
+        newEpisodeIds.length > 0
+          ? await getEpisodeTopics(newEpisodeIds)
+          : new Map<number, string[]>();
+      const newTopics: Record<number, string[]> = {};
+      newTopicsMap.forEach((topics, id) => {
+        newTopics[id] = topics;
+      });
+      setItems((prev) => [...prev, ...newItems]);
+      setTopicsByEpisode((prev) => ({ ...prev, ...newTopics }));
+      setOffset((prev) => prev + PAGE_SIZE);
+      setHasMore(result.hasMore ?? false);
     });
   };
 
@@ -262,6 +271,7 @@ function NotificationRow({
 
   return (
     <article
+      data-read={item.isRead}
       className={`relative flex items-start gap-3 rounded-lg border p-4 ${
         !item.isRead ? "bg-accent/10" : ""
       }`}

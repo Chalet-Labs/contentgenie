@@ -281,4 +281,85 @@ describe("NotificationPageList", () => {
       expect(mockGetNotifications).toHaveBeenCalledWith(50, 50);
     });
   });
+
+  // Regression: dismiss success decrements offset so next Load more doesn't skip a row
+  it("dismiss success decrements offset so Load more doesn't skip a server row", async () => {
+    mockGetNotifications.mockResolvedValue({
+      notifications: [makeItem({ id: 99 })],
+      hasMore: false,
+      error: null,
+    });
+    const user = userEvent.setup();
+    render(
+      <NotificationPageList
+        initialItems={defaultProps.initialItems}
+        initialHasMore={true}
+        initialTopicsByEpisode={{}}
+      />
+    );
+
+    // Dismiss the first row — offset should go from 50 to 49
+    await user.click(screen.getAllByRole("button", { name: /dismiss/i })[0]);
+    await waitFor(() => {
+      expect(screen.getAllByRole("article")).toHaveLength(1);
+    });
+
+    // Clicking Load more should now request offset 49, not 50
+    await user.click(screen.getByRole("button", { name: /load more/i }));
+    await waitFor(() => {
+      expect(mockGetNotifications).toHaveBeenCalledWith(50, 49);
+    });
+  });
+
+  // Regression: row click does NOT mark local as read when server action fails
+  it("row click does NOT flip local isRead when markNotificationRead fails", async () => {
+    mockMarkNotificationRead.mockResolvedValue({
+      success: false,
+      error: "Notification not found",
+    });
+    const user = userEvent.setup();
+    render(<NotificationPageList {...defaultProps} />);
+
+    const unreadRow = screen.getAllByRole("article")[0];
+    expect(unreadRow).toHaveAttribute("data-read", "false");
+
+    const titleBtns = screen.getAllByRole("button", { name: /test episode|new episode/i });
+    await user.click(titleBtns[0]);
+
+    await waitFor(() => {
+      expect(mockMarkNotificationRead).toHaveBeenCalledWith(1);
+      expect(mockPush).toHaveBeenCalledWith("/episode/PI-42");
+    });
+    // Row should still render as unread because server rejected
+    expect(screen.getAllByRole("article")[0]).toHaveAttribute("data-read", "false");
+  });
+
+  // Regression: Load more fetch failure preserves hasMore and surfaces toast with Retry
+  it("Load more fetch failure preserves the button and toasts with Retry", async () => {
+    mockGetNotifications.mockResolvedValue({
+      notifications: [],
+      hasMore: false,
+      error: "Network error",
+    });
+    const user = userEvent.setup();
+    render(
+      <NotificationPageList
+        initialItems={defaultProps.initialItems}
+        initialHasMore={true}
+        initialTopicsByEpisode={{}}
+      />
+    );
+
+    await user.click(screen.getByRole("button", { name: /load more/i }));
+    await waitFor(() => {
+      expect(mockToastError).toHaveBeenCalledWith(
+        expect.stringMatching(/failed to load/i),
+        expect.objectContaining({
+          action: expect.objectContaining({ label: "Retry" }),
+        })
+      );
+    });
+    // Button is still present for manual retry
+    expect(screen.getByRole("button", { name: /load more/i })).toBeInTheDocument();
+  });
 });
