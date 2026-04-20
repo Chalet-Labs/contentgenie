@@ -56,13 +56,6 @@ export function NotificationPageList({
 
   const visibleItems = items.filter((n) => !n.pendingDismiss);
 
-  const filteredItems =
-    activeTab === "unread"
-      ? visibleItems.filter((n) => !n.isRead)
-      : activeTab === "read"
-        ? visibleItems.filter((n) => n.isRead)
-        : visibleItems;
-
   const handleDismiss = useCallback(
     (id: number) => {
       startTransition(async () => {
@@ -178,7 +171,43 @@ export function NotificationPageList({
     });
   }, []);
 
-  const showEmptyState = filteredItems.length === 0 && !hasMore;
+  const renderPanel = (tab: Tab, filtered: LocalNotification[]) => {
+    const showEmptyState = filtered.length === 0 && !hasMore;
+    return (
+      <TabsContent key={tab} value={tab} className="mt-4">
+        {showEmptyState ? (
+          <EmptyState activeTab={tab} hasItems={visibleItems.length > 0} />
+        ) : (
+          <div className="space-y-2">
+            {filtered.map((item) => (
+              <NotificationRow
+                key={item.id}
+                item={item}
+                topics={
+                  (item.episodeDbId
+                    ? topicsByEpisode[item.episodeDbId]
+                    : undefined) ?? []
+                }
+                onRowClick={handleRowClick}
+                onDismiss={handleDismiss}
+              />
+            ))}
+          </div>
+        )}
+        {hasMore && (
+          <div className="mt-4 flex justify-center">
+            <Button
+              variant="outline"
+              onClick={handleLoadMore}
+              disabled={isPending}
+            >
+              {isPending ? "Loading…" : "Load more"}
+            </Button>
+          </div>
+        )}
+      </TabsContent>
+    );
+  };
 
   return (
     <div className="space-y-4">
@@ -197,36 +226,11 @@ export function NotificationPageList({
           <TabsTrigger value="unread">Unread</TabsTrigger>
           <TabsTrigger value="read">Read</TabsTrigger>
         </TabsList>
-
-        <TabsContent value={activeTab} className="mt-4">
-          {showEmptyState ? (
-            <EmptyState activeTab={activeTab} hasItems={items.length > 0} />
-          ) : (
-            <div className="space-y-2">
-              {filteredItems.map((item) => (
-                <NotificationRow
-                  key={item.id}
-                  item={item}
-                  topics={(item.episodeDbId ? topicsByEpisode[item.episodeDbId] : undefined) ?? []}
-                  onRowClick={handleRowClick}
-                  onDismiss={handleDismiss}
-                />
-              ))}
-            </div>
-          )}
-
-          {hasMore && (
-            <div className="mt-4 flex justify-center">
-              <Button
-                variant="outline"
-                onClick={handleLoadMore}
-                disabled={isPending}
-              >
-                {isPending ? "Loading…" : "Load more"}
-              </Button>
-            </div>
-          )}
-        </TabsContent>
+        {/* Render a TabsContent per tab so each trigger's aria-controls resolves
+         * to a mounted panel; Radix hides inactive ones via data-state. */}
+        {renderPanel("all", visibleItems)}
+        {renderPanel("unread", visibleItems.filter((n) => !n.isRead))}
+        {renderPanel("read", visibleItems.filter((n) => n.isRead))}
       </Tabs>
     </div>
   );

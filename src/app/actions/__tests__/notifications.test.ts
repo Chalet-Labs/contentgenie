@@ -416,14 +416,29 @@ describe("notification server actions", () => {
   });
 
   describe("getEpisodeTopics", () => {
-    const mockSelectTopic = vi.fn();
+    // mockReturnValueOnce queues persist across tests — reset before each so
+    // a prior test's leftover one-shot returns don't bleed into the next.
+    beforeEach(() => {
+      mockSelect.mockReset();
+    });
 
-    function buildTopicChain(resolvedValue: unknown[]) {
-      const mockOrderBy = vi.fn().mockResolvedValue(resolvedValue);
-      const mockWhere = vi.fn().mockReturnValue({ orderBy: mockOrderBy });
-      const mockFrom = vi.fn().mockReturnValue({ where: mockWhere });
-      mockSelectTopic.mockReturnValue({ from: mockFrom });
-      mockSelect.mockImplementation((...args: unknown[]) => mockSelectTopic(...args));
+    // getEpisodeTopics now runs two queries: (1) notifications allowlist,
+    // (2) episodeTopics lookup. The helper wires up sequential select() mocks
+    // so each query in the real code pulls the next rowset in order.
+    function buildTopicChain(
+      notifRows: Array<{ episodeId: number | null }>,
+      topicRows: unknown[]
+    ) {
+      const firstWhere = vi.fn().mockResolvedValue(notifRows);
+      const firstFrom = vi.fn().mockReturnValue({ where: firstWhere });
+
+      const secondOrderBy = vi.fn().mockResolvedValue(topicRows);
+      const secondWhere = vi.fn().mockReturnValue({ orderBy: secondOrderBy });
+      const secondFrom = vi.fn().mockReturnValue({ where: secondWhere });
+
+      mockSelect
+        .mockReturnValueOnce({ from: firstFrom })
+        .mockReturnValueOnce({ from: secondFrom });
     }
 
     it("returns empty object when unauthenticated", async () => {
@@ -439,14 +454,24 @@ describe("notification server actions", () => {
       expect(result).toEqual({});
     });
 
+    it("returns empty object when caller owns none of the requested episodes", async () => {
+      buildTopicChain([], []);
+      const { getEpisodeTopics } = await import("@/app/actions/notifications");
+      const result = await getEpisodeTopics([1, 2]);
+      expect(result).toEqual({});
+    });
+
     it("groups topics by episodeId and caps at 3 per episode", async () => {
-      buildTopicChain([
-        { episodeId: 1, topic: "Topic A", topicRank: 1, relevance: "0.90" },
-        { episodeId: 1, topic: "Topic B", topicRank: 2, relevance: "0.80" },
-        { episodeId: 1, topic: "Topic C", topicRank: 3, relevance: "0.70" },
-        { episodeId: 1, topic: "Topic D", topicRank: 4, relevance: "0.60" },
-        { episodeId: 2, topic: "Topic E", topicRank: 1, relevance: "0.95" },
-      ]);
+      buildTopicChain(
+        [{ episodeId: 1 }, { episodeId: 2 }],
+        [
+          { episodeId: 1, topic: "Topic A", topicRank: 1, relevance: "0.90" },
+          { episodeId: 1, topic: "Topic B", topicRank: 2, relevance: "0.80" },
+          { episodeId: 1, topic: "Topic C", topicRank: 3, relevance: "0.70" },
+          { episodeId: 1, topic: "Topic D", topicRank: 4, relevance: "0.60" },
+          { episodeId: 2, topic: "Topic E", topicRank: 1, relevance: "0.95" },
+        ]
+      );
       const { getEpisodeTopics } = await import("@/app/actions/notifications");
       const result = await getEpisodeTopics([1, 2]);
       expect(result[1]).toHaveLength(3);
@@ -456,15 +481,19 @@ describe("notification server actions", () => {
     });
 
     it("uses inArray for episodeId filtering", async () => {
-      buildTopicChain([]);
+      buildTopicChain([{ episodeId: 1 }, { episodeId: 2 }, { episodeId: 3 }], []);
       const { inArray: mockInArray } = await import("drizzle-orm");
       const { getEpisodeTopics } = await import("@/app/actions/notifications");
       await getEpisodeTopics([1, 2, 3]);
-      expect(mockInArray).toHaveBeenCalledWith("episodeId", [1, 2, 3]);
+      // Called twice: once for the notifications allowlist, once for episodeTopics.
+      const calls = (mockInArray as unknown as { mock: { calls: unknown[][] } })
+        .mock.calls;
+      expect(calls.length).toBeGreaterThanOrEqual(2);
+      expect(calls[calls.length - 1]).toEqual(["episodeId", [1, 2, 3]]);
     });
 
     it("orders topicRank NULLS LAST so ranked topics win over unranked", async () => {
-      buildTopicChain([]);
+      buildTopicChain([{ episodeId: 1 }], []);
       const { sql: mockSql } = await import("drizzle-orm");
       const { getEpisodeTopics } = await import("@/app/actions/notifications");
       await getEpisodeTopics([1]);

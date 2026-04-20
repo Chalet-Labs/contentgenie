@@ -43,7 +43,9 @@ export async function getNotifications(limit = 50, offset = 0) {
           eq(notifications.isDismissed, false)
         )
       )
-      .orderBy(desc(notifications.createdAt))
+      // id is the deterministic tie-breaker; rows that share a createdAt
+      // (common during bulk inserts) would otherwise drift between pages.
+      .orderBy(desc(notifications.createdAt), desc(notifications.id))
       .limit(safeLimit + 1)
       .offset(safeOffset);
 
@@ -174,9 +176,33 @@ export async function getEpisodeTopics(
   episodeIds: number[]
 ): Promise<Record<number, string[]>> {
   const { userId } = await auth();
-  if (!userId || episodeIds.length === 0) return {};
+  const safeEpisodeIds = Array.from(new Set(episodeIds))
+    .filter((id) => Number.isInteger(id) && id > 0)
+    .slice(0, 100);
+  if (!userId || safeEpisodeIds.length === 0) return {};
 
   try {
+    // Restrict to episodes present in the caller's non-dismissed notifications —
+    // prevents arbitrary callers from probing topics for episodes they don't own.
+    const allowedRows = await db
+      .select({ episodeId: notifications.episodeId })
+      .from(notifications)
+      .where(
+        and(
+          eq(notifications.userId, userId),
+          eq(notifications.isDismissed, false),
+          inArray(notifications.episodeId, safeEpisodeIds)
+        )
+      );
+    const allowedEpisodeIds = Array.from(
+      new Set(
+        allowedRows
+          .map((r) => r.episodeId)
+          .filter((id): id is number => id !== null)
+      )
+    );
+    if (allowedEpisodeIds.length === 0) return {};
+
     const rows = await db
       .select({
         episodeId: episodeTopics.episodeId,
@@ -185,7 +211,7 @@ export async function getEpisodeTopics(
         relevance: episodeTopics.relevance,
       })
       .from(episodeTopics)
-      .where(inArray(episodeTopics.episodeId, episodeIds))
+      .where(inArray(episodeTopics.episodeId, allowedEpisodeIds))
       .orderBy(
         sql`${episodeTopics.topicRank} ASC NULLS LAST`,
         desc(episodeTopics.relevance)
