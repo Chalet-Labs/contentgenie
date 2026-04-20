@@ -28,9 +28,16 @@ vi.mock("@/app/actions/notifications", () => ({
 }));
 
 const mockAddToQueue = vi.fn();
+// Mutable state the mock factory reads on each render — lets individual tests
+// seed a non-empty queue before rendering without resorting to vi.doMock, which
+// does not retroactively re-bind statically imported modules.
+let mockPlayerState: {
+  queue: Array<{ id: string }>;
+  currentEpisode: unknown;
+} = { queue: [], currentEpisode: null };
 vi.mock("@/contexts/audio-player-context", () => ({
   useAudioPlayerAPI: () => ({ addToQueue: mockAddToQueue }),
-  useAudioPlayerState: () => ({ queue: [], currentEpisode: null }),
+  useAudioPlayerState: () => mockPlayerState,
 }));
 
 // Import component after mocks
@@ -69,11 +76,12 @@ const defaultProps = {
 describe("NotificationPageList", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockPlayerState = { queue: [], currentEpisode: null };
     mockDismissNotification.mockResolvedValue({ success: true });
     mockMarkNotificationRead.mockResolvedValue({ success: true });
     mockMarkAllNotificationsRead.mockResolvedValue({ success: true });
     mockGetNotifications.mockResolvedValue({ notifications: [], hasMore: false, error: null });
-    mockGetEpisodeTopics.mockResolvedValue(new Map());
+    mockGetEpisodeTopics.mockResolvedValue({});
   });
 
   // AC-3: empty state
@@ -163,18 +171,12 @@ describe("NotificationPageList", () => {
 
   // AC-6: Add-to-queue disabled when already in queue
   it("Add-to-queue button is disabled when episode is in queue", () => {
-    vi.doMock("@/contexts/audio-player-context", () => ({
-      useAudioPlayerAPI: () => ({ addToQueue: mockAddToQueue }),
-      useAudioPlayerState: () => ({
-        queue: [{ id: "PI-42" }],
-        currentEpisode: null,
-      }),
-    }));
-    // Re-render with fresh mock — use aria-label check
+    mockPlayerState = { queue: [{ id: "PI-42" }], currentEpisode: null };
     render(<NotificationPageList {...defaultProps} />);
-    const btn = screen.getAllByRole("button", { name: /already in queue|add to queue/i })[0];
-    // The button itself is checked — disabled when in queue via the mock
-    expect(btn).toBeDefined();
+    const btn = screen.getAllByRole("button", {
+      name: /already in queue|add to queue/i,
+    })[0];
+    expect(btn).toBeDisabled();
   });
 
   // AC-7: optimistic dismiss removes row immediately and persists after server confirms
@@ -266,7 +268,7 @@ describe("NotificationPageList", () => {
       hasMore: false,
       error: null,
     });
-    mockGetEpisodeTopics.mockResolvedValue(new Map());
+    mockGetEpisodeTopics.mockResolvedValue({});
     const user = userEvent.setup();
     render(
       <NotificationPageList

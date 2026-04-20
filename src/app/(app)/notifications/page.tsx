@@ -38,13 +38,8 @@ export default async function NotificationsPage() {
     .map((n) => n.episodeDbId)
     .filter((id): id is number => id !== null);
 
-  const topicsMap =
-    episodeIds.length > 0 ? await getEpisodeTopics(episodeIds) : new Map<number, string[]>();
-
-  const topicsByEpisode: Record<number, string[]> = {};
-  topicsMap.forEach((topics, id) => {
-    topicsByEpisode[id] = topics;
-  });
+  const topicsByEpisode =
+    episodeIds.length > 0 ? await getEpisodeTopics(episodeIds) : {};
 
   return (
     <div className="container max-w-2xl py-8">

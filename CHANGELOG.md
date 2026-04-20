@@ -15,8 +15,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 - Trending topics trigger task: `MAX_EPISODES` lowered from 500 to 200, input field switched from `keyTakeaways` to `summary` for richer clustering context, and the LLM call now passes `maxTokens: 16000` so reasoning models (e.g. GLM-5.1) have headroom after chain-of-thought.
-
-### Changed
 - Podcast detail page now loads up to 200 episodes (raised from 20 for PodcastIndex-sourced and 50 for RSS-sourced) and supports client-side title search within the loaded window (#291)
 - Dashboard Trending Topics card redesigned as a vertical list with topic name, AI description (2-line clamp), episode count, and per-row link to `/trending/<slug>` (#281)
 

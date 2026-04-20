@@ -172,9 +172,9 @@ export async function dismissNotification(notificationId: number) {
 
 export async function getEpisodeTopics(
   episodeIds: number[]
-): Promise<Map<number, string[]>> {
+): Promise<Record<number, string[]>> {
   const { userId } = await auth();
-  if (!userId || episodeIds.length === 0) return new Map();
+  if (!userId || episodeIds.length === 0) return {};
 
   try {
     const rows = await db
@@ -191,18 +191,20 @@ export async function getEpisodeTopics(
         desc(episodeTopics.relevance)
       );
 
-    const map = new Map<number, string[]>();
+    // Plain object rather than Map — Server Action return values travel over
+    // the RSC wire and Map is not a reliably serializable shape.
+    const byEpisode: Record<number, string[]> = {};
     for (const row of rows) {
-      const existing = map.get(row.episodeId) ?? [];
+      const existing = byEpisode[row.episodeId] ?? [];
       if (existing.length < 3) {
         existing.push(row.topic);
-        map.set(row.episodeId, existing);
+        byEpisode[row.episodeId] = existing;
       }
     }
-    return map;
+    return byEpisode;
   } catch (error) {
     console.error("Error fetching episode topics:", error);
-    return new Map();
+    return {};
   }
 }
 

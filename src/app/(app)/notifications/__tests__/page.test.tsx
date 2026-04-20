@@ -47,7 +47,7 @@ describe("NotificationsPage", () => {
       hasMore: true,
       error: null,
     });
-    mockGetEpisodeTopics.mockResolvedValue(new Map([[10, ["AI", "Tech"]]]));
+    mockGetEpisodeTopics.mockResolvedValue({ 10: ["AI", "Tech"] });
 
     render((await NotificationsPage()) as React.ReactElement);
 

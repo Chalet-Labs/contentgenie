@@ -88,20 +88,32 @@ export function NotificationPageList({
     []
   );
 
-  const handleRowClick = async (item: NotificationItem) => {
+  const handleRowClick = (item: NotificationItem) => {
     if (!item.isRead) {
-      try {
-        const result = await markNotificationRead(item.id);
-        if (result.success) {
+      // Optimistic flip + rollback on failure keeps navigation snappy without
+      // letting a stale read=true linger if the server rejects the mutation.
+      setItems((prev) =>
+        prev.map((n) => (n.id === item.id ? { ...n, isRead: true } : n))
+      );
+      markNotificationRead(item.id)
+        .then((result) => {
+          if (!result.success) {
+            setItems((prev) =>
+              prev.map((n) =>
+                n.id === item.id ? { ...n, isRead: false } : n
+              )
+            );
+            toast.error(result.error ?? "Couldn't mark as read");
+          }
+        })
+        .catch(() => {
           setItems((prev) =>
-            prev.map((n) => (n.id === item.id ? { ...n, isRead: true } : n))
+            prev.map((n) =>
+              n.id === item.id ? { ...n, isRead: false } : n
+            )
           );
-        } else {
-          toast.error(result.error ?? "Couldn't mark as read");
-        }
-      } catch {
-        toast.error("Couldn't mark as read");
-      }
+          toast.error("Couldn't mark as read");
+        });
     }
     router.push(
       item.episodePodcastIndexId
@@ -150,10 +162,7 @@ export function NotificationPageList({
         let newTopics: Record<number, string[]> = {};
         if (newEpisodeIds.length > 0) {
           try {
-            const newTopicsMap = await getEpisodeTopics(newEpisodeIds);
-            newTopicsMap.forEach((topics, id) => {
-              newTopics[id] = topics;
-            });
+            newTopics = await getEpisodeTopics(newEpisodeIds);
           } catch {
             // Degrade gracefully — append rows without topic chips.
             newTopics = {};
@@ -169,8 +178,7 @@ export function NotificationPageList({
     });
   }, []);
 
-  const showEmptyState =
-    filteredItems.length === 0 && (!hasMore || activeTab !== "all");
+  const showEmptyState = filteredItems.length === 0 && !hasMore;
 
   return (
     <div className="space-y-4">
@@ -207,7 +215,7 @@ export function NotificationPageList({
             </div>
           )}
 
-          {hasMore && activeTab === "all" && (
+          {hasMore && (
             <div className="mt-4 flex justify-center">
               <Button
                 variant="outline"

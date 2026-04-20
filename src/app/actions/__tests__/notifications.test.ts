@@ -426,19 +426,17 @@ describe("notification server actions", () => {
       mockSelect.mockImplementation((...args: unknown[]) => mockSelectTopic(...args));
     }
 
-    it("returns empty Map when unauthenticated", async () => {
+    it("returns empty object when unauthenticated", async () => {
       mockAuth.mockResolvedValue({ userId: null });
       const { getEpisodeTopics } = await import("@/app/actions/notifications");
       const result = await getEpisodeTopics([1, 2]);
-      expect(result).toBeInstanceOf(Map);
-      expect(result.size).toBe(0);
+      expect(result).toEqual({});
     });
 
-    it("returns empty Map for empty episodeIds array", async () => {
+    it("returns empty object for empty episodeIds array", async () => {
       const { getEpisodeTopics } = await import("@/app/actions/notifications");
       const result = await getEpisodeTopics([]);
-      expect(result).toBeInstanceOf(Map);
-      expect(result.size).toBe(0);
+      expect(result).toEqual({});
     });
 
     it("groups topics by episodeId and caps at 3 per episode", async () => {
@@ -451,10 +449,10 @@ describe("notification server actions", () => {
       ]);
       const { getEpisodeTopics } = await import("@/app/actions/notifications");
       const result = await getEpisodeTopics([1, 2]);
-      expect(result.get(1)).toHaveLength(3);
-      expect(result.get(1)).toEqual(["Topic A", "Topic B", "Topic C"]);
-      expect(result.get(2)).toHaveLength(1);
-      expect(result.get(2)).toEqual(["Topic E"]);
+      expect(result[1]).toHaveLength(3);
+      expect(result[1]).toEqual(["Topic A", "Topic B", "Topic C"]);
+      expect(result[2]).toHaveLength(1);
+      expect(result[2]).toEqual(["Topic E"]);
     });
 
     it("uses inArray for episodeId filtering", async () => {

@@ -1,6 +1,6 @@
 # ADR-037: Dedicated `/notifications` Page + `isDismissed` Schema Addition
 
-**Status:** Proposed
+**Status:** Accepted — 2026-04-20
 **Date:** 2026-04-20
 **Issue:** [#303](https://github.com/Chalet-Labs/contentgenie/issues/303)
 **Relates to:** [ADR-009](009-notification-system-architecture.md) (in-app + PWA push notification system), [ADR-035](035-single-row-episode-notifications.md) (single-row episode notification lifecycle)
@@ -59,13 +59,13 @@ Skip `isDismissed`, run a scheduled job to delete dismissed rows after 30 days.
 
 3. **Routing and rendering.**
    - `src/app/(app)/notifications/page.tsx` — server component. Calls `auth()`, calls `getNotifications(50, 0)`, extracts non-null episodeIds from the first page, calls `getEpisodeTopics(episodeIds)`, passes `{ initialItems, initialHasMore, topicsByEpisodeId }` to the client component. Exports `metadata` (title/description) alongside the default export — no other exports (page.tsx export constraint).
-   - `src/components/notifications/notification-page-list.tsx` — client component. Owns tab filter state (`all | unread | read`), accumulated items (state), load-more via `useTransition` calling `getNotifications(50, currentOffset)`, optimistic dismiss via `useOptimistic` wrapping the dismissed-id filter, mark-as-read on explicit row click and on "Mark all as read" button. Renders topic chips using the pre-fetched `topicsByEpisedId` map; newly-loaded pages fetch their topics via a second round-trip when "Load more" resolves (same `getEpisodeTopics` action).
+   - `src/components/notifications/notification-page-list.tsx` — client component. Owns tab filter state (`all | unread | read`), accumulated items (state), load-more via `useTransition` calling `getNotifications(50, currentOffset)`, optimistic dismiss via a per-row `pendingDismiss` flag on `LocalNotification` with explicit rollback on failure, mark-as-read on explicit row click and on "Mark all as read" button. Renders topic chips using the pre-fetched `topicsByEpisode` map; newly-loaded pages fetch their topics via a second round-trip when "Load more" resolves (same `getEpisodeTopics` action).
 
 4. **Bell becomes a link.** `src/components/notifications/notification-bell.tsx` collapses to a `<Link href="/notifications">` wrapping the bell icon + unread badge. It still polls `getUnreadCount` every 60s (the current cadence) so the badge stays fresh. Popover, `useState(isOpen)`, `getNotifications` fetch-on-open, and the inline `markAllNotificationsRead` wiring are removed. The existing `NotificationList` component in `src/components/notifications/notification-list.tsx` is no longer referenced at runtime after this change. **We delete it** along with its test file — leaving unused code is the refactor-cost-economics lint the project memory calls out explicitly (see `feedback_refactor_cost_economics.md`).
 
 5. **Filter tabs are client-side only.** Tabs operate on the accumulated `items` array, never re-fetching per tab. This matches the research finding and keeps pagination state consistent across tab switches. Install shadcn Tabs: `bunx shadcn@latest add tabs`.
 
-6. **Optimistic dismiss with rollback.** Use `useOptimistic` + `useTransition`. On success, the server confirms and the item stays removed. On failure, `useOptimistic`'s automatic revert re-inserts the row at its original position (structural — no splice). A `toast.error` with a Retry action fires on failure, calling the same dismiss handler.
+6. **Optimistic dismiss with rollback.** Per-row `pendingDismiss: boolean` flag on the `LocalNotification` shape, combined with `useTransition`. Rows with `pendingDismiss` are filtered out of the visible list. On server success the row is removed from state and `offsetRef.current` is decremented so subsequent "Load more" calls don't skip a server row. On failure the `pendingDismiss` flag is cleared (the row reappears at its original position without splicing) and a `toast.error` with a Retry action fires, calling the same handler. `useOptimistic` was considered but dropped — `useTransition`-driven mutation with an explicit flag gives finer-grained control over the offset bookkeeping and matches the rest of the component's state model.
 
 7. **Mark-as-read triggers.** Only three: (a) user clicks a row, (b) user clicks "Mark all as read", (c) user navigates from a row to the episode page (click-through is the same as (a) in terms of the server call). **Visiting `/notifications` does NOT clear unread.** The bell badge is sourced from `getUnreadCount`, which counts unread+not-dismissed rows. Page visit alone leaves unread count unchanged. This is the issue's explicit requirement.
 
