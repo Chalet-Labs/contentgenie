@@ -177,25 +177,31 @@ describe("NotificationPageList", () => {
     expect(btn).toBeDefined();
   });
 
-  // AC-7: optimistic dismiss removes row
-  it("dismiss removes row optimistically", async () => {
+  // AC-7: optimistic dismiss removes row immediately and persists after server confirms
+  it("dismiss removes row optimistically and persists on server success", async () => {
     const user = userEvent.setup();
     render(<NotificationPageList {...defaultProps} />);
+    expect(screen.getAllByRole("article")).toHaveLength(2);
     const dismissBtns = screen.getAllByRole("button", { name: /dismiss/i });
     await user.click(dismissBtns[0]);
     await waitFor(() => {
       expect(mockDismissNotification).toHaveBeenCalledWith(1);
+      // Row is gone after server confirms
+      expect(screen.getAllByRole("article")).toHaveLength(1);
     });
   });
 
-  // AC-8: dismiss failure — toast fires with Retry action
-  it("shows toast with Retry action on dismiss failure", async () => {
+  // AC-8: dismiss failure — row reappears AND toast fires with Retry action
+  it("row reappears and shows toast with Retry action on dismiss failure", async () => {
     mockDismissNotification.mockResolvedValue({ success: false, error: "Server error" });
     const user = userEvent.setup();
     render(<NotificationPageList {...defaultProps} />);
+    expect(screen.getAllByRole("article")).toHaveLength(2);
     const dismissBtns = screen.getAllByRole("button", { name: /dismiss/i });
     await user.click(dismissBtns[0]);
     await waitFor(() => {
+      // Row reappears after optimistic revert
+      expect(screen.getAllByRole("article")).toHaveLength(2);
       expect(mockToastError).toHaveBeenCalledWith(
         expect.any(String),
         expect.objectContaining({
