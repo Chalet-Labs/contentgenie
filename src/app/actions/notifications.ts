@@ -1,19 +1,19 @@
 "use server";
 
 import { auth } from "@clerk/nextjs/server";
-import { eq, and, desc, sql, count } from "drizzle-orm";
+import { eq, and, desc, sql, count, inArray } from "drizzle-orm";
 import { db } from "@/db";
-import { notifications, episodes, podcasts, users } from "@/db/schema";
+import { notifications, episodes, podcasts, users, episodeTopics } from "@/db/schema";
 
-export async function getNotifications(limit = 20, offset = 0) {
+export async function getNotifications(limit = 50, offset = 0) {
   const { userId } = await auth();
   if (!userId) {
-    return { notifications: [], error: "You must be signed in" };
+    return { notifications: [], hasMore: false, error: "You must be signed in" };
   }
 
   const safeLimit = Number.isInteger(limit)
     ? Math.min(Math.max(limit, 1), 100)
-    : 20;
+    : 50;
   const safeOffset = Number.isInteger(offset) ? Math.max(offset, 0) : 0;
 
   try {
@@ -25,22 +25,39 @@ export async function getNotifications(limit = 20, offset = 0) {
         body: notifications.body,
         isRead: notifications.isRead,
         createdAt: notifications.createdAt,
+        episodeDbId: notifications.episodeId,
         episodePodcastIndexId: episodes.podcastIndexId,
         episodeTitle: episodes.title,
         podcastTitle: podcasts.title,
+        worthItScore: episodes.worthItScore,
+        audioUrl: episodes.audioUrl,
+        artwork: podcasts.imageUrl,
+        duration: episodes.duration,
       })
       .from(notifications)
       .leftJoin(episodes, eq(notifications.episodeId, episodes.id))
       .leftJoin(podcasts, eq(episodes.podcastId, podcasts.id))
-      .where(eq(notifications.userId, userId))
-      .orderBy(desc(notifications.createdAt))
-      .limit(safeLimit)
+      .where(
+        and(
+          eq(notifications.userId, userId),
+          eq(notifications.isDismissed, false)
+        )
+      )
+      // id is the deterministic tie-breaker; rows that share a createdAt
+      // (common during bulk inserts) would otherwise drift between pages.
+      .orderBy(desc(notifications.createdAt), desc(notifications.id))
+      .limit(safeLimit + 1)
       .offset(safeOffset);
 
-    return { notifications: results, error: null };
+    const hasMore = results.length > safeLimit;
+    return {
+      notifications: hasMore ? results.slice(0, safeLimit) : results,
+      hasMore,
+      error: null,
+    };
   } catch (error) {
     console.error("Error fetching notifications:", error);
-    return { notifications: [], error: "Failed to load notifications" };
+    return { notifications: [], hasMore: false, error: "Failed to load notifications" };
   }
 }
 
@@ -48,22 +65,20 @@ export async function getUnreadCount(): Promise<number> {
   const { userId } = await auth();
   if (!userId) return 0;
 
-  try {
-    const [result] = await db
-      .select({ value: count() })
-      .from(notifications)
-      .where(
-        and(
-          eq(notifications.userId, userId),
-          eq(notifications.isRead, false)
-        )
-      );
+  // Let DB errors propagate so the caller can keep the last good count
+  // instead of showing a false "0 unread" after a transient failure.
+  const [result] = await db
+    .select({ value: count() })
+    .from(notifications)
+    .where(
+      and(
+        eq(notifications.userId, userId),
+        eq(notifications.isRead, false),
+        eq(notifications.isDismissed, false)
+      )
+    );
 
-    return result?.value ?? 0;
-  } catch (error) {
-    console.error("Error fetching unread count:", error);
-    return 0;
-  }
+  return result?.value ?? 0;
 }
 
 export async function markNotificationRead(notificationId: number) {
@@ -122,6 +137,100 @@ export async function markAllNotificationsRead() {
       success: false,
       error: "Failed to mark all notifications as read",
     };
+  }
+}
+
+export async function dismissNotification(notificationId: number) {
+  const { userId } = await auth();
+  if (!userId) {
+    return { success: false, error: "You must be signed in" };
+  }
+  if (!Number.isInteger(notificationId) || notificationId <= 0) {
+    return { success: false, error: "Invalid notification id" };
+  }
+
+  try {
+    const result = await db
+      .update(notifications)
+      .set({ isDismissed: true })
+      .where(
+        and(
+          eq(notifications.id, notificationId),
+          eq(notifications.userId, userId)
+        )
+      )
+      .returning({ id: notifications.id });
+
+    if (result.length === 0) {
+      return { success: false, error: "Notification not found" };
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error("Error dismissing notification:", error);
+    return { success: false, error: "Failed to dismiss notification" };
+  }
+}
+
+export async function getEpisodeTopics(
+  episodeIds: number[]
+): Promise<Record<number, string[]>> {
+  const { userId } = await auth();
+  const safeEpisodeIds = Array.from(new Set(episodeIds))
+    .filter((id) => Number.isInteger(id) && id > 0)
+    .slice(0, 100);
+  if (!userId || safeEpisodeIds.length === 0) return {};
+
+  try {
+    // Restrict to episodes present in the caller's non-dismissed notifications —
+    // prevents arbitrary callers from probing topics for episodes they don't own.
+    const allowedRows = await db
+      .select({ episodeId: notifications.episodeId })
+      .from(notifications)
+      .where(
+        and(
+          eq(notifications.userId, userId),
+          eq(notifications.isDismissed, false),
+          inArray(notifications.episodeId, safeEpisodeIds)
+        )
+      );
+    const allowedEpisodeIds = Array.from(
+      new Set(
+        allowedRows
+          .map((r) => r.episodeId)
+          .filter((id): id is number => id !== null)
+      )
+    );
+    if (allowedEpisodeIds.length === 0) return {};
+
+    const rows = await db
+      .select({
+        episodeId: episodeTopics.episodeId,
+        topic: episodeTopics.topic,
+        topicRank: episodeTopics.topicRank,
+        relevance: episodeTopics.relevance,
+      })
+      .from(episodeTopics)
+      .where(inArray(episodeTopics.episodeId, allowedEpisodeIds))
+      .orderBy(
+        sql`${episodeTopics.topicRank} ASC NULLS LAST`,
+        desc(episodeTopics.relevance)
+      );
+
+    // Plain object rather than Map — Server Action return values travel over
+    // the RSC wire and Map is not a reliably serializable shape.
+    const byEpisode: Record<number, string[]> = {};
+    for (const row of rows) {
+      const existing = byEpisode[row.episodeId] ?? [];
+      if (existing.length < 3) {
+        existing.push(row.topic);
+        byEpisode[row.episodeId] = existing;
+      }
+    }
+    return byEpisode;
+  } catch (error) {
+    console.error("Error fetching episode topics:", error);
+    return {};
   }
 }
 

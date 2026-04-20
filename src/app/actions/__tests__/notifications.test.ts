@@ -11,8 +11,10 @@ vi.mock("drizzle-orm", () => ({
   eq: vi.fn((...args: unknown[]) => args),
   and: vi.fn((...args: unknown[]) => args),
   desc: vi.fn((col: unknown) => col),
+  asc: vi.fn((col: unknown) => col),
   sql: vi.fn(),
   count: vi.fn(() => "count"),
+  inArray: vi.fn((...args: unknown[]) => args),
 }));
 
 // Mock schema
@@ -21,12 +23,29 @@ vi.mock("@/db/schema", () => ({
     id: "id",
     userId: "userId",
     isRead: "isRead",
+    isDismissed: "isDismissed",
     createdAt: "createdAt",
     episodeId: "episodeId",
   },
-  episodes: { id: "id", title: "title", podcastId: "podcastId", podcastIndexId: "podcastIndexId" },
-  podcasts: { id: "id", title: "title" },
+  episodes: {
+    id: "id",
+    title: "title",
+    podcastId: "podcastId",
+    podcastIndexId: "podcastIndexId",
+    audioUrl: "audioUrl",
+    artwork: "artwork",
+    duration: "duration",
+    worthItScore: "worthItScore",
+  },
+  podcasts: { id: "id", title: "title", imageUrl: "imageUrl" },
   users: { id: "id" },
+  episodeTopics: {
+    id: "id",
+    episodeId: "episodeId",
+    topic: "topic",
+    relevance: "relevance",
+    topicRank: "topicRank",
+  },
 }));
 
 // Mock DB
@@ -69,6 +88,17 @@ describe("notification server actions", () => {
       const { getUnreadCount } = await import("@/app/actions/notifications");
       const count = await getUnreadCount();
       expect(count).toBe(5);
+    });
+
+    it("lets DB errors propagate so the caller can keep the last good count", async () => {
+      const dbError = new Error("connection refused");
+      const mockFrom = vi.fn().mockReturnValue({
+        where: vi.fn().mockRejectedValue(dbError),
+      });
+      mockSelect.mockReturnValue({ from: mockFrom });
+
+      const { getUnreadCount } = await import("@/app/actions/notifications");
+      await expect(getUnreadCount()).rejects.toThrow("connection refused");
     });
   });
 
@@ -229,6 +259,253 @@ describe("notification server actions", () => {
 
       expect(result.notifications).toHaveLength(0);
       expect(result.error).toBe("Failed to load notifications");
+    });
+  });
+
+  describe("getNotifications — isDismissed filter + extended shape", () => {
+    function buildSelectChain(resolvedValue: unknown[]) {
+      const mockOffset = vi.fn().mockResolvedValue(resolvedValue);
+      const mockLimit = vi.fn().mockReturnValue({ offset: mockOffset });
+      const mockOrderBy = vi.fn().mockReturnValue({ limit: mockLimit });
+      const mockWhere = vi.fn().mockReturnValue({ orderBy: mockOrderBy });
+      const mockLeftJoin2 = vi.fn().mockReturnValue({ where: mockWhere });
+      const mockLeftJoin1 = vi.fn().mockReturnValue({ leftJoin: mockLeftJoin2 });
+      const mockFrom = vi.fn().mockReturnValue({ leftJoin: mockLeftJoin1 });
+      mockSelect.mockReturnValue({ from: mockFrom });
+      return { mockWhere, mockLimit, mockOffset };
+    }
+
+    it("uses default limit of 50", async () => {
+      const { mockLimit } = buildSelectChain([]);
+      const { getNotifications } = await import("@/app/actions/notifications");
+      await getNotifications();
+      // Implementation fetches safeLimit + 1 as the has-more sentinel
+      expect(mockLimit).toHaveBeenCalledWith(51);
+    });
+
+    it("clamps limit above 100 to 100", async () => {
+      const { mockLimit } = buildSelectChain([]);
+      const { getNotifications } = await import("@/app/actions/notifications");
+      await getNotifications(200);
+      expect(mockLimit).toHaveBeenCalledWith(101);
+    });
+
+    it("clamps limit below 1 to 1", async () => {
+      const { mockLimit } = buildSelectChain([]);
+      const { getNotifications } = await import("@/app/actions/notifications");
+      await getNotifications(0);
+      expect(mockLimit).toHaveBeenCalledWith(2);
+    });
+
+    it("select shape includes episodeDbId, worthItScore, audioUrl, artwork, duration", async () => {
+      buildSelectChain([]);
+      const { getNotifications } = await import("@/app/actions/notifications");
+      await getNotifications();
+      // Verify select was called with an object containing the expected keys
+      const selectArg = mockSelect.mock.calls[0]?.[0] as Record<string, unknown>;
+      expect(selectArg).toHaveProperty("episodeDbId");
+      expect(selectArg).toHaveProperty("worthItScore");
+      expect(selectArg).toHaveProperty("audioUrl");
+      expect(selectArg).toHaveProperty("artwork");
+      expect(selectArg).toHaveProperty("duration");
+    });
+
+    it("WHERE clause includes isDismissed=false filter", async () => {
+      const { mockWhere } = buildSelectChain([]);
+      const { and: mockAnd, eq: mockEq } = await import("drizzle-orm");
+      const { getNotifications } = await import("@/app/actions/notifications");
+      await getNotifications();
+      // and() should have been called — verifies isDismissed condition is present
+      expect(mockAnd).toHaveBeenCalled();
+      expect(mockEq).toHaveBeenCalledWith("isDismissed", false);
+      expect(mockWhere).toHaveBeenCalled();
+    });
+
+    it("hasMore is true when results.length > limit", async () => {
+      // Returns 51 items for limit=50 → hasMore=true
+      const items = Array.from({ length: 51 }, (_, i) => ({ id: i + 1 }));
+      buildSelectChain(items);
+      const { getNotifications } = await import("@/app/actions/notifications");
+      const result = await getNotifications(50);
+      expect(result.hasMore).toBe(true);
+      expect(result.notifications).toHaveLength(50);
+    });
+
+    it("hasMore is false when results.length <= limit", async () => {
+      const items = Array.from({ length: 3 }, (_, i) => ({ id: i + 1 }));
+      buildSelectChain(items);
+      const { getNotifications } = await import("@/app/actions/notifications");
+      const result = await getNotifications(50);
+      expect(result.hasMore).toBe(false);
+      expect(result.notifications).toHaveLength(3);
+    });
+  });
+
+  describe("getUnreadCount — excludes dismissed", () => {
+    it("includes isDismissed=false in WHERE", async () => {
+      const mockFrom = vi.fn().mockReturnValue({
+        where: vi.fn().mockResolvedValue([{ value: 3 }]),
+      });
+      mockSelect.mockReturnValue({ from: mockFrom });
+      const { eq: mockEq } = await import("drizzle-orm");
+      const { getUnreadCount } = await import("@/app/actions/notifications");
+      await getUnreadCount();
+      expect(mockEq).toHaveBeenCalledWith("isDismissed", false);
+    });
+  });
+
+  describe("dismissNotification", () => {
+    it("returns error when unauthenticated", async () => {
+      mockAuth.mockResolvedValue({ userId: null });
+      const { dismissNotification } = await import("@/app/actions/notifications");
+      const result = await dismissNotification(1);
+      expect(result.success).toBe(false);
+      expect(result.error).toBe("You must be signed in");
+    });
+
+    it("returns error for non-integer id", async () => {
+      const { dismissNotification } = await import("@/app/actions/notifications");
+      const result = await dismissNotification(1.5);
+      expect(result.success).toBe(false);
+      expect(result.error).toBe("Invalid notification id");
+    });
+
+    it("returns error for id <= 0", async () => {
+      const { dismissNotification } = await import("@/app/actions/notifications");
+      const result = await dismissNotification(0);
+      expect(result.success).toBe(false);
+      expect(result.error).toBe("Invalid notification id");
+    });
+
+    it("dismisses notification and returns success", async () => {
+      const mockReturning = vi.fn().mockResolvedValue([{ id: 5 }]);
+      const mockWhere = vi.fn().mockReturnValue({ returning: mockReturning });
+      const mockSet = vi.fn().mockReturnValue({ where: mockWhere });
+      mockUpdate.mockReturnValue({ set: mockSet });
+
+      const { dismissNotification } = await import("@/app/actions/notifications");
+      const result = await dismissNotification(5);
+      expect(result.success).toBe(true);
+      expect(mockSet).toHaveBeenCalledWith({ isDismissed: true });
+    });
+
+    it("returns not-found when notification belongs to another user", async () => {
+      const mockReturning = vi.fn().mockResolvedValue([]);
+      const mockWhere = vi.fn().mockReturnValue({ returning: mockReturning });
+      const mockSet = vi.fn().mockReturnValue({ where: mockWhere });
+      mockUpdate.mockReturnValue({ set: mockSet });
+
+      const { dismissNotification } = await import("@/app/actions/notifications");
+      const result = await dismissNotification(999);
+      expect(result.success).toBe(false);
+      expect(result.error).toBe("Notification not found");
+    });
+
+    it("scopes update to userId (and() called with userId condition)", async () => {
+      const mockReturning = vi.fn().mockResolvedValue([{ id: 1 }]);
+      const mockWhere = vi.fn().mockReturnValue({ returning: mockReturning });
+      const mockSet = vi.fn().mockReturnValue({ where: mockWhere });
+      mockUpdate.mockReturnValue({ set: mockSet });
+      const { and: mockAnd, eq: mockEq } = await import("drizzle-orm");
+
+      const { dismissNotification } = await import("@/app/actions/notifications");
+      await dismissNotification(1);
+      expect(mockAnd).toHaveBeenCalled();
+      expect(mockEq).toHaveBeenCalledWith("userId", "user-1");
+    });
+  });
+
+  describe("getEpisodeTopics", () => {
+    // mockReturnValueOnce queues persist across tests — reset before each so
+    // a prior test's leftover one-shot returns don't bleed into the next.
+    beforeEach(() => {
+      mockSelect.mockReset();
+    });
+
+    // getEpisodeTopics now runs two queries: (1) notifications allowlist,
+    // (2) episodeTopics lookup. The helper wires up sequential select() mocks
+    // so each query in the real code pulls the next rowset in order.
+    function buildTopicChain(
+      notifRows: Array<{ episodeId: number | null }>,
+      topicRows: unknown[]
+    ) {
+      const firstWhere = vi.fn().mockResolvedValue(notifRows);
+      const firstFrom = vi.fn().mockReturnValue({ where: firstWhere });
+
+      const secondOrderBy = vi.fn().mockResolvedValue(topicRows);
+      const secondWhere = vi.fn().mockReturnValue({ orderBy: secondOrderBy });
+      const secondFrom = vi.fn().mockReturnValue({ where: secondWhere });
+
+      mockSelect
+        .mockReturnValueOnce({ from: firstFrom })
+        .mockReturnValueOnce({ from: secondFrom });
+    }
+
+    it("returns empty object when unauthenticated", async () => {
+      mockAuth.mockResolvedValue({ userId: null });
+      const { getEpisodeTopics } = await import("@/app/actions/notifications");
+      const result = await getEpisodeTopics([1, 2]);
+      expect(result).toEqual({});
+    });
+
+    it("returns empty object for empty episodeIds array", async () => {
+      const { getEpisodeTopics } = await import("@/app/actions/notifications");
+      const result = await getEpisodeTopics([]);
+      expect(result).toEqual({});
+    });
+
+    it("returns empty object when caller owns none of the requested episodes", async () => {
+      buildTopicChain([], []);
+      const { getEpisodeTopics } = await import("@/app/actions/notifications");
+      const result = await getEpisodeTopics([1, 2]);
+      expect(result).toEqual({});
+    });
+
+    it("groups topics by episodeId and caps at 3 per episode", async () => {
+      buildTopicChain(
+        [{ episodeId: 1 }, { episodeId: 2 }],
+        [
+          { episodeId: 1, topic: "Topic A", topicRank: 1, relevance: "0.90" },
+          { episodeId: 1, topic: "Topic B", topicRank: 2, relevance: "0.80" },
+          { episodeId: 1, topic: "Topic C", topicRank: 3, relevance: "0.70" },
+          { episodeId: 1, topic: "Topic D", topicRank: 4, relevance: "0.60" },
+          { episodeId: 2, topic: "Topic E", topicRank: 1, relevance: "0.95" },
+        ]
+      );
+      const { getEpisodeTopics } = await import("@/app/actions/notifications");
+      const result = await getEpisodeTopics([1, 2]);
+      expect(result[1]).toHaveLength(3);
+      expect(result[1]).toEqual(["Topic A", "Topic B", "Topic C"]);
+      expect(result[2]).toHaveLength(1);
+      expect(result[2]).toEqual(["Topic E"]);
+    });
+
+    it("uses inArray for episodeId filtering", async () => {
+      buildTopicChain([{ episodeId: 1 }, { episodeId: 2 }, { episodeId: 3 }], []);
+      const { inArray: mockInArray } = await import("drizzle-orm");
+      const { getEpisodeTopics } = await import("@/app/actions/notifications");
+      await getEpisodeTopics([1, 2, 3]);
+      // Called twice: once for the notifications allowlist, once for episodeTopics.
+      const calls = (mockInArray as unknown as { mock: { calls: unknown[][] } })
+        .mock.calls;
+      expect(calls.length).toBeGreaterThanOrEqual(2);
+      expect(calls[calls.length - 1]).toEqual(["episodeId", [1, 2, 3]]);
+    });
+
+    it("orders topicRank NULLS LAST so ranked topics win over unranked", async () => {
+      buildTopicChain([{ episodeId: 1 }], []);
+      const { sql: mockSql } = await import("drizzle-orm");
+      const { getEpisodeTopics } = await import("@/app/actions/notifications");
+      await getEpisodeTopics([1]);
+
+      const sqlCalls = (mockSql as unknown as { mock: { calls: unknown[][] } })
+        .mock.calls;
+      const hasNullsLast = sqlCalls.some((call) =>
+        (call[0] as readonly string[]).some((part) =>
+          part.includes("NULLS LAST")
+        )
+      );
+      expect(hasNullsLast).toBe(true);
     });
   });
 

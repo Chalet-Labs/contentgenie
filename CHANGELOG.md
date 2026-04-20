@@ -15,12 +15,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 - Trending topics trigger task: `MAX_EPISODES` lowered from 500 to 200, input field switched from `keyTakeaways` to `summary` for richer clustering context, and the LLM call now passes `maxTokens: 16000` so reasoning models (e.g. GLM-5.1) have headroom after chain-of-thought.
-
-### Changed
 - Podcast detail page now loads up to 200 episodes (raised from 20 for PodcastIndex-sourced and 50 for RSS-sourced) and supports client-side title search within the loaded window (#291)
 - Dashboard Trending Topics card redesigned as a vertical list with topic name, AI description (2-line clamp), episode count, and per-row link to `/trending/<slug>` (#281)
 
 ### Added
+- Dedicated `/notifications` page with worth-it score badges, topic chips (up to 3 per row), inline Add-to-queue button, and optimistic dismiss with automatic rollback on server error and a Retry toast. Bell icon now links to the page and retains a poll-based unread badge. Schema: `notifications.isDismissed` boolean column (DEFAULT false NOT NULL) — **production requires `doppler run --config prd -- bunx drizzle-kit push` before or with code deploy** (#303)
 - Cross-device sync for the listening queue and currently-playing episode. Queue and resume-position now round-trip through the server and reconcile on app mount or window focus. Concurrent mutations use last-commit-wins; active playback is never rewound by a server refetch. (#282)
 - Public episode share pages for anonymous viewers at `/episode/[id]`, with a signed-out shell, read-only episode details, share/external links, existing summaries, and sign-up redirects for save/queue/library actions (#293)
 - Trending topic detail page at /trending/<slug> with horizontal topic switcher and ranked episode list sorted by worth-it score (#280)
