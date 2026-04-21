@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { SignUpButton, SignedIn, SignedOut } from "@clerk/nextjs";
 import { ArrowRight } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { ContrastButton } from "@/components/landing/contrast-button";
 
 interface JoinBetaButtonProps {
   label?: string;
@@ -23,13 +23,13 @@ export function JoinBetaButton({
     <>
       <SignedOut>
         <SignUpButton>
-          <Button variant="contrast" size="lg">{content}</Button>
+          <ContrastButton size="lg">{content}</ContrastButton>
         </SignUpButton>
       </SignedOut>
       <SignedIn>
-        <Button asChild variant="contrast" size="lg">
+        <ContrastButton asChild size="lg">
           <Link href="/dashboard">{content}</Link>
-        </Button>
+        </ContrastButton>
       </SignedIn>
     </>
   );

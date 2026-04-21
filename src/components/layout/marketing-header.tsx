@@ -13,6 +13,7 @@ import {
   UserButton,
 } from "@clerk/nextjs";
 import { Button } from "@/components/ui/button";
+import { ContrastButton } from "@/components/landing/contrast-button";
 
 export function MarketingHeader() {
   const { resolvedTheme, setTheme } = useTheme();
@@ -48,13 +49,13 @@ export function MarketingHeader() {
               <Button variant="ghost">Sign in</Button>
             </SignInButton>
             <SignUpButton>
-              <Button variant="contrast">Join beta</Button>
+              <ContrastButton>Join beta</ContrastButton>
             </SignUpButton>
           </SignedOut>
           <SignedIn>
-            <Button asChild variant="contrast">
+            <ContrastButton asChild>
               <Link href="/dashboard">Open app</Link>
-            </Button>
+            </ContrastButton>
             <UserButton />
           </SignedIn>
         </div>
