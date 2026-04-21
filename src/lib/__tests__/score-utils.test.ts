@@ -6,6 +6,7 @@ import {
   clampAdjustment,
   coerceSignals,
   computeSignalScore,
+  parseScore,
 } from "@/lib/score-utils";
 import { WORTH_IT_SIGNAL_KEYS } from "@/lib/openrouter";
 import type { WorthItSignals } from "@/lib/openrouter";
@@ -167,6 +168,24 @@ describe("clampAdjustment", () => {
 
   it("returns 0 for null", () => {
     expect(clampAdjustment(null)).toBe(0);
+  });
+});
+
+describe("parseScore", () => {
+  it('parses a valid decimal string "7.50" to 7.5', () => {
+    expect(parseScore("7.50")).toBe(7.5);
+  });
+
+  it("returns 0 for null", () => {
+    expect(parseScore(null)).toBe(0);
+  });
+
+  it("returns 0 for an empty string", () => {
+    expect(parseScore("")).toBe(0);
+  });
+
+  it("returns 0 for a non-numeric string", () => {
+    expect(parseScore("garbage")).toBe(0);
   });
 });
 

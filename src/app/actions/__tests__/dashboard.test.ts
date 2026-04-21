@@ -458,6 +458,48 @@ describe("getRecommendedEpisodes", () => {
     expect(result.episodes[0].topRankedTopic).toBe("Artificial Intelligence");
   });
 
+  it("partially enriches episodes — only those with rank rows get populated fields", async () => {
+    const mockEpisodes = [
+      {
+        id: 1,
+        podcastIndexId: "ep-111",
+        title: "Has Rank",
+        description: null,
+        audioUrl: null,
+        duration: null,
+        publishDate: null,
+        worthItScore: "9.00",
+        podcastTitle: "Pod A",
+        podcastImageUrl: null,
+      },
+      {
+        id: 2,
+        podcastIndexId: "ep-222",
+        title: "No Rank",
+        description: null,
+        audioUrl: null,
+        duration: null,
+        publishDate: null,
+        worthItScore: "7.00",
+        podcastTitle: "Pod B",
+        podcastImageUrl: null,
+      },
+    ];
+    mockLimit.mockResolvedValue(mockEpisodes);
+    // Only episode 1 has a rank row; episode 2 falls through to null
+    mockGroupBy.mockResolvedValue([
+      { episodeId: 1, bestRank: 3, topTopic: "Climate Tech" },
+    ]);
+
+    const { getRecommendedEpisodes } = await import("@/app/actions/dashboard");
+    const result = await getRecommendedEpisodes();
+
+    expect(result.episodes[0].bestTopicRank).toBe(3);
+    expect(result.episodes[0].topRankedTopic).toBe("Climate Tech");
+    expect(result.episodes[1].bestTopicRank).toBeNull();
+    expect(result.episodes[1].topRankedTopic).toBeNull();
+  });
+
   it("uses default limit of 10 when called with no arguments", async () => {
     mockLimit.mockResolvedValue([]);
 
