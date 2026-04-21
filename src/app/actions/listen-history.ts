@@ -5,14 +5,15 @@ import { eq, sql } from "drizzle-orm"
 import { db } from "@/db"
 import { ensureUserExists } from "@/db/helpers"
 import { episodes, listenHistory } from "@/db/schema"
+import type { ActionResult } from "@/types/action-result"
 
 export async function recordListenEvent(input: {
   podcastIndexEpisodeId: string
   completed?: boolean
   durationSeconds?: number
-}): Promise<{ success: boolean }> {
+}): Promise<ActionResult> {
   const { userId } = await auth()
-  if (!userId) return { success: false }
+  if (!userId) return { success: false, error: "Not authenticated" }
 
   const { podcastIndexEpisodeId, completed, durationSeconds } = input
   const trimmedPodcastIndexEpisodeId =
@@ -25,14 +26,14 @@ export async function recordListenEvent(input: {
     trimmedPodcastIndexEpisodeId.length === 0 ||
     (completed !== undefined && typeof completed !== "boolean")
   ) {
-    return { success: false }
+    return { success: false, error: "Invalid input" }
   }
 
   if (
     durationSeconds !== undefined &&
     (!Number.isInteger(durationSeconds) || durationSeconds < 0)
   ) {
-    return { success: false }
+    return { success: false, error: "Invalid durationSeconds" }
   }
 
   try {
@@ -42,7 +43,7 @@ export async function recordListenEvent(input: {
     })
 
     if (!episode) {
-      return { success: false }
+      return { success: false, error: "Episode not found" }
     }
 
     await ensureUserExists(userId)
@@ -81,6 +82,6 @@ export async function recordListenEvent(input: {
     return { success: true }
   } catch (e) {
     console.error("Failed to record listen event:", e)
-    return { success: false }
+    return { success: false, error: "Failed to record listen event" }
   }
 }

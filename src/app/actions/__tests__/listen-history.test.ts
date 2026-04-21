@@ -86,7 +86,7 @@ describe("recordListenEvent", () => {
       podcastIndexEpisodeId: "12345",
 
     })
-    expect(result).toEqual({ success: false })
+    expect(result).toMatchObject({ success: false })
     expect(mockInsert).not.toHaveBeenCalled()
   })
 
@@ -97,7 +97,7 @@ describe("recordListenEvent", () => {
       podcastIndexEpisodeId: "99999",
 
     })
-    expect(result).toEqual({ success: false })
+    expect(result).toMatchObject({ success: false })
     expect(mockFindFirst).toHaveBeenCalledTimes(1)
     expect(mockEnsureUserExists).not.toHaveBeenCalled()
     expect(mockInsert).not.toHaveBeenCalled()
@@ -201,7 +201,7 @@ describe("recordListenEvent", () => {
       podcastIndexEpisodeId: "12345",
       durationSeconds: -10,
     })
-    expect(result).toEqual({ success: false })
+    expect(result).toMatchObject({ success: false })
     expect(mockInsert).not.toHaveBeenCalled()
   })
 
@@ -211,7 +211,7 @@ describe("recordListenEvent", () => {
       podcastIndexEpisodeId: "12345",
       durationSeconds: 3.14,
     })
-    expect(result).toEqual({ success: false })
+    expect(result).toMatchObject({ success: false })
     expect(mockInsert).not.toHaveBeenCalled()
   })
 
@@ -220,7 +220,7 @@ describe("recordListenEvent", () => {
     const result = await recordListenEvent({
       podcastIndexEpisodeId: "",
     })
-    expect(result).toEqual({ success: false })
+    expect(result).toMatchObject({ success: false })
     expect(mockFindFirst).not.toHaveBeenCalled()
     expect(mockInsert).not.toHaveBeenCalled()
   })

@@ -11,10 +11,10 @@ import {
   toEpisodeDenormRow,
   type AudioEpisode,
 } from "@/lib/schemas/listening-queue"
+import type { ActionResult } from "@/types/action-result"
 
 export async function getPlayerSession(): Promise<
-  | { success: true; data: { episode: AudioEpisode; currentTime: number } | null }
-  | { success: false; error: string }
+  ActionResult<{ episode: AudioEpisode; currentTime: number } | null>
 > {
   return withAuthAction(async (userId) => {
     try {
@@ -51,7 +51,7 @@ export async function getPlayerSession(): Promise<
 export async function savePlayerSession(
   episode: AudioEpisode,
   currentTime: number
-): Promise<{ success: true } | { success: false; error: string }> {
+): Promise<ActionResult> {
   return withAuthAction(async (userId) => {
     const parsed = savePlayerSessionSchema.safeParse({ episode, currentTime })
     if (!parsed.success) {
@@ -86,9 +86,7 @@ export async function savePlayerSession(
   })
 }
 
-export async function clearPlayerSession(): Promise<
-  { success: true } | { success: false; error: string }
-> {
+export async function clearPlayerSession(): Promise<ActionResult> {
   return withAuthAction(async (userId) => {
     try {
       await db
