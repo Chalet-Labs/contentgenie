@@ -205,7 +205,6 @@ describe("rank-episode-topics task", () => {
 
     setupSelectSequence(topicRows, episodeRows);
     mockGenerateCompletion.mockResolvedValue("ok");
-    // Middle pair returns an invalid winner — should hit the throw at rank-episode-topics.ts
     mockParseJsonResponse
       .mockReturnValueOnce({ winner: "A", reason: "ok" })
       .mockReturnValueOnce({ winner: "invalid", reason: "bad response" })

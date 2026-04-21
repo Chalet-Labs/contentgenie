@@ -486,7 +486,6 @@ describe("getRecommendedEpisodes", () => {
       },
     ];
     mockLimit.mockResolvedValue(mockEpisodes);
-    // Only episode 1 has a rank row; episode 2 falls through to null
     mockGroupBy.mockResolvedValue([
       { episodeId: 1, bestRank: 3, topTopic: "Climate Tech" },
     ]);

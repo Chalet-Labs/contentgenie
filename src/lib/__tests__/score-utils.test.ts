@@ -172,7 +172,7 @@ describe("clampAdjustment", () => {
 });
 
 describe("parseScore", () => {
-  it('parses a valid decimal string "7.50" to 7.5', () => {
+  it("parses a decimal string to a number", () => {
     expect(parseScore("7.50")).toBe(7.5);
   });
 
@@ -192,7 +192,7 @@ describe("parseScore", () => {
     expect(parseScore("10")).toBe(10);
   });
 
-  it('parses "0.00" to 0 without triggering the empty-string guard', () => {
+  it("parses a zero decimal string to 0", () => {
     expect(parseScore("0.00")).toBe(0);
   });
 });
