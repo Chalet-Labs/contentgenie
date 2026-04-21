@@ -38,7 +38,11 @@ export function MarketingHeader() {
           <Button
             variant="ghost"
             size="icon"
-            onClick={() => setTheme(isDark ? "light" : "dark")}
+            disabled={!mounted}
+            onClick={() => {
+              if (!mounted) return;
+              setTheme(isDark ? "light" : "dark");
+            }}
             aria-label="Toggle theme"
             title="Toggle theme"
           >
