@@ -86,7 +86,7 @@ describe("recordListenEvent", () => {
       podcastIndexEpisodeId: "12345",
 
     })
-    expect(result).toEqual({ success: false, error: "Not authenticated" })
+    expect(result).toEqual({ success: false, error: "Unauthorized" })
     expect(mockInsert).not.toHaveBeenCalled()
   })
 
