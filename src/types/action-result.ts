@@ -13,5 +13,9 @@
  * PR #305 review discussion tracked as a follow-up.
  */
 export type ActionResult<T = void> =
-  | (T extends void ? { success: true } : { success: true; data: T })
+  // `[T] extends [void]` (tuple-wrapped) disables distributive conditional
+  // types, so a union like `ActionResult<string | void>` does not split into
+  // multiple success variants. Side effect: `ActionResult<undefined>` still
+  // collapses to the no-data branch because `undefined extends void` is true.
+  | ([T] extends [void] ? { success: true } : { success: true; data: T })
   | { success: false; error: string }

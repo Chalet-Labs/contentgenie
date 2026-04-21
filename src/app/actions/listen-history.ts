@@ -81,7 +81,13 @@ export async function recordListenEvent(input: {
 
     return { success: true }
   } catch (e) {
-    console.error("Failed to record listen event:", e)
+    console.error("[recordListenEvent] failed", {
+      userId,
+      podcastIndexEpisodeId: trimmedPodcastIndexEpisodeId,
+      completed,
+      durationSeconds,
+      error: e,
+    })
     return { success: false, error: "Failed to record listen event" }
   }
 }
