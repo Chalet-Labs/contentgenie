@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite"
-import { TrendingTopics, TrendingTopicsLoading } from "@/components/dashboard/trending-topics"
+import { TrendingTopics, TrendingTopicsLoading, TOPICS_INITIAL } from "@/components/dashboard/trending-topics"
 import type { TrendingTopic } from "@/db/schema"
 import { STORY_TWO_HOURS_AGO, STORY_THIRTY_MIN_AGO, STORY_THREE_DAYS_AGO } from "@/test/story-fixtures"
 
@@ -55,9 +55,35 @@ type Story = StoryObj<typeof TrendingTopics>
 // Stories
 // ---------------------------------------------------------------------------
 
+// baseTopics has 6 items which exceeds TOPICS_INITIAL (5), so the toggle button
+// is intentionally visible in this story — expected behaviour after the show-more feature.
 export const Default: Story = {
   args: {
     topics: baseTopics,
+    generatedAt: STORY_TWO_HOURS_AGO,
+  },
+}
+
+const manyTopics: TrendingTopic[] = [
+  ...baseTopics,
+  { name: "Geopolitics", description: "Shifting alliances, trade wars, and the fracturing of post-cold-war institutions.", episodeCount: 10, episodeIds: [], slug: "geopolitics" },
+  { name: "Healthcare Innovation", description: "GLP-1 drugs, AI diagnostics, and the changing economics of drug discovery.", episodeCount: 6, episodeIds: [], slug: "healthcare-innovation" },
+  { name: "Education Technology", description: "Personalized learning, AI tutors, and what schools are actually adopting at scale.", episodeCount: 4, episodeIds: [], slug: "education-technology" },
+  { name: "Future of Work", description: "Automation anxiety, new employment models, and how organizations are restructuring.", episodeCount: 8, episodeIds: [], slug: "future-of-work" },
+]
+
+export const ManyTopics: Story = {
+  args: {
+    topics: manyTopics,
+    generatedAt: STORY_TWO_HOURS_AGO,
+  },
+}
+
+const exactThresholdTopics: TrendingTopic[] = baseTopics.slice(0, TOPICS_INITIAL)
+
+export const ExactThreshold: Story = {
+  args: {
+    topics: exactThresholdTopics,
     generatedAt: STORY_TWO_HOURS_AGO,
   },
 }

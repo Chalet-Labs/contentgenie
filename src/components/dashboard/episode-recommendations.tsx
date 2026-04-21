@@ -1,11 +1,17 @@
+"use client";
+
+import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
+import { ChevronDown, ChevronUp, ChevronRight, Sparkles, Rss } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ChevronRight, Sparkles, Rss } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { WorthItBadge } from "@/components/episodes/worth-it-badge";
 import { formatDate, formatDuration, stripHtml } from "@/lib/utils";
 import type { RecommendedEpisodeDTO } from "@/db/library-columns";
+
+export const EPISODES_INITIAL = 6;
 
 export function EpisodeRecommendationsLoading() {
   return (
@@ -35,6 +41,8 @@ interface EpisodeRecommendationsProps {
 }
 
 export function EpisodeRecommendations({ episodes }: EpisodeRecommendationsProps) {
+  const [expanded, setExpanded] = useState(false);
+
   if (episodes.length === 0) {
     return (
       <Card>
@@ -62,6 +70,9 @@ export function EpisodeRecommendations({ episodes }: EpisodeRecommendationsProps
     );
   }
 
+  const visible = episodes.slice(0, expanded ? undefined : EPISODES_INITIAL);
+  const hiddenCount = episodes.length - EPISODES_INITIAL;
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between pb-2">
@@ -76,7 +87,7 @@ export function EpisodeRecommendations({ episodes }: EpisodeRecommendationsProps
       </CardHeader>
       <CardContent>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {episodes.map((episode) => (
+          {visible.map((episode) => (
             <Link
               key={episode.id}
               href={`/episode/${episode.podcastIndexId}`}
@@ -131,6 +142,25 @@ export function EpisodeRecommendations({ episodes }: EpisodeRecommendationsProps
             </Link>
           ))}
         </div>
+        {episodes.length > EPISODES_INITIAL && (
+          <Button
+            variant="ghost"
+            className="w-full mt-2"
+            onClick={() => setExpanded((prev) => !prev)}
+          >
+            {expanded ? (
+              <>
+                Show less
+                <ChevronUp className="ml-2 h-4 w-4" />
+              </>
+            ) : (
+              <>
+                Show {hiddenCount} more
+                <ChevronDown className="ml-2 h-4 w-4" />
+              </>
+            )}
+          </Button>
+        )}
       </CardContent>
     </Card>
   );

@@ -1,5 +1,8 @@
+"use client";
+
+import { useState } from "react";
 import Link from "next/link";
-import { TrendingUp, ChevronRight } from "lucide-react";
+import { TrendingUp, ChevronRight, ChevronDown, ChevronUp } from "lucide-react";
 import {
   Card,
   CardContent,
@@ -8,9 +11,12 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
 import { cn, formatRelativeTime } from "@/lib/utils";
 import { dedupeTopics } from "@/lib/trending";
 import type { TrendingTopic } from "@/db/schema";
+
+export const TOPICS_INITIAL = 5;
 
 interface TrendingTopicsProps {
   topics: TrendingTopic[];
@@ -22,8 +28,11 @@ interface TrendingTopicsProps {
 }
 
 export function TrendingTopics({ topics, generatedAt, isStale = false }: TrendingTopicsProps) {
+  const [expanded, setExpanded] = useState(false);
   const updatedAgo = formatRelativeTime(generatedAt);
   const deduped = dedupeTopics(topics);
+  const visible = deduped.slice(0, expanded ? undefined : TOPICS_INITIAL);
+  const hiddenCount = deduped.length - TOPICS_INITIAL;
 
   return (
     <Card>
@@ -45,29 +54,50 @@ export function TrendingTopics({ topics, generatedAt, isStale = false }: Trendin
             No trending topics yet — check back soon.
           </p>
         ) : (
-          deduped.map(({ topic, slug }) => {
-            const count = topic.episodeCount;
-            return (
-              <Link
-                key={slug}
-                href={`/trending/${slug}`}
-                className="flex items-start gap-3 rounded-md p-3 transition-colors hover:bg-accent"
+          <>
+            {visible.map(({ topic, slug }) => {
+              const count = topic.episodeCount;
+              return (
+                <Link
+                  key={slug}
+                  href={`/trending/${slug}`}
+                  className="flex items-start gap-3 rounded-md p-3 transition-colors hover:bg-accent"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="break-words font-semibold">{topic.name}</p>
+                    {topic.description && (
+                      <p className="line-clamp-2 break-words text-sm text-muted-foreground">
+                        {topic.description}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1 text-sm text-muted-foreground">
+                    <span>{count} {count === 1 ? "episode" : "episodes"}</span>
+                    <ChevronRight className="h-4 w-4" />
+                  </div>
+                </Link>
+              );
+            })}
+            {deduped.length > TOPICS_INITIAL && (
+              <Button
+                variant="ghost"
+                className="w-full mt-2"
+                onClick={() => setExpanded((prev) => !prev)}
               >
-                <div className="min-w-0 flex-1">
-                  <p className="break-words font-semibold">{topic.name}</p>
-                  {topic.description && (
-                    <p className="line-clamp-2 break-words text-sm text-muted-foreground">
-                      {topic.description}
-                    </p>
-                  )}
-                </div>
-                <div className="flex shrink-0 items-center gap-1 text-sm text-muted-foreground">
-                  <span>{count} {count === 1 ? "episode" : "episodes"}</span>
-                  <ChevronRight className="h-4 w-4" />
-                </div>
-              </Link>
-            );
-          })
+                {expanded ? (
+                  <>
+                    Show less
+                    <ChevronUp className="ml-2 h-4 w-4" />
+                  </>
+                ) : (
+                  <>
+                    Show {hiddenCount} more
+                    <ChevronDown className="ml-2 h-4 w-4" />
+                  </>
+                )}
+              </Button>
+            )}
+          </>
         )}
       </CardContent>
     </Card>

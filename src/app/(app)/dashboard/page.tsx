@@ -69,7 +69,7 @@ async function RecentEpisodesSection() {
 
 // Server component for episode recommendations
 async function RecommendationsSection() {
-  const { episodes, error } = await getRecommendedEpisodes(6);
+  const { episodes, error } = await getRecommendedEpisodes(12);
   if (error) console.error("[RecommendationsSection]", error);
   return <EpisodeRecommendations episodes={episodes} />;
 }
