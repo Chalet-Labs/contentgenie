@@ -64,3 +64,6 @@ clerk-nextjs-guide
 
 # Emdash worktree artifacts
 .emdash/
+
+# clerk configuration (can include secrets)
+/.clerk/

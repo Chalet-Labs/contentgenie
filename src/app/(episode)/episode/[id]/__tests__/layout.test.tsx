@@ -13,8 +13,8 @@ vi.mock("@/components/layout/app-shell", () => ({
   ),
 }));
 
-vi.mock("@/components/layout/landing-header", () => ({
-  LandingHeader: () => <div data-testid="landing-header" />,
+vi.mock("@/components/layout/marketing-header", () => ({
+  MarketingHeader: () => <div data-testid="marketing-header" />,
 }));
 
 import EpisodeLayout from "@/app/(episode)/episode/[id]/layout";
@@ -30,7 +30,7 @@ describe("EpisodeLayout", () => {
     const result = await EpisodeLayout({ children: <div>episode content</div> });
     render(result as React.ReactElement);
 
-    expect(screen.getByTestId("landing-header")).toBeInTheDocument();
+    expect(screen.getByTestId("marketing-header")).toBeInTheDocument();
     expect(screen.getByText("episode content")).toBeInTheDocument();
     expect(screen.queryByTestId("app-shell")).not.toBeInTheDocument();
   });
@@ -43,6 +43,6 @@ describe("EpisodeLayout", () => {
 
     expect(screen.getByTestId("app-shell")).toBeInTheDocument();
     expect(screen.getByText("episode content")).toBeInTheDocument();
-    expect(screen.queryByTestId("landing-header")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("marketing-header")).not.toBeInTheDocument();
   });
 });

@@ -1,0 +1,22 @@
+.lp-footer {
+  border-top: 1px solid hsl(var(--border));
+  padding: 40px 0;
+  font-size: 13px;
+  color: hsl(var(--muted-foreground));
+}
+.lp-footer .lp-brand { font-size: 13px; }
+.lp-foot-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.lp-foot-links { display: flex; gap: 20px; }
+.lp-foot-links a:hover { color: hsl(var(--foreground)); }
+@media (max-width: 640px) {
+  .lp-foot-inner { padding: 0 20px; }
+}

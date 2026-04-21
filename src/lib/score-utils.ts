@@ -1,25 +1,45 @@
-/**
- * Shared helpers for Worth It Score display.
- * Used by both SummaryDisplay (full card) and WorthItBadge (compact).
- */
-
 import type { WorthItSignals } from "@/lib/openrouter";
 import { WORTH_IT_SIGNAL_KEYS } from "@/lib/openrouter";
 
-export function getScoreColor(score: number): string {
-  if (score >= 8) return "bg-score-exceptional text-score-exceptional-foreground";
-  if (score >= 6) return "bg-score-above text-score-above-foreground";
-  if (score >= 4) return "bg-score-average text-score-average-foreground";
-  if (score >= 2) return "bg-score-below text-score-below-foreground";
-  return "bg-score-skip text-score-skip-foreground";
+export type ScoreBand = "exceptional" | "above" | "average" | "below" | "skip";
+
+export type ScoreLabel =
+  | "Exceptional"
+  | "Above Average"
+  | "Average"
+  | "Below Average"
+  | "Skip";
+
+const BAND_LABEL: Record<ScoreBand, ScoreLabel> = {
+  exceptional: "Exceptional",
+  above: "Above Average",
+  average: "Average",
+  below: "Below Average",
+  skip: "Skip",
+};
+
+const BAND_COLOR_CLASS: Record<ScoreBand, string> = {
+  exceptional: "bg-score-exceptional text-score-exceptional-foreground",
+  above: "bg-score-above text-score-above-foreground",
+  average: "bg-score-average text-score-average-foreground",
+  below: "bg-score-below text-score-below-foreground",
+  skip: "bg-score-skip text-score-skip-foreground",
+};
+
+export function getScoreBand(score: number): ScoreBand {
+  if (score >= 8) return "exceptional";
+  if (score >= 6) return "above";
+  if (score >= 4) return "average";
+  if (score >= 2) return "below";
+  return "skip";
 }
 
-export function getScoreLabel(score: number): string {
-  if (score >= 8) return "Exceptional";
-  if (score >= 6) return "Above Average";
-  if (score >= 4) return "Average";
-  if (score >= 2) return "Below Average";
-  return "Skip";
+export function getScoreLabel(score: number): ScoreLabel {
+  return BAND_LABEL[getScoreBand(score)];
+}
+
+export function getScoreColor(score: number): string {
+  return BAND_COLOR_CLASS[getScoreBand(score)];
 }
 
 /** Clamp a raw adjustment value to -1 | 0 | 1. Non-numbers and NaN → 0. */
