@@ -195,6 +195,28 @@ describe("rank-episode-topics task", () => {
     expect(mockUpdate).toHaveBeenCalledTimes(4);
   });
 
+  it("increments comparisonsFailed when LLM returns an invalid winner value", async () => {
+    const topicRows = [{ topic: "AI", episodeCount: 3 }];
+    const episodeRows = [
+      { episodeId: 1, title: "Ep 1", summary: "Summary 1", worthItScore: "8.00" },
+      { episodeId: 2, title: "Ep 2", summary: "Summary 2", worthItScore: "7.00" },
+      { episodeId: 3, title: "Ep 3", summary: "Summary 3", worthItScore: "6.00" },
+    ];
+
+    setupSelectSequence(topicRows, episodeRows);
+    mockGenerateCompletion.mockResolvedValue("ok");
+    mockParseJsonResponse
+      .mockReturnValueOnce({ winner: "A", reason: "ok" })
+      .mockReturnValueOnce({ winner: "invalid", reason: "bad response" })
+      .mockReturnValueOnce({ winner: "B", reason: "ok" });
+
+    const result = await taskConfig.run();
+
+    expect(result.comparisonsRun).toBe(2);
+    expect(result.comparisonsFailed).toBe(1);
+    expect(result.topicsRanked).toBe(1);
+  });
+
   it("skips topic entirely when all comparisons fail", async () => {
     const { logger } = await import("@trigger.dev/sdk");
     const topicRows = [{ topic: "Broken", episodeCount: 3 }];
