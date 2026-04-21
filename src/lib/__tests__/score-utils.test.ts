@@ -187,6 +187,14 @@ describe("parseScore", () => {
   it("returns 0 for a non-numeric string", () => {
     expect(parseScore("garbage")).toBe(0);
   });
+
+  it("parses an integer string without decimals", () => {
+    expect(parseScore("10")).toBe(10);
+  });
+
+  it('parses "0.00" to 0 without triggering the empty-string guard', () => {
+    expect(parseScore("0.00")).toBe(0);
+  });
 });
 
 describe("coerceSignals", () => {
