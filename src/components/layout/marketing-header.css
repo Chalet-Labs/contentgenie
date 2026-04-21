@@ -1,6 +1,7 @@
 .lp {
   --lp-border-strong: 0 0% 80%;
   --lp-shadow-surface: 0 30px 60px -30px rgba(9, 9, 11, 0.25);
+
   font-feature-settings: "cv11", "ss01", "ss03";
   letter-spacing: -0.011em;
 }

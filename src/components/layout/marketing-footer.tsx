@@ -1,5 +1,5 @@
 import Link from "next/link";
-import "./marketing-footer.css";
+import "@/components/layout/marketing-footer.css";
 
 export function MarketingFooter() {
   const year = new Date().getFullYear();

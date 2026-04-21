@@ -6,7 +6,7 @@ import { NotificationPageList } from "@/components/notifications/notification-pa
 import { NOTIFICATIONS_PAGE_SIZE } from "@/lib/notifications-constants";
 
 export const metadata: Metadata = {
-  title: "Notifications · ContentGenie",
+  title: "Notifications",
 };
 
 export default async function NotificationsPage() {

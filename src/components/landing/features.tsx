@@ -56,7 +56,7 @@ export function Features() {
             <div className="lp-feat-num">F.01</div>
             <h3>Worth-It Score</h3>
             <p>
-              Every episode gets a 0–10 rating calibrated on takeaway density,
+              Every episode gets a 1–10 rating calibrated on takeaway density,
               signal-to-noise, and how well it holds up past the intro. No chart
               crimes, no vibes.
             </p>

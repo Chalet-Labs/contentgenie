@@ -1,6 +1,6 @@
 "use client";
 
-import "./marketing-header.css";
+import "@/components/layout/marketing-header.css";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useTheme } from "next-themes";
