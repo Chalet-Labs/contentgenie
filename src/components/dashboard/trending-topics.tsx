@@ -81,7 +81,8 @@ export function TrendingTopics({ topics, generatedAt, isStale = false }: Trendin
             {deduped.length > TOPICS_INITIAL && (
               <Button
                 variant="ghost"
-                className="w-full mt-2"
+                className="mt-2 w-full"
+                aria-expanded={expanded}
                 onClick={() => setExpanded((prev) => !prev)}
               >
                 {expanded ? (
@@ -112,7 +113,7 @@ export function TrendingTopicsLoading() {
         <Skeleton className="h-3 w-56" />
       </CardHeader>
       <CardContent className="space-y-1">
-        {Array.from({ length: 5 }).map((_, i) => (
+        {Array.from({ length: TOPICS_INITIAL }).map((_, i) => (
           <div
             key={i}
             data-testid="trending-loading-row"

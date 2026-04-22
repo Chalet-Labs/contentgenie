@@ -10,6 +10,7 @@ import { RecentEpisodesContainer } from "@/components/dashboard/recent-episodes-
 import {
   EpisodeRecommendations,
   EpisodeRecommendationsLoading,
+  EPISODES_INITIAL,
 } from "@/components/dashboard/episode-recommendations";
 import { QueueSection } from "@/components/dashboard/queue-section";
 import { TrendingTopicsLoading } from "@/components/dashboard/trending-topics";
@@ -69,7 +70,7 @@ async function RecentEpisodesSection() {
 
 // Server component for episode recommendations
 async function RecommendationsSection() {
-  const { episodes, error } = await getRecommendedEpisodes(12);
+  const { episodes, error } = await getRecommendedEpisodes(EPISODES_INITIAL * 2);
   if (error) console.error("[RecommendationsSection]", error);
   return <EpisodeRecommendations episodes={episodes} />;
 }

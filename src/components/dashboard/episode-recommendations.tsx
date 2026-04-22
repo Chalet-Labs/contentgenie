@@ -21,7 +21,7 @@ export function EpisodeRecommendationsLoading() {
       </CardHeader>
       <CardContent>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {[1, 2, 3, 4, 5, 6].map((i) => (
+          {Array.from({ length: EPISODES_INITIAL }).map((_, i) => (
             <div key={i} className="flex gap-3 p-2">
               <Skeleton className="h-14 w-14 shrink-0 rounded-md" />
               <div className="min-w-0 flex-1 space-y-2">
@@ -145,7 +145,8 @@ export function EpisodeRecommendations({ episodes }: EpisodeRecommendationsProps
         {episodes.length > EPISODES_INITIAL && (
           <Button
             variant="ghost"
-            className="w-full mt-2"
+            className="mt-2 w-full"
+            aria-expanded={expanded}
             onClick={() => setExpanded((prev) => !prev)}
           >
             {expanded ? (

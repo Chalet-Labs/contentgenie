@@ -67,7 +67,8 @@ describe("EpisodeRecommendations", () => {
   })
 
   it("shows 'Show less' button after expanding and re-collapses when clicked", async () => {
-    const episodes = makeEpisodes(EPISODES_INITIAL + 2)
+    const hidden = 2
+    const episodes = makeEpisodes(EPISODES_INITIAL + hidden)
     render(<EpisodeRecommendations episodes={episodes} />)
 
     const user = userEvent.setup()
@@ -81,6 +82,20 @@ describe("EpisodeRecommendations", () => {
     const links = screen.getAllByRole("link", { name: /Episode/ })
     expect(links).toHaveLength(EPISODES_INITIAL)
     expect(screen.queryByRole("button", { name: /show less/i })).not.toBeInTheDocument()
+    // Re-collapse restores the original "Show N more" label with the correct count
+    expect(screen.getByRole("button", { name: `Show ${hidden} more` })).toBeInTheDocument()
+  })
+
+  it("toggle button reports aria-expanded state accurately through expand/collapse", async () => {
+    const episodes = makeEpisodes(EPISODES_INITIAL + 2)
+    render(<EpisodeRecommendations episodes={episodes} />)
+
+    const user = userEvent.setup()
+    const initial = screen.getByRole("button", { name: /show.*more/i })
+    expect(initial).toHaveAttribute("aria-expanded", "false")
+
+    await user.click(initial)
+    expect(screen.getByRole("button", { name: /show less/i })).toHaveAttribute("aria-expanded", "true")
   })
 
   it("toggle button is absent when episodes.length < EPISODES_INITIAL", () => {
@@ -102,6 +117,12 @@ describe("EpisodeRecommendations", () => {
     expect(screen.getByRole("button", { name: `Show ${hidden} more` })).toBeInTheDocument()
   })
 
+  it("renders 'Show 1 more' when exactly EPISODES_INITIAL + 1 episodes are provided (singular-count boundary)", () => {
+    const episodes = makeEpisodes(EPISODES_INITIAL + 1)
+    render(<EpisodeRecommendations episodes={episodes} />)
+    expect(screen.getByRole("button", { name: "Show 1 more" })).toBeInTheDocument()
+  })
+
   it("renders empty state when episodes array is empty", () => {
     render(<EpisodeRecommendations episodes={[]} />)
     expect(screen.getByText("No recommendations yet")).toBeInTheDocument()
@@ -114,8 +135,9 @@ describe("EpisodeRecommendations", () => {
 // ---------------------------------------------------------------------------
 
 describe("EpisodeRecommendationsLoading", () => {
-  it("renders without crashing", () => {
+  it("renders a skeleton grid with EPISODES_INITIAL placeholder rows", () => {
     const { container } = render(<EpisodeRecommendationsLoading />)
-    expect(container.firstChild).not.toBeNull()
+    const rows = container.querySelectorAll(".grid > .flex.gap-3")
+    expect(rows).toHaveLength(EPISODES_INITIAL)
   })
 })
