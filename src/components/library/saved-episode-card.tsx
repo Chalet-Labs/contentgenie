@@ -146,7 +146,7 @@ export function SavedEpisodeCard({ item, onRemoved, onCollectionChanged, isOffli
                   </div>
                 )}
                 {item.rating && (
-                  <div className="flex items-center gap-1 text-yellow-500">
+                  <div className="flex items-center gap-1 text-brand">
                     <Star className="h-3 w-3 fill-current" />
                     <span>{item.rating}/5</span>
                   </div>

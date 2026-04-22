@@ -110,31 +110,31 @@ describe("EpisodeCard", () => {
     expect(card).not.toBeInTheDocument();
   });
 
-  it("renders high score in green", () => {
+  it("maps high score (>= 8) to the exceptional band", () => {
     render(
       <EpisodeCard episode={mockEpisode} summaryStatus="completed" worthItScore="8.50" />
     );
-    expect(screen.getByText("8.5")).toBeInTheDocument();
-    const scoreContainer = screen.getByText("8.5").closest("div");
-    expect(scoreContainer).toHaveClass("text-green-600");
+    const scoreContainer = screen.getByText("8.5").closest("[data-score-band]");
+    expect(scoreContainer).toHaveAttribute("data-score-band", "exceptional");
+    expect(scoreContainer).toHaveClass("text-score-exceptional");
   });
 
-  it("renders medium score in amber", () => {
+  it("maps mid score (6–7.99) to the above band", () => {
     render(
       <EpisodeCard episode={mockEpisode} summaryStatus="completed" worthItScore="6.00" />
     );
-    expect(screen.getByText("6.0")).toBeInTheDocument();
-    const scoreContainer = screen.getByText("6.0").closest("div");
-    expect(scoreContainer).toHaveClass("text-amber-600");
+    const scoreContainer = screen.getByText("6.0").closest("[data-score-band]");
+    expect(scoreContainer).toHaveAttribute("data-score-band", "above");
+    expect(scoreContainer).toHaveClass("text-score-above");
   });
 
-  it("renders low score in red", () => {
+  it("maps low score (2–3.99) to the below band", () => {
     render(
       <EpisodeCard episode={mockEpisode} summaryStatus="completed" worthItScore="3.50" />
     );
-    expect(screen.getByText("3.5")).toBeInTheDocument();
-    const scoreContainer = screen.getByText("3.5").closest("div");
-    expect(scoreContainer).toHaveClass("text-red-600");
+    const scoreContainer = screen.getByText("3.5").closest("[data-score-band]");
+    expect(scoreContainer).toHaveAttribute("data-score-band", "below");
+    expect(scoreContainer).toHaveClass("text-score-below");
   });
 
   it("does not render score indicator without worthItScore", () => {

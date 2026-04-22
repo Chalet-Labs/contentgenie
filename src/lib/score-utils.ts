@@ -26,6 +26,14 @@ const BAND_COLOR_CLASS: Record<ScoreBand, string> = {
   skip: "bg-score-skip text-score-skip-foreground",
 };
 
+const BAND_TEXT_COLOR_CLASS: Record<ScoreBand, string> = {
+  exceptional: "text-score-exceptional",
+  above: "text-score-above",
+  average: "text-score-average",
+  below: "text-score-below",
+  skip: "text-score-skip",
+};
+
 export function getScoreBand(score: number): ScoreBand {
   if (score >= 8) return "exceptional";
   if (score >= 6) return "above";
@@ -40,6 +48,11 @@ export function getScoreLabel(score: number): ScoreLabel {
 
 export function getScoreColor(score: number): string {
   return BAND_COLOR_CLASS[getScoreBand(score)];
+}
+
+/** Text-only color for inline score indicators (no background). */
+export function getScoreTextColor(score: number): string {
+  return BAND_TEXT_COLOR_CLASS[getScoreBand(score)];
 }
 
 /** Clamp a raw adjustment value to -1 | 0 | 1. Non-numbers and NaN → 0. */

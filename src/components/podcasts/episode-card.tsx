@@ -10,6 +10,7 @@ import { ProcessingStatus } from "@/components/episodes/processing-status";
 import { cn, stripHtml } from "@/lib/utils";
 import type { SummaryStatus } from "@/db/schema";
 import { AddToQueueButton } from "@/components/audio-player/add-to-queue-button";
+import { getScoreTextColor, getScoreBand } from "@/lib/score-utils";
 
 interface EpisodeCardProps {
   episode: PodcastIndexEpisode;
@@ -18,17 +19,14 @@ interface EpisodeCardProps {
   showQueueAction?: boolean;
 }
 
-function getScoreColor(score: number): string {
-  if (score >= 8) return "text-green-600 dark:text-green-400";
-  if (score >= 5) return "text-amber-600 dark:text-amber-400";
-  return "text-red-600 dark:text-red-400";
-}
-
 function ScoreIndicator({ value }: { value: string }) {
   const score = parseFloat(value);
   if (isNaN(score)) return null;
   return (
-    <div className={cn("flex items-center gap-1", getScoreColor(score))}>
+    <div
+      className={cn("flex items-center gap-1", getScoreTextColor(score))}
+      data-score-band={getScoreBand(score)}
+    >
       <Star className="h-3 w-3" />
       <span>{score.toFixed(1)}</span>
     </div>

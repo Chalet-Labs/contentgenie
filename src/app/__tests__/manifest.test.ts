@@ -38,8 +38,8 @@ describe("manifest", () => {
     );
   });
 
-  it("sets brand colors", () => {
-    expect(result.background_color).toBe("#09090b");
-    expect(result.theme_color).toBe("#09090b");
+  it("sets brand colors (paper bg + amber theme, 2026 palette)", () => {
+    expect(result.background_color).toBe("#FCFDFC");
+    expect(result.theme_color).toBe("#F59E0B");
   });
 });

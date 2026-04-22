@@ -2,119 +2,144 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --foreground-rgb: 0, 0, 0;
-  --background-start-rgb: 214, 219, 220;
-  --background-end-rgb: 255, 255, 255;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --foreground-rgb: 255, 255, 255;
-    --background-start-rgb: 0, 0, 0;
-    --background-end-rgb: 0, 0, 0;
-  }
-}
-
-
+/* ContentGenie Design System — 2026 revision ("Paper, fern, amber")
+ * Palette: emerald primary, amber brand accent, vermilion destructive,
+ * green-tinted neutrals. Design ref: .impeccable.md + docs/design-system/.
+ */
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 0 0% 3.9%;
+    /* Neutrals / chrome */
+    --background: 150 12% 99%;
+    --foreground: 150 18% 6%;
     --card: 0 0% 100%;
-    --card-foreground: 0 0% 3.9%;
+    --card-foreground: 150 18% 6%;
     --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 3.9%;
-    --primary: 221.2 83.2% 53.3%;
-    --primary-foreground: 210 40% 98%;
-    --secondary: 0 0% 96.1%;
-    --secondary-foreground: 0 0% 9%;
-    --muted: 0 0% 96.1%;
-    --muted-foreground: 0 0% 45.1%;
-    --accent: 0 0% 96.1%;
-    --accent-foreground: 0 0% 9%;
-    --destructive: 0 84.2% 60.2%;
+    --popover-foreground: 150 18% 6%;
+    --secondary: 150 12% 96%;
+    --secondary-foreground: 150 18% 12%;
+    --muted: 150 12% 96%;
+    --muted-foreground: 150 6% 46%;
+    --accent: 150 12% 96%;
+    --accent-foreground: 150 18% 12%;
+    --border: 150 10% 90%;
+    --input: 150 10% 90%;
+
+    /* Primary (emerald) */
+    --primary: 160 70% 35%;
+    --primary-foreground: 150 20% 98%;
+    --ring: 160 70% 35%;
+
+    /* Brand accent (amber — logo, marketing) */
+    --brand: 38 92% 50%;
+    --brand-foreground: 32 80% 12%;
+
+    /* Destructive (warm vermilion) */
+    --destructive: 12 76% 52%;
     --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 89.8%;
-    --input: 0 0% 89.8%;
-    --ring: 221.2 83.2% 53.3%;
+
+    /* Chart colors — retained from prior palette; out of scope for this revision */
     --chart-1: 12 76% 61%;
     --chart-2: 173 58% 39%;
     --chart-3: 197 37% 24%;
     --chart-4: 43 74% 66%;
     --chart-5: 27 87% 67%;
-    --score-exceptional: 142 71% 45%;
+
+    /* Worth-It Score palette — warm 5-tier ramp (emerald → vermilion) */
+    --score-exceptional: 160 75% 32%;
     --score-exceptional-foreground: 0 0% 100%;
-    --score-above: 160 84% 39%;
+    --score-above: 152 60% 45%;
     --score-above-foreground: 0 0% 100%;
-    --score-average: 48 96% 53%;
-    --score-average-foreground: 0 0% 9%;
-    --score-below: 25 95% 53%;
-    --score-below-foreground: 0 0% 9%;
-    --score-skip: 0 84% 60%;
+    --score-average: 84 55% 55%;
+    --score-average-foreground: 84 45% 14%;
+    --score-below: 38 92% 50%;
+    --score-below-foreground: 32 80% 12%;
+    --score-skip: 12 76% 52%;
     --score-skip-foreground: 0 0% 100%;
-    --status-success-bg: 142 76% 94%;
-    --status-success-text: 142 71% 29%;
-    --status-warning-bg: 48 96% 92%;
-    --status-warning-text: 32 95% 33%;
-    --status-info-bg: 221 91% 94%;
-    --status-info-text: 221 83% 40%;
-    --status-danger-bg: 0 86% 94%;
-    --status-danger-text: 0 84% 40%;
-    --status-neutral-bg: 0 0% 93%;
-    --status-neutral-text: 0 0% 37%;
+
+    /* Status (subtle bg + strong text, paired) */
+    --status-success-bg: 152 60% 92%;
+    --status-success-text: 160 75% 24%;
+    --status-warning-bg: 38 92% 92%;
+    --status-warning-text: 32 80% 28%;
+    --status-info-bg: 150 25% 92%;
+    --status-info-text: 160 70% 26%;
+    --status-danger-bg: 12 76% 93%;
+    --status-danger-text: 12 76% 36%;
+    --status-neutral-bg: 150 10% 93%;
+    --status-neutral-text: 150 6% 38%;
+
+    /* Shape */
     --radius: 0.5rem;
+    --radius-sm: calc(var(--radius) - 4px);
+    --radius-md: calc(var(--radius) - 2px);
+    --radius-lg: var(--radius);
+    --radius-xl: 0.75rem;
+    --radius-full: 9999px;
+
+    /* Shadows (sparingly — borders do the structural work) */
+    --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+
+    /* Type foundation (Inter is loaded via next/font in layout.tsx) */
+    --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
   }
+
   .dark {
-    --background: 0 0% 3.9%;
-    --foreground: 0 0% 98%;
-    --card: 0 0% 3.9%;
-    --card-foreground: 0 0% 98%;
-    --popover: 0 0% 3.9%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 217.2 91.2% 59.8%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 0 0% 14.9%;
-    --secondary-foreground: 0 0% 98%;
-    --muted: 0 0% 14.9%;
-    --muted-foreground: 0 0% 63.9%;
-    --accent: 0 0% 14.9%;
-    --accent-foreground: 0 0% 98%;
-    --destructive: 0 62.8% 30.6%;
+    --background: 150 18% 6%;
+    --foreground: 150 12% 96%;
+    --card: 150 18% 6%;
+    --card-foreground: 150 12% 96%;
+    --popover: 150 18% 6%;
+    --popover-foreground: 150 12% 96%;
+    --primary: 156 60% 48%;
+    --primary-foreground: 160 60% 8%;
+    --secondary: 150 15% 13%;
+    --secondary-foreground: 150 12% 96%;
+    --muted: 150 15% 13%;
+    --muted-foreground: 150 6% 64%;
+    --accent: 150 15% 13%;
+    --accent-foreground: 150 12% 96%;
+    --destructive: 12 60% 38%;
     --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 14.9%;
-    --input: 0 0% 14.9%;
-    --ring: 217.2 91.2% 59.8%;
+    --border: 150 15% 13%;
+    --input: 150 15% 13%;
+    --ring: 156 60% 48%;
+    --brand: 38 92% 54%;
+    --brand-foreground: 32 80% 10%;
+
     --chart-1: 220 70% 50%;
     --chart-2: 160 60% 45%;
     --chart-3: 30 80% 55%;
     --chart-4: 280 65% 60%;
     --chart-5: 340 75% 55%;
-    --score-exceptional: 142 71% 45%;
+
+    --score-exceptional: 160 75% 40%;
     --score-exceptional-foreground: 0 0% 100%;
-    --score-above: 160 84% 39%;
+    --score-above: 152 60% 50%;
     --score-above-foreground: 0 0% 100%;
-    --score-average: 48 96% 53%;
-    --score-average-foreground: 0 0% 9%;
-    --score-below: 25 95% 53%;
-    --score-below-foreground: 0 0% 9%;
-    --score-skip: 0 84% 60%;
+    --score-average: 84 55% 55%;
+    --score-average-foreground: 84 45% 14%;
+    --score-below: 38 92% 54%;
+    --score-below-foreground: 32 80% 10%;
+    --score-skip: 12 76% 55%;
     --score-skip-foreground: 0 0% 100%;
-    --status-success-bg: 142 76% 18%;
-    --status-success-text: 142 71% 65%;
-    --status-warning-bg: 48 96% 15%;
-    --status-warning-text: 48 96% 65%;
-    --status-info-bg: 221 91% 18%;
-    --status-info-text: 221 83% 65%;
-    --status-danger-bg: 0 86% 18%;
-    --status-danger-text: 0 84% 65%;
-    --status-neutral-bg: 0 0% 15%;
-    --status-neutral-text: 0 0% 60%;
+
+    --status-success-bg: 160 70% 14%;
+    --status-success-text: 152 60% 68%;
+    --status-warning-bg: 38 92% 15%;
+    --status-warning-text: 38 92% 70%;
+    --status-info-bg: 150 20% 14%;
+    --status-info-text: 156 60% 68%;
+    --status-danger-bg: 12 60% 16%;
+    --status-danger-text: 12 76% 70%;
+    --status-neutral-bg: 150 15% 15%;
+    --status-neutral-text: 150 6% 62%;
   }
 }
-
-
 
 @layer base {
   * {
@@ -123,6 +148,74 @@
   body {
     @apply bg-background text-foreground;
   }
+}
+
+/* Semantic typography classes — mirror the .impeccable.md type scale.
+ * Use sparingly; Tailwind utilities handle most cases. These help keep
+ * landing/marketing copy ramped consistently. */
+.cg-h1 {
+  font-size: 1.875rem;
+  line-height: 2.25rem;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  color: hsl(var(--foreground));
+}
+.cg-h1-hero {
+  font-size: 2.25rem;
+  line-height: 2.5rem;
+  font-weight: 700;
+  letter-spacing: -0.025em;
+}
+@media (min-width: 640px) {
+  .cg-h1-hero {
+    font-size: 3.75rem;
+    line-height: 1;
+  }
+}
+.cg-h2 {
+  font-size: 1.25rem;
+  line-height: 1.75rem;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  color: hsl(var(--foreground));
+}
+.cg-h3 {
+  font-size: 1rem;
+  line-height: 1.5rem;
+  font-weight: 600;
+  color: hsl(var(--foreground));
+}
+.cg-lead {
+  font-size: 1.125rem;
+  line-height: 1.75rem;
+  color: hsl(var(--muted-foreground));
+}
+.cg-body {
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  color: hsl(var(--foreground));
+}
+.cg-muted {
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  color: hsl(var(--muted-foreground));
+}
+.cg-small {
+  font-size: 0.75rem;
+  line-height: 1rem;
+  color: hsl(var(--muted-foreground));
+}
+.cg-label {
+  font-size: 0.875rem;
+  line-height: 1;
+  font-weight: 500;
+}
+.cg-eyebrow {
+  font-size: 0.75rem;
+  line-height: 1rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: hsl(var(--muted-foreground));
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -276,14 +276,14 @@ export function OpmlImportForm() {
         {state === "done" && progress && (
           <div className="mt-3 flex items-center gap-2" aria-live="polite">
             <CheckCircle2
-              className="h-4 w-4 text-green-600"
+              className="h-4 w-4 text-primary"
               aria-hidden="true"
             />
             <span className="text-sm text-muted-foreground">
               {progress.succeeded} subscribed
               {progress.skipped > 0 && `, ${progress.skipped} already subscribed`}
               {progress.failed > 0 && (
-                <span className="text-amber-500">
+                <span className="text-status-warning-text">
                   , {progress.failed} failed
                 </span>
               )}

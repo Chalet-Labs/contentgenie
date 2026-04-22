@@ -133,15 +133,15 @@ describe("TrendingTopics", () => {
     render(<TrendingTopics topics={topics} generatedAt={fixedDate} />)
     const desc = screen.getByText(/Past 7 days · Updated 10m ago/)
     expect(desc.textContent).not.toMatch(/Out of date/)
-    expect(desc.className).not.toContain("text-amber-600")
+    expect(desc.className).not.toContain("text-status-warning-text")
   })
 
-  it("renders 'Out of date' suffix and amber warning color when isStale is true", () => {
+  it("renders 'Out of date' suffix and warning color when isStale is true", () => {
     const topics = [makeTopic({ name: "AI" })]
     render(<TrendingTopics topics={topics} generatedAt={fixedDate} isStale />)
     const desc = screen.getByText(/Past 7 days · Updated 10m ago · Out of date/)
     expect(desc).toBeInTheDocument()
-    expect(desc.className).toContain("text-amber-600")
+    expect(desc.className).toContain("text-status-warning-text")
   })
 
   it("shows stale warning alongside empty-state when both conditions hold", () => {

@@ -43,7 +43,7 @@ export function TrendingTopics({ topics, generatedAt, isStale = false }: Trendin
           Trending Topics
         </CardTitle>
         <CardDescription
-          className={cn(isStale && "text-amber-600 dark:text-amber-500")}
+          className={cn(isStale && "text-status-warning-text")}
         >
           Past 7 days · Updated {updatedAgo}
           {isStale && " · Out of date"}

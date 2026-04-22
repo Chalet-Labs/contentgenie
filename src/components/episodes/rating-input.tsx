@@ -103,7 +103,7 @@ export function RatingInput({
                 sizeClasses[size],
                 "transition-colors",
                 value <= displayRating
-                  ? "fill-yellow-400 text-yellow-400"
+                  ? "fill-brand text-brand"
                   : "fill-transparent text-muted-foreground"
               )}
             />

@@ -134,7 +134,7 @@ export function SummaryDisplay({
                       className="flex items-center gap-3 text-sm"
                     >
                       {isCompleted ? (
-                        <CheckCircle className="h-4 w-4 shrink-0 text-green-500" />
+                        <CheckCircle className="h-4 w-4 shrink-0 text-primary" />
                       ) : isActive ? (
                         <Loader2 className="h-4 w-4 shrink-0 animate-spin text-primary" />
                       ) : (
@@ -288,8 +288,8 @@ export function SummaryDisplay({
               <p
                 className={`mt-3 text-sm font-medium ${
                   overlapLabelKind === "high-overlap"
-                    ? "text-amber-600 dark:text-amber-400"
-                    : "text-green-600 dark:text-green-400"
+                    ? "text-status-warning-text"
+                    : "text-primary"
                 }`}
               >
                 {overlapLabel}
@@ -301,7 +301,7 @@ export function SummaryDisplay({
                 {WORTH_IT_SIGNAL_KEYS.map((key) => (
                   <div key={key} className="flex items-center gap-2 text-sm">
                     {worthItDimensions.signals[key] ? (
-                      <CheckCircle className="h-4 w-4 text-green-500" />
+                      <CheckCircle className="h-4 w-4 text-primary" />
                     ) : (
                       <XCircle className="h-4 w-4 text-muted-foreground/40" />
                     )}
