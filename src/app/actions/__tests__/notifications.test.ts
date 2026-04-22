@@ -12,9 +12,12 @@ vi.mock("drizzle-orm", () => ({
   and: vi.fn((...args: unknown[]) => args),
   desc: vi.fn((col: unknown) => col),
   asc: vi.fn((col: unknown) => col),
+  gte: vi.fn((...args: unknown[]) => args),
   sql: vi.fn(),
   count: vi.fn(() => "count"),
   inArray: vi.fn((...args: unknown[]) => args),
+  groupBy: vi.fn((...args: unknown[]) => args),
+  orderBy: vi.fn((...args: unknown[]) => args),
 }));
 
 // Mock schema
@@ -26,6 +29,7 @@ vi.mock("@/db/schema", () => ({
     isDismissed: "isDismissed",
     createdAt: "createdAt",
     episodeId: "episodeId",
+    type: "type",
   },
   episodes: {
     id: "id",
@@ -536,6 +540,238 @@ describe("notification server actions", () => {
       const result = await getNotificationPreferences();
       expect(result.digestFrequency).toBe("realtime");
       expect(result.pushEnabled).toBe(false);
+    });
+  });
+
+  describe("getNotificationSummary", () => {
+    beforeEach(() => {
+      mockSelect.mockReset();
+    });
+
+    // Wires up two sequential select() calls:
+    // 1. lastSeenAt query → returns { lastSeen: Date | null }
+    // 2. grouped query → returns per-podcast rows
+    function buildSummaryChain(
+      lastSeenRow: Array<{ lastSeen: Date | null }>,
+      groupRows: Array<{ podcastId: number; podcastTitle: string; count: string }>
+    ) {
+      const firstWhere = vi.fn().mockResolvedValue(lastSeenRow);
+      const firstFrom = vi.fn().mockReturnValue({ where: firstWhere });
+
+      const secondOrderBy = vi.fn().mockResolvedValue(groupRows);
+      const secondGroupBy = vi.fn().mockReturnValue({ orderBy: secondOrderBy });
+      const secondWhere = vi.fn().mockReturnValue({ groupBy: secondGroupBy });
+      const secondLeftJoin2 = vi.fn().mockReturnValue({ where: secondWhere });
+      const secondLeftJoin1 = vi.fn().mockReturnValue({ leftJoin: secondLeftJoin2 });
+      const secondFrom = vi.fn().mockReturnValue({ leftJoin: secondLeftJoin1 });
+
+      mockSelect
+        .mockReturnValueOnce({ from: firstFrom })
+        .mockReturnValueOnce({ from: secondFrom });
+    }
+
+    it("(a) returns zero summary when signed out", async () => {
+      mockAuth.mockResolvedValue({ userId: null });
+      const { getNotificationSummary } = await import("@/app/actions/notifications");
+      const result = await getNotificationSummary();
+      expect(result).toEqual({ totalUnread: 0, lastSeenAt: null, groups: [] });
+    });
+
+    it("(b) returns zero groups + null lastSeenAt when user has no notifications", async () => {
+      buildSummaryChain([{ lastSeen: null }], []);
+      const { getNotificationSummary } = await import("@/app/actions/notifications");
+      const result = await getNotificationSummary();
+      expect(result.totalUnread).toBe(0);
+      expect(result.lastSeenAt).toBeNull();
+      expect(result.groups).toEqual([]);
+    });
+
+    it("(c) returns single podcast group when all unread from one podcast", async () => {
+      buildSummaryChain(
+        [{ lastSeen: null }],
+        [{ podcastId: 1, podcastTitle: "Test Pod", count: "3" }]
+      );
+      const { getNotificationSummary } = await import("@/app/actions/notifications");
+      const result = await getNotificationSummary();
+      expect(result.totalUnread).toBe(3);
+      expect(result.groups).toHaveLength(1);
+      expect(result.groups[0]).toEqual({
+        kind: "episodes_by_podcast",
+        podcastId: 1,
+        podcastTitle: "Test Pod",
+        count: 3,
+      });
+    });
+
+    it("(d) multiple podcast groups sorted by count DESC, podcastTitle ASC", async () => {
+      buildSummaryChain(
+        [{ lastSeen: null }],
+        [
+          { podcastId: 2, podcastTitle: "Alpha Pod", count: "5" },
+          { podcastId: 3, podcastTitle: "Beta Pod", count: "2" },
+        ]
+      );
+      const { getNotificationSummary } = await import("@/app/actions/notifications");
+      const result = await getNotificationSummary();
+      expect(result.totalUnread).toBe(7);
+      expect(result.groups[0]).toMatchObject({ kind: "episodes_by_podcast", podcastId: 2 });
+      expect(result.groups[1]).toMatchObject({ kind: "episodes_by_podcast", podcastId: 3 });
+    });
+
+    it("(e) emits episodes_since_last_seen when unread-since < totalUnread", async () => {
+      const lastSeen = new Date("2026-04-01T00:00:00Z");
+      buildSummaryChain(
+        [{ lastSeen }],
+        [
+          { podcastId: 1, podcastTitle: "Pod A", count: "3" },
+          { podcastId: 2, podcastTitle: "Pod B", count: "2" },
+        ]
+      );
+      // Simulate: 2 are newer than lastSeen, 3 are older → since_count < totalUnread (5)
+      // We need a third select mock for the since-count query
+      const thirdWhere = vi.fn().mockResolvedValue([{ sinceCount: "2" }]);
+      const thirdFrom = vi.fn().mockReturnValue({ where: thirdWhere });
+      mockSelect.mockReturnValueOnce({ from: thirdFrom });
+
+      const { getNotificationSummary } = await import("@/app/actions/notifications");
+      const result = await getNotificationSummary();
+      expect(result.lastSeenAt).toEqual(lastSeen);
+      const sinceGroup = result.groups.find((g) => g.kind === "episodes_since_last_seen");
+      expect(sinceGroup).toBeDefined();
+      expect(sinceGroup).toMatchObject({ kind: "episodes_since_last_seen", count: 2 });
+    });
+
+    it("(f) omits episodes_since_last_seen when since_count equals totalUnread", async () => {
+      const lastSeen = new Date("2026-04-01T00:00:00Z");
+      buildSummaryChain(
+        [{ lastSeen }],
+        [{ podcastId: 1, podcastTitle: "Pod A", count: "3" }]
+      );
+      const thirdWhere = vi.fn().mockResolvedValue([{ sinceCount: "3" }]);
+      const thirdFrom = vi.fn().mockReturnValue({ where: thirdWhere });
+      mockSelect.mockReturnValueOnce({ from: thirdFrom });
+
+      const { getNotificationSummary } = await import("@/app/actions/notifications");
+      const result = await getNotificationSummary();
+      const sinceGroup = result.groups.find((g) => g.kind === "episodes_since_last_seen");
+      expect(sinceGroup).toBeUndefined();
+    });
+
+    it("(g) omits episodes_since_last_seen when lastSeenAt is null", async () => {
+      buildSummaryChain(
+        [{ lastSeen: null }],
+        [{ podcastId: 1, podcastTitle: "Pod A", count: "3" }]
+      );
+      const { getNotificationSummary } = await import("@/app/actions/notifications");
+      const result = await getNotificationSummary();
+      const sinceGroup = result.groups.find((g) => g.kind === "episodes_since_last_seen");
+      expect(sinceGroup).toBeUndefined();
+    });
+
+    it("(h) dismissed notifications excluded from groups", async () => {
+      buildSummaryChain([{ lastSeen: null }], []);
+      const { eq: mockEq } = await import("drizzle-orm");
+      const { getNotificationSummary } = await import("@/app/actions/notifications");
+      await getNotificationSummary();
+      expect(mockEq).toHaveBeenCalledWith("isDismissed", false);
+    });
+
+    it("(i) read notifications excluded from groups (isRead = false predicate)", async () => {
+      buildSummaryChain([{ lastSeen: null }], []);
+      const { eq: mockEq } = await import("drizzle-orm");
+      const { getNotificationSummary } = await import("@/app/actions/notifications");
+      await getNotificationSummary();
+      expect(mockEq).toHaveBeenCalledWith("isRead", false);
+    });
+
+    it("(j) summary_completed notifications excluded; totalUnread = sum of new_episode groups only", async () => {
+      // Mixed fixture: 2 new_episode rows + 1 summary_completed (which has null podcastId)
+      // The grouped query already filters by type='new_episode', so only new_episode rows come back
+      buildSummaryChain(
+        [{ lastSeen: null }],
+        [
+          { podcastId: 1, podcastTitle: "Pod A", count: "2" },
+          { podcastId: 2, podcastTitle: "Pod B", count: "1" },
+        ]
+      );
+      const { eq: mockEq } = await import("drizzle-orm");
+      const { getNotificationSummary } = await import("@/app/actions/notifications");
+      const result = await getNotificationSummary();
+      // totalUnread = sum of returned group counts (3), not including summary_completed
+      expect(result.totalUnread).toBe(3);
+      expect(result.groups.every((g) => g.kind === "episodes_by_podcast")).toBe(true);
+      // type='new_episode' predicate must be applied
+      expect(mockEq).toHaveBeenCalledWith("type", "new_episode");
+    });
+  });
+
+  describe("getNotifications — filter parameter", () => {
+    beforeEach(() => {
+      mockSelect.mockReset();
+    });
+
+    function buildFilteredChain(resolvedValue: unknown[]) {
+      const mockOffset = vi.fn().mockResolvedValue(resolvedValue);
+      const mockLimit = vi.fn().mockReturnValue({ offset: mockOffset });
+      const mockOrderBy = vi.fn().mockReturnValue({ limit: mockLimit });
+      const mockWhere = vi.fn().mockReturnValue({ orderBy: mockOrderBy });
+      const mockLeftJoin2 = vi.fn().mockReturnValue({ where: mockWhere });
+      const mockLeftJoin1 = vi.fn().mockReturnValue({ leftJoin: mockLeftJoin2 });
+      const mockFrom = vi.fn().mockReturnValue({ leftJoin: mockLeftJoin1 });
+      mockSelect.mockReturnValue({ from: mockFrom });
+      return { mockWhere };
+    }
+
+    it("(a) podcastId filter: eq called with podcast id", async () => {
+      const { mockWhere } = buildFilteredChain([]);
+      const { eq: mockEq } = await import("drizzle-orm");
+      const { getNotifications } = await import("@/app/actions/notifications");
+      await getNotifications(50, 0, { podcastId: 42 });
+      expect(mockEq).toHaveBeenCalledWith("id", 42);
+      expect(mockWhere).toHaveBeenCalled();
+    });
+
+    it("(b) since filter: gte called with since date", async () => {
+      buildFilteredChain([]);
+      const { gte: mockGte } = await import("drizzle-orm");
+      const since = new Date("2026-04-20T00:00:00Z");
+      const { getNotifications } = await import("@/app/actions/notifications");
+      await getNotifications(50, 0, { since });
+      expect(mockGte).toHaveBeenCalledWith("createdAt", since);
+    });
+
+    it("(c) invalid podcastId (0) is ignored — same as no filter", async () => {
+      buildFilteredChain([]);
+      const { gte: mockGte } = await import("drizzle-orm");
+      const { getNotifications } = await import("@/app/actions/notifications");
+      await getNotifications(50, 0, { podcastId: 0 });
+      expect(mockGte).not.toHaveBeenCalled();
+    });
+
+    it("(c) invalid podcastId (negative) is ignored", async () => {
+      buildFilteredChain([]);
+      const { gte: mockGte } = await import("drizzle-orm");
+      const { getNotifications } = await import("@/app/actions/notifications");
+      await getNotifications(50, 0, { podcastId: -5 });
+      expect(mockGte).not.toHaveBeenCalled();
+    });
+
+    it("(d) invalid since (Invalid Date) is ignored", async () => {
+      buildFilteredChain([]);
+      const { gte: mockGte } = await import("drizzle-orm");
+      const { getNotifications } = await import("@/app/actions/notifications");
+      await getNotifications(50, 0, { since: new Date("not-a-date") });
+      expect(mockGte).not.toHaveBeenCalled();
+    });
+
+    it("(e) combined podcast+since filter applies both predicates", async () => {
+      buildFilteredChain([]);
+      const { eq: mockEq, gte: mockGte } = await import("drizzle-orm");
+      const since = new Date("2026-04-20T00:00:00Z");
+      const { getNotifications } = await import("@/app/actions/notifications");
+      await getNotifications(50, 0, { podcastId: 42, since });
+      expect(mockEq).toHaveBeenCalledWith("id", 42);
+      expect(mockGte).toHaveBeenCalledWith("createdAt", since);
     });
   });
 });

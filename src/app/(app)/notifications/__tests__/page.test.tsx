@@ -38,6 +38,15 @@ describe("NotificationsPage", () => {
     mockAuth.mockResolvedValue({ userId: "user-1" });
   });
 
+  function mockSuccess(items: Array<{ id: number; episodeDbId?: number | null }> = []) {
+    mockGetNotifications.mockResolvedValue({
+      notifications: items,
+      hasMore: false,
+      error: null,
+    });
+    mockGetEpisodeTopics.mockResolvedValue({});
+  }
+
   it("renders the list with initial items on success", async () => {
     mockGetNotifications.mockResolvedValue({
       notifications: [
@@ -49,7 +58,9 @@ describe("NotificationsPage", () => {
     });
     mockGetEpisodeTopics.mockResolvedValue({ 10: ["AI", "Tech"] });
 
-    render((await NotificationsPage()) as React.ReactElement);
+    render(
+      (await NotificationsPage({ searchParams: Promise.resolve({}) })) as React.ReactElement
+    );
 
     expect(screen.getByTestId("notification-page-list")).toHaveTextContent(
       "items:2:hasMore:true:topics:1"
@@ -64,7 +75,9 @@ describe("NotificationsPage", () => {
       error: null,
     });
 
-    render((await NotificationsPage()) as React.ReactElement);
+    render(
+      (await NotificationsPage({ searchParams: Promise.resolve({}) })) as React.ReactElement
+    );
 
     expect(mockGetEpisodeTopics).not.toHaveBeenCalled();
     expect(screen.getByTestId("notification-page-list")).toHaveTextContent(
@@ -79,7 +92,9 @@ describe("NotificationsPage", () => {
       error: "Failed to load notifications",
     });
 
-    render((await NotificationsPage()) as React.ReactElement);
+    render(
+      (await NotificationsPage({ searchParams: Promise.resolve({}) })) as React.ReactElement
+    );
 
     expect(screen.getByRole("alert")).toBeInTheDocument();
     expect(screen.getByText(/couldn't load notifications/i)).toBeInTheDocument();
@@ -95,11 +110,61 @@ describe("NotificationsPage", () => {
       error: null,
     });
 
-    render((await NotificationsPage()) as React.ReactElement);
+    render(
+      (await NotificationsPage({ searchParams: Promise.resolve({}) })) as React.ReactElement
+    );
 
     expect(screen.getByTestId("notification-page-list")).toHaveTextContent(
       "items:0:hasMore:false:topics:0"
     );
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("(a) no search params: getNotifications called with (50, 0, undefined)", async () => {
+    mockSuccess();
+    await NotificationsPage({ searchParams: Promise.resolve({}) });
+    expect(mockGetNotifications).toHaveBeenCalledWith(50, 0, undefined);
+  });
+
+  it("(b) ?podcast=42: getNotifications called with podcastId filter", async () => {
+    mockSuccess();
+    await NotificationsPage({ searchParams: Promise.resolve({ podcast: "42" }) });
+    expect(mockGetNotifications).toHaveBeenCalledWith(50, 0, { podcastId: 42 });
+  });
+
+  it("(c) ?podcast=abc (invalid): getNotifications called without filter", async () => {
+    mockSuccess();
+    await NotificationsPage({ searchParams: Promise.resolve({ podcast: "abc" }) });
+    expect(mockGetNotifications).toHaveBeenCalledWith(50, 0, undefined);
+  });
+
+  it("(d) ?since=2026-04-20T00:00:00Z: getNotifications called with since filter", async () => {
+    mockSuccess();
+    await NotificationsPage({
+      searchParams: Promise.resolve({ since: "2026-04-20T00:00:00.000Z" }),
+    });
+    expect(mockGetNotifications).toHaveBeenCalledWith(50, 0, {
+      since: new Date("2026-04-20T00:00:00.000Z"),
+    });
+  });
+
+  it("(e) ?since=not-a-date: getNotifications called without filter", async () => {
+    mockSuccess();
+    await NotificationsPage({ searchParams: Promise.resolve({ since: "not-a-date" }) });
+    expect(mockGetNotifications).toHaveBeenCalledWith(50, 0, undefined);
+  });
+
+  it("(f) combined ?podcast=42&since=2026-04-20: getNotifications called with both filters", async () => {
+    mockSuccess();
+    await NotificationsPage({
+      searchParams: Promise.resolve({
+        podcast: "42",
+        since: "2026-04-20T00:00:00.000Z",
+      }),
+    });
+    expect(mockGetNotifications).toHaveBeenCalledWith(50, 0, {
+      podcastId: 42,
+      since: new Date("2026-04-20T00:00:00.000Z"),
+    });
   });
 });

@@ -9,10 +9,40 @@ export const metadata: Metadata = {
   title: "Notifications",
 };
 
-export default async function NotificationsPage() {
+export default async function NotificationsPage({
+  searchParams,
+}: {
+  searchParams?: Promise<{ podcast?: string; since?: string }>;
+}) {
   await auth();
 
-  const result = await getNotifications(NOTIFICATIONS_PAGE_SIZE, 0);
+  const params = searchParams ? await searchParams : {};
+
+  const rawPodcast = params.podcast;
+  const rawSince = params.since;
+
+  const podcastId =
+    rawPodcast !== undefined
+      ? (() => {
+          const n = parseInt(rawPodcast, 10);
+          return Number.isInteger(n) && n > 0 ? n : undefined;
+        })()
+      : undefined;
+
+  const since =
+    rawSince !== undefined
+      ? (() => {
+          const d = new Date(rawSince);
+          return !isNaN(d.getTime()) ? d : undefined;
+        })()
+      : undefined;
+
+  const filter =
+    podcastId !== undefined || since !== undefined
+      ? { ...(podcastId !== undefined ? { podcastId } : {}), ...(since !== undefined ? { since } : {}) }
+      : undefined;
+
+  const result = await getNotifications(NOTIFICATIONS_PAGE_SIZE, 0, filter);
 
   if (result.error) {
     return (
