@@ -9,12 +9,10 @@ vi.mock("@/hooks/use-media-query", () => ({
   useMediaQuery: (...args: unknown[]) => mockUseMediaQuery(...args),
 }));
 
-// Component does not exist yet — these tests are intentionally failing (red phase).
 import { NotificationPopover } from "@/components/notifications/notification-popover";
 
 const populatedSummary: NotificationSummary = {
   totalUnread: 3,
-  lastSeenAt: null,
   groups: [
     {
       kind: "episodes_by_podcast",
@@ -27,7 +25,6 @@ const populatedSummary: NotificationSummary = {
 
 const emptySummary: NotificationSummary = {
   totalUnread: 0,
-  lastSeenAt: null,
   groups: [],
 };
 

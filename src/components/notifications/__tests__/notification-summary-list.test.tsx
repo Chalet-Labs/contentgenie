@@ -2,26 +2,25 @@ import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import type { NotificationSummary } from "@/app/actions/notifications";
 
-// Component does not exist yet — these tests are intentionally failing (red phase).
 import { NotificationSummaryList } from "@/components/notifications/notification-summary-list";
 
 const emptySummary: NotificationSummary = {
   totalUnread: 0,
-  lastSeenAt: null,
   groups: [],
 };
 
 const lastSeenAt = new Date("2026-04-10T12:00:00.000Z");
+const lastSeenIso = lastSeenAt.toISOString();
 
 const sinceOnlySummary: NotificationSummary = {
   totalUnread: 4,
-  lastSeenAt,
-  groups: [{ kind: "episodes_since_last_seen", count: 4 }],
+  groups: [
+    { kind: "episodes_since_last_seen", count: 4, sinceIso: lastSeenIso },
+  ],
 };
 
 const podcastSummary: NotificationSummary = {
   totalUnread: 3,
-  lastSeenAt: null,
   groups: [
     {
       kind: "episodes_by_podcast",
@@ -34,7 +33,6 @@ const podcastSummary: NotificationSummary = {
 
 const singularSummary: NotificationSummary = {
   totalUnread: 1,
-  lastSeenAt: null,
   groups: [
     {
       kind: "episodes_by_podcast",
@@ -47,9 +45,8 @@ const singularSummary: NotificationSummary = {
 
 const multiGroupSummary: NotificationSummary = {
   totalUnread: 7,
-  lastSeenAt,
   groups: [
-    { kind: "episodes_since_last_seen", count: 3 },
+    { kind: "episodes_since_last_seen", count: 3, sinceIso: lastSeenIso },
     {
       kind: "episodes_by_podcast",
       podcastId: 1,
@@ -67,7 +64,6 @@ const multiGroupSummary: NotificationSummary = {
 
 const podcastOnlySummary: NotificationSummary = {
   totalUnread: 5,
-  lastSeenAt,
   groups: [
     {
       kind: "episodes_by_podcast",
@@ -76,6 +72,12 @@ const podcastOnlySummary: NotificationSummary = {
       count: 5,
     },
   ],
+};
+
+const legacyOnlySummary: NotificationSummary = {
+  // Unread rows exist (e.g., summary_completed) but none group into an episode bucket.
+  totalUnread: 2,
+  groups: [],
 };
 
 describe("NotificationSummaryList", () => {
@@ -142,5 +144,16 @@ describe("NotificationSummaryList", () => {
     expect(
       screen.getByRole("link", { name: /no since pod/i })
     ).toBeInTheDocument();
+  });
+
+  it("(h) unread exists but zero episode groups renders fallback link to inbox", () => {
+    render(<NotificationSummaryList summary={legacyOnlySummary} />);
+    // Important: we must NOT render "You're all caught up" when totalUnread > 0,
+    // or the popover contradicts the bell badge for users with legacy rows.
+    expect(screen.queryByText(/you're all caught up/i)).not.toBeInTheDocument();
+    const link = screen.getByRole("link", {
+      name: /2 unread notifications/i,
+    });
+    expect(link).toHaveAttribute("href", "/notifications");
   });
 });

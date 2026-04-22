@@ -10,6 +10,10 @@ function pluralEpisode(count: number): string {
   return count === 1 ? "1 new episode" : `${count} new episodes`;
 }
 
+function pluralNotification(count: number): string {
+  return count === 1 ? "1 unread notification" : `${count} unread notifications`;
+}
+
 export function NotificationSummaryList({
   summary,
 }: NotificationSummaryListProps) {
@@ -24,6 +28,23 @@ export function NotificationSummaryList({
     );
   }
 
+  // Unread exists but nothing groups into an episode bucket (e.g., only
+  // summary_completed rows). Surface a link so the bell badge and popover agree.
+  if (summary.groups.length === 0) {
+    return (
+      <ul className="divide-y">
+        <li>
+          <Link
+            href="/notifications"
+            className="flex items-center justify-between px-4 py-3 text-sm hover:bg-accent/50 focus-visible:outline-none focus-visible:bg-accent/50"
+          >
+            {pluralNotification(summary.totalUnread)}
+          </Link>
+        </li>
+      </ul>
+    );
+  }
+
   return (
     <ul className="divide-y">
       {summary.groups.map((group, i) => {
@@ -32,7 +53,7 @@ export function NotificationSummaryList({
             return (
               <li key={`since-${i}`}>
                 <Link
-                  href={`/notifications?since=${summary.lastSeenAt!.toISOString()}`}
+                  href={`/notifications?since=${group.sinceIso}`}
                   className="flex items-center justify-between px-4 py-3 text-sm hover:bg-accent/50 focus-visible:outline-none focus-visible:bg-accent/50"
                 >
                   {pluralEpisode(group.count)} since last visit

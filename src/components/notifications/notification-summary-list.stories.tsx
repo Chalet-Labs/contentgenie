@@ -13,13 +13,12 @@ const meta: Meta<typeof NotificationSummaryList> = {
 export default meta;
 type Story = StoryObj<typeof NotificationSummaryList>;
 
-const lastSeenAt = new Date("2026-04-20T10:00:00.000Z");
+const lastSeenIso = new Date("2026-04-20T10:00:00.000Z").toISOString();
 
 export const Empty: Story = {
   args: {
     summary: {
       totalUnread: 0,
-      lastSeenAt: null,
       groups: [],
     } satisfies NotificationSummary,
   },
@@ -29,7 +28,6 @@ export const SingleGroup: Story = {
   args: {
     summary: {
       totalUnread: 3,
-      lastSeenAt: null,
       groups: [
         {
           kind: "episodes_by_podcast",
@@ -46,9 +44,8 @@ export const MultipleGroups: Story = {
   args: {
     summary: {
       totalUnread: 9,
-      lastSeenAt,
       groups: [
-        { kind: "episodes_since_last_seen", count: 4 },
+        { kind: "episodes_since_last_seen", count: 4, sinceIso: lastSeenIso },
         {
           kind: "episodes_by_podcast",
           podcastId: 1,
@@ -76,8 +73,19 @@ export const SinceLastSeenOnly: Story = {
   args: {
     summary: {
       totalUnread: 4,
-      lastSeenAt,
-      groups: [{ kind: "episodes_since_last_seen", count: 4 }],
+      groups: [
+        { kind: "episodes_since_last_seen", count: 4, sinceIso: lastSeenIso },
+      ],
+    } satisfies NotificationSummary,
+  },
+};
+
+export const LegacyOnly: Story = {
+  args: {
+    summary: {
+      // Unread non-new-episode rows exist (e.g., summary_completed) but nothing groups.
+      totalUnread: 2,
+      groups: [],
     } satisfies NotificationSummary,
   },
 };
@@ -86,7 +94,6 @@ export const LongPodcastTitle: Story = {
   args: {
     summary: {
       totalUnread: 2,
-      lastSeenAt: null,
       groups: [
         {
           kind: "episodes_by_podcast",

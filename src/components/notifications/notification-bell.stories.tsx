@@ -34,9 +34,12 @@ function BellTrigger({ count }: { count?: number }) {
 
 const populatedSummary: NotificationSummary = {
   totalUnread: 7,
-  lastSeenAt: new Date("2026-04-20T10:00:00.000Z"),
   groups: [
-    { kind: "episodes_since_last_seen", count: 3 },
+    {
+      kind: "episodes_since_last_seen",
+      count: 3,
+      sinceIso: new Date("2026-04-20T10:00:00.000Z").toISOString(),
+    },
     {
       kind: "episodes_by_podcast",
       podcastId: 1,
@@ -54,7 +57,6 @@ const populatedSummary: NotificationSummary = {
 
 const emptySummary: NotificationSummary = {
   totalUnread: 0,
-  lastSeenAt: null,
   groups: [],
 };
 

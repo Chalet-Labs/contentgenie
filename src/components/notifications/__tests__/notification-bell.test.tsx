@@ -26,7 +26,6 @@ import { NotificationBell } from "@/components/notifications/notification-bell";
 
 const defaultSummary = {
   totalUnread: 3,
-  lastSeenAt: null,
   groups: [
     {
       kind: "episodes_by_podcast" as const,
@@ -127,9 +126,11 @@ describe("NotificationBell", () => {
     expect(mockGetNotificationSummary).toHaveBeenCalledOnce();
   });
 
-  it("(f) getNotificationSummary error shows Retry path in popover", async () => {
+  it("(f) getNotificationSummary error shows Retry path AND logs the error", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
     mockGetUnreadCount.mockResolvedValue(2);
-    mockGetNotificationSummary.mockRejectedValue(new Error("fetch failed"));
+    const fetchError = new Error("fetch failed");
+    mockGetNotificationSummary.mockRejectedValue(fetchError);
     render(<NotificationBell />);
     await flushMicrotasks();
 
@@ -142,6 +143,13 @@ describe("NotificationBell", () => {
       screen.getByText(/couldn't load notifications/i)
     ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /retry/i })).toBeInTheDocument();
+    // Error must be logged, not swallowed — bare catch {} was a debugging blackhole.
+    expect(consoleError).toHaveBeenCalledWith(
+      "Failed to fetch notification summary:",
+      fetchError
+    );
+
+    consoleError.mockRestore();
   });
 
   it("(g) opening popover does NOT call markAllNotificationsRead or markNotificationRead", async () => {
@@ -234,5 +242,66 @@ describe("NotificationBell", () => {
     expect(consoleError).toHaveBeenCalled();
 
     consoleError.mockRestore();
+  });
+
+  it("(j) ignores stale summary resolution after open → close → open race", async () => {
+    mockGetUnreadCount.mockResolvedValue(0);
+
+    // First open: slow-resolving fetch we control via a manual deferred.
+    let resolveFirst: (value: typeof defaultSummary) => void = () => {};
+    const firstSummary: typeof defaultSummary = {
+      totalUnread: 1,
+      groups: [
+        { kind: "episodes_by_podcast", podcastId: 1, podcastTitle: "Stale Pod", count: 1 },
+      ],
+    };
+    const firstFetch = new Promise<typeof defaultSummary>((resolve) => {
+      resolveFirst = resolve;
+    });
+    mockGetNotificationSummary.mockReturnValueOnce(firstFetch);
+
+    // Second open: resolves synchronously with fresh data.
+    const freshSummary: typeof defaultSummary = {
+      totalUnread: 2,
+      groups: [
+        { kind: "episodes_by_podcast", podcastId: 2, podcastTitle: "Fresh Pod", count: 2 },
+      ],
+    };
+    mockGetNotificationSummary.mockResolvedValueOnce(freshSummary);
+
+    render(<NotificationBell />);
+    await flushMicrotasks();
+
+    const btn = screen.getByRole("button", { name: /notifications/i });
+
+    // Open (kicks off slow fetch), close, open again (kicks off fresh fetch).
+    await act(async () => {
+      fireEvent.click(btn);
+    });
+    await act(async () => {
+      fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });
+    });
+    await act(async () => {
+      fireEvent.click(btn);
+    });
+    await flushMicrotasks();
+
+    // The fresh fetch has resolved — popover now shows Fresh Pod.
+    expect(
+      screen.getByRole("link", { name: /from fresh pod/i })
+    ).toBeInTheDocument();
+
+    // NOW the slow first fetch finally resolves. It must not clobber the fresh state.
+    await act(async () => {
+      resolveFirst(firstSummary);
+    });
+    await flushMicrotasks();
+
+    expect(
+      screen.getByRole("link", { name: /from fresh pod/i })
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: /from stale pod/i })
+    ).not.toBeInTheDocument();
   });
 });

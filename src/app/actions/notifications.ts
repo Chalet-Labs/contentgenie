@@ -5,97 +5,124 @@ import { eq, and, desc, gte, sql, count, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { notifications, episodes, podcasts, users, episodeTopics } from "@/db/schema";
 
+export type NotificationGroup =
+  | { kind: "episodes_since_last_seen"; count: number; sinceIso: string }
+  | {
+      kind: "episodes_by_podcast";
+      podcastId: number;
+      podcastTitle: string;
+      count: number;
+    };
+
 export type NotificationSummary = {
+  // Counts every unread, non-dismissed notification — matches getUnreadCount so
+  // the popover can't disagree with the badge for accounts with legacy rows.
   totalUnread: number;
-  lastSeenAt: Date | null;
-  groups: Array<
-    | { kind: "episodes_since_last_seen"; count: number }
-    | {
-        kind: "episodes_by_podcast";
-        podcastId: number;
-        podcastTitle: string;
-        count: number;
-      }
-  >;
+  groups: NotificationGroup[];
 };
 
 export async function getNotificationSummary(): Promise<NotificationSummary> {
   const { userId } = await auth();
   if (!userId) {
-    return { totalUnread: 0, lastSeenAt: null, groups: [] };
+    return { totalUnread: 0, groups: [] };
   }
 
-  // Query 1: last-seen proxy via MAX(createdAt) WHERE isRead = true
-  const [lastSeenRow] = await db
-    .select({ lastSeen: sql<Date | null>`MAX(${notifications.createdAt})` })
-    .from(notifications)
-    .where(
-      and(
-        eq(notifications.userId, userId),
-        eq(notifications.isRead, true),
-        eq(notifications.isDismissed, false)
-      )
-    );
-  const lastSeenAt = lastSeenRow?.lastSeen ?? null;
-
-  // Query 2: per-podcast groups over unread new_episode notifications
-  const groupRows = await db
-    .select({
-      podcastId: podcasts.id,
-      podcastTitle: podcasts.title,
-      count: count(),
-    })
-    .from(notifications)
-    .leftJoin(episodes, eq(notifications.episodeId, episodes.id))
-    .leftJoin(podcasts, eq(episodes.podcastId, podcasts.id))
-    .where(
-      and(
-        eq(notifications.userId, userId),
-        eq(notifications.isRead, false),
-        eq(notifications.isDismissed, false),
-        eq(notifications.type, "new_episode")
-      )
-    )
-    .groupBy(podcasts.id, podcasts.title)
-    .orderBy(desc(count()), podcasts.title);
-
-  const podcastGroups = groupRows
-    .filter((r) => r.podcastId !== null && r.podcastTitle !== null)
-    .map((r) => ({
-      kind: "episodes_by_podcast" as const,
-      podcastId: r.podcastId!,
-      podcastTitle: r.podcastTitle!,
-      count: Number(r.count),
-    }));
-
-  const totalUnread = podcastGroups.reduce((sum, g) => sum + g.count, 0);
-
-  const groups: NotificationSummary["groups"] = [];
-
-  // Conditionally prepend the since-last-seen bucket
-  if (lastSeenAt !== null && totalUnread > 0) {
-    const [sinceRow] = await db
-      .select({ sinceCount: count() })
+  try {
+    // Query 1: total unread across ALL notification types (parity with badge).
+    const [totalRow] = await db
+      .select({ value: count() })
       .from(notifications)
       .where(
         and(
           eq(notifications.userId, userId),
           eq(notifications.isRead, false),
-          eq(notifications.isDismissed, false),
-          eq(notifications.type, "new_episode"),
-          gte(notifications.createdAt, lastSeenAt)
+          eq(notifications.isDismissed, false)
         )
       );
-    const sinceCount = Number(sinceRow?.sinceCount ?? 0);
-    // Omit bucket when it would duplicate totalUnread (all unread are "since last seen")
-    if (sinceCount > 0 && sinceCount < totalUnread) {
-      groups.push({ kind: "episodes_since_last_seen", count: sinceCount });
+    const totalUnread = totalRow?.value ?? 0;
+
+    // Query 2: last-seen proxy via MAX(createdAt) WHERE isRead = true
+    const [lastSeenRow] = await db
+      .select({ lastSeen: sql<Date | null>`MAX(${notifications.createdAt})` })
+      .from(notifications)
+      .where(
+        and(
+          eq(notifications.userId, userId),
+          eq(notifications.isRead, true),
+          eq(notifications.isDismissed, false)
+        )
+      );
+    const lastSeenAt = lastSeenRow?.lastSeen ?? null;
+
+    // Query 3: per-podcast groups over unread new_episode notifications.
+    // The `type = 'new_episode'` predicate is load-bearing — summary_completed
+    // rows have null episodeId and would corrupt the podcast join.
+    const groupRows = await db
+      .select({
+        podcastId: podcasts.id,
+        podcastTitle: podcasts.title,
+        count: count(),
+      })
+      .from(notifications)
+      .leftJoin(episodes, eq(notifications.episodeId, episodes.id))
+      .leftJoin(podcasts, eq(episodes.podcastId, podcasts.id))
+      .where(
+        and(
+          eq(notifications.userId, userId),
+          eq(notifications.isRead, false),
+          eq(notifications.isDismissed, false),
+          eq(notifications.type, "new_episode")
+        )
+      )
+      .groupBy(podcasts.id, podcasts.title)
+      .orderBy(desc(count()), podcasts.title);
+
+    const podcastGroups = groupRows
+      .filter((r) => r.podcastId !== null && r.podcastTitle !== null)
+      .map((r) => ({
+        kind: "episodes_by_podcast" as const,
+        podcastId: r.podcastId!,
+        podcastTitle: r.podcastTitle!,
+        count: Number(r.count),
+      }));
+
+    const newEpisodeUnread = podcastGroups.reduce((sum, g) => sum + g.count, 0);
+
+    const groups: NotificationGroup[] = [];
+
+    // Conditionally prepend the since-last-seen bucket. Compared against
+    // newEpisodeUnread (not totalUnread) — the bucket only groups new_episode rows.
+    if (lastSeenAt !== null && newEpisodeUnread > 0) {
+      const [sinceRow] = await db
+        .select({ sinceCount: count() })
+        .from(notifications)
+        .where(
+          and(
+            eq(notifications.userId, userId),
+            eq(notifications.isRead, false),
+            eq(notifications.isDismissed, false),
+            eq(notifications.type, "new_episode"),
+            gte(notifications.createdAt, lastSeenAt)
+          )
+        );
+      const sinceCount = Number(sinceRow?.sinceCount ?? 0);
+      // Omit when it would duplicate newEpisodeUnread (all new-episode unread are "since last seen")
+      if (sinceCount > 0 && sinceCount < newEpisodeUnread) {
+        groups.push({
+          kind: "episodes_since_last_seen",
+          count: sinceCount,
+          sinceIso: lastSeenAt.toISOString(),
+        });
+      }
     }
+
+    groups.push(...podcastGroups);
+
+    return { totalUnread, groups };
+  } catch (error) {
+    console.error("Error fetching notification summary:", error);
+    throw error;
   }
-
-  groups.push(...podcastGroups);
-
-  return { totalUnread, lastSeenAt, groups };
 }
 
 export async function getNotifications(

@@ -13,21 +13,22 @@ vi.mock("@/app/actions/notifications", () => ({
   getEpisodeTopics: (...args: unknown[]) => mockGetEpisodeTopics(...args),
 }));
 
+const mockPageListProps = vi.fn();
 vi.mock("@/components/notifications/notification-page-list", () => ({
-  NotificationPageList: ({
-    initialItems,
-    initialHasMore,
-    initialTopicsByEpisode,
-  }: {
+  NotificationPageList: (props: {
     initialItems: Array<{ id: number }>;
     initialHasMore: boolean;
     initialTopicsByEpisode: Record<number, string[]>;
-  }) => (
-    <div data-testid="notification-page-list">
-      items:{initialItems.length}:hasMore:{String(initialHasMore)}:topics:
-      {Object.keys(initialTopicsByEpisode).length}
-    </div>
-  ),
+    filter?: { podcastId?: number; since?: Date };
+  }) => {
+    mockPageListProps(props);
+    return (
+      <div data-testid="notification-page-list">
+        items:{props.initialItems.length}:hasMore:{String(props.initialHasMore)}:topics:
+        {Object.keys(props.initialTopicsByEpisode).length}
+      </div>
+    );
+  },
 }));
 
 import NotificationsPage from "@/app/(app)/notifications/page";
@@ -166,5 +167,87 @@ describe("NotificationsPage", () => {
       podcastId: 42,
       since: new Date("2026-04-20T00:00:00.000Z"),
     });
+  });
+
+  // Stricter parsing — silent coercion ("42abc", "42.5") is a data-visibility hazard
+  // if upstream linkers produce malformed URLs. These assert the rejection path + warn.
+  it("(g) ?podcast=42abc (trailing garbage) is rejected AND warns", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    mockSuccess();
+    await NotificationsPage({ searchParams: Promise.resolve({ podcast: "42abc" }) });
+    expect(mockGetNotifications).toHaveBeenCalledWith(50, 0, undefined);
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining("Invalid 'podcast' searchParam")
+    );
+    warn.mockRestore();
+  });
+
+  it("(h) ?podcast=42.5 (non-integer) is rejected", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    mockSuccess();
+    await NotificationsPage({ searchParams: Promise.resolve({ podcast: "42.5" }) });
+    expect(mockGetNotifications).toHaveBeenCalledWith(50, 0, undefined);
+    warn.mockRestore();
+  });
+
+  it("(i) ?podcast=-5 (negative) is rejected", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    mockSuccess();
+    await NotificationsPage({ searchParams: Promise.resolve({ podcast: "-5" }) });
+    expect(mockGetNotifications).toHaveBeenCalledWith(50, 0, undefined);
+    warn.mockRestore();
+  });
+
+  it("(j) ?podcast=0 is rejected", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    mockSuccess();
+    await NotificationsPage({ searchParams: Promise.resolve({ podcast: "0" }) });
+    expect(mockGetNotifications).toHaveBeenCalledWith(50, 0, undefined);
+    warn.mockRestore();
+  });
+
+  it("(k) invalid ?since warns", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    mockSuccess();
+    await NotificationsPage({ searchParams: Promise.resolve({ since: "not-a-date" }) });
+    expect(warn).toHaveBeenCalledWith(
+      expect.stringContaining("Invalid 'since' searchParam")
+    );
+    warn.mockRestore();
+  });
+
+  // Filter must reach the list — otherwise "Load more" loses the filter context
+  // and appends unfiltered rows to the filtered first page.
+  it("(l) filter is forwarded to NotificationPageList", async () => {
+    mockSuccess();
+    mockPageListProps.mockClear();
+    render(
+      (await NotificationsPage({
+        searchParams: Promise.resolve({
+          podcast: "42",
+          since: "2026-04-20T00:00:00.000Z",
+        }),
+      })) as React.ReactElement
+    );
+    expect(mockPageListProps).toHaveBeenCalledWith(
+      expect.objectContaining({
+        filter: {
+          podcastId: 42,
+          since: new Date("2026-04-20T00:00:00.000Z"),
+        },
+      })
+    );
+  });
+
+  it("(m) no filter is forwarded when no params are present", async () => {
+    mockSuccess();
+    mockPageListProps.mockClear();
+    render(
+      (await NotificationsPage({
+        searchParams: Promise.resolve({}),
+      })) as React.ReactElement
+    );
+    const call = mockPageListProps.mock.calls[0][0];
+    expect(call.filter).toBeUndefined();
   });
 });

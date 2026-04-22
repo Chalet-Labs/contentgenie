@@ -49,13 +49,20 @@ export function NotificationBell() {
     setOpen(false);
   }, [pathname]);
 
+  // Monotonically increasing so a slow earlier fetch can't clobber a fast later one
+  // (open → close → open races).
+  const fetchIdRef = useRef(0);
   const fetchSummary = useCallback(async () => {
+    const fetchId = ++fetchIdRef.current;
     setSummary(null);
     setSummaryError(false);
     try {
       const result = await getNotificationSummary();
+      if (fetchId !== fetchIdRef.current) return;
       setSummary(result);
-    } catch {
+    } catch (error) {
+      console.error("Failed to fetch notification summary:", error);
+      if (fetchId !== fetchIdRef.current) return;
       setSummaryError(true);
     }
   }, []);
@@ -65,11 +72,9 @@ export function NotificationBell() {
       setOpen(nextOpen);
       if (nextOpen) {
         fetchSummary();
-      } else {
-        // Reset so next open re-fetches fresh data
-        setSummary(null);
-        setSummaryError(false);
       }
+      // Close branch intentionally empty — fetchSummary resets on next open, and
+      // wiping state here would flicker skeletons during the popover exit animation.
     },
     [fetchSummary]
   );

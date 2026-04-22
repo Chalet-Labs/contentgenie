@@ -285,7 +285,37 @@ describe("NotificationPageList", () => {
     const loadMoreBtn = screen.getByRole("button", { name: /load more/i });
     await user.click(loadMoreBtn);
     await waitFor(() => {
-      expect(mockGetNotifications).toHaveBeenCalledWith(50, 50);
+      expect(mockGetNotifications).toHaveBeenCalledWith(50, 50, undefined);
+    });
+  });
+
+  it("Load more forwards the active filter so page 2 stays scoped to the filter", async () => {
+    mockGetNotifications.mockResolvedValue({
+      notifications: [makeItem({ id: 999 })],
+      hasMore: false,
+      error: null,
+    });
+    mockGetEpisodeTopics.mockResolvedValue({});
+    const user = userEvent.setup();
+    const fullPage = Array.from({ length: 50 }, (_, i) =>
+      makeItem({ id: i + 1 })
+    );
+    const since = new Date("2026-04-20T00:00:00.000Z");
+    render(
+      <NotificationPageList
+        initialItems={fullPage}
+        initialHasMore={true}
+        initialTopicsByEpisode={{}}
+        filter={{ podcastId: 42, since }}
+      />
+    );
+    const loadMoreBtn = screen.getByRole("button", { name: /load more/i });
+    await user.click(loadMoreBtn);
+    await waitFor(() => {
+      expect(mockGetNotifications).toHaveBeenCalledWith(50, 50, {
+        podcastId: 42,
+        since,
+      });
     });
   });
 
@@ -317,7 +347,7 @@ describe("NotificationPageList", () => {
     // Clicking Load more should now request offset 49, not 50
     await user.click(screen.getByRole("button", { name: /load more/i }));
     await waitFor(() => {
-      expect(mockGetNotifications).toHaveBeenCalledWith(50, 49);
+      expect(mockGetNotifications).toHaveBeenCalledWith(50, 49, undefined);
     });
   });
 

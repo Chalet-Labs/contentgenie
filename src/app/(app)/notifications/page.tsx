@@ -24,8 +24,15 @@ export default async function NotificationsPage({
   const podcastId =
     rawPodcast !== undefined
       ? (() => {
-          const n = parseInt(rawPodcast, 10);
-          return Number.isInteger(n) && n > 0 ? n : undefined;
+          // Stricter than parseInt — rejects "42abc", "42.5", etc. so an
+          // upstream linker producing malformed URLs gets logged, not silently
+          // coerced to a truncated id.
+          const n = /^\d+$/.test(rawPodcast) ? Number(rawPodcast) : NaN;
+          if (Number.isInteger(n) && n > 0) return n;
+          console.warn(
+            `Invalid 'podcast' searchParam on /notifications: ${rawPodcast}`
+          );
+          return undefined;
         })()
       : undefined;
 
@@ -33,7 +40,11 @@ export default async function NotificationsPage({
     rawSince !== undefined
       ? (() => {
           const d = new Date(rawSince);
-          return !isNaN(d.getTime()) ? d : undefined;
+          if (!isNaN(d.getTime())) return d;
+          console.warn(
+            `Invalid 'since' searchParam on /notifications: ${rawSince}`
+          );
+          return undefined;
         })()
       : undefined;
 
@@ -77,6 +88,7 @@ export default async function NotificationsPage({
         initialItems={notifications}
         initialHasMore={hasMore ?? false}
         initialTopicsByEpisode={topicsByEpisode}
+        {...(filter ? { filter } : {})}
       />
     </div>
   );
