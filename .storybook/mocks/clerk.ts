@@ -1,14 +1,10 @@
 // Stub for @clerk/nextjs in Storybook (browser context has no ClerkProvider).
-// Per-story admin state is toggled via setStorybookIsAdmin() so WithAdmin /
-// InSheetWithAdmin decorators can demonstrate the admin branch.
+// No Storybook-rendered component currently reads admin state via useAuth().has()
+// — Sidebar and friends take it as a prop — so `has: () => false` is enough to
+// render signed-in, non-admin views. If a future component starts gating capability
+// on useAuth().has(), revisit this mock instead of relying on it to silently return
+// false.
 import React from "react"
-import { ADMIN_ROLE } from "../../src/lib/auth-roles"
-
-let isAdminMock = false
-
-export const setStorybookIsAdmin = (value: boolean) => {
-  isAdminMock = value
-}
 
 export const ClerkProvider = ({ children }: { children: React.ReactNode }) => children
 export const SignedIn = ({ children }: { children: React.ReactNode }) => children
@@ -19,8 +15,7 @@ export const useAuth = () => ({
   isLoaded: true,
   isSignedIn: true,
   userId: "storybook-user",
-  has: ({ role }: { role?: string } = {}) =>
-    isAdminMock && role === ADMIN_ROLE,
+  has: () => false,
 })
 export const useUser = () => ({
   isLoaded: true,
