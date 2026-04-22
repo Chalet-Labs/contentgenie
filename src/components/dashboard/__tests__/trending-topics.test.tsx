@@ -1,6 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { render, screen } from "@testing-library/react"
-import { TrendingTopics, TrendingTopicsLoading } from "@/components/dashboard/trending-topics"
+import userEvent from "@testing-library/user-event"
+import {
+  TrendingTopics,
+  TrendingTopicsLoading,
+  TOPICS_INITIAL,
+} from "@/components/dashboard/trending-topics"
 import { makeTopic } from "@/test/trending-factories"
 
 const MOCK_NOW = new Date("2026-03-15T12:00:00.000Z")
@@ -144,6 +149,136 @@ describe("TrendingTopics", () => {
     expect(screen.getByText(/No trending topics yet/)).toBeInTheDocument()
     expect(screen.getByText(/Out of date/)).toBeInTheDocument()
   })
+
+  // -------------------------------------------------------------------------
+  // Show more / Show less toggle (no fake timers — userEvent needs real ones)
+  // -------------------------------------------------------------------------
+
+  describe("toggle behaviour", () => {
+    beforeEach(() => {
+      vi.useRealTimers()
+    })
+
+    afterEach(() => {
+      vi.useFakeTimers()
+      vi.setSystemTime(MOCK_NOW)
+    })
+
+    it("renders only TOPICS_INITIAL topics when more than TOPICS_INITIAL are provided and not expanded", () => {
+      const topics = Array.from({ length: TOPICS_INITIAL + 1 }, (_, i) =>
+        makeTopic({ name: `Topic ${i}`, slug: `topic-${i}` })
+      )
+      render(<TrendingTopics topics={topics} generatedAt={fixedDate} />)
+      const links = screen.getAllByRole("link")
+      expect(links).toHaveLength(TOPICS_INITIAL)
+    })
+
+    it("shows all topics after clicking the expand button", async () => {
+      const total = TOPICS_INITIAL + 2
+      const topics = Array.from({ length: total }, (_, i) =>
+        makeTopic({ name: `Topic ${i}`, slug: `topic-${i}` })
+      )
+      render(<TrendingTopics topics={topics} generatedAt={fixedDate} />)
+
+      const user = userEvent.setup()
+      await user.click(screen.getByRole("button", { name: /show.*more/i }))
+
+      const links = screen.getAllByRole("link")
+      expect(links).toHaveLength(total)
+    })
+
+    it("shows 'Show less' button after expanding and re-collapses when clicked", async () => {
+      const hidden = 2
+      const topics = Array.from({ length: TOPICS_INITIAL + hidden }, (_, i) =>
+        makeTopic({ name: `Topic ${i}`, slug: `topic-${i}` })
+      )
+      render(<TrendingTopics topics={topics} generatedAt={fixedDate} />)
+
+      const user = userEvent.setup()
+      await user.click(screen.getByRole("button", { name: /show.*more/i }))
+
+      const lessBtn = screen.getByRole("button", { name: /show less/i })
+      expect(lessBtn).toBeInTheDocument()
+
+      await user.click(lessBtn)
+
+      const links = screen.getAllByRole("link")
+      expect(links).toHaveLength(TOPICS_INITIAL)
+      expect(screen.queryByRole("button", { name: /show less/i })).not.toBeInTheDocument()
+      // Re-collapse restores the original "Show N more" label with the correct count
+      expect(
+        screen.getByRole("button", { name: `Show ${hidden} more` })
+      ).toBeInTheDocument()
+    })
+
+    it("toggle button reports aria-expanded state accurately through expand/collapse", async () => {
+      const topics = Array.from({ length: TOPICS_INITIAL + 2 }, (_, i) =>
+        makeTopic({ name: `Topic ${i}`, slug: `topic-${i}` })
+      )
+      render(<TrendingTopics topics={topics} generatedAt={fixedDate} />)
+
+      const user = userEvent.setup()
+      const initial = screen.getByRole("button", { name: /show.*more/i })
+      expect(initial).toHaveAttribute("aria-expanded", "false")
+
+      await user.click(initial)
+      expect(screen.getByRole("button", { name: /show less/i })).toHaveAttribute(
+        "aria-expanded",
+        "true"
+      )
+    })
+
+    it("toggle button is absent when deduped topics count < TOPICS_INITIAL", () => {
+      const topics = Array.from({ length: TOPICS_INITIAL - 1 }, (_, i) =>
+        makeTopic({ name: `Topic ${i}`, slug: `topic-${i}` })
+      )
+      render(<TrendingTopics topics={topics} generatedAt={fixedDate} />)
+      expect(screen.queryByRole("button", { name: /show/i })).not.toBeInTheDocument()
+    })
+
+    it("toggle button is absent when exactly TOPICS_INITIAL deduplicated topics are provided (boundary: N > N is false)", () => {
+      const topics = Array.from({ length: TOPICS_INITIAL }, (_, i) =>
+        makeTopic({ name: `Topic ${i}`, slug: `topic-${i}` })
+      )
+      render(<TrendingTopics topics={topics} generatedAt={fixedDate} />)
+      expect(screen.queryByRole("button", { name: /show/i })).not.toBeInTheDocument()
+    })
+
+    it("toggle button label shows correct hidden count", () => {
+      const hidden = 3
+      const topics = Array.from({ length: TOPICS_INITIAL + hidden }, (_, i) =>
+        makeTopic({ name: `Topic ${i}`, slug: `topic-${i}` })
+      )
+      render(<TrendingTopics topics={topics} generatedAt={fixedDate} />)
+      expect(
+        screen.getByRole("button", { name: `Show ${hidden} more` })
+      ).toBeInTheDocument()
+    })
+
+    it("renders 'Show 1 more' when exactly TOPICS_INITIAL + 1 topics are provided (singular-count boundary)", () => {
+      const topics = Array.from({ length: TOPICS_INITIAL + 1 }, (_, i) =>
+        makeTopic({ name: `Topic ${i}`, slug: `topic-${i}` })
+      )
+      render(<TrendingTopics topics={topics} generatedAt={fixedDate} />)
+      expect(screen.getByRole("button", { name: "Show 1 more" })).toBeInTheDocument()
+    })
+
+    it("toggle button is absent when raw topics exceed threshold but deduped count does not", () => {
+      // Raw length > TOPICS_INITIAL, but after dedupeTopics collapses duplicate slugs,
+      // the visible count is <= TOPICS_INITIAL and the toggle must stay hidden.
+      const uniqueSlugs = Math.max(TOPICS_INITIAL - 1, 1)
+      const uniqueTopics = Array.from({ length: uniqueSlugs }, (_, i) =>
+        makeTopic({ name: `Topic ${i}`, slug: `topic-${i}` })
+      )
+      const duplicates = Array.from({ length: 3 }, () =>
+        makeTopic({ name: "Topic 0", slug: "topic-0" })
+      )
+      const topics = [...uniqueTopics, ...duplicates]
+      expect(topics.length).toBeGreaterThan(TOPICS_INITIAL)
+      render(<TrendingTopics topics={topics} generatedAt={fixedDate} />)
+      expect(screen.queryByRole("button", { name: /show/i })).not.toBeInTheDocument()
+    })
+  })
 })
 
 // ---------------------------------------------------------------------------
@@ -151,8 +286,8 @@ describe("TrendingTopics", () => {
 // ---------------------------------------------------------------------------
 
 describe("TrendingTopicsLoading", () => {
-  it("renders exactly 5 row-shaped skeleton placeholders", () => {
+  it("renders TOPICS_INITIAL row-shaped skeleton placeholders", () => {
     render(<TrendingTopicsLoading />)
-    expect(screen.getAllByTestId("trending-loading-row")).toHaveLength(5)
+    expect(screen.getAllByTestId("trending-loading-row")).toHaveLength(TOPICS_INITIAL)
   })
 })

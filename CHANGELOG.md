@@ -6,6 +6,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Added
+- Dashboard Trending Topics and Recommended Episodes cards now collapse to a preview (5 topics / 6 episodes) with a ghost full-width "Show N more" / "Show less" toggle when there are more items to reveal. The Recommended Episodes server fetch limit was raised from 6 to 12 so the toggle has headroom to expand (#308).
+
 ### Changed
 - Server-action envelope return types normalized: new `ActionResult<T = void>` alias at `src/types/action-result.ts` replaces the inline `{ success: true; data?: T } | { success: false; error: string }` unions in `player-session.ts`, `listening-queue.ts`, `listen-history.ts`, and the `updateAiConfig` / `updateSummarizationPrompt` exports of `ai-config.ts`. `recordListenEvent` is tightened from `{ success: boolean }` to `ActionResult<void>`; failure payloads now carry an `error: string` (previously absent) but no call site read that field. Raw-return actions and `getAiConfig` are unchanged (#306).
 - Public marketing landing page (`/`) redesigned: editorial-clean hero with a live-feeling inbox surface + floating AI summary, four-feature bento grid (Worth-It Score, Key Takeaways, Library, Discover), four-step how-it-works flow, worked example summary, and a free-during-beta pricing card (50% off forever for grandfathered accounts). Adds JetBrains Mono alongside Inter via `next/font`. The previous minimal `LandingHeader` is replaced by `MarketingHeader` (brand mark, full nav, contrast CTA), which now also powers the signed-out public episode share page — share-link visitors can discover the product instead of hitting a nav-less dead end. Adds a `ContrastButton` wrapper (at `src/components/landing/contrast-button.tsx`) that composes the shadcn `Button` primitive with inverted-color styling for marketing CTAs — keeps `src/components/ui/button.tsx` pristine and shadcn-sync-safe.

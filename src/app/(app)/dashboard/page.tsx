@@ -17,7 +17,13 @@ import { TrendingTopicsSection } from "@/app/(app)/dashboard/trending-topics-sec
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 
-// Loading skeleton for recent episodes (inline — presentational file is "use client")
+// Recent-episodes sidebar caps at 3 so the card stays compact next to Queue.
+const RECENT_EPISODES_LIMIT = 3;
+
+// Over-fetch relative to the card's initial visible count so the "Show more"
+// toggle has candidates to reveal without a round-trip.
+const RECOMMENDATIONS_FETCH_SIZE = 12;
+
 function RecentEpisodesLoading() {
   return (
     <Card>
@@ -25,7 +31,7 @@ function RecentEpisodesLoading() {
         <Skeleton className="h-5 w-40" />
       </CardHeader>
       <CardContent className="space-y-3">
-        {[1, 2, 3].map((i) => (
+        {Array.from({ length: RECENT_EPISODES_LIMIT }).map((_, i) => (
           <div key={i} className="flex gap-3">
             <Skeleton className="h-14 w-14 shrink-0 rounded-md" />
             <div className="flex-1 space-y-2">
@@ -52,7 +58,7 @@ async function RecentEpisodesSection() {
       : Math.floor(lastSignInAt.getTime() / 1000);
 
   const { episodes, hasSubscriptions, error } = await getRecentEpisodesFromSubscriptions({
-    limit: 3,
+    limit: RECENT_EPISODES_LIMIT,
     since: Math.floor((Date.now() - 7 * 24 * 60 * 60 * 1000) / 1000),
   });
 
@@ -69,7 +75,7 @@ async function RecentEpisodesSection() {
 
 // Server component for episode recommendations
 async function RecommendationsSection() {
-  const { episodes, error } = await getRecommendedEpisodes(6);
+  const { episodes, error } = await getRecommendedEpisodes(RECOMMENDATIONS_FETCH_SIZE);
   if (error) console.error("[RecommendationsSection]", error);
   return <EpisodeRecommendations episodes={episodes} />;
 }

@@ -1,11 +1,17 @@
+"use client";
+
 import Image from "next/image";
 import Link from "next/link";
+import { ChevronRight, Sparkles, Rss } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ChevronRight, Sparkles, Rss } from "lucide-react";
+import { ShowMoreToggle } from "@/components/ui/show-more-toggle";
 import { WorthItBadge } from "@/components/episodes/worth-it-badge";
 import { formatDate, formatDuration, stripHtml } from "@/lib/utils";
+import { useExpandable } from "@/hooks/use-expandable";
 import type { RecommendedEpisodeDTO } from "@/db/library-columns";
+
+export const EPISODES_INITIAL = 6;
 
 export function EpisodeRecommendationsLoading() {
   return (
@@ -15,8 +21,8 @@ export function EpisodeRecommendationsLoading() {
       </CardHeader>
       <CardContent>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {[1, 2, 3, 4, 5, 6].map((i) => (
-            <div key={i} className="flex gap-3 p-2">
+          {Array.from({ length: EPISODES_INITIAL }).map((_, i) => (
+            <div key={i} data-testid="episode-loading-row" className="flex gap-3 p-2">
               <Skeleton className="h-14 w-14 shrink-0 rounded-md" />
               <div className="min-w-0 flex-1 space-y-2">
                 <Skeleton className="h-4 w-3/4" />
@@ -35,6 +41,11 @@ interface EpisodeRecommendationsProps {
 }
 
 export function EpisodeRecommendations({ episodes }: EpisodeRecommendationsProps) {
+  const { visible, expanded, hiddenCount, shouldShowToggle, toggle } = useExpandable(
+    episodes,
+    EPISODES_INITIAL,
+  );
+
   if (episodes.length === 0) {
     return (
       <Card>
@@ -76,7 +87,7 @@ export function EpisodeRecommendations({ episodes }: EpisodeRecommendationsProps
       </CardHeader>
       <CardContent>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {episodes.map((episode) => (
+          {visible.map((episode) => (
             <Link
               key={episode.id}
               href={`/episode/${episode.podcastIndexId}`}
@@ -131,6 +142,13 @@ export function EpisodeRecommendations({ episodes }: EpisodeRecommendationsProps
             </Link>
           ))}
         </div>
+        {shouldShowToggle && (
+          <ShowMoreToggle
+            expanded={expanded}
+            hiddenCount={hiddenCount}
+            onToggle={toggle}
+          />
+        )}
       </CardContent>
     </Card>
   );

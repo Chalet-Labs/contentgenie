@@ -1,3 +1,5 @@
+"use client";
+
 import Link from "next/link";
 import { TrendingUp, ChevronRight } from "lucide-react";
 import {
@@ -8,9 +10,13 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ShowMoreToggle } from "@/components/ui/show-more-toggle";
 import { cn, formatRelativeTime } from "@/lib/utils";
 import { dedupeTopics } from "@/lib/trending";
+import { useExpandable } from "@/hooks/use-expandable";
 import type { TrendingTopic } from "@/db/schema";
+
+export const TOPICS_INITIAL = 5;
 
 interface TrendingTopicsProps {
   topics: TrendingTopic[];
@@ -24,6 +30,10 @@ interface TrendingTopicsProps {
 export function TrendingTopics({ topics, generatedAt, isStale = false }: TrendingTopicsProps) {
   const updatedAgo = formatRelativeTime(generatedAt);
   const deduped = dedupeTopics(topics);
+  const { visible, expanded, hiddenCount, shouldShowToggle, toggle } = useExpandable(
+    deduped,
+    TOPICS_INITIAL,
+  );
 
   return (
     <Card>
@@ -45,29 +55,38 @@ export function TrendingTopics({ topics, generatedAt, isStale = false }: Trendin
             No trending topics yet — check back soon.
           </p>
         ) : (
-          deduped.map(({ topic, slug }) => {
-            const count = topic.episodeCount;
-            return (
-              <Link
-                key={slug}
-                href={`/trending/${slug}`}
-                className="flex items-start gap-3 rounded-md p-3 transition-colors hover:bg-accent"
-              >
-                <div className="min-w-0 flex-1">
-                  <p className="break-words font-semibold">{topic.name}</p>
-                  {topic.description && (
-                    <p className="line-clamp-2 break-words text-sm text-muted-foreground">
-                      {topic.description}
-                    </p>
-                  )}
-                </div>
-                <div className="flex shrink-0 items-center gap-1 text-sm text-muted-foreground">
-                  <span>{count} {count === 1 ? "episode" : "episodes"}</span>
-                  <ChevronRight className="h-4 w-4" />
-                </div>
-              </Link>
-            );
-          })
+          <>
+            {visible.map(({ topic, slug }) => {
+              const count = topic.episodeCount;
+              return (
+                <Link
+                  key={slug}
+                  href={`/trending/${slug}`}
+                  className="flex items-start gap-3 rounded-md p-3 transition-colors hover:bg-accent"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="break-words font-semibold">{topic.name}</p>
+                    {topic.description && (
+                      <p className="line-clamp-2 break-words text-sm text-muted-foreground">
+                        {topic.description}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1 text-sm text-muted-foreground">
+                    <span>{count} {count === 1 ? "episode" : "episodes"}</span>
+                    <ChevronRight className="h-4 w-4" />
+                  </div>
+                </Link>
+              );
+            })}
+            {shouldShowToggle && (
+              <ShowMoreToggle
+                expanded={expanded}
+                hiddenCount={hiddenCount}
+                onToggle={toggle}
+              />
+            )}
+          </>
         )}
       </CardContent>
     </Card>
@@ -82,7 +101,7 @@ export function TrendingTopicsLoading() {
         <Skeleton className="h-3 w-56" />
       </CardHeader>
       <CardContent className="space-y-1">
-        {Array.from({ length: 5 }).map((_, i) => (
+        {Array.from({ length: TOPICS_INITIAL }).map((_, i) => (
           <div
             key={i}
             data-testid="trending-loading-row"
