@@ -14,6 +14,7 @@ interface ShowMoreToggleProps {
 export function ShowMoreToggle({ expanded, hiddenCount, onToggle, className }: ShowMoreToggleProps) {
   return (
     <Button
+      type="button"
       variant="ghost"
       className={cn("mt-2 w-full", className)}
       aria-expanded={expanded}

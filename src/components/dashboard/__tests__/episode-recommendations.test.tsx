@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest"
+import { describe, it, expect, beforeEach } from "vitest"
 import { render, screen } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import {
@@ -13,6 +13,10 @@ import type { RecommendedEpisodeDTO } from "@/db/library-columns"
 // ---------------------------------------------------------------------------
 
 let _idCounter = 1
+
+beforeEach(() => {
+  _idCounter = 1
+})
 
 function makeEpisode(overrides: Partial<RecommendedEpisodeDTO> = {}): RecommendedEpisodeDTO {
   const id = _idCounter++
