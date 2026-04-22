@@ -1,14 +1,14 @@
 "use client";
 
-import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { ChevronDown, ChevronUp, ChevronRight, Sparkles, Rss } from "lucide-react";
+import { ChevronRight, Sparkles, Rss } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Button } from "@/components/ui/button";
+import { ShowMoreToggle } from "@/components/ui/show-more-toggle";
 import { WorthItBadge } from "@/components/episodes/worth-it-badge";
 import { formatDate, formatDuration, stripHtml } from "@/lib/utils";
+import { useExpandable } from "@/hooks/use-expandable";
 import type { RecommendedEpisodeDTO } from "@/db/library-columns";
 
 export const EPISODES_INITIAL = 6;
@@ -41,7 +41,10 @@ interface EpisodeRecommendationsProps {
 }
 
 export function EpisodeRecommendations({ episodes }: EpisodeRecommendationsProps) {
-  const [expanded, setExpanded] = useState(false);
+  const { visible, expanded, hiddenCount, shouldShowToggle, toggle } = useExpandable(
+    episodes,
+    EPISODES_INITIAL,
+  );
 
   if (episodes.length === 0) {
     return (
@@ -69,9 +72,6 @@ export function EpisodeRecommendations({ episodes }: EpisodeRecommendationsProps
       </Card>
     );
   }
-
-  const visible = episodes.slice(0, expanded ? undefined : EPISODES_INITIAL);
-  const hiddenCount = episodes.length - EPISODES_INITIAL;
 
   return (
     <Card>
@@ -142,25 +142,12 @@ export function EpisodeRecommendations({ episodes }: EpisodeRecommendationsProps
             </Link>
           ))}
         </div>
-        {episodes.length > EPISODES_INITIAL && (
-          <Button
-            variant="ghost"
-            className="mt-2 w-full"
-            aria-expanded={expanded}
-            onClick={() => setExpanded((prev) => !prev)}
-          >
-            {expanded ? (
-              <>
-                Show less
-                <ChevronUp className="ml-2 h-4 w-4" />
-              </>
-            ) : (
-              <>
-                Show {hiddenCount} more
-                <ChevronDown className="ml-2 h-4 w-4" />
-              </>
-            )}
-          </Button>
+        {shouldShowToggle && (
+          <ShowMoreToggle
+            expanded={expanded}
+            hiddenCount={hiddenCount}
+            onToggle={toggle}
+          />
         )}
       </CardContent>
     </Card>

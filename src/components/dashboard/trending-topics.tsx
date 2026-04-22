@@ -1,8 +1,7 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
-import { TrendingUp, ChevronRight, ChevronDown, ChevronUp } from "lucide-react";
+import { TrendingUp, ChevronRight } from "lucide-react";
 import {
   Card,
   CardContent,
@@ -11,9 +10,10 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Button } from "@/components/ui/button";
+import { ShowMoreToggle } from "@/components/ui/show-more-toggle";
 import { cn, formatRelativeTime } from "@/lib/utils";
 import { dedupeTopics } from "@/lib/trending";
+import { useExpandable } from "@/hooks/use-expandable";
 import type { TrendingTopic } from "@/db/schema";
 
 export const TOPICS_INITIAL = 5;
@@ -28,11 +28,12 @@ interface TrendingTopicsProps {
 }
 
 export function TrendingTopics({ topics, generatedAt, isStale = false }: TrendingTopicsProps) {
-  const [expanded, setExpanded] = useState(false);
   const updatedAgo = formatRelativeTime(generatedAt);
   const deduped = dedupeTopics(topics);
-  const visible = deduped.slice(0, expanded ? undefined : TOPICS_INITIAL);
-  const hiddenCount = deduped.length - TOPICS_INITIAL;
+  const { visible, expanded, hiddenCount, shouldShowToggle, toggle } = useExpandable(
+    deduped,
+    TOPICS_INITIAL,
+  );
 
   return (
     <Card>
@@ -78,25 +79,12 @@ export function TrendingTopics({ topics, generatedAt, isStale = false }: Trendin
                 </Link>
               );
             })}
-            {deduped.length > TOPICS_INITIAL && (
-              <Button
-                variant="ghost"
-                className="mt-2 w-full"
-                aria-expanded={expanded}
-                onClick={() => setExpanded((prev) => !prev)}
-              >
-                {expanded ? (
-                  <>
-                    Show less
-                    <ChevronUp className="ml-2 h-4 w-4" />
-                  </>
-                ) : (
-                  <>
-                    Show {hiddenCount} more
-                    <ChevronDown className="ml-2 h-4 w-4" />
-                  </>
-                )}
-              </Button>
+            {shouldShowToggle && (
+              <ShowMoreToggle
+                expanded={expanded}
+                hiddenCount={hiddenCount}
+                onToggle={toggle}
+              />
             )}
           </>
         )}
