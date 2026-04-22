@@ -9,6 +9,23 @@ export const metadata: Metadata = {
   title: "Notifications",
 };
 
+// Stricter than parseInt: rejects "42abc", "42.5", "-5" — silent coercion would
+// let upstream linker bugs (malformed URLs in emails, push payloads) masquerade
+// as healthy requests.
+function parsePositiveInt(raw: string, name: string): number | undefined {
+  const n = /^\d+$/.test(raw) ? Number(raw) : NaN;
+  if (Number.isInteger(n) && n > 0) return n;
+  console.warn(`Invalid '${name}' searchParam on /notifications: ${raw}`);
+  return undefined;
+}
+
+function parseIsoDate(raw: string, name: string): Date | undefined {
+  const d = new Date(raw);
+  if (!isNaN(d.getTime())) return d;
+  console.warn(`Invalid '${name}' searchParam on /notifications: ${raw}`);
+  return undefined;
+}
+
 export default async function NotificationsPage({
   searchParams,
 }: {
@@ -17,40 +34,21 @@ export default async function NotificationsPage({
   await auth();
 
   const params = searchParams ? await searchParams : {};
-
-  const rawPodcast = params.podcast;
-  const rawSince = params.since;
-
   const podcastId =
-    rawPodcast !== undefined
-      ? (() => {
-          // Stricter than parseInt — rejects "42abc", "42.5", etc. so an
-          // upstream linker producing malformed URLs gets logged, not silently
-          // coerced to a truncated id.
-          const n = /^\d+$/.test(rawPodcast) ? Number(rawPodcast) : NaN;
-          if (Number.isInteger(n) && n > 0) return n;
-          console.warn(
-            `Invalid 'podcast' searchParam on /notifications: ${rawPodcast}`
-          );
-          return undefined;
-        })()
+    params.podcast !== undefined
+      ? parsePositiveInt(params.podcast, "podcast")
       : undefined;
-
   const since =
-    rawSince !== undefined
-      ? (() => {
-          const d = new Date(rawSince);
-          if (!isNaN(d.getTime())) return d;
-          console.warn(
-            `Invalid 'since' searchParam on /notifications: ${rawSince}`
-          );
-          return undefined;
-        })()
+    params.since !== undefined
+      ? parseIsoDate(params.since, "since")
       : undefined;
 
   const filter =
     podcastId !== undefined || since !== undefined
-      ? { ...(podcastId !== undefined ? { podcastId } : {}), ...(since !== undefined ? { since } : {}) }
+      ? {
+          ...(podcastId !== undefined && { podcastId }),
+          ...(since !== undefined && { since }),
+        }
       : undefined;
 
   const result = await getNotifications(NOTIFICATIONS_PAGE_SIZE, 0, filter);
@@ -88,7 +86,7 @@ export default async function NotificationsPage({
         initialItems={notifications}
         initialHasMore={hasMore ?? false}
         initialTopicsByEpisode={topicsByEpisode}
-        {...(filter ? { filter } : {})}
+        filter={filter}
       />
     </div>
   );

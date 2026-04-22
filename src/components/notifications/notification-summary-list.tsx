@@ -14,6 +14,19 @@ function pluralNotification(count: number): string {
   return count === 1 ? "1 unread notification" : `${count} unread notifications`;
 }
 
+function SummaryRow({ href, children }: { href: string; children: React.ReactNode }) {
+  return (
+    <li>
+      <Link
+        href={href}
+        className="flex items-center justify-between px-4 py-3 text-sm hover:bg-accent/50 focus-visible:outline-none focus-visible:bg-accent/50"
+      >
+        {children}
+      </Link>
+    </li>
+  );
+}
+
 export function NotificationSummaryList({
   summary,
 }: NotificationSummaryListProps) {
@@ -33,14 +46,9 @@ export function NotificationSummaryList({
   if (summary.groups.length === 0) {
     return (
       <ul className="divide-y">
-        <li>
-          <Link
-            href="/notifications"
-            className="flex items-center justify-between px-4 py-3 text-sm hover:bg-accent/50 focus-visible:outline-none focus-visible:bg-accent/50"
-          >
-            {pluralNotification(summary.totalUnread)}
-          </Link>
-        </li>
+        <SummaryRow href="/notifications">
+          {pluralNotification(summary.totalUnread)}
+        </SummaryRow>
       </ul>
     );
   }
@@ -51,29 +59,25 @@ export function NotificationSummaryList({
         switch (group.kind) {
           case "episodes_since_last_seen":
             return (
-              <li key={`since-${i}`}>
-                <Link
-                  href={`/notifications?since=${group.sinceIso}`}
-                  className="flex items-center justify-between px-4 py-3 text-sm hover:bg-accent/50 focus-visible:outline-none focus-visible:bg-accent/50"
-                >
-                  {pluralEpisode(group.count)} since last visit
-                </Link>
-              </li>
+              <SummaryRow
+                key={`since-${i}`}
+                href={`/notifications?since=${group.sinceIso}`}
+              >
+                {pluralEpisode(group.count)} since last visit
+              </SummaryRow>
             );
           case "episodes_by_podcast":
             return (
-              <li key={`podcast-${group.podcastId}`}>
-                <Link
-                  href={`/notifications?podcast=${group.podcastId}`}
-                  className="flex items-center justify-between px-4 py-3 text-sm hover:bg-accent/50 focus-visible:outline-none focus-visible:bg-accent/50"
-                >
-                  {pluralEpisode(group.count)} from {group.podcastTitle}
-                </Link>
-              </li>
+              <SummaryRow
+                key={`podcast-${group.podcastId}`}
+                href={`/notifications?podcast=${group.podcastId}`}
+              >
+                {pluralEpisode(group.count)} from {group.podcastTitle}
+              </SummaryRow>
             );
           default: {
             const _exhaustive: never = group;
-            return _exhaustive;
+            throw new Error(`Unhandled NotificationGroup: ${JSON.stringify(_exhaustive)}`);
           }
         }
       })}

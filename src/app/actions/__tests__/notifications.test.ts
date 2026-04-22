@@ -750,9 +750,25 @@ describe("notification server actions", () => {
     it("(l) logs and rethrows on DB failure so server has a trail", async () => {
       const dbError = new Error("connection refused");
       const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-      const firstWhere = vi.fn().mockRejectedValue(dbError);
-      const firstFrom = vi.fn().mockReturnValue({ where: firstWhere });
-      mockSelect.mockReturnValueOnce({ from: firstFrom });
+      // Queries run concurrently via Promise.all — reject the first, stub
+      // the other two so their chains don't TypeError on undefined.
+      const rejectingWhere = vi.fn().mockRejectedValue(dbError);
+      const rejectingFrom = vi.fn().mockReturnValue({ where: rejectingWhere });
+
+      const stubWhere = vi.fn().mockResolvedValue([]);
+      const stubFrom = vi.fn().mockReturnValue({ where: stubWhere });
+
+      const stubOrderBy = vi.fn().mockResolvedValue([]);
+      const stubGroupBy = vi.fn().mockReturnValue({ orderBy: stubOrderBy });
+      const stubGroupedWhere = vi.fn().mockReturnValue({ groupBy: stubGroupBy });
+      const stubLeftJoin2 = vi.fn().mockReturnValue({ where: stubGroupedWhere });
+      const stubLeftJoin1 = vi.fn().mockReturnValue({ leftJoin: stubLeftJoin2 });
+      const stubGroupedFrom = vi.fn().mockReturnValue({ leftJoin: stubLeftJoin1 });
+
+      mockSelect
+        .mockReturnValueOnce({ from: rejectingFrom })
+        .mockReturnValueOnce({ from: stubFrom })
+        .mockReturnValueOnce({ from: stubGroupedFrom });
 
       const { getNotificationSummary } = await import("@/app/actions/notifications");
       await expect(getNotificationSummary()).rejects.toThrow("connection refused");

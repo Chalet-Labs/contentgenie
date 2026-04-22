@@ -49,8 +49,7 @@ export function NotificationBell() {
     setOpen(false);
   }, [pathname]);
 
-  // Monotonically increasing so a slow earlier fetch can't clobber a fast later one
-  // (open → close → open races).
+  // Race guard: ignore stale resolutions from prior opens.
   const fetchIdRef = useRef(0);
   const fetchSummary = useCallback(async () => {
     const fetchId = ++fetchIdRef.current;
@@ -70,11 +69,7 @@ export function NotificationBell() {
   const handleOpenChange = useCallback(
     (nextOpen: boolean) => {
       setOpen(nextOpen);
-      if (nextOpen) {
-        fetchSummary();
-      }
-      // Close branch intentionally empty — fetchSummary resets on next open, and
-      // wiping state here would flicker skeletons during the popover exit animation.
+      if (nextOpen) fetchSummary();
     },
     [fetchSummary]
   );
