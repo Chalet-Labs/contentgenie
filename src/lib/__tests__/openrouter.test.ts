@@ -68,11 +68,11 @@ describe("parseJsonResponse", () => {
 
 describe("SIGNAL_LABELS", () => {
   it("aligns staysFocused with editorial content (excluding ads)", () => {
-    expect(SIGNAL_LABELS.staysFocused).toContain("Editorial");
+    expect(SIGNAL_LABELS.staysFocused).toMatch(/editorial/i);
   });
 
   it("aligns timeJustified with editorial content density (excluding ads)", () => {
-    expect(SIGNAL_LABELS.timeJustified).toContain("editorial");
+    expect(SIGNAL_LABELS.timeJustified).toMatch(/editorial/i);
   });
 });
 

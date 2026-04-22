@@ -128,25 +128,34 @@ describe("getSummarizationPrompt ad-exclusion guards", () => {
   );
 
   it("instructs staysFocused to ignore ads and sponsor reads", () => {
-    expect(prompt).toContain(
-      "Ignore ads and sponsor reads — evaluate editorial content only."
-    );
+    expect(prompt).toMatch(/ignore ads and sponsor reads/i);
+    expect(prompt).toMatch(/editorial content only/i);
   });
 
   it("instructs timeJustified to exclude ads and sponsor reads", () => {
-    expect(prompt).toContain("Exclude ads and sponsor reads from this judgment");
+    expect(prompt).toMatch(/exclude ads and sponsor reads from this judgment/i);
+    expect(prompt).toMatch(/users can skip them/i);
   });
 
   it("forbids applying -1 for ads, sponsor reads, or promotional segments", () => {
-    expect(prompt).toContain(
-      "Never apply -1 for ads, sponsor reads, or promotional segments"
+    expect(prompt).toMatch(
+      /never apply -1 for ads, sponsor reads, or promotional segments/i
     );
   });
 
   it("forbids citing ads as negatives in the Bottom Line or worthItReason", () => {
-    expect(prompt).toContain(
-      "Do not cite ads, sponsor reads, or promo length as negatives"
+    expect(prompt).toMatch(
+      /do not cite ads, sponsor reads, or promo length as negatives/i
     );
+  });
+
+  it("does not frame ads as a quality deduction anywhere in the prompt", () => {
+    // Regression guard: previously the LLM would cite ad load as a reason
+    // for a -1 adjustment. If any future edit reintroduces language that
+    // frames ads/sponsors as reducing quality, this test fails.
+    expect(prompt).not.toMatch(/ads? (reduce|dilute|hurt|lower|degrade)/i);
+    expect(prompt).not.toMatch(/sponsor(ship)? reads? (reduce|dilute|hurt|lower|degrade)/i);
+    expect(prompt).not.toMatch(/penaliz\w* .*\b(ads?|sponsor|promo)/i);
   });
 });
 
