@@ -135,9 +135,8 @@ describe("EpisodeRecommendations", () => {
 // ---------------------------------------------------------------------------
 
 describe("EpisodeRecommendationsLoading", () => {
-  it("renders a skeleton grid with EPISODES_INITIAL placeholder rows", () => {
-    const { container } = render(<EpisodeRecommendationsLoading />)
-    const rows = container.querySelectorAll(".grid > .flex.gap-3")
-    expect(rows).toHaveLength(EPISODES_INITIAL)
+  it("renders EPISODES_INITIAL skeleton placeholder rows", () => {
+    render(<EpisodeRecommendationsLoading />)
+    expect(screen.getAllByTestId("episode-loading-row")).toHaveLength(EPISODES_INITIAL)
   })
 })

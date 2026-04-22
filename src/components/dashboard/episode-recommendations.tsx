@@ -22,7 +22,7 @@ export function EpisodeRecommendationsLoading() {
       <CardContent>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {Array.from({ length: EPISODES_INITIAL }).map((_, i) => (
-            <div key={i} className="flex gap-3 p-2">
+            <div key={i} data-testid="episode-loading-row" className="flex gap-3 p-2">
               <Skeleton className="h-14 w-14 shrink-0 rounded-md" />
               <div className="min-w-0 flex-1 space-y-2">
                 <Skeleton className="h-4 w-3/4" />
