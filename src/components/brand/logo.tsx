@@ -1,13 +1,15 @@
 import { cn } from "@/lib/utils";
 
-type LogoVariant = "mark" | "mark-mono" | "lockup";
+export type LogoVariant = "mark" | "mark-mono" | "lockup";
 
 interface LogoProps {
   variant?: LogoVariant;
   className?: string;
   size?: number;
-  /** Accessible label. Empty string marks the logo decorative (aria-hidden). */
+  /** Accessible label. Ignored when `decorative` is true. */
   label?: string;
+  /** When true, renders with `aria-hidden` — for spots where adjacent text already names the logo. */
+  decorative?: boolean;
 }
 
 /**
@@ -23,10 +25,11 @@ export function Logo({
   className,
   size,
   label = "ContentGenie",
+  decorative = false,
 }: LogoProps) {
-  const a11y = label
-    ? { role: "img" as const, "aria-label": label }
-    : { "aria-hidden": true };
+  const a11y = decorative
+    ? { "aria-hidden": true }
+    : { role: "img" as const, "aria-label": label };
 
   if (variant === "lockup") {
     const dimension = size ?? 32;

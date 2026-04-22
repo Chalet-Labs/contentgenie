@@ -3,6 +3,7 @@ import {
   getScoreColor,
   getScoreLabel,
   getScoreBand,
+  getScoreTextColor,
   clampAdjustment,
   coerceSignals,
   computeSignalScore,
@@ -111,7 +112,13 @@ describe("getScoreBand", () => {
     expect(getScoreBand(1.9)).toBe("skip");
   });
 
-  it("agrees with getScoreColor and getScoreLabel on every band boundary", () => {
+  it("throws on non-finite input (NaN / Infinity)", () => {
+    expect(() => getScoreBand(NaN)).toThrow(TypeError);
+    expect(() => getScoreBand(Infinity)).toThrow(TypeError);
+    expect(() => getScoreBand(-Infinity)).toThrow(TypeError);
+  });
+
+  it("agrees with getScoreColor, getScoreLabel, and getScoreTextColor on every band boundary", () => {
     const EXPECTED_LABEL = {
       exceptional: "Exceptional",
       above: "Above Average",
@@ -123,8 +130,36 @@ describe("getScoreBand", () => {
     for (const s of boundaries) {
       const band = getScoreBand(s);
       expect(getScoreColor(s)).toContain(`bg-score-${band}`);
+      expect(getScoreTextColor(s)).toBe(`text-score-${band}`);
       expect(getScoreLabel(s)).toBe(EXPECTED_LABEL[band]);
     }
+  });
+});
+
+describe("getScoreTextColor", () => {
+  it("returns text-score-exceptional for scores >= 8", () => {
+    expect(getScoreTextColor(8)).toBe("text-score-exceptional");
+    expect(getScoreTextColor(10)).toBe("text-score-exceptional");
+  });
+
+  it("returns text-score-above for scores >= 6 and < 8", () => {
+    expect(getScoreTextColor(6)).toBe("text-score-above");
+    expect(getScoreTextColor(7.9)).toBe("text-score-above");
+  });
+
+  it("returns text-score-average for scores >= 4 and < 6", () => {
+    expect(getScoreTextColor(4)).toBe("text-score-average");
+    expect(getScoreTextColor(5.9)).toBe("text-score-average");
+  });
+
+  it("returns text-score-below for scores >= 2 and < 4", () => {
+    expect(getScoreTextColor(2)).toBe("text-score-below");
+    expect(getScoreTextColor(3.9)).toBe("text-score-below");
+  });
+
+  it("returns text-score-skip for scores < 2", () => {
+    expect(getScoreTextColor(0)).toBe("text-score-skip");
+    expect(getScoreTextColor(1.9)).toBe("text-score-skip");
   });
 });
 

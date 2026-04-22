@@ -222,8 +222,8 @@ function QueueEpisodeRow({
             <RefreshCw className="h-3 w-3" />
             Retry
           </Button>
-        ) : typeof score === "number" ? (
-          <QueueScoreBadge score={score} />
+        ) : Number.isFinite(score) ? (
+          <QueueScoreBadge score={score as number} />
         ) : (
           <Button
             variant="outline"

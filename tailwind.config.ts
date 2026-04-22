@@ -79,14 +79,19 @@ const config: Config = {
   			status: {
   				'success-bg': 'hsl(var(--status-success-bg))',
   				'success-text': 'hsl(var(--status-success-text))',
+  				'success-border': 'hsl(var(--status-success-border))',
   				'warning-bg': 'hsl(var(--status-warning-bg))',
   				'warning-text': 'hsl(var(--status-warning-text))',
+  				'warning-border': 'hsl(var(--status-warning-border))',
   				'info-bg': 'hsl(var(--status-info-bg))',
   				'info-text': 'hsl(var(--status-info-text))',
+  				'info-border': 'hsl(var(--status-info-border))',
   				'danger-bg': 'hsl(var(--status-danger-bg))',
   				'danger-text': 'hsl(var(--status-danger-text))',
+  				'danger-border': 'hsl(var(--status-danger-border))',
   				'neutral-bg': 'hsl(var(--status-neutral-bg))',
   				'neutral-text': 'hsl(var(--status-neutral-text))',
+  				'neutral-border': 'hsl(var(--status-neutral-border))',
   			}
   		}
   	}

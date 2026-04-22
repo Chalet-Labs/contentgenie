@@ -17,7 +17,7 @@ export function InstallBanner() {
       className="fixed bottom-0 left-0 right-0 z-50 p-4 md:hidden animate-in slide-in-from-bottom duration-300"
     >
       <div className="flex items-center gap-3 rounded-lg border bg-card p-4 shadow-lg">
-        <Logo variant="mark" size={40} label="" className="shrink-0" />
+        <Logo variant="mark" size={40} decorative className="shrink-0" />
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-card-foreground">
             Install ContentGenie

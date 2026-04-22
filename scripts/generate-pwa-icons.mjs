@@ -18,9 +18,10 @@ const outDir = path.join(root, "public");
 
 const logoSvg = await fs.readFile(sourcePath);
 
-// The source mark already includes its amber tile at viewBox 0 0 32 32.
-// For `maskable`, we render the glyph on a larger amber canvas so the safe
-// zone (inner 80%) is respected by Android launchers.
+// Maskable icon: Android launchers crop the outer ~10% per edge into arbitrary
+// shapes. We render the glyph inset to ~22% (112/512) so it stays well inside
+// the safe zone across circle/squircle/rounded-square masks. Fill color must
+// match --brand / --brand-foreground in globals.css (light mode).
 const maskableSvg = Buffer.from(`
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
   <rect width="512" height="512" fill="#F59E0B"/>
@@ -33,24 +34,32 @@ const maskableSvg = Buffer.from(`
 </svg>
 `);
 
-async function writePng(svgBuffer, size, outPath) {
-  await sharp(svgBuffer, { density: 384 })
+// density: 384 rasterizes the 32-viewBox source SVG cleanly at 512px
+// (384 dpi × 32/72 ≈ 170px native, upscaled to 512 with antialiasing).
+// Don't lower to the default 72 — small glyph details become blurry.
+function rasterize(svgBuffer, size) {
+  return sharp(svgBuffer, { density: 384 })
     .resize(size, size, { fit: "contain" })
-    .png()
-    .toFile(outPath);
-  console.log(`  → ${path.relative(root, outPath)} (${size}×${size})`);
+    .png();
 }
 
-async function writeIco(svgBuffer, sizes, outPath) {
-  // Minimal multi-size ICO (BMP-encoded). Each image is embedded as its
-  // own PNG within the ICO container — modern browsers handle this fine.
+const writes = [];
+
+async function stagePng(svgBuffer, size, outPath) {
+  const tmp = `${outPath}.tmp`;
+  await rasterize(svgBuffer, size).toFile(tmp);
+  writes.push({ tmp, final: outPath, label: `${path.relative(root, outPath)} (${size}×${size})` });
+}
+
+async function stageIco(svgBuffer, sizes, outPath) {
+  // Minimal multi-size ICO: each entry is a PNG payload inside the ICO
+  // container — the spec allows this and modern browsers render it fine.
+  if (!sizes.every((s) => Number.isInteger(s) && s > 0 && s <= 256)) {
+    throw new RangeError(`ICO sizes must be integers in (0, 256], got ${JSON.stringify(sizes)}`);
+  }
+
   const pngs = await Promise.all(
-    sizes.map((size) =>
-      sharp(svgBuffer, { density: 384 })
-        .resize(size, size, { fit: "contain" })
-        .png()
-        .toBuffer(),
-    ),
+    sizes.map((size) => rasterize(svgBuffer, size).toBuffer()),
   );
 
   const header = Buffer.alloc(6);
@@ -63,8 +72,9 @@ async function writeIco(svgBuffer, sizes, outPath) {
   for (let i = 0; i < sizes.length; i++) {
     const entry = Buffer.alloc(16);
     const size = sizes[i];
-    entry.writeUInt8(size >= 256 ? 0 : size, 0); // width
-    entry.writeUInt8(size >= 256 ? 0 : size, 1); // height
+    // ICO spec quirk: width/height byte of 0 encodes 256.
+    entry.writeUInt8(size === 256 ? 0 : size, 0);
+    entry.writeUInt8(size === 256 ? 0 : size, 1);
     entry.writeUInt8(0, 2); // palette
     entry.writeUInt8(0, 3); // reserved
     entry.writeUInt16LE(1, 4); // color planes
@@ -75,14 +85,38 @@ async function writeIco(svgBuffer, sizes, outPath) {
     dirEntries.push(entry);
   }
 
-  await fs.writeFile(outPath, Buffer.concat([header, ...dirEntries, ...pngs]));
-  console.log(`  → ${path.relative(root, outPath)} (${sizes.join(", ")})`);
+  const tmp = `${outPath}.tmp`;
+  await fs.writeFile(tmp, Buffer.concat([header, ...dirEntries, ...pngs]));
+  writes.push({ tmp, final: outPath, label: `${path.relative(root, outPath)} (${sizes.join(", ")})` });
 }
 
-console.log("Regenerating PWA icons from public/brand/logo-mark.svg …");
-await writePng(logoSvg, 192, path.join(outDir, "icon-192x192.png"));
-await writePng(logoSvg, 512, path.join(outDir, "icon-512x512.png"));
-await writePng(maskableSvg, 512, path.join(outDir, "icon-maskable-512x512.png"));
-await writePng(logoSvg, 180, path.join(outDir, "apple-touch-icon.png"));
-await writeIco(logoSvg, [16, 32, 48], path.join(outDir, "favicon.ico"));
-console.log("Done.");
+async function commitAll() {
+  // Two-phase write: rasterize everything to .tmp files first, then rename
+  // in a single pass. A mid-run failure leaves the on-disk icons untouched
+  // rather than shipping a half-rebranded set.
+  for (const { tmp, final, label } of writes) {
+    await fs.rename(tmp, final);
+    console.log(`  → ${label}`);
+  }
+}
+
+async function cleanupTmp() {
+  for (const { tmp } of writes) {
+    await fs.rm(tmp, { force: true });
+  }
+}
+
+try {
+  console.log("Regenerating PWA icons from public/brand/logo-mark.svg …");
+  await stagePng(logoSvg, 192, path.join(outDir, "icon-192x192.png"));
+  await stagePng(logoSvg, 512, path.join(outDir, "icon-512x512.png"));
+  await stagePng(maskableSvg, 512, path.join(outDir, "icon-maskable-512x512.png"));
+  await stagePng(logoSvg, 180, path.join(outDir, "apple-touch-icon.png"));
+  await stageIco(logoSvg, [16, 32, 48], path.join(outDir, "favicon.ico"));
+  await commitAll();
+  console.log("Done.");
+} catch (err) {
+  await cleanupTmp();
+  console.error("Icon generation failed:", err);
+  process.exit(1);
+}

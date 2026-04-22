@@ -39,7 +39,7 @@ export function AppHeader({ isAdmin }: { isAdmin: boolean }) {
 
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2 mr-6" aria-label="ContentGenie home">
-          <Logo variant="mark" size={24} label="" />
+          <Logo variant="mark" size={24} decorative />
           <span className="font-bold hidden sm:inline-block">ContentGenie</span>
         </Link>
 

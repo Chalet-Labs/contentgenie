@@ -132,7 +132,7 @@ export function EpisodeRecommendations({ episodes }: EpisodeRecommendationsProps
                     className={`mt-1 text-xs font-medium ${
                       episode.overlapLabelKind === "high-overlap"
                         ? "text-status-warning-text"
-                        : "text-primary"
+                        : "text-status-success-text"
                     }`}
                   >
                     {episode.overlapLabel}

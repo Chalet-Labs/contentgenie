@@ -10,7 +10,7 @@ export function WelcomeCard() {
       <CardContent className="py-12">
         <div className="mx-auto max-w-md text-center">
           <div className="mx-auto mb-4">
-            <Logo variant="mark" size={56} label="" />
+            <Logo variant="mark" size={56} decorative />
           </div>
           <h2 className="text-xl font-semibold tracking-tight">
             Welcome to ContentGenie

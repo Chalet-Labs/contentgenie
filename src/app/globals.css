@@ -2,11 +2,6 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ContentGenie Design System — 2026 revision ("Paper, fern, amber")
- * Palette: emerald primary, amber brand accent, vermilion destructive,
- * green-tinted neutrals. Design ref: .impeccable.md + docs/design-system/.
- */
-
 @layer base {
   :root {
     /* Neutrals / chrome */
@@ -38,7 +33,7 @@
     --destructive: 12 76% 52%;
     --destructive-foreground: 0 0% 98%;
 
-    /* Chart colors — retained from prior palette; out of scope for this revision */
+    /* Chart palette — tracked separately from brand tokens */
     --chart-1: 12 76% 61%;
     --chart-2: 173 58% 39%;
     --chart-3: 197 37% 24%;
@@ -60,14 +55,19 @@
     /* Status (subtle bg + strong text, paired) */
     --status-success-bg: 152 60% 92%;
     --status-success-text: 160 75% 24%;
+    --status-success-border: 152 50% 78%;
     --status-warning-bg: 38 92% 92%;
     --status-warning-text: 32 80% 28%;
+    --status-warning-border: 38 80% 78%;
     --status-info-bg: 150 25% 92%;
     --status-info-text: 160 70% 26%;
+    --status-info-border: 150 25% 78%;
     --status-danger-bg: 12 76% 93%;
     --status-danger-text: 12 76% 36%;
+    --status-danger-border: 12 70% 80%;
     --status-neutral-bg: 150 10% 93%;
     --status-neutral-text: 150 6% 38%;
+    --status-neutral-border: 150 10% 80%;
 
     /* Shape */
     --radius: 0.5rem;
@@ -130,14 +130,19 @@
 
     --status-success-bg: 160 70% 14%;
     --status-success-text: 152 60% 68%;
+    --status-success-border: 160 50% 24%;
     --status-warning-bg: 38 92% 15%;
     --status-warning-text: 38 92% 70%;
+    --status-warning-border: 38 70% 26%;
     --status-info-bg: 150 20% 14%;
     --status-info-text: 156 60% 68%;
+    --status-info-border: 156 40% 24%;
     --status-danger-bg: 12 60% 16%;
     --status-danger-text: 12 76% 70%;
+    --status-danger-border: 12 60% 26%;
     --status-neutral-bg: 150 15% 15%;
     --status-neutral-text: 150 6% 62%;
+    --status-neutral-border: 150 12% 26%;
   }
 }
 
@@ -150,9 +155,8 @@
   }
 }
 
-/* Semantic typography classes — mirror the .impeccable.md type scale.
- * Use sparingly; Tailwind utilities handle most cases. These help keep
- * landing/marketing copy ramped consistently. */
+/* Semantic typography classes — use sparingly; Tailwind utilities cover most
+ * cases. These exist to keep landing/marketing copy ramped consistently. */
 .cg-h1 {
   font-size: 1.875rem;
   line-height: 2.25rem;

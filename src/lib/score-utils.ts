@@ -35,6 +35,9 @@ const BAND_TEXT_COLOR_CLASS: Record<ScoreBand, string> = {
 };
 
 export function getScoreBand(score: number): ScoreBand {
+  if (!Number.isFinite(score)) {
+    throw new TypeError(`getScoreBand: expected a finite number, got ${score}`);
+  }
   if (score >= 8) return "exceptional";
   if (score >= 6) return "above";
   if (score >= 4) return "average";

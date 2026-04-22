@@ -88,8 +88,8 @@ export function NotesEditor({
           )}
           {isSaved && !isSaving && (
             <>
-              <Check className="h-3 w-3 text-primary" />
-              <span className="text-primary">Saved</span>
+              <Check className="h-3 w-3 text-status-success-text" />
+              <span className="text-status-success-text">Saved</span>
             </>
           )}
           {error && <span className="text-destructive">{error}</span>}

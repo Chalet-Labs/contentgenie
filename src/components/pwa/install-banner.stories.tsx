@@ -22,7 +22,7 @@ export const Visible: Story = {
       <div className="fixed bottom-0 left-0 right-0 z-40 p-4 animate-in slide-in-from-bottom duration-300">
         {/* zinc-900/800 mocks an OS-level dark install prompt — intentional, not product chrome */}
         <div className="flex items-center gap-3 rounded-lg bg-zinc-900 p-4 shadow-lg dark:bg-zinc-800">
-          <Logo variant="mark" size={40} label="" className="shrink-0" />
+          <Logo variant="mark" size={40} decorative className="shrink-0" />
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold text-white">
               Install ContentGenie

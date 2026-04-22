@@ -219,7 +219,7 @@ export function BatchSummarizeButton({
 
     return (
       <div className="flex items-center gap-2" aria-live="polite">
-        <CheckCircle2 className="h-4 w-4 text-primary" aria-hidden="true" />
+        <CheckCircle2 className="h-4 w-4 text-status-success-text" aria-hidden="true" />
         <span className="text-sm text-muted-foreground">
           {succeeded} summarized, {skipped} skipped
           {failed > 0 && (
