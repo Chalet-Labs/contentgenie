@@ -3,7 +3,6 @@ import type { ReactNode } from "react"
 import { SidebarCountsProvider } from "@/contexts/sidebar-counts-context"
 import { Sheet, SheetContent } from "@/components/ui/sheet"
 import { Sidebar } from "@/components/layout/sidebar"
-import { setStorybookIsAdmin } from "@storybook-mocks/clerk"
 
 // ---------------------------------------------------------------------------
 // Provider decorator — wraps stories that need SidebarCountsProvider.
@@ -25,11 +24,6 @@ const meta: Meta<typeof Sidebar> = {
   component: Sidebar,
   parameters: {
     layout: "fullscreen",
-  },
-  // Reset admin state before every story so Docs view doesn't leak between renders.
-  // WithAdmin / InSheetWithAdmin re-enable it via their own decorators.
-  beforeEach: () => {
-    setStorybookIsAdmin(false)
   },
   decorators: [
     (Story) => (
@@ -53,23 +47,17 @@ type Story = StoryObj<typeof Sidebar>
 // ---------------------------------------------------------------------------
 
 export const Default: Story = {
-  args: {},
+  args: { isAdmin: false },
 }
 
 export const WithBadges: Story = {
   // SidebarCountsProvider fetches from the mocked getDashboardStats which returns
   // subscriptionCount: 3, savedCount: 5 — badges appear automatically.
-  args: {},
+  args: { isAdmin: false },
 }
 
 export const WithAdmin: Story = {
-  decorators: [
-    (Story) => {
-      setStorybookIsAdmin(true)
-      return <Story />
-    },
-  ],
-  args: {},
+  args: { isAdmin: true },
   parameters: {
     docs: {
       description: {
@@ -93,23 +81,20 @@ export const InSheet: Story = {
       </Sheet>
     ),
   ],
-  args: { inSheet: true },
+  args: { inSheet: true, isAdmin: false },
 }
 
 export const InSheetWithAdmin: Story = {
   decorators: [
-    (Story) => {
-      setStorybookIsAdmin(true)
-      return (
-        <Sheet defaultOpen>
-          <SheetContent side="left" className="w-[280px] sm:w-[320px] p-0 flex flex-col">
-            <Story />
-          </SheetContent>
-        </Sheet>
-      )
-    },
+    (Story) => (
+      <Sheet defaultOpen>
+        <SheetContent side="left" className="w-[280px] sm:w-[320px] p-0 flex flex-col">
+          <Story />
+        </SheetContent>
+      </Sheet>
+    ),
   ],
-  args: { inSheet: true },
+  args: { inSheet: true, isAdmin: true },
   parameters: {
     docs: {
       description: {
