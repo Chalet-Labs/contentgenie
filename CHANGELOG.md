@@ -7,7 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
-- Dashboard Trending Topics and Recommended Episodes cards now collapse to a preview (5 topics / 6 episodes) with a ghost full-width "Show N more" / "Show less" toggle when there are more items to reveal. The Recommended Episodes server fetch limit was raised from 6 to 12 so the toggle has headroom to expand (#308).
+- Dashboard Trending Topics and Recommended Episodes cards now collapse to a 3-item preview with a ghost full-width "Show N more" / "Show less" toggle when there are more items to reveal. The Recommended Episodes server fetch limit was raised from 6 to 12 so the toggle has headroom to expand (#308).
 
 ### Changed
 - Server-action envelope return types normalized: new `ActionResult<T = void>` alias at `src/types/action-result.ts` replaces the inline `{ success: true; data?: T } | { success: false; error: string }` unions in `player-session.ts`, `listening-queue.ts`, `listen-history.ts`, and the `updateAiConfig` / `updateSummarizationPrompt` exports of `ai-config.ts`. `recordListenEvent` is tightened from `{ success: boolean }` to `ActionResult<void>`; failure payloads now carry an `error: string` (previously absent) but no call site read that field. Raw-return actions and `getAiConfig` are unchanged (#306).
