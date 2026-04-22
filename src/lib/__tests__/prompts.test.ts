@@ -150,11 +150,12 @@ describe("getSummarizationPrompt ad-exclusion guards", () => {
   });
 
   it("does not frame ads as a quality deduction anywhere in the prompt", () => {
-    // Regression guard: previously the LLM would cite ad load as a reason
-    // for a -1 adjustment. If any future edit reintroduces language that
-    // frames ads/sponsors as reducing quality, this test fails.
-    expect(prompt).not.toMatch(/ads? (reduce|dilute|hurt|lower|degrade)/i);
-    expect(prompt).not.toMatch(/sponsor(ship)? reads? (reduce|dilute|hurt|lower|degrade)/i);
+    // Lexical smell-test — not exhaustive. A determined edit using synonyms
+    // like "diminish" or "downgrade" can slip through; the positive assertions
+    // above are the primary guard.
+    expect(prompt).not.toMatch(
+      /\b(ads?|sponsor(ship)? reads?)\b.*\b(reduce|dilute|hurt|lower|degrade|diminish|downgrade|detract)\b/i
+    );
     expect(prompt).not.toMatch(/penaliz\w* .*\b(ads?|sponsor|promo)/i);
   });
 });

@@ -320,9 +320,7 @@ describe("generateEpisodeSummary", () => {
     });
 
     it("carries the editorial-focused SIGNAL_LABELS wording into worthItReason", async () => {
-      // staysFocused=true → its label must flow through the fired-signal summary.
-      // This is the regression guard that ties the label change in openrouter.ts
-      // to the user-visible string built in ai-summary.ts.
+      // staysFocused=true in mockSignalResult, so its label flows through the fired-signal summary.
       mockParseJsonResponse.mockReturnValue({ ...mockSignalResult });
       const result = await generateEpisodeSummary(mockPodcast, mockEpisode, "transcript text");
 
