@@ -13,6 +13,7 @@ import {
   SheetHeader,
   SheetTitle,
   SheetDescription,
+  SheetTrigger,
 } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
@@ -114,7 +115,7 @@ export function NotificationPopover({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <div onClick={() => onOpenChange(!open)}>{trigger}</div>
+      <SheetTrigger asChild>{trigger}</SheetTrigger>
       <SheetContent side="bottom" className="h-[85vh] flex flex-col p-0">
         <SheetHeader className="border-b px-4 py-3">
           <SheetTitle>Notifications</SheetTitle>
