@@ -162,6 +162,29 @@ describe("NotificationBell", () => {
     expect(mockGetNotificationSummary).toHaveBeenCalled();
   });
 
+  it("(h) route change closes the popover", async () => {
+    mockGetUnreadCount.mockResolvedValue(2);
+    mockGetNotificationSummary.mockResolvedValue(defaultSummary);
+    const { rerender } = render(<NotificationBell />);
+    await flushMicrotasks();
+
+    // Open the popover
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /notifications/i }));
+    });
+    await flushMicrotasks();
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+
+    // Simulate route change by mutating mockPathname and re-rendering
+    await act(async () => {
+      mockPathname = "/library";
+      rerender(<NotificationBell />);
+    });
+    await flushMicrotasks();
+
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
   it("(i) badge stays at last-known count when getUnreadCount rejects on subsequent poll", async () => {
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
 
