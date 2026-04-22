@@ -1,10 +1,15 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
-import Link from "next/link";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { usePathname } from "next/navigation";
 import { Bell } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { getUnreadCount } from "@/app/actions/notifications";
+import {
+  getUnreadCount,
+  getNotificationSummary,
+} from "@/app/actions/notifications";
+import type { NotificationSummary } from "@/app/actions/notifications";
+import { NotificationPopover } from "@/components/notifications/notification-popover";
 import { formatRelativeTime } from "@/lib/utils";
 
 const POLL_INTERVAL_MS = 60_000;
@@ -12,11 +17,16 @@ const POLL_INTERVAL_MS = 60_000;
 export function NotificationBell() {
   const [unreadCount, setUnreadCount] = useState<number | null>(null);
   const [lastUpdatedAt, setLastUpdatedAt] = useState<Date | null>(null);
+  const [open, setOpen] = useState(false);
+  const [summary, setSummary] = useState<NotificationSummary | null>(null);
+  const [summaryError, setSummaryError] = useState(false);
+  const pathname = usePathname();
+  const isFirstRender = useRef(true);
 
   const fetchUnreadCount = useCallback(async () => {
     try {
-      const count = await getUnreadCount();
-      setUnreadCount(count);
+      const c = await getUnreadCount();
+      setUnreadCount(c);
       setLastUpdatedAt(new Date());
     } catch (error) {
       // Swallow so the badge keeps the last known count instead of flipping to 0.
@@ -30,21 +40,70 @@ export function NotificationBell() {
     return () => clearInterval(interval);
   }, [fetchUnreadCount]);
 
+  // Close on route change (skip initial mount — popover starts closed)
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+    setOpen(false);
+  }, [pathname]);
+
+  // Race guard: ignore stale resolutions from prior opens.
+  const fetchIdRef = useRef(0);
+  const fetchSummary = useCallback(async () => {
+    const fetchId = ++fetchIdRef.current;
+    setSummary(null);
+    setSummaryError(false);
+    try {
+      const result = await getNotificationSummary();
+      if (fetchId !== fetchIdRef.current) return;
+      setSummary(result);
+    } catch (error) {
+      console.error("Failed to fetch notification summary:", error);
+      if (fetchId !== fetchIdRef.current) return;
+      setSummaryError(true);
+    }
+  }, []);
+
+  const handleOpenChange = useCallback(
+    (nextOpen: boolean) => {
+      setOpen(nextOpen);
+      if (nextOpen) fetchSummary();
+    },
+    [fetchSummary]
+  );
+
   const tooltip = lastUpdatedAt
-    ? `Notifications \u00b7 Updated ${formatRelativeTime(lastUpdatedAt)}`
+    ? `Notifications · Updated ${formatRelativeTime(lastUpdatedAt)}`
     : "Notifications";
 
-  return (
-    <Button variant="ghost" size="icon" className="relative" asChild>
-      <Link href="/notifications" title={tooltip}>
-        <Bell className="h-[1.2rem] w-[1.2rem]" />
-        {unreadCount !== null && unreadCount > 0 && (
-          <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-destructive-foreground">
-            {unreadCount > 99 ? "99+" : unreadCount}
-          </span>
-        )}
-        <span className="sr-only">Notifications</span>
-      </Link>
+  const trigger = (
+    <Button
+      variant="ghost"
+      size="icon"
+      className="relative"
+      title={tooltip}
+      aria-label="Notifications"
+    >
+      <Bell className="h-[1.2rem] w-[1.2rem]" />
+      {unreadCount !== null && unreadCount > 0 && (
+        <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-bold text-destructive-foreground">
+          {unreadCount > 99 ? "99+" : unreadCount}
+        </span>
+      )}
+      <span className="sr-only">Notifications</span>
     </Button>
+  );
+
+  return (
+    <NotificationPopover
+      open={open}
+      onOpenChange={handleOpenChange}
+      trigger={trigger}
+      summary={summary}
+      isError={summaryError}
+      onRetry={fetchSummary}
+    />
   );
 }

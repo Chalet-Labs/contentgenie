@@ -38,12 +38,14 @@ interface NotificationPageListProps {
   initialItems: NotificationItem[];
   initialHasMore: boolean;
   initialTopicsByEpisode: Record<number, string[]>;
+  filter?: { podcastId?: number; since?: Date };
 }
 
 export function NotificationPageList({
   initialItems,
   initialHasMore,
   initialTopicsByEpisode,
+  filter,
 }: NotificationPageListProps) {
   const router = useRouter();
   const [items, setItems] = useState<LocalNotification[]>(initialItems);
@@ -141,7 +143,8 @@ export function NotificationPageList({
       try {
         const result = await getNotifications(
           NOTIFICATIONS_PAGE_SIZE,
-          offsetRef.current
+          offsetRef.current,
+          filter
         );
         if (result.error) {
           toastErrorWithRetry("Failed to load more notifications", retry);
@@ -172,7 +175,7 @@ export function NotificationPageList({
         toastErrorWithRetry("Failed to load more notifications", retry);
       }
     });
-  }, []);
+  }, [filter]);
 
   const renderPanel = (tab: Tab, filtered: LocalNotification[]) => {
     const showEmptyState = filtered.length === 0 && !hasMore;

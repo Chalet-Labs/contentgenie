@@ -1,11 +1,147 @@
 "use server";
 
 import { auth } from "@clerk/nextjs/server";
-import { eq, and, desc, sql, count, inArray } from "drizzle-orm";
+import { eq, and, desc, gte, sql, count, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { notifications, episodes, podcasts, users, episodeTopics } from "@/db/schema";
 
-export async function getNotifications(limit = 50, offset = 0) {
+// Postgres `serial` upper bound — reject IDs that would overflow the DB column
+// before binding them into an `eq(podcasts.id, …)` predicate.
+const MAX_SERIAL_ID = 2_147_483_647;
+
+export type NotificationGroup =
+  | { kind: "episodes_since_last_seen"; count: number; sinceIso: string }
+  | {
+      kind: "episodes_by_podcast";
+      podcastId: number;
+      podcastTitle: string;
+      count: number;
+    };
+
+export type NotificationSummary = {
+  // Matches getUnreadCount so the popover never disagrees with the badge.
+  totalUnread: number;
+  groups: NotificationGroup[];
+};
+
+type PodcastGroupRow = {
+  podcastId: number;
+  podcastTitle: string;
+  count: number;
+};
+
+export async function getNotificationSummary(): Promise<NotificationSummary> {
+  const { userId } = await auth();
+  if (!userId) {
+    return { totalUnread: 0, groups: [] };
+  }
+
+  try {
+    const [totalRow, lastSeenRow, groupRows] = await Promise.all([
+      db
+        .select({ value: count() })
+        .from(notifications)
+        .where(
+          and(
+            eq(notifications.userId, userId),
+            eq(notifications.isRead, false),
+            eq(notifications.isDismissed, false)
+          )
+        ),
+      db
+        .select({ lastSeen: sql<Date | null>`MAX(${notifications.createdAt})` })
+        .from(notifications)
+        .where(
+          and(
+            eq(notifications.userId, userId),
+            eq(notifications.isRead, true),
+            eq(notifications.isDismissed, false)
+          )
+        ),
+      // `type = 'new_episode'` is load-bearing: summary_completed rows have null
+      // episodeId and would corrupt the podcast join.
+      db
+        .select({
+          podcastId: podcasts.id,
+          podcastTitle: podcasts.title,
+          count: count(),
+        })
+        .from(notifications)
+        .leftJoin(episodes, eq(notifications.episodeId, episodes.id))
+        .leftJoin(podcasts, eq(episodes.podcastId, podcasts.id))
+        .where(
+          and(
+            eq(notifications.userId, userId),
+            eq(notifications.isRead, false),
+            eq(notifications.isDismissed, false),
+            eq(notifications.type, "new_episode")
+          )
+        )
+        .groupBy(podcasts.id, podcasts.title)
+        .orderBy(desc(count()), podcasts.title),
+    ]);
+
+    const totalUnread = totalRow[0]?.value ?? 0;
+    const lastSeenAt = lastSeenRow[0]?.lastSeen ?? null;
+
+    type RawGroupRow = (typeof groupRows)[number];
+    const podcastGroups: PodcastGroupRow[] = groupRows
+      .filter(
+        (r): r is RawGroupRow & { podcastId: number; podcastTitle: string } =>
+          r.podcastId !== null && r.podcastTitle !== null
+      )
+      .map((r) => ({
+        podcastId: r.podcastId,
+        podcastTitle: r.podcastTitle,
+        count: Number(r.count),
+      }));
+
+    const newEpisodeUnread = podcastGroups.reduce((sum, g) => sum + g.count, 0);
+
+    const groups: NotificationGroup[] = [];
+
+    // The since-bucket is compared against newEpisodeUnread (not totalUnread) —
+    // it only groups new_episode rows. Omit when all new-episode unread are "since
+    // last seen" (would be redundant with the podcast groups).
+    if (lastSeenAt !== null && newEpisodeUnread > 0) {
+      const [sinceRow] = await db
+        .select({ sinceCount: count() })
+        .from(notifications)
+        .where(
+          and(
+            eq(notifications.userId, userId),
+            eq(notifications.isRead, false),
+            eq(notifications.isDismissed, false),
+            eq(notifications.type, "new_episode"),
+            gte(notifications.createdAt, lastSeenAt)
+          )
+        );
+      const sinceCount = Number(sinceRow?.sinceCount ?? 0);
+      if (sinceCount > 0 && sinceCount < newEpisodeUnread) {
+        groups.push({
+          kind: "episodes_since_last_seen",
+          count: sinceCount,
+          sinceIso: lastSeenAt.toISOString(),
+        });
+      }
+    }
+
+    for (const g of podcastGroups) {
+      groups.push({ kind: "episodes_by_podcast", ...g });
+    }
+
+    return { totalUnread, groups };
+  } catch (error) {
+    console.error("Error fetching notification summary:", error);
+    throw error;
+  }
+}
+
+export async function getNotifications(
+  limit = 50,
+  offset = 0,
+  filter?: { podcastId?: number; since?: Date }
+) {
   const { userId } = await auth();
   if (!userId) {
     return { notifications: [], hasMore: false, error: "You must be signed in" };
@@ -15,6 +151,19 @@ export async function getNotifications(limit = 50, offset = 0) {
     ? Math.min(Math.max(limit, 1), 100)
     : 50;
   const safeOffset = Number.isInteger(offset) ? Math.max(offset, 0) : 0;
+
+  const validPodcastId =
+    filter?.podcastId !== undefined &&
+    Number.isSafeInteger(filter.podcastId) &&
+    filter.podcastId > 0 &&
+    filter.podcastId <= MAX_SERIAL_ID
+      ? filter.podcastId
+      : undefined;
+
+  const validSince =
+    filter?.since instanceof Date && !isNaN(filter.since.getTime())
+      ? filter.since
+      : undefined;
 
   try {
     const results = await db
@@ -40,7 +189,13 @@ export async function getNotifications(limit = 50, offset = 0) {
       .where(
         and(
           eq(notifications.userId, userId),
-          eq(notifications.isDismissed, false)
+          eq(notifications.isDismissed, false),
+          validPodcastId !== undefined
+            ? eq(podcasts.id, validPodcastId)
+            : undefined,
+          validSince !== undefined
+            ? gte(notifications.createdAt, validSince)
+            : undefined
         )
       )
       // id is the deterministic tie-breaker; rows that share a createdAt
