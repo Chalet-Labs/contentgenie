@@ -61,10 +61,10 @@ Please provide your analysis in the following JSON format:
 ## Boolean Quality Signals (answer true or false for each):
 - **hasActionableInsights**: Does the episode contain 3 or more actionable insights?
 - **hasNearTermApplicability**: Could a listener apply something from this episode within a week?
-- **staysFocused**: Does the episode stay focused with a low filler-to-content ratio?
+- **staysFocused**: Does the episode stay focused with a low filler-to-content ratio? (Ignore ads and sponsor reads — evaluate editorial content only.)
 - **goesBeyondSurface**: Does it go beyond surface-level discussion?
 - **isWellStructured**: Is it well-structured and easy to follow?
-- **timeJustified**: Is the ${durationMinutes != null ? `${durationMinutes}-minute` : "unknown"} time investment justified by the content density?
+- **timeJustified**: Is the ${durationMinutes != null ? `${durationMinutes}-minute` : "unknown"} time investment justified by the content density? (Exclude ads and sponsor reads from this judgment — users can skip them.)
 - **hasConcreteExamples**: Does it include concrete examples, data, or evidence?
 - **hasExpertPerspectives**: Does it feature expert or practitioner perspectives?
 
@@ -73,6 +73,8 @@ After answering the signals, you may apply a small adjustment:
 - **-1**: The signals slightly overstate quality (e.g., technically structured but painfully boring)
 - **0**: The signals accurately capture quality (use this in most cases)
 - **+1**: The signals slightly understate quality (e.g., a masterclass that transcends the checklist)
+
+**Never apply -1 for ads, sponsor reads, or promotional segments.** These are skippable and do not affect content quality.
 
 You MUST provide a brief reason for your adjustment in "worthItAdjustmentReason".
 The final score is computed server-side: 1 + (count of true signals) + adjustment.
@@ -83,6 +85,7 @@ Important:
 - The summary must include all 5 sections (TL;DR, What You'll Learn, Notable Quotes / Key Moments, Action Items, Bottom Line) using ## headers
 - For Notable Quotes / Key Moments: include 2-3 standout moments; add approximate timestamps (~XX:XX) when working from a transcript; write "No notable moments available" if nothing stands out
 - Consider the time investment (${durationMinutes != null ? `${durationMinutes} min` : "unknown duration"}) when evaluating timeJustified
+- Do not cite ads, sponsor reads, or promo length as negatives in the Bottom Line or \`worthItReason\`. If you mention them, do so neutrally — not as a quality deduction.
 - Focus on value for busy professionals who need to be selective with their time
 - Extract 1-5 topic tags that best describe the episode's subject matter.
 - Each topic name must be 2-5 words, professional, and in Title Case (e.g., "AI & Machine Learning").

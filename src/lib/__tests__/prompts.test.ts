@@ -118,6 +118,38 @@ describe("getSummarizationPrompt", () => {
   });
 });
 
+describe("getSummarizationPrompt ad-exclusion guards", () => {
+  const prompt = getSummarizationPrompt(
+    "Podcast",
+    "Episode",
+    "Description",
+    3600,
+    "Transcript content here"
+  );
+
+  it("instructs staysFocused to ignore ads and sponsor reads", () => {
+    expect(prompt).toContain(
+      "Ignore ads and sponsor reads — evaluate editorial content only."
+    );
+  });
+
+  it("instructs timeJustified to exclude ads and sponsor reads", () => {
+    expect(prompt).toContain("Exclude ads and sponsor reads from this judgment");
+  });
+
+  it("forbids applying -1 for ads, sponsor reads, or promotional segments", () => {
+    expect(prompt).toContain(
+      "Never apply -1 for ads, sponsor reads, or promotional segments"
+    );
+  });
+
+  it("forbids citing ads as negatives in the Bottom Line or worthItReason", () => {
+    expect(prompt).toContain(
+      "Do not cite ads, sponsor reads, or promo length as negatives"
+    );
+  });
+});
+
 describe("getTrendingTopicsPrompt", () => {
   it("serializes the summary field (not keyTakeaways) in the payload", () => {
     const prompt = getTrendingTopicsPrompt([
