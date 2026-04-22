@@ -319,6 +319,16 @@ describe("generateEpisodeSummary", () => {
       expect(result.worthItReason).toContain("5/8 signals");
     });
 
+    it("carries the editorial-focused SIGNAL_LABELS wording into worthItReason", async () => {
+      // staysFocused=true → its label must flow through the fired-signal summary.
+      // This is the regression guard that ties the label change in openrouter.ts
+      // to the user-visible string built in ai-summary.ts.
+      mockParseJsonResponse.mockReturnValue({ ...mockSignalResult });
+      const result = await generateEpisodeSummary(mockPodcast, mockEpisode, "transcript text");
+
+      expect(result.worthItReason).toMatch(/editorial/i);
+    });
+
     it("coerces non-boolean signal values via toSignalBoolean", async () => {
       mockParseJsonResponse.mockReturnValue({
         ...mockSignalResult,
