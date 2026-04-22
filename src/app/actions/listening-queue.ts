@@ -11,10 +11,9 @@ import {
   toEpisodeDenormRow,
   type AudioEpisode,
 } from "@/lib/schemas/listening-queue"
+import type { ActionResult } from "@/types/action-result"
 
-export async function getQueue(): Promise<
-  { success: true; data: AudioEpisode[] } | { success: false; error: string }
-> {
+export async function getQueue(): Promise<ActionResult<AudioEpisode[]>> {
   return withAuthAction(async (userId) => {
     try {
       const rows = await db.query.userQueueItems.findMany({
@@ -43,7 +42,7 @@ export async function getQueue(): Promise<
  */
 export async function setQueue(
   episodes: AudioEpisode[]
-): Promise<{ success: true } | { success: false; error: string }> {
+): Promise<ActionResult> {
   return withAuthAction(async (userId) => {
     const parsed = queueSchema.safeParse(episodes)
     if (!parsed.success) {
@@ -82,9 +81,7 @@ export async function setQueue(
   })
 }
 
-export async function clearQueue(): Promise<
-  { success: true } | { success: false; error: string }
-> {
+export async function clearQueue(): Promise<ActionResult> {
   return withAuthAction(async (userId) => {
     try {
       await db.delete(userQueueItems).where(eq(userQueueItems.userId, userId))

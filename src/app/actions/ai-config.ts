@@ -7,6 +7,7 @@ import { aiConfig } from "@/db/schema";
 import type { AiConfig, AiProviderName } from "@/lib/ai";
 import { DEFAULT_AI_CONFIG } from "@/lib/ai";
 import { ADMIN_ROLE } from "@/lib/auth-roles";
+import type { ActionResult } from "@/types/action-result";
 
 const VALID_PROVIDERS: AiProviderName[] = ["openrouter", "zai"];
 
@@ -38,7 +39,7 @@ export async function getAiConfig(): Promise<{
 
 export async function updateSummarizationPrompt(
   prompt: string | null
-): Promise<{ success: boolean; error?: string }> {
+): Promise<ActionResult> {
   const { userId, has } = await auth();
 
   if (!userId) {
@@ -91,7 +92,7 @@ export async function updateSummarizationPrompt(
 export async function updateAiConfig(
   provider: AiProviderName,
   model: string
-): Promise<{ success: boolean; error?: string }> {
+): Promise<ActionResult> {
   const { userId, has } = await auth();
 
   if (!userId) {

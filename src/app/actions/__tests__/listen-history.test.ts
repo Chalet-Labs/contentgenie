@@ -86,7 +86,7 @@ describe("recordListenEvent", () => {
       podcastIndexEpisodeId: "12345",
 
     })
-    expect(result).toEqual({ success: false })
+    expect(result).toEqual({ success: false, error: "Unauthorized" })
     expect(mockInsert).not.toHaveBeenCalled()
   })
 
@@ -97,7 +97,7 @@ describe("recordListenEvent", () => {
       podcastIndexEpisodeId: "99999",
 
     })
-    expect(result).toEqual({ success: false })
+    expect(result).toEqual({ success: false, error: "Episode not found" })
     expect(mockFindFirst).toHaveBeenCalledTimes(1)
     expect(mockEnsureUserExists).not.toHaveBeenCalled()
     expect(mockInsert).not.toHaveBeenCalled()
@@ -201,7 +201,7 @@ describe("recordListenEvent", () => {
       podcastIndexEpisodeId: "12345",
       durationSeconds: -10,
     })
-    expect(result).toEqual({ success: false })
+    expect(result).toEqual({ success: false, error: "Invalid durationSeconds" })
     expect(mockInsert).not.toHaveBeenCalled()
   })
 
@@ -211,7 +211,7 @@ describe("recordListenEvent", () => {
       podcastIndexEpisodeId: "12345",
       durationSeconds: 3.14,
     })
-    expect(result).toEqual({ success: false })
+    expect(result).toEqual({ success: false, error: "Invalid durationSeconds" })
     expect(mockInsert).not.toHaveBeenCalled()
   })
 
@@ -220,8 +220,24 @@ describe("recordListenEvent", () => {
     const result = await recordListenEvent({
       podcastIndexEpisodeId: "",
     })
-    expect(result).toEqual({ success: false })
+    expect(result).toEqual({ success: false, error: "Invalid input" })
     expect(mockFindFirst).not.toHaveBeenCalled()
     expect(mockInsert).not.toHaveBeenCalled()
+  })
+
+  it("returns { success: false } when the DB insert throws", async () => {
+    mockOnConflictDoUpdate.mockImplementationOnce(() => {
+      throw new Error("DB failure")
+    })
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {})
+    const { recordListenEvent } = await import("@/app/actions/listen-history")
+    const result = await recordListenEvent({
+      podcastIndexEpisodeId: "12345",
+    })
+    expect(result).toEqual({
+      success: false,
+      error: "Failed to record listen event",
+    })
+    expect(consoleSpy).toHaveBeenCalled()
   })
 })
