@@ -118,6 +118,48 @@ describe("getSummarizationPrompt", () => {
   });
 });
 
+describe("getSummarizationPrompt ad-exclusion guards", () => {
+  const prompt = getSummarizationPrompt(
+    "Podcast",
+    "Episode",
+    "Description",
+    3600,
+    "Transcript content here"
+  );
+
+  it("instructs staysFocused to ignore ads and sponsor reads", () => {
+    expect(prompt).toMatch(/ignore ads and sponsor reads/i);
+    expect(prompt).toMatch(/editorial content only/i);
+  });
+
+  it("instructs timeJustified to exclude ads and sponsor reads", () => {
+    expect(prompt).toMatch(/exclude ads and sponsor reads from this judgment/i);
+    expect(prompt).toMatch(/users can skip them/i);
+  });
+
+  it("forbids applying -1 for ads, sponsor reads, or promotional segments", () => {
+    expect(prompt).toMatch(
+      /never apply -1 for ads, sponsor reads, or promotional segments/i
+    );
+  });
+
+  it("forbids citing ads as negatives in the Bottom Line or worthItReason", () => {
+    expect(prompt).toMatch(
+      /do not cite ads, sponsor reads, or promo length as negatives/i
+    );
+  });
+
+  it("does not frame ads as a quality deduction anywhere in the prompt", () => {
+    // Lexical smell-test — not exhaustive. A determined edit using synonyms
+    // like "diminish" or "downgrade" can slip through; the positive assertions
+    // above are the primary guard.
+    expect(prompt).not.toMatch(
+      /\b(ads?|sponsor(ship)? reads?)\b.*\b(reduce|dilute|hurt|lower|degrade|diminish|downgrade|detract)\b/i
+    );
+    expect(prompt).not.toMatch(/penaliz\w* .*\b(ads?|sponsor|promo)/i);
+  });
+});
+
 describe("getTrendingTopicsPrompt", () => {
   it("serializes the summary field (not keyTakeaways) in the payload", () => {
     const prompt = getTrendingTopicsPrompt([

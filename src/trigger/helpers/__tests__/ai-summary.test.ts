@@ -319,6 +319,14 @@ describe("generateEpisodeSummary", () => {
       expect(result.worthItReason).toContain("5/8 signals");
     });
 
+    it("carries the editorial-focused SIGNAL_LABELS wording into worthItReason", async () => {
+      // staysFocused=true in mockSignalResult, so its label flows through the fired-signal summary.
+      mockParseJsonResponse.mockReturnValue({ ...mockSignalResult });
+      const result = await generateEpisodeSummary(mockPodcast, mockEpisode, "transcript text");
+
+      expect(result.worthItReason).toMatch(/editorial/i);
+    });
+
     it("coerces non-boolean signal values via toSignalBoolean", async () => {
       mockParseJsonResponse.mockReturnValue({
         ...mockSignalResult,

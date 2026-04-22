@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { parseJsonResponse, generateCompletion } from "@/lib/openrouter";
+import { parseJsonResponse, generateCompletion, SIGNAL_LABELS } from "@/lib/openrouter";
 
 // generateCompletion routes through @/lib/ai which calls getActiveAiConfig() → DB.
 // Mock the config module so tests never touch the database.
@@ -63,6 +63,16 @@ describe("parseJsonResponse", () => {
 
   it("throws on empty string", () => {
     expect(() => parseJsonResponse("")).toThrow();
+  });
+});
+
+describe("SIGNAL_LABELS", () => {
+  it("aligns staysFocused with editorial content (excluding ads)", () => {
+    expect(SIGNAL_LABELS.staysFocused).toMatch(/editorial/i);
+  });
+
+  it("aligns timeJustified with editorial content density (excluding ads)", () => {
+    expect(SIGNAL_LABELS.timeJustified).toMatch(/editorial/i);
   });
 });
 

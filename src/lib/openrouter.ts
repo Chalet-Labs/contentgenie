@@ -33,10 +33,10 @@ export const WORTH_IT_SIGNAL_KEYS: readonly (keyof WorthItSignals)[] = [
 export const SIGNAL_LABELS: Record<keyof WorthItSignals, string> = {
   hasActionableInsights: "Contains 3+ actionable insights",
   hasNearTermApplicability: "Listener could apply something within a week",
-  staysFocused: "Episode stays focused, low filler-to-content ratio",
+  staysFocused: "Editorial content stays focused, low filler-to-content ratio",
   goesBeyondSurface: "Goes beyond surface-level discussion",
   isWellStructured: "Well-structured and easy to follow",
-  timeJustified: "Time investment justified by content density",
+  timeJustified: "Time investment justified by editorial content density",
   hasConcreteExamples: "Includes concrete examples, data, or evidence",
   hasExpertPerspectives: "Features expert/practitioner perspectives",
 };
