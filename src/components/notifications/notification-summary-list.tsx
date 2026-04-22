@@ -61,7 +61,7 @@ export function NotificationSummaryList({
             return (
               <SummaryRow
                 key={`since-${i}`}
-                href={`/notifications?since=${group.sinceIso}`}
+                href={`/notifications?since=${encodeURIComponent(group.sinceIso)}`}
               >
                 {pluralEpisode(group.count)} since last visit
               </SummaryRow>

@@ -5,6 +5,10 @@ import { eq, and, desc, gte, sql, count, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { notifications, episodes, podcasts, users, episodeTopics } from "@/db/schema";
 
+// Postgres `serial` upper bound — reject IDs that would overflow the DB column
+// before binding them into an `eq(podcasts.id, …)` predicate.
+const MAX_SERIAL_ID = 2_147_483_647;
+
 export type NotificationGroup =
   | { kind: "episodes_since_last_seen"; count: number; sinceIso: string }
   | {
@@ -150,8 +154,9 @@ export async function getNotifications(
 
   const validPodcastId =
     filter?.podcastId !== undefined &&
-    Number.isInteger(filter.podcastId) &&
-    filter.podcastId > 0
+    Number.isSafeInteger(filter.podcastId) &&
+    filter.podcastId > 0 &&
+    filter.podcastId <= MAX_SERIAL_ID
       ? filter.podcastId
       : undefined;
 

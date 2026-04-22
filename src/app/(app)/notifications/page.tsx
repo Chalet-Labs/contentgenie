@@ -9,19 +9,30 @@ export const metadata: Metadata = {
   title: "Notifications",
 };
 
-// Stricter than parseInt: rejects "42abc", "42.5", "-5" — silent coercion would
-// let upstream linker bugs (malformed URLs in emails, push payloads) masquerade
-// as healthy requests.
+// Postgres `serial` upper bound — reject IDs that would overflow the DB column.
+const MAX_SERIAL_ID = 2_147_483_647;
+
+// Strict enough that "2026", "04/20/2026", or "Thu Apr 20 2026" (all accepted by
+// `new Date()`) don't slip past input validation. Requires the `YYYY-MM-DDTHH:MM:SS`
+// shell with optional fractional seconds and a `Z` or `±HH:MM` offset.
+const ISO_INSTANT_RE =
+  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,3})?(?:Z|[+-]\d{2}:?\d{2})$/;
+
+// Stricter than parseInt: rejects "42abc", "42.5", "-5", and values above the
+// Postgres serial range. Silent coercion would let upstream linker bugs
+// (malformed URLs in emails, push payloads) masquerade as healthy requests.
 function parsePositiveInt(raw: string, name: string): number | undefined {
   const n = /^\d+$/.test(raw) ? Number(raw) : NaN;
-  if (Number.isInteger(n) && n > 0) return n;
+  if (Number.isSafeInteger(n) && n > 0 && n <= MAX_SERIAL_ID) return n;
   console.warn(`Invalid '${name}' searchParam on /notifications: ${raw}`);
   return undefined;
 }
 
 function parseIsoDate(raw: string, name: string): Date | undefined {
-  const d = new Date(raw);
-  if (!isNaN(d.getTime())) return d;
+  if (ISO_INSTANT_RE.test(raw)) {
+    const d = new Date(raw);
+    if (!isNaN(d.getTime())) return d;
+  }
   console.warn(`Invalid '${name}' searchParam on /notifications: ${raw}`);
   return undefined;
 }
@@ -29,11 +40,11 @@ function parseIsoDate(raw: string, name: string): Date | undefined {
 export default async function NotificationsPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ podcast?: string; since?: string }>;
+  searchParams?: { podcast?: string; since?: string };
 }) {
   await auth();
 
-  const params = searchParams ? await searchParams : {};
+  const params = searchParams ?? {};
   const podcastId =
     params.podcast !== undefined
       ? parsePositiveInt(params.podcast, "podcast")

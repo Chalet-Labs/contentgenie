@@ -94,7 +94,7 @@ describe("NotificationSummaryList", () => {
     expect(link).toBeInTheDocument();
     expect(link).toHaveAttribute(
       "href",
-      `/notifications?since=${lastSeenAt.toISOString()}`
+      `/notifications?since=${encodeURIComponent(lastSeenAt.toISOString())}`
     );
   });
 

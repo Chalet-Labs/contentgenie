@@ -86,8 +86,8 @@ export const DesktopEmpty: Story = {
 
 export const MobilePopulated: Story = {
   name: "Mobile / Populated",
-  parameters: {
-    viewport: { defaultViewport: "mobile1" },
+  globals: {
+    viewport: { value: "mobile1", isRotated: false },
   },
   args: {
     summary: populatedSummary,
