@@ -16,7 +16,7 @@ import { dedupeTopics } from "@/lib/trending";
 import { useExpandable } from "@/hooks/use-expandable";
 import type { TrendingTopic } from "@/db/schema";
 
-export const TOPICS_INITIAL = 5;
+export const TOPICS_INITIAL = 3;
 
 interface TrendingTopicsProps {
   topics: TrendingTopic[];

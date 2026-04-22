@@ -11,7 +11,7 @@ import { formatDate, formatDuration, stripHtml } from "@/lib/utils";
 import { useExpandable } from "@/hooks/use-expandable";
 import type { RecommendedEpisodeDTO } from "@/db/library-columns";
 
-export const EPISODES_INITIAL = 6;
+export const EPISODES_INITIAL = 3;
 
 export function EpisodeRecommendationsLoading() {
   return (

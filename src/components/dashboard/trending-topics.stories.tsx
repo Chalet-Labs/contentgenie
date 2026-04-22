@@ -55,7 +55,7 @@ type Story = StoryObj<typeof TrendingTopics>
 // Stories
 // ---------------------------------------------------------------------------
 
-// baseTopics has 6 items which exceeds TOPICS_INITIAL (5), so the toggle button
+// baseTopics.length exceeds TOPICS_INITIAL, so the toggle button
 // is intentionally visible in this story — expected behaviour after the show-more feature.
 export const Default: Story = {
   args: {

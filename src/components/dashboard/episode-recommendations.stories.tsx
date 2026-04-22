@@ -103,14 +103,14 @@ type Story = StoryObj<typeof EpisodeRecommendations>
 // Stories
 // ---------------------------------------------------------------------------
 
-// 7 episodes exceeds EPISODES_INITIAL (6) — the toggle button is visible.
+// sampleEpisodes.length exceeds EPISODES_INITIAL — the toggle button is visible.
 export const Default: Story = {
   args: {
     episodes: sampleEpisodes,
   },
 }
 
-// Exactly EPISODES_INITIAL episodes — toggle button must NOT appear (6 > 6 is false).
+// Exactly EPISODES_INITIAL episodes — toggle button must NOT appear (N > N is false).
 export const ExactThreshold: Story = {
   args: {
     episodes: sampleEpisodes.slice(0, EPISODES_INITIAL),
