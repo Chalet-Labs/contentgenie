@@ -6,9 +6,9 @@ import { Sidebar } from "@/components/layout/sidebar"
 
 // ---------------------------------------------------------------------------
 // Provider decorator — wraps stories that need SidebarCountsProvider.
-// @/app/actions/dashboard is aliased in .storybook/main.ts to mocks/actions.ts,
-// which stubs getDashboardStats to return { subscriptionCount: 3, savedCount: 5 },
-// so badges render without network calls.
+// `@/app/actions/dashboard` is aliased in .storybook/main.ts to mocks/actions.ts,
+// which stubs getDashboardStats with non-zero counts so badges render without
+// network calls. See .storybook/mocks/actions.ts for the concrete values.
 // ---------------------------------------------------------------------------
 
 function CountsProvider({ children }: { children: ReactNode }) {
@@ -51,8 +51,8 @@ export const Default: Story = {
 }
 
 export const WithBadges: Story = {
-  // SidebarCountsProvider fetches from the mocked getDashboardStats which returns
-  // subscriptionCount: 3, savedCount: 5 — badges appear automatically.
+  // Same args as Default — badges come from the mocked getDashboardStats in the
+  // provider decorator above, not from anything this story configures.
   args: { isAdmin: false },
 }
 

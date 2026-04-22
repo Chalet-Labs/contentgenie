@@ -1,6 +1,9 @@
 // Stub for @clerk/nextjs in Storybook (browser context has no ClerkProvider).
-// Admin state flows through component props (e.g. Sidebar's `isAdmin` prop) rather
-// than through useAuth().has(), so the mock simply reports a signed-in non-admin user.
+// No Storybook-rendered component currently reads admin state via useAuth().has()
+// — Sidebar and friends take it as a prop — so `has: () => false` is enough to
+// render signed-in, non-admin views. If a future component starts gating capability
+// on useAuth().has(), revisit this mock instead of relying on it to silently return
+// false.
 import React from "react"
 
 export const ClerkProvider = ({ children }: { children: React.ReactNode }) => children
