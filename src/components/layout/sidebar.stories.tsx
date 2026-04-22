@@ -18,6 +18,7 @@ const sheetDecorator: Decorator = (Story) => (
 const meta: Meta<typeof Sidebar> = {
   title: "Layout/Sidebar",
   component: Sidebar,
+  args: { isAdmin: false },
   parameters: {
     layout: "fullscreen",
   },
@@ -38,12 +39,9 @@ const meta: Meta<typeof Sidebar> = {
 export default meta
 type Story = StoryObj<typeof Sidebar>
 
-export const Default: Story = {
-  args: { isAdmin: false },
-}
+export const Default: Story = {}
 
 export const WithBadges: Story = {
-  args: { isAdmin: false },
   parameters: {
     docs: {
       description: {
@@ -67,12 +65,12 @@ export const WithAdmin: Story = {
 
 export const InSheet: Story = {
   decorators: [sheetDecorator],
-  args: { inSheet: true, isAdmin: false },
+  args: { inSheet: true },
 }
 
 export const InSheetWithAdmin: Story = {
-  decorators: [sheetDecorator],
-  args: { inSheet: true, isAdmin: true },
+  ...InSheet,
+  args: { ...InSheet.args, isAdmin: true },
   parameters: {
     docs: {
       description: {
