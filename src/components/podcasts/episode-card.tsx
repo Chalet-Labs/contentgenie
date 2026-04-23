@@ -1,17 +1,14 @@
 "use client";
 
-import Link from "next/link";
-import { Card, CardContent } from "@/components/ui/card";
+import { Calendar, Clock, Mic } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import { Clock, Calendar, Mic, Star } from "lucide-react";
 import type { PodcastIndexEpisode } from "@/lib/podcastindex";
 import { formatDuration, formatPublishDate } from "@/lib/podcastindex";
-import { ProcessingStatus } from "@/components/episodes/processing-status";
-import { cn, stripHtml } from "@/lib/utils";
+import { stripHtml } from "@/lib/utils";
 import type { SummaryStatus } from "@/db/schema";
 import { AddToQueueButton } from "@/components/audio-player/add-to-queue-button";
 import { ListenedButton } from "@/components/episodes/listened-button";
-import { getScoreTextColor, getScoreBand } from "@/lib/score-utils";
+import { EpisodeCard as EpisodeCardPrimitive } from "@/components/episodes/episode-card";
 
 interface EpisodeCardProps {
   episode: PodcastIndexEpisode;
@@ -22,101 +19,89 @@ interface EpisodeCardProps {
   canMarkListened?: boolean;
 }
 
-function ScoreIndicator({ value }: { value: string }) {
-  const score = parseFloat(value);
-  if (!Number.isFinite(score)) return null;
-  return (
-    <div
-      className={cn("flex items-center gap-1", getScoreTextColor(score))}
-      data-score-band={getScoreBand(score)}
-    >
-      <Star className="h-3 w-3" />
-      <span>{score.toFixed(1)}</span>
-    </div>
-  );
-}
-
-export function EpisodeCard({ episode, summaryStatus, worthItScore, showQueueAction = false, isListened = false, canMarkListened = true }: EpisodeCardProps) {
+export function EpisodeCard({
+  episode,
+  summaryStatus,
+  worthItScore,
+  showQueueAction = false,
+  isListened = false,
+  canMarkListened = true,
+}: EpisodeCardProps) {
   const hasAudio = Boolean(episode.enclosureUrl);
 
-  return (
-    <Card className={cn("group transition-colors hover:bg-accent", summaryStatus === "completed" && "border-l-2 border-primary")}>
-      <CardContent className="p-4">
-        <div className="flex gap-2">
-          <Link href={`/episode/${episode.id}`} className="min-w-0 flex-1">
-            <div className="flex flex-col gap-3">
-              <div className="flex items-start justify-between gap-4">
-                <div className="min-w-0 flex-1">
-                  <h3 className="line-clamp-2 font-semibold group-hover:text-primary">
-                    {episode.title}
-                  </h3>
-                </div>
-                <div className="flex shrink-0 items-center gap-1.5">
-                  {episode.episodeType && episode.episodeType !== "full" && (
-                    <Badge variant="secondary" className="text-xs">
-                      {episode.episodeType}
-                    </Badge>
-                  )}
-                  <ProcessingStatus status={summaryStatus ?? null} className="text-xs" />
-                </div>
-              </div>
+  const meta = [
+    <div key="date" className="flex items-center gap-1">
+      <Calendar className="h-3 w-3" />
+      <span>{formatPublishDate(episode.datePublished)}</span>
+    </div>,
+    ...(episode.duration > 0
+      ? [
+          <div key="duration" className="flex items-center gap-1">
+            <Clock className="h-3 w-3" />
+            <span>{formatDuration(episode.duration)}</span>
+          </div>,
+        ]
+      : []),
+    ...(episode.episode !== null
+      ? [
+          <div key="episode" className="flex items-center gap-1">
+            <Mic className="h-3 w-3" />
+            <span>Episode {episode.episode}</span>
+          </div>,
+        ]
+      : []),
+    ...(episode.season > 0
+      ? [<span key="season">Season {episode.season}</span>]
+      : []),
+    ...(episode.episodeType && episode.episodeType !== "full"
+      ? [
+          <Badge key="type" variant="secondary" className="text-xs">
+            {episode.episodeType}
+          </Badge>,
+        ]
+      : []),
+  ];
 
-              <p className="line-clamp-2 text-sm text-muted-foreground">
-                {episode.description
-                  ? stripHtml(episode.description)
-                  : "No description available"}
-              </p>
-
-              <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
-                <div className="flex items-center gap-1">
-                  <Calendar className="h-3 w-3" />
-                  <span>{formatPublishDate(episode.datePublished)}</span>
-                </div>
-                {episode.duration > 0 && (
-                  <div className="flex items-center gap-1">
-                    <Clock className="h-3 w-3" />
-                    <span>{formatDuration(episode.duration)}</span>
-                  </div>
-                )}
-                {episode.episode !== null && (
-                  <div className="flex items-center gap-1">
-                    <Mic className="h-3 w-3" />
-                    <span>Episode {episode.episode}</span>
-                  </div>
-                )}
-                {episode.season > 0 && (
-                  <span>Season {episode.season}</span>
-                )}
-                {worthItScore != null && <ScoreIndicator value={worthItScore} />}
-              </div>
-            </div>
-          </Link>
-
-          <div className="flex shrink-0 flex-col items-center gap-1 self-start">
-            {canMarkListened && (
-              <ListenedButton
-                podcastIndexEpisodeId={String(episode.id)}
-                isListened={isListened}
-              />
-            )}
-            {showQueueAction && hasAudio && (
-              <div className="invisible opacity-0 transition-all group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100 max-md:visible max-md:opacity-100">
-                <AddToQueueButton
-                  episode={{
-                    id: String(episode.id),
-                    title: episode.title,
-                    podcastTitle: episode.feedTitle ?? "Podcast",
-                    audioUrl: episode.enclosureUrl,
-                    duration: episode.duration,
-                  }}
-                  variant="icon"
-                />
-              </div>
-            )}
-          </div>
+  const secondaryActions = (
+    <>
+      {canMarkListened && (
+        <ListenedButton
+          podcastIndexEpisodeId={String(episode.id)}
+          isListened={isListened}
+        />
+      )}
+      {showQueueAction && hasAudio && (
+        <div className="invisible opacity-0 transition-all group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100 max-md:visible max-md:opacity-100">
+          <AddToQueueButton
+            episode={{
+              id: String(episode.id),
+              title: episode.title,
+              podcastTitle: episode.feedTitle ?? "Podcast",
+              audioUrl: episode.enclosureUrl,
+              duration: episode.duration,
+            }}
+            variant="icon"
+          />
         </div>
-      </CardContent>
-    </Card>
+      )}
+    </>
+  );
+
+  return (
+    <EpisodeCardPrimitive
+      podcastTitle={episode.feedTitle ?? ""}
+      title={episode.title}
+      href={`/episode/${episode.id}`}
+      description={
+        episode.description
+          ? stripHtml(episode.description)
+          : "No description available"
+      }
+      score={worthItScore}
+      status={summaryStatus}
+      meta={meta}
+      secondaryActions={secondaryActions}
+      isListened={isListened}
+    />
   );
 }
-

@@ -13,12 +13,12 @@ import {
 } from "@/app/actions/notifications";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { WorthItBadge } from "@/components/episodes/worth-it-badge";
 import { AddToQueueButton } from "@/components/audio-player/add-to-queue-button";
+import { EpisodeCard } from "@/components/episodes/episode-card";
 import { formatRelativeTime } from "@/lib/utils";
 import { ROUTES } from "@/lib/routes";
 import { NOTIFICATIONS_PAGE_SIZE } from "@/lib/notifications-constants";
+import { useAudioPlayerAPI } from "@/contexts/audio-player-context";
 
 type NotificationItem = Awaited<
   ReturnType<typeof getNotifications>
@@ -284,8 +284,7 @@ function NotificationRow({
   onRowClick: (item: NotificationItem) => void;
   onDismiss: (id: number) => void;
 }) {
-  const worthItScore =
-    item.worthItScore !== null ? parseFloat(item.worthItScore) : null;
+  const { playEpisode } = useAudioPlayerAPI();
 
   const audioEpisode =
     item.audioUrl && item.episodePodcastIndexId
@@ -299,53 +298,62 @@ function NotificationRow({
         }
       : null;
 
+  const handleListen = () => {
+    if (audioEpisode) {
+      if (!item.isRead) {
+        onRowClick(item);
+      }
+      playEpisode(audioEpisode);
+    } else {
+      onRowClick(item);
+    }
+  };
+
   return (
-    <article
-      data-read={item.isRead}
-      className={`relative flex items-start gap-3 rounded-lg border p-4 ${
-        !item.isRead ? "bg-accent/10" : ""
-      }`}
-    >
-      <div className="flex-1 min-w-0 space-y-1">
-        <button
-          className="text-sm font-medium hover:underline text-left w-full truncate"
-          onClick={() => onRowClick(item)}
-        >
-          {item.episodeTitle ?? item.title}
-        </button>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <WorthItBadge score={worthItScore} />
-          {topics.slice(0, 3).map((topic) => (
-            <Badge key={topic} variant="secondary" className="text-xs">
-              {topic}
-            </Badge>
-          ))}
-        </div>
-
-        {item.podcastTitle && (
-          <p className="text-xs text-muted-foreground">{item.podcastTitle}</p>
-        )}
-
-        <p className="text-xs text-muted-foreground">
-          {formatRelativeTime(item.createdAt)}
-        </p>
-      </div>
-
-      <div className="flex items-center gap-1 shrink-0">
-        {audioEpisode && (
-          <AddToQueueButton episode={audioEpisode} variant="icon" />
-        )}
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8"
-          aria-label="Dismiss"
-          onClick={() => onDismiss(item.id)}
-        >
-          <X className="h-4 w-4" />
-        </Button>
-      </div>
+    <article data-read={item.isRead}>
+      <EpisodeCard
+        artwork={item.artwork}
+        podcastTitle={item.podcastTitle ?? ""}
+        title={item.episodeTitle ?? item.title}
+        href={
+          item.episodePodcastIndexId
+            ? ROUTES.episode(item.episodePodcastIndexId)
+            : ROUTES.DASHBOARD
+        }
+        topics={topics}
+        score={item.worthItScore}
+        accent={item.isRead ? "none" : "unread"}
+        meta={[
+          <span key="time">{formatRelativeTime(item.createdAt)}</span>,
+        ]}
+        primaryAction={
+          audioEpisode ? (
+            <Button size="sm" onClick={handleListen}>
+              Listen
+            </Button>
+          ) : (
+            <Button size="sm" variant="outline" onClick={() => onRowClick(item)}>
+              View episode
+            </Button>
+          )
+        }
+        secondaryActions={
+          <>
+            {audioEpisode && (
+              <AddToQueueButton episode={audioEpisode} variant="icon" />
+            )}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              aria-label="Dismiss"
+              onClick={() => onDismiss(item.id)}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </>
+        }
+      />
     </article>
   );
 }
