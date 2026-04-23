@@ -66,14 +66,20 @@ describe("EpisodeCard", () => {
     expect(screen.getByText(/7\.5/)).toBeInTheDocument();
   });
 
-  it("does not render score pill when score is null", () => {
+  it("renders 'Not rated' badge when score is null", () => {
     render(<EpisodeCard {...baseProps} score={null} />);
-    expect(screen.queryByText(/\d+\.\d/)).not.toBeInTheDocument();
+    expect(screen.getByText(/not rated/i)).toBeInTheDocument();
   });
 
-  it("does not render score pill when score is undefined", () => {
+  it("renders 'Not rated' badge when score is an empty string", () => {
+    render(<EpisodeCard {...baseProps} score="" />);
+    expect(screen.getByText(/not rated/i)).toBeInTheDocument();
+  });
+
+  it("does not render any score badge when score prop is omitted", () => {
     render(<EpisodeCard {...baseProps} />);
     expect(screen.queryByText(/\d+\.\d/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/not rated/i)).not.toBeInTheDocument();
   });
 
   it("renders spinner icon for status=running", () => {
@@ -106,6 +112,46 @@ describe("EpisodeCard", () => {
     render(<EpisodeCard {...baseProps} />);
     expect(screen.queryByLabelText("Processing")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Summary failed")).not.toBeInTheDocument();
+  });
+
+  it("applies completed-status left-border accent", () => {
+    const { container } = render(
+      <EpisodeCard {...baseProps} status="completed" />
+    );
+    const card = container.firstChild as HTMLElement;
+    expect(card).toHaveAttribute("data-status", "completed");
+    expect(card.className).toContain("border-l-primary");
+  });
+
+  it("does not apply completed accent for non-completed statuses", () => {
+    const { container } = render(
+      <EpisodeCard {...baseProps} status="running" />
+    );
+    const card = container.firstChild as HTMLElement;
+    expect(card.className).not.toContain("border-l-primary");
+  });
+
+  it("wraps podcastTitle in a Link when podcastHref is provided", () => {
+    const { container } = render(
+      <EpisodeCard
+        {...baseProps}
+        podcastHref="/podcast/PI-99?from=library"
+      />
+    );
+    const link = container.querySelector<HTMLAnchorElement>(
+      'a[href="/podcast/PI-99?from=library"]'
+    );
+    expect(link).not.toBeNull();
+    expect(link?.textContent).toBe("Tech Talk Daily");
+  });
+
+  it("renders podcastTitle as plain text when podcastHref is omitted", () => {
+    const { container } = render(<EpisodeCard {...baseProps} />);
+    const podcastLink = container.querySelector(
+      'a[href^="/podcast/"]'
+    );
+    expect(podcastLink).toBeNull();
+    expect(screen.getByText("Tech Talk Daily").tagName).toBe("P");
   });
 
   it("renders artwork image when artwork string is provided", () => {

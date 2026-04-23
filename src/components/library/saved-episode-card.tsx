@@ -171,6 +171,7 @@ export function SavedEpisodeCard({
       <EpisodeCard
         artwork={podcast.imageUrl}
         podcastTitle={podcast.title}
+        podcastHref={`/podcast/${podcast.podcastIndexId}?from=library`}
         title={episode.title}
         href={`/episode/${episode.podcastIndexId}`}
         description={

@@ -86,39 +86,43 @@ export function NotificationPageList({
     []
   );
 
-  const handleRowClick = (item: NotificationItem) => {
-    if (!item.isRead) {
-      // Optimistic flip + rollback on failure keeps navigation snappy without
-      // letting a stale read=true linger if the server rejects the mutation.
-      setItems((prev) =>
-        prev.map((n) => (n.id === item.id ? { ...n, isRead: true } : n))
-      );
-      markNotificationRead(item.id)
-        .then((result) => {
-          if (!result.success) {
-            setItems((prev) =>
-              prev.map((n) =>
-                n.id === item.id ? { ...n, isRead: false } : n
-              )
-            );
-            toast.error(result.error ?? "Couldn't mark as read");
-          }
-        })
-        .catch(() => {
+  const markReadOptimistic = useCallback((item: NotificationItem) => {
+    if (item.isRead) return;
+    // Optimistic flip + rollback on failure keeps interactions snappy without
+    // letting a stale read=true linger if the server rejects the mutation.
+    setItems((prev) =>
+      prev.map((n) => (n.id === item.id ? { ...n, isRead: true } : n))
+    );
+    markNotificationRead(item.id)
+      .then((result) => {
+        if (!result.success) {
           setItems((prev) =>
             prev.map((n) =>
               n.id === item.id ? { ...n, isRead: false } : n
             )
           );
-          toast.error("Couldn't mark as read");
-        });
-    }
-    router.push(
-      item.episodePodcastIndexId
-        ? ROUTES.episode(item.episodePodcastIndexId)
-        : ROUTES.DASHBOARD
-    );
-  };
+          toast.error(result.error ?? "Couldn't mark as read");
+        }
+      })
+      .catch(() => {
+        setItems((prev) =>
+          prev.map((n) =>
+            n.id === item.id ? { ...n, isRead: false } : n
+          )
+        );
+        toast.error("Couldn't mark as read");
+      });
+  }, []);
+
+  const handleRowClick = useCallback(
+    (item: NotificationItem) => {
+      markReadOptimistic(item);
+      if (item.episodePodcastIndexId) {
+        router.push(ROUTES.episode(item.episodePodcastIndexId));
+      }
+    },
+    [markReadOptimistic, router]
+  );
 
   const handleMarkAllRead = useCallback(async () => {
     const retry = () => handleMarkAllRead();
@@ -195,6 +199,7 @@ export function NotificationPageList({
                     : undefined) ?? []
                 }
                 onRowClick={handleRowClick}
+                onMarkRead={markReadOptimistic}
                 onDismiss={handleDismiss}
               />
             ))}
@@ -277,15 +282,18 @@ function NotificationRow({
   item,
   topics,
   onRowClick,
+  onMarkRead,
   onDismiss,
 }: {
   item: NotificationItem;
   topics: string[];
   onRowClick: (item: NotificationItem) => void;
+  onMarkRead: (item: NotificationItem) => void;
   onDismiss: (id: number) => void;
 }) {
   const { playEpisode } = useAudioPlayerAPI();
 
+  const hasEpisodeId = Boolean(item.episodePodcastIndexId);
   const audioEpisode =
     item.audioUrl && item.episodePodcastIndexId
       ? {
@@ -299,15 +307,25 @@ function NotificationRow({
       : null;
 
   const handleListen = () => {
-    if (audioEpisode) {
-      if (!item.isRead) {
-        onRowClick(item);
-      }
-      playEpisode(audioEpisode);
-    } else {
-      onRowClick(item);
-    }
+    if (!audioEpisode) return;
+    onMarkRead(item);
+    playEpisode(audioEpisode);
   };
+
+  let primaryAction: React.ReactNode = null;
+  if (audioEpisode) {
+    primaryAction = (
+      <Button size="sm" onClick={handleListen}>
+        Listen
+      </Button>
+    );
+  } else if (hasEpisodeId) {
+    primaryAction = (
+      <Button size="sm" variant="outline" onClick={() => onRowClick(item)}>
+        View episode
+      </Button>
+    );
+  }
 
   return (
     <article data-read={item.isRead}>
@@ -318,7 +336,7 @@ function NotificationRow({
         href={
           item.episodePodcastIndexId
             ? ROUTES.episode(item.episodePodcastIndexId)
-            : ROUTES.DASHBOARD
+            : "#"
         }
         topics={topics}
         score={item.worthItScore}
@@ -326,17 +344,7 @@ function NotificationRow({
         meta={[
           <span key="time">{formatRelativeTime(item.createdAt)}</span>,
         ]}
-        primaryAction={
-          audioEpisode ? (
-            <Button size="sm" onClick={handleListen}>
-              Listen
-            </Button>
-          ) : (
-            <Button size="sm" variant="outline" onClick={() => onRowClick(item)}>
-              View episode
-            </Button>
-          )
-        }
+        primaryAction={primaryAction}
         secondaryActions={
           <>
             {audioEpisode && (

@@ -89,7 +89,7 @@ export function EpisodeCard({
 
   return (
     <EpisodeCardPrimitive
-      podcastTitle={episode.feedTitle ?? ""}
+      podcastTitle={episode.feedTitle ?? "Podcast"}
       title={episode.title}
       href={`/episode/${episode.id}`}
       description={
@@ -97,7 +97,7 @@ export function EpisodeCard({
           ? stripHtml(episode.description)
           : "No description available"
       }
-      score={worthItScore}
+      score={worthItScore ?? undefined}
       status={summaryStatus}
       meta={meta}
       secondaryActions={secondaryActions}

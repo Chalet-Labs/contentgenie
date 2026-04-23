@@ -14,6 +14,8 @@ export interface EpisodeCardProps {
   artwork?: string | null;
   /** Podcast title shown as the kicker line above the episode title. */
   podcastTitle: string;
+  /** When provided, wraps podcastTitle in a Link (e.g. /podcast/{id}). */
+  podcastHref?: string;
   /** Episode title — the primary heading. */
   title: string;
   /** Target of the title link. Only the title (and artwork, if present) are wrapped in the link. */
@@ -22,9 +24,17 @@ export interface EpisodeCardProps {
   description?: string | null;
   /** Topic chips rendered below the description; capped at 3. */
   topics?: string[];
-  /** Worth-It score as a decimal string (DB shape). null | undefined → no pill. */
+  /**
+   * Worth-It score (DB decimal string).
+   * - `undefined` (or prop omitted) → no badge rendered.
+   * - `null` or unparseable → "Not rated" badge.
+   * - parseable → score badge.
+   */
   score?: string | null;
-  /** Summary processing state. Terminal "completed" is NOT rendered as a badge. */
+  /**
+   * Summary processing state. Non-terminal states render a small StatusIcon;
+   * `"completed"` applies a left-border accent; `"failed"` renders an alert icon.
+   */
   status?: SummaryStatus | null;
   /** Meta row cells rendered between description and action row. */
   meta: ReactNode[];
@@ -61,6 +71,7 @@ function StatusIcon({ status }: { status?: SummaryStatus | null }) {
 export function EpisodeCard({
   artwork,
   podcastTitle,
+  podcastHref,
   title,
   href,
   description,
@@ -73,24 +84,28 @@ export function EpisodeCard({
   secondaryActions,
   isListened = false,
 }: EpisodeCardProps) {
-  // Only attempt to parse when the raw string is non-null and non-empty.
-  // parseScoreOrNull returns null for non-finite inputs; treat null as "no pill".
   const parsedScore =
-    score != null && score !== "" ? parseScoreOrNull(score) : undefined;
+    score != null && score !== "" ? parseScoreOrNull(score) : null;
 
   return (
     <Card
       data-accent={accent}
       data-listened={isListened}
+      data-status={status ?? undefined}
       className={cn(
         "group transition-colors hover:bg-accent/50",
-        accent === "unread" && "bg-accent/10"
+        accent === "unread" && "bg-accent/10",
+        status === "completed" && "border-l-2 border-l-primary"
       )}
     >
       <CardContent className="p-4">
         <div className="flex gap-4">
           {artwork !== undefined && (
-            <Link href={href} className="shrink-0">
+            <Link
+              href={href}
+              className="shrink-0"
+              aria-label={`Open episode: ${title}`}
+            >
               <div className="relative h-20 w-20 overflow-hidden rounded-lg bg-muted">
                 {artwork ? (
                   <Image
@@ -102,7 +117,7 @@ export function EpisodeCard({
                   />
                 ) : (
                   <div className="flex h-full w-full items-center justify-center text-muted-foreground">
-                    <Rss className="h-8 w-8" />
+                    <Rss className="h-8 w-8" aria-hidden="true" />
                   </div>
                 )}
               </div>
@@ -112,9 +127,18 @@ export function EpisodeCard({
           <div className="min-w-0 flex-1">
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0 flex-1 space-y-0.5">
-                <p className="truncate text-xs text-muted-foreground">
-                  {podcastTitle}
-                </p>
+                {podcastHref ? (
+                  <Link
+                    href={podcastHref}
+                    className="block truncate text-xs text-muted-foreground hover:text-primary"
+                  >
+                    {podcastTitle}
+                  </Link>
+                ) : (
+                  <p className="truncate text-xs text-muted-foreground">
+                    {podcastTitle}
+                  </p>
+                )}
                 <Link href={href} className="block">
                   <h3 className="line-clamp-2 font-semibold group-hover:text-primary">
                     {title}
@@ -123,9 +147,7 @@ export function EpisodeCard({
               </div>
               <div className="flex shrink-0 items-center gap-1.5">
                 <StatusIcon status={status} />
-                {parsedScore != null && (
-                  <WorthItBadge score={parsedScore} />
-                )}
+                {score !== undefined && <WorthItBadge score={parsedScore} />}
               </div>
             </div>
 

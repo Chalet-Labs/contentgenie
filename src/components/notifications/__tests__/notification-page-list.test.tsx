@@ -245,6 +245,20 @@ describe("NotificationPageList", () => {
     });
   });
 
+  // Regression: Listen click must NOT navigate away from the notifications page.
+  // Legacy behavior routed to the episode page; the dedicated Listen CTA is an
+  // in-place action so users can keep triaging while audio plays.
+  it("Listen click does NOT call router.push", async () => {
+    const user = userEvent.setup();
+    render(<NotificationPageList {...defaultProps} />);
+    const listenBtns = screen.getAllByRole("button", { name: /listen/i });
+    await user.click(listenBtns[0]);
+    await waitFor(() => {
+      expect(mockPlayEpisode).toHaveBeenCalled();
+    });
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+
   // AC-14: Listen click on already-read item skips markNotificationRead
   it("Listen click on read item skips markNotificationRead", async () => {
     const user = userEvent.setup();
@@ -261,6 +275,48 @@ describe("NotificationPageList", () => {
       expect(mockMarkNotificationRead).not.toHaveBeenCalled();
       expect(mockPlayEpisode).toHaveBeenCalled();
     });
+  });
+
+  // Primary-action fallback: when audioUrl is missing but episode id is present,
+  // show "View episode" outline button that navigates (no playback).
+  it("shows View-episode CTA when audioUrl is null and routes via onRowClick", async () => {
+    const user = userEvent.setup();
+    render(
+      <NotificationPageList
+        initialItems={[
+          makeItem({ id: 1, isRead: false, audioUrl: null }),
+        ]}
+        initialHasMore={false}
+        initialTopicsByEpisode={{}}
+      />
+    );
+    const viewBtn = screen.getByRole("button", { name: /view episode/i });
+    await user.click(viewBtn);
+    await waitFor(() => {
+      expect(mockPush).toHaveBeenCalledWith(expect.stringContaining("PI-42"));
+    });
+    expect(mockPlayEpisode).not.toHaveBeenCalled();
+  });
+
+  // Primary-action hidden: when episodePodcastIndexId is missing (data-integrity
+  // contract violation upstream), neither Listen nor View-episode is rendered —
+  // we don't silently route to the dashboard.
+  it("hides primary action when episodePodcastIndexId is null", () => {
+    render(
+      <NotificationPageList
+        initialItems={[
+          makeItem({ id: 1, episodePodcastIndexId: null, audioUrl: null }),
+        ]}
+        initialHasMore={false}
+        initialTopicsByEpisode={{}}
+      />
+    );
+    expect(
+      screen.queryByRole("button", { name: /^listen$/i })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /view episode/i })
+    ).not.toBeInTheDocument();
   });
 
   // Load more: calls getNotifications with next offset
