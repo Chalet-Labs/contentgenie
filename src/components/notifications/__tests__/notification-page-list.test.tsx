@@ -281,6 +281,7 @@ describe("NotificationPageList", () => {
 
   // Primary-action fallback: when audioUrl is missing but episode id is present,
   // show "View episode" outline button that navigates (no playback).
+  // Also locks the read-on-navigate side effect for the fallback path.
   it("shows View-episode CTA when audioUrl is null and routes via onRowClick", async () => {
     const user = userEvent.setup();
     render(
@@ -296,6 +297,7 @@ describe("NotificationPageList", () => {
     await user.click(viewBtn);
     await waitFor(() => {
       expect(mockPush).toHaveBeenCalledWith(expect.stringContaining("PI-42"));
+      expect(mockMarkNotificationRead).toHaveBeenCalledWith(1);
     });
     expect(mockPlayEpisode).not.toHaveBeenCalled();
   });

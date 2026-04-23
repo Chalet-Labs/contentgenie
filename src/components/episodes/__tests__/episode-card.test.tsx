@@ -248,13 +248,15 @@ describe("EpisodeCard", () => {
         artwork="https://example.com/art.jpg"
       />
     );
-    const titleLink = container.querySelector<HTMLAnchorElement>(
-      'a[aria-label^="Open episode"]'
+    // With href undefined, both the title Link and ArtworkTile's Link drop out —
+    // the card should contain zero anchors. Asserting absence-by-count is
+    // stronger than probing for a never-set aria-label.
+    expect(container.querySelectorAll("a")).toHaveLength(0);
+    const titleNode = screen.getByText(
+      "How AI is Transforming Podcast Discovery"
     );
-    expect(titleLink).toBeNull();
-    expect(
-      screen.getByText("How AI is Transforming Podcast Discovery").tagName
-    ).toBe("H3");
+    expect(titleNode.tagName).toBe("H3");
+    expect(titleNode.closest("a")).toBeNull();
   });
 
   it("renders meta nodes", () => {

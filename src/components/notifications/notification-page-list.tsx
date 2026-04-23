@@ -299,7 +299,7 @@ function NotificationRow({
       ? {
           id: item.episodePodcastIndexId,
           title: item.episodeTitle ?? item.title,
-          podcastTitle: item.podcastTitle ?? "",
+          podcastTitle: item.podcastTitle ?? "Podcast",
           audioUrl: item.audioUrl,
           ...(item.artwork ? { artwork: item.artwork } : {}),
           ...(item.duration ? { duration: item.duration } : {}),
@@ -331,7 +331,7 @@ function NotificationRow({
     <article data-read={item.isRead}>
       <EpisodeCard
         artwork={item.artwork}
-        podcastTitle={item.podcastTitle ?? ""}
+        podcastTitle={item.podcastTitle ?? "Podcast"}
         title={item.episodeTitle ?? item.title}
         href={
           item.episodePodcastIndexId
