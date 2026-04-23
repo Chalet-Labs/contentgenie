@@ -16,8 +16,6 @@ import {
 import { relations, sql } from "drizzle-orm";
 import type { WorthItSignals } from "@/lib/openrouter";
 
-// Single source of truth for the /subscriptions sort modes. Used by the typed
-// JSON shape below and by server-action Zod validation in the next sub-issue.
 export const SUBSCRIPTION_SORTS = [
   "recently-added",
   "title-asc",
