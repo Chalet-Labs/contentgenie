@@ -420,8 +420,7 @@ describe("isSubscribedToPodcast", () => {
   });
 });
 
-// Helper: mock the main subscriptions list select chain
-// (select → from → innerJoin [→ leftJoin]? → where → orderBy → Promise<rows>)
+// Chain shape: select → from → innerJoin [→ leftJoin if recentlyListened] → where → orderBy → Promise<rows>
 function makeSubsListChain(
   rows: unknown[],
   { recentlyListened = false }: { recentlyListened?: boolean } = {},
@@ -445,8 +444,7 @@ function makeSubsListChain(
   };
 }
 
-// Helper: mock the "last listened" subquery chain
-// (select → from → innerJoin → where → groupBy → as → opaque subquery token)
+// Chain shape: select → from → innerJoin → where → groupBy → as → opaque subquery token
 function makeLastListenedSubqueryChain() {
   const subqueryToken = {
     __subquery: "last_listened",
@@ -636,6 +634,25 @@ describe("getUserSubscriptions", () => {
     expect(result.subscriptions).toEqual([]);
     expect(result.error).toMatch(/failed to load/i);
   });
+
+  it("falls back to default sort when the preference read throws", async () => {
+    // A transient failure reading preferences must NOT nuke the list.
+    mockFindFirstUser.mockRejectedValue(new Error("prefs read hiccup"));
+    const { chain, mocks } = makeSubsListChain([]);
+    mockSelect.mockReturnValue(chain);
+
+    const { getUserSubscriptions } = await import(
+      "@/app/actions/subscriptions"
+    );
+    const result = await getUserSubscriptions();
+
+    // Still reaches the main query and orders by the default (recently-added).
+    expect(result.error).toBeNull();
+    expect(mocks.mockOrderBy).toHaveBeenCalledWith(
+      { __op: "desc", col: "is_pinned" },
+      { __op: "desc", col: "subscribed_at" },
+    );
+  });
 });
 
 describe("togglePinSubscription", () => {
@@ -711,6 +728,29 @@ describe("togglePinSubscription", () => {
     expect(setArg.isPinned).toMatchObject({ strings: expect.any(Object) });
   });
 
+  it("scopes the UPDATE to the current user (ownership regression guard)", async () => {
+    mockUpdateReturning.mockResolvedValue([{ isPinned: true }]);
+
+    const { togglePinSubscription } = await import(
+      "@/app/actions/subscriptions"
+    );
+    await togglePinSubscription(42);
+
+    // WHERE must be an and(eq(id, 42), eq(user_id, userId)) — dropping the
+    // userId predicate would let one user flip another user's subscription.
+    expect(mockUpdateWhere).toHaveBeenCalledTimes(1);
+    const whereArg = mockUpdateWhere.mock.calls[0][0] as {
+      __op: string;
+      args: Array<{ __op: string; a: unknown; b: unknown }>;
+    };
+    expect(whereArg.__op).toBe("and");
+    const cols = whereArg.args.map((p) => p.a);
+    expect(cols).toContain("id");
+    expect(cols).toContain("user_id");
+    const userIdPredicate = whereArg.args.find((p) => p.a === "user_id");
+    expect(userIdPredicate?.b).toBe("user_123");
+  });
+
   it("returns error envelope on database failure", async () => {
     mockUpdateReturning.mockRejectedValue(new Error("db exploded"));
 
@@ -730,6 +770,8 @@ describe("setSubscriptionSort", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockAuth.mockResolvedValue({ userId: "user_123" });
+    // Short-circuit ensureUserExists: if the row already has an email, it early-returns.
+    mockFindFirstUser.mockResolvedValue({ email: "test@example.com" });
   });
 
   afterEach(() => {
@@ -766,15 +808,8 @@ describe("setSubscriptionSort", () => {
     expect(mockUpdate).not.toHaveBeenCalled();
   });
 
-  it("merges the new sort into existing preferences without wiping other keys", async () => {
+  it("emits an atomic jsonb_set UPDATE with the new sort and touches updatedAt", async () => {
     const { revalidatePath } = await import("next/cache");
-    mockFindFirstUser.mockResolvedValue({
-      preferences: {
-        theme: "dark",
-        notifications: true,
-        digestFrequency: "weekly",
-      },
-    });
 
     const { setSubscriptionSort } = await import(
       "@/app/actions/subscriptions"
@@ -783,31 +818,40 @@ describe("setSubscriptionSort", () => {
 
     expect(result).toEqual({ success: true });
     expect(revalidatePath).toHaveBeenCalledWith("/subscriptions");
-    expect(mockUpdateSet).toHaveBeenCalledWith({
-      preferences: {
-        theme: "dark",
-        notifications: true,
-        digestFrequency: "weekly",
-        subscriptionSort: "title-asc",
-      },
-    });
+    expect(mockUpdateSet).toHaveBeenCalledTimes(1);
+    const setArg = mockUpdateSet.mock.calls[0][0] as {
+      preferences: { strings: TemplateStringsArray; values: unknown[] };
+      updatedAt: unknown;
+    };
+    // The preferences value is an sql-tagged template (atomic merge at the DB layer),
+    // NOT a pre-merged plain object (which would race with other preference writers).
+    expect(setArg.preferences).toMatchObject({ strings: expect.any(Object) });
+    expect(setArg.preferences.values).toContain("title-asc");
+    // Second positional arg in the template is the sort; first is the column ref.
+    // Rebuild SQL text to confirm jsonb_set is actually what's emitted.
+    expect(Array.from(setArg.preferences.strings).join("?")).toMatch(
+      /jsonb_set/,
+    );
+    expect(setArg.updatedAt).toBeInstanceOf(Date);
   });
 
-  it("handles null preferences (new user) by seeding just the sort key", async () => {
-    mockFindFirstUser.mockResolvedValue({ preferences: null });
+  it("calls ensureUserExists before the UPDATE so first-session writes can't silently no-op", async () => {
+    // mockFindFirstUser is consulted by ensureUserExists (looking for an email).
+    // If the row doesn't exist yet, ensureUserExists would fall through to an
+    // insert; either way, it must run before the preferences UPDATE.
+    mockFindFirstUser.mockResolvedValueOnce({ email: "already@exists.com" });
 
     const { setSubscriptionSort } = await import(
       "@/app/actions/subscriptions"
     );
-    const result = await setSubscriptionSort("recently-listened");
+    await setSubscriptionSort("title-asc");
 
-    expect(result).toEqual({ success: true });
-    expect(mockUpdateSet).toHaveBeenCalledWith({
-      preferences: { subscriptionSort: "recently-listened" },
-    });
+    expect(mockFindFirstUser).toHaveBeenCalled();
+    // And then the UPDATE fired.
+    expect(mockUpdate).toHaveBeenCalled();
   });
 
-  it("returns error envelope on database failure", async () => {
+  it("returns error envelope when ensureUserExists throws", async () => {
     mockFindFirstUser.mockRejectedValue(new Error("db exploded"));
 
     const { setSubscriptionSort } = await import(
@@ -819,5 +863,6 @@ describe("setSubscriptionSort", () => {
       success: false,
       error: expect.stringMatching(/failed to save/i),
     });
+    expect(mockUpdate).not.toHaveBeenCalled();
   });
 });

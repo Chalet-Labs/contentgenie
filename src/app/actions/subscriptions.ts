@@ -445,11 +445,11 @@ export async function refreshPodcastFeed(podcastId: number) {
   }
 }
 
-// Select shape that omits the high-volume podcasts.description column
-// (BOLT payload optimization: ~20-30% smaller payloads for users with many subscriptions).
+// Omit podcasts.description from the list select — it's a high-volume text
+// column not rendered in the subscription list, and including it materially
+// inflates the response payload.
 function podcastListSelect() {
   const { description: _description, ...rest } = getTableColumns(podcasts);
-  void _description;
   return rest;
 }
 
@@ -464,8 +464,7 @@ function orderByForSort(sort: Exclude<SubscriptionSort, "recently-listened">) {
   }
 }
 
-// Get all subscriptions for the current user, sorted per `sort` (or the user's stored preference).
-// Pinned subscriptions always come first. Sorting is performed in SQL in a single statement.
+// Pinned subscriptions always sort before unpinned, regardless of `sort`.
 export async function getUserSubscriptions(sort?: SubscriptionSort) {
   const { userId } = await auth();
 
@@ -476,19 +475,35 @@ export async function getUserSubscriptions(sort?: SubscriptionSort) {
     };
   }
 
-  try {
-    let resolved: SubscriptionSort = sort ?? "recently-added";
-    if (!sort) {
+  // Preference read is best-effort: failure falls back to the default sort
+  // rather than empty-listing the user's subscriptions.
+  let resolved: SubscriptionSort = sort ?? "recently-added";
+  if (!sort) {
+    try {
       const user = await db.query.users.findFirst({
         where: eq(users.id, userId),
         columns: { preferences: true },
       });
       const stored = user?.preferences?.subscriptionSort;
-      if (stored && SUBSCRIPTION_SORTS.includes(stored)) {
-        resolved = stored;
+      if (stored) {
+        if (SUBSCRIPTION_SORTS.includes(stored)) {
+          resolved = stored;
+        } else {
+          console.warn("[getUserSubscriptions] unknown stored sort", {
+            userId,
+            stored,
+          });
+        }
       }
+    } catch (error) {
+      console.warn(
+        "[getUserSubscriptions] failed to read sort preference; using default",
+        { userId, error },
+      );
     }
+  }
 
+  try {
     const podcastSelect = podcastListSelect();
 
     const rows =
@@ -549,12 +564,11 @@ export async function getUserSubscriptions(sort?: SubscriptionSort) {
 
     return { subscriptions, error: null };
   } catch (error) {
-    console.error("Error fetching subscriptions:", error);
+    console.error("[getUserSubscriptions] failed", { userId, sort: resolved, error });
     return { subscriptions: [], error: "Failed to load subscriptions" };
   }
 }
 
-// Flip the pinned state of a subscription owned by the current user.
 export async function togglePinSubscription(
   subscriptionId: number,
 ): Promise<ActionResult<{ isPinned: boolean }>> {
@@ -581,18 +595,25 @@ export async function togglePinSubscription(
       .returning({ isPinned: userSubscriptions.isPinned });
 
     if (!updated) {
+      console.warn("[togglePinSubscription] no row updated", {
+        userId,
+        subscriptionId: parsed.data.subscriptionId,
+      });
       return { success: false, error: "Subscription not found" };
     }
 
     revalidatePath("/subscriptions");
     return { success: true, data: { isPinned: updated.isPinned } };
   } catch (error) {
-    console.error("Error toggling pin:", error);
+    console.error("[togglePinSubscription] failed", {
+      userId,
+      subscriptionId: parsed.data.subscriptionId,
+      error,
+    });
     return { success: false, error: "Failed to toggle pin" };
   }
 }
 
-// Persist the user's preferred subscription sort, merging into existing preferences.
 export async function setSubscriptionSort(
   sort: SubscriptionSort,
 ): Promise<ActionResult> {
@@ -607,25 +628,28 @@ export async function setSubscriptionSort(
   }
 
   try {
-    const user = await db.query.users.findFirst({
-      where: eq(users.id, userId),
-      columns: { preferences: true },
-    });
-
-    const merged = {
-      ...(user?.preferences ?? {}),
-      subscriptionSort: parsed.data,
-    };
+    // Ensure the row exists before the UPDATE (first-session users may not have
+    // triggered any other mutation yet), then atomically merge `subscriptionSort`
+    // into the JSONB preferences so concurrent writers on other keys can't
+    // clobber each other via read-modify-write.
+    await ensureUserExists(userId);
 
     await db
       .update(users)
-      .set({ preferences: merged })
+      .set({
+        preferences: sql`jsonb_set(COALESCE(${users.preferences}::jsonb, '{}'::jsonb), '{subscriptionSort}', to_jsonb(${parsed.data}::text))`,
+        updatedAt: new Date(),
+      })
       .where(eq(users.id, userId));
 
     revalidatePath("/subscriptions");
     return { success: true };
   } catch (error) {
-    console.error("Error setting subscription sort:", error);
+    console.error("[setSubscriptionSort] failed", {
+      userId,
+      sort: parsed.data,
+      error,
+    });
     return { success: false, error: "Failed to save sort preference" };
   }
 }
