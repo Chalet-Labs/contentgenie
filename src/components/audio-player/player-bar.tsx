@@ -1,6 +1,6 @@
 "use client"
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react"
+import { useCallback, useEffect, useRef, useState } from "react"
 import Image from "next/image"
 import Link from "next/link"
 import {
@@ -21,6 +21,8 @@ import {
   useAudioPlayerState,
   useAudioPlayerAPI,
   useAudioPlayerProgress,
+  SKIP_BACK_SECONDS,
+  SKIP_FORWARD_SECONDS,
 } from "@/contexts/audio-player-context"
 import { SeekBar } from "@/components/audio-player/seek-bar"
 import { PlaybackSpeed } from "@/components/audio-player/playback-speed"
@@ -32,8 +34,6 @@ import { BookmarkButton } from "@/components/audio-player/bookmark-button"
 import { useCurrentChapter } from "@/hooks/use-current-chapter"
 import { useMediaQuery } from "@/hooks/use-media-query"
 
-const REWIND_SECONDS = 10
-const FORWARD_SECONDS = 30
 const PREV_CHAPTER_RESTART_THRESHOLD_SECONDS = 3
 const SKIP_FLASH_DURATION_MS = 700
 
@@ -50,21 +50,12 @@ export function PlayerBar() {
   const [skipFlash, setSkipFlash] = useState<SkipFlash | null>(null)
   const flashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const nonceRef = useRef(0)
-  const currentChapter = useCurrentChapter()
+  const { chapter: currentChapter, index: currentChapterIdx } = useCurrentChapter()
   const isDesktop = useMediaQuery("(min-width: 768px)")
 
   const hasChapters = chapters != null && chapters.length > 0
   const canNavigateQueue = queue.length > 0
   const showNavButtons = hasChapters || canNavigateQueue || chaptersLoading
-
-  const currentChapterIdx = useMemo(() => {
-    if (!hasChapters) return -1
-    let idx = -1
-    for (let i = 0; i < chapters.length; i++) {
-      if (currentTime >= chapters[i].startTime) idx = i
-    }
-    return idx
-  }, [chapters, currentTime, hasChapters])
 
   const flashSkip = useCallback((direction: "back" | "forward", seconds: number) => {
     nonceRef.current += 1
@@ -90,13 +81,13 @@ export function PlayerBar() {
   }, [isVisible])
 
   const handleSkipBack = useCallback(() => {
-    skipBack(REWIND_SECONDS)
-    flashSkip("back", REWIND_SECONDS)
+    skipBack(SKIP_BACK_SECONDS)
+    flashSkip("back", SKIP_BACK_SECONDS)
   }, [skipBack, flashSkip])
 
   const handleSkipForward = useCallback(() => {
-    skipForward(FORWARD_SECONDS)
-    flashSkip("forward", FORWARD_SECONDS)
+    skipForward(SKIP_FORWARD_SECONDS)
+    flashSkip("forward", SKIP_FORWARD_SECONDS)
   }, [skipForward, flashSkip])
 
   const handlePrevNav = useCallback(() => {
@@ -126,8 +117,12 @@ export function PlayerBar() {
 
   const willAdvanceChapter =
     hasChapters && currentChapterIdx + 1 < chapters.length
-  const prevLabel = hasChapters ? "Previous chapter" : "Previous episode"
-  const nextLabel = willAdvanceChapter ? "Next chapter" : "Next episode"
+  const prevLabel = "Previous chapter"
+  const nextLabel = willAdvanceChapter
+    ? "Next chapter"
+    : canNavigateQueue
+      ? "Next episode"
+      : "Next"
   const canGoPrev = hasChapters && currentChapterIdx >= 0
   const canGoNext = willAdvanceChapter || canNavigateQueue
 
@@ -247,8 +242,8 @@ export function PlayerBar() {
             <Button
               variant="secondary"
               onClick={handleSkipBack}
-              aria-label={`Skip back ${REWIND_SECONDS} seconds`}
-              title={`Rewind ${REWIND_SECONDS}s`}
+              aria-label={`Skip back ${SKIP_BACK_SECONDS} seconds`}
+              title={`Rewind ${SKIP_BACK_SECONDS}s`}
               className="h-11 w-12 rounded-full border border-border"
             >
               <ChevronsLeft className="h-[22px] w-[22px]" />
@@ -270,8 +265,8 @@ export function PlayerBar() {
             <Button
               variant="secondary"
               onClick={handleSkipForward}
-              aria-label={`Skip forward ${FORWARD_SECONDS} seconds`}
-              title={`Forward ${FORWARD_SECONDS}s`}
+              aria-label={`Skip forward ${SKIP_FORWARD_SECONDS} seconds`}
+              title={`Forward ${SKIP_FORWARD_SECONDS}s`}
               className="h-11 w-12 rounded-full border border-border"
             >
               <ChevronsRight className="h-[22px] w-[22px]" />
@@ -411,7 +406,7 @@ export function PlayerBar() {
             variant="ghost"
             size="icon"
             onClick={handleSkipBack}
-            aria-label={`Skip back ${REWIND_SECONDS} seconds`}
+            aria-label={`Skip back ${SKIP_BACK_SECONDS} seconds`}
             className="h-7 w-7 shrink-0"
           >
             <ChevronsLeft className="h-4 w-4" />
@@ -423,7 +418,7 @@ export function PlayerBar() {
             variant="ghost"
             size="icon"
             onClick={handleSkipForward}
-            aria-label={`Skip forward ${FORWARD_SECONDS} seconds`}
+            aria-label={`Skip forward ${SKIP_FORWARD_SECONDS} seconds`}
             className="h-7 w-7 shrink-0"
           >
             <ChevronsRight className="h-4 w-4" />

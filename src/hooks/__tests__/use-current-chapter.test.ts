@@ -17,20 +17,20 @@ vi.mock("@/contexts/audio-player-context", () => ({
 }))
 
 describe("useCurrentChapter", () => {
-  it("returns null when chapters is null", () => {
+  it("returns { chapter: null, index: -1 } when chapters is null", () => {
     mockState.chapters = null
     mockProgress.currentTime = 0
 
     const { result } = renderHook(() => useCurrentChapter())
-    expect(result.current).toBeNull()
+    expect(result.current).toEqual({ chapter: null, index: -1 })
   })
 
-  it("returns null when chapters is empty", () => {
+  it("returns { chapter: null, index: -1 } when chapters is empty", () => {
     mockState.chapters = []
     mockProgress.currentTime = 0
 
     const { result } = renderHook(() => useCurrentChapter())
-    expect(result.current).toBeNull()
+    expect(result.current).toEqual({ chapter: null, index: -1 })
   })
 
   it("returns the only chapter when there is one", () => {
@@ -38,53 +38,54 @@ describe("useCurrentChapter", () => {
     mockProgress.currentTime = 30
 
     const { result } = renderHook(() => useCurrentChapter())
-    expect(result.current).toEqual({ startTime: 0, title: "Only Chapter" })
+    expect(result.current.chapter).toEqual({ startTime: 0, title: "Only Chapter" })
+    expect(result.current.index).toBe(0)
   })
 
-  it("returns null when currentTime is before the first chapter", () => {
+  it("returns null + index -1 when currentTime is before the first chapter", () => {
     mockState.chapters = [{ startTime: 10, title: "Chapter 1" }]
     mockProgress.currentTime = 5
 
     const { result } = renderHook(() => useCurrentChapter())
-    expect(result.current).toBeNull()
+    expect(result.current).toEqual({ chapter: null, index: -1 })
   })
 
-  it("returns the correct chapter for various currentTime values", () => {
+  it("returns the correct chapter + index for various currentTime values", () => {
     mockState.chapters = [
       { startTime: 0, title: "Intro" },
       { startTime: 60, title: "Main" },
       { startTime: 300, title: "Conclusion" },
     ]
 
-    // At the start
     mockProgress.currentTime = 0
     const { result: r1 } = renderHook(() => useCurrentChapter())
-    expect(r1.current?.title).toBe("Intro")
+    expect(r1.current.chapter?.title).toBe("Intro")
+    expect(r1.current.index).toBe(0)
 
-    // In the middle of first chapter
     mockProgress.currentTime = 30
     const { result: r2 } = renderHook(() => useCurrentChapter())
-    expect(r2.current?.title).toBe("Intro")
+    expect(r2.current.chapter?.title).toBe("Intro")
+    expect(r2.current.index).toBe(0)
 
-    // Right at the second chapter boundary
     mockProgress.currentTime = 60
     const { result: r3 } = renderHook(() => useCurrentChapter())
-    expect(r3.current?.title).toBe("Main")
+    expect(r3.current.chapter?.title).toBe("Main")
+    expect(r3.current.index).toBe(1)
 
-    // Between second and third chapters
     mockProgress.currentTime = 150
     const { result: r4 } = renderHook(() => useCurrentChapter())
-    expect(r4.current?.title).toBe("Main")
+    expect(r4.current.chapter?.title).toBe("Main")
+    expect(r4.current.index).toBe(1)
 
-    // At the last chapter
     mockProgress.currentTime = 300
     const { result: r5 } = renderHook(() => useCurrentChapter())
-    expect(r5.current?.title).toBe("Conclusion")
+    expect(r5.current.chapter?.title).toBe("Conclusion")
+    expect(r5.current.index).toBe(2)
 
-    // After the last chapter
     mockProgress.currentTime = 600
     const { result: r6 } = renderHook(() => useCurrentChapter())
-    expect(r6.current?.title).toBe("Conclusion")
+    expect(r6.current.chapter?.title).toBe("Conclusion")
+    expect(r6.current.index).toBe(2)
   })
 
   it("returns the chapter at the exact boundary", () => {
@@ -95,6 +96,7 @@ describe("useCurrentChapter", () => {
 
     mockProgress.currentTime = 100
     const { result } = renderHook(() => useCurrentChapter())
-    expect(result.current?.title).toBe("B")
+    expect(result.current.chapter?.title).toBe("B")
+    expect(result.current.index).toBe(1)
   })
 })

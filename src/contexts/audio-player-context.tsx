@@ -284,8 +284,8 @@ export const AudioPlayerProgressContext = createContext<AudioPlayerProgress | nu
 // Provider
 // ---------------------------------------------------------------------------
 
-const SKIP_BACK_SECONDS = 10
-const SKIP_FORWARD_SECONDS = 30
+export const SKIP_BACK_SECONDS = 10
+export const SKIP_FORWARD_SECONDS = 30
 const STALL_TIMEOUT_MS = 10_000
 const SLEEP_FADE_DURATION_MS = 3000
 const MS_PER_MINUTE = 60_000

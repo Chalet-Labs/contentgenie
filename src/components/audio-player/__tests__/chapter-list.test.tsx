@@ -40,13 +40,19 @@ vi.mock("@/contexts/audio-player-context", () => ({
 
 vi.mock("@/hooks/use-current-chapter", () => ({
   useCurrentChapter: () => {
-    if (!mockState.chapters || mockState.chapters.length === 0) return null
-    let result: Chapter | null = null
-    for (const ch of mockState.chapters) {
-      if (ch.startTime <= mockProgress.currentTime) result = ch
-      else break
+    if (!mockState.chapters || mockState.chapters.length === 0) {
+      return { chapter: null, index: -1 }
     }
-    return result
+    let chapter: Chapter | null = null
+    let index = -1
+    for (let i = 0; i < mockState.chapters.length; i++) {
+      const ch = mockState.chapters[i]
+      if (ch.startTime <= mockProgress.currentTime) {
+        chapter = ch
+        index = i
+      } else break
+    }
+    return { chapter, index }
   },
 }))
 
