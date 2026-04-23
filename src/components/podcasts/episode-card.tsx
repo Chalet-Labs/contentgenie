@@ -21,7 +21,7 @@ interface EpisodeCardProps {
 
 function ScoreIndicator({ value }: { value: string }) {
   const score = parseFloat(value);
-  if (isNaN(score)) return null;
+  if (!Number.isFinite(score)) return null;
   return (
     <div
       className={cn("flex items-center gap-1", getScoreTextColor(score))}

@@ -1,3 +1,4 @@
+import { useId } from "react";
 import { cn } from "@/lib/utils";
 
 export type LogoVariant = "mark" | "mark-mono" | "lockup";
@@ -30,6 +31,7 @@ export function Logo({
   const a11y = decorative
     ? { "aria-hidden": true }
     : { role: "img" as const, "aria-label": label };
+  const maskId = useId();
 
   if (variant === "lockup") {
     const dimension = size ?? 32;
@@ -79,13 +81,18 @@ export function Logo({
         fill="none"
         {...a11y}
       >
-        <path
-          d="M7 8 h18 a3 3 0 0 1 3 3 v8 a3 3 0 0 1 -3 3 h-10 l-5 4 v-4 h-3 a3 3 0 0 1 -3 -3 v-8 a3 3 0 0 1 3 -3 z"
-          fill="currentColor"
-        />
-        <rect x="11.5" y="14" width="2" height="3" rx="1" fill="hsl(var(--background))" />
-        <rect x="15.5" y="11.5" width="2" height="8" rx="1" fill="hsl(var(--background))" />
-        <rect x="19.5" y="13" width="2" height="5" rx="1" fill="hsl(var(--background))" />
+        <defs>
+          <mask id={maskId} maskUnits="userSpaceOnUse" x="0" y="0" width="32" height="32">
+            <path
+              d="M7 8 h18 a3 3 0 0 1 3 3 v8 a3 3 0 0 1 -3 3 h-10 l-5 4 v-4 h-3 a3 3 0 0 1 -3 -3 v-8 a3 3 0 0 1 3 -3 z"
+              fill="white"
+            />
+            <rect x="11.5" y="14" width="2" height="3" rx="1" fill="black" />
+            <rect x="15.5" y="11.5" width="2" height="8" rx="1" fill="black" />
+            <rect x="19.5" y="13" width="2" height="5" rx="1" fill="black" />
+          </mask>
+        </defs>
+        <rect width="32" height="32" fill="currentColor" mask={`url(#${maskId})`} />
       </svg>
     );
   }

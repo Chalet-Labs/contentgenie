@@ -92,8 +92,10 @@ async function stageIco(svgBuffer, sizes, outPath) {
 
 async function commitAll() {
   // Two-phase write: rasterize everything to .tmp files first, then rename
-  // in a single pass. A mid-run failure leaves the on-disk icons untouched
-  // rather than shipping a half-rebranded set.
+  // in a commit pass. If any rasterization fails, no finals are touched.
+  // Note: the rename loop itself is not atomic — a mid-loop failure (rare:
+  // disk full, permissions) can leave a partially-updated set. Rerun the
+  // script to recover in that case.
   for (const { tmp, final, label } of writes) {
     await fs.rename(tmp, final);
     console.log(`  → ${label}`);
