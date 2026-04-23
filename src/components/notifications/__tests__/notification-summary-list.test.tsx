@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { describe, it, expect, vi } from "vitest";
+import { render, screen, fireEvent } from "@testing-library/react";
 import type { NotificationSummary } from "@/app/actions/notifications";
 
 import { NotificationSummaryList } from "@/components/notifications/notification-summary-list";
@@ -155,5 +155,33 @@ describe("NotificationSummaryList", () => {
       name: /2 unread notifications/i,
     });
     expect(link).toHaveAttribute("href", "/notifications");
+  });
+
+  it("(i) onItemClick fires with `podcast-<id>` when a podcast row is clicked", () => {
+    const onItemClick = vi.fn();
+    render(
+      <NotificationSummaryList
+        summary={podcastSummary}
+        onItemClick={onItemClick}
+      />
+    );
+    const link = screen.getByRole("link", { name: /from the daily/i });
+    // Prevent the default navigation so jsdom doesn't throw "Not implemented"
+    // for same-document location changes.
+    fireEvent.click(link, { button: 0 });
+    expect(onItemClick).toHaveBeenCalledWith("podcast-42");
+  });
+
+  it("(j) onItemClick fires with `since-<iso>` when the since row is clicked", () => {
+    const onItemClick = vi.fn();
+    render(
+      <NotificationSummaryList
+        summary={sinceOnlySummary}
+        onItemClick={onItemClick}
+      />
+    );
+    const link = screen.getByRole("link", { name: /since last visit/i });
+    fireEvent.click(link, { button: 0 });
+    expect(onItemClick).toHaveBeenCalledWith(`since-${lastSeenIso}`);
   });
 });

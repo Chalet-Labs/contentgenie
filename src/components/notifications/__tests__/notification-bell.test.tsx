@@ -3,10 +3,13 @@ import { render, screen, act, fireEvent } from "@testing-library/react";
 
 const mockGetUnreadCount = vi.fn();
 const mockGetNotificationSummary = vi.fn();
+const mockMarkAllNotificationsRead = vi.fn();
 vi.mock("@/app/actions/notifications", () => ({
   getUnreadCount: (...args: unknown[]) => mockGetUnreadCount(...args),
   getNotificationSummary: (...args: unknown[]) =>
     mockGetNotificationSummary(...args),
+  markAllNotificationsRead: (...args: unknown[]) =>
+    mockMarkAllNotificationsRead(...args),
 }));
 
 let mockPathname = "/dashboard";
@@ -41,6 +44,8 @@ describe("NotificationBell", () => {
     vi.useFakeTimers();
     mockGetUnreadCount.mockReset();
     mockGetNotificationSummary.mockReset();
+    mockMarkAllNotificationsRead.mockReset();
+    mockMarkAllNotificationsRead.mockResolvedValue({ success: true });
     mockPathname = "/dashboard";
   });
 
@@ -152,9 +157,7 @@ describe("NotificationBell", () => {
     consoleError.mockRestore();
   });
 
-  it("(g) opening popover does NOT call markAllNotificationsRead or markNotificationRead", async () => {
-    // These functions are not imported in notification-bell.tsx — verify by
-    // ensuring only getUnreadCount + getNotificationSummary are called after click.
+  it("(g) opening the popover calls markAllNotificationsRead after fetching the summary", async () => {
     mockGetUnreadCount.mockResolvedValue(3);
     mockGetNotificationSummary.mockResolvedValue(defaultSummary);
     render(<NotificationBell />);
@@ -165,9 +168,102 @@ describe("NotificationBell", () => {
     });
     await flushMicrotasks();
 
-    // Only the two expected functions were called — no mark-read side effects
-    expect(mockGetUnreadCount).toHaveBeenCalled();
-    expect(mockGetNotificationSummary).toHaveBeenCalled();
+    expect(mockGetNotificationSummary).toHaveBeenCalledOnce();
+    expect(mockMarkAllNotificationsRead).toHaveBeenCalledOnce();
+    // fetchSummary must be issued before markAllNotificationsRead so the
+    // popover renders items that *were* unread (the unread SELECT has to
+    // observe the rows before the UPDATE commits).
+    const fetchOrder = mockGetNotificationSummary.mock.invocationCallOrder[0];
+    const markOrder = mockMarkAllNotificationsRead.mock.invocationCallOrder[0];
+    expect(fetchOrder).toBeLessThan(markOrder);
+  });
+
+  it("(g2) closing the popover does NOT call markAllNotificationsRead", async () => {
+    mockGetUnreadCount.mockResolvedValue(3);
+    mockGetNotificationSummary.mockResolvedValue(defaultSummary);
+    render(<NotificationBell />);
+    await flushMicrotasks();
+
+    // Open
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /notifications/i }));
+    });
+    await flushMicrotasks();
+    mockMarkAllNotificationsRead.mockClear();
+
+    // Close via Escape
+    await act(async () => {
+      fireEvent.keyDown(document.activeElement ?? document.body, {
+        key: "Escape",
+      });
+    });
+    await flushMicrotasks();
+
+    expect(mockMarkAllNotificationsRead).not.toHaveBeenCalled();
+  });
+
+  it("(g3) badge optimistically drops to 0 when popover opens, reverts on mark-read failure", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    mockGetUnreadCount.mockResolvedValue(5);
+    mockGetNotificationSummary.mockResolvedValue(defaultSummary);
+    mockMarkAllNotificationsRead.mockResolvedValue({
+      success: false,
+      error: "DB down",
+    });
+
+    render(<NotificationBell />);
+    await flushMicrotasks();
+    expect(screen.getByText("5")).toBeInTheDocument();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /notifications/i }));
+    });
+    await flushMicrotasks();
+
+    // Badge reverts to 5 because markAllNotificationsRead returned {success: false}.
+    expect(screen.getByText("5")).toBeInTheDocument();
+    consoleError.mockRestore();
+  });
+
+  it("(g4) badge drops to 0 and stays there on successful mark-read", async () => {
+    mockGetUnreadCount.mockResolvedValue(5);
+    mockGetNotificationSummary.mockResolvedValue(defaultSummary);
+    mockMarkAllNotificationsRead.mockResolvedValue({ success: true });
+
+    render(<NotificationBell />);
+    await flushMicrotasks();
+    expect(screen.getByText("5")).toBeInTheDocument();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /notifications/i }));
+    });
+    await flushMicrotasks();
+
+    // Badge is hidden when count is 0.
+    expect(screen.queryByText("5")).not.toBeInTheDocument();
+    expect(screen.queryByText(/^\d+$/)).not.toBeInTheDocument();
+  });
+
+  it("(g5) badge reverts when markAllNotificationsRead throws", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    mockGetUnreadCount.mockResolvedValue(4);
+    mockGetNotificationSummary.mockResolvedValue(defaultSummary);
+    mockMarkAllNotificationsRead.mockRejectedValue(new Error("boom"));
+
+    render(<NotificationBell />);
+    await flushMicrotasks();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /notifications/i }));
+    });
+    await flushMicrotasks();
+
+    expect(screen.getByText("4")).toBeInTheDocument();
+    expect(consoleError).toHaveBeenCalledWith(
+      "Failed to mark all notifications as read:",
+      expect.any(Error)
+    );
+    consoleError.mockRestore();
   });
 
   it("(h) route change closes the popover", async () => {

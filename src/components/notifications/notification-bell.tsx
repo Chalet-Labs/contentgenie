@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import {
   getUnreadCount,
   getNotificationSummary,
+  markAllNotificationsRead,
 } from "@/app/actions/notifications";
 import type { NotificationSummary } from "@/app/actions/notifications";
 import { NotificationPopover } from "@/components/notifications/notification-popover";
@@ -69,9 +70,27 @@ export function NotificationBell() {
   const handleOpenChange = useCallback(
     (nextOpen: boolean) => {
       setOpen(nextOpen);
-      if (nextOpen) fetchSummary();
+      if (!nextOpen) return;
+
+      // Order matters: fetch first so the popover renders the items that
+      // were unread, then mark them read so the badge clears and the
+      // `MAX(createdAt) WHERE isRead=true` used by getNotificationSummary
+      // advances to "just now" for the next open (making the "since last
+      // visit" group actually mean since the last open).
+      void (async () => {
+        await fetchSummary();
+        const prev = unreadCount;
+        setUnreadCount(0);
+        try {
+          const result = await markAllNotificationsRead();
+          if (!result.success) setUnreadCount(prev);
+        } catch (error) {
+          console.error("Failed to mark all notifications as read:", error);
+          setUnreadCount(prev);
+        }
+      })();
     },
-    [fetchSummary]
+    [fetchSummary, unreadCount]
   );
 
   const tooltip = lastUpdatedAt
