@@ -16,11 +16,12 @@ import {
 import { relations, sql } from "drizzle-orm";
 import type { WorthItSignals } from "@/lib/openrouter";
 import {
+  DEFAULT_SUBSCRIPTION_SORT,
   SUBSCRIPTION_SORTS,
   type SubscriptionSort,
 } from "@/db/subscription-sorts";
 
-export { SUBSCRIPTION_SORTS, type SubscriptionSort };
+export { DEFAULT_SUBSCRIPTION_SORT, SUBSCRIPTION_SORTS, type SubscriptionSort };
 
 // Rate limits table (managed by rate-limiter-flexible, see ADR-001).
 // Defined here so drizzle-kit push doesn't try to drop it.

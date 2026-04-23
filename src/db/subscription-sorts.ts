@@ -6,3 +6,5 @@ export const SUBSCRIPTION_SORTS = [
 ] as const;
 
 export type SubscriptionSort = (typeof SUBSCRIPTION_SORTS)[number];
+
+export const DEFAULT_SUBSCRIPTION_SORT: SubscriptionSort = "recently-added";

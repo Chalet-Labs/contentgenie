@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { eq, and, asc, desc, getTableColumns, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
+  DEFAULT_SUBSCRIPTION_SORT,
   SUBSCRIPTION_SORTS,
   type SubscriptionSort,
   episodes,
@@ -464,7 +465,79 @@ function orderByForSort(sort: Exclude<SubscriptionSort, "recently-listened">) {
   }
 }
 
-// Pinned subscriptions always sort before unpinned, regardless of `sort`.
+function buildStandardQuery(
+  userId: string,
+  sort: Exclude<SubscriptionSort, "recently-listened">,
+) {
+  return db
+    .select({ subscription: userSubscriptions, podcast: podcastListSelect() })
+    .from(userSubscriptions)
+    .innerJoin(podcasts, eq(podcasts.id, userSubscriptions.podcastId))
+    .where(eq(userSubscriptions.userId, userId))
+    .orderBy(desc(userSubscriptions.isPinned), ...orderByForSort(sort));
+}
+
+function buildRecentlyListenedQuery(userId: string) {
+  const lastListened = db
+    .select({
+      podcastId: episodes.podcastId,
+      lastStartedAt:
+        sql<string | null>`MAX(${listenHistory.startedAt})`.as(
+          "last_started_at",
+        ),
+    })
+    .from(listenHistory)
+    .innerJoin(episodes, eq(episodes.id, listenHistory.episodeId))
+    .where(eq(listenHistory.userId, userId))
+    .groupBy(episodes.podcastId)
+    .as("last_listened");
+
+  return db
+    .select({ subscription: userSubscriptions, podcast: podcastListSelect() })
+    .from(userSubscriptions)
+    .innerJoin(podcasts, eq(podcasts.id, userSubscriptions.podcastId))
+    .leftJoin(
+      lastListened,
+      eq(lastListened.podcastId, userSubscriptions.podcastId),
+    )
+    .where(eq(userSubscriptions.userId, userId))
+    .orderBy(
+      desc(userSubscriptions.isPinned),
+      sql`COALESCE(${lastListened.lastStartedAt}, to_timestamp(0)) DESC`,
+      desc(userSubscriptions.subscribedAt),
+    );
+}
+
+async function resolveSort(
+  userId: string,
+  explicit: SubscriptionSort | undefined,
+): Promise<SubscriptionSort> {
+  if (explicit) return explicit;
+
+  try {
+    const user = await db.query.users.findFirst({
+      where: eq(users.id, userId),
+      columns: { preferences: true },
+    });
+    const stored = user?.preferences?.subscriptionSort;
+    if (!stored) return DEFAULT_SUBSCRIPTION_SORT;
+    if (SUBSCRIPTION_SORTS.includes(stored)) return stored;
+    console.warn("[getUserSubscriptions] unknown stored sort", {
+      userId,
+      stored,
+    });
+    return DEFAULT_SUBSCRIPTION_SORT;
+  } catch (error) {
+    // Preference read is best-effort: a transient failure falls back to the
+    // default sort rather than empty-listing the user's subscriptions.
+    console.warn(
+      "[getUserSubscriptions] failed to read sort preference; using default",
+      { userId, error },
+    );
+    return DEFAULT_SUBSCRIPTION_SORT;
+  }
+}
+
 export async function getUserSubscriptions(sort?: SubscriptionSort) {
   const { userId } = await auth();
 
@@ -475,87 +548,13 @@ export async function getUserSubscriptions(sort?: SubscriptionSort) {
     };
   }
 
-  // Preference read is best-effort: failure falls back to the default sort
-  // rather than empty-listing the user's subscriptions.
-  let resolved: SubscriptionSort = sort ?? "recently-added";
-  if (!sort) {
-    try {
-      const user = await db.query.users.findFirst({
-        where: eq(users.id, userId),
-        columns: { preferences: true },
-      });
-      const stored = user?.preferences?.subscriptionSort;
-      if (stored) {
-        if (SUBSCRIPTION_SORTS.includes(stored)) {
-          resolved = stored;
-        } else {
-          console.warn("[getUserSubscriptions] unknown stored sort", {
-            userId,
-            stored,
-          });
-        }
-      }
-    } catch (error) {
-      console.warn(
-        "[getUserSubscriptions] failed to read sort preference; using default",
-        { userId, error },
-      );
-    }
-  }
+  const resolved = await resolveSort(userId, sort);
 
   try {
-    const podcastSelect = podcastListSelect();
-
     const rows =
       resolved === "recently-listened"
-        ? await (() => {
-            const lastListened = db
-              .select({
-                podcastId: episodes.podcastId,
-                lastStartedAt:
-                  sql<string | null>`MAX(${listenHistory.startedAt})`.as(
-                    "last_started_at",
-                  ),
-              })
-              .from(listenHistory)
-              .innerJoin(episodes, eq(episodes.id, listenHistory.episodeId))
-              .where(eq(listenHistory.userId, userId))
-              .groupBy(episodes.podcastId)
-              .as("last_listened");
-
-            return db
-              .select({
-                subscription: userSubscriptions,
-                podcast: podcastSelect,
-              })
-              .from(userSubscriptions)
-              .innerJoin(
-                podcasts,
-                eq(podcasts.id, userSubscriptions.podcastId),
-              )
-              .leftJoin(
-                lastListened,
-                eq(lastListened.podcastId, userSubscriptions.podcastId),
-              )
-              .where(eq(userSubscriptions.userId, userId))
-              .orderBy(
-                desc(userSubscriptions.isPinned),
-                sql`COALESCE(${lastListened.lastStartedAt}, to_timestamp(0)) DESC`,
-                desc(userSubscriptions.subscribedAt),
-              );
-          })()
-        : await db
-            .select({
-              subscription: userSubscriptions,
-              podcast: podcastSelect,
-            })
-            .from(userSubscriptions)
-            .innerJoin(podcasts, eq(podcasts.id, userSubscriptions.podcastId))
-            .where(eq(userSubscriptions.userId, userId))
-            .orderBy(
-              desc(userSubscriptions.isPinned),
-              ...orderByForSort(resolved),
-            );
+        ? await buildRecentlyListenedQuery(userId)
+        : await buildStandardQuery(userId, resolved);
 
     const subscriptions = rows.map((r) => ({
       ...r.subscription,
@@ -628,10 +627,8 @@ export async function setSubscriptionSort(
   }
 
   try {
-    // Ensure the row exists before the UPDATE (first-session users may not have
-    // triggered any other mutation yet), then atomically merge `subscriptionSort`
-    // into the JSONB preferences so concurrent writers on other keys can't
-    // clobber each other via read-modify-write.
+    // `ensureUserExists` covers the first-session case; `jsonb_set` avoids a
+    // read-modify-write race against other `preferences` writers.
     await ensureUserExists(userId);
 
     await db

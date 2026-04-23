@@ -96,41 +96,44 @@ vi.mock("@/lib/rss", async () => {
   };
 });
 
-// Mock schema — just need the table references
-vi.mock("@/db/schema", () => ({
-  users: { id: "id", preferences: "preferences" },
-  podcasts: {
-    id: "id",
-    podcastIndexId: "podcast_index_id",
-    title: "title",
-    latestEpisodeDate: "latest_episode_date",
-    description: "description",
-  },
-  episodes: {
-    id: "id",
-    podcastIndexId: "podcast_index_id",
-    podcastId: "podcast_id",
-  },
-  userSubscriptions: {
-    id: "id",
-    userId: "user_id",
-    podcastId: "podcast_id",
-    subscribedAt: "subscribed_at",
-    isPinned: "is_pinned",
-  },
-  listenHistory: {
-    id: "id",
-    userId: "user_id",
-    episodeId: "episode_id",
-    startedAt: "started_at",
-  },
-  SUBSCRIPTION_SORTS: [
-    "recently-added",
-    "title-asc",
-    "latest-episode",
-    "recently-listened",
-  ] as const,
-}));
+// Mock schema — just need the table references. `SUBSCRIPTION_SORTS` /
+// `DEFAULT_SUBSCRIPTION_SORT` come from the unmocked `@/db/subscription-sorts`
+// module so adding a new sort value here can't silently desync the mock.
+vi.mock("@/db/schema", async () => {
+  const sorts = await vi.importActual<typeof import("@/db/subscription-sorts")>(
+    "@/db/subscription-sorts",
+  );
+  return {
+    users: { id: "id", preferences: "preferences" },
+    podcasts: {
+      id: "id",
+      podcastIndexId: "podcast_index_id",
+      title: "title",
+      latestEpisodeDate: "latest_episode_date",
+      description: "description",
+    },
+    episodes: {
+      id: "id",
+      podcastIndexId: "podcast_index_id",
+      podcastId: "podcast_id",
+    },
+    userSubscriptions: {
+      id: "id",
+      userId: "user_id",
+      podcastId: "podcast_id",
+      subscribedAt: "subscribed_at",
+      isPinned: "is_pinned",
+    },
+    listenHistory: {
+      id: "id",
+      userId: "user_id",
+      episodeId: "episode_id",
+      startedAt: "started_at",
+    },
+    SUBSCRIPTION_SORTS: sorts.SUBSCRIPTION_SORTS,
+    DEFAULT_SUBSCRIPTION_SORT: sorts.DEFAULT_SUBSCRIPTION_SORT,
+  };
+});
 
 // Mock drizzle-orm — capture orderBy/join args to assert sort wiring
 const sqlTemplate = (strings: TemplateStringsArray, ...values: unknown[]) => {
@@ -262,8 +265,6 @@ describe("addPodcastByRssUrl", () => {
   });
 
   it("successfully imports a podcast and returns metadata", async () => {
-    // 1. podcast insert returning → [{ id: 1 }]
-    // 2. episode batch insert returning → [{ id: 1 }, { id: 2 }]
     mockReturning
       .mockReturnValueOnce([{ id: 1 }])
       .mockReturnValueOnce([{ id: 1 }, { id: 2 }]);
@@ -324,8 +325,6 @@ describe("subscribeToPodcast", () => {
   });
 
   it("successfully subscribes to a new podcast", async () => {
-    // 1. podcast insert -> [{id: 1}]
-    // 2. subscription insert -> [{id: 2}]
     mockReturning
       .mockReturnValueOnce([{ id: 1 }])
       .mockReturnValueOnce([{ id: 2 }]);
@@ -345,8 +344,6 @@ describe("subscribeToPodcast", () => {
   });
 
   it("handles already subscribed case correctly", async () => {
-    // 1. podcast insert -> [{id: 1}]
-    // 2. subscription insert (onConflictDoNothing) -> []
     mockReturning
       .mockReturnValueOnce([{ id: 1 }])
       .mockReturnValueOnce([]);
@@ -459,6 +456,13 @@ function makeLastListenedSubqueryChain() {
   return { from: mockFrom };
 }
 
+// orderBy args captured when `getUserSubscriptions` resolves to the default
+// sort: desc(isPinned), desc(subscribedAt).
+const DEFAULT_ORDER_BY = [
+  { __op: "desc", col: "is_pinned" },
+  { __op: "desc", col: "subscribed_at" },
+];
+
 describe("getUserSubscriptions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -492,11 +496,7 @@ describe("getUserSubscriptions", () => {
     );
     await getUserSubscriptions();
 
-    // orderBy called with (desc(isPinned), desc(subscribedAt))
-    expect(mocks.mockOrderBy).toHaveBeenCalledWith(
-      { __op: "desc", col: "is_pinned" },
-      { __op: "desc", col: "subscribed_at" },
-    );
+    expect(mocks.mockOrderBy).toHaveBeenCalledWith(...DEFAULT_ORDER_BY);
     expect(mocks.mockLeftJoin).not.toHaveBeenCalled();
   });
 
@@ -553,11 +553,7 @@ describe("getUserSubscriptions", () => {
     );
     await getUserSubscriptions();
 
-    // falls through to recently-added
-    expect(mocks.mockOrderBy).toHaveBeenCalledWith(
-      { __op: "desc", col: "is_pinned" },
-      { __op: "desc", col: "subscribed_at" },
-    );
+    expect(mocks.mockOrderBy).toHaveBeenCalledWith(...DEFAULT_ORDER_BY);
   });
 
   it("recently-listened path builds a leftJoin on a grouped subquery", async () => {
@@ -646,12 +642,8 @@ describe("getUserSubscriptions", () => {
     );
     const result = await getUserSubscriptions();
 
-    // Still reaches the main query and orders by the default (recently-added).
     expect(result.error).toBeNull();
-    expect(mocks.mockOrderBy).toHaveBeenCalledWith(
-      { __op: "desc", col: "is_pinned" },
-      { __op: "desc", col: "subscribed_at" },
-    );
+    expect(mocks.mockOrderBy).toHaveBeenCalledWith(...DEFAULT_ORDER_BY);
   });
 });
 
