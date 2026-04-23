@@ -273,7 +273,10 @@ components:
     typography: "{typography.button-label}"
     rounded: "{rounded.md}"
     height: 36px
-    padding: 0 16px
+    paddingTop: 0
+    paddingRight: 16px
+    paddingBottom: 0
+    paddingLeft: 16px
     shadow: "{elevation.DEFAULT}"
   button-primary-hover:
     # Mirrors Tailwind `hover:bg-primary/90` — only the BACKGROUND fill
@@ -289,7 +292,10 @@ components:
     typography: "{typography.button-label}"
     rounded: "{rounded.md}"
     height: 36px
-    padding: 0 16px
+    paddingTop: 0
+    paddingRight: 16px
+    paddingBottom: 0
+    paddingLeft: 16px
     shadow: "{elevation.sm}"
   button-secondary-hover:
     # Mirrors Tailwind `hover:bg-secondary/80` — background alpha to 80%,
@@ -302,7 +308,10 @@ components:
     typography: "{typography.button-label}"
     rounded: "{rounded.md}"
     height: 36px
-    padding: 0 12px
+    paddingTop: 0
+    paddingRight: 12px
+    paddingBottom: 0
+    paddingLeft: 12px
   button-ghost-hover:
     backgroundColor: "{colors.accent}"
     textColor: "{colors.accent-foreground}"
@@ -312,7 +321,10 @@ components:
     typography: "{typography.button-label}"
     rounded: "{rounded.md}"
     height: 36px
-    padding: 0 16px
+    paddingTop: 0
+    paddingRight: 16px
+    paddingBottom: 0
+    paddingLeft: 16px
     shadow: "{elevation.sm}"
   button-destructive-hover:
     # Mirrors Tailwind `hover:bg-destructive/90` — background alpha to 90%,
@@ -325,7 +337,10 @@ components:
     typography: "{typography.button-label}"
     rounded: "{rounded.md}"
     height: 36px
-    padding: 0 16px
+    paddingTop: 0
+    paddingRight: 16px
+    paddingBottom: 0
+    paddingLeft: 16px
     borderWidth: 1px
     borderColor: "{colors.input}"
     shadow: "{elevation.sm}"
@@ -356,8 +371,12 @@ components:
     borderLeftWidth: 2px
     borderLeftColor: "{colors.primary}"
   card-header:
-    # Header carries the full `p-6` block on all four sides.
-    padding: "{spacing.card-padding-lg}"
+    # Header carries the full `p-6` block on all four sides — written
+    # per-edge for schema symmetry with card-content / card-footer below.
+    paddingTop: "{spacing.card-padding-lg}"
+    paddingRight: "{spacing.card-padding-lg}"
+    paddingBottom: "{spacing.card-padding-lg}"
+    paddingLeft: "{spacing.card-padding-lg}"
   card-content:
     # `p-6 pt-0` in the shipped primitive: 24px on sides and bottom, 0 on
     # top so the header and content flow without a doubled vertical gap.
@@ -386,7 +405,10 @@ components:
     typography: "{typography.body-lg}"
     rounded: "{rounded.md}"
     height: 36px
-    padding: 0 12px
+    paddingTop: 0
+    paddingRight: 12px
+    paddingBottom: 0
+    paddingLeft: 12px
     borderWidth: 1px
     borderColor: "{colors.input}"
     shadow: "{elevation.sm}"
@@ -399,61 +421,91 @@ components:
     backgroundColor: "{colors.score-exceptional}"
     textColor: "{colors.score-exceptional-foreground}"
     rounded: "{rounded.full}"
-    padding: 2px 8px
+    paddingTop: 2px
+    paddingRight: 8px
+    paddingBottom: 2px
+    paddingLeft: 8px
     typography: "{typography.small}"
   badge-score-above:
     backgroundColor: "{colors.score-above}"
     textColor: "{colors.score-above-foreground}"
     rounded: "{rounded.full}"
-    padding: 2px 8px
+    paddingTop: 2px
+    paddingRight: 8px
+    paddingBottom: 2px
+    paddingLeft: 8px
     typography: "{typography.small}"
   badge-score-average:
     backgroundColor: "{colors.score-average}"
     textColor: "{colors.score-average-foreground}"
     rounded: "{rounded.full}"
-    padding: 2px 8px
+    paddingTop: 2px
+    paddingRight: 8px
+    paddingBottom: 2px
+    paddingLeft: 8px
     typography: "{typography.small}"
   badge-score-below:
     backgroundColor: "{colors.score-below}"
     textColor: "{colors.score-below-foreground}"
     rounded: "{rounded.full}"
-    padding: 2px 8px
+    paddingTop: 2px
+    paddingRight: 8px
+    paddingBottom: 2px
+    paddingLeft: 8px
     typography: "{typography.small}"
   badge-score-skip:
     backgroundColor: "{colors.score-skip}"
     textColor: "{colors.score-skip-foreground}"
     rounded: "{rounded.full}"
-    padding: 2px 8px
+    paddingTop: 2px
+    paddingRight: 8px
+    paddingBottom: 2px
+    paddingLeft: 8px
     typography: "{typography.small}"
   status-pill-success:
     backgroundColor: "{colors.status-success-bg}"
     textColor: "{colors.status-success-text}"
     rounded: "{rounded.full}"
-    padding: 2px 10px
+    paddingTop: 2px
+    paddingRight: 10px
+    paddingBottom: 2px
+    paddingLeft: 10px
     typography: "{typography.small}"
   status-pill-warning:
     backgroundColor: "{colors.status-warning-bg}"
     textColor: "{colors.status-warning-text}"
     rounded: "{rounded.full}"
-    padding: 2px 10px
+    paddingTop: 2px
+    paddingRight: 10px
+    paddingBottom: 2px
+    paddingLeft: 10px
     typography: "{typography.small}"
   status-pill-info:
     backgroundColor: "{colors.status-info-bg}"
     textColor: "{colors.status-info-text}"
     rounded: "{rounded.full}"
-    padding: 2px 10px
+    paddingTop: 2px
+    paddingRight: 10px
+    paddingBottom: 2px
+    paddingLeft: 10px
     typography: "{typography.small}"
   status-pill-danger:
     backgroundColor: "{colors.status-danger-bg}"
     textColor: "{colors.status-danger-text}"
     rounded: "{rounded.full}"
-    padding: 2px 10px
+    paddingTop: 2px
+    paddingRight: 10px
+    paddingBottom: 2px
+    paddingLeft: 10px
     typography: "{typography.small}"
   status-pill-neutral:
     backgroundColor: "{colors.status-neutral-bg}"
     textColor: "{colors.status-neutral-text}"
     rounded: "{rounded.full}"
-    padding: 2px 10px
+    paddingTop: 2px
+    paddingRight: 10px
+    paddingBottom: 2px
+    paddingLeft: 10px
     typography: "{typography.small}"
   logo-tile:
     backgroundColor: "{colors.brand}"
