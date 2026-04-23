@@ -37,7 +37,7 @@ const FORWARD_SECONDS = 30
 const PREV_CHAPTER_RESTART_THRESHOLD_SECONDS = 3
 const SKIP_FLASH_DURATION_MS = 700
 
-type SkipFlash = { direction: "back" | "fwd"; seconds: number; key: number }
+type SkipFlash = { direction: "back" | "forward"; seconds: number; nonce: number }
 
 export function PlayerBar() {
   const { currentEpisode, isPlaying, isBuffering, isVisible, queue, chapters, chaptersLoading } =
@@ -49,6 +49,7 @@ export function PlayerBar() {
   const [chaptersOpen, setChaptersOpen] = useState(false)
   const [skipFlash, setSkipFlash] = useState<SkipFlash | null>(null)
   const flashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const nonceRef = useRef(0)
   const currentChapter = useCurrentChapter()
   const isDesktop = useMediaQuery("(min-width: 768px)")
 
@@ -65,8 +66,9 @@ export function PlayerBar() {
     return idx
   }, [chapters, currentTime, hasChapters])
 
-  const flashSkip = useCallback((direction: "back" | "fwd", seconds: number) => {
-    setSkipFlash({ direction, seconds, key: Date.now() })
+  const flashSkip = useCallback((direction: "back" | "forward", seconds: number) => {
+    nonceRef.current += 1
+    setSkipFlash({ direction, seconds, nonce: nonceRef.current })
     if (flashTimerRef.current) clearTimeout(flashTimerRef.current)
     flashTimerRef.current = setTimeout(() => setSkipFlash(null), SKIP_FLASH_DURATION_MS)
   }, [])
@@ -77,6 +79,16 @@ export function PlayerBar() {
     }
   }, [])
 
+  useEffect(() => {
+    if (!isVisible) {
+      if (flashTimerRef.current) {
+        clearTimeout(flashTimerRef.current)
+        flashTimerRef.current = null
+      }
+      setSkipFlash(null)
+    }
+  }, [isVisible])
+
   const handleSkipBack = useCallback(() => {
     skipBack(REWIND_SECONDS)
     flashSkip("back", REWIND_SECONDS)
@@ -84,7 +96,7 @@ export function PlayerBar() {
 
   const handleSkipForward = useCallback(() => {
     skipForward(FORWARD_SECONDS)
-    flashSkip("fwd", FORWARD_SECONDS)
+    flashSkip("forward", FORWARD_SECONDS)
   }, [skipForward, flashSkip])
 
   const handlePrevNav = useCallback(() => {
@@ -163,27 +175,24 @@ export function PlayerBar() {
     >
       {skipFlash && (
         <div
-          key={skipFlash.key}
-          aria-live="polite"
+          key={skipFlash.nonce}
+          aria-hidden="true"
           className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-3 flex -translate-x-1/2 items-center gap-1 whitespace-nowrap rounded-full bg-foreground/90 px-3.5 py-2 text-[13px] font-semibold tracking-tight text-background shadow-lg animate-in fade-in slide-in-from-bottom-1 duration-200"
         >
           {skipFlash.direction === "back" ? "−" : "+"} {skipFlash.seconds}s
         </div>
       )}
 
-      {/* Desktop layout (md+): seek bar on top, controls row underneath */}
       <div className="hidden flex-col md:flex">
         <div className="px-5 pt-2.5">
           <SeekBar />
         </div>
         <div className="grid h-16 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-4 px-5 pb-3 pt-1">
-          {/* Track info (left) */}
           <Link
             href={episodeHref}
-            className="group/info flex min-w-0 items-center gap-3"
+            className="group/info flex min-w-0 max-w-[260px] items-center gap-3"
             prefetch={false}
             aria-label={episodeAriaLabel}
-            style={{ maxWidth: 260 }}
           >
             <div className="relative h-12 w-12 shrink-0 overflow-hidden rounded bg-muted">
               {currentEpisode.artwork ? (
@@ -221,9 +230,8 @@ export function PlayerBar() {
             </div>
           </Link>
 
-          {/* Transport cluster — sits in the auto-sized center grid track */}
           <div className="flex items-center justify-self-center gap-2.5">
-            {showNavButtons && (
+            {hasChapters && (
               <Button
                 variant="ghost"
                 size="icon"
@@ -283,7 +291,6 @@ export function PlayerBar() {
             )}
           </div>
 
-          {/* Ancillary controls (right) */}
           <div className="flex items-center justify-self-end gap-1">
             <PlaybackSpeed />
             <SleepTimerMenu />
@@ -316,9 +323,7 @@ export function PlayerBar() {
         </div>
       </div>
 
-      {/* Mobile layout (<md): two rows */}
       <div className="flex flex-col md:hidden">
-        {/* Top row: info + play/pause + close */}
         <div className="flex items-center gap-3 px-3 py-2">
           <Link
             href={episodeHref}
@@ -401,7 +406,6 @@ export function PlayerBar() {
           </Button>
         </div>
 
-        {/* Bottom row: skip + seek + speed */}
         <div className="flex items-center gap-2 px-3 pb-2">
           <Button
             variant="ghost"
