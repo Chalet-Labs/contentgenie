@@ -49,7 +49,11 @@ export async function getNotificationSummary(): Promise<NotificationSummary> {
           )
         ),
       db
-        .select({ lastSeen: sql<Date | null>`MAX(${notifications.createdAt})` })
+        .select({
+          lastSeen: sql<
+            Date | string | null
+          >`MAX(${notifications.createdAt})`,
+        })
         .from(notifications)
         .where(
           and(
@@ -82,7 +86,16 @@ export async function getNotificationSummary(): Promise<NotificationSummary> {
     ]);
 
     const totalUnread = totalRow[0]?.value ?? 0;
-    const lastSeenAt = lastSeenRow[0]?.lastSeen ?? null;
+    // Neon's HTTP driver returns raw Postgres strings for `sql<...>` aggregates
+    // (no column-level mapFromDriverValue runs). Rehydrate to a real Date so
+    // downstream Drizzle comparisons and `.toISOString()` calls are safe.
+    const rawLastSeen = lastSeenRow[0]?.lastSeen ?? null;
+    const lastSeenAt =
+      rawLastSeen instanceof Date
+        ? rawLastSeen
+        : rawLastSeen != null
+          ? new Date(rawLastSeen)
+          : null;
 
     type RawGroupRow = (typeof groupRows)[number];
     const podcastGroups: PodcastGroupRow[] = groupRows

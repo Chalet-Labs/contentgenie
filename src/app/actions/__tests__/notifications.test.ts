@@ -560,7 +560,7 @@ describe("notification server actions", () => {
     // 3. grouped rows → returns per-podcast rows
     function buildSummaryChain(
       totalUnread: number,
-      lastSeenRow: Array<{ lastSeen: Date | null }>,
+      lastSeenRow: Array<{ lastSeen: Date | string | null }>,
       groupRows: Array<{
         podcastId: number | null;
         podcastTitle: string | null;
@@ -777,6 +777,33 @@ describe("notification server actions", () => {
         dbError
       );
       errorSpy.mockRestore();
+    });
+
+    it("(m) rehydrates string lastSeen from Neon HTTP driver into Date for gte + toISOString", async () => {
+      // Regression for production TypeError: e.toISOString is not a function.
+      // Raw `sql<...>` aggregates bypass Drizzle's PgTimestamp.mapFromDriverValue,
+      // so Neon's HTTP driver returns MAX(created_at) as a string. The action must
+      // rehydrate before passing to `gte(...)` or calling `.toISOString()`.
+      const lastSeenIso = "2026-04-01T00:00:00.000Z";
+      buildSummaryChain(
+        5,
+        [{ lastSeen: lastSeenIso }],
+        [
+          { podcastId: 1, podcastTitle: "Pod A", count: "3" },
+          { podcastId: 2, podcastTitle: "Pod B", count: "2" },
+        ]
+      );
+      const fourthWhere = vi.fn().mockResolvedValue([{ sinceCount: "2" }]);
+      const fourthFrom = vi.fn().mockReturnValue({ where: fourthWhere });
+      mockSelect.mockReturnValueOnce({ from: fourthFrom });
+
+      const { getNotificationSummary } = await import("@/app/actions/notifications");
+      const result = await getNotificationSummary();
+      expect(result.groups).toContainEqual({
+        kind: "episodes_since_last_seen",
+        count: 2,
+        sinceIso: new Date(lastSeenIso).toISOString(),
+      });
     });
   });
 
