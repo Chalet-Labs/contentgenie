@@ -61,3 +61,23 @@ export const LongTitle: Story = {
     subscribedAt: new Date("2026-01-15"),
   },
 };
+
+export const Unpinned: Story = {
+  args: {
+    podcast: basePodcast,
+    subscribedAt: new Date("2026-01-15"),
+    subscriptionId: 1,
+    isPinned: false,
+    onTogglePin: () => {},
+  },
+};
+
+export const Pinned: Story = {
+  args: {
+    podcast: basePodcast,
+    subscribedAt: new Date("2026-01-15"),
+    subscriptionId: 1,
+    isPinned: true,
+    onTogglePin: () => {},
+  },
+};

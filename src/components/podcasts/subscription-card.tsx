@@ -2,9 +2,10 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { Rss, Clock } from "lucide-react";
+import { Rss, Clock, Pin, PinOff } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { SubscribeButton } from "./subscribe-button";
 import type { Podcast } from "@/db/schema";
 
@@ -12,11 +13,16 @@ interface SubscriptionCardProps {
   // BOLT OPTIMIZATION: Allow partial podcast object to support selective column fetching
   podcast: Omit<Podcast, "description"> & { description?: string | null };
   subscribedAt: Date;
+  subscriptionId?: number;
+  isPinned?: boolean;
+  onTogglePin?: () => void;
 }
 
 export function SubscriptionCard({
   podcast,
   subscribedAt,
+  isPinned = false,
+  onTogglePin,
 }: SubscriptionCardProps) {
   const categories = podcast.categories || [];
 
@@ -90,12 +96,32 @@ export function SubscriptionCard({
 
             {/* Actions — click isolated */}
             <div
-              className="relative z-10 flex shrink-0 flex-col items-end justify-between"
+              className="relative z-10 flex shrink-0 flex-col items-end justify-between gap-2"
               onClick={(e) => e.stopPropagation()}
               onKeyDown={(e) => {
                 if (e.key === "Enter") e.stopPropagation();
               }}
             >
+              {onTogglePin && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  aria-pressed={isPinned}
+                  aria-label={isPinned ? "Unpin podcast" : "Pin podcast"}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onTogglePin();
+                  }}
+                >
+                  {isPinned ? (
+                    <Pin className="h-4 w-4 fill-current" />
+                  ) : (
+                    <PinOff className="h-4 w-4" />
+                  )}
+                </Button>
+              )}
               <SubscribeButton
                 podcastIndexId={podcast.podcastIndexId}
                 title={podcast.title}

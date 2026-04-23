@@ -568,6 +568,16 @@ export async function getUserSubscriptions(sort?: SubscriptionSort) {
   }
 }
 
+export type SubscriptionWithPodcast = Awaited<
+  ReturnType<typeof getUserSubscriptions>
+>["subscriptions"][number];
+
+export async function getUserSubscriptionSort(): Promise<SubscriptionSort> {
+  const { userId } = await auth();
+  if (!userId) return DEFAULT_SUBSCRIPTION_SORT;
+  return resolveSort(userId, undefined);
+}
+
 export async function togglePinSubscription(
   subscriptionId: number,
 ): Promise<ActionResult<{ isPinned: boolean }>> {

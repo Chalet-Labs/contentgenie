@@ -147,4 +147,74 @@ describe("SubscriptionCard", () => {
     fireEvent(buttonContainer, keydownEvent);
     expect(stopPropagationSpyKeydown).toHaveBeenCalled();
   });
+
+  describe("pin toggle", () => {
+    it("does not render a pin button when onTogglePin is not supplied", () => {
+      render(
+        <SubscriptionCard podcast={mockPodcast} subscribedAt={subscribedAt} />
+      );
+      expect(screen.queryByRole("button", { name: /pin/i })).toBeNull();
+    });
+
+    it("exposes aria-pressed=false and 'Pin podcast' label when unpinned", () => {
+      render(
+        <SubscriptionCard
+          podcast={mockPodcast}
+          subscribedAt={subscribedAt}
+          subscriptionId={1}
+          isPinned={false}
+          onTogglePin={() => {}}
+        />
+      );
+      const pin = screen.getByRole("button", { name: "Pin podcast" });
+      expect(pin).toHaveAttribute("aria-pressed", "false");
+    });
+
+    it("exposes aria-pressed=true and 'Unpin podcast' label when pinned", () => {
+      render(
+        <SubscriptionCard
+          podcast={mockPodcast}
+          subscribedAt={subscribedAt}
+          subscriptionId={1}
+          isPinned={true}
+          onTogglePin={() => {}}
+        />
+      );
+      const pin = screen.getByRole("button", { name: "Unpin podcast" });
+      expect(pin).toHaveAttribute("aria-pressed", "true");
+    });
+
+    it("calls onTogglePin when the pin button is clicked", () => {
+      const onTogglePin = vi.fn();
+      render(
+        <SubscriptionCard
+          podcast={mockPodcast}
+          subscribedAt={subscribedAt}
+          subscriptionId={1}
+          isPinned={false}
+          onTogglePin={onTogglePin}
+        />
+      );
+      fireEvent.click(screen.getByRole("button", { name: "Pin podcast" }));
+      expect(onTogglePin).toHaveBeenCalledTimes(1);
+    });
+
+    it("does not navigate the parent link when the pin button is clicked", () => {
+      const parentClickHandler = vi.fn();
+      render(
+        // eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events
+        <div onClick={parentClickHandler}>
+          <SubscriptionCard
+            podcast={mockPodcast}
+            subscribedAt={subscribedAt}
+            subscriptionId={1}
+            isPinned={false}
+            onTogglePin={() => {}}
+          />
+        </div>
+      );
+      fireEvent.click(screen.getByRole("button", { name: "Pin podcast" }));
+      expect(parentClickHandler).not.toHaveBeenCalled();
+    });
+  });
 });

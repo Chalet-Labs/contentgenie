@@ -1,11 +1,15 @@
 import Link from "next/link";
 import { Rss, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { SubscriptionCard } from "@/components/podcasts/subscription-card";
-import { getUserSubscriptions } from "@/app/actions/subscriptions";
+import { SubscriptionsList } from "@/components/podcasts/subscriptions-list";
+import {
+  getUserSubscriptionSort,
+  getUserSubscriptions,
+} from "@/app/actions/subscriptions";
 
 export default async function SubscriptionsPage() {
-  const { subscriptions, error } = await getUserSubscriptions();
+  const sort = await getUserSubscriptionSort();
+  const { subscriptions, error } = await getUserSubscriptions(sort);
 
   if (error) {
     return (
@@ -60,15 +64,10 @@ export default async function SubscriptionsPage() {
           </Button>
         </div>
       ) : (
-        <div className="space-y-4">
-          {subscriptions.map((subscription) => (
-            <SubscriptionCard
-              key={subscription.id}
-              podcast={subscription.podcast}
-              subscribedAt={subscription.subscribedAt}
-            />
-          ))}
-        </div>
+        <SubscriptionsList
+          subscriptions={subscriptions}
+          initialSort={sort}
+        />
       )}
     </div>
   );
