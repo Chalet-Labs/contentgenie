@@ -8,6 +8,11 @@ vi.mock("@/app/actions/dashboard", () => ({
   getTrendingTopicBySlug: (slug: string) => mockGetTrendingTopicBySlug(slug),
 }));
 
+const mockGetListenedEpisodeIds = vi.fn();
+vi.mock("@/app/actions/listen-history", () => ({
+  getListenedEpisodeIds: (...args: unknown[]) => mockGetListenedEpisodeIds(...args),
+}));
+
 import { TrendingDetailContent } from "../trending-detail-content";
 import { STALE_THRESHOLD_MS } from "@/lib/trending";
 
@@ -45,6 +50,7 @@ const mockEpisode: RecommendedEpisodeDTO = {
 describe("TrendingDetailContent", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockGetListenedEpisodeIds.mockResolvedValue(new Set<number>());
   });
 
   afterEach(() => {
@@ -161,5 +167,51 @@ describe("TrendingDetailContent", () => {
     render(await TrendingDetailContent({ slug: "artificial-intelligence" }));
 
     expect(screen.getByText(/no episodes available for this topic yet/i)).toBeInTheDocument();
+  });
+
+  it("skips getListenedEpisodeIds when there are no episodes", async () => {
+    mockGetTrendingTopicBySlug.mockResolvedValue({
+      kind: "found",
+      topic: aiTopic,
+      allTopics: [aiTopic],
+      episodes: [],
+      generatedAt: new Date(),
+    });
+
+    render(await TrendingDetailContent({ slug: "artificial-intelligence" }));
+
+    expect(mockGetListenedEpisodeIds).not.toHaveBeenCalled();
+  });
+
+  it("passes internal episode ids to getListenedEpisodeIds and reflects listened state", async () => {
+    mockGetTrendingTopicBySlug.mockResolvedValue({
+      kind: "found",
+      topic: aiTopic,
+      allTopics: [aiTopic],
+      episodes: [mockEpisode],
+      generatedAt: new Date(Date.now() - 60 * 60 * 1000),
+    });
+    mockGetListenedEpisodeIds.mockResolvedValue(new Set<number>([mockEpisode.id]));
+
+    render(await TrendingDetailContent({ slug: "artificial-intelligence" }));
+
+    expect(mockGetListenedEpisodeIds).toHaveBeenCalledWith([mockEpisode.id]);
+    expect(screen.queryByRole("button", { name: "Mark as listened" })).toBeNull();
+    expect(screen.getByLabelText("Already listened")).toBeInTheDocument();
+  });
+
+  it("renders the Mark-as-listened button when the episode is not in the listened set", async () => {
+    mockGetTrendingTopicBySlug.mockResolvedValue({
+      kind: "found",
+      topic: aiTopic,
+      allTopics: [aiTopic],
+      episodes: [mockEpisode],
+      generatedAt: new Date(Date.now() - 60 * 60 * 1000),
+    });
+    mockGetListenedEpisodeIds.mockResolvedValue(new Set<number>());
+
+    render(await TrendingDetailContent({ slug: "artificial-intelligence" }));
+
+    expect(screen.getByRole("button", { name: "Mark as listened" })).toBeInTheDocument();
   });
 });

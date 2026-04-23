@@ -283,6 +283,25 @@ describe("getListenedEpisodeIds", () => {
     expect(result).toEqual(new Set([10, 42, 99]))
   })
 
+  it("filters by both userId and episodeId (privacy guard)", async () => {
+    mockSelectWhere.mockResolvedValue([])
+    const { getListenedEpisodeIds } = await import("@/app/actions/listen-history")
+    await getListenedEpisodeIds([10, 42])
+
+    const whereArg = mockSelectWhere.mock.calls[0][0] as { _and: Array<Record<string, unknown>> }
+    expect(whereArg).toHaveProperty("_and")
+    const predicates = whereArg._and
+    const userIdPredicate = predicates.find(
+      (p) => p.col === "userId" && p.val === "user_123",
+    )
+    const episodeIdPredicate = predicates.find(
+      (p) => (p as { _inArray?: { col: unknown; vals: unknown[] } })._inArray?.col === "episodeId",
+    ) as { _inArray: { col: unknown; vals: number[] } } | undefined
+    expect(userIdPredicate).toBeDefined()
+    expect(episodeIdPredicate).toBeDefined()
+    expect(episodeIdPredicate?._inArray.vals).toEqual([10, 42])
+  })
+
   it("returns empty Set and logs when DB throws", async () => {
     mockSelectWhere.mockRejectedValueOnce(new Error("DB boom"))
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {})

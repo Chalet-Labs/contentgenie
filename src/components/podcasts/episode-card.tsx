@@ -19,6 +19,7 @@ interface EpisodeCardProps {
   worthItScore?: string | null;
   showQueueAction?: boolean;
   isListened?: boolean;
+  canMarkListened?: boolean;
 }
 
 function ScoreIndicator({ value }: { value: string }) {
@@ -35,7 +36,7 @@ function ScoreIndicator({ value }: { value: string }) {
   );
 }
 
-export function EpisodeCard({ episode, summaryStatus, worthItScore, showQueueAction = false, isListened = false }: EpisodeCardProps) {
+export function EpisodeCard({ episode, summaryStatus, worthItScore, showQueueAction = false, isListened = false, canMarkListened = true }: EpisodeCardProps) {
   const hasAudio = Boolean(episode.enclosureUrl);
 
   return (
@@ -92,10 +93,12 @@ export function EpisodeCard({ episode, summaryStatus, worthItScore, showQueueAct
           </Link>
 
           <div className="flex shrink-0 flex-col items-center gap-1 self-start">
-            <ListenedButton
-              podcastIndexEpisodeId={String(episode.id)}
-              isListened={isListened}
-            />
+            {canMarkListened && (
+              <ListenedButton
+                podcastIndexEpisodeId={String(episode.id)}
+                isListened={isListened}
+              />
+            )}
             {showQueueAction && hasAudio && (
               <div className="invisible opacity-0 transition-all group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100 max-md:visible max-md:opacity-100">
                 <AddToQueueButton

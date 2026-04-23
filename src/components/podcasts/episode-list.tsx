@@ -15,9 +15,12 @@ interface EpisodeListProps {
   statusMap?: Record<string, SummaryStatus>;
   scoreMap?: Record<string, string>;
   listenedSet?: Set<string>;
+  // Podcast-index-episode-ids (stringified) that exist in our DB and can be targeted by recordListenEvent.
+  // Omit to allow marking on all episodes (library/trending surfaces where every episode is in-DB by construction).
+  knownSet?: Set<string>;
 }
 
-export function EpisodeList({ episodes, isLoading, error, statusMap, scoreMap, listenedSet }: EpisodeListProps) {
+export function EpisodeList({ episodes, isLoading, error, statusMap, scoreMap, listenedSet, knownSet }: EpisodeListProps) {
   const [query, setQuery] = useState("");
   const trimmedQuery = query.trim();
   const normalizedQuery = trimmedQuery.toLowerCase();
@@ -87,6 +90,7 @@ export function EpisodeList({ episodes, isLoading, error, statusMap, scoreMap, l
             summaryStatus={statusMap?.[String(episode.id)]}
             worthItScore={scoreMap?.[String(episode.id)]}
             isListened={listenedSet?.has(String(episode.id)) ?? false}
+            canMarkListened={knownSet ? knownSet.has(String(episode.id)) : true}
           />
         ))
       )}

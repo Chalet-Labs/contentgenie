@@ -167,10 +167,12 @@ export function SavedEpisodeCard({ item, onRemoved, onCollectionChanged, isOffli
                   )}
                 </div>
                 <div className="flex items-center gap-1">
-                  <ListenedButton
-                    podcastIndexEpisodeId={episode.podcastIndexId}
-                    isListened={isListened}
-                  />
+                  {!isOffline && (
+                    <ListenedButton
+                      podcastIndexEpisodeId={episode.podcastIndexId}
+                      isListened={isListened}
+                    />
+                  )}
                   <CollapsibleTrigger asChild>
                     <Button
                       variant="ghost"

@@ -19,10 +19,11 @@ interface ListenedButtonProps {
 }
 
 export function ListenedButton({ podcastIndexEpisodeId, isListened }: ListenedButtonProps) {
-  const [listened, setListened] = useState(isListened)
+  const [optimisticOn, setOptimisticOn] = useState(false)
   const [isPending, startTransition] = useTransition()
+  const displayed = isListened || optimisticOn
 
-  if (listened) {
+  if (displayed) {
     return (
       <TooltipProvider>
         <Tooltip>
@@ -38,16 +39,25 @@ export function ListenedButton({ podcastIndexEpisodeId, isListened }: ListenedBu
   }
 
   const handleClick = () => {
-    setListened(true)
+    setOptimisticOn(true)
     startTransition(async () => {
-      const result = await recordListenEvent({ podcastIndexEpisodeId, completed: true })
-      if (!result.success) {
-        setListened(false)
-        toast.error(result.error || "Failed to mark as listened")
-        return
+      try {
+        const result = await recordListenEvent({ podcastIndexEpisodeId, completed: true })
+        if (!result || result.success !== true) {
+          setOptimisticOn(false)
+          toast.error((result && "error" in result && result.error) || "Failed to mark as listened")
+          return
+        }
+        toast.success("Marked as listened")
+        window.dispatchEvent(new CustomEvent(LISTEN_STATE_CHANGED_EVENT))
+      } catch (e) {
+        console.error("[ListenedButton] recordListenEvent threw", {
+          podcastIndexEpisodeId,
+          error: e instanceof Error ? { name: e.name, message: e.message } : e,
+        })
+        setOptimisticOn(false)
+        toast.error("Could not mark as listened — check your connection")
       }
-      toast.success("Marked as listened")
-      window.dispatchEvent(new CustomEvent(LISTEN_STATE_CHANGED_EVENT))
     })
   }
 

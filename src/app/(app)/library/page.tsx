@@ -19,6 +19,7 @@ import { getListenedEpisodeIds } from "@/app/actions/listen-history";
 import { useOnlineStatus } from "@/hooks/use-online-status";
 import { OfflineBanner } from "@/components/ui/offline-banner";
 import { cacheLibrary, getCachedLibrary } from "@/lib/offline-cache";
+import { LISTEN_STATE_CHANGED_EVENT } from "@/lib/events";
 import type { SavedItemDTO } from "@/db/library-columns";
 
 export default function LibraryPage() {
@@ -94,6 +95,20 @@ export default function LibraryPage() {
       loadFromCache();
     }
   }, [isOnline, loadLibrary, loadFromCache]);
+
+  // Refresh listened state when any ListenedButton on the page fires a mark.
+  // Without this, a second card for the same episode would stay on the "Mark as listened" affordance.
+  useEffect(() => {
+    if (!isOnline) return;
+    const refresh = async () => {
+      const ids = items.map((i) => i.episode.id);
+      if (ids.length === 0) return;
+      const s = await getListenedEpisodeIds(ids);
+      setListenedSet(s);
+    };
+    window.addEventListener(LISTEN_STATE_CHANGED_EVENT, refresh);
+    return () => window.removeEventListener(LISTEN_STATE_CHANGED_EVENT, refresh);
+  }, [isOnline, items]);
 
   const handleRemoved = () => {
     loadLibrary();

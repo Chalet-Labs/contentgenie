@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { getCollection, deleteCollection } from "@/app/actions/collections";
 import { getListenedEpisodeIds } from "@/app/actions/listen-history";
+import { LISTEN_STATE_CHANGED_EVENT } from "@/lib/events";
 import type { SavedItemDTO } from "@/db/library-columns";
 import type { Collection } from "@/db/schema";
 
@@ -65,6 +66,19 @@ export default function CollectionDetailPage() {
   useEffect(() => {
     loadCollection();
   }, [loadCollection]);
+
+  // Refresh listened state when any ListenedButton on the page fires a mark.
+  // Without this, a second card for the same episode would stay on the "Mark as listened" affordance.
+  useEffect(() => {
+    const refresh = async () => {
+      const ids = items.map((i) => i.episode.id);
+      if (ids.length === 0) return;
+      const s = await getListenedEpisodeIds(ids);
+      setListenedSet(s);
+    };
+    window.addEventListener(LISTEN_STATE_CHANGED_EVENT, refresh);
+    return () => window.removeEventListener(LISTEN_STATE_CHANGED_EVENT, refresh);
+  }, [items]);
 
   const handleRemoved = () => {
     loadCollection();

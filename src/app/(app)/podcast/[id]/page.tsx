@@ -298,6 +298,7 @@ export default async function PodcastPage({ params, searchParams }: PodcastPageP
         .filter((e) => listenedInternalIds.has(e.id))
         .map((e) => e.podcastIndexId),
     )
+    const piKnownSet = new Set(dbEpisodeData.map((e) => e.podcastIndexId))
 
     if (!podcast) {
       notFound();
@@ -435,7 +436,7 @@ export default async function PodcastPage({ params, searchParams }: PodcastPageP
           <h2 className="mb-4 text-xl font-semibold">
             Episodes ({episodes.length})
           </h2>
-          <EpisodeList episodes={episodes} statusMap={statusMap} scoreMap={scoreMap} listenedSet={piListenedSet} />
+          <EpisodeList episodes={episodes} statusMap={statusMap} scoreMap={scoreMap} listenedSet={piListenedSet} knownSet={piKnownSet} />
         </div>
       </div>
     );
