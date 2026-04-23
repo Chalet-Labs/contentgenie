@@ -161,6 +161,11 @@ typography:
     fontSize: 18px
     fontWeight: "400"
     lineHeight: 28px
+  body-lg:
+    fontFamily: Inter
+    fontSize: 16px
+    fontWeight: "400"
+    lineHeight: 24px
   body:
     fontFamily: Inter
     fontSize: 14px
@@ -306,11 +311,14 @@ components:
     borderLeftColor: "{colors.primary}"
   input:
     # Matches the shipped Input primitive: transparent surface that inherits
-    # the enclosing card/page background, with responsive text-base on
-    # small screens / text-sm above the md breakpoint.
+    # the enclosing card/page background. The base typography is 16px
+    # (body-lg / Tailwind text-base) so iOS Safari does not zoom on focus;
+    # the shipped primitive drops to 14px (typography.body / text-sm) above
+    # the md breakpoint, documented in the Inputs prose rather than encoded
+    # here since design.md components have no media-query primitive.
     backgroundColor: transparent
     textColor: "{colors.foreground}"
-    typography: "{typography.body}"
+    typography: "{typography.body-lg}"
     rounded: "{rounded.md}"
     height: 36px
     padding: 0 12px
@@ -731,9 +739,12 @@ the card edge without competing with content.
   `input` token, **transparent** background (`bg-transparent`) so the
   field inherits its enclosing surface — critical when inputs sit
   inside tinted cards or modals.
-- Responsive text sizing: `text-base` (16px) on small screens to
-  prevent iOS auto-zoom, stepping down to `text-sm` (14px) above the
-  `md` breakpoint.
+- Responsive text sizing: `body-lg` (16px / Tailwind `text-base`) by
+  default — the 16px floor prevents iOS Safari zoom-on-focus —
+  stepping down to `body` (14px / `text-sm`) above the `md`
+  breakpoint. The token frontmatter encodes the base (`body-lg`); the
+  breakpoint refinement lives here because the design.md component
+  schema has no media-query primitive.
 - Focus ring: 1px `ring` color, no offset (`focus-visible:ring-1`).
   Tight and restrained — no halo glow.
 - Error state: border shifts to `destructive`; inline message below
