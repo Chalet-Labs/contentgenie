@@ -35,7 +35,7 @@ import { useCurrentChapter } from "@/hooks/use-current-chapter"
 import { useMediaQuery } from "@/hooks/use-media-query"
 
 const PREV_CHAPTER_RESTART_THRESHOLD_SECONDS = 3
-const SKIP_FLASH_DURATION_MS = 700
+export const SKIP_FLASH_DURATION_MS = 700
 
 type SkipFlash = { direction: "back" | "forward"; seconds: number; nonce: number }
 
@@ -223,7 +223,7 @@ export function PlayerBar() {
                 {currentEpisode.podcastTitle}
               </p>
               {currentChapter && (
-                <p className="truncate text-xs text-muted-foreground" data-testid="current-chapter-title">
+                <p className="truncate text-xs text-muted-foreground" data-testid="current-chapter-title-desktop">
                   {currentChapter.title}
                 </p>
               )}
@@ -246,6 +246,7 @@ export function PlayerBar() {
             )}
             <Button
               variant="secondary"
+              size="icon"
               onClick={handleSkipBack}
               aria-label={`Skip back ${SKIP_BACK_SECONDS} seconds`}
               title={`Rewind ${SKIP_BACK_SECONDS}s`}
@@ -255,6 +256,7 @@ export function PlayerBar() {
             </Button>
             <Button
               variant="default"
+              size="icon"
               onClick={togglePlay}
               aria-label={isPlaying ? "Pause" : "Play"}
               className="h-14 w-14 shrink-0 rounded-full shadow-md hover:shadow-lg"
@@ -269,6 +271,7 @@ export function PlayerBar() {
             </Button>
             <Button
               variant="secondary"
+              size="icon"
               onClick={handleSkipForward}
               aria-label={`Skip forward ${SKIP_FORWARD_SECONDS} seconds`}
               title={`Forward ${SKIP_FORWARD_SECONDS}s`}
@@ -360,7 +363,7 @@ export function PlayerBar() {
                 {currentEpisode.podcastTitle}
               </p>
               {currentChapter && (
-                <p className="truncate text-xs text-muted-foreground" data-testid="current-chapter-title">
+                <p className="truncate text-xs text-muted-foreground" data-testid="current-chapter-title-mobile">
                   {currentChapter.title}
                 </p>
               )}

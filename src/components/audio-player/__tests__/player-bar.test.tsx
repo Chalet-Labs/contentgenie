@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { render, screen, fireEvent, act } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
-import { PlayerBar } from "@/components/audio-player/player-bar"
+import { PlayerBar, SKIP_FLASH_DURATION_MS } from "@/components/audio-player/player-bar"
 
 // Radix Slider uses ResizeObserver which jsdom doesn't provide
 class MockResizeObserver {
@@ -407,7 +407,7 @@ describe("PlayerBar", () => {
   })
 
   describe("Skip flash lifecycle", () => {
-    it("shows the flash on skip forward and clears it after 700ms", () => {
+    it("shows the flash on skip forward and clears it after the full window", () => {
       vi.useFakeTimers()
       try {
         mockState.isVisible = true
@@ -418,7 +418,7 @@ describe("PlayerBar", () => {
         expect(screen.getByText(/\+ 30s/)).toBeInTheDocument()
 
         act(() => {
-          vi.advanceTimersByTime(700)
+          vi.advanceTimersByTime(SKIP_FLASH_DURATION_MS)
         })
         expect(screen.queryByText(/\+ 30s/)).not.toBeInTheDocument()
       } finally {
@@ -433,22 +433,26 @@ describe("PlayerBar", () => {
         mockState.currentEpisode = testEpisode
         render(<PlayerBar />)
 
+        const firstHalf = Math.floor(SKIP_FLASH_DURATION_MS * 0.57)
+        const secondAdvance = Math.floor(SKIP_FLASH_DURATION_MS * 0.71)
+        const remainder = SKIP_FLASH_DURATION_MS - secondAdvance + 1
+
         fireEvent.click(screen.getAllByRole("button", { name: "Skip back 10 seconds" })[0])
         expect(screen.getByText(/− 10s/)).toBeInTheDocument()
 
         act(() => {
-          vi.advanceTimersByTime(400)
+          vi.advanceTimersByTime(firstHalf)
         })
         fireEvent.click(screen.getAllByRole("button", { name: "Skip forward 30 seconds" })[0])
         expect(screen.getByText(/\+ 30s/)).toBeInTheDocument()
 
         act(() => {
-          vi.advanceTimersByTime(500)
+          vi.advanceTimersByTime(secondAdvance)
         })
         expect(screen.getByText(/\+ 30s/)).toBeInTheDocument()
 
         act(() => {
-          vi.advanceTimersByTime(300)
+          vi.advanceTimersByTime(remainder)
         })
         expect(screen.queryByText(/\+ 30s/)).not.toBeInTheDocument()
       } finally {
