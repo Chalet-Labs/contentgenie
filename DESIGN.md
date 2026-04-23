@@ -201,9 +201,10 @@ typography:
 
 rounded:
   # These correspond to the Tailwind `rounded-{sm,md,lg,xl,full}` utilities
-  # as configured in the codebase. There is no Tailwind `rounded.DEFAULT`
-  # key — the bare `rounded` utility falls through to Tailwind's built-in
-  # 4px default, which this system does not use.
+  # as configured in the codebase. Tailwind provides a built-in default
+  # radius for the bare `rounded` utility (0.25rem), but this system does
+  # not override it and intentionally does not use the bare shorthand —
+  # always reach for a named size below.
   sm: 4px
   md: 6px
   lg: 8px
@@ -233,9 +234,9 @@ motion:
   duration-fast: 150ms
   duration-base: 200ms
   duration-slow: 300ms
+  duration-reduced: 0ms
   easing-standard: cubic-bezier(0.2, 0, 0, 1)
   easing-emphasized: cubic-bezier(0.3, 0, 0, 1)
-  reduced-motion: "Honor prefers-reduced-motion: clamp every animation + transition to ~0ms and disable smooth scroll."
 
 components:
   button-primary:
@@ -247,6 +248,7 @@ components:
     padding: 0 16px
   button-primary-hover:
     backgroundColor: "{colors.primary}"
+    opacity: 0.9
   button-secondary:
     backgroundColor: "{colors.secondary}"
     textColor: "{colors.secondary-foreground}"
@@ -263,6 +265,7 @@ components:
     padding: 0 12px
   button-ghost-hover:
     backgroundColor: "{colors.accent}"
+    textColor: "{colors.accent-foreground}"
   button-destructive:
     backgroundColor: "{colors.destructive}"
     textColor: "{colors.destructive-foreground}"
@@ -292,15 +295,20 @@ components:
     textColor: "{colors.card-foreground}"
     rounded: "{rounded.xl}"
     padding: "{spacing.card-padding-lg}"
+    borderLeftWidth: 2px
+    borderLeftColor: "{colors.primary}"
   input:
-    backgroundColor: "{colors.background}"
+    # Matches the shipped Input primitive: transparent surface that inherits
+    # the enclosing card/page background, with responsive text-base on
+    # small screens / text-sm above the md breakpoint.
+    backgroundColor: transparent
     textColor: "{colors.foreground}"
     typography: "{typography.body}"
     rounded: "{rounded.md}"
     height: 36px
     padding: 0 12px
   input-focus:
-    backgroundColor: "{colors.background}"
+    backgroundColor: transparent
     ringColor: "{colors.ring}"
     ringWidth: 1px
     ringOffsetWidth: 0px
@@ -499,18 +507,37 @@ elements — they're read-only semantic framing for content, not chrome.
 
 ### Contrast targets
 
-- Body text on paper: 4.5:1 (AA).
-- Primary button text on emerald: > 7:1 (AAA).
-- Amber on dark text: > 10:1 (the amber tile always carries dark ink).
-- Muted-foreground: tuned to land at exactly 4.5:1 — any darker and
-  "secondary info" starts competing with primary copy.
+Target and measured ratios for the shipped light-mode pairings (WCAG 2.1
+definitions):
+
+- **Body text on paper** — foreground on background, ~18.5:1.
+  Exceeds AAA for all text sizes.
+- **Amber tile glyph** — brand-foreground on brand, ~8.5:1. Passes AAA
+  for large text and AA for normal text. The amber tile always carries
+  dark ink and must never be tinted to a value that drops below 4.5:1.
+- **Muted-foreground on paper** — ~4.3:1. Passes AA for large text
+  (≥18pt / 14pt bold) and narrowly misses AA for normal text by
+  design; metadata is tuned to recede. Never demote primary copy to
+  `muted-foreground`.
+- **Primary button label on emerald primary** — primary-foreground on
+  primary, ~3.5:1. Passes the 3:1 AA bar for large text and UI
+  components but is **below** the 4.5:1 normal-text bar. This is a
+  known delta; primary button labels ship at 14px / 500-weight
+  (non-large) so the target is formally AA-UI rather than AA-normal.
+  If a future system refresh requires AA-normal on primary, darken
+  the primary token (or lift the primary-foreground token) until
+  ≥4.5:1; until then, treat this as the accepted shipped ratio, not
+  an aspirational AAA.
 
 ## Typography
 
 One family: **Inter**. Weight and size carry hierarchy; no display serifs,
-no secondary sans, no decorative fallbacks. The fallback stack is
-system-ui first so SSR still renders the correct metrics before the
-variable font arrives.
+no secondary sans. Inter is loaded via `next/font` — SSR and first paint
+render with the Next.js-generated, metric-compatible fallback font until
+Inter finishes loading, so there is no measurable layout shift. The
+`--font-sans` token still lists an explicit fallback stack (Inter →
+`ui-sans-serif` → `system-ui` → platform sans) as a defense-in-depth
+safety net for environments where the `next/font` pipeline is bypassed.
 
 ### Scale
 
@@ -645,10 +672,14 @@ easing flourish is 400ms of delay between the user and the information.
   opacity rather than a second color token.
 - **Secondary** — `secondary` fill, foreground label. Same geometry.
   Use when primary is adjacent and would out-shout content.
-- **Outline** — transparent fill over background, foreground label,
-  1px `input`-colored border. Same geometry.
-- **Ghost** — transparent, foreground label, hover reveals `accent`
-  fill. Use inside dense toolbars.
+- **Outline** — `background` fill (not transparent), foreground
+  label, 1px `input`-colored border. Same geometry. The opaque fill
+  preserves a clean edge when the button sits on a tinted or card
+  surface — unlike ghost, which deliberately lets the surround show
+  through.
+- **Ghost** — transparent, foreground label, hover reveals both
+  `accent` fill *and* `accent-foreground` label color. Use inside
+  dense toolbars.
 - **Destructive** — vermilion fill. Pair with an explicit confirm step
   for irreversible actions.
 - **Icon-only** — ghost by default, 36×36 hit area; pad the wrapper
@@ -663,8 +694,11 @@ one row — if both feel equal, one of them is mis-labeled.
   border, 24px padding, with a subtle default drop shadow at rest.
 - **Bordered** — same, explicit when the context otherwise loses the
   edge.
-- **Accent** — same, but with a 2px left border in `primary` to flag
-  "this one has a completed summary." Reserved for that one semantic.
+- **Accent** — same, plus a 2px left border in `primary`
+  (`borderLeftWidth: 2px`, `borderLeftColor: primary`) to flag
+  "this one has a completed summary." Reserved for that one
+  semantic. The left border sits *on top of* the card's structural
+  border and shadow, not instead of them.
 
 Cards have at most one hero element (title, score, image) and metadata
 stacks below at `muted-foreground`. The shadow is intentionally subtle —
@@ -674,7 +708,12 @@ the card edge without competing with content.
 ### Inputs
 
 - 36px tall (`h-9`), 6px radius (`rounded-md`), 1px border using the
-  `input` token.
+  `input` token, **transparent** background (`bg-transparent`) so the
+  field inherits its enclosing surface — critical when inputs sit
+  inside tinted cards or modals.
+- Responsive text sizing: `text-base` (16px) on small screens to
+  prevent iOS auto-zoom, stepping down to `text-sm` (14px) above the
+  `md` breakpoint.
 - Focus ring: 1px `ring` color, no offset (`focus-visible:ring-1`).
   Tight and restrained — no halo glow.
 - Error state: border shifts to `destructive`; inline message below
