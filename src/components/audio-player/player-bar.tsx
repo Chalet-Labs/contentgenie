@@ -58,7 +58,7 @@ export function PlayerBar() {
 
   const currentChapterIdx = useMemo(() => {
     if (!hasChapters) return -1
-    let idx = 0
+    let idx = -1
     for (let i = 0; i < chapters.length; i++) {
       if (currentTime >= chapters[i].startTime) idx = i
     }
@@ -100,20 +100,24 @@ export function PlayerBar() {
   }, [hasChapters, chapters, currentChapterIdx, currentTime, seek])
 
   const handleNextNav = useCallback(() => {
-    if (hasChapters && currentChapterIdx >= 0 && currentChapterIdx < chapters.length - 1) {
-      seek(chapters[currentChapterIdx + 1].startTime)
-    } else if (canNavigateQueue) {
+    if (hasChapters) {
+      const nextIdx = currentChapterIdx + 1
+      if (nextIdx < chapters.length) {
+        seek(chapters[nextIdx].startTime)
+        return
+      }
+    }
+    if (canNavigateQueue) {
       playNext()
     }
   }, [hasChapters, chapters, currentChapterIdx, canNavigateQueue, seek, playNext])
 
-  const navMode: "chapter" | "queue" = hasChapters ? "chapter" : "queue"
-  const prevLabel = navMode === "chapter" ? "Previous chapter" : "Previous episode"
-  const nextLabel = navMode === "chapter" ? "Next chapter" : "Next episode"
-  const canGoPrev = hasChapters
-  const canGoNext =
-    (hasChapters && currentChapterIdx >= 0 && currentChapterIdx < chapters.length - 1) ||
-    canNavigateQueue
+  const willAdvanceChapter =
+    hasChapters && currentChapterIdx + 1 < chapters.length
+  const prevLabel = hasChapters ? "Previous chapter" : "Previous episode"
+  const nextLabel = willAdvanceChapter ? "Next chapter" : "Next episode"
+  const canGoPrev = hasChapters && currentChapterIdx >= 0
+  const canGoNext = willAdvanceChapter || canNavigateQueue
 
   if (!isVisible || !currentEpisode) return null
 
@@ -172,7 +176,7 @@ export function PlayerBar() {
         <div className="px-5 pt-2.5">
           <SeekBar />
         </div>
-        <div className="relative flex h-16 items-center gap-4 px-5 pb-3 pt-1">
+        <div className="grid h-16 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-4 px-5 pb-3 pt-1">
           {/* Track info (left) */}
           <Link
             href={episodeHref}
@@ -217,8 +221,8 @@ export function PlayerBar() {
             </div>
           </Link>
 
-          {/* Transport cluster — absolutely centered in the row, independent of sibling widths */}
-          <div className="absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center gap-2.5">
+          {/* Transport cluster — sits in the auto-sized center grid track */}
+          <div className="flex items-center justify-self-center gap-2.5">
             {showNavButtons && (
               <Button
                 variant="ghost"
@@ -280,7 +284,7 @@ export function PlayerBar() {
           </div>
 
           {/* Ancillary controls (right) */}
-          <div className="ml-auto flex items-center gap-1">
+          <div className="flex items-center justify-self-end gap-1">
             <PlaybackSpeed />
             <SleepTimerMenu />
             <BookmarkButton />
