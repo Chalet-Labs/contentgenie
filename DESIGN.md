@@ -611,8 +611,10 @@ SC 1.4.3 (AA) and SC 1.4.6 (AAA). AA requires 4.5:1 for normal text and
   document is not a waiver. The remediation paths are: (a) darken
   the `primary` token or lift `primary-foreground` until the pair
   reaches ≥4.5:1, or (b) increase button label size/weight to
-  qualify as large text (≥18px regular or ≥14px bold) so the 3:1
-  large-text threshold applies. Do not paper over the issue by
+  qualify as large text (WCAG 2.1 defines this as ≥18pt regular or
+  ≥14pt bold — roughly ≥24px regular or ≥18.5px bold in CSS pixels
+  at 1:1 pt-to-px ratio, **not** the more permissive ≥18px/≥14px some
+  specs loosely cite) so the 3:1 large-text threshold applies. Do not paper over the issue by
   claiming an AA-UI exemption — SC 1.4.11 (3:1 for UI components)
   governs component boundaries, not the text inside them.
 
@@ -703,8 +705,16 @@ Rules:
   shadows push the palette toward "branded gradient kitsch."
 - Past the card tier, don't combine border + heavy shadow. Pick one
   per surface tier.
-- Dark mode shadows shrink (halve their opacity) — forest ink already
-  absorbs depth cues, and over-shadowing reads as muddy.
+- Dark mode shadow intent: the tier values *should* halve opacity in
+  dark mode — forest ink already absorbs depth cues, and
+  over-shadowing reads as muddy. **Known gap:** neither the
+  frontmatter (`elevation:`) nor the shipped `.dark` block in
+  `src/app/globals.css` carries `-dark` shadow overrides today, so
+  production currently re-uses the light-mode shadow triplet values
+  under dark mode. Remediation when the system is revisited: add
+  `-dark` twins to the `elevation` section *and* matching
+  `--shadow-*` overrides inside `.dark { … }`, then update this
+  rule to describe the shipped behavior.
 
 ## Shapes
 
