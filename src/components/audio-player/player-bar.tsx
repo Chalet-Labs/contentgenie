@@ -50,6 +50,11 @@ export function PlayerBar() {
   const [skipFlash, setSkipFlash] = useState<SkipFlash | null>(null)
   const flashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const nonceRef = useRef(0)
+  // Tracks the last chapter index we optimistically advanced to, so that rapid
+  // "Next" presses keep stepping forward even before `currentTime` (and thus
+  // `currentChapterIdx`) refreshes via `timeupdate`.
+  const nextTargetRef = useRef(-1)
+  const prevLiveIdxRef = useRef(-1)
   const { chapter: currentChapter, index: currentChapterIdx } = useCurrentChapter()
   const isDesktop = useMediaQuery("(min-width: 768px)")
 
@@ -80,6 +85,27 @@ export function PlayerBar() {
     }
   }, [isVisible])
 
+  useEffect(() => {
+    const prev = prevLiveIdxRef.current
+    prevLiveIdxRef.current = currentChapterIdx
+    if (nextTargetRef.current < 0) return
+    // Caught up to (or passed) the optimistic target → clear.
+    if (currentChapterIdx >= nextTargetRef.current) {
+      nextTargetRef.current = -1
+      return
+    }
+    // Live index moved backward (e.g. user picked a chapter from the panel) →
+    // drop the optimistic target so the next nav action starts from the new
+    // live position.
+    if (prev >= 0 && currentChapterIdx < prev) {
+      nextTargetRef.current = -1
+    }
+  }, [currentChapterIdx])
+
+  useEffect(() => {
+    nextTargetRef.current = -1
+  }, [chapters])
+
   const handleSkipBack = useCallback(() => {
     skipBack(SKIP_BACK_SECONDS)
     flashSkip("back", SKIP_BACK_SECONDS)
@@ -104,9 +130,12 @@ export function PlayerBar() {
 
   const handleNextNav = useCallback(() => {
     if (hasChapters) {
-      const nextIdx = currentChapterIdx + 1
+      const baseIdx =
+        nextTargetRef.current >= 0 ? nextTargetRef.current : currentChapterIdx
+      const nextIdx = baseIdx + 1
       if (nextIdx < chapters.length) {
         seek(chapters[nextIdx].startTime)
+        nextTargetRef.current = nextIdx
         return
       }
     }

@@ -375,6 +375,31 @@ describe("PlayerBar", () => {
       expect(mockAPI.seek).not.toHaveBeenCalled()
     })
 
+    it("advances chapter-by-chapter on rapid Next presses even before currentTime refreshes", async () => {
+      const fourChapters = [
+        { startTime: 0, title: "Intro" },
+        { startTime: 60, title: "Main" },
+        { startTime: 180, title: "Outro" },
+        { startTime: 300, title: "Credits" },
+      ]
+      const user = userEvent.setup()
+      mockState.isVisible = true
+      mockState.currentEpisode = testEpisode
+      mockState.chapters = fourChapters
+      mockProgress.currentTime = 1
+      Object.assign(mockChapterResult, { chapter: fourChapters[0], index: 0 })
+      render(<PlayerBar />)
+
+      const next = screen.getByRole("button", { name: "Next chapter" })
+      await user.click(next)
+      await user.click(next)
+      await user.click(next)
+
+      expect(mockAPI.seek).toHaveBeenNthCalledWith(1, fourChapters[1].startTime)
+      expect(mockAPI.seek).toHaveBeenNthCalledWith(2, fourChapters[2].startTime)
+      expect(mockAPI.seek).toHaveBeenNthCalledWith(3, fourChapters[3].startTime)
+    })
+
     it("does not advance the queue while chapters are still loading", async () => {
       const user = userEvent.setup()
       mockState.isVisible = true
