@@ -309,6 +309,38 @@ describe("NotificationPopover", () => {
     ).toBeInTheDocument();
   });
 
+  it("(n) clicking the last group leaves the empty state, not the legacy fallback", async () => {
+    const user = userEvent.setup();
+    const singleGroupSummary: NotificationSummary = {
+      totalUnread: 3,
+      groups: [
+        {
+          kind: "episodes_by_podcast",
+          podcastId: 1,
+          podcastTitle: "Pod Solo",
+          count: 3,
+        },
+      ],
+    };
+    render(
+      <NotificationPopover
+        open={true}
+        onOpenChange={vi.fn()}
+        trigger={makeTrigger()}
+        summary={singleGroupSummary}
+        isError={false}
+        onRetry={vi.fn()}
+      />
+    );
+
+    await user.click(screen.getByRole("link", { name: /from pod solo/i }));
+
+    expect(screen.getByText(/you're all caught up/i)).toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: /unread notifications?$/i })
+    ).not.toBeInTheDocument();
+  });
+
   it("(m) displayed list resyncs when the summary prop changes", () => {
     const initialSummary: NotificationSummary = {
       totalUnread: 1,

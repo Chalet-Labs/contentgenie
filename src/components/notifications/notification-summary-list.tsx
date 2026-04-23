@@ -30,7 +30,7 @@ function SummaryRow({
   children,
 }: {
   href: string;
-  onClick?: () => void;
+  onClick?: (e: React.MouseEvent<HTMLAnchorElement>) => void;
   children: React.ReactNode;
 }) {
   return (
@@ -77,8 +77,23 @@ export function NotificationSummaryList({
     <ul className="divide-y">
       {summary.groups.map((group) => {
         const key = groupKeyOf(group);
+        // Skip the callback (and the cosmetic removal it drives) when the user
+        // modifier/middle-clicks — those clicks open a new tab, so the group
+        // should stay visible in the still-open popover instead of disappearing.
         const handleClick = onItemClick
-          ? () => onItemClick(key)
+          ? (e: React.MouseEvent<HTMLAnchorElement>) => {
+              if (
+                e.defaultPrevented ||
+                e.metaKey ||
+                e.ctrlKey ||
+                e.shiftKey ||
+                e.altKey ||
+                e.button !== 0
+              ) {
+                return;
+              }
+              onItemClick(key);
+            }
           : undefined;
         switch (group.kind) {
           case "episodes_since_last_seen":

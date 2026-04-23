@@ -182,4 +182,22 @@ describe("NotificationSummaryList", () => {
     fireEvent.click(link, { button: 0 });
     expect(onItemClick).toHaveBeenCalledWith(`since-${lastSeenIso}`);
   });
+
+  it("(k) onItemClick does NOT fire on modifier/middle clicks (open-in-new-tab intent)", () => {
+    const onItemClick = vi.fn();
+    render(
+      <NotificationSummaryList
+        summary={podcastSummary}
+        onItemClick={onItemClick}
+      />
+    );
+    const link = screen.getByRole("link", { name: /from the daily/i });
+
+    fireEvent.click(link, { button: 0, metaKey: true });
+    fireEvent.click(link, { button: 0, ctrlKey: true });
+    fireEvent.click(link, { button: 0, shiftKey: true });
+    fireEvent.click(link, { button: 1 });
+
+    expect(onItemClick).not.toHaveBeenCalled();
+  });
 });

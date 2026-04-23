@@ -91,17 +91,23 @@ export function NotificationBell() {
     const markId = ++markAllIdRef.current;
     const prev = unreadCountRef.current;
     setUnreadCount(0);
+    // Revert only if our optimistic 0 is still on screen. A 60s poll tick (or
+    // any other writer) that landed a fresher count between setUnreadCount(0)
+    // and this failure branch must not be clobbered by the stale `prev`.
+    const revertIfStillZero = () => {
+      setUnreadCount((c) => (c === 0 ? prev : c));
+    };
     try {
       const result = await markAllNotificationsRead();
       if (markId !== markAllIdRef.current) return;
       if (!result.success) {
         console.error("markAllNotificationsRead failed:", result.error);
-        setUnreadCount(prev);
+        revertIfStillZero();
       }
     } catch (error) {
       if (markId !== markAllIdRef.current) return;
       console.error("Failed to mark all notifications as read:", error);
-      setUnreadCount(prev);
+      revertIfStillZero();
     }
   }, [fetchSummary]);
 

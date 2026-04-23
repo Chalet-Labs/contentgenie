@@ -128,7 +128,17 @@ export function NotificationPopover({
   const handleItemClick = useCallback((groupKey: string) => {
     setDisplayedSummary((s) => {
       if (!s) return s;
-      return { ...s, groups: s.groups.filter((g) => groupKeyOf(g) !== groupKey) };
+      // Decrement totalUnread by the removed group's count so the summary stays
+      // internally consistent — otherwise `groups=[]` with `totalUnread>0` drops
+      // the list into NotificationSummaryList's legacy "N unread notifications"
+      // fallback on the next render.
+      const removed = s.groups.find((g) => groupKeyOf(g) === groupKey);
+      const removedCount = removed?.count ?? 0;
+      return {
+        ...s,
+        totalUnread: Math.max(0, s.totalUnread - removedCount),
+        groups: s.groups.filter((g) => groupKeyOf(g) !== groupKey),
+      };
     });
   }, []);
 
