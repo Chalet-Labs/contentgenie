@@ -291,6 +291,7 @@ function NotificationRow({
   onMarkRead: (item: NotificationItem) => void;
   onDismiss: (id: number) => void;
 }) {
+  const handleTitleNavigate = () => onMarkRead(item);
   const { playEpisode } = useAudioPlayerAPI();
 
   const audioEpisode =
@@ -337,6 +338,7 @@ function NotificationRow({
             ? ROUTES.episode(item.episodePodcastIndexId)
             : undefined
         }
+        onTitleClick={handleTitleNavigate}
         topics={topics}
         score={item.worthItScore}
         accent={item.isRead ? "none" : "unread"}

@@ -42,7 +42,7 @@ export function EpisodeCard({
           </div>,
         ]
       : []),
-    ...(episode.episode !== null
+    ...(typeof episode.episode === "number" && episode.episode > 0
       ? [
           <div key="episode" className="flex items-center gap-1">
             <Mic className="h-3 w-3" />

@@ -50,18 +50,24 @@ export interface EpisodeCardProps {
   secondaryActions?: ReactNode;
   /** When true, marks the card as listened — used for data attrs and future styling. */
   isListened?: boolean;
+  /**
+   * Invoked when the user clicks the title or artwork link. Runs alongside the
+   * Link's navigation — lets callers mark a notification as read, log analytics,
+   * etc., without swapping the nav target.
+   */
+  onTitleClick?: () => void;
 }
 
 function ArtworkTile({
   href,
-  title,
   artwork,
   podcastTitle,
+  onClick,
 }: {
   href?: string;
-  title: string;
   artwork: string | null;
   podcastTitle: string;
+  onClick?: () => void;
 }) {
   const tile = (
     <div className="relative h-20 w-20 overflow-hidden rounded-lg bg-muted">
@@ -85,7 +91,9 @@ function ArtworkTile({
     <Link
       href={href}
       className="shrink-0"
-      aria-label={`Open episode: ${title}`}
+      aria-hidden="true"
+      tabIndex={-1}
+      onClick={onClick}
     >
       {tile}
     </Link>
@@ -127,6 +135,7 @@ export function EpisodeCard({
   primaryAction,
   secondaryActions,
   isListened = false,
+  onTitleClick,
 }: EpisodeCardProps) {
   const parsedScore =
     score != null && score !== "" ? parseScoreOrNull(score) : null;
@@ -147,9 +156,9 @@ export function EpisodeCard({
           {artwork !== undefined && (
             <ArtworkTile
               href={href}
-              title={title}
               artwork={artwork}
               podcastTitle={podcastTitle}
+              onClick={onTitleClick}
             />
           )}
 
@@ -169,7 +178,7 @@ export function EpisodeCard({
                   </p>
                 )}
                 {href ? (
-                  <Link href={href} className="block">
+                  <Link href={href} className="block" onClick={onTitleClick}>
                     <h3 className="line-clamp-2 font-semibold group-hover:text-primary">
                       {title}
                     </h3>

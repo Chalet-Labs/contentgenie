@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { EpisodeCard } from "@/components/episodes/episode-card";
 
 vi.mock("next/image", () => ({
@@ -14,12 +15,24 @@ vi.mock("next/link", () => ({
     href,
     children,
     className,
+    onClick,
+    tabIndex,
+    "aria-hidden": ariaHidden,
   }: {
     href: string;
     children: React.ReactNode;
     className?: string;
+    onClick?: () => void;
+    tabIndex?: number;
+    "aria-hidden"?: boolean | "true" | "false";
   }) => (
-    <a href={href} className={className}>
+    <a
+      href={href}
+      className={className}
+      onClick={onClick}
+      tabIndex={tabIndex}
+      aria-hidden={ariaHidden}
+    >
       {children}
     </a>
   ),
@@ -152,19 +165,18 @@ describe("EpisodeCard", () => {
   });
 
   it("renders artwork image when artwork string is provided", () => {
-    render(
+    const { container } = render(
       <EpisodeCard {...baseProps} artwork="https://example.com/art.jpg" />
     );
-    expect(screen.getByRole("img")).toHaveAttribute(
-      "src",
-      "https://example.com/art.jpg"
-    );
+    // Artwork Link is aria-hidden, so role-based queries skip it; query by tag.
+    const img = container.querySelector("img");
+    expect(img).toHaveAttribute("src", "https://example.com/art.jpg");
   });
 
   it("renders Rss fallback when artwork is null", () => {
     const { container } = render(<EpisodeCard {...baseProps} artwork={null} />);
-    // artwork column is rendered (not omitted), but no img — Rss icon fills the tile
-    expect(screen.queryByRole("img")).not.toBeInTheDocument();
+    // Artwork column rendered but no <img> — Rss icon fills the tile
+    expect(container.querySelector("img")).toBeNull();
     // Link wrapping the artwork tile is present
     const artworkLink = container.querySelector('a[href="/episode/PI-42"]');
     expect(artworkLink).toBeInTheDocument();
@@ -173,7 +185,7 @@ describe("EpisodeCard", () => {
   it("omits the artwork column entirely when artwork is undefined", () => {
     const { container } = render(<EpisodeCard {...baseProps} />);
     // No img and no artwork-wrapping link
-    expect(screen.queryByRole("img")).not.toBeInTheDocument();
+    expect(container.querySelector("img")).toBeNull();
     // The only link present should be the title link (h3 inside it)
     const links = container.querySelectorAll("a");
     expect(links).toHaveLength(1);
@@ -248,5 +260,44 @@ describe("EpisodeCard", () => {
   it("renders meta nodes", () => {
     render(<EpisodeCard {...baseProps} meta={[<span key="t">2 hours ago</span>]} />);
     expect(screen.getByText("2 hours ago")).toBeInTheDocument();
+  });
+
+  it("fires onTitleClick when the title link is clicked", async () => {
+    const onTitleClick = vi.fn();
+    const user = userEvent.setup();
+    render(<EpisodeCard {...baseProps} onTitleClick={onTitleClick} />);
+    await user.click(
+      screen.getByText("How AI is Transforming Podcast Discovery")
+    );
+    expect(onTitleClick).toHaveBeenCalledTimes(1);
+  });
+
+  it("fires onTitleClick when the artwork link is clicked", async () => {
+    const onTitleClick = vi.fn();
+    const user = userEvent.setup();
+    const { container } = render(
+      <EpisodeCard
+        {...baseProps}
+        artwork="https://example.com/art.jpg"
+        onTitleClick={onTitleClick}
+      />
+    );
+    const artworkLink = container.querySelector<HTMLAnchorElement>(
+      'a[href="/episode/PI-42"][aria-hidden="true"]'
+    );
+    expect(artworkLink).not.toBeNull();
+    await user.click(artworkLink!);
+    expect(onTitleClick).toHaveBeenCalledTimes(1);
+  });
+
+  it("marks the artwork link as aria-hidden to avoid duplicate screen-reader announcements", () => {
+    const { container } = render(
+      <EpisodeCard {...baseProps} artwork="https://example.com/art.jpg" />
+    );
+    const artworkLink = container.querySelector<HTMLAnchorElement>(
+      'a[href="/episode/PI-42"][aria-hidden="true"]'
+    );
+    expect(artworkLink).not.toBeNull();
+    expect(artworkLink).toHaveAttribute("tabindex", "-1");
   });
 });

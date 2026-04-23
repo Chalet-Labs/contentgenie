@@ -243,6 +243,7 @@ describe("NotificationPageList", () => {
       expect(mockMarkNotificationRead).toHaveBeenCalledWith(1);
       expect(mockPlayEpisode).toHaveBeenCalled();
     });
+    expect(mockPush).not.toHaveBeenCalled();
   });
 
   // Regression: Listen click must NOT navigate away from the notifications page.
@@ -275,6 +276,7 @@ describe("NotificationPageList", () => {
       expect(mockMarkNotificationRead).not.toHaveBeenCalled();
       expect(mockPlayEpisode).toHaveBeenCalled();
     });
+    expect(mockPush).not.toHaveBeenCalled();
   });
 
   // Primary-action fallback: when audioUrl is missing but episode id is present,
@@ -429,6 +431,7 @@ describe("NotificationPageList", () => {
     });
     // Row should still render as unread because server rejected
     expect(screen.getAllByRole("article")[0]).toHaveAttribute("data-read", "false");
+    expect(mockPush).not.toHaveBeenCalled();
   });
 
   // Regression: Load more fetch failure preserves hasMore and surfaces toast with Retry
@@ -496,6 +499,22 @@ describe("NotificationPageList", () => {
         expect.stringMatching(/couldn.t mark as read/i)
       );
       expect(mockPlayEpisode).toHaveBeenCalled();
+    });
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  // Regression (Gemini review): clicking the title link marks the notification
+  // as read so navigation via the primary nav target doesn't leave unread state
+  // behind. Legacy row-level onClick handled this; the split primary/View flow
+  // dropped it, so the primitive now exposes onTitleClick which wires into
+  // markReadOptimistic.
+  it("clicking the title link marks the notification as read", async () => {
+    const user = userEvent.setup();
+    render(<NotificationPageList {...defaultProps} />);
+    const titleLink = screen.getAllByRole("link", { name: /test episode/i })[0];
+    await user.click(titleLink);
+    await waitFor(() => {
+      expect(mockMarkNotificationRead).toHaveBeenCalledWith(1);
     });
   });
 
