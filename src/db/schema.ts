@@ -37,6 +37,11 @@ export const users = pgTable("users", {
     digestFrequency?: "realtime" | "daily" | "weekly";
     pushEnabled?: boolean;
     lastDigestSentAt?: string; // ISO 8601
+    subscriptionSort?:
+      | "recently-added"
+      | "title-asc"
+      | "latest-episode"
+      | "recently-listened";
   }>(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -148,6 +153,7 @@ export const userSubscriptions = pgTable(
       .notNull(),
     subscribedAt: timestamp("subscribed_at").defaultNow().notNull(),
     notificationsEnabled: boolean("notifications_enabled").default(true),
+    isPinned: boolean("is_pinned").default(false).notNull(),
   },
   (table) => [
     uniqueIndex("user_subscriptions_user_podcast_idx").on(
@@ -155,6 +161,9 @@ export const userSubscriptions = pgTable(
       table.podcastId
     ),
     index("user_subscriptions_user_id_idx").on(table.userId),
+    index("user_subscriptions_pinned_idx")
+      .on(table.userId)
+      .where(sql`${table.isPinned} = true`),
   ]
 );
 
@@ -557,6 +566,10 @@ export type NewEpisode = typeof episodes.$inferInsert;
 
 export type UserSubscription = typeof userSubscriptions.$inferSelect;
 export type NewUserSubscription = typeof userSubscriptions.$inferInsert;
+
+export type SubscriptionSort = NonNullable<
+  NonNullable<User["preferences"]>["subscriptionSort"]
+>;
 
 export type Collection = typeof collections.$inferSelect;
 export type NewCollection = typeof collections.$inferInsert;
