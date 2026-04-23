@@ -21,6 +21,7 @@ const config: StorybookConfig = {
       { find: "@clerk/nextjs", replacement: path.resolve(__dirname, "mocks/clerk.ts") },
       { find: "@/db/schema", replacement: path.resolve(__dirname, "mocks/db-schema.ts") },
       { find: "@/db/helpers", replacement: path.resolve(__dirname, "mocks/db-helpers.ts") },
+      { find: "@/db/subscription-sorts", replacement: path.resolve(__dirname, "../src/db/subscription-sorts.ts") },
       { find: "@/db", replacement: path.resolve(__dirname, "mocks/db.ts") },
       { find: "@/app/actions/library", replacement: path.resolve(__dirname, "mocks/actions.ts") },
       { find: "@/app/actions/subscriptions", replacement: path.resolve(__dirname, "mocks/actions.ts") },
