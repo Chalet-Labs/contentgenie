@@ -507,39 +507,39 @@ components:
   status-pill-warning:
     backgroundColor: "{colors.status-warning-bg}"
     textColor: "{colors.status-warning-text}"
-    rounded: "{rounded.full}"
+    rounded: "{rounded.md}"
     paddingTop: 2px
     paddingRight: 10px
     paddingBottom: 2px
     paddingLeft: 10px
-    typography: "{typography.small}"
+    typography: "{typography.small-strong}"
   status-pill-info:
     backgroundColor: "{colors.status-info-bg}"
     textColor: "{colors.status-info-text}"
-    rounded: "{rounded.full}"
+    rounded: "{rounded.md}"
     paddingTop: 2px
     paddingRight: 10px
     paddingBottom: 2px
     paddingLeft: 10px
-    typography: "{typography.small}"
+    typography: "{typography.small-strong}"
   status-pill-danger:
     backgroundColor: "{colors.status-danger-bg}"
     textColor: "{colors.status-danger-text}"
-    rounded: "{rounded.full}"
+    rounded: "{rounded.md}"
     paddingTop: 2px
     paddingRight: 10px
     paddingBottom: 2px
     paddingLeft: 10px
-    typography: "{typography.small}"
+    typography: "{typography.small-strong}"
   status-pill-neutral:
     backgroundColor: "{colors.status-neutral-bg}"
     textColor: "{colors.status-neutral-text}"
-    rounded: "{rounded.full}"
+    rounded: "{rounded.md}"
     paddingTop: 2px
     paddingRight: 10px
     paddingBottom: 2px
     paddingLeft: 10px
-    typography: "{typography.small}"
+    typography: "{typography.small-strong}"
   logo-tile:
     backgroundColor: "{colors.brand}"
     textColor: "{colors.brand-foreground}"
@@ -896,9 +896,13 @@ easing flourish is 400ms of delay between the user and the information.
 ### Buttons
 
 - **Primary** — emerald fill, near-white label, 36px tall (`h-9`),
-  16px horizontal padding, 6px radius (`rounded-md`). Hover: the same
-  fill at 90% opacity (`primary/90`) — the darkening comes from
-  opacity rather than a second color token.
+  16px horizontal padding, 6px radius (`rounded-md`). Hover: a
+  dedicated solid `primary-hover` token (light: `#12684B` / HSL
+  160 70% 24%; dark: `#2BAB78` / HSL 156 60% 42%) — darker than rest
+  and AA-compliant at ~6.49:1 / ~5.84:1. The previous approach
+  (same fill at 90% alpha) composited to ~4.04:1 on paper, below
+  the WCAG 4.5:1 floor; the solid token keeps hover geometry
+  AA-compliant regardless of the surface tint.
 - **Secondary** — `secondary` fill, foreground label. Same geometry.
   Use when primary is adjacent and would out-shout content.
 - **Outline** — `background` fill (not transparent), foreground
@@ -970,7 +974,11 @@ the card edge without competing with content.
 
 ### Status pills
 
-- Rounded-full, 2×10 padding, small type.
+- 6px radius (`rounded-md`), 10px horizontal / 2px vertical padding,
+  12px/600 text (`small-strong`, matches Badge's default
+  `font-semibold`). Shipped StatusBadge composes the shared Badge
+  primitive and only overrides color/border, so the radius and weight
+  follow Badge's defaults — not a `rounded-full` pill shape.
 - Always bg + text from the same status pair. Optional 1px border in the
   matching `-border` when the pill sits on a non-paper surface.
 
