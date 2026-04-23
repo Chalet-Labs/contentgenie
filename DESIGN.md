@@ -200,6 +200,16 @@ typography:
     fontSize: 14px
     fontWeight: "500"
     lineHeight: 14px
+  button-label:
+    # Button text uses the same 14/500 cut as form labels but with body
+    # leading (20px, = Tailwind `text-sm`) so the label sits on the
+    # correct visual baseline inside the 36px button height — the tight
+    # 14px `label` leading is reserved for form labels that pair directly
+    # above an input.
+    fontFamily: Inter
+    fontSize: 14px
+    fontWeight: "500"
+    lineHeight: 20px
   eyebrow:
     fontFamily: Inter
     fontSize: 12px
@@ -260,18 +270,23 @@ components:
   button-primary:
     backgroundColor: "{colors.primary}"
     textColor: "{colors.primary-foreground}"
-    typography: "{typography.label}"
+    typography: "{typography.button-label}"
     rounded: "{rounded.md}"
     height: 36px
     padding: 0 16px
     shadow: "{elevation.DEFAULT}"
   button-primary-hover:
+    # Mirrors Tailwind `hover:bg-primary/90` — only the BACKGROUND fill
+    # blends to 90% alpha of primary, the label and icon keep full opacity.
+    # Do not use element `opacity: 0.9` (which dims label text too and
+    # weakens contrast against primary). Generators should express this as
+    # an alpha-composited fill over whatever surface the button sits on.
     backgroundColor: "{colors.primary}"
-    opacity: 0.9
+    backgroundColorOpacity: 0.9
   button-secondary:
     backgroundColor: "{colors.secondary}"
     textColor: "{colors.secondary-foreground}"
-    typography: "{typography.label}"
+    typography: "{typography.button-label}"
     rounded: "{rounded.md}"
     height: 36px
     padding: 0 16px
@@ -279,7 +294,7 @@ components:
   button-ghost:
     backgroundColor: transparent
     textColor: "{colors.foreground}"
-    typography: "{typography.label}"
+    typography: "{typography.button-label}"
     rounded: "{rounded.md}"
     height: 36px
     padding: 0 12px
@@ -289,7 +304,7 @@ components:
   button-destructive:
     backgroundColor: "{colors.destructive}"
     textColor: "{colors.destructive-foreground}"
-    typography: "{typography.label}"
+    typography: "{typography.button-label}"
     rounded: "{rounded.md}"
     height: 36px
     padding: 0 16px
@@ -297,7 +312,7 @@ components:
   button-outline:
     backgroundColor: "{colors.background}"
     textColor: "{colors.foreground}"
-    typography: "{typography.label}"
+    typography: "{typography.button-label}"
     rounded: "{rounded.md}"
     height: 36px
     padding: 0 16px
@@ -331,15 +346,24 @@ components:
     borderLeftWidth: 2px
     borderLeftColor: "{colors.primary}"
   card-header:
+    # Header carries the full `p-6` block on all four sides.
     padding: "{spacing.card-padding-lg}"
   card-content:
-    # `p-6 pt-0` in the shipped primitive: 24px sides/bottom, 0 top so header
-    # and content flow without a doubled gap. Generators should express this
-    # as independent vertical/horizontal padding where the target framework
-    # supports it; this token captures the nominal 24px value.
-    padding: "{spacing.card-padding-lg}"
+    # `p-6 pt-0` in the shipped primitive: 24px on sides and bottom, 0 on
+    # top so the header and content flow without a doubled vertical gap.
+    # Encoded as explicit per-edge values so generators don't collapse it
+    # back to a uniform 24px inset.
+    paddingTop: 0
+    paddingRight: "{spacing.card-padding-lg}"
+    paddingBottom: "{spacing.card-padding-lg}"
+    paddingLeft: "{spacing.card-padding-lg}"
   card-footer:
-    padding: "{spacing.card-padding-lg}"
+    # Same `p-6 pt-0` treatment as card-content — the footer butts up
+    # directly against the content block above with no added top inset.
+    paddingTop: 0
+    paddingRight: "{spacing.card-padding-lg}"
+    paddingBottom: "{spacing.card-padding-lg}"
+    paddingLeft: "{spacing.card-padding-lg}"
   input:
     # Matches the shipped Input primitive: transparent surface that inherits
     # the enclosing card/page background. The base typography is 16px
@@ -579,10 +603,14 @@ SC 1.4.3 (AA) and SC 1.4.6 (AAA). AA requires 4.5:1 for normal text and
   on primary, ~3.5:1. Button labels are text and fall under SC 1.4.3,
   which requires 4.5:1 for normal text — so this pairing **fails AA
   for normal-size button labels** at the shipped 14px / 500-weight.
-  This is an accepted shipping delta, not a target. The actionable
-  remediation paths, whenever the system is revisited, are: (a)
-  darken the `primary` token or lift `primary-foreground` until the
-  pair reaches ≥4.5:1, or (b) increase button label size/weight to
+  This is a **known WCAG 2.1 AA noncompliance** relative to the
+  project's stated accessibility target (`.impeccable.md` →
+  Accessibility: 4.5:1 for body text) and must be remediated. If it
+  is temporarily retained, track it in an accessibility remediation
+  issue rather than treating it as an accepted shipping delta — this
+  document is not a waiver. The remediation paths are: (a) darken
+  the `primary` token or lift `primary-foreground` until the pair
+  reaches ≥4.5:1, or (b) increase button label size/weight to
   qualify as large text (≥18px regular or ≥14px bold) so the 3:1
   large-text threshold applies. Do not paper over the issue by
   claiming an AA-UI exemption — SC 1.4.11 (3:1 for UI components)
@@ -659,17 +687,18 @@ safety net for environments where the `next/font` pipeline is bypassed.
 Shadows are *structural, not decorative*. Four shadow tiers cover the
 full surface hierarchy:
 
-- **sm** — default card rest state and subtle bottom hint for hovered
-  rows. A single 1px/2px offset that just defines the card edge from
-  paper.
-- **DEFAULT** — dropdowns, menus. The "popped" state.
+- **sm** — subtle bottom hint for hovered rows and the lightest
+  structural lift (e.g. inputs and outline buttons). A single 1px/2px
+  offset that just defines an edge against paper.
+- **DEFAULT** — cards at rest, dropdowns, menus. The standard "popped"
+  surface state.
 - **md** — modal panels, popovers with meaningful offset.
 - **lg** — only for overlay dialogs that eclipse the page chrome.
 
 Rules:
-- Cards combine a 1px border with the `sm` shadow — the border draws
-  the edge, the shadow anchors the card against paper. This is the one
-  place border + shadow coexist by design.
+- Cards combine a 1px border with the `DEFAULT` shadow — the border
+  draws the edge, the shadow anchors the card against paper. This is
+  the one place border + shadow coexist by design.
 - Shadows are always grey (black at low opacity), never tinted. Tinted
   shadows push the palette toward "branded gradient kitsch."
 - Past the card tier, don't combine border + heavy shadow. Pick one
