@@ -14,6 +14,7 @@ vi.mock("next/cache", () => ({
 // Mock database
 const mockFindFirstPodcast = vi.fn();
 const mockFindFirstSubscription = vi.fn();
+const mockFindFirstUser = vi.fn();
 const mockInsert = vi.fn();
 const mockValues = vi.fn();
 const mockOnConflictDoNothing = vi.fn();
@@ -21,11 +22,14 @@ const mockOnConflictDoUpdate = vi.fn();
 const mockReturning = vi.fn();
 const mockSelect = vi.fn();
 const mockUpdate = vi.fn();
+const mockUpdateSet = vi.fn();
+const mockUpdateWhere = vi.fn();
+const mockUpdateReturning = vi.fn();
 
 vi.mock("@/db", () => ({
   db: {
     query: {
-      users: { findFirst: vi.fn() },
+      users: { findFirst: (...args: unknown[]) => mockFindFirstUser(...args) },
       podcasts: { findFirst: (...args: unknown[]) => mockFindFirstPodcast(...args) },
       userSubscriptions: {
         findFirst: (...args: unknown[]) => mockFindFirstSubscription(...args),
@@ -35,9 +39,23 @@ vi.mock("@/db", () => ({
     update: (...args: unknown[]) => {
       mockUpdate(...args);
       return {
-        set: () => ({
-          where: () => Promise.resolve(),
-        }),
+        set: (...sArgs: unknown[]) => {
+          mockUpdateSet(...sArgs);
+          return {
+            where: (...wArgs: unknown[]) => {
+              mockUpdateWhere(...wArgs);
+              const thenable = {
+                returning: (...rArgs: unknown[]) =>
+                  mockUpdateReturning(...rArgs),
+                then: (
+                  onFulfilled?: ((v: unknown) => unknown) | null,
+                  onRejected?: ((r: unknown) => unknown) | null,
+                ) => Promise.resolve().then(onFulfilled, onRejected),
+              };
+              return thenable;
+            },
+          };
+        },
       };
     },
     insert: (...args: unknown[]) => {
@@ -78,21 +96,71 @@ vi.mock("@/lib/rss", async () => {
   };
 });
 
-// Mock schema — just need the table references
-vi.mock("@/db/schema", () => ({
-  users: { id: "id" },
-  podcasts: { id: "id", podcastIndexId: "podcast_index_id" },
-  episodes: { id: "id", podcastIndexId: "podcast_index_id" },
-  userSubscriptions: { userId: "user_id", podcastId: "podcast_id" },
-}));
+// Mock schema — just need the table references. `SUBSCRIPTION_SORTS` /
+// `DEFAULT_SUBSCRIPTION_SORT` come from the unmocked `@/db/subscription-sorts`
+// module so adding a new sort value here can't silently desync the mock.
+vi.mock("@/db/schema", async () => {
+  const sorts = await vi.importActual<typeof import("@/db/subscription-sorts")>(
+    "@/db/subscription-sorts",
+  );
+  return {
+    users: { id: "id", preferences: "preferences" },
+    podcasts: {
+      id: "id",
+      podcastIndexId: "podcast_index_id",
+      title: "title",
+      latestEpisodeDate: "latest_episode_date",
+      description: "description",
+    },
+    episodes: {
+      id: "id",
+      podcastIndexId: "podcast_index_id",
+      podcastId: "podcast_id",
+    },
+    userSubscriptions: {
+      id: "id",
+      userId: "user_id",
+      podcastId: "podcast_id",
+      subscribedAt: "subscribed_at",
+      isPinned: "is_pinned",
+    },
+    listenHistory: {
+      id: "id",
+      userId: "user_id",
+      episodeId: "episode_id",
+      startedAt: "started_at",
+    },
+    SUBSCRIPTION_SORTS: sorts.SUBSCRIPTION_SORTS,
+    DEFAULT_SUBSCRIPTION_SORT: sorts.DEFAULT_SUBSCRIPTION_SORT,
+  };
+});
 
-// Mock drizzle-orm — just need eq, and, desc, sql stubs
+// Mock drizzle-orm — capture orderBy/join args to assert sort wiring
+const sqlTemplate = (strings: TemplateStringsArray, ...values: unknown[]) => {
+  const result: { strings: TemplateStringsArray; values: unknown[]; alias?: string } = {
+    strings,
+    values,
+  };
+  (result as typeof result & { as: (a: string) => typeof result }).as = (
+    alias: string,
+  ) => ({ ...result, alias });
+  return result;
+};
 vi.mock("drizzle-orm", () => ({
-  eq: vi.fn(),
-  and: vi.fn(),
-  desc: vi.fn(),
+  eq: vi.fn((a: unknown, b: unknown) => ({ __op: "eq", a, b })),
+  and: vi.fn((...args: unknown[]) => ({ __op: "and", args })),
+  desc: vi.fn((col: unknown) => ({ __op: "desc", col })),
+  asc: vi.fn((col: unknown) => ({ __op: "asc", col })),
   inArray: vi.fn(),
-  sql: (strings: TemplateStringsArray, ...values: unknown[]) => ({ strings, values }),
+  sql: sqlTemplate,
+  max: vi.fn(),
+  getTableColumns: vi.fn(() => ({
+    id: "id",
+    podcastIndexId: "podcast_index_id",
+    title: "title",
+    latestEpisodeDate: "latest_episode_date",
+    description: "description",
+  })),
 }));
 
 // Mock SSRF security utility
@@ -197,8 +265,6 @@ describe("addPodcastByRssUrl", () => {
   });
 
   it("successfully imports a podcast and returns metadata", async () => {
-    // 1. podcast insert returning → [{ id: 1 }]
-    // 2. episode batch insert returning → [{ id: 1 }, { id: 2 }]
     mockReturning
       .mockReturnValueOnce([{ id: 1 }])
       .mockReturnValueOnce([{ id: 1 }, { id: 2 }]);
@@ -259,8 +325,6 @@ describe("subscribeToPodcast", () => {
   });
 
   it("successfully subscribes to a new podcast", async () => {
-    // 1. podcast insert -> [{id: 1}]
-    // 2. subscription insert -> [{id: 2}]
     mockReturning
       .mockReturnValueOnce([{ id: 1 }])
       .mockReturnValueOnce([{ id: 2 }]);
@@ -280,8 +344,6 @@ describe("subscribeToPodcast", () => {
   });
 
   it("handles already subscribed case correctly", async () => {
-    // 1. podcast insert -> [{id: 1}]
-    // 2. subscription insert (onConflictDoNothing) -> []
     mockReturning
       .mockReturnValueOnce([{ id: 1 }])
       .mockReturnValueOnce([]);
@@ -352,5 +414,447 @@ describe("isSubscribedToPodcast", () => {
     const result = await isSubscribedToPodcast("12345");
 
     expect(result).toBe(false);
+  });
+});
+
+// Chain shape: select → from → innerJoin [→ leftJoin if recentlyListened] → where → orderBy → Promise<rows>
+function makeSubsListChain(
+  rows: unknown[],
+  { recentlyListened = false }: { recentlyListened?: boolean } = {},
+) {
+  const mockOrderBy = vi.fn().mockResolvedValue(rows);
+  const mockWhere = vi.fn().mockReturnValue({ orderBy: mockOrderBy });
+  const mockLeftJoin = vi.fn().mockReturnValue({ where: mockWhere });
+  const mockInnerJoin = vi.fn().mockReturnValue(
+    recentlyListened ? { leftJoin: mockLeftJoin } : { where: mockWhere },
+  );
+  const mockFrom = vi.fn().mockReturnValue({ innerJoin: mockInnerJoin });
+  return {
+    chain: { from: mockFrom },
+    mocks: {
+      mockFrom,
+      mockInnerJoin,
+      mockLeftJoin,
+      mockWhere,
+      mockOrderBy,
+    },
+  };
+}
+
+// Chain shape: select → from → innerJoin → where → groupBy → as → opaque subquery token
+function makeLastListenedSubqueryChain() {
+  const subqueryToken = {
+    __subquery: "last_listened",
+    podcastId: "ll_podcast_id",
+    lastStartedAt: "ll_last_started_at",
+  };
+  const mockAs = vi.fn().mockReturnValue(subqueryToken);
+  const mockGroupBy = vi.fn().mockReturnValue({ as: mockAs });
+  const mockWhere = vi.fn().mockReturnValue({ groupBy: mockGroupBy });
+  const mockInnerJoin = vi.fn().mockReturnValue({ where: mockWhere });
+  const mockFrom = vi.fn().mockReturnValue({ innerJoin: mockInnerJoin });
+  return { from: mockFrom };
+}
+
+// orderBy args captured when `getUserSubscriptions` resolves to the default
+// sort: desc(isPinned), desc(subscribedAt).
+const DEFAULT_ORDER_BY = [
+  { __op: "desc", col: "is_pinned" },
+  { __op: "desc", col: "subscribed_at" },
+];
+
+describe("getUserSubscriptions", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockAuth.mockResolvedValue({ userId: "user_123" });
+    mockFindFirstUser.mockResolvedValue({ preferences: null });
+  });
+
+  afterEach(() => {
+    vi.resetModules();
+  });
+
+  it("returns error when not authenticated", async () => {
+    mockAuth.mockResolvedValue({ userId: null });
+
+    const { getUserSubscriptions } = await import(
+      "@/app/actions/subscriptions"
+    );
+    const result = await getUserSubscriptions();
+
+    expect(result.subscriptions).toEqual([]);
+    expect(result.error).toMatch(/signed in/i);
+    expect(mockSelect).not.toHaveBeenCalled();
+  });
+
+  it("uses recently-added default when no arg and no stored preference", async () => {
+    const { chain, mocks } = makeSubsListChain([]);
+    mockSelect.mockReturnValue(chain);
+
+    const { getUserSubscriptions } = await import(
+      "@/app/actions/subscriptions"
+    );
+    await getUserSubscriptions();
+
+    expect(mocks.mockOrderBy).toHaveBeenCalledWith(...DEFAULT_ORDER_BY);
+    expect(mocks.mockLeftJoin).not.toHaveBeenCalled();
+  });
+
+  it("uses stored preference when no sort arg provided", async () => {
+    mockFindFirstUser.mockResolvedValue({
+      preferences: { subscriptionSort: "title-asc" },
+    });
+    const { chain, mocks } = makeSubsListChain([]);
+    mockSelect.mockReturnValue(chain);
+
+    const { getUserSubscriptions } = await import(
+      "@/app/actions/subscriptions"
+    );
+    await getUserSubscriptions();
+
+    expect(mocks.mockOrderBy).toHaveBeenCalledWith(
+      { __op: "desc", col: "is_pinned" },
+      { __op: "asc", col: "title" },
+    );
+  });
+
+  it("explicit sort argument wins over stored preference", async () => {
+    mockFindFirstUser.mockResolvedValue({
+      preferences: { subscriptionSort: "title-asc" },
+    });
+    const { chain, mocks } = makeSubsListChain([]);
+    mockSelect.mockReturnValue(chain);
+
+    const { getUserSubscriptions } = await import(
+      "@/app/actions/subscriptions"
+    );
+    await getUserSubscriptions("latest-episode");
+
+    // stored pref lookup skipped when arg is passed
+    expect(mockFindFirstUser).not.toHaveBeenCalled();
+    // 2nd orderBy arg is an sql`${latestEpisodeDate} DESC NULLS LAST` template
+    const callArgs = mocks.mockOrderBy.mock.calls[0];
+    expect(callArgs[0]).toEqual({ __op: "desc", col: "is_pinned" });
+    expect(callArgs[1]).toMatchObject({
+      strings: expect.any(Object),
+      values: ["latest_episode_date"],
+    });
+  });
+
+  it("falls back to default when stored preference is an unknown value", async () => {
+    mockFindFirstUser.mockResolvedValue({
+      preferences: { subscriptionSort: "bogus-value" },
+    });
+    const { chain, mocks } = makeSubsListChain([]);
+    mockSelect.mockReturnValue(chain);
+
+    const { getUserSubscriptions } = await import(
+      "@/app/actions/subscriptions"
+    );
+    await getUserSubscriptions();
+
+    expect(mocks.mockOrderBy).toHaveBeenCalledWith(...DEFAULT_ORDER_BY);
+  });
+
+  it("recently-listened path builds a leftJoin on a grouped subquery", async () => {
+    const subqueryChain = makeLastListenedSubqueryChain();
+    const main = makeSubsListChain([], { recentlyListened: true });
+    mockSelect
+      .mockReturnValueOnce(subqueryChain)
+      .mockReturnValueOnce(main.chain);
+
+    const { getUserSubscriptions } = await import(
+      "@/app/actions/subscriptions"
+    );
+    await getUserSubscriptions("recently-listened");
+
+    expect(main.mocks.mockLeftJoin).toHaveBeenCalledTimes(1);
+    // orderBy: desc(isPinned), sql`COALESCE(...) DESC`, desc(subscribedAt) tiebreaker
+    const [pinnedArg, coalesceArg, tiebreakerArg] =
+      main.mocks.mockOrderBy.mock.calls[0];
+    expect(pinnedArg).toEqual({ __op: "desc", col: "is_pinned" });
+    expect(coalesceArg).toMatchObject({ strings: expect.any(Object) });
+    expect(tiebreakerArg).toEqual({ __op: "desc", col: "subscribed_at" });
+  });
+
+  it("reshapes joined rows into the flat podcast-nested shape", async () => {
+    const rows = [
+      {
+        subscription: {
+          id: 1,
+          userId: "user_123",
+          podcastId: 42,
+          isPinned: true,
+          subscribedAt: new Date("2024-01-01"),
+        },
+        podcast: { id: 42, title: "Pinned Pod" },
+      },
+      {
+        subscription: {
+          id: 2,
+          userId: "user_123",
+          podcastId: 43,
+          isPinned: false,
+          subscribedAt: new Date("2024-01-02"),
+        },
+        podcast: { id: 43, title: "Other Pod" },
+      },
+    ];
+    const { chain } = makeSubsListChain(rows);
+    mockSelect.mockReturnValue(chain);
+
+    const { getUserSubscriptions } = await import(
+      "@/app/actions/subscriptions"
+    );
+    const result = await getUserSubscriptions();
+
+    expect(result.error).toBeNull();
+    expect(result.subscriptions).toHaveLength(2);
+    expect(result.subscriptions[0]).toMatchObject({
+      id: 1,
+      isPinned: true,
+      podcast: { id: 42, title: "Pinned Pod" },
+    });
+  });
+
+  it("returns error envelope on database failure", async () => {
+    mockSelect.mockImplementation(() => {
+      throw new Error("db exploded");
+    });
+
+    const { getUserSubscriptions } = await import(
+      "@/app/actions/subscriptions"
+    );
+    const result = await getUserSubscriptions();
+
+    expect(result.subscriptions).toEqual([]);
+    expect(result.error).toMatch(/failed to load/i);
+  });
+
+  it("falls back to default sort when the preference read throws", async () => {
+    // A transient failure reading preferences must NOT nuke the list.
+    mockFindFirstUser.mockRejectedValue(new Error("prefs read hiccup"));
+    const { chain, mocks } = makeSubsListChain([]);
+    mockSelect.mockReturnValue(chain);
+
+    const { getUserSubscriptions } = await import(
+      "@/app/actions/subscriptions"
+    );
+    const result = await getUserSubscriptions();
+
+    expect(result.error).toBeNull();
+    expect(mocks.mockOrderBy).toHaveBeenCalledWith(...DEFAULT_ORDER_BY);
+  });
+});
+
+describe("togglePinSubscription", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockAuth.mockResolvedValue({ userId: "user_123" });
+  });
+
+  afterEach(() => {
+    vi.resetModules();
+  });
+
+  it("returns error when not authenticated", async () => {
+    mockAuth.mockResolvedValue({ userId: null });
+
+    const { togglePinSubscription } = await import(
+      "@/app/actions/subscriptions"
+    );
+    const result = await togglePinSubscription(1);
+
+    expect(result).toEqual({
+      success: false,
+      error: expect.stringMatching(/signed in/i),
+    });
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  it.each([0, -1, 1.5, Number.NaN])(
+    "rejects invalid subscription id: %s",
+    async (badId) => {
+      const { togglePinSubscription } = await import(
+        "@/app/actions/subscriptions"
+      );
+      const result = await togglePinSubscription(badId);
+
+      expect(result).toEqual({
+        success: false,
+        error: expect.stringMatching(/invalid/i),
+      });
+      expect(mockUpdate).not.toHaveBeenCalled();
+    },
+  );
+
+  it("returns not-found when the UPDATE RETURNING is empty (ownership or bad id)", async () => {
+    mockUpdateReturning.mockResolvedValue([]);
+
+    const { togglePinSubscription } = await import(
+      "@/app/actions/subscriptions"
+    );
+    const result = await togglePinSubscription(999);
+
+    expect(result).toEqual({
+      success: false,
+      error: expect.stringMatching(/not found/i),
+    });
+  });
+
+  it("returns the new isPinned state from RETURNING and calls revalidatePath", async () => {
+    const { revalidatePath } = await import("next/cache");
+    mockUpdateReturning.mockResolvedValue([{ isPinned: true }]);
+
+    const { togglePinSubscription } = await import(
+      "@/app/actions/subscriptions"
+    );
+    const result = await togglePinSubscription(42);
+
+    expect(result).toEqual({ success: true, data: { isPinned: true } });
+    expect(revalidatePath).toHaveBeenCalledWith("/subscriptions");
+    // The set() call receives an sql-tagged template, not a JS boolean
+    expect(mockUpdateSet).toHaveBeenCalledTimes(1);
+    const setArg = mockUpdateSet.mock.calls[0][0] as { isPinned: unknown };
+    expect(typeof setArg.isPinned).not.toBe("boolean");
+    expect(setArg.isPinned).toMatchObject({ strings: expect.any(Object) });
+  });
+
+  it("scopes the UPDATE to the current user (ownership regression guard)", async () => {
+    mockUpdateReturning.mockResolvedValue([{ isPinned: true }]);
+
+    const { togglePinSubscription } = await import(
+      "@/app/actions/subscriptions"
+    );
+    await togglePinSubscription(42);
+
+    // WHERE must be an and(eq(id, 42), eq(user_id, userId)) — dropping the
+    // userId predicate would let one user flip another user's subscription.
+    expect(mockUpdateWhere).toHaveBeenCalledTimes(1);
+    const whereArg = mockUpdateWhere.mock.calls[0][0] as {
+      __op: string;
+      args: Array<{ __op: string; a: unknown; b: unknown }>;
+    };
+    expect(whereArg.__op).toBe("and");
+    const cols = whereArg.args.map((p) => p.a);
+    expect(cols).toContain("id");
+    expect(cols).toContain("user_id");
+    const userIdPredicate = whereArg.args.find((p) => p.a === "user_id");
+    expect(userIdPredicate?.b).toBe("user_123");
+  });
+
+  it("returns error envelope on database failure", async () => {
+    mockUpdateReturning.mockRejectedValue(new Error("db exploded"));
+
+    const { togglePinSubscription } = await import(
+      "@/app/actions/subscriptions"
+    );
+    const result = await togglePinSubscription(1);
+
+    expect(result).toEqual({
+      success: false,
+      error: expect.stringMatching(/failed to toggle/i),
+    });
+  });
+});
+
+describe("setSubscriptionSort", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockAuth.mockResolvedValue({ userId: "user_123" });
+    // Short-circuit ensureUserExists: if the row already has an email, it early-returns.
+    mockFindFirstUser.mockResolvedValue({ email: "test@example.com" });
+  });
+
+  afterEach(() => {
+    vi.resetModules();
+  });
+
+  it("returns error when not authenticated", async () => {
+    mockAuth.mockResolvedValue({ userId: null });
+
+    const { setSubscriptionSort } = await import(
+      "@/app/actions/subscriptions"
+    );
+    const result = await setSubscriptionSort("title-asc");
+
+    expect(result).toEqual({
+      success: false,
+      error: expect.stringMatching(/signed in/i),
+    });
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  it("rejects invalid sort values at the zod boundary", async () => {
+    const { setSubscriptionSort } = await import(
+      "@/app/actions/subscriptions"
+    );
+    const result = await setSubscriptionSort(
+      "not-a-real-sort" as unknown as "title-asc",
+    );
+
+    expect(result).toEqual({
+      success: false,
+      error: expect.stringMatching(/invalid/i),
+    });
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  it("emits an atomic jsonb_set UPDATE with the new sort and touches updatedAt", async () => {
+    const { revalidatePath } = await import("next/cache");
+
+    const { setSubscriptionSort } = await import(
+      "@/app/actions/subscriptions"
+    );
+    const result = await setSubscriptionSort("title-asc");
+
+    expect(result).toEqual({ success: true });
+    expect(revalidatePath).toHaveBeenCalledWith("/subscriptions");
+    expect(mockUpdateSet).toHaveBeenCalledTimes(1);
+    const setArg = mockUpdateSet.mock.calls[0][0] as {
+      preferences: { strings: TemplateStringsArray; values: unknown[] };
+      updatedAt: unknown;
+    };
+    // The preferences value is an sql-tagged template (atomic merge at the DB layer),
+    // NOT a pre-merged plain object (which would race with other preference writers).
+    expect(setArg.preferences).toMatchObject({ strings: expect.any(Object) });
+    expect(setArg.preferences.values).toContain("title-asc");
+    // Second positional arg in the template is the sort; first is the column ref.
+    // Rebuild SQL text to confirm jsonb_set is actually what's emitted.
+    expect(Array.from(setArg.preferences.strings).join("?")).toMatch(
+      /jsonb_set/,
+    );
+    expect(setArg.updatedAt).toBeInstanceOf(Date);
+  });
+
+  it("calls ensureUserExists before the UPDATE so first-session writes can't silently no-op", async () => {
+    // mockFindFirstUser is consulted by ensureUserExists (looking for an email).
+    // If the row doesn't exist yet, ensureUserExists would fall through to an
+    // insert; either way, it must run before the preferences UPDATE.
+    mockFindFirstUser.mockResolvedValueOnce({ email: "already@exists.com" });
+
+    const { setSubscriptionSort } = await import(
+      "@/app/actions/subscriptions"
+    );
+    await setSubscriptionSort("title-asc");
+
+    expect(mockFindFirstUser).toHaveBeenCalled();
+    // And then the UPDATE fired.
+    expect(mockUpdate).toHaveBeenCalled();
+  });
+
+  it("returns error envelope when ensureUserExists throws", async () => {
+    mockFindFirstUser.mockRejectedValue(new Error("db exploded"));
+
+    const { setSubscriptionSort } = await import(
+      "@/app/actions/subscriptions"
+    );
+    const result = await setSubscriptionSort("title-asc");
+
+    expect(result).toEqual({
+      success: false,
+      error: expect.stringMatching(/failed to save/i),
+    });
+    expect(mockUpdate).not.toHaveBeenCalled();
   });
 });

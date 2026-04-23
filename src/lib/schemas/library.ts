@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { SUBSCRIPTION_SORTS } from "@/db/subscription-sorts";
 
 /** Shared max-length for short user text (notes, descriptions, etc.). */
 export const MAX_SHORT_TEXT = 500;
@@ -51,6 +52,14 @@ export const subscribeSchema = podcastSchema
 export const unsubscribeSchema = z
   .object({
     podcastIndexId: trimmedNonEmpty,
+  })
+  .strip();
+
+export const subscriptionSortSchema = z.enum(SUBSCRIPTION_SORTS);
+
+export const toggleSubscriptionSchema = z
+  .object({
+    subscriptionId: z.number().int().positive(),
   })
   .strip();
 

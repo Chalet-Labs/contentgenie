@@ -2,9 +2,18 @@
 
 import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
-import { eq, and, inArray, sql } from "drizzle-orm";
+import { eq, and, asc, desc, getTableColumns, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { podcasts, episodes, userSubscriptions } from "@/db/schema";
+import {
+  DEFAULT_SUBSCRIPTION_SORT,
+  SUBSCRIPTION_SORTS,
+  type SubscriptionSort,
+  episodes,
+  listenHistory,
+  podcasts,
+  users,
+  userSubscriptions,
+} from "@/db/schema";
 import { upsertPodcast, ensureUserExists } from "@/db/helpers";
 import {
   parsePodcastFeed,
@@ -12,7 +21,13 @@ import {
   generateEpisodeSyntheticId,
 } from "@/lib/rss";
 import { isSafeUrl } from "@/lib/security";
-import { subscribeSchema, safeParseDate } from "@/lib/schemas/library";
+import {
+  subscribeSchema,
+  safeParseDate,
+  subscriptionSortSchema,
+  toggleSubscriptionSchema,
+} from "@/lib/schemas/library";
+import type { ActionResult } from "@/types/action-result";
 
 const MAX_EPISODES_PER_IMPORT = 50;
 
@@ -431,33 +446,207 @@ export async function refreshPodcastFeed(podcastId: number) {
   }
 }
 
-// Get all subscriptions for the current user
-export async function getUserSubscriptions() {
+// Omit podcasts.description from the list select — it's a high-volume text
+// column not rendered in the subscription list, and including it materially
+// inflates the response payload.
+function podcastListSelect() {
+  const { description: _description, ...rest } = getTableColumns(podcasts);
+  return rest;
+}
+
+function orderByForSort(sort: Exclude<SubscriptionSort, "recently-listened">) {
+  switch (sort) {
+    case "title-asc":
+      return [asc(podcasts.title)];
+    case "recently-added":
+      return [desc(userSubscriptions.subscribedAt)];
+    case "latest-episode":
+      return [sql`${podcasts.latestEpisodeDate} DESC NULLS LAST`];
+  }
+}
+
+function buildStandardQuery(
+  userId: string,
+  sort: Exclude<SubscriptionSort, "recently-listened">,
+) {
+  return db
+    .select({ subscription: userSubscriptions, podcast: podcastListSelect() })
+    .from(userSubscriptions)
+    .innerJoin(podcasts, eq(podcasts.id, userSubscriptions.podcastId))
+    .where(eq(userSubscriptions.userId, userId))
+    .orderBy(desc(userSubscriptions.isPinned), ...orderByForSort(sort));
+}
+
+function buildRecentlyListenedQuery(userId: string) {
+  const lastListened = db
+    .select({
+      podcastId: episodes.podcastId,
+      lastStartedAt:
+        sql<string | null>`MAX(${listenHistory.startedAt})`.as(
+          "last_started_at",
+        ),
+    })
+    .from(listenHistory)
+    .innerJoin(episodes, eq(episodes.id, listenHistory.episodeId))
+    .where(eq(listenHistory.userId, userId))
+    .groupBy(episodes.podcastId)
+    .as("last_listened");
+
+  return db
+    .select({ subscription: userSubscriptions, podcast: podcastListSelect() })
+    .from(userSubscriptions)
+    .innerJoin(podcasts, eq(podcasts.id, userSubscriptions.podcastId))
+    .leftJoin(
+      lastListened,
+      eq(lastListened.podcastId, userSubscriptions.podcastId),
+    )
+    .where(eq(userSubscriptions.userId, userId))
+    .orderBy(
+      desc(userSubscriptions.isPinned),
+      sql`COALESCE(${lastListened.lastStartedAt}, to_timestamp(0)) DESC`,
+      desc(userSubscriptions.subscribedAt),
+    );
+}
+
+async function resolveSort(
+  userId: string,
+  explicit: SubscriptionSort | undefined,
+): Promise<SubscriptionSort> {
+  if (explicit) return explicit;
+
+  try {
+    const user = await db.query.users.findFirst({
+      where: eq(users.id, userId),
+      columns: { preferences: true },
+    });
+    const stored = user?.preferences?.subscriptionSort;
+    if (!stored) return DEFAULT_SUBSCRIPTION_SORT;
+    if (SUBSCRIPTION_SORTS.includes(stored)) return stored;
+    console.warn("[getUserSubscriptions] unknown stored sort", {
+      userId,
+      stored,
+    });
+    return DEFAULT_SUBSCRIPTION_SORT;
+  } catch (error) {
+    // Preference read is best-effort: a transient failure falls back to the
+    // default sort rather than empty-listing the user's subscriptions.
+    console.warn(
+      "[getUserSubscriptions] failed to read sort preference; using default",
+      { userId, error },
+    );
+    return DEFAULT_SUBSCRIPTION_SORT;
+  }
+}
+
+export async function getUserSubscriptions(sort?: SubscriptionSort) {
   const { userId } = await auth();
 
   if (!userId) {
-    return { subscriptions: [], error: "You must be signed in to view subscriptions" };
+    return {
+      subscriptions: [],
+      error: "You must be signed in to view subscriptions",
+    };
   }
 
+  const resolved = await resolveSort(userId, sort);
+
   try {
-    // BOLT OPTIMIZATION: Use selective column fetching to avoid loading high-volume text fields
-    // (like podcast description) that are not primarily displayed in the subscription list.
-    // Expected impact: ~20-30% reduction in database payload for users with many subscriptions.
-    const subscriptions = await db.query.userSubscriptions.findMany({
-      where: eq(userSubscriptions.userId, userId),
-      with: {
-        podcast: {
-          columns: {
-            description: false,
-          },
-        },
-      },
-      orderBy: (userSubscriptions, { desc }) => [desc(userSubscriptions.subscribedAt)],
-    });
+    const rows =
+      resolved === "recently-listened"
+        ? await buildRecentlyListenedQuery(userId)
+        : await buildStandardQuery(userId, resolved);
+
+    const subscriptions = rows.map((r) => ({
+      ...r.subscription,
+      podcast: r.podcast,
+    }));
 
     return { subscriptions, error: null };
   } catch (error) {
-    console.error("Error fetching subscriptions:", error);
+    console.error("[getUserSubscriptions] failed", { userId, sort: resolved, error });
     return { subscriptions: [], error: "Failed to load subscriptions" };
+  }
+}
+
+export async function togglePinSubscription(
+  subscriptionId: number,
+): Promise<ActionResult<{ isPinned: boolean }>> {
+  const { userId } = await auth();
+  if (!userId) {
+    return { success: false, error: "You must be signed in" };
+  }
+
+  const parsed = toggleSubscriptionSchema.safeParse({ subscriptionId });
+  if (!parsed.success) {
+    return { success: false, error: "Invalid subscription id" };
+  }
+
+  try {
+    const [updated] = await db
+      .update(userSubscriptions)
+      .set({ isPinned: sql`NOT ${userSubscriptions.isPinned}` })
+      .where(
+        and(
+          eq(userSubscriptions.id, parsed.data.subscriptionId),
+          eq(userSubscriptions.userId, userId),
+        ),
+      )
+      .returning({ isPinned: userSubscriptions.isPinned });
+
+    if (!updated) {
+      console.warn("[togglePinSubscription] no row updated", {
+        userId,
+        subscriptionId: parsed.data.subscriptionId,
+      });
+      return { success: false, error: "Subscription not found" };
+    }
+
+    revalidatePath("/subscriptions");
+    return { success: true, data: { isPinned: updated.isPinned } };
+  } catch (error) {
+    console.error("[togglePinSubscription] failed", {
+      userId,
+      subscriptionId: parsed.data.subscriptionId,
+      error,
+    });
+    return { success: false, error: "Failed to toggle pin" };
+  }
+}
+
+export async function setSubscriptionSort(
+  sort: SubscriptionSort,
+): Promise<ActionResult> {
+  const { userId } = await auth();
+  if (!userId) {
+    return { success: false, error: "You must be signed in" };
+  }
+
+  const parsed = subscriptionSortSchema.safeParse(sort);
+  if (!parsed.success) {
+    return { success: false, error: "Invalid sort value" };
+  }
+
+  try {
+    // `ensureUserExists` covers the first-session case; `jsonb_set` avoids a
+    // read-modify-write race against other `preferences` writers.
+    await ensureUserExists(userId);
+
+    await db
+      .update(users)
+      .set({
+        preferences: sql`jsonb_set(COALESCE(${users.preferences}::jsonb, '{}'::jsonb), '{subscriptionSort}', to_jsonb(${parsed.data}::text))`,
+        updatedAt: new Date(),
+      })
+      .where(eq(users.id, userId));
+
+    revalidatePath("/subscriptions");
+    return { success: true };
+  } catch (error) {
+    console.error("[setSubscriptionSort] failed", {
+      userId,
+      sort: parsed.data,
+      error,
+    });
+    return { success: false, error: "Failed to save sort preference" };
   }
 }

@@ -15,14 +15,13 @@ import {
 } from "drizzle-orm/pg-core";
 import { relations, sql } from "drizzle-orm";
 import type { WorthItSignals } from "@/lib/openrouter";
+import {
+  DEFAULT_SUBSCRIPTION_SORT,
+  SUBSCRIPTION_SORTS,
+  type SubscriptionSort,
+} from "@/db/subscription-sorts";
 
-export const SUBSCRIPTION_SORTS = [
-  "recently-added",
-  "title-asc",
-  "latest-episode",
-  "recently-listened",
-] as const;
-export type SubscriptionSort = (typeof SUBSCRIPTION_SORTS)[number];
+export { DEFAULT_SUBSCRIPTION_SORT, SUBSCRIPTION_SORTS, type SubscriptionSort };
 
 // Rate limits table (managed by rate-limiter-flexible, see ADR-001).
 // Defined here so drizzle-kit push doesn't try to drop it.
