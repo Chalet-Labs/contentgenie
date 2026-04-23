@@ -201,6 +201,16 @@ typography:
     fontSize: 12px
     fontWeight: 400
     lineHeight: 16px
+  small-strong:
+    # Same 12/16 geometry as `small` but at 600 weight — matches the
+    # shipped Badge primitive which applies `font-semibold` by default.
+    # Score badges and any other element using the Badge base should
+    # point here instead of `small` so generators produce the shipped
+    # text weight.
+    fontFamily: Inter
+    fontSize: 12px
+    fontWeight: 600
+    lineHeight: 16px
   label:
     fontFamily: Inter
     fontSize: 14px
@@ -264,7 +274,11 @@ motion:
   duration-fast: 150ms
   duration-base: 200ms
   duration-slow: 300ms
-  duration-reduced: 0ms
+  # `prefers-reduced-motion` uses 0.01ms (not 0ms) so browsers still fire
+  # `animationend` / `transitionend` events — code that listens for those
+  # events to clean up or advance state would otherwise hang silently
+  # under reduced-motion. Matches the shipped @media block in globals.css.
+  duration-reduced: 0.01ms
   easing-standard: cubic-bezier(0.2, 0, 0, 1)
   easing-emphasized: cubic-bezier(0.3, 0, 0, 1)
 
@@ -428,55 +442,55 @@ components:
     textColor: "{colors.score-exceptional-foreground}"
     rounded: "{rounded.full}"
     paddingTop: 2px
-    paddingRight: 8px
+    paddingRight: 10px
     paddingBottom: 2px
-    paddingLeft: 8px
-    typography: "{typography.small}"
+    paddingLeft: 10px
+    typography: "{typography.small-strong}"
   badge-score-above:
     backgroundColor: "{colors.score-above}"
     textColor: "{colors.score-above-foreground}"
     rounded: "{rounded.full}"
     paddingTop: 2px
-    paddingRight: 8px
+    paddingRight: 10px
     paddingBottom: 2px
-    paddingLeft: 8px
-    typography: "{typography.small}"
+    paddingLeft: 10px
+    typography: "{typography.small-strong}"
   badge-score-average:
     backgroundColor: "{colors.score-average}"
     textColor: "{colors.score-average-foreground}"
     rounded: "{rounded.full}"
     paddingTop: 2px
-    paddingRight: 8px
+    paddingRight: 10px
     paddingBottom: 2px
-    paddingLeft: 8px
-    typography: "{typography.small}"
+    paddingLeft: 10px
+    typography: "{typography.small-strong}"
   badge-score-below:
     backgroundColor: "{colors.score-below}"
     textColor: "{colors.score-below-foreground}"
     rounded: "{rounded.full}"
     paddingTop: 2px
-    paddingRight: 8px
+    paddingRight: 10px
     paddingBottom: 2px
-    paddingLeft: 8px
-    typography: "{typography.small}"
+    paddingLeft: 10px
+    typography: "{typography.small-strong}"
   badge-score-skip:
     backgroundColor: "{colors.score-skip}"
     textColor: "{colors.score-skip-foreground}"
     rounded: "{rounded.full}"
     paddingTop: 2px
-    paddingRight: 8px
+    paddingRight: 10px
     paddingBottom: 2px
-    paddingLeft: 8px
-    typography: "{typography.small}"
+    paddingLeft: 10px
+    typography: "{typography.small-strong}"
   status-pill-success:
     backgroundColor: "{colors.status-success-bg}"
     textColor: "{colors.status-success-text}"
-    rounded: "{rounded.full}"
+    rounded: "{rounded.md}"
     paddingTop: 2px
     paddingRight: 10px
     paddingBottom: 2px
     paddingLeft: 10px
-    typography: "{typography.small}"
+    typography: "{typography.small-strong}"
   status-pill-warning:
     backgroundColor: "{colors.status-warning-bg}"
     textColor: "{colors.status-warning-text}"
@@ -699,12 +713,17 @@ safety net for environments where the `next/font` pipeline is bypassed.
 ### Scale
 
 - **display-hero (60/60, 700, -0.025em)** — landing page hero only. A
-  single line on desktop; use `display-hero-compact` (36/40) on small
-  screens.
+  single line on desktop.
+- **display-hero-compact (36/40, 700, -0.025em)** — small-screen hero
+  variant; swap to this below `sm` so the hero stays on one line.
 - **h1 (30/36, 700, -0.025em)** — page titles inside the app.
 - **h2 (20/28, 600, -0.015em)** — section headings inside pages.
 - **h3 (16/24, 600)** — card titles, sub-sections.
 - **lead (18/28, 400)** — intro paragraphs, hero subtitles. Muted color.
+- **body-lg (16/24, 400)** — larger body variant. Reserved for input
+  fields on mobile (the 16px floor prevents iOS Safari zoom-on-focus)
+  and the occasional lead-adjacent paragraph that wants more air than
+  `body` but less than `lead`.
 - **body (14/20, 400)** — the workhorse. Most UI copy lives here.
 - **body-strong (14/20, 600)** — emphasized body inline.
 - **muted (14/20, 400, muted-fg)** — metadata lines: publish date, show
@@ -712,6 +731,11 @@ safety net for environments where the `next/font` pipeline is bypassed.
 - **small (12/16, 400)** — chip text, badge text, timestamp tails.
 - **label (14/14, 500)** — form labels, tab labels. Tight leading on
   purpose so label + input read as one unit.
+- **button-label (14/20, 500)** — interactive button text. Same 14/500
+  cut as `label`, but with body leading (20px, = Tailwind `text-sm`) so
+  the label sits on the correct visual baseline inside the 36px button
+  height. Do not use `label` for buttons — the 14/14 tight leading is
+  only right for form labels that pair directly above an input.
 - **eyebrow (12/16, 400, uppercase, +0.06em)** — small kickers above
   section headings. Muted color. Use sparingly — more than three per page
   creates noise.
@@ -840,9 +864,11 @@ easing flourish is 400ms of delay between the user and the information.
 - **Skeletons over spinners.** When content is pending, show the shape
   of the content, not a rotating gear.
 - **`prefers-reduced-motion` is a hard gate.** When reduced, animation
-  duration collapses to ~0ms and scroll-behavior reverts to auto. Test
-  this path explicitly — a feature that only works with animation is
-  broken.
+  and transition durations collapse to **0.01ms** (the standard trick —
+  vanishingly short but non-zero so `animationend` / `transitionend`
+  events still fire and any state-cleanup listeners wake up), and
+  scroll-behavior reverts to auto. Test this path explicitly — a
+  feature that only works with animation is broken.
 
 ## Components
 
