@@ -2,14 +2,15 @@ import Link from "next/link";
 import { Headphones, Search, Rss, Library } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Logo } from "@/components/brand/logo";
 
 export function WelcomeCard() {
   return (
     <Card>
       <CardContent className="py-12">
         <div className="mx-auto max-w-md text-center">
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-primary/10">
-            <Headphones className="h-7 w-7 text-primary" />
+          <div className="mx-auto mb-4">
+            <Logo variant="mark" size={56} decorative />
           </div>
           <h2 className="text-xl font-semibold tracking-tight">
             Welcome to ContentGenie

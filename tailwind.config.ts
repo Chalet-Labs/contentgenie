@@ -34,6 +34,10 @@ const config: Config = {
   				DEFAULT: 'hsl(var(--primary))',
   				foreground: 'hsl(var(--primary-foreground))'
   			},
+  			brand: {
+  				DEFAULT: 'hsl(var(--brand))',
+  				foreground: 'hsl(var(--brand-foreground))'
+  			},
   			secondary: {
   				DEFAULT: 'hsl(var(--secondary))',
   				foreground: 'hsl(var(--secondary-foreground))'
@@ -62,27 +66,37 @@ const config: Config = {
   			},
   			score: {
   				exceptional: 'hsl(var(--score-exceptional))',
+  				'exceptional-text': 'hsl(var(--score-exceptional-text))',
   				'exceptional-foreground': 'hsl(var(--score-exceptional-foreground))',
   				above: 'hsl(var(--score-above))',
+  				'above-text': 'hsl(var(--score-above-text))',
   				'above-foreground': 'hsl(var(--score-above-foreground))',
   				average: 'hsl(var(--score-average))',
+  				'average-text': 'hsl(var(--score-average-text))',
   				'average-foreground': 'hsl(var(--score-average-foreground))',
   				below: 'hsl(var(--score-below))',
+  				'below-text': 'hsl(var(--score-below-text))',
   				'below-foreground': 'hsl(var(--score-below-foreground))',
   				skip: 'hsl(var(--score-skip))',
+  				'skip-text': 'hsl(var(--score-skip-text))',
   				'skip-foreground': 'hsl(var(--score-skip-foreground))',
   			},
   			status: {
   				'success-bg': 'hsl(var(--status-success-bg))',
   				'success-text': 'hsl(var(--status-success-text))',
+  				'success-border': 'hsl(var(--status-success-border))',
   				'warning-bg': 'hsl(var(--status-warning-bg))',
   				'warning-text': 'hsl(var(--status-warning-text))',
+  				'warning-border': 'hsl(var(--status-warning-border))',
   				'info-bg': 'hsl(var(--status-info-bg))',
   				'info-text': 'hsl(var(--status-info-text))',
+  				'info-border': 'hsl(var(--status-info-border))',
   				'danger-bg': 'hsl(var(--status-danger-bg))',
   				'danger-text': 'hsl(var(--status-danger-text))',
+  				'danger-border': 'hsl(var(--status-danger-border))',
   				'neutral-bg': 'hsl(var(--status-neutral-bg))',
   				'neutral-text': 'hsl(var(--status-neutral-text))',
+  				'neutral-border': 'hsl(var(--status-neutral-border))',
   			}
   		}
   	}

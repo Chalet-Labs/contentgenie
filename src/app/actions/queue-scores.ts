@@ -4,6 +4,7 @@ import { auth } from "@clerk/nextjs/server";
 import { inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { episodes } from "@/db/schema";
+import { parseScoreOrNull } from "@/lib/score-utils";
 
 const MAX_IDS = 50;
 
@@ -39,8 +40,7 @@ export async function getQueueEpisodeScores(
 
     const result = Object.create(null) as Record<string, number | null>;
     for (const row of rows) {
-      result[row.podcastIndexId] =
-        row.worthItScore !== null ? parseFloat(row.worthItScore) : null;
+      result[row.podcastIndexId] = parseScoreOrNull(row.worthItScore);
     }
     return result;
   } catch (err) {

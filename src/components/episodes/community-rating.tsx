@@ -83,13 +83,13 @@ export function CommunityRating({
         {Array.from({ length: fullStars }).map((_, i) => (
           <Star
             key={`full-${i}`}
-            className={cn(sizeClasses[size], "fill-yellow-400 text-yellow-400")}
+            className={cn(sizeClasses[size], "fill-brand text-brand")}
           />
         ))}
         {/* Half star (simplified as full for now) */}
         {hasHalfStar && (
           <Star
-            className={cn(sizeClasses[size], "fill-yellow-400/50 text-yellow-400")}
+            className={cn(sizeClasses[size], "fill-brand/50 text-brand")}
           />
         )}
         {/* Empty stars */}

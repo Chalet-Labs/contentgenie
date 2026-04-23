@@ -26,7 +26,18 @@ const BAND_COLOR_CLASS: Record<ScoreBand, string> = {
   skip: "bg-score-skip text-score-skip-foreground",
 };
 
+const BAND_TEXT_COLOR_CLASS: Record<ScoreBand, string> = {
+  exceptional: "text-score-exceptional-text",
+  above: "text-score-above-text",
+  average: "text-score-average-text",
+  below: "text-score-below-text",
+  skip: "text-score-skip-text",
+};
+
 export function getScoreBand(score: number): ScoreBand {
+  if (!Number.isFinite(score)) {
+    throw new TypeError(`getScoreBand: expected a finite number, got ${score}`);
+  }
   if (score >= 8) return "exceptional";
   if (score >= 6) return "above";
   if (score >= 4) return "average";
@@ -40,6 +51,11 @@ export function getScoreLabel(score: number): ScoreLabel {
 
 export function getScoreColor(score: number): string {
   return BAND_COLOR_CLASS[getScoreBand(score)];
+}
+
+/** Text-only color for inline score indicators (no background). */
+export function getScoreTextColor(score: number): string {
+  return BAND_TEXT_COLOR_CLASS[getScoreBand(score)];
 }
 
 /** Clamp a raw adjustment value to -1 | 0 | 1. Non-numbers and NaN → 0. */
@@ -84,6 +100,16 @@ export function parseScore(raw: string | null): number {
   if (raw === null || raw === "") return 0;
   const n = parseFloat(raw);
   return Number.isFinite(n) ? n : 0;
+}
+
+/**
+ * Like parseScore, but returns null for null/empty/non-finite input.
+ * Use at UI-ingress sites where "unrated" must stay distinguishable from "0".
+ */
+export function parseScoreOrNull(raw: string | null): number | null {
+  if (raw === null || raw === "") return null;
+  const n = parseFloat(raw);
+  return Number.isFinite(n) ? n : null;
 }
 
 /** Compute the worth-it score from boolean signals + adjustment. Range: [1, 10]. */

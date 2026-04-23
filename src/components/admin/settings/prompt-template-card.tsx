@@ -183,7 +183,7 @@ export function PromptTemplateCard({ initialPrompt }: PromptTemplateCardProps) {
             onChange={(e) => setPromptText(e.target.value)}
           />
           {missingTranscript && (
-            <p className="text-sm text-yellow-600 dark:text-yellow-400">
+            <p className="text-sm text-status-warning-text">
               Warning: prompt must contain {"{{transcript}}"} to work correctly.
             </p>
           )}

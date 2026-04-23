@@ -9,10 +9,11 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet"
-import { Menu, Headphones } from "lucide-react"
+import { Menu } from "lucide-react"
 import { NotificationBell } from "@/components/notifications/notification-bell"
 import { Sidebar } from "@/components/layout/sidebar"
 import { ThemeToggle } from "@/components/layout/theme-toggle"
+import { Logo } from "@/components/brand/logo"
 
 export function AppHeader({ isAdmin }: { isAdmin: boolean }) {
   return (
@@ -37,8 +38,8 @@ export function AppHeader({ isAdmin }: { isAdmin: boolean }) {
         </Sheet>
 
         {/* Logo */}
-        <Link href="/" className="flex items-center gap-2 mr-6">
-          <Headphones className="h-6 w-6" />
+        <Link href="/" className="flex items-center gap-2 mr-6" aria-label="ContentGenie home">
+          <Logo variant="mark" size={24} decorative />
           <span className="font-bold hidden sm:inline-block">ContentGenie</span>
         </Link>
 

@@ -7,8 +7,8 @@ export default function manifest(): MetadataRoute.Manifest {
     description: "Podcast summaries for busy professionals",
     start_url: "/",
     display: "standalone",
-    background_color: "#09090b",
-    theme_color: "#09090b",
+    background_color: "#FCFDFC",
+    theme_color: "#F59E0B",
     icons: [
       {
         src: "/icon-192x192.png",
