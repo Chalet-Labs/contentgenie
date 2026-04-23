@@ -709,20 +709,32 @@ Rules:
 ## Shapes
 
 One base radius: **8px** (`--radius`, exposed as `rounded-lg` in the
-Tailwind config). Everything derives from it via `calc()`:
+Tailwind config). In the shipped system, **sm** and **md** derive
+from that base via `calc()`, **lg** is the base radius itself, and
+**xl** / **full** are fixed values that stand outside the calc()
+chain:
 
-- **sm (4px)** — inline chips, tight pills where 8px looks bubbly.
-- **md (6px)** — inputs, buttons, inner elements of cards.
-- **lg (8px)** — menus, popovers, sheets.
-- **xl (12px)** — cards, feature panels, hero modules, the logo
-  tile's outer frame if it is embedded in a larger container.
-- **full (9999px)** — avatars, score badges, status pills, star icons.
+- **sm (4px, derived)** — `calc(var(--radius) - 4px)`. Inline chips,
+  tight pills where 8px looks bubbly.
+- **md (6px, derived)** — `calc(var(--radius) - 2px)`. Inputs,
+  buttons, inner elements of cards.
+- **lg (8px, = --radius)** — menus, popovers, sheets.
+- **xl (12px, fixed at `0.75rem`)** — cards, feature panels, hero
+  modules, the logo tile's outer frame if it is embedded in a larger
+  container. Not derived from `--radius` — bumping the base radius
+  will not cascade to `xl`.
+- **full (9999px, fixed)** — avatars, score badges, status pills,
+  star icons.
 
-There is no `rounded-*` utility that maps to the 8px base without an
-explicit `lg` suffix — the Tailwind config deliberately omits a
-`DEFAULT` key, so the bare `rounded` class falls back to Tailwind's
-built-in 4px. Always reach for `rounded-md`, `rounded-lg`, or
-`rounded-xl` explicitly; never `rounded` alone.
+The Tailwind config (`tailwind.config.ts`) only maps `sm` / `md` /
+`lg` to the `--radius` chain; `rounded-xl` resolves to Tailwind's
+built-in 0.75rem (which happens to match the `--radius-xl` CSS
+variable in `globals.css`), and `rounded-full` uses Tailwind's
+built-in 9999px. There is no `rounded-*` utility that maps to the
+8px base without an explicit `lg` suffix — the config deliberately
+omits a `DEFAULT` key, so the bare `rounded` class falls back to
+Tailwind's built-in 4px. Always reach for `rounded-md`,
+`rounded-lg`, or `rounded-xl` explicitly; never `rounded` alone.
 
 Rules:
 - **Rounded but not bubbly.** Never use `full` rounding on non-pill
