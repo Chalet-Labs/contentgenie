@@ -20,10 +20,15 @@
     --border: 150 10% 90%;
     --input: 150 10% 90%;
 
-    /* Primary (emerald) */
-    --primary: 160 70% 35%;
+    /* Primary (emerald) — darkened from L 35% to L 29% so the near-white
+     * label (#F9FBFA / 150 20% 98%) on a filled primary button reaches
+     * ~4.86:1, clearing WCAG 2.1 AA (SC 1.4.3, 4.5:1 for normal text)
+     * per the .impeccable.md accessibility target. Dark mode stays at
+     * 156 60% 48% since the dark label/fill pair already measures 7.57:1
+     * (passes AAA). */
+    --primary: 160 70% 29%;
     --primary-foreground: 150 20% 98%;
-    --ring: 160 70% 35%;
+    --ring: 160 70% 29%;
 
     /* Brand accent (amber — logo, marketing) */
     /* Foreground must match the ink color baked into public/brand/logo-*.svg

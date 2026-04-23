@@ -22,10 +22,10 @@ colors:
   accent-foreground: "#19241F"
   border: "#E3E8E6"
   input: "#E3E8E6"
-  ring: "#1B986E"
+  ring: "#167E5B"
 
   # Primary — emerald (interactive chrome, CTAs)
-  primary: "#1B986E"
+  primary: "#167E5B"
   primary-foreground: "#F9FBFA"
 
   # Brand — amber (logo tile, marketing accent ONLY, never a CTA)
@@ -521,7 +521,7 @@ out-of-system.
 - **Border (#E3E8E6)** — quiet and structural. Borders do the work of
   separating surfaces; shadows are a last resort.
 
-### Primary — emerald (#1B986E)
+### Primary — emerald (#167E5B)
 
 The single color for interactive chrome. Used for:
 - Primary buttons, submit actions, default toggle-on states.
@@ -610,23 +610,17 @@ SC 1.4.3 (AA) and SC 1.4.6 (AAA). AA requires 4.5:1 for normal text and
   text in a de-emphasized tone, use `foreground` at a lower weight
   or opacity instead.
 - **Primary button label on emerald primary** — primary-foreground
-  on primary, ~3.5:1. Button labels are text and fall under SC 1.4.3,
-  which requires 4.5:1 for normal text — so this pairing **fails AA
-  for normal-size button labels** at the shipped 14px / 500-weight.
-  This is a **known WCAG 2.1 AA noncompliance** relative to the
-  project's stated accessibility target (`.impeccable.md` →
-  Accessibility: 4.5:1 for body text) and must be remediated. If it
-  is temporarily retained, track it in an accessibility remediation
-  issue rather than treating it as an accepted shipping delta — this
-  document is not a waiver. The remediation paths are: (a) darken
-  the `primary` token or lift `primary-foreground` until the pair
-  reaches ≥4.5:1, or (b) increase button label size/weight to
-  qualify as large text (WCAG 2.1 defines this as ≥18pt regular or
-  ≥14pt bold — roughly ≥24px regular or ≥18.5px bold in CSS pixels
-  at 1:1 pt-to-px ratio, **not** the more permissive ≥18px/≥14px some
-  specs loosely cite) so the 3:1 large-text threshold applies. Do not paper over the issue by
-  claiming an AA-UI exemption — SC 1.4.11 (3:1 for UI components)
-  governs component boundaries, not the text inside them.
+  (`#F9FBFA`, HSL 150 20% 98%) on primary (`#167E5B`, HSL 160 70%
+  29%), ~4.86:1. Passes WCAG 2.1 AA (SC 1.4.3, 4.5:1 for normal
+  text) at the shipped 14px / 500-weight, matching the
+  `.impeccable.md` accessibility target. This pairing was
+  previously 3.51:1 on `#1B986E` (HSL 160 70% 35%) — a documented
+  noncompliance that was remediated by darkening the `primary`
+  lightness from 35% to 29%, the only load-bearing contrast change
+  in the palette. The emerald hue family is unchanged. Dark mode
+  (`156 60% 48%` label fill, `160 60% 8%` label ink) already
+  measures ~7.57:1 and comfortably clears AAA, so it did not need a
+  parallel nudge.
 
 ## Typography
 
