@@ -39,10 +39,9 @@ export function SubscriptionsList({
   const [pinOverrides, setPinOverrides] = useState<Record<number, boolean>>({});
   const [isPending, startTransition] = useTransition();
 
-  // Reconcile overrides against refreshed server props: drop any whose value
-  // now matches the authoritative `subscription.isPinned`. Keeping overrides
-  // that don't match yet covers the window between the server action resolving
-  // and `router.refresh()`'s RSC payload arriving.
+  // Covers the window between a successful pin action resolving and the
+  // `router.refresh()` RSC payload arriving: keep overrides that still
+  // disagree with the prop, drop the ones the server has caught up on.
   useEffect(() => {
     setPinOverrides((prev) => {
       let changed = false;
