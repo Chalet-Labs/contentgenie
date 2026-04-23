@@ -22,6 +22,10 @@ colors:
   accent-foreground: "#19241F"
   border: "#E3E8E6"
   input: "#E3E8E6"
+  # Invariant: `ring` must always match `primary` below. The design-token
+  # schema does not support cross-references, so the value is duplicated
+  # here — update both in lockstep or focus rings will diverge from the
+  # CTA color they're supposed to telegraph.
   ring: "#167E5B"
 
   # Primary — emerald (interactive chrome, CTAs)
@@ -88,6 +92,8 @@ colors:
   accent-foreground-dark: "#F4F6F5"
   border-dark: "#1C2621"
   input-dark: "#1C2621"
+  # Same invariant as `ring` in light mode: `ring-dark` must always match
+  # `primary-dark`. Update both together.
   ring-dark: "#31C489"
   primary-dark: "#31C489"
   primary-foreground-dark: "#082118"
@@ -273,9 +279,9 @@ components:
     typography: "{typography.button-label}"
     rounded: "{rounded.md}"
     height: 36px
-    paddingTop: 0
+    paddingTop: 8px
     paddingRight: 16px
-    paddingBottom: 0
+    paddingBottom: 8px
     paddingLeft: 16px
     shadow: "{elevation.DEFAULT}"
   button-primary-hover:
@@ -292,9 +298,9 @@ components:
     typography: "{typography.button-label}"
     rounded: "{rounded.md}"
     height: 36px
-    paddingTop: 0
+    paddingTop: 8px
     paddingRight: 16px
-    paddingBottom: 0
+    paddingBottom: 8px
     paddingLeft: 16px
     shadow: "{elevation.sm}"
   button-secondary-hover:
@@ -308,10 +314,10 @@ components:
     typography: "{typography.button-label}"
     rounded: "{rounded.md}"
     height: 36px
-    paddingTop: 0
-    paddingRight: 12px
-    paddingBottom: 0
-    paddingLeft: 12px
+    paddingTop: 8px
+    paddingRight: 16px
+    paddingBottom: 8px
+    paddingLeft: 16px
   button-ghost-hover:
     backgroundColor: "{colors.accent}"
     textColor: "{colors.accent-foreground}"
@@ -321,9 +327,9 @@ components:
     typography: "{typography.button-label}"
     rounded: "{rounded.md}"
     height: 36px
-    paddingTop: 0
+    paddingTop: 8px
     paddingRight: 16px
-    paddingBottom: 0
+    paddingBottom: 8px
     paddingLeft: 16px
     shadow: "{elevation.sm}"
   button-destructive-hover:
@@ -337,9 +343,9 @@ components:
     typography: "{typography.button-label}"
     rounded: "{rounded.md}"
     height: 36px
-    paddingTop: 0
+    paddingTop: 8px
     paddingRight: 16px
-    paddingBottom: 0
+    paddingBottom: 8px
     paddingLeft: 16px
     borderWidth: 1px
     borderColor: "{colors.input}"
@@ -405,9 +411,9 @@ components:
     typography: "{typography.body-lg}"
     rounded: "{rounded.md}"
     height: 36px
-    paddingTop: 0
+    paddingTop: 4px
     paddingRight: 12px
-    paddingBottom: 0
+    paddingBottom: 4px
     paddingLeft: 12px
     borderWidth: 1px
     borderColor: "{colors.input}"
@@ -660,7 +666,13 @@ SC 1.4.3 (AA) and SC 1.4.6 (AAA). AA requires 4.5:1 for normal text and
   metadata, timestamps, and secondary copy — never demote primary
   copy to `muted-foreground`. If a surface needs AA-compliant normal
   text in a de-emphasized tone, use `foreground` at a lower weight
-  or opacity instead.
+  (500 instead of 400) while keeping the color at full opacity — that
+  preserves contrast. Do **not** lower the opacity of `foreground` to
+  fake de-emphasis: opacity compounds with the underlying surface
+  alpha and can drop below 4.5:1 on anything other than pure paper
+  (tinted cards, overlays). If a dedicated de-emphasis tone is needed
+  at AA, add a new token whose measured contrast against the target
+  surface is verified ≥4.5:1 rather than reaching for opacity.
 - **Primary button label on emerald primary** — primary-foreground
   (`#F9FBFA`, HSL 150 20% 98%) on primary (`#167E5B`, HSL 160 70%
   29%), ~4.86:1. Passes WCAG 2.1 AA (SC 1.4.3, 4.5:1 for normal
