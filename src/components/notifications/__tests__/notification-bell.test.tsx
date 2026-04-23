@@ -248,7 +248,6 @@ describe("NotificationBell", () => {
     });
     await flushMicrotasks();
 
-    // Badge is hidden when count is 0.
     expect(screen.queryByText("5")).not.toBeInTheDocument();
     expect(screen.queryByText(/^\d+$/)).not.toBeInTheDocument();
   });
@@ -305,7 +304,6 @@ describe("NotificationBell", () => {
     });
     await flushMicrotasks();
 
-    // Badge is 0 from the successful second call.
     expect(screen.queryByText("5")).not.toBeInTheDocument();
 
     // The stale first mark-read now rejects. It must not revert the badge.
@@ -315,6 +313,70 @@ describe("NotificationBell", () => {
     await flushMicrotasks();
 
     expect(screen.queryByText("5")).not.toBeInTheDocument();
+    consoleError.mockRestore();
+  });
+
+  it("(g7) closing the popover before summary resolves skips mark-read", async () => {
+    mockGetUnreadCount.mockResolvedValue(5);
+    // Slow summary that only resolves after the user has already closed.
+    let resolveSummary: (value: typeof defaultSummary) => void = () => {};
+    const slowSummary = new Promise<typeof defaultSummary>((resolve) => {
+      resolveSummary = resolve;
+    });
+    mockGetNotificationSummary.mockReturnValueOnce(slowSummary);
+
+    render(<NotificationBell />);
+    await flushMicrotasks();
+    const btn = screen.getByRole("button", { name: /notifications/i });
+
+    // Open → close before the summary fetch resolves.
+    await act(async () => {
+      fireEvent.click(btn);
+    });
+    await act(async () => {
+      fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });
+    });
+
+    // Only now does the slow fetch resolve. The mark-read step must NOT fire.
+    await act(async () => {
+      resolveSummary(defaultSummary);
+    });
+    await flushMicrotasks();
+
+    expect(mockMarkAllNotificationsRead).not.toHaveBeenCalled();
+    // Badge stays at the server-known count since we skipped the optimistic reset.
+    expect(screen.getByText("5")).toBeInTheDocument();
+  });
+
+  it("(g8) Retry after an initial fetch failure also runs mark-read", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    mockGetUnreadCount.mockResolvedValue(3);
+    // First fetch fails, retry succeeds.
+    mockGetNotificationSummary
+      .mockRejectedValueOnce(new Error("transient"))
+      .mockResolvedValueOnce(defaultSummary);
+
+    render(<NotificationBell />);
+    await flushMicrotasks();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /notifications/i }));
+    });
+    await flushMicrotasks();
+
+    // Initial fetch failed, no mark-read yet, badge intact.
+    expect(mockMarkAllNotificationsRead).not.toHaveBeenCalled();
+    expect(screen.getByText("3")).toBeInTheDocument();
+
+    // Click Retry — must drive the same open-flow (fetch + mark-read).
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /retry/i }));
+    });
+    await flushMicrotasks();
+
+    expect(mockGetNotificationSummary).toHaveBeenCalledTimes(2);
+    expect(mockMarkAllNotificationsRead).toHaveBeenCalledOnce();
+    expect(screen.queryByText("3")).not.toBeInTheDocument();
     consoleError.mockRestore();
   });
 

@@ -24,6 +24,13 @@ export function NotificationBell() {
   const pathname = usePathname();
   const isFirstRender = useRef(true);
 
+  // Mirror of unreadCount for use inside stable callbacks — reading the ref
+  // avoids a 60s churn of `handleOpenChange` identity on every poll tick.
+  const unreadCountRef = useRef<number | null>(null);
+  useEffect(() => {
+    unreadCountRef.current = unreadCount;
+  }, [unreadCount]);
+
   const fetchUnreadCount = useCallback(async () => {
     try {
       const c = await getUnreadCount();
@@ -69,44 +76,50 @@ export function NotificationBell() {
     }
   }, []);
 
-  // Parallel race guard for mark-all: prevents a late rejection from
-  // reverting a later open's successful mark.
+  // Parallel race guard for mark-all: also bumped on close so a fetch that
+  // resolves after the user closed the popover short-circuits before mark.
   const markAllIdRef = useRef(0);
+
+  // Fetch-then-mark: unread SELECT must observe the rows before the UPDATE
+  // commits, and marking on open advances the "since last visit" boundary
+  // for the next open. Also the Retry path — after a transient fetch
+  // failure the user still sees the list, so mark-read must still run.
+  const openAndMarkRead = useCallback(async () => {
+    const fetchOk = await fetchSummary();
+    if (!fetchOk) return;
+
+    const markId = ++markAllIdRef.current;
+    const prev = unreadCountRef.current;
+    setUnreadCount(0);
+    try {
+      const result = await markAllNotificationsRead();
+      if (markId !== markAllIdRef.current) return;
+      if (!result.success) {
+        console.error("markAllNotificationsRead failed:", result.error);
+        setUnreadCount(prev);
+      }
+    } catch (error) {
+      if (markId !== markAllIdRef.current) return;
+      console.error("Failed to mark all notifications as read:", error);
+      setUnreadCount(prev);
+    }
+  }, [fetchSummary]);
 
   const handleOpenChange = useCallback(
     (nextOpen: boolean) => {
       setOpen(nextOpen);
-      if (!nextOpen) return;
-
-      // Order matters: fetch first so the popover renders the items that
-      // were unread, then mark them read so the badge clears and the
-      // `MAX(createdAt) WHERE isRead=true` used by getNotificationSummary
-      // advances to "just now" for the next open (making the "since last
-      // visit" group actually mean since the last open).
-      void (async () => {
-        const fetchOk = await fetchSummary();
-        // Don't advance the "since last visit" boundary over notifications
-        // the user never saw — retry via the error state re-enters this flow.
-        if (!fetchOk) return;
-
-        const markId = ++markAllIdRef.current;
-        const prev = unreadCount;
-        setUnreadCount(0);
-        try {
-          const result = await markAllNotificationsRead();
-          if (markId !== markAllIdRef.current) return;
-          if (!result.success) {
-            console.error("markAllNotificationsRead failed:", result.error);
-            setUnreadCount(prev);
-          }
-        } catch (error) {
-          if (markId !== markAllIdRef.current) return;
-          console.error("Failed to mark all notifications as read:", error);
-          setUnreadCount(prev);
-        }
-      })();
+      if (!nextOpen) {
+        // Close invalidates any in-flight flow: a summary that resolves
+        // after close must not advance the read boundary over rows the
+        // user never saw, and a late mark-all rejection must not revert
+        // a badge already overwritten by a later cycle.
+        fetchIdRef.current++;
+        markAllIdRef.current++;
+        return;
+      }
+      void openAndMarkRead();
     },
-    [fetchSummary, unreadCount]
+    [openAndMarkRead]
   );
 
   const tooltip = lastUpdatedAt
@@ -138,7 +151,7 @@ export function NotificationBell() {
       trigger={trigger}
       summary={summary}
       isError={summaryError}
-      onRetry={fetchSummary}
+      onRetry={openAndMarkRead}
     />
   );
 }
