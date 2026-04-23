@@ -31,6 +31,13 @@ colors:
   # Primary — emerald (interactive chrome, CTAs)
   primary: "#167E5B"
   primary-foreground: "#F9FBFA"
+  # Solid darker emerald for the primary-button hover state. Replaces
+  # the prior `hover:bg-primary/90` alpha composite, which on paper
+  # evaluated to ~#2D8B6B (~4.04:1) — below AA. This solid value sits
+  # at ~6.49:1 against primary-foreground and keeps the emerald hue
+  # family intact. Generators should use this token verbatim for
+  # button-primary-hover rather than reaching for alpha.
+  primary-hover: "#12684B"
 
   # Brand — amber (logo tile, marketing accent ONLY, never a CTA)
   # Values are the asset-baked literals used by the logo SVGs and PWA icon
@@ -97,6 +104,10 @@ colors:
   ring-dark: "#31C489"
   primary-dark: "#31C489"
   primary-foreground-dark: "#082118"
+  # Dark primary-hover: solid L 42% (darker than rest L 48%) — preserves
+  # the alpha-composite-in-dark-mode intent (which also darkened on
+  # hover) with a generator-reproducible token. Measures ~5.84:1.
+  primary-hover-dark: "#2BAB78"
   brand-dark: "#F6A61E"
   brand-foreground-dark: "#1A1407"
   destructive-dark: "#9B3E27"
@@ -299,13 +310,15 @@ components:
     paddingLeft: 16px
     shadow: "{elevation.DEFAULT}"
   button-primary-hover:
-    # Mirrors Tailwind `hover:bg-primary/90` — only the BACKGROUND fill
-    # blends to 90% alpha of primary, the label and icon keep full opacity.
-    # Do not use element `opacity: 0.9` (which dims label text too and
-    # weakens contrast against primary). Generators should express this as
-    # an alpha-composited fill over whatever surface the button sits on.
-    backgroundColor: "{colors.primary}"
-    backgroundColorOpacity: 0.9
+    # Solid darker emerald. Matches the shipped Tailwind class
+    # `hover:bg-primary-hover` in src/components/ui/button.tsx, which
+    # resolves to `hsl(var(--primary-hover))` → L 24% in light mode,
+    # L 42% in dark. Replaced the earlier alpha-composite approach
+    # (`hover:bg-primary/90`) because that composited against the paper
+    # surface to ~#2D8B6B / ~4.04:1 in light mode — failing WCAG 2.1 AA
+    # for the label text on the hovered button. Generators should render
+    # this variant as a solid fill, not as an alpha overlay.
+    backgroundColor: "{colors.primary-hover}"
   button-secondary:
     backgroundColor: "{colors.secondary}"
     textColor: "{colors.secondary-foreground}"
@@ -691,7 +704,15 @@ SC 1.4.3 (AA) and SC 1.4.6 (AAA). AA requires 4.5:1 for normal text and
   (`#F9FBFA`, HSL 150 20% 98%) on primary (`#167E5B`, HSL 160 70%
   29%), ~4.86:1. Passes WCAG 2.1 AA (SC 1.4.3, 4.5:1 for normal
   text) at the shipped 14px / 500-weight, matching the
-  `.impeccable.md` accessibility target. This pairing was
+  `.impeccable.md` accessibility target.
+- **Primary button label on hover state** — primary-foreground on
+  primary-hover (`#12684B`, HSL 160 70% 24%), ~6.49:1. Also clears
+  AA with headroom. The previous `hover:bg-primary/90` alpha
+  composite measured only ~4.04:1 on the paper surface; it was
+  replaced with this solid `primary-hover` token so hover geometry
+  stays AA-compliant regardless of the underlying surface tint.
+  Dark-mode hover (`primary-hover-dark: #2BAB78`, HSL 156 60% 42%)
+  on dark foreground ink measures ~5.84:1 — also clears AA. This pairing was
   previously 3.51:1 on `#1B986E` (HSL 160 70% 35%) — a documented
   noncompliance that was remediated by darkening the `primary`
   lightness from 35% to 29%, the only load-bearing contrast change
