@@ -280,6 +280,12 @@ components:
     rounded: "{rounded.md}"
     height: 36px
     padding: 0 16px
+    borderWidth: 1px
+    borderColor: "{colors.input}"
+    shadow: "{elevation.sm}"
+  button-outline-hover:
+    backgroundColor: "{colors.accent}"
+    textColor: "{colors.accent-foreground}"
   card:
     backgroundColor: "{colors.card}"
     textColor: "{colors.card-foreground}"
