@@ -110,21 +110,26 @@ export function PlayerBar() {
         return
       }
     }
+    // Defer queue advance while chapters are still resolving — otherwise a
+    // press during the fetch ejects the user to the next episode instead of
+    // waiting to see if chapter navigation becomes available.
+    if (chaptersLoading) return
     if (canNavigateQueue) {
       playNext()
     }
-  }, [hasChapters, chapters, currentChapterIdx, canNavigateQueue, seek, playNext])
+  }, [hasChapters, chapters, currentChapterIdx, chaptersLoading, canNavigateQueue, seek, playNext])
 
   const willAdvanceChapter =
     hasChapters && currentChapterIdx + 1 < chapters.length
+  const queueAdvanceReady = !chaptersLoading && canNavigateQueue
   const prevLabel = "Previous chapter"
   const nextLabel = willAdvanceChapter
     ? "Next chapter"
-    : canNavigateQueue
+    : queueAdvanceReady
       ? "Next episode"
       : "Next"
   const canGoPrev = hasChapters && currentChapterIdx >= 0
-  const canGoNext = willAdvanceChapter || canNavigateQueue
+  const canGoNext = willAdvanceChapter || queueAdvanceReady
 
   if (!isVisible || !currentEpisode) return null
 

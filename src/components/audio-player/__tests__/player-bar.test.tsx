@@ -375,6 +375,23 @@ describe("PlayerBar", () => {
       expect(mockAPI.seek).not.toHaveBeenCalled()
     })
 
+    it("does not advance the queue while chapters are still loading", async () => {
+      const user = userEvent.setup()
+      mockState.isVisible = true
+      mockState.currentEpisode = testEpisode
+      mockState.chapters = null
+      mockState.chaptersLoading = true
+      mockState.queue = [
+        { id: "ep-2", title: "Next ep", podcastTitle: "P", audioUrl: "a" },
+      ]
+      render(<PlayerBar />)
+
+      const next = screen.getByRole("button", { name: "Next" })
+      expect(next).toBeDisabled()
+      await user.click(next)
+      expect(mockAPI.playNext).not.toHaveBeenCalled()
+    })
+
     it("renders a disabled 'Next' button when no chapter advance and empty queue", () => {
       mockState.isVisible = true
       mockState.currentEpisode = testEpisode
