@@ -284,7 +284,8 @@ export const AudioPlayerProgressContext = createContext<AudioPlayerProgress | nu
 // Provider
 // ---------------------------------------------------------------------------
 
-const SKIP_SECONDS = 15
+const SKIP_BACK_SECONDS = 10
+const SKIP_FORWARD_SECONDS = 30
 const STALL_TIMEOUT_MS = 10_000
 const SLEEP_FADE_DURATION_MS = 3000
 const MS_PER_MINUTE = 60_000
@@ -970,7 +971,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
         audio.currentTime = Math.max(0, Math.min(time, audio.duration || 0))
       },
 
-      skipForward: (seconds = SKIP_SECONDS) => {
+      skipForward: (seconds = SKIP_FORWARD_SECONDS) => {
         const audio = audioRef.current
         if (!audio) return
         audio.currentTime = Math.min(
@@ -979,7 +980,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
         )
       },
 
-      skipBack: (seconds = SKIP_SECONDS) => {
+      skipBack: (seconds = SKIP_BACK_SECONDS) => {
         const audio = audioRef.current
         if (!audio) return
         audio.currentTime = Math.max(audio.currentTime - seconds, 0)

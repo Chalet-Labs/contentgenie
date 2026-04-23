@@ -177,7 +177,7 @@ describe("PlayerBar", () => {
     mockState.currentEpisode = testEpisode
     render(<PlayerBar />)
 
-    const skipBackButtons = screen.getAllByRole("button", { name: "Skip back 15 seconds" })
+    const skipBackButtons = screen.getAllByRole("button", { name: "Skip back 10 seconds" })
     await user.click(skipBackButtons[0])
     expect(mockAPI.skipBack).toHaveBeenCalled()
   })
@@ -188,7 +188,7 @@ describe("PlayerBar", () => {
     mockState.currentEpisode = testEpisode
     render(<PlayerBar />)
 
-    const skipForwardButtons = screen.getAllByRole("button", { name: "Skip forward 15 seconds" })
+    const skipForwardButtons = screen.getAllByRole("button", { name: "Skip forward 30 seconds" })
     await user.click(skipForwardButtons[0])
     expect(mockAPI.skipForward).toHaveBeenCalled()
   })
