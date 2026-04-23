@@ -130,36 +130,36 @@ describe("getScoreBand", () => {
     for (const s of boundaries) {
       const band = getScoreBand(s);
       expect(getScoreColor(s)).toContain(`bg-score-${band}`);
-      expect(getScoreTextColor(s)).toBe(`text-score-${band}`);
+      expect(getScoreTextColor(s)).toBe(`text-score-${band}-text`);
       expect(getScoreLabel(s)).toBe(EXPECTED_LABEL[band]);
     }
   });
 });
 
 describe("getScoreTextColor", () => {
-  it("returns text-score-exceptional for scores >= 8", () => {
-    expect(getScoreTextColor(8)).toBe("text-score-exceptional");
-    expect(getScoreTextColor(10)).toBe("text-score-exceptional");
+  it("returns text-score-exceptional-text for scores >= 8", () => {
+    expect(getScoreTextColor(8)).toBe("text-score-exceptional-text");
+    expect(getScoreTextColor(10)).toBe("text-score-exceptional-text");
   });
 
-  it("returns text-score-above for scores >= 6 and < 8", () => {
-    expect(getScoreTextColor(6)).toBe("text-score-above");
-    expect(getScoreTextColor(7.9)).toBe("text-score-above");
+  it("returns text-score-above-text for scores >= 6 and < 8", () => {
+    expect(getScoreTextColor(6)).toBe("text-score-above-text");
+    expect(getScoreTextColor(7.9)).toBe("text-score-above-text");
   });
 
-  it("returns text-score-average for scores >= 4 and < 6", () => {
-    expect(getScoreTextColor(4)).toBe("text-score-average");
-    expect(getScoreTextColor(5.9)).toBe("text-score-average");
+  it("returns text-score-average-text for scores >= 4 and < 6", () => {
+    expect(getScoreTextColor(4)).toBe("text-score-average-text");
+    expect(getScoreTextColor(5.9)).toBe("text-score-average-text");
   });
 
-  it("returns text-score-below for scores >= 2 and < 4", () => {
-    expect(getScoreTextColor(2)).toBe("text-score-below");
-    expect(getScoreTextColor(3.9)).toBe("text-score-below");
+  it("returns text-score-below-text for scores >= 2 and < 4", () => {
+    expect(getScoreTextColor(2)).toBe("text-score-below-text");
+    expect(getScoreTextColor(3.9)).toBe("text-score-below-text");
   });
 
-  it("returns text-score-skip for scores < 2", () => {
-    expect(getScoreTextColor(0)).toBe("text-score-skip");
-    expect(getScoreTextColor(1.9)).toBe("text-score-skip");
+  it("returns text-score-skip-text for scores < 2", () => {
+    expect(getScoreTextColor(0)).toBe("text-score-skip-text");
+    expect(getScoreTextColor(1.9)).toBe("text-score-skip-text");
   });
 });
 

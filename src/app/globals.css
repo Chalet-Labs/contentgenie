@@ -26,8 +26,11 @@
     --ring: 160 70% 35%;
 
     /* Brand accent (amber — logo, marketing) */
+    /* Foreground must match the ink color baked into public/brand/logo-*.svg
+     * and scripts/generate-pwa-icons.mjs (#1A1407) so the React Logo and
+     * generated bitmap assets render identical glyph tones. */
     --brand: 38 92% 50%;
-    --brand-foreground: 32 80% 12%;
+    --brand-foreground: 41 58% 6%;
 
     /* Destructive (warm vermilion) */
     --destructive: 12 76% 52%;
@@ -40,16 +43,24 @@
     --chart-4: 43 74% 66%;
     --chart-5: 27 87% 67%;
 
-    /* Worth-It Score palette — warm 5-tier ramp (emerald → vermilion) */
+    /* Worth-It Score palette — warm 5-tier ramp (emerald → vermilion).
+     * -bg / -foreground pair drives badge fills; -text is the darker
+     * accessible tone for inline score indicators on the paper surface
+     * (meets WCAG AA 4.5:1 against --background). */
     --score-exceptional: 160 75% 32%;
+    --score-exceptional-text: 160 75% 24%;
     --score-exceptional-foreground: 0 0% 100%;
     --score-above: 152 60% 45%;
+    --score-above-text: 152 70% 26%;
     --score-above-foreground: 0 0% 100%;
     --score-average: 84 55% 55%;
+    --score-average-text: 84 45% 24%;
     --score-average-foreground: 84 45% 14%;
     --score-below: 38 92% 50%;
+    --score-below-text: 32 80% 28%;
     --score-below-foreground: 32 80% 12%;
     --score-skip: 12 76% 52%;
+    --score-skip-text: 12 76% 36%;
     --score-skip-foreground: 0 0% 100%;
 
     /* Status (subtle bg + strong text, paired) */
@@ -109,7 +120,7 @@
     --input: 150 15% 13%;
     --ring: 156 60% 48%;
     --brand: 38 92% 54%;
-    --brand-foreground: 32 80% 10%;
+    --brand-foreground: 41 58% 6%;
 
     --chart-1: 220 70% 50%;
     --chart-2: 160 60% 45%;
@@ -118,14 +129,19 @@
     --chart-5: 340 75% 55%;
 
     --score-exceptional: 160 75% 40%;
+    --score-exceptional-text: 152 65% 70%;
     --score-exceptional-foreground: 0 0% 100%;
     --score-above: 152 60% 50%;
+    --score-above-text: 152 60% 72%;
     --score-above-foreground: 0 0% 100%;
     --score-average: 84 55% 55%;
+    --score-average-text: 84 55% 72%;
     --score-average-foreground: 84 45% 14%;
     --score-below: 38 92% 54%;
+    --score-below-text: 38 92% 72%;
     --score-below-foreground: 32 80% 10%;
     --score-skip: 12 76% 55%;
+    --score-skip-text: 12 76% 72%;
     --score-skip-foreground: 0 0% 100%;
 
     --status-success-bg: 160 70% 14%;

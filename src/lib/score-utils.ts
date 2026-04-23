@@ -27,11 +27,11 @@ const BAND_COLOR_CLASS: Record<ScoreBand, string> = {
 };
 
 const BAND_TEXT_COLOR_CLASS: Record<ScoreBand, string> = {
-  exceptional: "text-score-exceptional",
-  above: "text-score-above",
-  average: "text-score-average",
-  below: "text-score-below",
-  skip: "text-score-skip",
+  exceptional: "text-score-exceptional-text",
+  above: "text-score-above-text",
+  average: "text-score-average-text",
+  below: "text-score-below-text",
+  skip: "text-score-skip-text",
 };
 
 export function getScoreBand(score: number): ScoreBand {

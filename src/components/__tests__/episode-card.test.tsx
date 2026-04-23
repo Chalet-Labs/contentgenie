@@ -116,7 +116,7 @@ describe("EpisodeCard", () => {
     );
     const scoreContainer = screen.getByText("8.5").closest("[data-score-band]");
     expect(scoreContainer).toHaveAttribute("data-score-band", "exceptional");
-    expect(scoreContainer).toHaveClass("text-score-exceptional");
+    expect(scoreContainer).toHaveClass("text-score-exceptional-text");
   });
 
   it("maps mid score (6–7.99) to the above band", () => {
@@ -125,7 +125,7 @@ describe("EpisodeCard", () => {
     );
     const scoreContainer = screen.getByText("6.0").closest("[data-score-band]");
     expect(scoreContainer).toHaveAttribute("data-score-band", "above");
-    expect(scoreContainer).toHaveClass("text-score-above");
+    expect(scoreContainer).toHaveClass("text-score-above-text");
   });
 
   it("maps low score (2–3.99) to the below band", () => {
@@ -134,7 +134,7 @@ describe("EpisodeCard", () => {
     );
     const scoreContainer = screen.getByText("3.5").closest("[data-score-band]");
     expect(scoreContainer).toHaveAttribute("data-score-band", "below");
-    expect(scoreContainer).toHaveClass("text-score-below");
+    expect(scoreContainer).toHaveClass("text-score-below-text");
   });
 
   it("does not render score indicator without worthItScore", () => {
