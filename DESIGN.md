@@ -29,8 +29,11 @@ colors:
   primary-foreground: "#F9FBFA"
 
   # Brand — amber (logo tile, marketing accent ONLY, never a CTA)
-  brand: "#F59F0A"
-  brand-foreground: "#181306"
+  # Values are the asset-baked literals used by the logo SVGs and PWA icon
+  # generator; the CSS variable resolves to essentially the same amber at
+  # runtime, but these exact hexes are what ships in rendered bitmaps.
+  brand: "#F59E0B"
+  brand-foreground: "#1A1407"
 
   # Destructive — warm vermilion (not cool red)
   destructive: "#E24D28"
@@ -46,7 +49,7 @@ colors:
   score-average: "#99CB4D"
   score-average-text: "#435922"
   score-average-foreground: "#273414"
-  score-below: "#F59F0A"
+  score-below: "#F59E0B"
   score-below-text: "#814B0E"
   score-below-foreground: "#372006"
   score-skip: "#E24D28"
@@ -70,17 +73,57 @@ colors:
   status-neutral-text: "#5B6761"
   status-neutral-border: "#C7D1CC"
 
-  # Chrome — dark (system-aware; user can override)
+  # Chrome — dark (system-aware; every light-mode surface has a dark twin)
   background-dark: "#0D120F"
   foreground-dark: "#F4F6F5"
   card-dark: "#0D120F"
+  card-foreground-dark: "#F4F6F5"
+  popover-dark: "#0D120F"
+  popover-foreground-dark: "#F4F6F5"
+  secondary-dark: "#1C2621"
+  secondary-foreground-dark: "#F4F6F5"
   muted-dark: "#1C2621"
   muted-foreground-dark: "#9EA9A3"
+  accent-dark: "#1C2621"
+  accent-foreground-dark: "#F4F6F5"
   border-dark: "#1C2621"
+  input-dark: "#1C2621"
+  ring-dark: "#31C489"
   primary-dark: "#31C489"
   primary-foreground-dark: "#082118"
   brand-dark: "#F6A61E"
+  brand-foreground-dark: "#1A1407"
   destructive-dark: "#9B3E27"
+  destructive-foreground-dark: "#FAFAFA"
+
+  # Worth-It score ramp — dark twins (lifted tints for forest-ink surfaces)
+  score-exceptional-dark: "#1AAD7A"
+  score-exceptional-text-dark: "#8AD8B5"
+  score-above-dark: "#39CB85"
+  score-above-text-dark: "#8ED8B0"
+  score-average-dark: "#A2D256"
+  score-average-text-dark: "#CFE39B"
+  score-below-dark: "#F6A61E"
+  score-below-text-dark: "#F8D38A"
+  score-skip-dark: "#E35838"
+  score-skip-text-dark: "#F0A18C"
+
+  # Status palette — dark twins
+  status-success-bg-dark: "#0C3B27"
+  status-success-text-dark: "#85CAA5"
+  status-success-border-dark: "#1F5C42"
+  status-warning-bg-dark: "#402B07"
+  status-warning-text-dark: "#F5C878"
+  status-warning-border-dark: "#704E16"
+  status-info-bg-dark: "#1C2B23"
+  status-info-text-dark: "#85CAAB"
+  status-info-border-dark: "#355646"
+  status-danger-bg-dark: "#401510"
+  status-danger-text-dark: "#E8A796"
+  status-danger-border-dark: "#6A2820"
+  status-neutral-bg-dark: "#1F2623"
+  status-neutral-text-dark: "#99A19D"
+  status-neutral-border-dark: "#3B4440"
 
 typography:
   display-hero:
@@ -156,9 +199,12 @@ typography:
     lineHeight: 18px
 
 rounded:
+  # These correspond to the Tailwind `rounded-{sm,md,lg,xl,full}` utilities
+  # as configured in the codebase. There is no Tailwind `rounded.DEFAULT`
+  # key — the bare `rounded` utility falls through to Tailwind's built-in
+  # 4px default, which this system does not use.
   sm: 4px
   md: 6px
-  DEFAULT: 8px
   lg: 8px
   xl: 12px
   full: 9999px
@@ -196,23 +242,23 @@ components:
     textColor: "{colors.primary-foreground}"
     typography: "{typography.label}"
     rounded: "{rounded.md}"
-    height: 40px
+    height: 36px
     padding: 0 16px
   button-primary-hover:
-    backgroundColor: "#136C4F"
+    backgroundColor: "{colors.primary}"
   button-secondary:
     backgroundColor: "{colors.secondary}"
     textColor: "{colors.secondary-foreground}"
     typography: "{typography.label}"
     rounded: "{rounded.md}"
-    height: 40px
+    height: 36px
     padding: 0 16px
   button-ghost:
     backgroundColor: transparent
     textColor: "{colors.foreground}"
     typography: "{typography.label}"
     rounded: "{rounded.md}"
-    height: 40px
+    height: 36px
     padding: 0 12px
   button-ghost-hover:
     backgroundColor: "{colors.accent}"
@@ -221,32 +267,42 @@ components:
     textColor: "{colors.destructive-foreground}"
     typography: "{typography.label}"
     rounded: "{rounded.md}"
-    height: 40px
+    height: 36px
+    padding: 0 16px
+  button-outline:
+    backgroundColor: "{colors.background}"
+    textColor: "{colors.foreground}"
+    typography: "{typography.label}"
+    rounded: "{rounded.md}"
+    height: 36px
     padding: 0 16px
   card:
     backgroundColor: "{colors.card}"
     textColor: "{colors.card-foreground}"
-    rounded: "{rounded.lg}"
+    rounded: "{rounded.xl}"
     padding: "{spacing.card-padding-lg}"
   card-bordered:
     backgroundColor: "{colors.card}"
     textColor: "{colors.card-foreground}"
-    rounded: "{rounded.lg}"
+    rounded: "{rounded.xl}"
     padding: "{spacing.card-padding-lg}"
   card-accent:
     backgroundColor: "{colors.card}"
     textColor: "{colors.card-foreground}"
-    rounded: "{rounded.lg}"
+    rounded: "{rounded.xl}"
     padding: "{spacing.card-padding-lg}"
   input:
     backgroundColor: "{colors.background}"
     textColor: "{colors.foreground}"
     typography: "{typography.body}"
     rounded: "{rounded.md}"
-    height: 40px
+    height: 36px
     padding: 0 12px
   input-focus:
     backgroundColor: "{colors.background}"
+    ringColor: "{colors.ring}"
+    ringWidth: 1px
+    ringOffsetWidth: 0px
   badge-score-exceptional:
     backgroundColor: "{colors.score-exceptional}"
     textColor: "{colors.score-exceptional-foreground}"
@@ -315,6 +371,9 @@ components:
   focus-ring:
     backgroundColor: transparent
     textColor: "{colors.ring}"
+    ringColor: "{colors.ring}"
+    ringWidth: 1px
+    ringOffsetWidth: 0px
 ---
 
 ## Overview
@@ -380,7 +439,7 @@ The single color for interactive chrome. Used for:
 Dark mode lifts to **#31C489** (lighter and a touch more saturated) so the
 chrome stays legible against the forest-ink background.
 
-### Brand — amber (#F59F0A)
+### Brand — amber (#F59E0B)
 
 The identity accent. Used for:
 - The logo tile (amber square + ink glyph). The tile is the product's face;
@@ -389,7 +448,7 @@ The identity accent. Used for:
 - A single marketing accent per section — a divider, a hero callout, never
   more than one per viewport.
 
-Amber's foreground ink is a deep warm ink (**#181306**), not pure black —
+Amber's foreground ink is a deep warm ink (**#1A1407**), not pure black —
 matching the glyph color inside the logo SVG so bitmap favicons render
 identically.
 
@@ -409,7 +468,7 @@ vermilion:
 | Exceptional | ≥ 8    | #148F66   | Listen now       |
 | Above avg.  | 6–7.99 | #2EB877   | Worth the time   |
 | Average     | 4–5.99 | #99CB4D   | Maybe, if time   |
-| Below avg.  | 2–3.99 | #F59F0A   | Skim the summary |
+| Below avg.  | 2–3.99 | #F59E0B   | Skim the summary |
 | Skip        | < 2    | #E24D28   | Move on          |
 
 Each tier has three paired tokens:
@@ -506,33 +565,44 @@ variable font arrives.
 
 ## Elevation & Depth
 
-Shadows are *structural, not decorative*. Default chrome uses borders.
-Four shadow tiers exist for surfaces that must lift off the page:
+Shadows are *structural, not decorative*. Four shadow tiers cover the
+full surface hierarchy:
 
-- **sm** — subtle bottom hint for hovered rows.
+- **sm** — default card rest state and subtle bottom hint for hovered
+  rows. A single 1px/2px offset that just defines the card edge from
+  paper.
 - **DEFAULT** — dropdowns, menus. The "popped" state.
 - **md** — modal panels, popovers with meaningful offset.
 - **lg** — only for overlay dialogs that eclipse the page chrome.
 
 Rules:
-- Hero cards and primary content stay **flat + bordered**. Never give the
-  hero a shadow.
+- Cards combine a 1px border with the `sm` shadow — the border draws
+  the edge, the shadow anchors the card against paper. This is the one
+  place border + shadow coexist by design.
 - Shadows are always grey (black at low opacity), never tinted. Tinted
   shadows push the palette toward "branded gradient kitsch."
-- Do not combine border + heavy shadow. Pick one per surface tier.
+- Past the card tier, don't combine border + heavy shadow. Pick one
+  per surface tier.
 - Dark mode shadows shrink (halve their opacity) — forest ink already
   absorbs depth cues, and over-shadowing reads as muddy.
 
 ## Shapes
 
-One base radius: **8px** (`rounded.DEFAULT`). Everything derives from it.
+One base radius: **8px** (`--radius`, exposed as `rounded-lg` in the
+Tailwind config). Everything derives from it via `calc()`:
 
 - **sm (4px)** — inline chips, tight pills where 8px looks bubbly.
 - **md (6px)** — inputs, buttons, inner elements of cards.
-- **DEFAULT / lg (8px)** — cards, menus, popovers, sheets.
-- **xl (12px)** — feature panels, hero modules, the logo tile's outer
-  frame if it is embedded in a larger container.
+- **lg (8px)** — menus, popovers, sheets.
+- **xl (12px)** — cards, feature panels, hero modules, the logo
+  tile's outer frame if it is embedded in a larger container.
 - **full (9999px)** — avatars, score badges, status pills, star icons.
+
+There is no `rounded-*` utility that maps to the 8px base without an
+explicit `lg` suffix — the Tailwind config deliberately omits a
+`DEFAULT` key, so the bare `rounded` class falls back to Tailwind's
+built-in 4px. Always reach for `rounded-md`, `rounded-lg`, or
+`rounded-xl` explicitly; never `rounded` alone.
 
 Rules:
 - **Rounded but not bubbly.** Never use `full` rounding on non-pill
@@ -568,38 +638,49 @@ easing flourish is 400ms of delay between the user and the information.
 
 ### Buttons
 
-- **Primary** — emerald fill, near-white label, 40px tall, 16px
-  horizontal padding, 6px radius. Hover: shift ~10% darker (#136C4F).
+- **Primary** — emerald fill, near-white label, 36px tall (`h-9`),
+  16px horizontal padding, 6px radius (`rounded-md`). Hover: the same
+  fill at 90% opacity (`primary/90`) — the darkening comes from
+  opacity rather than a second color token.
 - **Secondary** — `secondary` fill, foreground label. Same geometry.
   Use when primary is adjacent and would out-shout content.
+- **Outline** — transparent fill over background, foreground label,
+  1px `input`-colored border. Same geometry.
 - **Ghost** — transparent, foreground label, hover reveals `accent`
   fill. Use inside dense toolbars.
 - **Destructive** — vermilion fill. Pair with an explicit confirm step
   for irreversible actions.
-- **Icon-only** — ghost by default, 40×40 hit area even when the glyph
-  is 16px.
+- **Icon-only** — ghost by default, 36×36 hit area; pad the wrapper
+  if the surrounding density requires a 44px touch target.
 
 Never use brand amber as a button fill. Never combine two primaries in
 one row — if both feel equal, one of them is mis-labeled.
 
 ### Cards
 
-- **Default** — white fill (card), 8px radius, 1px border, 24px
-  padding. No shadow at rest.
+- **Default** — white fill (`card`), 12px radius (`rounded-xl`), 1px
+  border, 24px padding, with a subtle default drop shadow at rest.
 - **Bordered** — same, explicit when the context otherwise loses the
   edge.
 - **Accent** — same, but with a 2px left border in `primary` to flag
   "this one has a completed summary." Reserved for that one semantic.
 
 Cards have at most one hero element (title, score, image) and metadata
-stacks below at `muted-foreground`.
+stacks below at `muted-foreground`. The shadow is intentionally subtle —
+it provides just enough separation from the paper background to define
+the card edge without competing with content.
 
 ### Inputs
 
-- 40px tall, 6px radius, 1px border using the `input` token.
-- Focus ring: 2px `ring` color offset 2px. Never a halo glow.
-- Error state: border shifts to `destructive`; message below the field
-  in `destructive-foreground` at `small` size.
+- 36px tall (`h-9`), 6px radius (`rounded-md`), 1px border using the
+  `input` token.
+- Focus ring: 1px `ring` color, no offset (`focus-visible:ring-1`).
+  Tight and restrained — no halo glow.
+- Error state: border shifts to `destructive`; inline message below
+  the field uses `destructive` text (i.e. `text-destructive`) at
+  `small` size. Never use `destructive-foreground` here — that token
+  is the near-white color meant to sit *on* a destructive-filled
+  surface, not free-floating on paper.
 - Never replace the label with a placeholder. Placeholders disappear on
   focus; labels don't.
 
@@ -636,8 +717,8 @@ stacks below at `muted-foreground`.
 ### Focus
 
 - Keyboard focus is visible on every interactive element.
-- 2px `ring`-colored outline + 2px offset; no removal via
-  `outline: none` without a replacement.
+- 1px `ring`-colored outline, no offset (`focus-visible:ring-1`);
+  never removed via `outline: none` without a replacement.
 - Focus color is emerald, matching `primary` — the "touch this" color
   doubles as "you are here" signal.
 
@@ -648,8 +729,9 @@ stacks below at `muted-foreground`.
   for "touch this" makes the product scannable.
 - Use `brand` (amber) exactly where it means "this is the product":
   logo, rating stars, maybe one marketing accent per section.
-- Let borders and whitespace do the work of separating surfaces.
-  Shadows are reserved for lifted chrome (menus, modals).
+- Let borders and whitespace do the structural work of separating
+  surfaces. Cards carry a subtle default shadow; heavier shadows are
+  reserved for lifted chrome (menus, modals, dialogs).
 - Stay inside the token palette. If a color doesn't exist in the
   frontmatter above, the answer is not "add a new shade of blue."
 - Honor `prefers-reduced-motion`. Every transition.
