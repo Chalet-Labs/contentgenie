@@ -1,9 +1,19 @@
 import Link from "next/link";
 import { Bell } from "lucide-react";
-import type { NotificationSummary } from "@/app/actions/notifications";
+import type {
+  NotificationGroup,
+  NotificationSummary,
+} from "@/app/actions/notifications";
 
 interface NotificationSummaryListProps {
   summary: NotificationSummary;
+  onItemClick?: (groupKey: string) => void;
+}
+
+export function groupKeyOf(group: NotificationGroup): string {
+  return group.kind === "episodes_since_last_seen"
+    ? `since-${group.sinceIso}`
+    : `podcast-${group.podcastId}`;
 }
 
 function pluralEpisode(count: number): string {
@@ -14,11 +24,20 @@ function pluralNotification(count: number): string {
   return count === 1 ? "1 unread notification" : `${count} unread notifications`;
 }
 
-function SummaryRow({ href, children }: { href: string; children: React.ReactNode }) {
+function SummaryRow({
+  href,
+  onClick,
+  children,
+}: {
+  href: string;
+  onClick?: (e: React.MouseEvent<HTMLAnchorElement>) => void;
+  children: React.ReactNode;
+}) {
   return (
     <li>
       <Link
         href={href}
+        onClick={onClick}
         className="flex items-center justify-between px-4 py-3 text-sm hover:bg-accent/50 focus-visible:outline-none focus-visible:bg-accent/50"
       >
         {children}
@@ -29,6 +48,7 @@ function SummaryRow({ href, children }: { href: string; children: React.ReactNod
 
 export function NotificationSummaryList({
   summary,
+  onItemClick,
 }: NotificationSummaryListProps) {
   if (summary.totalUnread === 0) {
     return (
@@ -55,13 +75,33 @@ export function NotificationSummaryList({
 
   return (
     <ul className="divide-y">
-      {summary.groups.map((group, i) => {
+      {summary.groups.map((group) => {
+        const key = groupKeyOf(group);
+        // Skip the callback (and the cosmetic removal it drives) when the user
+        // modifier/middle-clicks — those clicks open a new tab, so the group
+        // should stay visible in the still-open popover instead of disappearing.
+        const handleClick = onItemClick
+          ? (e: React.MouseEvent<HTMLAnchorElement>) => {
+              if (
+                e.defaultPrevented ||
+                e.metaKey ||
+                e.ctrlKey ||
+                e.shiftKey ||
+                e.altKey ||
+                e.button !== 0
+              ) {
+                return;
+              }
+              onItemClick(key);
+            }
+          : undefined;
         switch (group.kind) {
           case "episodes_since_last_seen":
             return (
               <SummaryRow
-                key={`since-${i}`}
+                key={key}
                 href={`/notifications?since=${encodeURIComponent(group.sinceIso)}`}
+                onClick={handleClick}
               >
                 {pluralEpisode(group.count)} since last visit
               </SummaryRow>
@@ -69,8 +109,9 @@ export function NotificationSummaryList({
           case "episodes_by_podcast":
             return (
               <SummaryRow
-                key={`podcast-${group.podcastId}`}
+                key={key}
                 href={`/notifications?podcast=${group.podcastId}`}
+                onClick={handleClick}
               >
                 {pluralEpisode(group.count)} from {group.podcastTitle}
               </SummaryRow>

@@ -210,6 +210,193 @@ describe("NotificationPopover", () => {
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 
+  it("(i) Clear all button is absent when summary is empty", () => {
+    render(
+      <NotificationPopover
+        open={true}
+        onOpenChange={vi.fn()}
+        trigger={makeTrigger()}
+        summary={emptySummary}
+        isError={false}
+        onRetry={vi.fn()}
+      />
+    );
+    expect(
+      screen.queryByRole("button", { name: /clear all/i })
+    ).not.toBeInTheDocument();
+  });
+
+  it("(j) Clear all button is absent in loading state", () => {
+    render(
+      <NotificationPopover
+        open={true}
+        onOpenChange={vi.fn()}
+        trigger={makeTrigger()}
+        summary={null}
+        isError={false}
+        onRetry={vi.fn()}
+      />
+    );
+    expect(
+      screen.queryByRole("button", { name: /clear all/i })
+    ).not.toBeInTheDocument();
+  });
+
+  it("(k) Clear all empties the displayed list and hides the button", async () => {
+    const user = userEvent.setup();
+    render(
+      <NotificationPopover
+        open={true}
+        onOpenChange={vi.fn()}
+        trigger={makeTrigger()}
+        summary={populatedSummary}
+        isError={false}
+        onRetry={vi.fn()}
+      />
+    );
+    expect(
+      screen.getByRole("link", { name: /3 new episodes from test podcast/i })
+    ).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /clear all/i }));
+
+    expect(
+      screen.queryByRole("link", { name: /from test podcast/i })
+    ).not.toBeInTheDocument();
+    expect(screen.getByText(/you're all caught up/i)).toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /clear all/i })
+    ).not.toBeInTheDocument();
+  });
+
+  it("(l) clicking an item removes it from the displayed list", async () => {
+    const user = userEvent.setup();
+    const twoGroupSummary: NotificationSummary = {
+      totalUnread: 5,
+      groups: [
+        {
+          kind: "episodes_by_podcast",
+          podcastId: 1,
+          podcastTitle: "Pod A",
+          count: 3,
+        },
+        {
+          kind: "episodes_by_podcast",
+          podcastId: 2,
+          podcastTitle: "Pod B",
+          count: 2,
+        },
+      ],
+    };
+    render(
+      <NotificationPopover
+        open={true}
+        onOpenChange={vi.fn()}
+        trigger={makeTrigger()}
+        summary={twoGroupSummary}
+        isError={false}
+        onRetry={vi.fn()}
+      />
+    );
+
+    await user.click(screen.getByRole("link", { name: /from pod a/i }));
+
+    expect(
+      screen.queryByRole("link", { name: /from pod a/i })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: /from pod b/i })
+    ).toBeInTheDocument();
+  });
+
+  it("(n) clicking the last group leaves the empty state, not the legacy fallback", async () => {
+    const user = userEvent.setup();
+    const singleGroupSummary: NotificationSummary = {
+      totalUnread: 3,
+      groups: [
+        {
+          kind: "episodes_by_podcast",
+          podcastId: 1,
+          podcastTitle: "Pod Solo",
+          count: 3,
+        },
+      ],
+    };
+    render(
+      <NotificationPopover
+        open={true}
+        onOpenChange={vi.fn()}
+        trigger={makeTrigger()}
+        summary={singleGroupSummary}
+        isError={false}
+        onRetry={vi.fn()}
+      />
+    );
+
+    await user.click(screen.getByRole("link", { name: /from pod solo/i }));
+
+    expect(screen.getByText(/you're all caught up/i)).toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: /unread notifications?$/i })
+    ).not.toBeInTheDocument();
+  });
+
+  it("(m) displayed list resyncs when the summary prop changes", () => {
+    const initialSummary: NotificationSummary = {
+      totalUnread: 1,
+      groups: [
+        {
+          kind: "episodes_by_podcast",
+          podcastId: 1,
+          podcastTitle: "Pod One",
+          count: 1,
+        },
+      ],
+    };
+    const updatedSummary: NotificationSummary = {
+      totalUnread: 1,
+      groups: [
+        {
+          kind: "episodes_by_podcast",
+          podcastId: 2,
+          podcastTitle: "Pod Two",
+          count: 1,
+        },
+      ],
+    };
+
+    const { rerender } = render(
+      <NotificationPopover
+        open={true}
+        onOpenChange={vi.fn()}
+        trigger={makeTrigger()}
+        summary={initialSummary}
+        isError={false}
+        onRetry={vi.fn()}
+      />
+    );
+    expect(
+      screen.getByRole("link", { name: /from pod one/i })
+    ).toBeInTheDocument();
+
+    rerender(
+      <NotificationPopover
+        open={true}
+        onOpenChange={vi.fn()}
+        trigger={makeTrigger()}
+        summary={updatedSummary}
+        isError={false}
+        onRetry={vi.fn()}
+      />
+    );
+    expect(
+      screen.getByRole("link", { name: /from pod two/i })
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: /from pod one/i })
+    ).not.toBeInTheDocument();
+  });
+
   it("(h) onOpenChange prop is wired to the Radix surface (outside-click provided by Radix DismissableLayer)", () => {
     // Radix's DismissableLayer handles outside-click → onOpenChange(false) natively.
     // We verify the prop is correctly wired by confirming the controlled state renders

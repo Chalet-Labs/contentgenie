@@ -1,5 +1,6 @@
 "use client";
 
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { AlertCircle } from "lucide-react";
 import {
@@ -18,7 +19,10 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { useMediaQuery } from "@/hooks/use-media-query";
-import { NotificationSummaryList } from "@/components/notifications/notification-summary-list";
+import {
+  NotificationSummaryList,
+  groupKeyOf,
+} from "@/components/notifications/notification-summary-list";
 import type { NotificationSummary } from "@/app/actions/notifications";
 
 interface NotificationPopoverProps {
@@ -35,11 +39,16 @@ function PopoverBody({
   summary,
   isError,
   onRetry,
+  onItemClick,
+  onClearAll,
 }: {
   summary: NotificationSummary | null;
   isError: boolean;
   onRetry: () => void;
+  onItemClick: (groupKey: string) => void;
+  onClearAll: () => void;
 }) {
+  const hasItems = summary !== null && summary.groups.length > 0;
   return (
     <>
       <div className="max-h-96 overflow-y-auto">
@@ -64,15 +73,25 @@ function PopoverBody({
             </div>
           </div>
         ) : (
-          <NotificationSummaryList summary={summary} />
+          <NotificationSummaryList
+            summary={summary}
+            onItemClick={onItemClick}
+          />
         )}
       </div>
-      <Link
-        href="/notifications"
-        className="block border-t p-3 text-center text-sm hover:underline"
-      >
-        See all
-      </Link>
+      <div className="flex items-center justify-between border-t px-3 py-2">
+        <Link
+          href="/notifications"
+          className="px-1 py-1 text-sm hover:underline"
+        >
+          See all
+        </Link>
+        {hasItems && (
+          <Button variant="ghost" size="sm" onClick={onClearAll}>
+            Clear all
+          </Button>
+        )}
+      </div>
     </>
   );
 }
@@ -94,6 +113,39 @@ export function NotificationPopover({
         ? false
         : isDesktopQuery;
 
+  // `displayedSummary` is the popover's view of the summary — it diverges from
+  // the `summary` prop when the user clicks items or "Clear all", so items can
+  // visually disappear without waiting for a server refetch. It resyncs
+  // whenever the parent provides a new summary (e.g., a fresh fetch on open).
+  const [displayedSummary, setDisplayedSummary] = useState<
+    NotificationSummary | null
+  >(summary);
+
+  useEffect(() => {
+    setDisplayedSummary(summary);
+  }, [summary]);
+
+  const handleItemClick = useCallback((groupKey: string) => {
+    setDisplayedSummary((s) => {
+      if (!s) return s;
+      // Decrement totalUnread by the removed group's count so the summary stays
+      // internally consistent — otherwise `groups=[]` with `totalUnread>0` drops
+      // the list into NotificationSummaryList's legacy "N unread notifications"
+      // fallback on the next render.
+      const removed = s.groups.find((g) => groupKeyOf(g) === groupKey);
+      const removedCount = removed?.count ?? 0;
+      return {
+        ...s,
+        totalUnread: Math.max(0, s.totalUnread - removedCount),
+        groups: s.groups.filter((g) => groupKeyOf(g) !== groupKey),
+      };
+    });
+  }, []);
+
+  const handleClearAll = useCallback(() => {
+    setDisplayedSummary({ totalUnread: 0, groups: [] });
+  }, []);
+
   if (isDesktop) {
     return (
       <Popover open={open} onOpenChange={onOpenChange}>
@@ -107,7 +159,13 @@ export function NotificationPopover({
           <div className="flex items-center border-b px-4 py-3">
             <h2 className="text-sm font-semibold">Notifications</h2>
           </div>
-          <PopoverBody summary={summary} isError={isError} onRetry={onRetry} />
+          <PopoverBody
+            summary={displayedSummary}
+            isError={isError}
+            onRetry={onRetry}
+            onItemClick={handleItemClick}
+            onClearAll={handleClearAll}
+          />
         </PopoverContent>
       </Popover>
     );
@@ -124,7 +182,13 @@ export function NotificationPopover({
           </SheetDescription>
         </SheetHeader>
         <div className="flex flex-col flex-1 overflow-hidden">
-          <PopoverBody summary={summary} isError={isError} onRetry={onRetry} />
+          <PopoverBody
+            summary={displayedSummary}
+            isError={isError}
+            onRetry={onRetry}
+            onItemClick={handleItemClick}
+            onClearAll={handleClearAll}
+          />
         </div>
       </SheetContent>
     </Sheet>
