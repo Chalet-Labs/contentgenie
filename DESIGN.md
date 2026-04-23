@@ -291,16 +291,17 @@ components:
     textColor: "{colors.card-foreground}"
     rounded: "{rounded.xl}"
     padding: "{spacing.card-padding-lg}"
-  card-bordered:
-    backgroundColor: "{colors.card}"
-    textColor: "{colors.card-foreground}"
-    rounded: "{rounded.xl}"
-    padding: "{spacing.card-padding-lg}"
+    borderWidth: 1px
+    borderColor: "{colors.border}"
+    shadow: "{elevation.sm}"
   card-accent:
     backgroundColor: "{colors.card}"
     textColor: "{colors.card-foreground}"
     rounded: "{rounded.xl}"
     padding: "{spacing.card-padding-lg}"
+    borderWidth: 1px
+    borderColor: "{colors.border}"
+    shadow: "{elevation.sm}"
     borderLeftWidth: 2px
     borderLeftColor: "{colors.primary}"
   input:
@@ -313,6 +314,9 @@ components:
     rounded: "{rounded.md}"
     height: 36px
     padding: 0 12px
+    borderWidth: 1px
+    borderColor: "{colors.input}"
+    shadow: "{elevation.sm}"
   input-focus:
     backgroundColor: transparent
     ringColor: "{colors.ring}"
@@ -438,7 +442,9 @@ out-of-system.
   row-striping / card-backdrop tint. Used for hover states on ghost buttons
   and for list-row highlights.
 - **Muted-foreground (#6E7C75)** — metadata, timestamps, de-emphasized
-  copy. Meets AA 4.5:1 against paper.
+  copy. Measures ~4.3:1 against paper, narrowly below AA for normal
+  text — reserve for secondary copy or large/bold text where 3:1 AA
+  large-text applies.
 - **Border (#E3E8E6)** — quiet and structural. Borders do the work of
   separating surfaces; shadows are a last resort.
 
@@ -513,27 +519,35 @@ elements — they're read-only semantic framing for content, not chrome.
 
 ### Contrast targets
 
-Target and measured ratios for the shipped light-mode pairings (WCAG 2.1
-definitions):
+Measured ratios for the shipped light-mode pairings, against WCAG 2.1
+SC 1.4.3 (AA) and SC 1.4.6 (AAA). AA requires 4.5:1 for normal text and
+3:1 for large text (≥18pt regular or ≥14pt bold); AAA requires 7:1 and
+4.5:1 respectively.
 
 - **Body text on paper** — foreground on background, ~18.5:1.
-  Exceeds AAA for all text sizes.
-- **Amber tile glyph** — brand-foreground on brand, ~8.5:1. Passes AAA
-  for large text and AA for normal text. The amber tile always carries
-  dark ink and must never be tinted to a value that drops below 4.5:1.
-- **Muted-foreground on paper** — ~4.3:1. Passes AA for large text
-  (≥18pt / 14pt bold) and narrowly misses AA for normal text by
-  design; metadata is tuned to recede. Never demote primary copy to
-  `muted-foreground`.
-- **Primary button label on emerald primary** — primary-foreground on
-  primary, ~3.5:1. Passes the 3:1 AA bar for large text and UI
-  components but is **below** the 4.5:1 normal-text bar. This is a
-  known delta; primary button labels ship at 14px / 500-weight
-  (non-large) so the target is formally AA-UI rather than AA-normal.
-  If a future system refresh requires AA-normal on primary, darken
-  the primary token (or lift the primary-foreground token) until
-  ≥4.5:1; until then, treat this as the accepted shipped ratio, not
-  an aspirational AAA.
+  Exceeds AAA at every size.
+- **Amber tile glyph** — brand-foreground on brand, ~8.5:1. Exceeds
+  AAA for both normal and large text. The amber tile always carries
+  dark ink and must never be tinted to a value that drops below
+  4.5:1.
+- **Muted-foreground on paper** — ~4.3:1. Narrowly misses AA for
+  normal text; passes AA for large text. Reserve this token for
+  metadata, timestamps, and secondary copy — never demote primary
+  copy to `muted-foreground`. If a surface needs AA-compliant normal
+  text in a de-emphasized tone, use `foreground` at a lower weight
+  or opacity instead.
+- **Primary button label on emerald primary** — primary-foreground
+  on primary, ~3.5:1. Button labels are text and fall under SC 1.4.3,
+  which requires 4.5:1 for normal text — so this pairing **fails AA
+  for normal-size button labels** at the shipped 14px / 500-weight.
+  This is an accepted shipping delta, not a target. The actionable
+  remediation paths, whenever the system is revisited, are: (a)
+  darken the `primary` token or lift `primary-foreground` until the
+  pair reaches ≥4.5:1, or (b) increase button label size/weight to
+  qualify as large text (≥18px regular or ≥14px bold) so the 3:1
+  large-text threshold applies. Do not paper over the issue by
+  claiming an AA-UI exemption — SC 1.4.11 (3:1 for UI components)
+  governs component boundaries, not the text inside them.
 
 ## Typography
 
@@ -697,14 +711,14 @@ one row — if both feel equal, one of them is mis-labeled.
 ### Cards
 
 - **Default** — white fill (`card`), 12px radius (`rounded-xl`), 1px
-  border, 24px padding, with a subtle default drop shadow at rest.
-- **Bordered** — same, explicit when the context otherwise loses the
-  edge.
+  `border`-colored border, 24px padding, with a subtle default drop
+  shadow at rest. The border and shadow are part of every card — there
+  is no "borderless" variant.
 - **Accent** — same, plus a 2px left border in `primary`
   (`borderLeftWidth: 2px`, `borderLeftColor: primary`) to flag
   "this one has a completed summary." Reserved for that one
-  semantic. The left border sits *on top of* the card's structural
-  border and shadow, not instead of them.
+  semantic. The left accent stripe sits *on top of* the card's
+  structural border and shadow, not instead of them.
 
 Cards have at most one hero element (title, score, image) and metadata
 stacks below at `muted-foreground`. The shadow is intentionally subtle —
