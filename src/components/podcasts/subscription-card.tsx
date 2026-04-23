@@ -15,6 +15,7 @@ interface SubscriptionCardProps {
   subscribedAt: Date;
   isPinned?: boolean;
   onTogglePin?: () => void;
+  pinDisabled?: boolean;
 }
 
 export function SubscriptionCard({
@@ -22,6 +23,7 @@ export function SubscriptionCard({
   subscribedAt,
   isPinned = false,
   onTogglePin,
+  pinDisabled = false,
 }: SubscriptionCardProps) {
   const categories = podcast.categories || [];
 
@@ -106,6 +108,7 @@ export function SubscriptionCard({
                   type="button"
                   variant="ghost"
                   size="icon"
+                  disabled={pinDisabled}
                   aria-pressed={isPinned}
                   aria-label={isPinned ? "Unpin podcast" : "Pin podcast"}
                   onClick={(e) => {

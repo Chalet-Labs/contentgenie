@@ -37,7 +37,11 @@ export function SubscriptionsList({
   const router = useRouter();
   const [sort, setSort] = useState<SubscriptionSort>(initialSort);
   const [pinOverrides, setPinOverrides] = useState<Record<number, boolean>>({});
-  const [isPending, startTransition] = useTransition();
+  const [pinPendingIds, setPinPendingIds] = useState<ReadonlySet<number>>(
+    () => new Set(),
+  );
+  const [isSortPending, startSortTransition] = useTransition();
+  const [, startPinTransition] = useTransition();
 
   // Covers the window between a successful pin action resolving and the
   // `router.refresh()` RSC payload arriving: keep overrides that still
@@ -67,7 +71,7 @@ export function SubscriptionsList({
     const nextSort = next as SubscriptionSort;
     const prev = sort;
     setSort(nextSort);
-    startTransition(async () => {
+    startSortTransition(async () => {
       try {
         const result = await setSubscriptionSort(nextSort);
         if (!result.success) {
@@ -92,10 +96,22 @@ export function SubscriptionsList({
     });
   };
 
+  const markPinPending = (id: number, pending: boolean) => {
+    setPinPendingIds((prev) => {
+      if (pending === prev.has(id)) return prev;
+      const next = new Set(prev);
+      if (pending) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  };
+
   const handleTogglePin = (id: number, currentPinned: boolean) => {
+    if (pinPendingIds.has(id)) return;
     const optimistic = !currentPinned;
     setPinOverrides((prev) => ({ ...prev, [id]: optimistic }));
-    startTransition(async () => {
+    markPinPending(id, true);
+    startPinTransition(async () => {
       try {
         const result = await togglePinSubscription(id);
         if (!result.success) {
@@ -110,6 +126,8 @@ export function SubscriptionsList({
         console.error("[SubscriptionsList] togglePinSubscription threw", error);
         clearOverride(id);
         toast.error("Couldn't update pin. Check your connection and retry.");
+      } finally {
+        markPinPending(id, false);
       }
     });
   };
@@ -117,7 +135,11 @@ export function SubscriptionsList({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-end">
-        <Select value={sort} onValueChange={handleSortChange} disabled={isPending}>
+        <Select
+          value={sort}
+          onValueChange={handleSortChange}
+          disabled={isSortPending}
+        >
           <SelectTrigger className="w-[200px]" aria-label="Sort subscriptions">
             <SelectValue />
           </SelectTrigger>
@@ -141,6 +163,7 @@ export function SubscriptionsList({
               podcast={subscription.podcast}
               subscribedAt={subscription.subscribedAt}
               isPinned={displayedPinned}
+              pinDisabled={pinPendingIds.has(subscription.id)}
               onTogglePin={() =>
                 handleTogglePin(subscription.id, displayedPinned)
               }
