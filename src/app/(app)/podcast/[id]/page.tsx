@@ -87,12 +87,12 @@ async function loadRssPodcast(podcastIndexId: string) {
   });
 
   const { statusMap, scoreMap } = buildSummaryMaps(dbEpisodes);
-  const listenedInternalIds = await getListenedEpisodeIds(dbEpisodes.map((ep) => ep.id))
-  const listenedSet = new Set(
-    dbEpisodes
-      .filter((ep) => listenedInternalIds.has(ep.id))
-      .map((ep) => ep.podcastIndexId),
+  const listenedInternalIdSet = new Set(
+    await getListenedEpisodeIds(dbEpisodes.map((ep) => ep.id)),
   )
+  const listenedIds = dbEpisodes
+    .filter((ep) => listenedInternalIdSet.has(ep.id))
+    .map((ep) => ep.podcastIndexId)
 
   // Map DB episodes to PodcastIndexEpisode shape for reuse of EpisodeList
   // Use podcastIndexId (rss-...) as the id so EpisodeCard links to /episode/rss-...
@@ -136,7 +136,7 @@ async function loadRssPodcast(podcastIndexId: string) {
     transcripts: [],
   }));
 
-  return { podcast, episodes: mappedEpisodes, statusMap, scoreMap, listenedSet };
+  return { podcast, episodes: mappedEpisodes, statusMap, scoreMap, listenedIds };
 }
 
 export default async function PodcastPage({ params, searchParams }: PodcastPageProps) {
@@ -152,7 +152,7 @@ export default async function PodcastPage({ params, searchParams }: PodcastPageP
       notFound();
     }
 
-    const { podcast, episodes, statusMap, scoreMap, listenedSet } = data;
+    const { podcast, episodes, statusMap, scoreMap, listenedIds } = data;
     const subscribed = await isSubscribedToPodcast(podcast.podcastIndexId);
     const categories = (podcast.categories as string[]) ?? [];
 
@@ -261,7 +261,7 @@ export default async function PodcastPage({ params, searchParams }: PodcastPageP
           <h2 className="mb-4 text-xl font-semibold">
             Episodes ({episodes.length})
           </h2>
-          <EpisodeList episodes={episodes} statusMap={statusMap} scoreMap={scoreMap} listenedSet={listenedSet} />
+          <EpisodeList episodes={episodes} statusMap={statusMap} scoreMap={scoreMap} listenedIds={listenedIds} />
         </div>
       </div>
     );
@@ -292,13 +292,13 @@ export default async function PodcastPage({ params, searchParams }: PodcastPageP
         })
       : [];
     const { statusMap, scoreMap } = buildSummaryMaps(dbEpisodeData);
-    const listenedInternalIds = await getListenedEpisodeIds(dbEpisodeData.map((e) => e.id))
-    const piListenedSet = new Set(
-      dbEpisodeData
-        .filter((e) => listenedInternalIds.has(e.id))
-        .map((e) => e.podcastIndexId),
+    const listenedInternalIdSet = new Set(
+      await getListenedEpisodeIds(dbEpisodeData.map((e) => e.id)),
     )
-    const piKnownSet = new Set(dbEpisodeData.map((e) => e.podcastIndexId))
+    const piListenedIds = dbEpisodeData
+      .filter((e) => listenedInternalIdSet.has(e.id))
+      .map((e) => e.podcastIndexId)
+    const piKnownIds = dbEpisodeData.map((e) => e.podcastIndexId)
 
     if (!podcast) {
       notFound();
@@ -436,7 +436,7 @@ export default async function PodcastPage({ params, searchParams }: PodcastPageP
           <h2 className="mb-4 text-xl font-semibold">
             Episodes ({episodes.length})
           </h2>
-          <EpisodeList episodes={episodes} statusMap={statusMap} scoreMap={scoreMap} listenedSet={piListenedSet} knownSet={piKnownSet} />
+          <EpisodeList episodes={episodes} statusMap={statusMap} scoreMap={scoreMap} listenedIds={piListenedIds} knownIds={piKnownIds} />
         </div>
       </div>
     );

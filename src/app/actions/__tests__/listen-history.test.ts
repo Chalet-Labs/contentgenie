@@ -262,26 +262,26 @@ describe("getListenedEpisodeIds", () => {
     vi.restoreAllMocks()
   })
 
-  it("returns empty Set when unauthenticated without touching the DB", async () => {
+  it("returns empty array when unauthenticated without touching the DB", async () => {
     mockAuth.mockResolvedValue({ userId: null })
     const { getListenedEpisodeIds } = await import("@/app/actions/listen-history")
     const result = await getListenedEpisodeIds([1, 2, 3])
-    expect(result).toEqual(new Set())
+    expect(result).toEqual([])
     expect(mockSelectWhere).not.toHaveBeenCalled()
   })
 
-  it("returns empty Set for empty input without touching the DB", async () => {
+  it("returns empty array for empty input without touching the DB", async () => {
     const { getListenedEpisodeIds } = await import("@/app/actions/listen-history")
     const result = await getListenedEpisodeIds([])
-    expect(result).toEqual(new Set())
+    expect(result).toEqual([])
     expect(mockSelectWhere).not.toHaveBeenCalled()
   })
 
-  it("returns a Set<number> of episodeIds returned by the query", async () => {
+  it("returns an array of episodeIds returned by the query", async () => {
     mockSelectWhere.mockResolvedValue([{ id: 10 }, { id: 42 }, { id: 99 }])
     const { getListenedEpisodeIds } = await import("@/app/actions/listen-history")
     const result = await getListenedEpisodeIds([10, 42, 99, 200])
-    expect(result).toEqual(new Set([10, 42, 99]))
+    expect(result).toEqual([10, 42, 99])
   })
 
   it("filters by userId, episodeId, and completedAt IS NOT NULL", async () => {
@@ -310,12 +310,53 @@ describe("getListenedEpisodeIds", () => {
     expect(completedAtPredicate).toBeDefined()
   })
 
-  it("returns empty Set and logs when DB throws", async () => {
+  it("dedupes, drops non-positive-integer ids, and caps the batch at 500", async () => {
+    mockSelectWhere.mockResolvedValue([])
+    const { getListenedEpisodeIds } = await import("@/app/actions/listen-history")
+
+    // Mix of duplicates, zero, negatives, and non-integers — all must be sanitized out.
+    await getListenedEpisodeIds([
+      5,
+      5,
+      -3,
+      0,
+      1.5,
+      Number.NaN,
+      10,
+    ] as number[])
+
+    const whereArg = mockSelectWhere.mock.calls[0][0] as { _and: Array<Record<string, unknown>> }
+    const episodeIdPredicate = whereArg._and.find(
+      (p) => (p as { _inArray?: { col: unknown; vals: unknown[] } })._inArray?.col === "episodeId",
+    ) as { _inArray: { col: unknown; vals: number[] } } | undefined
+    expect(episodeIdPredicate?._inArray.vals).toEqual([5, 10])
+
+    // 600 ints → should be capped to 500.
+    mockSelectWhere.mockClear()
+    mockSelectWhere.mockResolvedValue([])
+    const manyIds = Array.from({ length: 600 }, (_, i) => i + 1)
+    await getListenedEpisodeIds(manyIds)
+
+    const whereArg2 = mockSelectWhere.mock.calls[0][0] as { _and: Array<Record<string, unknown>> }
+    const episodeIdPredicate2 = whereArg2._and.find(
+      (p) => (p as { _inArray?: { col: unknown; vals: unknown[] } })._inArray?.col === "episodeId",
+    ) as { _inArray: { col: unknown; vals: number[] } } | undefined
+    expect(episodeIdPredicate2?._inArray.vals).toHaveLength(500)
+  })
+
+  it("returns empty array when all input ids are invalid (no DB hit)", async () => {
+    const { getListenedEpisodeIds } = await import("@/app/actions/listen-history")
+    const result = await getListenedEpisodeIds([-1, 0, 1.5, Number.NaN] as number[])
+    expect(result).toEqual([])
+    expect(mockSelectWhere).not.toHaveBeenCalled()
+  })
+
+  it("returns empty array and logs when DB throws", async () => {
     mockSelectWhere.mockRejectedValueOnce(new Error("DB boom"))
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {})
     const { getListenedEpisodeIds } = await import("@/app/actions/listen-history")
     const result = await getListenedEpisodeIds([1, 2])
-    expect(result).toEqual(new Set())
+    expect(result).toEqual([])
     expect(consoleSpy).toHaveBeenCalled()
   })
 })

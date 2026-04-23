@@ -48,8 +48,8 @@ export default function LibraryPage() {
       setIsFromCache(false);
 
       if (isOnline) {
-        const s = await getListenedEpisodeIds(libraryItems.map((i) => i.episode.id))
-        setListenedSet(s)
+        const ids = await getListenedEpisodeIds(libraryItems.map((i) => i.episode.id))
+        setListenedSet(new Set(ids))
       }
 
       // Cache library data for offline use
@@ -103,8 +103,8 @@ export default function LibraryPage() {
     const refresh = async () => {
       const ids = items.map((i) => i.episode.id);
       if (ids.length === 0) return;
-      const s = await getListenedEpisodeIds(ids);
-      setListenedSet(s);
+      const listenedIds = await getListenedEpisodeIds(ids);
+      setListenedSet(new Set(listenedIds));
     };
     window.addEventListener(LISTEN_STATE_CHANGED_EVENT, refresh);
     return () => window.removeEventListener(LISTEN_STATE_CHANGED_EVENT, refresh);

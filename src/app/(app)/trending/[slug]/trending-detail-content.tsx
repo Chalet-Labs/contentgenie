@@ -118,9 +118,10 @@ export async function TrendingDetailContent({ slug }: { slug: string }) {
 
     case "found": {
       const { topic, allTopics, episodes, generatedAt } = result;
-      const listenedSet = episodes.length > 0
+      const listenedIds = episodes.length > 0
         ? await getListenedEpisodeIds(episodes.map((e) => e.id))
-        : new Set<number>()
+        : []
+      const listenedSet = new Set<number>(listenedIds)
       return (
         <div className="space-y-6">
           <h1 className="text-3xl font-bold tracking-tight">{topic.name}</h1>

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
-import { render, screen, act } from "@testing-library/react"
+import { render, screen, act, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { LISTEN_STATE_CHANGED_EVENT } from "@/lib/events"
 
@@ -71,8 +71,10 @@ describe("ListenedButton", () => {
 
     await user.click(screen.getByRole("button", { name: "Mark as listened" }))
 
-    expect(screen.getByRole("button", { name: "Mark as listened" })).toBeInTheDocument()
-    expect(toast.error).toHaveBeenCalledWith("boom")
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Mark as listened" })).toBeInTheDocument()
+      expect(toast.error).toHaveBeenCalledWith("boom")
+    })
   })
 
   it("uses fallback error message when action returns { success: false } with no error field", async () => {
@@ -85,8 +87,10 @@ describe("ListenedButton", () => {
 
     await user.click(screen.getByRole("button", { name: "Mark as listened" }))
 
-    expect(screen.getByRole("button", { name: "Mark as listened" })).toBeInTheDocument()
-    expect(toast.error).toHaveBeenCalledWith("Failed to mark as listened")
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Mark as listened" })).toBeInTheDocument()
+      expect(toast.error).toHaveBeenCalledWith("Failed to mark as listened")
+    })
   })
 
   it("reverts and shows connection-error toast when action rejects", async () => {
@@ -101,15 +105,20 @@ describe("ListenedButton", () => {
 
     await user.click(screen.getByRole("button", { name: "Mark as listened" }))
 
-    expect(screen.getByRole("button", { name: "Mark as listened" })).toBeInTheDocument()
-    expect(toast.error).toHaveBeenCalledWith(
-      "Could not mark as listened — check your connection",
-    )
-    const listenEventDispatched = dispatchSpy.mock.calls.some(
-      (call) => call[0] instanceof CustomEvent && (call[0] as CustomEvent).type === LISTEN_STATE_CHANGED_EVENT,
-    )
-    expect(listenEventDispatched).toBe(false)
-    expect(consoleSpy).toHaveBeenCalled()
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Mark as listened" })).toBeInTheDocument()
+      expect(toast.error).toHaveBeenCalledWith(
+        "Could not mark as listened — check your connection",
+      )
+      expect(consoleSpy).toHaveBeenCalled()
+    })
+    expect(
+      dispatchSpy.mock.calls.some(
+        (call) =>
+          call[0] instanceof CustomEvent &&
+          (call[0] as CustomEvent).type === LISTEN_STATE_CHANGED_EVENT,
+      ),
+    ).toBe(false)
   })
 
   it("dispatches LISTEN_STATE_CHANGED_EVENT and shows success toast on success", async () => {
@@ -123,10 +132,14 @@ describe("ListenedButton", () => {
 
     await user.click(screen.getByRole("button", { name: "Mark as listened" }))
 
-    const dispatched = dispatchSpy.mock.calls.find(
-      (call) => call[0] instanceof CustomEvent && (call[0] as CustomEvent).type === LISTEN_STATE_CHANGED_EVENT,
-    )
-    expect(dispatched).toBeTruthy()
-    expect(toast.success).toHaveBeenCalledWith("Marked as listened")
+    await waitFor(() => {
+      const dispatched = dispatchSpy.mock.calls.find(
+        (call) =>
+          call[0] instanceof CustomEvent &&
+          (call[0] as CustomEvent).type === LISTEN_STATE_CHANGED_EVENT,
+      )
+      expect(dispatched).toBeTruthy()
+      expect(toast.success).toHaveBeenCalledWith("Marked as listened")
+    })
   })
 })

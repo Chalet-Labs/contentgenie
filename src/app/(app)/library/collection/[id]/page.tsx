@@ -56,8 +56,8 @@ export default function CollectionDetailPage() {
     } else {
       setCollection(result.collection);
       setItems(result.items);
-      const s = await getListenedEpisodeIds(result.items.map((i) => i.episode.id))
-      setListenedSet(s)
+      const ids = await getListenedEpisodeIds(result.items.map((i) => i.episode.id))
+      setListenedSet(new Set(ids))
     }
 
     setIsLoading(false);
@@ -73,8 +73,8 @@ export default function CollectionDetailPage() {
     const refresh = async () => {
       const ids = items.map((i) => i.episode.id);
       if (ids.length === 0) return;
-      const s = await getListenedEpisodeIds(ids);
-      setListenedSet(s);
+      const listenedIds = await getListenedEpisodeIds(ids);
+      setListenedSet(new Set(listenedIds));
     };
     window.addEventListener(LISTEN_STATE_CHANGED_EVENT, refresh);
     return () => window.removeEventListener(LISTEN_STATE_CHANGED_EVENT, refresh);

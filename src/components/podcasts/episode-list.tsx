@@ -14,13 +14,16 @@ interface EpisodeListProps {
   error?: string | null;
   statusMap?: Record<string, SummaryStatus>;
   scoreMap?: Record<string, string>;
-  listenedSet?: Set<string>;
+  // String arrays (not Set) because props cross the RSC Flight boundary from
+  // Server Components to this Client Component; Set is not serializable on
+  // Next.js 14 / React 18 and becomes {} on the client.
+  listenedIds?: string[];
   // Podcast-index-episode-ids (stringified) that exist in our DB and can be targeted by recordListenEvent.
   // Omit to allow marking on all episodes (library/trending surfaces where every episode is in-DB by construction).
-  knownSet?: Set<string>;
+  knownIds?: string[];
 }
 
-export function EpisodeList({ episodes, isLoading, error, statusMap, scoreMap, listenedSet, knownSet }: EpisodeListProps) {
+export function EpisodeList({ episodes, isLoading, error, statusMap, scoreMap, listenedIds, knownIds }: EpisodeListProps) {
   const [query, setQuery] = useState("");
   const trimmedQuery = query.trim();
   const normalizedQuery = trimmedQuery.toLowerCase();
@@ -30,6 +33,11 @@ export function EpisodeList({ episodes, isLoading, error, statusMap, scoreMap, l
       (episode.title ?? "").toLowerCase().includes(normalizedQuery),
     );
   }, [episodes, normalizedQuery]);
+  const listenedSet = useMemo(() => new Set(listenedIds ?? []), [listenedIds]);
+  const knownSet = useMemo(
+    () => (knownIds ? new Set(knownIds) : undefined),
+    [knownIds],
+  );
 
   if (isLoading) {
     return (
@@ -89,7 +97,7 @@ export function EpisodeList({ episodes, isLoading, error, statusMap, scoreMap, l
             episode={episode}
             summaryStatus={statusMap?.[String(episode.id)]}
             worthItScore={scoreMap?.[String(episode.id)]}
-            isListened={listenedSet?.has(String(episode.id)) ?? false}
+            isListened={listenedSet.has(String(episode.id))}
             canMarkListened={knownSet ? knownSet.has(String(episode.id)) : true}
           />
         ))

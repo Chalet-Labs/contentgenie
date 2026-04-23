@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite"
-import { ListenedButton } from "./listened-button"
+import { ListenedButton } from "@/components/episodes/listened-button"
 
 const meta: Meta<typeof ListenedButton> = {
   title: "Episodes/ListenedButton",

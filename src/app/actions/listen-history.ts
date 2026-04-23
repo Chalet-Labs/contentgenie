@@ -92,11 +92,29 @@ export async function recordListenEvent(input: {
   })
 }
 
+// Cap batch lookups to keep the IN predicate bounded even if the client
+// forwards an untrusted array (server actions are reachable from the network).
+const MAX_LISTENED_LOOKUP_IDS = 500
+
+// Returns an array (not Set) because server actions serialize across the
+// RSC Flight boundary; Set is not serializable on Next.js 14 / React 18 and
+// becomes {} on the client. Callers that need O(1) lookup wrap in `new Set()`.
 export async function getListenedEpisodeIds(
   episodeInternalIds: number[],
-): Promise<Set<number>> {
+): Promise<number[]> {
   const { userId } = await auth()
-  if (!userId || episodeInternalIds.length === 0) return new Set()
+  if (!userId || !Array.isArray(episodeInternalIds)) return []
+
+  const sanitizedIds = Array.from(
+    new Set(
+      episodeInternalIds.filter(
+        (id) => Number.isInteger(id) && id > 0,
+      ),
+    ),
+  ).slice(0, MAX_LISTENED_LOOKUP_IDS)
+
+  if (sanitizedIds.length === 0) return []
+
   try {
     // Filter on completedAt: the audio player writes listen_history rows at
     // a playback milestone without setting completedAt, so partial plays
@@ -107,13 +125,13 @@ export async function getListenedEpisodeIds(
       .where(
         and(
           eq(listenHistory.userId, userId),
-          inArray(listenHistory.episodeId, episodeInternalIds),
+          inArray(listenHistory.episodeId, sanitizedIds),
           isNotNull(listenHistory.completedAt),
         ),
       )
-    return new Set(rows.map((r) => r.id))
+    return rows.map((r) => r.id)
   } catch (e) {
     console.error("[getListenedEpisodeIds] failed", { userId, error: e })
-    return new Set()
+    return []
   }
 }
