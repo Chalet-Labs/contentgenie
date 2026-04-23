@@ -253,6 +253,10 @@ motion:
   easing-emphasized: cubic-bezier(0.3, 0, 0, 1)
 
 components:
+  # Button shadows mirror the shipped CVA variants in src/components/ui/button.tsx:
+  # the default (primary) variant carries Tailwind `shadow` (= elevation.DEFAULT)
+  # for a slightly stronger CTA presence; destructive/outline/secondary use
+  # Tailwind `shadow-sm` (= elevation.sm); ghost and link carry no shadow.
   button-primary:
     backgroundColor: "{colors.primary}"
     textColor: "{colors.primary-foreground}"
@@ -260,6 +264,7 @@ components:
     rounded: "{rounded.md}"
     height: 36px
     padding: 0 16px
+    shadow: "{elevation.DEFAULT}"
   button-primary-hover:
     backgroundColor: "{colors.primary}"
     opacity: 0.9
@@ -270,6 +275,7 @@ components:
     rounded: "{rounded.md}"
     height: 36px
     padding: 0 16px
+    shadow: "{elevation.sm}"
   button-ghost:
     backgroundColor: transparent
     textColor: "{colors.foreground}"
@@ -287,6 +293,7 @@ components:
     rounded: "{rounded.md}"
     height: 36px
     padding: 0 16px
+    shadow: "{elevation.sm}"
   button-outline:
     backgroundColor: "{colors.background}"
     textColor: "{colors.foreground}"
@@ -300,24 +307,39 @@ components:
   button-outline-hover:
     backgroundColor: "{colors.accent}"
     textColor: "{colors.accent-foreground}"
+  # The card root itself has no padding — padding is applied by the
+  # card-header / card-content / card-footer sub-part tokens below, matching
+  # the shipped Card primitive in src/components/ui/card.tsx where Header,
+  # Content, and Footer each carry `p-6` (24px). Dense consumers (e.g. the
+  # episode card) override Content to `p-4` (16px, = spacing.card-padding).
+  # Shadow is Tailwind `shadow` (elevation.DEFAULT), not `shadow-sm` — the
+  # Card root ships with the stronger default drop.
   card:
     backgroundColor: "{colors.card}"
     textColor: "{colors.card-foreground}"
     rounded: "{rounded.xl}"
-    padding: "{spacing.card-padding-lg}"
     borderWidth: 1px
     borderColor: "{colors.border}"
-    shadow: "{elevation.sm}"
+    shadow: "{elevation.DEFAULT}"
   card-accent:
     backgroundColor: "{colors.card}"
     textColor: "{colors.card-foreground}"
     rounded: "{rounded.xl}"
-    padding: "{spacing.card-padding-lg}"
     borderWidth: 1px
     borderColor: "{colors.border}"
-    shadow: "{elevation.sm}"
+    shadow: "{elevation.DEFAULT}"
     borderLeftWidth: 2px
     borderLeftColor: "{colors.primary}"
+  card-header:
+    padding: "{spacing.card-padding-lg}"
+  card-content:
+    # `p-6 pt-0` in the shipped primitive: 24px sides/bottom, 0 top so header
+    # and content flow without a doubled gap. Generators should express this
+    # as independent vertical/horizontal padding where the target framework
+    # supports it; this token captures the nominal 24px value.
+    padding: "{spacing.card-padding-lg}"
+  card-footer:
+    padding: "{spacing.card-padding-lg}"
   input:
     # Matches the shipped Input primitive: transparent surface that inherits
     # the enclosing card/page background. The base typography is 16px
@@ -732,9 +754,14 @@ one row — if both feel equal, one of them is mis-labeled.
 ### Cards
 
 - **Default** — white fill (`card`), 12px radius (`rounded-xl`), 1px
-  `border`-colored border, 24px padding, with a subtle default drop
-  shadow at rest. The border and shadow are part of every card — there
-  is no "borderless" variant.
+  `border`-colored border, with a default drop shadow at rest. The
+  border and shadow are part of every card — there is no "borderless"
+  variant. The card root carries no padding of its own; the 24px
+  (`p-6`) internal padding is applied by the `card-header`,
+  `card-content`, and `card-footer` sub-part tokens, which mirrors
+  the shipped Card primitive and lets dense consumers (e.g. the
+  episode card) drop the content area to 16px (`p-4`) without
+  fighting a padded root.
 - **Accent** — same, plus a 2px left border in `primary`
   (`borderLeftWidth: 2px`, `borderLeftColor: primary`) to flag
   "this one has a completed summary." Reserved for that one
