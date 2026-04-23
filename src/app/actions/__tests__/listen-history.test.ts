@@ -11,6 +11,7 @@ const mockInsert = vi.fn()
 const mockValues = vi.fn()
 const mockOnConflictDoUpdate = vi.fn()
 const mockFindFirst = vi.fn()
+const mockSelectWhere = vi.fn()
 
 vi.mock("@/db", () => ({
   db: {
@@ -28,6 +29,11 @@ vi.mock("@/db", () => ({
         },
       }
     },
+    select: (_cols: unknown) => ({
+      from: (_table: unknown) => ({
+        where: (...args: unknown[]) => mockSelectWhere(...args),
+      }),
+    }),
     query: {
       episodes: {
         findFirst: (...args: unknown[]) => mockFindFirst(...args),
@@ -65,6 +71,9 @@ vi.mock("drizzle-orm", () => ({
     _values: values,
   })),
   eq: vi.fn((col: unknown, val: unknown) => ({ col, val })),
+  and: vi.fn((...conditions: unknown[]) => ({ _and: conditions })),
+  inArray: vi.fn((col: unknown, vals: unknown) => ({ _inArray: { col, vals } })),
+  isNotNull: vi.fn((col: unknown) => ({ _isNotNull: col })),
 }))
 
 describe("recordListenEvent", () => {
@@ -238,6 +247,116 @@ describe("recordListenEvent", () => {
       success: false,
       error: "Failed to record listen event",
     })
+    expect(consoleSpy).toHaveBeenCalled()
+  })
+})
+
+describe("getListenedEpisodeIds", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockAuth.mockResolvedValue({ userId: "user_123" })
+    mockSelectWhere.mockResolvedValue([])
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it("returns empty array when unauthenticated without touching the DB", async () => {
+    mockAuth.mockResolvedValue({ userId: null })
+    const { getListenedEpisodeIds } = await import("@/app/actions/listen-history")
+    const result = await getListenedEpisodeIds([1, 2, 3])
+    expect(result).toEqual([])
+    expect(mockSelectWhere).not.toHaveBeenCalled()
+  })
+
+  it("returns empty array for empty input without touching the DB", async () => {
+    const { getListenedEpisodeIds } = await import("@/app/actions/listen-history")
+    const result = await getListenedEpisodeIds([])
+    expect(result).toEqual([])
+    expect(mockSelectWhere).not.toHaveBeenCalled()
+  })
+
+  it("returns an array of episodeIds returned by the query", async () => {
+    mockSelectWhere.mockResolvedValue([{ id: 10 }, { id: 42 }, { id: 99 }])
+    const { getListenedEpisodeIds } = await import("@/app/actions/listen-history")
+    const result = await getListenedEpisodeIds([10, 42, 99, 200])
+    expect(result).toEqual([10, 42, 99])
+  })
+
+  it("filters by userId, episodeId, and completedAt IS NOT NULL", async () => {
+    mockSelectWhere.mockResolvedValue([])
+    const { getListenedEpisodeIds } = await import("@/app/actions/listen-history")
+    await getListenedEpisodeIds([10, 42])
+
+    const whereArg = mockSelectWhere.mock.calls[0][0] as { _and: Array<Record<string, unknown>> }
+    expect(whereArg).toHaveProperty("_and")
+    const predicates = whereArg._and
+    // userId must be pinned to the current user — prevents cross-user leaks.
+    const userIdPredicate = predicates.find(
+      (p) => p.col === "userId" && p.val === "user_123",
+    )
+    // episodeId must be scoped to the requested batch.
+    const episodeIdPredicate = predicates.find(
+      (p) => (p as { _inArray?: { col: unknown; vals: unknown[] } })._inArray?.col === "episodeId",
+    ) as { _inArray: { col: unknown; vals: number[] } } | undefined
+    // completedAt IS NOT NULL — exclude partial plays recorded by the audio player.
+    const completedAtPredicate = predicates.find(
+      (p) => (p as { _isNotNull?: unknown })._isNotNull === "completedAt",
+    )
+    expect(userIdPredicate).toBeDefined()
+    expect(episodeIdPredicate).toBeDefined()
+    expect(episodeIdPredicate?._inArray.vals).toEqual([10, 42])
+    expect(completedAtPredicate).toBeDefined()
+  })
+
+  it("dedupes, drops non-positive-integer ids, and caps the batch at 500", async () => {
+    mockSelectWhere.mockResolvedValue([])
+    const { getListenedEpisodeIds } = await import("@/app/actions/listen-history")
+
+    // Mix of duplicates, zero, negatives, and non-integers — all must be sanitized out.
+    await getListenedEpisodeIds([
+      5,
+      5,
+      -3,
+      0,
+      1.5,
+      Number.NaN,
+      10,
+    ] as number[])
+
+    const whereArg = mockSelectWhere.mock.calls[0][0] as { _and: Array<Record<string, unknown>> }
+    const episodeIdPredicate = whereArg._and.find(
+      (p) => (p as { _inArray?: { col: unknown; vals: unknown[] } })._inArray?.col === "episodeId",
+    ) as { _inArray: { col: unknown; vals: number[] } } | undefined
+    expect(episodeIdPredicate?._inArray.vals).toEqual([5, 10])
+
+    // 600 ints → should be capped to 500.
+    mockSelectWhere.mockClear()
+    mockSelectWhere.mockResolvedValue([])
+    const manyIds = Array.from({ length: 600 }, (_, i) => i + 1)
+    await getListenedEpisodeIds(manyIds)
+
+    const whereArg2 = mockSelectWhere.mock.calls[0][0] as { _and: Array<Record<string, unknown>> }
+    const episodeIdPredicate2 = whereArg2._and.find(
+      (p) => (p as { _inArray?: { col: unknown; vals: unknown[] } })._inArray?.col === "episodeId",
+    ) as { _inArray: { col: unknown; vals: number[] } } | undefined
+    expect(episodeIdPredicate2?._inArray.vals).toHaveLength(500)
+  })
+
+  it("returns empty array when all input ids are invalid (no DB hit)", async () => {
+    const { getListenedEpisodeIds } = await import("@/app/actions/listen-history")
+    const result = await getListenedEpisodeIds([-1, 0, 1.5, Number.NaN] as number[])
+    expect(result).toEqual([])
+    expect(mockSelectWhere).not.toHaveBeenCalled()
+  })
+
+  it("returns empty array and logs when DB throws", async () => {
+    mockSelectWhere.mockRejectedValueOnce(new Error("DB boom"))
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {})
+    const { getListenedEpisodeIds } = await import("@/app/actions/listen-history")
+    const result = await getListenedEpisodeIds([1, 2])
+    expect(result).toEqual([])
     expect(consoleSpy).toHaveBeenCalled()
   })
 })

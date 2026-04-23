@@ -10,6 +10,7 @@ import { ProcessingStatus } from "@/components/episodes/processing-status";
 import { cn, stripHtml } from "@/lib/utils";
 import type { SummaryStatus } from "@/db/schema";
 import { AddToQueueButton } from "@/components/audio-player/add-to-queue-button";
+import { ListenedButton } from "@/components/episodes/listened-button";
 import { getScoreTextColor, getScoreBand } from "@/lib/score-utils";
 
 interface EpisodeCardProps {
@@ -17,6 +18,8 @@ interface EpisodeCardProps {
   summaryStatus?: SummaryStatus | null;
   worthItScore?: string | null;
   showQueueAction?: boolean;
+  isListened?: boolean;
+  canMarkListened?: boolean;
 }
 
 function ScoreIndicator({ value }: { value: string }) {
@@ -33,7 +36,7 @@ function ScoreIndicator({ value }: { value: string }) {
   );
 }
 
-export function EpisodeCard({ episode, summaryStatus, worthItScore, showQueueAction = false }: EpisodeCardProps) {
+export function EpisodeCard({ episode, summaryStatus, worthItScore, showQueueAction = false, isListened = false, canMarkListened = true }: EpisodeCardProps) {
   const hasAudio = Boolean(episode.enclosureUrl);
 
   return (
@@ -89,20 +92,28 @@ export function EpisodeCard({ episode, summaryStatus, worthItScore, showQueueAct
             </div>
           </Link>
 
-          {showQueueAction && hasAudio && (
-            <div className="flex shrink-0 items-center self-center invisible opacity-0 transition-all group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100 max-md:visible max-md:opacity-100">
-              <AddToQueueButton
-                episode={{
-                  id: String(episode.id),
-                  title: episode.title,
-                  podcastTitle: episode.feedTitle ?? "Podcast",
-                  audioUrl: episode.enclosureUrl,
-                  duration: episode.duration,
-                }}
-                variant="icon"
+          <div className="flex shrink-0 flex-col items-center gap-1 self-start">
+            {canMarkListened && (
+              <ListenedButton
+                podcastIndexEpisodeId={String(episode.id)}
+                isListened={isListened}
               />
-            </div>
-          )}
+            )}
+            {showQueueAction && hasAudio && (
+              <div className="invisible opacity-0 transition-all group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100 max-md:visible max-md:opacity-100">
+                <AddToQueueButton
+                  episode={{
+                    id: String(episode.id),
+                    title: episode.title,
+                    podcastTitle: episode.feedTitle ?? "Podcast",
+                    audioUrl: episode.enclosureUrl,
+                    duration: episode.duration,
+                  }}
+                  variant="icon"
+                />
+              </div>
+            )}
+          </div>
         </div>
       </CardContent>
     </Card>

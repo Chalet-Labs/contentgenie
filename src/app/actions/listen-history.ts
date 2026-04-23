@@ -1,9 +1,10 @@
 "use server"
 
-import { eq, sql } from "drizzle-orm"
+import { and, eq, inArray, isNotNull, sql } from "drizzle-orm"
 import { db } from "@/db"
 import { ensureUserExists } from "@/db/helpers"
 import { episodes, listenHistory } from "@/db/schema"
+import { auth } from "@clerk/nextjs/server"
 import { withAuthAction } from "@/lib/auth-wrapper"
 import type { ActionResult } from "@/types/action-result"
 
@@ -89,4 +90,48 @@ export async function recordListenEvent(input: {
       return { success: false, error: "Failed to record listen event" }
     }
   })
+}
+
+// Cap batch lookups to keep the IN predicate bounded even if the client
+// forwards an untrusted array (server actions are reachable from the network).
+const MAX_LISTENED_LOOKUP_IDS = 500
+
+// Returns an array (not Set) because server actions serialize across the
+// RSC Flight boundary; Set is not serializable on Next.js 14 / React 18 and
+// becomes {} on the client. Callers that need O(1) lookup wrap in `new Set()`.
+export async function getListenedEpisodeIds(
+  episodeInternalIds: number[],
+): Promise<number[]> {
+  const { userId } = await auth()
+  if (!userId || !Array.isArray(episodeInternalIds)) return []
+
+  const sanitizedIds = Array.from(
+    new Set(
+      episodeInternalIds.filter(
+        (id) => Number.isInteger(id) && id > 0,
+      ),
+    ),
+  ).slice(0, MAX_LISTENED_LOOKUP_IDS)
+
+  if (sanitizedIds.length === 0) return []
+
+  try {
+    // Filter on completedAt: the audio player writes listen_history rows at
+    // a playback milestone without setting completedAt, so partial plays
+    // must not count as "already listened" for the ListenedButton indicator.
+    const rows = await db
+      .select({ id: listenHistory.episodeId })
+      .from(listenHistory)
+      .where(
+        and(
+          eq(listenHistory.userId, userId),
+          inArray(listenHistory.episodeId, sanitizedIds),
+          isNotNull(listenHistory.completedAt),
+        ),
+      )
+    return rows.map((r) => r.id)
+  } catch (e) {
+    console.error("[getListenedEpisodeIds] failed", { userId, error: e })
+    return []
+  }
 }

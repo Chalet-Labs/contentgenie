@@ -134,6 +134,20 @@ const mockPlayerState: AudioPlayerState = {
   sleepTimer: null,
 };
 
+export const Unlistened: Story = {
+  args: {
+    episode: baseEpisode,
+    isListened: false,
+  },
+};
+
+export const Listened: Story = {
+  args: {
+    episode: baseEpisode,
+    isListened: true,
+  },
+};
+
 export const WithQueueAction: Story = {
   args: {
     episode: { ...baseEpisode, feedTitle: "Tech Talk Daily" },

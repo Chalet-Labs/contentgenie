@@ -22,6 +22,8 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { getCollection, deleteCollection } from "@/app/actions/collections";
+import { getListenedEpisodeIds } from "@/app/actions/listen-history";
+import { LISTEN_STATE_CHANGED_EVENT } from "@/lib/events";
 import type { SavedItemDTO } from "@/db/library-columns";
 import type { Collection } from "@/db/schema";
 
@@ -31,6 +33,7 @@ export default function CollectionDetailPage() {
 
   const [collection, setCollection] = useState<Collection | null>(null);
   const [items, setItems] = useState<SavedItemDTO[]>([]);
+  const [listenedSet, setListenedSet] = useState<Set<number>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showEditDialog, setShowEditDialog] = useState(false);
@@ -53,6 +56,8 @@ export default function CollectionDetailPage() {
     } else {
       setCollection(result.collection);
       setItems(result.items);
+      const ids = await getListenedEpisodeIds(result.items.map((i) => i.episode.id))
+      setListenedSet(new Set(ids))
     }
 
     setIsLoading(false);
@@ -61,6 +66,19 @@ export default function CollectionDetailPage() {
   useEffect(() => {
     loadCollection();
   }, [loadCollection]);
+
+  // Refresh listened state when any ListenedButton on the page fires a mark.
+  // Without this, a second card for the same episode would stay on the "Mark as listened" affordance.
+  useEffect(() => {
+    const refresh = async () => {
+      const ids = items.map((i) => i.episode.id);
+      if (ids.length === 0) return;
+      const listenedIds = await getListenedEpisodeIds(ids);
+      setListenedSet(new Set(listenedIds));
+    };
+    window.addEventListener(LISTEN_STATE_CHANGED_EVENT, refresh);
+    return () => window.removeEventListener(LISTEN_STATE_CHANGED_EVENT, refresh);
+  }, [items]);
 
   const handleRemoved = () => {
     loadCollection();
@@ -230,6 +248,7 @@ export default function CollectionDetailPage() {
               item={item}
               onRemoved={handleRemoved}
               onCollectionChanged={handleCollectionChanged}
+              isListened={listenedSet.has(item.episode.id)}
             />
           ))}
         </div>

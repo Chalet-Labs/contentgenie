@@ -15,9 +15,11 @@ import {
 } from "@/components/ui/select";
 import { SavedEpisodeCard } from "@/components/library/saved-episode-card";
 import { getUserLibrary, type LibrarySortOption, type SortDirection } from "@/app/actions/library";
+import { getListenedEpisodeIds } from "@/app/actions/listen-history";
 import { useOnlineStatus } from "@/hooks/use-online-status";
 import { OfflineBanner } from "@/components/ui/offline-banner";
 import { cacheLibrary, getCachedLibrary } from "@/lib/offline-cache";
+import { LISTEN_STATE_CHANGED_EVENT } from "@/lib/events";
 import type { SavedItemDTO } from "@/db/library-columns";
 
 export default function LibraryPage() {
@@ -25,6 +27,7 @@ export default function LibraryPage() {
   const isOnline = useOnlineStatus();
 
   const [items, setItems] = useState<SavedItemDTO[]>([]);
+  const [listenedSet, setListenedSet] = useState<Set<number>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<LibrarySortOption>("savedAt");
@@ -44,6 +47,11 @@ export default function LibraryPage() {
       setItems(libraryItems);
       setIsFromCache(false);
 
+      if (isOnline) {
+        const ids = await getListenedEpisodeIds(libraryItems.map((i) => i.episode.id))
+        setListenedSet(new Set(ids))
+      }
+
       // Cache library data for offline use
       if (userId) {
         void cacheLibrary(userId, libraryItems);
@@ -51,7 +59,7 @@ export default function LibraryPage() {
     }
 
     setIsLoading(false);
-  }, [sortBy, sortDirection, userId]);
+  }, [sortBy, sortDirection, userId, isOnline]);
 
   const loadFromCache = useCallback(async () => {
     if (!userId) {
@@ -72,6 +80,7 @@ export default function LibraryPage() {
       setItems([]);
       setIsFromCache(true);
     }
+    setListenedSet(new Set());
 
     setIsLoading(false);
   }, [userId]);
@@ -86,6 +95,20 @@ export default function LibraryPage() {
       loadFromCache();
     }
   }, [isOnline, loadLibrary, loadFromCache]);
+
+  // Refresh listened state when any ListenedButton on the page fires a mark.
+  // Without this, a second card for the same episode would stay on the "Mark as listened" affordance.
+  useEffect(() => {
+    if (!isOnline) return;
+    const refresh = async () => {
+      const ids = items.map((i) => i.episode.id);
+      if (ids.length === 0) return;
+      const listenedIds = await getListenedEpisodeIds(ids);
+      setListenedSet(new Set(listenedIds));
+    };
+    window.addEventListener(LISTEN_STATE_CHANGED_EVENT, refresh);
+    return () => window.removeEventListener(LISTEN_STATE_CHANGED_EVENT, refresh);
+  }, [isOnline, items]);
 
   const handleRemoved = () => {
     loadLibrary();
@@ -238,6 +261,7 @@ export default function LibraryPage() {
               onRemoved={isOnline ? handleRemoved : undefined}
               onCollectionChanged={isOnline ? handleCollectionChanged : undefined}
               isOffline={!isOnline}
+              isListened={listenedSet.has(item.episode.id)}
             />
           ))}
         </div>
