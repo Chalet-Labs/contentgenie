@@ -237,7 +237,7 @@ describe("NotificationPageList", () => {
   it("Listen click calls markNotificationRead if unread then plays episode", async () => {
     const user = userEvent.setup();
     render(<NotificationPageList {...defaultProps} />);
-    const listenBtns = screen.getAllByRole("button", { name: /listen/i });
+    const listenBtns = screen.getAllByRole("button", { name: /^play episode$/i });
     await user.click(listenBtns[0]);
     await waitFor(() => {
       expect(mockMarkNotificationRead).toHaveBeenCalledWith(1);
@@ -252,7 +252,7 @@ describe("NotificationPageList", () => {
   it("Listen click does NOT call router.push", async () => {
     const user = userEvent.setup();
     render(<NotificationPageList {...defaultProps} />);
-    const listenBtns = screen.getAllByRole("button", { name: /listen/i });
+    const listenBtns = screen.getAllByRole("button", { name: /^play episode$/i });
     await user.click(listenBtns[0]);
     await waitFor(() => {
       expect(mockPlayEpisode).toHaveBeenCalled();
@@ -270,7 +270,7 @@ describe("NotificationPageList", () => {
         initialTopicsByEpisode={{}}
       />
     );
-    const listenBtns = screen.getAllByRole("button", { name: /listen/i });
+    const listenBtns = screen.getAllByRole("button", { name: /^play episode$/i });
     await user.click(listenBtns[0]);
     await waitFor(() => {
       expect(mockMarkNotificationRead).not.toHaveBeenCalled();
@@ -303,9 +303,10 @@ describe("NotificationPageList", () => {
   });
 
   // Primary-action hidden: when episodePodcastIndexId is missing (data-integrity
-  // contract violation upstream), neither Listen nor View-episode is rendered —
-  // we don't silently route to the dashboard.
-  it("hides primary action when episodePodcastIndexId is null", () => {
+  // contract violation upstream), neither Play nor View-episode is rendered —
+  // we don't silently route to the dashboard. ListenedButton is also hidden
+  // because it needs the podcast-index id to target recordListenEvent.
+  it("hides primary action and ListenedButton when episodePodcastIndexId is null", () => {
     render(
       <NotificationPageList
         initialItems={[
@@ -316,11 +317,39 @@ describe("NotificationPageList", () => {
       />
     );
     expect(
-      screen.queryByRole("button", { name: /^listen$/i })
+      screen.queryByRole("button", { name: /^play episode$/i })
     ).not.toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: /view episode/i })
     ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /mark as listened/i })
+    ).not.toBeInTheDocument();
+  });
+
+  // Listened wiring: initialListenedIds seeds each row's ListenedButton.
+  // A row whose episodePodcastIndexId is in the set renders the "Already listened"
+  // indicator (a span, not a button); a row that isn't renders the clickable
+  // "Mark as listened" button. This proves the Set-lookup plumbing through the
+  // listenedSet memo.
+  it("renders ListenedButton state based on initialListenedIds", () => {
+    render(
+      <NotificationPageList
+        initialItems={[
+          makeItem({ id: 1, episodePodcastIndexId: "PI-unread" }),
+          makeItem({ id: 2, episodePodcastIndexId: "PI-read" }),
+        ]}
+        initialHasMore={false}
+        initialTopicsByEpisode={{}}
+        initialListenedIds={["PI-read"]}
+      />
+    );
+    // Row 1: unlistened → clickable Mark-as-listened button exists.
+    expect(
+      screen.getByRole("button", { name: /mark as listened/i })
+    ).toBeInTheDocument();
+    // Row 2: listened → Already-listened indicator (a span with aria-label).
+    expect(screen.getByLabelText(/already listened/i)).toBeInTheDocument();
   });
 
   // Load more: calls getNotifications with next offset
@@ -425,7 +454,7 @@ describe("NotificationPageList", () => {
     const unreadRow = screen.getAllByRole("article")[0];
     expect(unreadRow).toHaveAttribute("data-read", "false");
 
-    const listenBtns = screen.getAllByRole("button", { name: /listen/i });
+    const listenBtns = screen.getAllByRole("button", { name: /^play episode$/i });
     await user.click(listenBtns[0]);
 
     await waitFor(() => {
@@ -493,7 +522,7 @@ describe("NotificationPageList", () => {
     const user = userEvent.setup();
     render(<NotificationPageList {...defaultProps} />);
 
-    const listenBtns = screen.getAllByRole("button", { name: /listen/i });
+    const listenBtns = screen.getAllByRole("button", { name: /^play episode$/i });
     await user.click(listenBtns[0]);
 
     await waitFor(() => {

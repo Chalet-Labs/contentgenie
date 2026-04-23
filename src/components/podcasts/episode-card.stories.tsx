@@ -40,9 +40,57 @@ const baseEpisode: PodcastIndexEpisode = {
   transcripts: [],
 };
 
+const noopAPI: AudioPlayerAPI = {
+  playEpisode: () => {},
+  togglePlay: () => {},
+  seek: () => {},
+  skipForward: () => {},
+  skipBack: () => {},
+  setVolume: () => {},
+  setPlaybackSpeed: () => {},
+  closePlayer: () => {},
+  addToQueue: () => {},
+  removeFromQueue: () => {},
+  reorderQueue: () => {},
+  clearQueue: () => {},
+  playNext: () => {},
+  setSleepTimer: () => {},
+  cancelSleepTimer: () => {},
+  getCurrentTime: () => 0,
+};
+
+const mockPlayerState: AudioPlayerState = {
+  currentEpisode: null,
+  isPlaying: false,
+  isBuffering: false,
+  isVisible: false,
+  duration: 0,
+  volume: 1,
+  playbackSpeed: 1,
+  hasError: false,
+  errorMessage: null,
+  queue: [],
+  chapters: null,
+  chaptersLoading: false,
+  sleepTimer: null,
+};
+
 const meta: Meta<typeof EpisodeCard> = {
   title: "Podcasts/EpisodeCard",
   component: EpisodeCard,
+  decorators: [
+    (Story) => (
+      <AudioPlayerAPIContext.Provider value={noopAPI}>
+        <AudioPlayerStateContext.Provider value={mockPlayerState}>
+          <AudioPlayerProgressContext.Provider
+            value={{ currentTime: 0, buffered: 0 }}
+          >
+            <Story />
+          </AudioPlayerProgressContext.Provider>
+        </AudioPlayerStateContext.Provider>
+      </AudioPlayerAPIContext.Provider>
+    ),
+  ],
 };
 
 export default meta;
@@ -114,41 +162,6 @@ export const NoSummaryData: Story = {
   },
 };
 
-const noopAPI: AudioPlayerAPI = {
-  playEpisode: () => {},
-  togglePlay: () => {},
-  seek: () => {},
-  skipForward: () => {},
-  skipBack: () => {},
-  setVolume: () => {},
-  setPlaybackSpeed: () => {},
-  closePlayer: () => {},
-  addToQueue: () => {},
-  removeFromQueue: () => {},
-  reorderQueue: () => {},
-  clearQueue: () => {},
-  playNext: () => {},
-  setSleepTimer: () => {},
-  cancelSleepTimer: () => {},
-  getCurrentTime: () => 0,
-};
-
-const mockPlayerState: AudioPlayerState = {
-  currentEpisode: null,
-  isPlaying: false,
-  isBuffering: false,
-  isVisible: false,
-  duration: 0,
-  volume: 1,
-  playbackSpeed: 1,
-  hasError: false,
-  errorMessage: null,
-  queue: [],
-  chapters: null,
-  chaptersLoading: false,
-  sleepTimer: null,
-};
-
 export const Unlistened: Story = {
   args: {
     episode: baseEpisode,
@@ -168,17 +181,13 @@ export const WithQueueAction: Story = {
     episode: { ...baseEpisode, feedTitle: "Tech Talk Daily" },
     showQueueAction: true,
   },
-  decorators: [
-    (Story) => (
-      <AudioPlayerAPIContext.Provider value={noopAPI}>
-        <AudioPlayerStateContext.Provider value={mockPlayerState}>
-          <AudioPlayerProgressContext.Provider
-            value={{ currentTime: 0, buffered: 0 }}
-          >
-            <Story />
-          </AudioPlayerProgressContext.Provider>
-        </AudioPlayerStateContext.Provider>
-      </AudioPlayerAPIContext.Provider>
-    ),
-  ],
+};
+
+export const WithTopics: Story = {
+  args: {
+    episode: { ...baseEpisode, feedTitle: "Tech Talk Daily" },
+    summaryStatus: "completed",
+    worthItScore: "7.80",
+    topics: ["AI", "Developer Tools", "Startups"],
+  },
 };

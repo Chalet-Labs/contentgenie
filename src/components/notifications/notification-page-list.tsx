@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, useCallback, useRef } from "react";
+import { useState, useTransition, useCallback, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Bell, X } from "lucide-react";
@@ -11,14 +11,16 @@ import {
   getNotifications,
   getEpisodeTopics,
 } from "@/app/actions/notifications";
+import { getListenedEpisodeIds } from "@/app/actions/listen-history";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { AddToQueueButton } from "@/components/audio-player/add-to-queue-button";
+import { PlayEpisodeButton } from "@/components/audio-player/play-episode-button";
 import { EpisodeCard } from "@/components/episodes/episode-card";
+import { ListenedButton } from "@/components/episodes/listened-button";
 import { formatRelativeTime } from "@/lib/utils";
 import { ROUTES } from "@/lib/routes";
 import { NOTIFICATIONS_PAGE_SIZE } from "@/lib/notifications-constants";
-import { useAudioPlayerAPI } from "@/contexts/audio-player-context";
 
 type NotificationItem = Awaited<
   ReturnType<typeof getNotifications>
@@ -38,6 +40,12 @@ interface NotificationPageListProps {
   initialItems: NotificationItem[];
   initialHasMore: boolean;
   initialTopicsByEpisode: Record<number, string[]>;
+  /**
+   * Podcast-index-episode-ids (strings) that the current user has completed.
+   * Passed as an array because RSC Flight can't serialize Sets; we build the
+   * Set client-side. Matches the pattern in `src/components/podcasts/episode-list.tsx`.
+   */
+  initialListenedIds?: string[];
   filter?: { podcastId?: number; since?: Date };
 }
 
@@ -45,11 +53,16 @@ export function NotificationPageList({
   initialItems,
   initialHasMore,
   initialTopicsByEpisode,
+  initialListenedIds,
   filter,
 }: NotificationPageListProps) {
   const router = useRouter();
   const [items, setItems] = useState<LocalNotification[]>(initialItems);
   const [hasMore, setHasMore] = useState(initialHasMore);
+  const [listenedIds, setListenedIds] = useState<string[]>(
+    initialListenedIds ?? [],
+  );
+  const listenedSet = useMemo(() => new Set(listenedIds), [listenedIds]);
   // Derive from initialItems.length instead of a hardcoded page size so a
   // partial first page (e.g., dismissals between SSR and hydration) doesn't
   // cause "Load more" to skip unfetched rows.
@@ -163,6 +176,7 @@ export function NotificationPageList({
           .map((n) => n.episodeDbId)
           .filter((id): id is number => id !== null);
         let newTopics: Record<number, string[]> = {};
+        let newListenedPiIds: string[] = [];
         if (newEpisodeIds.length > 0) {
           try {
             newTopics = await getEpisodeTopics(newEpisodeIds);
@@ -170,9 +184,29 @@ export function NotificationPageList({
             // Degrade gracefully — append rows without topic chips.
             newTopics = {};
           }
+          try {
+            const listenedDbIds = new Set(
+              await getListenedEpisodeIds(newEpisodeIds),
+            );
+            newListenedPiIds = newItems
+              .filter(
+                (n) =>
+                  n.episodeDbId !== null &&
+                  listenedDbIds.has(n.episodeDbId) &&
+                  n.episodePodcastIndexId,
+              )
+              .map((n) => n.episodePodcastIndexId as string);
+          } catch {
+            // Degrade gracefully — rows stay "unlistened" on failure; the
+            // user can re-mark if needed.
+            newListenedPiIds = [];
+          }
         }
         setItems((prev) => [...prev, ...newItems]);
         setTopicsByEpisode((prev) => ({ ...prev, ...newTopics }));
+        if (newListenedPiIds.length > 0) {
+          setListenedIds((prev) => [...prev, ...newListenedPiIds]);
+        }
         offsetRef.current = offsetRef.current + NOTIFICATIONS_PAGE_SIZE;
         setHasMore(result.hasMore ?? false);
       } catch {
@@ -197,6 +231,11 @@ export function NotificationPageList({
                   (item.episodeDbId
                     ? topicsByEpisode[item.episodeDbId]
                     : undefined) ?? []
+                }
+                isListened={
+                  item.episodePodcastIndexId
+                    ? listenedSet.has(item.episodePodcastIndexId)
+                    : false
                 }
                 onRowClick={handleRowClick}
                 onMarkRead={markReadOptimistic}
@@ -281,18 +320,19 @@ function EmptyState({
 function NotificationRow({
   item,
   topics,
+  isListened,
   onRowClick,
   onMarkRead,
   onDismiss,
 }: {
   item: NotificationItem;
   topics: string[];
+  isListened: boolean;
   onRowClick: (item: NotificationItem) => void;
   onMarkRead: (item: NotificationItem) => void;
   onDismiss: (id: number) => void;
 }) {
   const handleTitleNavigate = () => onMarkRead(item);
-  const { playEpisode } = useAudioPlayerAPI();
 
   const audioEpisode =
     item.audioUrl && item.episodePodcastIndexId
@@ -306,18 +346,13 @@ function NotificationRow({
         }
       : null;
 
-  const handleListen = () => {
-    if (!audioEpisode) return;
-    onMarkRead(item);
-    playEpisode(audioEpisode);
-  };
-
   let primaryAction: React.ReactNode = null;
   if (audioEpisode) {
     primaryAction = (
-      <Button size="sm" onClick={handleListen}>
-        Listen
-      </Button>
+      <PlayEpisodeButton
+        episode={audioEpisode}
+        onBeforePlay={() => onMarkRead(item)}
+      />
     );
   } else if (item.episodePodcastIndexId) {
     primaryAction = (
@@ -350,6 +385,12 @@ function NotificationRow({
           <>
             {audioEpisode && (
               <AddToQueueButton episode={audioEpisode} variant="icon" />
+            )}
+            {item.episodePodcastIndexId && (
+              <ListenedButton
+                podcastIndexEpisodeId={item.episodePodcastIndexId}
+                isListened={isListened}
+              />
             )}
             <Button
               variant="ghost"

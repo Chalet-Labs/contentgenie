@@ -21,9 +21,14 @@ interface EpisodeListProps {
   // Podcast-index-episode-ids (stringified) that exist in our DB and can be targeted by recordListenEvent.
   // Omit to allow marking on all episodes (library/trending surfaces where every episode is in-DB by construction).
   knownIds?: string[];
+  /**
+   * Top topics per episode, keyed by PodcastIndex id (string). Absent keys render
+   * no chips — episodes without summaries simply show nothing here.
+   */
+  topicsByPodcastIndexId?: Record<string, string[]>;
 }
 
-export function EpisodeList({ episodes, isLoading, error, statusMap, scoreMap, listenedIds, knownIds }: EpisodeListProps) {
+export function EpisodeList({ episodes, isLoading, error, statusMap, scoreMap, listenedIds, knownIds, topicsByPodcastIndexId }: EpisodeListProps) {
   const [query, setQuery] = useState("");
   const trimmedQuery = query.trim();
   const normalizedQuery = trimmedQuery.toLowerCase();
@@ -99,6 +104,7 @@ export function EpisodeList({ episodes, isLoading, error, statusMap, scoreMap, l
             worthItScore={scoreMap?.[String(episode.id)]}
             isListened={listenedSet.has(String(episode.id))}
             canMarkListened={knownSet ? knownSet.has(String(episode.id)) : true}
+            topics={topicsByPodcastIndexId?.[String(episode.id)]}
           />
         ))
       )}

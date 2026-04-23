@@ -20,9 +20,55 @@ import type { PodcastIndexEpisode } from "@/lib/podcastindex";
 import { isSubscribedToPodcast } from "@/app/actions/subscriptions";
 import { getListenedEpisodeIds } from "@/app/actions/listen-history";
 import { db } from "@/db";
-import { podcasts, episodes as episodesTable } from "@/db/schema";
+import { podcasts, episodes as episodesTable, episodeTopics } from "@/db/schema";
 import type { SummaryStatus } from "@/db/schema";
 import { getBackNavigation } from "@/app/(app)/podcast/[id]/back-navigation";
+
+// Max topics per episode kept in the client — the primitive renders at most 3 chips,
+// so fetching ranks 1..4 is enough signal (the extra one is insurance against ties).
+const TOPICS_PER_EPISODE_LIMIT = 4;
+
+/**
+ * Batch-fetch top topics for a set of DB episodes keyed by their PodcastIndex id.
+ * Topics are public metadata attached to summarized episodes — no per-user gating.
+ */
+async function getTopicsByPodcastIndexId(
+  dbEpisodes: { id: number; podcastIndexId: string }[],
+): Promise<Record<string, string[]>> {
+  if (dbEpisodes.length === 0) return {};
+  const idToPodcastIndexId = new Map(
+    dbEpisodes.map((e) => [e.id, e.podcastIndexId]),
+  );
+  const rows = await db
+    .select({
+      episodeId: episodeTopics.episodeId,
+      topic: episodeTopics.topic,
+      topicRank: episodeTopics.topicRank,
+    })
+    .from(episodeTopics)
+    .where(inArray(episodeTopics.episodeId, Array.from(idToPodcastIndexId.keys())));
+  // Bucket by episode, sort by rank (NULL ranks drop to the end), cap per-episode.
+  const grouped: Record<number, { topic: string; rank: number | null }[]> = {};
+  for (const row of rows) {
+    const list = grouped[row.episodeId] ?? (grouped[row.episodeId] = []);
+    list.push({ topic: row.topic, rank: row.topicRank });
+  }
+  const out: Record<string, string[]> = {};
+  for (const [dbId, list] of Object.entries(grouped)) {
+    const pi = idToPodcastIndexId.get(Number(dbId));
+    if (!pi) continue;
+    out[pi] = list
+      .sort((a, b) => {
+        if (a.rank === null && b.rank === null) return 0;
+        if (a.rank === null) return 1;
+        if (b.rank === null) return -1;
+        return a.rank - b.rank;
+      })
+      .slice(0, TOPICS_PER_EPISODE_LIMIT)
+      .map((x) => x.topic);
+  }
+  return out;
+}
 
 const PODCAST_PAGE_EPISODE_LIMIT = 200;
 
@@ -87,9 +133,11 @@ async function loadRssPodcast(podcastIndexId: string) {
   });
 
   const { statusMap, scoreMap } = buildSummaryMaps(dbEpisodes);
-  const listenedInternalIdSet = new Set(
-    await getListenedEpisodeIds(dbEpisodes.map((ep) => ep.id)),
-  )
+  const [listenedInternalIds, topicsByPodcastIndexId] = await Promise.all([
+    getListenedEpisodeIds(dbEpisodes.map((ep) => ep.id)),
+    getTopicsByPodcastIndexId(dbEpisodes),
+  ]);
+  const listenedInternalIdSet = new Set(listenedInternalIds);
   const listenedIds = dbEpisodes
     .filter((ep) => listenedInternalIdSet.has(ep.id))
     .map((ep) => ep.podcastIndexId)
@@ -136,7 +184,7 @@ async function loadRssPodcast(podcastIndexId: string) {
     transcripts: [],
   }));
 
-  return { podcast, episodes: mappedEpisodes, statusMap, scoreMap, listenedIds };
+  return { podcast, episodes: mappedEpisodes, statusMap, scoreMap, listenedIds, topicsByPodcastIndexId };
 }
 
 export default async function PodcastPage({ params, searchParams }: PodcastPageProps) {
@@ -152,7 +200,7 @@ export default async function PodcastPage({ params, searchParams }: PodcastPageP
       notFound();
     }
 
-    const { podcast, episodes, statusMap, scoreMap, listenedIds } = data;
+    const { podcast, episodes, statusMap, scoreMap, listenedIds, topicsByPodcastIndexId } = data;
     const subscribed = await isSubscribedToPodcast(podcast.podcastIndexId);
     const categories = (podcast.categories as string[]) ?? [];
 
@@ -261,7 +309,7 @@ export default async function PodcastPage({ params, searchParams }: PodcastPageP
           <h2 className="mb-4 text-xl font-semibold">
             Episodes ({episodes.length})
           </h2>
-          <EpisodeList episodes={episodes} statusMap={statusMap} scoreMap={scoreMap} listenedIds={listenedIds} />
+          <EpisodeList episodes={episodes} statusMap={statusMap} scoreMap={scoreMap} listenedIds={listenedIds} topicsByPodcastIndexId={topicsByPodcastIndexId} />
         </div>
       </div>
     );
@@ -292,9 +340,11 @@ export default async function PodcastPage({ params, searchParams }: PodcastPageP
         })
       : [];
     const { statusMap, scoreMap } = buildSummaryMaps(dbEpisodeData);
-    const listenedInternalIdSet = new Set(
-      await getListenedEpisodeIds(dbEpisodeData.map((e) => e.id)),
-    )
+    const [listenedInternalIds, topicsByPodcastIndexId] = await Promise.all([
+      getListenedEpisodeIds(dbEpisodeData.map((e) => e.id)),
+      getTopicsByPodcastIndexId(dbEpisodeData),
+    ]);
+    const listenedInternalIdSet = new Set(listenedInternalIds);
     const piListenedIds = dbEpisodeData
       .filter((e) => listenedInternalIdSet.has(e.id))
       .map((e) => e.podcastIndexId)
@@ -436,7 +486,7 @@ export default async function PodcastPage({ params, searchParams }: PodcastPageP
           <h2 className="mb-4 text-xl font-semibold">
             Episodes ({episodes.length})
           </h2>
-          <EpisodeList episodes={episodes} statusMap={statusMap} scoreMap={scoreMap} listenedIds={piListenedIds} knownIds={piKnownIds} />
+          <EpisodeList episodes={episodes} statusMap={statusMap} scoreMap={scoreMap} listenedIds={piListenedIds} knownIds={piKnownIds} topicsByPodcastIndexId={topicsByPodcastIndexId} />
         </div>
       </div>
     );
