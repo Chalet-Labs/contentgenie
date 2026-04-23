@@ -11,6 +11,7 @@ const mockInsert = vi.fn()
 const mockValues = vi.fn()
 const mockOnConflictDoUpdate = vi.fn()
 const mockFindFirst = vi.fn()
+const mockSelectWhere = vi.fn()
 
 vi.mock("@/db", () => ({
   db: {
@@ -28,6 +29,11 @@ vi.mock("@/db", () => ({
         },
       }
     },
+    select: (_cols: unknown) => ({
+      from: (_table: unknown) => ({
+        where: (...args: unknown[]) => mockSelectWhere(...args),
+      }),
+    }),
     query: {
       episodes: {
         findFirst: (...args: unknown[]) => mockFindFirst(...args),
@@ -65,6 +71,8 @@ vi.mock("drizzle-orm", () => ({
     _values: values,
   })),
   eq: vi.fn((col: unknown, val: unknown) => ({ col, val })),
+  and: vi.fn((...conditions: unknown[]) => ({ _and: conditions })),
+  inArray: vi.fn((col: unknown, vals: unknown) => ({ _inArray: { col, vals } })),
 }))
 
 describe("recordListenEvent", () => {
@@ -238,6 +246,49 @@ describe("recordListenEvent", () => {
       success: false,
       error: "Failed to record listen event",
     })
+    expect(consoleSpy).toHaveBeenCalled()
+  })
+})
+
+describe("getListenedEpisodeIds", () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockAuth.mockResolvedValue({ userId: "user_123" })
+    mockSelectWhere.mockResolvedValue([])
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it("returns empty Set when unauthenticated without touching the DB", async () => {
+    mockAuth.mockResolvedValue({ userId: null })
+    const { getListenedEpisodeIds } = await import("@/app/actions/listen-history")
+    const result = await getListenedEpisodeIds([1, 2, 3])
+    expect(result).toEqual(new Set())
+    expect(mockSelectWhere).not.toHaveBeenCalled()
+  })
+
+  it("returns empty Set for empty input without touching the DB", async () => {
+    const { getListenedEpisodeIds } = await import("@/app/actions/listen-history")
+    const result = await getListenedEpisodeIds([])
+    expect(result).toEqual(new Set())
+    expect(mockSelectWhere).not.toHaveBeenCalled()
+  })
+
+  it("returns a Set<number> of episodeIds returned by the query", async () => {
+    mockSelectWhere.mockResolvedValue([{ id: 10 }, { id: 42 }, { id: 99 }])
+    const { getListenedEpisodeIds } = await import("@/app/actions/listen-history")
+    const result = await getListenedEpisodeIds([10, 42, 99, 200])
+    expect(result).toEqual(new Set([10, 42, 99]))
+  })
+
+  it("returns empty Set and logs when DB throws", async () => {
+    mockSelectWhere.mockRejectedValueOnce(new Error("DB boom"))
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {})
+    const { getListenedEpisodeIds } = await import("@/app/actions/listen-history")
+    const result = await getListenedEpisodeIds([1, 2])
+    expect(result).toEqual(new Set())
     expect(consoleSpy).toHaveBeenCalled()
   })
 })

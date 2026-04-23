@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/select";
 import { SavedEpisodeCard } from "@/components/library/saved-episode-card";
 import { getUserLibrary, type LibrarySortOption, type SortDirection } from "@/app/actions/library";
+import { getListenedEpisodeIds } from "@/app/actions/listen-history";
 import { useOnlineStatus } from "@/hooks/use-online-status";
 import { OfflineBanner } from "@/components/ui/offline-banner";
 import { cacheLibrary, getCachedLibrary } from "@/lib/offline-cache";
@@ -25,6 +26,7 @@ export default function LibraryPage() {
   const isOnline = useOnlineStatus();
 
   const [items, setItems] = useState<SavedItemDTO[]>([]);
+  const [listenedSet, setListenedSet] = useState<Set<number>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<LibrarySortOption>("savedAt");
@@ -44,6 +46,11 @@ export default function LibraryPage() {
       setItems(libraryItems);
       setIsFromCache(false);
 
+      if (isOnline) {
+        const s = await getListenedEpisodeIds(libraryItems.map((i) => i.episode.id))
+        setListenedSet(s)
+      }
+
       // Cache library data for offline use
       if (userId) {
         void cacheLibrary(userId, libraryItems);
@@ -51,7 +58,7 @@ export default function LibraryPage() {
     }
 
     setIsLoading(false);
-  }, [sortBy, sortDirection, userId]);
+  }, [sortBy, sortDirection, userId, isOnline]);
 
   const loadFromCache = useCallback(async () => {
     if (!userId) {
@@ -72,6 +79,7 @@ export default function LibraryPage() {
       setItems([]);
       setIsFromCache(true);
     }
+    setListenedSet(new Set());
 
     setIsLoading(false);
   }, [userId]);
@@ -238,6 +246,7 @@ export default function LibraryPage() {
               onRemoved={isOnline ? handleRemoved : undefined}
               onCollectionChanged={isOnline ? handleCollectionChanged : undefined}
               isOffline={!isOnline}
+              isListened={listenedSet.has(item.episode.id)}
             />
           ))}
         </div>

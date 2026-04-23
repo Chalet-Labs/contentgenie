@@ -1,9 +1,10 @@
 "use server"
 
-import { eq, sql } from "drizzle-orm"
+import { and, eq, inArray, sql } from "drizzle-orm"
 import { db } from "@/db"
 import { ensureUserExists } from "@/db/helpers"
 import { episodes, listenHistory } from "@/db/schema"
+import { auth } from "@clerk/nextjs/server"
 import { withAuthAction } from "@/lib/auth-wrapper"
 import type { ActionResult } from "@/types/action-result"
 
@@ -89,4 +90,26 @@ export async function recordListenEvent(input: {
       return { success: false, error: "Failed to record listen event" }
     }
   })
+}
+
+export async function getListenedEpisodeIds(
+  episodeInternalIds: number[],
+): Promise<Set<number>> {
+  const { userId } = await auth()
+  if (!userId || episodeInternalIds.length === 0) return new Set()
+  try {
+    const rows = await db
+      .select({ id: listenHistory.episodeId })
+      .from(listenHistory)
+      .where(
+        and(
+          eq(listenHistory.userId, userId),
+          inArray(listenHistory.episodeId, episodeInternalIds),
+        ),
+      )
+    return new Set(rows.map((r) => r.id))
+  } catch (e) {
+    console.error("[getListenedEpisodeIds] failed", { userId, error: e })
+    return new Set()
+  }
 }

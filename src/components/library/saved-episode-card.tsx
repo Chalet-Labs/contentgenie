@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { removeEpisodeFromLibrary, updateLibraryRating } from "@/app/actions/library";
 import { useSidebarCountsOptional } from "@/contexts/sidebar-counts-context";
+import { ListenedButton } from "@/components/episodes/listened-button";
 import { MoveToCollection } from "./move-to-collection";
 import { NotesEditor } from "./notes-editor";
 import { BookmarksList } from "./bookmarks-list";
@@ -39,10 +40,11 @@ interface SavedEpisodeCardProps {
   onRemoved?: () => void;
   onCollectionChanged?: () => void;
   isOffline?: boolean;
+  isListened?: boolean;
 }
 
 
-export function SavedEpisodeCard({ item, onRemoved, onCollectionChanged, isOffline }: SavedEpisodeCardProps) {
+export function SavedEpisodeCard({ item, onRemoved, onCollectionChanged, isOffline, isListened = false }: SavedEpisodeCardProps) {
   const [isRemoving, setIsRemoving] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [isExpanded, setIsExpanded] = useState(false);
@@ -165,6 +167,10 @@ export function SavedEpisodeCard({ item, onRemoved, onCollectionChanged, isOffli
                   )}
                 </div>
                 <div className="flex items-center gap-1">
+                  <ListenedButton
+                    podcastIndexEpisodeId={episode.podcastIndexId}
+                    isListened={isListened}
+                  />
                   <CollapsibleTrigger asChild>
                     <Button
                       variant="ghost"

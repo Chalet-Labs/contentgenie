@@ -22,6 +22,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { getCollection, deleteCollection } from "@/app/actions/collections";
+import { getListenedEpisodeIds } from "@/app/actions/listen-history";
 import type { SavedItemDTO } from "@/db/library-columns";
 import type { Collection } from "@/db/schema";
 
@@ -31,6 +32,7 @@ export default function CollectionDetailPage() {
 
   const [collection, setCollection] = useState<Collection | null>(null);
   const [items, setItems] = useState<SavedItemDTO[]>([]);
+  const [listenedSet, setListenedSet] = useState<Set<number>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showEditDialog, setShowEditDialog] = useState(false);
@@ -53,6 +55,8 @@ export default function CollectionDetailPage() {
     } else {
       setCollection(result.collection);
       setItems(result.items);
+      const s = await getListenedEpisodeIds(result.items.map((i) => i.episode.id))
+      setListenedSet(s)
     }
 
     setIsLoading(false);
@@ -230,6 +234,7 @@ export default function CollectionDetailPage() {
               item={item}
               onRemoved={handleRemoved}
               onCollectionChanged={handleCollectionChanged}
+              isListened={listenedSet.has(item.episode.id)}
             />
           ))}
         </div>

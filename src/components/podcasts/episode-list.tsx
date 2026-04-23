@@ -14,9 +14,10 @@ interface EpisodeListProps {
   error?: string | null;
   statusMap?: Record<string, SummaryStatus>;
   scoreMap?: Record<string, string>;
+  listenedSet?: Set<string>;
 }
 
-export function EpisodeList({ episodes, isLoading, error, statusMap, scoreMap }: EpisodeListProps) {
+export function EpisodeList({ episodes, isLoading, error, statusMap, scoreMap, listenedSet }: EpisodeListProps) {
   const [query, setQuery] = useState("");
   const trimmedQuery = query.trim();
   const normalizedQuery = trimmedQuery.toLowerCase();
@@ -85,6 +86,7 @@ export function EpisodeList({ episodes, isLoading, error, statusMap, scoreMap }:
             episode={episode}
             summaryStatus={statusMap?.[String(episode.id)]}
             worthItScore={scoreMap?.[String(episode.id)]}
+            isListened={listenedSet?.has(String(episode.id)) ?? false}
           />
         ))
       )}

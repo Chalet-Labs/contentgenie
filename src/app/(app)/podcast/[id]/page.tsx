@@ -18,6 +18,7 @@ import {
 } from "@/lib/podcastindex";
 import type { PodcastIndexEpisode } from "@/lib/podcastindex";
 import { isSubscribedToPodcast } from "@/app/actions/subscriptions";
+import { getListenedEpisodeIds } from "@/app/actions/listen-history";
 import { db } from "@/db";
 import { podcasts, episodes as episodesTable } from "@/db/schema";
 import type { SummaryStatus } from "@/db/schema";
@@ -70,8 +71,8 @@ async function loadRssPodcast(podcastIndexId: string) {
     where: eq(episodesTable.podcastId, podcast.id),
     orderBy: [descOrder(episodesTable.publishDate)],
     limit: PODCAST_PAGE_EPISODE_LIMIT,
-    // id omitted: RSS mapping uses podcastIndexId
     columns: {
+      id: true,
       podcastIndexId: true,
       title: true,
       description: true,
@@ -86,6 +87,12 @@ async function loadRssPodcast(podcastIndexId: string) {
   });
 
   const { statusMap, scoreMap } = buildSummaryMaps(dbEpisodes);
+  const listenedInternalIds = await getListenedEpisodeIds(dbEpisodes.map((ep) => ep.id))
+  const listenedSet = new Set(
+    dbEpisodes
+      .filter((ep) => listenedInternalIds.has(ep.id))
+      .map((ep) => ep.podcastIndexId),
+  )
 
   // Map DB episodes to PodcastIndexEpisode shape for reuse of EpisodeList
   // Use podcastIndexId (rss-...) as the id so EpisodeCard links to /episode/rss-...
@@ -129,7 +136,7 @@ async function loadRssPodcast(podcastIndexId: string) {
     transcripts: [],
   }));
 
-  return { podcast, episodes: mappedEpisodes, statusMap, scoreMap };
+  return { podcast, episodes: mappedEpisodes, statusMap, scoreMap, listenedSet };
 }
 
 export default async function PodcastPage({ params, searchParams }: PodcastPageProps) {
@@ -145,7 +152,7 @@ export default async function PodcastPage({ params, searchParams }: PodcastPageP
       notFound();
     }
 
-    const { podcast, episodes, statusMap, scoreMap } = data;
+    const { podcast, episodes, statusMap, scoreMap, listenedSet } = data;
     const subscribed = await isSubscribedToPodcast(podcast.podcastIndexId);
     const categories = (podcast.categories as string[]) ?? [];
 
@@ -254,7 +261,7 @@ export default async function PodcastPage({ params, searchParams }: PodcastPageP
           <h2 className="mb-4 text-xl font-semibold">
             Episodes ({episodes.length})
           </h2>
-          <EpisodeList episodes={episodes} statusMap={statusMap} scoreMap={scoreMap} />
+          <EpisodeList episodes={episodes} statusMap={statusMap} scoreMap={scoreMap} listenedSet={listenedSet} />
         </div>
       </div>
     );
@@ -281,10 +288,16 @@ export default async function PodcastPage({ params, searchParams }: PodcastPageP
     const dbEpisodeData = episodeStringIds.length > 0
       ? await db.query.episodes.findMany({
           where: inArray(episodesTable.podcastIndexId, episodeStringIds),
-          columns: { podcastIndexId: true, summaryStatus: true, worthItScore: true, processedAt: true },
+          columns: { id: true, podcastIndexId: true, summaryStatus: true, worthItScore: true, processedAt: true },
         })
       : [];
     const { statusMap, scoreMap } = buildSummaryMaps(dbEpisodeData);
+    const listenedInternalIds = await getListenedEpisodeIds(dbEpisodeData.map((e) => e.id))
+    const piListenedSet = new Set(
+      dbEpisodeData
+        .filter((e) => listenedInternalIds.has(e.id))
+        .map((e) => e.podcastIndexId),
+    )
 
     if (!podcast) {
       notFound();
@@ -422,7 +435,7 @@ export default async function PodcastPage({ params, searchParams }: PodcastPageP
           <h2 className="mb-4 text-xl font-semibold">
             Episodes ({episodes.length})
           </h2>
-          <EpisodeList episodes={episodes} statusMap={statusMap} scoreMap={scoreMap} />
+          <EpisodeList episodes={episodes} statusMap={statusMap} scoreMap={scoreMap} listenedSet={piListenedSet} />
         </div>
       </div>
     );

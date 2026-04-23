@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+- "Mark as listened" button on episode cards (podcast detail, trending, and library surfaces). Tapping the check-icon button optimistically flips the UI to a non-interactive "Already listened" indicator, calls `recordListenEvent`, and reverts with a toast on failure. A new `getListenedEpisodeIds` server action batch-fetches listened state per page. Marking an episode listened causes it to stop appearing in the dashboard "For You" feed on the next render (#330).
 - Notification bell now opens a grouped-summary popover (desktop) / full-width Sheet (mobile) instead of navigating directly to `/notifications`. The popover shows aggregated rows ("N new episodes since last visit", "N new episodes from {Podcast}"), a persistent "See all" footer, and loading/error/empty states. Clicking a row navigates to `/notifications?since=<iso>` or `/notifications?podcast=<id>` which filter the list server-side. The bell badge and 60-second polling are unchanged; opening the popover does not auto-mark-as-read. New server action `getNotificationSummary()` powers the aggregation (#312).
 - Dashboard Trending Topics and Recommended Episodes cards now collapse to a 3-item preview with a ghost full-width "Show N more" / "Show less" toggle when there are more items to reveal. The Recommended Episodes server fetch limit was raised from 6 to 12 so the toggle has headroom to expand (#308).
 

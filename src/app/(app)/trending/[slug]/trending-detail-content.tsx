@@ -3,8 +3,10 @@ import Image from "next/image";
 import Link from "next/link";
 import { Rss } from "lucide-react";
 import { getTrendingTopicBySlug } from "@/app/actions/dashboard";
+import { getListenedEpisodeIds } from "@/app/actions/listen-history";
 import { TopicSwitcher } from "@/components/trending/topic-switcher";
 import { WorthItBadge } from "@/components/episodes/worth-it-badge";
+import { ListenedButton } from "@/components/episodes/listened-button";
 import { Card, CardContent } from "@/components/ui/card";
 import { formatDate, formatDuration, formatRelativeTime, stripHtml } from "@/lib/utils";
 import { isTrendingSnapshotStale } from "@/lib/trending";
@@ -27,49 +29,55 @@ function FallbackCard({ heading, body, children }: { heading: string; body: stri
   );
 }
 
-function EpisodeCard({ episode }: { episode: RecommendedEpisodeDTO }) {
+function EpisodeCard({ episode, isListened = false }: { episode: RecommendedEpisodeDTO; isListened?: boolean }) {
   return (
-    <Link
-      href={`/episode/${episode.podcastIndexId}`}
-      aria-label={`${episode.title} from ${episode.podcastTitle}`}
-      className="flex gap-3 rounded-lg p-2 transition-colors hover:bg-accent"
-    >
-      <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-md bg-muted">
-        {episode.podcastImageUrl ? (
-          <Image
-            src={episode.podcastImageUrl}
-            alt=""
-            fill
-            className="object-cover"
-            sizes="56px"
-          />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center text-muted-foreground">
-            <Rss className="h-6 w-6" />
-          </div>
-        )}
-      </div>
-      <div className="min-w-0 flex-1">
-        <h4 className="line-clamp-1 text-sm font-medium">{episode.title}</h4>
-        <p className="line-clamp-1 text-xs text-muted-foreground">{episode.podcastTitle}</p>
-        {episode.description && (
-          <p className="line-clamp-2 text-xs text-muted-foreground">
-            {stripHtml(episode.description)}
-          </p>
-        )}
-        <div className="mt-1 flex flex-wrap items-center gap-2">
-          <WorthItBadge score={episode.worthItScore != null ? Number(episode.worthItScore) : null} />
-          <span className="text-xs text-muted-foreground">
-            {[
-              formatDuration(episode.duration),
-              episode.publishDate ? formatDate(episode.publishDate) : "",
-            ]
-              .filter(Boolean)
-              .join(" · ")}
-          </span>
+    <div className="flex items-start gap-3 rounded-lg p-2 transition-colors hover:bg-accent">
+      <Link
+        href={`/episode/${episode.podcastIndexId}`}
+        aria-label={`${episode.title} from ${episode.podcastTitle}`}
+        className="flex min-w-0 flex-1 gap-3"
+      >
+        <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-md bg-muted">
+          {episode.podcastImageUrl ? (
+            <Image
+              src={episode.podcastImageUrl}
+              alt=""
+              fill
+              className="object-cover"
+              sizes="56px"
+            />
+          ) : (
+            <div className="flex h-full w-full items-center justify-center text-muted-foreground">
+              <Rss className="h-6 w-6" />
+            </div>
+          )}
         </div>
-      </div>
-    </Link>
+        <div className="min-w-0 flex-1">
+          <h4 className="line-clamp-1 text-sm font-medium">{episode.title}</h4>
+          <p className="line-clamp-1 text-xs text-muted-foreground">{episode.podcastTitle}</p>
+          {episode.description && (
+            <p className="line-clamp-2 text-xs text-muted-foreground">
+              {stripHtml(episode.description)}
+            </p>
+          )}
+          <div className="mt-1 flex flex-wrap items-center gap-2">
+            <WorthItBadge score={episode.worthItScore != null ? Number(episode.worthItScore) : null} />
+            <span className="text-xs text-muted-foreground">
+              {[
+                formatDuration(episode.duration),
+                episode.publishDate ? formatDate(episode.publishDate) : "",
+              ]
+                .filter(Boolean)
+                .join(" · ")}
+            </span>
+          </div>
+        </div>
+      </Link>
+      <ListenedButton
+        podcastIndexEpisodeId={episode.podcastIndexId}
+        isListened={isListened}
+      />
+    </div>
   );
 }
 
@@ -110,6 +118,9 @@ export async function TrendingDetailContent({ slug }: { slug: string }) {
 
     case "found": {
       const { topic, allTopics, episodes, generatedAt } = result;
+      const listenedSet = episodes.length > 0
+        ? await getListenedEpisodeIds(episodes.map((e) => e.id))
+        : new Set<number>()
       return (
         <div className="space-y-6">
           <h1 className="text-3xl font-bold tracking-tight">{topic.name}</h1>
@@ -133,7 +144,7 @@ export async function TrendingDetailContent({ slug }: { slug: string }) {
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {episodes.map((episode) => (
-                <EpisodeCard key={episode.id} episode={episode} />
+                <EpisodeCard key={episode.id} episode={episode} isListened={listenedSet.has(episode.id)} />
               ))}
             </div>
           )}
