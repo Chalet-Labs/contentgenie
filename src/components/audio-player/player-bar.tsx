@@ -125,6 +125,10 @@ export function PlayerBar() {
       } else {
         seek(current.startTime)
       }
+      // Explicit backward intent — drop any pending forward target so the next
+      // Next press starts from the live position rather than an earlier
+      // optimistic advance that this Prev just undid.
+      nextTargetRef.current = -1
     }
   }, [hasChapters, chapters, currentChapterIdx, currentTime, seek])
 
