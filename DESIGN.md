@@ -97,17 +97,26 @@ colors:
   destructive-foreground-dark: "#FAFAFA"
 
   # Worth-It score ramp — dark twins (derived from runtime HSL in the
-  # shipped dark theme; lifted tints for forest-ink surfaces)
+  # shipped dark theme; lifted tints for forest-ink surfaces). Each tier
+  # also carries a `-foreground-dark` twin so generators that consume this
+  # frontmatter as the source of truth can reproduce badge text colors
+  # without falling back to the light-mode values — `score-below` in
+  # particular shifts to #2E1B05 in dark mode (vs #372006 in light).
   score-exceptional-dark: "#19B37F"
   score-exceptional-text-dark: "#81E4B6"
+  score-exceptional-foreground-dark: "#FFFFFF"
   score-above-dark: "#33CC85"
   score-above-text-dark: "#8DE2BA"
+  score-above-foreground-dark: "#FFFFFF"
   score-average-dark: "#99CB4D"
   score-average-text-dark: "#BFDF90"
+  score-average-foreground-dark: "#273414"
   score-below-dark: "#F6A61E"
   score-below-text-dark: "#F9C976"
+  score-below-foreground-dark: "#2E1B05"
   score-skip-dark: "#E35835"
   score-skip-text-dark: "#EE9781"
+  score-skip-foreground-dark: "#FFFFFF"
 
   # Status palette — dark twins (derived from runtime HSL)
   status-success-bg-dark: "#0B3D2C"
@@ -615,9 +624,13 @@ safety net for environments where the `next/font` pipeline is bypassed.
 - **Grid: 12-column, 24px gutter, collapses to a single column below
   768px.** No asymmetric designer grids; lists stay rectangular so scan
   speed wins.
-- **Touch targets: minimum 44×44px.** Applies to every interactive
-  element, including icon-only buttons — pad the hit area even if the
-  glyph is 16px.
+- **Touch targets: minimum 44×44px *hit area* on mobile.** The visual
+  button height stays at 36px (`h-9`) so the chrome does not dominate
+  dense desktop layouts; on touch devices the hit area is extended to
+  44×44 via wrapper padding (this is what the icon-only button note
+  below refers to when it says "pad the wrapper"). The 44px minimum is
+  a pointer-coarse floor, not a visual sizing rule — the two
+  measurements are intentionally decoupled.
 
 ## Elevation & Depth
 
