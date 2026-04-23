@@ -166,8 +166,6 @@ describe("NotificationSummaryList", () => {
       />
     );
     const link = screen.getByRole("link", { name: /from the daily/i });
-    // Prevent the default navigation so jsdom doesn't throw "Not implemented"
-    // for same-document location changes.
     fireEvent.click(link, { button: 0 });
     expect(onItemClick).toHaveBeenCalledWith("podcast-42");
   });

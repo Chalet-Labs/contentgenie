@@ -52,20 +52,26 @@ export function NotificationBell() {
 
   // Race guard: ignore stale resolutions from prior opens.
   const fetchIdRef = useRef(0);
-  const fetchSummary = useCallback(async () => {
+  const fetchSummary = useCallback(async (): Promise<boolean> => {
     const fetchId = ++fetchIdRef.current;
     setSummary(null);
     setSummaryError(false);
     try {
       const result = await getNotificationSummary();
-      if (fetchId !== fetchIdRef.current) return;
+      if (fetchId !== fetchIdRef.current) return false;
       setSummary(result);
+      return true;
     } catch (error) {
       console.error("Failed to fetch notification summary:", error);
-      if (fetchId !== fetchIdRef.current) return;
+      if (fetchId !== fetchIdRef.current) return false;
       setSummaryError(true);
+      return false;
     }
   }, []);
+
+  // Parallel race guard for mark-all: prevents a late rejection from
+  // reverting a later open's successful mark.
+  const markAllIdRef = useRef(0);
 
   const handleOpenChange = useCallback(
     (nextOpen: boolean) => {
@@ -78,13 +84,23 @@ export function NotificationBell() {
       // advances to "just now" for the next open (making the "since last
       // visit" group actually mean since the last open).
       void (async () => {
-        await fetchSummary();
+        const fetchOk = await fetchSummary();
+        // Don't advance the "since last visit" boundary over notifications
+        // the user never saw — retry via the error state re-enters this flow.
+        if (!fetchOk) return;
+
+        const markId = ++markAllIdRef.current;
         const prev = unreadCount;
         setUnreadCount(0);
         try {
           const result = await markAllNotificationsRead();
-          if (!result.success) setUnreadCount(prev);
+          if (markId !== markAllIdRef.current) return;
+          if (!result.success) {
+            console.error("markAllNotificationsRead failed:", result.error);
+            setUnreadCount(prev);
+          }
         } catch (error) {
+          if (markId !== markAllIdRef.current) return;
           console.error("Failed to mark all notifications as read:", error);
           setUnreadCount(prev);
         }

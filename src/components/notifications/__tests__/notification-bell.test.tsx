@@ -131,7 +131,7 @@ describe("NotificationBell", () => {
     expect(mockGetNotificationSummary).toHaveBeenCalledOnce();
   });
 
-  it("(f) getNotificationSummary error shows Retry path AND logs the error", async () => {
+  it("(f) getNotificationSummary error shows Retry path, logs the error, and does NOT call markAllNotificationsRead", async () => {
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
     mockGetUnreadCount.mockResolvedValue(2);
     const fetchError = new Error("fetch failed");
@@ -153,6 +153,11 @@ describe("NotificationBell", () => {
       "Failed to fetch notification summary:",
       fetchError
     );
+    // Don't advance the "since last visit" boundary over notifications the
+    // user never saw when the summary fetch failed.
+    expect(mockMarkAllNotificationsRead).not.toHaveBeenCalled();
+    // Badge should stay at the last-known count since we skipped the optimistic reset.
+    expect(screen.getByText("2")).toBeInTheDocument();
 
     consoleError.mockRestore();
   });
@@ -202,7 +207,7 @@ describe("NotificationBell", () => {
     expect(mockMarkAllNotificationsRead).not.toHaveBeenCalled();
   });
 
-  it("(g3) badge optimistically drops to 0 when popover opens, reverts on mark-read failure", async () => {
+  it("(g3) badge optimistically drops to 0 when popover opens, reverts and logs on mark-read failure", async () => {
     const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
     mockGetUnreadCount.mockResolvedValue(5);
     mockGetNotificationSummary.mockResolvedValue(defaultSummary);
@@ -220,8 +225,12 @@ describe("NotificationBell", () => {
     });
     await flushMicrotasks();
 
-    // Badge reverts to 5 because markAllNotificationsRead returned {success: false}.
     expect(screen.getByText("5")).toBeInTheDocument();
+    // Structured failures must surface — a silent revert hides session/DB issues.
+    expect(consoleError).toHaveBeenCalledWith(
+      "markAllNotificationsRead failed:",
+      "DB down"
+    );
     consoleError.mockRestore();
   });
 
@@ -263,6 +272,49 @@ describe("NotificationBell", () => {
       "Failed to mark all notifications as read:",
       expect.any(Error)
     );
+    consoleError.mockRestore();
+  });
+
+  it("(g6) stale mark-read rejection does not clobber a later successful mark", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    mockGetUnreadCount.mockResolvedValue(5);
+    mockGetNotificationSummary.mockResolvedValue(defaultSummary);
+
+    // First open: slow mark-read that we'll reject *after* a second open succeeds.
+    let rejectFirstMark: (reason: Error) => void = () => {};
+    const firstMark = new Promise<never>((_, reject) => {
+      rejectFirstMark = reject;
+    });
+    mockMarkAllNotificationsRead.mockReturnValueOnce(firstMark);
+    // Second open: resolves synchronously with success.
+    mockMarkAllNotificationsRead.mockResolvedValueOnce({ success: true });
+
+    render(<NotificationBell />);
+    await flushMicrotasks();
+
+    const btn = screen.getByRole("button", { name: /notifications/i });
+    // Open #1 (slow mark), close, open #2 (fast successful mark).
+    await act(async () => {
+      fireEvent.click(btn);
+    });
+    await act(async () => {
+      fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });
+    });
+    await act(async () => {
+      fireEvent.click(btn);
+    });
+    await flushMicrotasks();
+
+    // Badge is 0 from the successful second call.
+    expect(screen.queryByText("5")).not.toBeInTheDocument();
+
+    // The stale first mark-read now rejects. It must not revert the badge.
+    await act(async () => {
+      rejectFirstMark(new Error("stale"));
+    });
+    await flushMicrotasks();
+
+    expect(screen.queryByText("5")).not.toBeInTheDocument();
     consoleError.mockRestore();
   });
 
