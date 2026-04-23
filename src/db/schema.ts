@@ -16,6 +16,14 @@ import {
 import { relations, sql } from "drizzle-orm";
 import type { WorthItSignals } from "@/lib/openrouter";
 
+export const SUBSCRIPTION_SORTS = [
+  "recently-added",
+  "title-asc",
+  "latest-episode",
+  "recently-listened",
+] as const;
+export type SubscriptionSort = (typeof SUBSCRIPTION_SORTS)[number];
+
 // Rate limits table (managed by rate-limiter-flexible, see ADR-001).
 // Defined here so drizzle-kit push doesn't try to drop it.
 export const rateLimits = pgTable("rate_limits", {
@@ -37,6 +45,7 @@ export const users = pgTable("users", {
     digestFrequency?: "realtime" | "daily" | "weekly";
     pushEnabled?: boolean;
     lastDigestSentAt?: string; // ISO 8601
+    subscriptionSort?: SubscriptionSort;
   }>(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -148,6 +157,7 @@ export const userSubscriptions = pgTable(
       .notNull(),
     subscribedAt: timestamp("subscribed_at").defaultNow().notNull(),
     notificationsEnabled: boolean("notifications_enabled").default(true),
+    isPinned: boolean("is_pinned").default(false).notNull(),
   },
   (table) => [
     uniqueIndex("user_subscriptions_user_podcast_idx").on(
@@ -155,6 +165,10 @@ export const userSubscriptions = pgTable(
       table.podcastId
     ),
     index("user_subscriptions_user_id_idx").on(table.userId),
+    index("user_subscriptions_pinned_idx")
+      .on(table.userId)
+      .concurrently()
+      .where(sql`${table.isPinned} = true`),
   ]
 );
 
