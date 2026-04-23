@@ -73,6 +73,7 @@ vi.mock("drizzle-orm", () => ({
   eq: vi.fn((col: unknown, val: unknown) => ({ col, val })),
   and: vi.fn((...conditions: unknown[]) => ({ _and: conditions })),
   inArray: vi.fn((col: unknown, vals: unknown) => ({ _inArray: { col, vals } })),
+  isNotNull: vi.fn((col: unknown) => ({ _isNotNull: col })),
 }))
 
 describe("recordListenEvent", () => {
@@ -283,7 +284,7 @@ describe("getListenedEpisodeIds", () => {
     expect(result).toEqual(new Set([10, 42, 99]))
   })
 
-  it("filters by both userId and episodeId (privacy guard)", async () => {
+  it("filters by userId, episodeId, and completedAt IS NOT NULL", async () => {
     mockSelectWhere.mockResolvedValue([])
     const { getListenedEpisodeIds } = await import("@/app/actions/listen-history")
     await getListenedEpisodeIds([10, 42])
@@ -291,15 +292,22 @@ describe("getListenedEpisodeIds", () => {
     const whereArg = mockSelectWhere.mock.calls[0][0] as { _and: Array<Record<string, unknown>> }
     expect(whereArg).toHaveProperty("_and")
     const predicates = whereArg._and
+    // userId must be pinned to the current user — prevents cross-user leaks.
     const userIdPredicate = predicates.find(
       (p) => p.col === "userId" && p.val === "user_123",
     )
+    // episodeId must be scoped to the requested batch.
     const episodeIdPredicate = predicates.find(
       (p) => (p as { _inArray?: { col: unknown; vals: unknown[] } })._inArray?.col === "episodeId",
     ) as { _inArray: { col: unknown; vals: number[] } } | undefined
+    // completedAt IS NOT NULL — exclude partial plays recorded by the audio player.
+    const completedAtPredicate = predicates.find(
+      (p) => (p as { _isNotNull?: unknown })._isNotNull === "completedAt",
+    )
     expect(userIdPredicate).toBeDefined()
     expect(episodeIdPredicate).toBeDefined()
     expect(episodeIdPredicate?._inArray.vals).toEqual([10, 42])
+    expect(completedAtPredicate).toBeDefined()
   })
 
   it("returns empty Set and logs when DB throws", async () => {

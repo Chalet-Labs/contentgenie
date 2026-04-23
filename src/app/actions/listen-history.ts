@@ -1,6 +1,6 @@
 "use server"
 
-import { and, eq, inArray, sql } from "drizzle-orm"
+import { and, eq, inArray, isNotNull, sql } from "drizzle-orm"
 import { db } from "@/db"
 import { ensureUserExists } from "@/db/helpers"
 import { episodes, listenHistory } from "@/db/schema"
@@ -98,6 +98,9 @@ export async function getListenedEpisodeIds(
   const { userId } = await auth()
   if (!userId || episodeInternalIds.length === 0) return new Set()
   try {
+    // Filter on completedAt: the audio player writes listen_history rows at
+    // a playback milestone without setting completedAt, so partial plays
+    // must not count as "already listened" for the ListenedButton indicator.
     const rows = await db
       .select({ id: listenHistory.episodeId })
       .from(listenHistory)
@@ -105,6 +108,7 @@ export async function getListenedEpisodeIds(
         and(
           eq(listenHistory.userId, userId),
           inArray(listenHistory.episodeId, episodeInternalIds),
+          isNotNull(listenHistory.completedAt),
         ),
       )
     return new Set(rows.map((r) => r.id))
