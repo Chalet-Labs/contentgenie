@@ -20,10 +20,22 @@
     --border: 150 10% 90%;
     --input: 150 10% 90%;
 
-    /* Primary (emerald) */
-    --primary: 160 70% 35%;
+    /* Primary (emerald) — darkened from L 35% to L 29% so the near-white
+     * label (#F9FBFA / 150 20% 98%) on a filled primary button reaches
+     * ~4.86:1, clearing WCAG 2.1 AA (SC 1.4.3, 4.5:1 for normal text)
+     * per the .impeccable.md accessibility target. Dark mode stays at
+     * 156 60% 48% since the dark label/fill pair already measures 7.57:1
+     * (passes AAA).
+     *
+     * --primary-hover is a solid darker emerald used by the default Button
+     * variant's hover state (see src/components/ui/button.tsx). The
+     * previous `hover:bg-primary/90` alpha composite resolved to ~#2D8B6B
+     * on paper, measuring only ~4.04:1 — below AA. The solid L 24% hover
+     * clears AA at ~6.49:1 and keeps the emerald identity. */
+    --primary: 160 70% 29%;
     --primary-foreground: 150 20% 98%;
-    --ring: 160 70% 35%;
+    --primary-hover: 160 70% 24%;
+    --ring: 160 70% 29%;
 
     /* Brand accent (amber — logo, marketing) */
     /* Foreground must match the ink color baked into public/brand/logo-*.svg
@@ -108,6 +120,12 @@
     --popover-foreground: 150 12% 96%;
     --primary: 156 60% 48%;
     --primary-foreground: 160 60% 8%;
+    /* Dark hover: solid L 42% (darker than rest L 48%) matches the
+     * intent of the previous `hover:bg-primary/90` alpha composite
+     * (which darkened on hover in dark mode) while giving a token
+     * generators can reproduce. Measures ~5.84:1 against the dark
+     * label — clears AA with headroom. */
+    --primary-hover: 156 60% 42%;
     --secondary: 150 15% 13%;
     --secondary-foreground: 150 12% 96%;
     --muted: 150 15% 13%;
