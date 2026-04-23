@@ -1,0 +1,680 @@
+---
+version: alpha
+name: Paper, Fern, Amber
+description: >-
+  Editorial-clean palette for a podcast-triage reading app. Warm paper
+  neutrals, emerald interactive chrome, amber brand accent, vermilion
+  for destructive intent. Information-dense, typographically driven,
+  restrained motion.
+colors:
+  # Chrome — light
+  background: "#FCFDFC"
+  foreground: "#0D120F"
+  card: "#FFFFFF"
+  card-foreground: "#0D120F"
+  popover: "#FFFFFF"
+  popover-foreground: "#0D120F"
+  secondary: "#F4F6F5"
+  secondary-foreground: "#19241F"
+  muted: "#F4F6F5"
+  muted-foreground: "#6E7C75"
+  accent: "#F4F6F5"
+  accent-foreground: "#19241F"
+  border: "#E3E8E6"
+  input: "#E3E8E6"
+  ring: "#1B986E"
+
+  # Primary — emerald (interactive chrome, CTAs)
+  primary: "#1B986E"
+  primary-foreground: "#F9FBFA"
+
+  # Brand — amber (logo tile, marketing accent ONLY, never a CTA)
+  brand: "#F59F0A"
+  brand-foreground: "#181306"
+
+  # Destructive — warm vermilion (not cool red)
+  destructive: "#E24D28"
+  destructive-foreground: "#FAFAFA"
+
+  # Worth-It score ramp — emerald → fern → chartreuse → amber → vermilion
+  score-exceptional: "#148F66"
+  score-exceptional-text: "#0F6B4C"
+  score-exceptional-foreground: "#FFFFFF"
+  score-above: "#2EB877"
+  score-above-text: "#147145"
+  score-above-foreground: "#FFFFFF"
+  score-average: "#99CB4D"
+  score-average-text: "#435922"
+  score-average-foreground: "#273414"
+  score-below: "#F59F0A"
+  score-below-text: "#814B0E"
+  score-below-foreground: "#372006"
+  score-skip: "#E24D28"
+  score-skip-text: "#A23216"
+  score-skip-foreground: "#FFFFFF"
+
+  # Status (subtle tint + strong text + quiet border)
+  status-success-bg: "#DEF7EB"
+  status-success-text: "#0F6B4C"
+  status-success-border: "#ABE3C9"
+  status-warning-bg: "#FDF0D8"
+  status-warning-text: "#814B0E"
+  status-warning-border: "#F4D39A"
+  status-info-bg: "#E6F0EB"
+  status-info-text: "#147152"
+  status-info-border: "#B9D5C7"
+  status-danger-bg: "#FBE5E0"
+  status-danger-text: "#A23216"
+  status-danger-border: "#F0B7A8"
+  status-neutral-bg: "#EBEFED"
+  status-neutral-text: "#5B6761"
+  status-neutral-border: "#C7D1CC"
+
+  # Chrome — dark (system-aware; user can override)
+  background-dark: "#0D120F"
+  foreground-dark: "#F4F6F5"
+  card-dark: "#0D120F"
+  muted-dark: "#1C2621"
+  muted-foreground-dark: "#9EA9A3"
+  border-dark: "#1C2621"
+  primary-dark: "#31C489"
+  primary-foreground-dark: "#082118"
+  brand-dark: "#F6A61E"
+  destructive-dark: "#9B3E27"
+
+typography:
+  display-hero:
+    fontFamily: Inter
+    fontSize: 60px
+    fontWeight: "700"
+    lineHeight: 60px
+    letterSpacing: -0.025em
+  display-hero-compact:
+    fontFamily: Inter
+    fontSize: 36px
+    fontWeight: "700"
+    lineHeight: 40px
+    letterSpacing: -0.025em
+  h1:
+    fontFamily: Inter
+    fontSize: 30px
+    fontWeight: "700"
+    lineHeight: 36px
+    letterSpacing: -0.025em
+  h2:
+    fontFamily: Inter
+    fontSize: 20px
+    fontWeight: "600"
+    lineHeight: 28px
+    letterSpacing: -0.015em
+  h3:
+    fontFamily: Inter
+    fontSize: 16px
+    fontWeight: "600"
+    lineHeight: 24px
+  lead:
+    fontFamily: Inter
+    fontSize: 18px
+    fontWeight: "400"
+    lineHeight: 28px
+  body:
+    fontFamily: Inter
+    fontSize: 14px
+    fontWeight: "400"
+    lineHeight: 20px
+  body-strong:
+    fontFamily: Inter
+    fontSize: 14px
+    fontWeight: "600"
+    lineHeight: 20px
+  muted:
+    fontFamily: Inter
+    fontSize: 14px
+    fontWeight: "400"
+    lineHeight: 20px
+  small:
+    fontFamily: Inter
+    fontSize: 12px
+    fontWeight: "400"
+    lineHeight: 16px
+  label:
+    fontFamily: Inter
+    fontSize: 14px
+    fontWeight: "500"
+    lineHeight: 14px
+  eyebrow:
+    fontFamily: Inter
+    fontSize: 12px
+    fontWeight: "400"
+    lineHeight: 16px
+    letterSpacing: 0.06em
+    textTransform: uppercase
+  mono:
+    fontFamily: "ui-monospace, SF Mono, Menlo, Consolas, monospace"
+    fontSize: 13px
+    fontWeight: "400"
+    lineHeight: 18px
+
+rounded:
+  sm: 4px
+  md: 6px
+  DEFAULT: 8px
+  lg: 8px
+  xl: 12px
+  full: 9999px
+
+spacing:
+  unit: 4px
+  gap-inline: 8px
+  gap-group: 12px
+  card-padding: 16px
+  card-padding-lg: 24px
+  container-padding: 24px
+  section-gap: 32px
+  section-margin: 48px
+  page-max-width: 1200px
+
+elevation:
+  none: none
+  sm: "0 1px 2px 0 rgba(0,0,0,0.05)"
+  DEFAULT: "0 1px 3px 0 rgba(0,0,0,0.10), 0 1px 2px -1px rgba(0,0,0,0.10)"
+  md: "0 4px 6px -1px rgba(0,0,0,0.10), 0 2px 4px -2px rgba(0,0,0,0.10)"
+  lg: "0 10px 15px -3px rgba(0,0,0,0.10), 0 4px 6px -4px rgba(0,0,0,0.10)"
+
+motion:
+  duration-instant: 80ms
+  duration-fast: 150ms
+  duration-base: 200ms
+  duration-slow: 300ms
+  easing-standard: cubic-bezier(0.2, 0, 0, 1)
+  easing-emphasized: cubic-bezier(0.3, 0, 0, 1)
+  reduced-motion: "Honor prefers-reduced-motion: clamp every animation + transition to ~0ms and disable smooth scroll."
+
+components:
+  button-primary:
+    backgroundColor: "{colors.primary}"
+    textColor: "{colors.primary-foreground}"
+    typography: "{typography.label}"
+    rounded: "{rounded.md}"
+    height: 40px
+    padding: 0 16px
+  button-primary-hover:
+    backgroundColor: "#136C4F"
+  button-secondary:
+    backgroundColor: "{colors.secondary}"
+    textColor: "{colors.secondary-foreground}"
+    typography: "{typography.label}"
+    rounded: "{rounded.md}"
+    height: 40px
+    padding: 0 16px
+  button-ghost:
+    backgroundColor: transparent
+    textColor: "{colors.foreground}"
+    typography: "{typography.label}"
+    rounded: "{rounded.md}"
+    height: 40px
+    padding: 0 12px
+  button-ghost-hover:
+    backgroundColor: "{colors.accent}"
+  button-destructive:
+    backgroundColor: "{colors.destructive}"
+    textColor: "{colors.destructive-foreground}"
+    typography: "{typography.label}"
+    rounded: "{rounded.md}"
+    height: 40px
+    padding: 0 16px
+  card:
+    backgroundColor: "{colors.card}"
+    textColor: "{colors.card-foreground}"
+    rounded: "{rounded.lg}"
+    padding: "{spacing.card-padding-lg}"
+  card-bordered:
+    backgroundColor: "{colors.card}"
+    textColor: "{colors.card-foreground}"
+    rounded: "{rounded.lg}"
+    padding: "{spacing.card-padding-lg}"
+  card-accent:
+    backgroundColor: "{colors.card}"
+    textColor: "{colors.card-foreground}"
+    rounded: "{rounded.lg}"
+    padding: "{spacing.card-padding-lg}"
+  input:
+    backgroundColor: "{colors.background}"
+    textColor: "{colors.foreground}"
+    typography: "{typography.body}"
+    rounded: "{rounded.md}"
+    height: 40px
+    padding: 0 12px
+  input-focus:
+    backgroundColor: "{colors.background}"
+  badge-score-exceptional:
+    backgroundColor: "{colors.score-exceptional}"
+    textColor: "{colors.score-exceptional-foreground}"
+    rounded: "{rounded.full}"
+    padding: 2px 8px
+    typography: "{typography.small}"
+  badge-score-above:
+    backgroundColor: "{colors.score-above}"
+    textColor: "{colors.score-above-foreground}"
+    rounded: "{rounded.full}"
+    padding: 2px 8px
+    typography: "{typography.small}"
+  badge-score-average:
+    backgroundColor: "{colors.score-average}"
+    textColor: "{colors.score-average-foreground}"
+    rounded: "{rounded.full}"
+    padding: 2px 8px
+    typography: "{typography.small}"
+  badge-score-below:
+    backgroundColor: "{colors.score-below}"
+    textColor: "{colors.score-below-foreground}"
+    rounded: "{rounded.full}"
+    padding: 2px 8px
+    typography: "{typography.small}"
+  badge-score-skip:
+    backgroundColor: "{colors.score-skip}"
+    textColor: "{colors.score-skip-foreground}"
+    rounded: "{rounded.full}"
+    padding: 2px 8px
+    typography: "{typography.small}"
+  status-pill-success:
+    backgroundColor: "{colors.status-success-bg}"
+    textColor: "{colors.status-success-text}"
+    rounded: "{rounded.full}"
+    padding: 2px 10px
+    typography: "{typography.small}"
+  status-pill-warning:
+    backgroundColor: "{colors.status-warning-bg}"
+    textColor: "{colors.status-warning-text}"
+    rounded: "{rounded.full}"
+    padding: 2px 10px
+    typography: "{typography.small}"
+  status-pill-info:
+    backgroundColor: "{colors.status-info-bg}"
+    textColor: "{colors.status-info-text}"
+    rounded: "{rounded.full}"
+    padding: 2px 10px
+    typography: "{typography.small}"
+  status-pill-danger:
+    backgroundColor: "{colors.status-danger-bg}"
+    textColor: "{colors.status-danger-text}"
+    rounded: "{rounded.full}"
+    padding: 2px 10px
+    typography: "{typography.small}"
+  status-pill-neutral:
+    backgroundColor: "{colors.status-neutral-bg}"
+    textColor: "{colors.status-neutral-text}"
+    rounded: "{rounded.full}"
+    padding: 2px 10px
+    typography: "{typography.small}"
+  logo-tile:
+    backgroundColor: "{colors.brand}"
+    textColor: "{colors.brand-foreground}"
+    rounded: 7px
+    size: 32px
+  focus-ring:
+    backgroundColor: transparent
+    textColor: "{colors.ring}"
+---
+
+## Overview
+
+**Paper, Fern, Amber** is the visual identity of a podcast-triage tool for
+busy professionals. It is editorial-clean: information-dense but well-organized,
+with strong typographic hierarchy and generous whitespace. Content is the
+decoration.
+
+**Brand personality.** Smart. Efficient. Modern. The interface feels like a
+sharp tool, not a toy. It respects the user's time and intelligence — no
+ornamentation, no playful gimmicks, no unnecessary animation. Closer in spirit
+to Linear, Readwise Reader, and Superhuman than to Spotify or Apple Podcasts.
+
+**The warmth principle.** The system deliberately avoids cool greys and
+clinical blues. Neutrals carry a whisper of green (paper with a fern-tinted
+tooth); the primary interactive color is a deep emerald; the brand accent is
+a confident amber; destructive actions land in a warm vermilion rather than a
+cool red. The result reads as *inviting and collaborative* rather than
+corporate or sterile — a reading room, not a dashboard.
+
+**Two chromatic roles, never mixed.**
+- **Primary (emerald)** is the interactive chrome: buttons, links, focus
+  rings, selection highlights, filled icons at rest. It is the "touch this"
+  color.
+- **Brand (amber)** is the identity accent: the logo tile, rating stars, a
+  single marketing accent per section. It is the "this is the product"
+  color. **Never use amber for CTAs, form submits, or primary interactive
+  affordances.** If everything is amber, the logo disappears.
+
+## Colors
+
+The palette is rooted in a warm paper neutral, a single primary, a single
+brand accent, and a warm destructive. Every product surface uses a token;
+raw Tailwind palette colors (`blue-600`, `yellow-400`, `zinc-*`, …) are
+out-of-system.
+
+### Neutrals — "paper, fern-tinted"
+
+- **Background (#FCFDFC)** — near-white with a 150° green whisper (12% sat).
+  Reads as paper, not as plastic. Dark mode drops to **#0D120F** — a deep
+  forest ink, not pure black.
+- **Foreground (#0D120F)** — near-black in the same hue family. Text never
+  sits at `#000` against paper; the small bias back toward the background
+  hue keeps the page calm.
+- **Muted / secondary / accent surface (#F4F6F5)** — the quieter
+  row-striping / card-backdrop tint. Used for hover states on ghost buttons
+  and for list-row highlights.
+- **Muted-foreground (#6E7C75)** — metadata, timestamps, de-emphasized
+  copy. Meets AA 4.5:1 against paper.
+- **Border (#E3E8E6)** — quiet and structural. Borders do the work of
+  separating surfaces; shadows are a last resort.
+
+### Primary — emerald (#1B986E)
+
+The single color for interactive chrome. Used for:
+- Primary buttons, submit actions, default toggle-on states.
+- Links inside body copy (underline + emerald, not blue).
+- The focus ring on all inputs and buttons.
+- Filled icons that communicate completion ("summary ready", "saved").
+- "Positive signal" checkmarks inside Worth-It detail rows.
+
+Dark mode lifts to **#31C489** (lighter and a touch more saturated) so the
+chrome stays legible against the forest-ink background.
+
+### Brand — amber (#F59F0A)
+
+The identity accent. Used for:
+- The logo tile (amber square + ink glyph). The tile is the product's face;
+  keep it at its specified amber, never tinted.
+- Rating stars and user-supplied rating UI (fill + outline both at brand).
+- A single marketing accent per section — a divider, a hero callout, never
+  more than one per viewport.
+
+Amber's foreground ink is a deep warm ink (**#181306**), not pure black —
+matching the glyph color inside the logo SVG so bitmap favicons render
+identically.
+
+### Destructive — vermilion (#E24D28)
+
+Warm and confident, not cool and alarming. Used sparingly for delete
+confirmations, irreversible actions, and the "Skip" tier of the Worth-It
+score. The tone says "this is a strong action," not "error, error."
+
+### Worth-It score ramp (5 tiers)
+
+A product-specific semantic ramp that walks the palette from emerald to
+vermilion:
+
+| Tier        | Score  | Bg hex    | Meaning          |
+|-------------|--------|-----------|------------------|
+| Exceptional | ≥ 8    | #148F66   | Listen now       |
+| Above avg.  | 6–7.99 | #2EB877   | Worth the time   |
+| Average     | 4–5.99 | #99CB4D   | Maybe, if time   |
+| Below avg.  | 2–3.99 | #F59F0A   | Skim the summary |
+| Skip        | < 2    | #E24D28   | Move on          |
+
+Each tier has three paired tokens:
+- `-bg` — the fill behind short badges / pills.
+- `-foreground` — the text on that fill.
+- `-text` — a darker accessible variant for inline score numbers that sit
+  on the paper surface with no chip behind them (meets 4.5:1 against
+  `#FCFDFC`).
+
+The middle tier (average) leans chartreuse on purpose — the ramp must pass
+through a yellow-green to feel continuous; a skipped average would make
+the "above"/"below" steps feel categorical rather than graduated.
+
+### Status palette
+
+Used on banners, inline toasts, and admin surfaces. Every status has a
+bg / text / border triplet:
+
+- **Success** — `#DEF7EB` / `#0F6B4C` / `#ABE3C9`
+- **Warning** — `#FDF0D8` / `#814B0E` / `#F4D39A`
+- **Info** — `#E6F0EB` / `#147152` / `#B9D5C7`
+- **Danger** — `#FBE5E0` / `#A23216` / `#F0B7A8`
+- **Neutral** — `#EBEFED` / `#5B6761` / `#C7D1CC`
+
+Status colors *never* replace primary or destructive for interactive
+elements — they're read-only semantic framing for content, not chrome.
+
+### Contrast targets
+
+- Body text on paper: 4.5:1 (AA).
+- Primary button text on emerald: > 7:1 (AAA).
+- Amber on dark text: > 10:1 (the amber tile always carries dark ink).
+- Muted-foreground: tuned to land at exactly 4.5:1 — any darker and
+  "secondary info" starts competing with primary copy.
+
+## Typography
+
+One family: **Inter**. Weight and size carry hierarchy; no display serifs,
+no secondary sans, no decorative fallbacks. The fallback stack is
+system-ui first so SSR still renders the correct metrics before the
+variable font arrives.
+
+### Scale
+
+- **display-hero (60/60, 700, -0.025em)** — landing page hero only. A
+  single line on desktop; use `display-hero-compact` (36/40) on small
+  screens.
+- **h1 (30/36, 700, -0.025em)** — page titles inside the app.
+- **h2 (20/28, 600, -0.015em)** — section headings inside pages.
+- **h3 (16/24, 600)** — card titles, sub-sections.
+- **lead (18/28, 400)** — intro paragraphs, hero subtitles. Muted color.
+- **body (14/20, 400)** — the workhorse. Most UI copy lives here.
+- **body-strong (14/20, 600)** — emphasized body inline.
+- **muted (14/20, 400, muted-fg)** — metadata lines: publish date, show
+  name, duration.
+- **small (12/16, 400)** — chip text, badge text, timestamp tails.
+- **label (14/14, 500)** — form labels, tab labels. Tight leading on
+  purpose so label + input read as one unit.
+- **eyebrow (12/16, 400, uppercase, +0.06em)** — small kickers above
+  section headings. Muted color. Use sparingly — more than three per page
+  creates noise.
+- **mono (13/18)** — API keys, IDs, code samples. System UI monospace
+  stack; no custom mono face.
+
+### Rhythm rules
+
+- **Tracking tightens as size grows.** Display text at -0.025em; h2 at
+  -0.015em; body at 0. Rationale: Inter's default tracking is optimized
+  for body sizes.
+- **Weights used: 400, 500, 600, 700.** Never 300 (too thin for paper
+  backgrounds at small sizes), never 800/900 (crosses into marketing
+  brochure).
+- **Line-height collapses for labels, expands for body.** Labels at
+  1.0×; body at 1.43×; lead paragraphs at 1.56×. Reading rhythm beats
+  vertical economy.
+
+## Layout
+
+- **Base unit: 4px.** All spacing is a multiple. Common scale: 4, 8, 12,
+  16, 20, 24, 32, 40, 48, 64.
+- **Container max-width: 1200px.** Wider than that and scanning lists
+  becomes two-handed.
+- **Gutter / page padding: 24px on desktop, 16px on mobile.**
+- **Section vertical rhythm: 32px within a page, 48px between major
+  sections.**
+- **Card padding: 16px compact, 24px default.** Internal card elements
+  stack on an 8px gap; related groups tighten to 4px.
+- **Grid: 12-column, 24px gutter, collapses to a single column below
+  768px.** No asymmetric designer grids; lists stay rectangular so scan
+  speed wins.
+- **Touch targets: minimum 44×44px.** Applies to every interactive
+  element, including icon-only buttons — pad the hit area even if the
+  glyph is 16px.
+
+## Elevation & Depth
+
+Shadows are *structural, not decorative*. Default chrome uses borders.
+Four shadow tiers exist for surfaces that must lift off the page:
+
+- **sm** — subtle bottom hint for hovered rows.
+- **DEFAULT** — dropdowns, menus. The "popped" state.
+- **md** — modal panels, popovers with meaningful offset.
+- **lg** — only for overlay dialogs that eclipse the page chrome.
+
+Rules:
+- Hero cards and primary content stay **flat + bordered**. Never give the
+  hero a shadow.
+- Shadows are always grey (black at low opacity), never tinted. Tinted
+  shadows push the palette toward "branded gradient kitsch."
+- Do not combine border + heavy shadow. Pick one per surface tier.
+- Dark mode shadows shrink (halve their opacity) — forest ink already
+  absorbs depth cues, and over-shadowing reads as muddy.
+
+## Shapes
+
+One base radius: **8px** (`rounded.DEFAULT`). Everything derives from it.
+
+- **sm (4px)** — inline chips, tight pills where 8px looks bubbly.
+- **md (6px)** — inputs, buttons, inner elements of cards.
+- **DEFAULT / lg (8px)** — cards, menus, popovers, sheets.
+- **xl (12px)** — feature panels, hero modules, the logo tile's outer
+  frame if it is embedded in a larger container.
+- **full (9999px)** — avatars, score badges, status pills, star icons.
+
+Rules:
+- **Rounded but not bubbly.** Never use `full` rounding on non-pill
+  rectangles larger than 32px tall. Large `full`-rounded cards read as
+  kids' apps.
+- **Consistent corner family.** A card at 8px never nests a component at
+  12px — child radii are equal or smaller than parent radii.
+- **The logo tile is exactly 7px** on a 32px mark. This is a deliberate
+  hair-smaller value than 8px so the amber tile reads as a painted
+  sticker rather than a button. It is the only place in the system that
+  uses 7px.
+
+## Motion
+
+Motion supports, never blocks. The product is triage-oriented; a 400ms
+easing flourish is 400ms of delay between the user and the information.
+
+- **Durations.** 80ms (instant affordances: hover color), 150ms (small
+  state changes: press, focus), 200ms (default panel transitions), 300ms
+  (modal enter/exit).
+- **Easing.** Standard `cubic-bezier(0.2, 0, 0, 1)` for entrances and
+  state changes; emphasized `cubic-bezier(0.3, 0, 0, 1)` for modals.
+- **No spring.** No bounce. No stagger unless the content is genuinely
+  sequential (a list of items animating in beat-by-beat reads as fussy).
+- **Skeletons over spinners.** When content is pending, show the shape
+  of the content, not a rotating gear.
+- **`prefers-reduced-motion` is a hard gate.** When reduced, animation
+  duration collapses to ~0ms and scroll-behavior reverts to auto. Test
+  this path explicitly — a feature that only works with animation is
+  broken.
+
+## Components
+
+### Buttons
+
+- **Primary** — emerald fill, near-white label, 40px tall, 16px
+  horizontal padding, 6px radius. Hover: shift ~10% darker (#136C4F).
+- **Secondary** — `secondary` fill, foreground label. Same geometry.
+  Use when primary is adjacent and would out-shout content.
+- **Ghost** — transparent, foreground label, hover reveals `accent`
+  fill. Use inside dense toolbars.
+- **Destructive** — vermilion fill. Pair with an explicit confirm step
+  for irreversible actions.
+- **Icon-only** — ghost by default, 40×40 hit area even when the glyph
+  is 16px.
+
+Never use brand amber as a button fill. Never combine two primaries in
+one row — if both feel equal, one of them is mis-labeled.
+
+### Cards
+
+- **Default** — white fill (card), 8px radius, 1px border, 24px
+  padding. No shadow at rest.
+- **Bordered** — same, explicit when the context otherwise loses the
+  edge.
+- **Accent** — same, but with a 2px left border in `primary` to flag
+  "this one has a completed summary." Reserved for that one semantic.
+
+Cards have at most one hero element (title, score, image) and metadata
+stacks below at `muted-foreground`.
+
+### Inputs
+
+- 40px tall, 6px radius, 1px border using the `input` token.
+- Focus ring: 2px `ring` color offset 2px. Never a halo glow.
+- Error state: border shifts to `destructive`; message below the field
+  in `destructive-foreground` at `small` size.
+- Never replace the label with a placeholder. Placeholders disappear on
+  focus; labels don't.
+
+### Score badges
+
+- Rounded-full pill, 2×8 padding, small type.
+- Fill + foreground paired from one of the five score tiers.
+- Inline variants (no fill) use the `-text` token and align to baseline
+  with adjacent copy.
+
+### Status pills
+
+- Rounded-full, 2×10 padding, small type.
+- Always bg + text from the same status pair. Optional 1px border in the
+  matching `-border` when the pill sits on a non-paper surface.
+
+### Logo
+
+- The mark is a **32px amber tile** (radius 7px) containing a
+  speech-bubble-with-soundwave glyph in deep ink.
+- Three variants ship:
+  - **mark** — colored tile, for app chrome and marketing headers.
+  - **mark-mono** — single-color glyph tinted by `currentColor` —
+    embed inside colored contexts (a white footer, a dark modal) where
+    the amber tile would fight the surround.
+  - **lockup** — mark + "ContentGenie" wordmark in Inter 700 at
+    -0.035em tracking. Wordmark color flips for dark mode.
+- Favicon and PWA icons are rasterized from the `mark` SVG — the glyph
+  ink color there is **#1A1407**, identical to `brand-foreground`, so
+  bitmap icons and the React mark render the same tone.
+- **Do not** tint the amber tile, do not round it `full`, do not place a
+  shadow under it, do not emboss it.
+
+### Focus
+
+- Keyboard focus is visible on every interactive element.
+- 2px `ring`-colored outline + 2px offset; no removal via
+  `outline: none` without a replacement.
+- Focus color is emerald, matching `primary` — the "touch this" color
+  doubles as "you are here" signal.
+
+## Do's and Don'ts
+
+**Do**
+- Use `primary` (emerald) for every interactive affordance. One color
+  for "touch this" makes the product scannable.
+- Use `brand` (amber) exactly where it means "this is the product":
+  logo, rating stars, maybe one marketing accent per section.
+- Let borders and whitespace do the work of separating surfaces.
+  Shadows are reserved for lifted chrome (menus, modals).
+- Stay inside the token palette. If a color doesn't exist in the
+  frontmatter above, the answer is not "add a new shade of blue."
+- Honor `prefers-reduced-motion`. Every transition.
+- Treat the Worth-It score ramp as a semantic scale: the color is the
+  meaning. Don't substitute a color "because it looks better here."
+- Test at dark mode alongside light. The system is system-aware; every
+  surface must have a defined dark equivalent.
+
+**Don't**
+- Don't use Tailwind's palette literals (`blue-600`, `yellow-400`,
+  `zinc-*`, `slate-*`, `emerald-500`, …). They sit outside the token
+  system and drift.
+- Don't use amber as a CTA. Amber buttons cannibalize the logo.
+- Don't use pure `#000` text or pure `#FFF` backgrounds. The system
+  lives at `#0D120F` and `#FCFDFC` — the hue whisper is load-bearing.
+- Don't introduce a second font family. Inter + system mono is the
+  entire typographic inventory.
+- Don't use cool red (`#EF4444`, etc.) for destructive. Vermilion is
+  warm on purpose.
+- Don't add gradients, glows, or decorative illustrations. "Content is
+  the decoration."
+- Don't use spinners when a skeleton works. Don't animate things that
+  delay the user seeing content.
+- Don't mix radii across a single composition. A 12px card full of 8px
+  inputs is fine; a 12px card with a 20px inner panel is not.
+- Don't stack more than two colors per interactive surface. A primary
+  button on an accent row on a card is already the ceiling; anything
+  more and the hierarchy collapses.
