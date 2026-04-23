@@ -293,7 +293,6 @@ function NotificationRow({
 }) {
   const { playEpisode } = useAudioPlayerAPI();
 
-  const hasEpisodeId = Boolean(item.episodePodcastIndexId);
   const audioEpisode =
     item.audioUrl && item.episodePodcastIndexId
       ? {
@@ -319,7 +318,7 @@ function NotificationRow({
         Listen
       </Button>
     );
-  } else if (hasEpisodeId) {
+  } else if (item.episodePodcastIndexId) {
     primaryAction = (
       <Button size="sm" variant="outline" onClick={() => onRowClick(item)}>
         View episode
@@ -336,7 +335,7 @@ function NotificationRow({
         href={
           item.episodePodcastIndexId
             ? ROUTES.episode(item.episodePodcastIndexId)
-            : "#"
+            : undefined
         }
         topics={topics}
         score={item.worthItScore}

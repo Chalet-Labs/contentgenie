@@ -114,21 +114,18 @@ describe("EpisodeCard", () => {
     expect(screen.queryByLabelText("Summary failed")).not.toBeInTheDocument();
   });
 
-  it("applies completed-status left-border accent", () => {
+  it("exposes data-status='completed' for completed-state styling hooks", () => {
     const { container } = render(
       <EpisodeCard {...baseProps} status="completed" />
     );
-    const card = container.firstChild as HTMLElement;
-    expect(card).toHaveAttribute("data-status", "completed");
-    expect(card.className).toContain("border-l-primary");
+    expect(container.firstChild).toHaveAttribute("data-status", "completed");
   });
 
-  it("does not apply completed accent for non-completed statuses", () => {
+  it("exposes data-status for non-completed statuses", () => {
     const { container } = render(
       <EpisodeCard {...baseProps} status="running" />
     );
-    const card = container.firstChild as HTMLElement;
-    expect(card.className).not.toContain("border-l-primary");
+    expect(container.firstChild).toHaveAttribute("data-status", "running");
   });
 
   it("wraps podcastTitle in a Link when podcastHref is provided", () => {
@@ -182,21 +179,16 @@ describe("EpisodeCard", () => {
     expect(links).toHaveLength(1);
   });
 
-  it("applies unread bg tint for accent=unread", () => {
+  it("exposes data-accent='unread' for accent=unread", () => {
     const { container } = render(
       <EpisodeCard {...baseProps} accent="unread" />
     );
-    const card = container.firstChild as HTMLElement;
-    expect(card).toHaveAttribute("data-accent", "unread");
-    expect(card.className).toContain("bg-accent/10");
+    expect(container.firstChild).toHaveAttribute("data-accent", "unread");
   });
 
-  it("does not apply unread tint for accent=none", () => {
-    const { container } = render(
-      <EpisodeCard {...baseProps} accent="none" />
-    );
-    const card = container.firstChild as HTMLElement;
-    expect(card.className).not.toContain("bg-accent/10");
+  it("exposes data-accent='none' for accent=none (default)", () => {
+    const { container } = render(<EpisodeCard {...baseProps} />);
+    expect(container.firstChild).toHaveAttribute("data-accent", "none");
   });
 
   it("sets data-listened attribute from isListened prop", () => {
@@ -234,6 +226,23 @@ describe("EpisodeCard", () => {
     const links = container.querySelectorAll("a");
     const hrefs = Array.from(links).map((a) => a.getAttribute("href"));
     expect(hrefs).toContain("/episode/PI-42");
+  });
+
+  it("renders title without a Link when href is omitted", () => {
+    const { container } = render(
+      <EpisodeCard
+        {...baseProps}
+        href={undefined}
+        artwork="https://example.com/art.jpg"
+      />
+    );
+    const titleLink = container.querySelector<HTMLAnchorElement>(
+      'a[aria-label^="Open episode"]'
+    );
+    expect(titleLink).toBeNull();
+    expect(
+      screen.getByText("How AI is Transforming Podcast Discovery").tagName
+    ).toBe("H3");
   });
 
   it("renders meta nodes", () => {

@@ -18,8 +18,12 @@ export interface EpisodeCardProps {
   podcastHref?: string;
   /** Episode title — the primary heading. */
   title: string;
-  /** Target of the title link. Only the title (and artwork, if present) are wrapped in the link. */
-  href: string;
+  /**
+   * Target of the title link. Only the title (and artwork, if present) are
+   * wrapped. When omitted, title and artwork render as plain text — useful for
+   * degenerate data states where there is no episode to navigate to.
+   */
+  href?: string;
   /** Optional description; truncated to line-clamp-2. */
   description?: string | null;
   /** Topic chips rendered below the description; capped at 3. */
@@ -46,6 +50,46 @@ export interface EpisodeCardProps {
   secondaryActions?: ReactNode;
   /** When true, marks the card as listened — used for data attrs and future styling. */
   isListened?: boolean;
+}
+
+function ArtworkTile({
+  href,
+  title,
+  artwork,
+  podcastTitle,
+}: {
+  href?: string;
+  title: string;
+  artwork: string | null;
+  podcastTitle: string;
+}) {
+  const tile = (
+    <div className="relative h-20 w-20 overflow-hidden rounded-lg bg-muted">
+      {artwork ? (
+        <Image
+          src={artwork}
+          alt={podcastTitle}
+          fill
+          className="object-cover"
+          sizes="80px"
+        />
+      ) : (
+        <div className="flex h-full w-full items-center justify-center text-muted-foreground">
+          <Rss className="h-8 w-8" aria-hidden="true" />
+        </div>
+      )}
+    </div>
+  );
+  if (!href) return <div className="shrink-0">{tile}</div>;
+  return (
+    <Link
+      href={href}
+      className="shrink-0"
+      aria-label={`Open episode: ${title}`}
+    >
+      {tile}
+    </Link>
+  );
 }
 
 function StatusIcon({ status }: { status?: SummaryStatus | null }) {
@@ -101,27 +145,12 @@ export function EpisodeCard({
       <CardContent className="p-4">
         <div className="flex gap-4">
           {artwork !== undefined && (
-            <Link
+            <ArtworkTile
               href={href}
-              className="shrink-0"
-              aria-label={`Open episode: ${title}`}
-            >
-              <div className="relative h-20 w-20 overflow-hidden rounded-lg bg-muted">
-                {artwork ? (
-                  <Image
-                    src={artwork}
-                    alt={podcastTitle}
-                    fill
-                    className="object-cover"
-                    sizes="80px"
-                  />
-                ) : (
-                  <div className="flex h-full w-full items-center justify-center text-muted-foreground">
-                    <Rss className="h-8 w-8" aria-hidden="true" />
-                  </div>
-                )}
-              </div>
-            </Link>
+              title={title}
+              artwork={artwork}
+              podcastTitle={podcastTitle}
+            />
           )}
 
           <div className="min-w-0 flex-1">
@@ -139,11 +168,15 @@ export function EpisodeCard({
                     {podcastTitle}
                   </p>
                 )}
-                <Link href={href} className="block">
-                  <h3 className="line-clamp-2 font-semibold group-hover:text-primary">
-                    {title}
-                  </h3>
-                </Link>
+                {href ? (
+                  <Link href={href} className="block">
+                    <h3 className="line-clamp-2 font-semibold group-hover:text-primary">
+                      {title}
+                    </h3>
+                  </Link>
+                ) : (
+                  <h3 className="line-clamp-2 font-semibold">{title}</h3>
+                )}
               </div>
               <div className="flex shrink-0 items-center gap-1.5">
                 <StatusIcon status={status} />
