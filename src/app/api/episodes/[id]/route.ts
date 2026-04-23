@@ -5,6 +5,7 @@ import { db } from "@/db";
 import { episodes } from "@/db/schema";
 import { getEpisodeById, getPodcastById } from "@/lib/podcastindex";
 import { createRateLimitChecker } from "@/lib/rate-limit";
+import { parseScoreOrNull } from "@/lib/score-utils";
 
 const PUBLIC_CACHE_CONTROL = "public, s-maxage=300, stale-while-revalidate=600";
 const checkPublicEpisodeRateLimit = createRateLimitChecker({
@@ -144,9 +145,7 @@ export async function GET(
         summary = {
           summary: dbEpisode.summary,
           keyTakeaways: dbEpisode.keyTakeaways || [],
-          worthItScore: dbEpisode.worthItScore
-            ? parseFloat(dbEpisode.worthItScore)
-            : null,
+          worthItScore: parseScoreOrNull(dbEpisode.worthItScore),
           worthItReason: dbEpisode.worthItReason ?? undefined,
           worthItDimensions: dbEpisode.worthItDimensions ?? null,
         };
@@ -242,9 +241,7 @@ export async function GET(
         summary = {
           summary: cachedEpisode.summary,
           keyTakeaways: cachedEpisode.keyTakeaways || [],
-          worthItScore: cachedEpisode.worthItScore
-            ? parseFloat(cachedEpisode.worthItScore)
-            : null,
+          worthItScore: parseScoreOrNull(cachedEpisode.worthItScore),
           worthItReason: cachedEpisode.worthItReason ?? undefined,
           worthItDimensions: cachedEpisode.worthItDimensions ?? null,
         };

@@ -137,6 +137,15 @@ describe("EpisodeCard", () => {
     expect(scoreContainer).toHaveClass("text-score-below-text");
   });
 
+  it("maps very low score (< 2) to the skip band", () => {
+    render(
+      <EpisodeCard episode={mockEpisode} summaryStatus="completed" worthItScore="1.50" />
+    );
+    const scoreContainer = screen.getByText("1.5").closest("[data-score-band]");
+    expect(scoreContainer).toHaveAttribute("data-score-band", "skip");
+    expect(scoreContainer).toHaveClass("text-score-skip-text");
+  });
+
   it("does not render score indicator without worthItScore", () => {
     render(<EpisodeCard episode={mockEpisode} />);
     expect(screen.queryByText(/^\d+\.\d$/)).not.toBeInTheDocument();

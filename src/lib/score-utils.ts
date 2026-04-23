@@ -102,6 +102,16 @@ export function parseScore(raw: string | null): number {
   return Number.isFinite(n) ? n : 0;
 }
 
+/**
+ * Like parseScore, but returns null for null/empty/non-finite input.
+ * Use at UI-ingress sites where "unrated" must stay distinguishable from "0".
+ */
+export function parseScoreOrNull(raw: string | null): number | null {
+  if (raw === null || raw === "") return null;
+  const n = parseFloat(raw);
+  return Number.isFinite(n) ? n : null;
+}
+
 /** Compute the worth-it score from boolean signals + adjustment. Range: [1, 10]. */
 export function computeSignalScore(signals: WorthItSignals, adjustment: number): number {
   const trueCount = WORTH_IT_SIGNAL_KEYS.filter((k) => signals[k]).length;

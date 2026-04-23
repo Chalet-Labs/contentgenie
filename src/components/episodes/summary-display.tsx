@@ -244,7 +244,7 @@ export function SummaryDisplay({
   return (
     <div className="space-y-6">
       {/* Worth-it Score */}
-      {worthItScore !== null && (
+      {worthItScore !== null && Number.isFinite(worthItScore) && (
         <Card>
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-lg">
