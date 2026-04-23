@@ -139,66 +139,66 @@ typography:
   display-hero:
     fontFamily: Inter
     fontSize: 60px
-    fontWeight: "700"
+    fontWeight: 700
     lineHeight: 60px
     letterSpacing: -0.025em
   display-hero-compact:
     fontFamily: Inter
     fontSize: 36px
-    fontWeight: "700"
+    fontWeight: 700
     lineHeight: 40px
     letterSpacing: -0.025em
   h1:
     fontFamily: Inter
     fontSize: 30px
-    fontWeight: "700"
+    fontWeight: 700
     lineHeight: 36px
     letterSpacing: -0.025em
   h2:
     fontFamily: Inter
     fontSize: 20px
-    fontWeight: "600"
+    fontWeight: 600
     lineHeight: 28px
     letterSpacing: -0.015em
   h3:
     fontFamily: Inter
     fontSize: 16px
-    fontWeight: "600"
+    fontWeight: 600
     lineHeight: 24px
   lead:
     fontFamily: Inter
     fontSize: 18px
-    fontWeight: "400"
+    fontWeight: 400
     lineHeight: 28px
   body-lg:
     fontFamily: Inter
     fontSize: 16px
-    fontWeight: "400"
+    fontWeight: 400
     lineHeight: 24px
   body:
     fontFamily: Inter
     fontSize: 14px
-    fontWeight: "400"
+    fontWeight: 400
     lineHeight: 20px
   body-strong:
     fontFamily: Inter
     fontSize: 14px
-    fontWeight: "600"
+    fontWeight: 600
     lineHeight: 20px
   muted:
     fontFamily: Inter
     fontSize: 14px
-    fontWeight: "400"
+    fontWeight: 400
     lineHeight: 20px
   small:
     fontFamily: Inter
     fontSize: 12px
-    fontWeight: "400"
+    fontWeight: 400
     lineHeight: 16px
   label:
     fontFamily: Inter
     fontSize: 14px
-    fontWeight: "500"
+    fontWeight: 500
     lineHeight: 14px
   button-label:
     # Button text uses the same 14/500 cut as form labels but with body
@@ -208,19 +208,19 @@ typography:
     # above an input.
     fontFamily: Inter
     fontSize: 14px
-    fontWeight: "500"
+    fontWeight: 500
     lineHeight: 20px
   eyebrow:
     fontFamily: Inter
     fontSize: 12px
-    fontWeight: "400"
+    fontWeight: 400
     lineHeight: 16px
     letterSpacing: 0.06em
     textTransform: uppercase
   mono:
     fontFamily: "ui-monospace, SF Mono, Menlo, Consolas, monospace"
     fontSize: 13px
-    fontWeight: "400"
+    fontWeight: 400
     lineHeight: 18px
 
 rounded:
