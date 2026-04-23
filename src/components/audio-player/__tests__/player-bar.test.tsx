@@ -400,6 +400,38 @@ describe("PlayerBar", () => {
       expect(mockAPI.seek).toHaveBeenNthCalledWith(3, fourChapters[3].startTime)
     })
 
+    it("clears the optimistic target when the live chapter index jumps to an intermediate chapter", async () => {
+      const fourChapters = [
+        { startTime: 0, title: "Intro" },
+        { startTime: 60, title: "Main" },
+        { startTime: 180, title: "Outro" },
+        { startTime: 300, title: "Credits" },
+      ]
+      const user = userEvent.setup()
+      mockState.isVisible = true
+      mockState.currentEpisode = testEpisode
+      mockState.chapters = fourChapters
+      mockProgress.currentTime = 1
+      Object.assign(mockChapterResult, { chapter: fourChapters[0], index: 0 })
+      const { rerender } = render(<PlayerBar />)
+
+      const next = screen.getByRole("button", { name: "Next chapter" })
+      await user.click(next)
+      await user.click(next)
+      expect(mockAPI.seek).toHaveBeenNthCalledWith(2, 180)
+
+      // Simulate a chapter-panel pick to chapter 1 mid-sequence: live index
+      // jumps from stale 0 to 1 without reaching the optimistic target (2).
+      mockProgress.currentTime = 60
+      Object.assign(mockChapterResult, { chapter: fourChapters[1], index: 1 })
+      rerender(<PlayerBar />)
+
+      await user.click(next)
+      // The optimistic target should have been cleared, so baseIdx uses live
+      // index 1 → next seeks to chapter[2] (180) again, not chapter[3] (300).
+      expect(mockAPI.seek).toHaveBeenLastCalledWith(180)
+    })
+
     it("clears the optimistic target when Prev is pressed between Next presses", async () => {
       const fourChapters = [
         { startTime: 0, title: "Intro" },

@@ -94,10 +94,12 @@ export function PlayerBar() {
       nextTargetRef.current = -1
       return
     }
-    // Live index moved backward (e.g. user picked a chapter from the panel) →
-    // drop the optimistic target so the next nav action starts from the new
-    // live position.
-    if (prev >= 0 && currentChapterIdx < prev) {
+    // Live index changed but is still behind the optimistic target: either the
+    // user manually seeked backward or selected an intermediate chapter (via
+    // the chapter panel). Rapid Next/Prev clicks batch into a single
+    // timeupdate, so any real index change under the target means the target
+    // is stale — drop it.
+    if (prev >= 0 && currentChapterIdx !== prev) {
       nextTargetRef.current = -1
     }
   }, [currentChapterIdx])
