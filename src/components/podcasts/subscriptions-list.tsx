@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -39,25 +39,55 @@ export function SubscriptionsList({
   const [pinOverrides, setPinOverrides] = useState<Record<number, boolean>>({});
   const [isPending, startTransition] = useTransition();
 
+  // Reconcile overrides against refreshed server props: drop any whose value
+  // now matches the authoritative `subscription.isPinned`. Keeping overrides
+  // that don't match yet covers the window between the server action resolving
+  // and `router.refresh()`'s RSC payload arriving.
+  useEffect(() => {
+    setPinOverrides((prev) => {
+      let changed = false;
+      const next: Record<number, boolean> = {};
+      for (const sub of subscriptions) {
+        if (Object.hasOwn(prev, sub.id)) {
+          if (prev[sub.id] === sub.isPinned) {
+            changed = true;
+            continue;
+          }
+          next[sub.id] = prev[sub.id];
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [subscriptions]);
+
   const handleSortChange = (next: string) => {
-    if (!SUBSCRIPTION_SORTS.includes(next as SubscriptionSort)) return;
+    if (!SUBSCRIPTION_SORTS.includes(next as SubscriptionSort)) {
+      console.warn("[SubscriptionsList] ignoring unknown sort", next);
+      return;
+    }
     const nextSort = next as SubscriptionSort;
     const prev = sort;
     setSort(nextSort);
     startTransition(async () => {
-      const result = await setSubscriptionSort(nextSort);
-      if (!result.success) {
+      try {
+        const result = await setSubscriptionSort(nextSort);
+        if (!result.success) {
+          setSort(prev);
+          toast.error(result.error ?? "Failed to update sort");
+          return;
+        }
+        router.refresh();
+      } catch (error) {
+        console.error("[SubscriptionsList] setSubscriptionSort threw", error);
         setSort(prev);
-        toast.error(result.error ?? "Failed to update sort");
-        return;
+        toast.error("Couldn't update sort. Check your connection and retry.");
       }
-      router.refresh();
     });
   };
 
   const clearOverride = (id: number) => {
     setPinOverrides((prev) => {
-      if (!(id in prev)) return prev;
+      if (!Object.hasOwn(prev, id)) return prev;
       const { [id]: _dropped, ...rest } = prev;
       return rest;
     });
@@ -67,13 +97,21 @@ export function SubscriptionsList({
     const optimistic = !currentPinned;
     setPinOverrides((prev) => ({ ...prev, [id]: optimistic }));
     startTransition(async () => {
-      const result = await togglePinSubscription(id);
-      if (!result.success) {
+      try {
+        const result = await togglePinSubscription(id);
+        if (!result.success) {
+          clearOverride(id);
+          toast.error(result.error ?? "Failed to toggle pin");
+          return;
+        }
+        // Refresh the RSC tree so `subscription.isPinned` catches up; the
+        // reconcile effect then drops the override once prop === override.
+        router.refresh();
+      } catch (error) {
+        console.error("[SubscriptionsList] togglePinSubscription threw", error);
         clearOverride(id);
-        toast.error(result.error ?? "Failed to toggle pin");
-        return;
+        toast.error("Couldn't update pin. Check your connection and retry.");
       }
-      clearOverride(id);
     });
   };
 
@@ -101,7 +139,6 @@ export function SubscriptionsList({
           return (
             <SubscriptionCard
               key={subscription.id}
-              subscriptionId={subscription.id}
               podcast={subscription.podcast}
               subscribedAt={subscription.subscribedAt}
               isPinned={displayedPinned}

@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { DEFAULT_SUBSCRIPTION_SORT } from "@/db/subscription-sorts";
 
 // Mock Clerk auth
 const mockAuth = vi.fn();
@@ -877,7 +878,7 @@ describe("getUserSubscriptionSort", () => {
     );
     const result = await getUserSubscriptionSort();
 
-    expect(result).toBe("recently-added");
+    expect(result).toBe(DEFAULT_SUBSCRIPTION_SORT);
     expect(mockFindFirstUser).not.toHaveBeenCalled();
   });
 
@@ -889,7 +890,7 @@ describe("getUserSubscriptionSort", () => {
     );
     const result = await getUserSubscriptionSort();
 
-    expect(result).toBe("recently-added");
+    expect(result).toBe(DEFAULT_SUBSCRIPTION_SORT);
     expect(mockFindFirstUser).toHaveBeenCalledTimes(1);
   });
 
@@ -914,6 +915,6 @@ describe("getUserSubscriptionSort", () => {
     );
     const result = await getUserSubscriptionSort();
 
-    expect(result).toBe("recently-added");
+    expect(result).toBe(DEFAULT_SUBSCRIPTION_SORT);
   });
 });

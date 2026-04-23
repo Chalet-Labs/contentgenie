@@ -161,7 +161,6 @@ describe("SubscriptionCard", () => {
         <SubscriptionCard
           podcast={mockPodcast}
           subscribedAt={subscribedAt}
-          subscriptionId={1}
           isPinned={false}
           onTogglePin={() => {}}
         />
@@ -175,7 +174,6 @@ describe("SubscriptionCard", () => {
         <SubscriptionCard
           podcast={mockPodcast}
           subscribedAt={subscribedAt}
-          subscriptionId={1}
           isPinned={true}
           onTogglePin={() => {}}
         />
@@ -190,7 +188,6 @@ describe("SubscriptionCard", () => {
         <SubscriptionCard
           podcast={mockPodcast}
           subscribedAt={subscribedAt}
-          subscriptionId={1}
           isPinned={false}
           onTogglePin={onTogglePin}
         />
@@ -207,7 +204,6 @@ describe("SubscriptionCard", () => {
           <SubscriptionCard
             podcast={mockPodcast}
             subscribedAt={subscribedAt}
-            subscriptionId={1}
             isPinned={false}
             onTogglePin={() => {}}
           />

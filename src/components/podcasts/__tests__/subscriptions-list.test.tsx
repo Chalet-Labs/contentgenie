@@ -11,10 +11,32 @@ import {
 vi.mock("@/app/actions/subscriptions", () => ({
   setSubscriptionSort: vi.fn(),
   togglePinSubscription: vi.fn(),
-  // Child card pulls unsubscribeFromPodcast via SubscribeButton → also mocked here.
+  // SubscribeButton → @/lib/offline-actions → these server actions. Stubbing
+  // the action module short-circuits the whole chain so the child card renders
+  // without pulling a real DB call.
   subscribeToPodcast: vi.fn().mockResolvedValue({ success: true }),
   unsubscribeFromPodcast: vi.fn().mockResolvedValue({ success: true }),
 }));
+
+// Stable `router.refresh` spy — `src/test/setup.ts` returns a fresh vi.fn()
+// per call, so we override `useRouter` locally to capture calls across renders.
+const routerRefreshMock = vi.fn();
+vi.mock("next/navigation", async () => {
+  const actual = await vi.importActual<typeof import("next/navigation")>(
+    "next/navigation",
+  );
+  return {
+    ...actual,
+    useRouter: () => ({
+      refresh: routerRefreshMock,
+      push: vi.fn(),
+      replace: vi.fn(),
+      back: vi.fn(),
+      forward: vi.fn(),
+      prefetch: vi.fn(),
+    }),
+  };
+});
 
 vi.mock("@/hooks/use-sync-queue", () => ({
   useSyncQueue: () => ({ hasPending: () => false, hasFailed: () => false }),
@@ -31,6 +53,7 @@ vi.mock("@/components/ui/select", () => {
     value,
     onValueChange,
     children,
+    disabled,
   }: {
     value: string;
     onValueChange: (next: string) => void;
@@ -40,6 +63,7 @@ vi.mock("@/components/ui/select", () => {
     <select
       data-testid="sort-select"
       value={value}
+      disabled={disabled}
       onChange={(e) => onValueChange(e.currentTarget.value)}
     >
       {children}
@@ -100,6 +124,7 @@ describe("SubscriptionsList", () => {
     setSubscriptionSortMock.mockReset();
     togglePinSubscriptionMock.mockReset();
     toastError.mockReset();
+    routerRefreshMock.mockReset();
   });
 
   it("renders one card per subscription", () => {
@@ -113,7 +138,7 @@ describe("SubscriptionsList", () => {
     expect(screen.getByText("Podcast 2")).toBeInTheDocument();
   });
 
-  it("persists the new sort when the dropdown changes", async () => {
+  it("persists the new sort and refreshes the route on success", async () => {
     setSubscriptionSortMock.mockResolvedValue({ success: true });
     render(
       <SubscriptionsList
@@ -129,6 +154,26 @@ describe("SubscriptionsList", () => {
         "title-asc",
       );
     });
+    await waitFor(() => {
+      expect(routerRefreshMock).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it("rolls back the dropdown and toasts when setSubscriptionSort rejects", async () => {
+    setSubscriptionSortMock.mockRejectedValue(new Error("network"));
+    render(
+      <SubscriptionsList
+        subscriptions={[makeSub(1)]}
+        initialSort="recently-added"
+      />,
+    );
+    const select = screen.getByTestId("sort-select") as HTMLSelectElement;
+    fireEvent.change(select, { target: { value: "latest-episode" } });
+    await waitFor(() => {
+      expect(toastError).toHaveBeenCalled();
+    });
+    expect(select.value).toBe("recently-added");
+    expect(routerRefreshMock).not.toHaveBeenCalled();
   });
 
   it("rolls back the dropdown and toasts when setSubscriptionSort fails", async () => {
@@ -150,7 +195,7 @@ describe("SubscriptionsList", () => {
     expect(select.value).toBe("recently-added");
   });
 
-  it("optimistically flips the pin state when the pin button is clicked", async () => {
+  it("optimistically flips the pin state and refreshes the route on success", async () => {
     togglePinSubscriptionMock.mockImplementation(
       () =>
         new Promise((resolve) =>
@@ -177,9 +222,41 @@ describe("SubscriptionsList", () => {
     await waitFor(() => {
       expect(togglePinSubscriptionMock).toHaveBeenCalledExactlyOnceWith(1);
     });
+    // Server confirmed → route refreshed so RSC props catch up.
+    await waitFor(() => {
+      expect(routerRefreshMock).toHaveBeenCalledTimes(1);
+    });
   });
 
-  it("reverts the optimistic pin state and toasts when togglePinSubscription fails", async () => {
+  it("reconciles the override against the refreshed `subscription.isPinned` prop", async () => {
+    togglePinSubscriptionMock.mockResolvedValue({
+      success: true,
+      data: { isPinned: true },
+    });
+    const { rerender } = render(
+      <SubscriptionsList
+        subscriptions={[makeSub(1, { isPinned: false })]}
+        initialSort="recently-added"
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Pin podcast" }));
+    await waitFor(() => {
+      expect(routerRefreshMock).toHaveBeenCalledTimes(1);
+    });
+    // Simulate the refreshed RSC payload arriving with the server's new truth.
+    rerender(
+      <SubscriptionsList
+        subscriptions={[makeSub(1, { isPinned: true })]}
+        initialSort="recently-added"
+      />,
+    );
+    // Override is reconciled, prop wins — displayed state tracks the server.
+    expect(
+      screen.getByRole("button", { name: "Unpin podcast" }),
+    ).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("reverts the optimistic pin state and toasts when togglePinSubscription returns {success:false}", async () => {
     togglePinSubscriptionMock.mockResolvedValue({
       success: false,
       error: "pin failed",
@@ -194,9 +271,27 @@ describe("SubscriptionsList", () => {
     await waitFor(() => {
       expect(toastError).toHaveBeenCalledWith("pin failed");
     });
-    // Reverted to unpinned label.
     expect(
       screen.getByRole("button", { name: "Pin podcast" }),
     ).toHaveAttribute("aria-pressed", "false");
+    expect(routerRefreshMock).not.toHaveBeenCalled();
+  });
+
+  it("reverts the optimistic pin state and toasts when togglePinSubscription rejects", async () => {
+    togglePinSubscriptionMock.mockRejectedValue(new Error("network"));
+    render(
+      <SubscriptionsList
+        subscriptions={[makeSub(1, { isPinned: false })]}
+        initialSort="recently-added"
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Pin podcast" }));
+    await waitFor(() => {
+      expect(toastError).toHaveBeenCalled();
+    });
+    expect(
+      screen.getByRole("button", { name: "Pin podcast" }),
+    ).toHaveAttribute("aria-pressed", "false");
+    expect(routerRefreshMock).not.toHaveBeenCalled();
   });
 });

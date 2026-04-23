@@ -13,7 +13,6 @@ interface SubscriptionCardProps {
   // BOLT OPTIMIZATION: Allow partial podcast object to support selective column fetching
   podcast: Omit<Podcast, "description"> & { description?: string | null };
   subscribedAt: Date;
-  subscriptionId?: number;
   isPinned?: boolean;
   onTogglePin?: () => void;
 }
