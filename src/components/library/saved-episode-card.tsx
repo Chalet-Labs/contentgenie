@@ -1,12 +1,8 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import Link from "next/link";
-import Image from "next/image";
 import { toast } from "sonner";
-import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { WorthItBadge } from "@/components/episodes/worth-it-badge";
 import { Button } from "@/components/ui/button";
 import {
   Collapsible,
@@ -16,7 +12,6 @@ import {
 import {
   Clock,
   Calendar,
-  Rss,
   Trash2,
   Loader2,
   Folder,
@@ -28,6 +23,7 @@ import {
 import { removeEpisodeFromLibrary, updateLibraryRating } from "@/app/actions/library";
 import { useSidebarCountsOptional } from "@/contexts/sidebar-counts-context";
 import { ListenedButton } from "@/components/episodes/listened-button";
+import { EpisodeCard } from "@/components/episodes/episode-card";
 import { MoveToCollection } from "./move-to-collection";
 import { NotesEditor } from "./notes-editor";
 import { BookmarksList } from "./bookmarks-list";
@@ -43,8 +39,13 @@ interface SavedEpisodeCardProps {
   isListened?: boolean;
 }
 
-
-export function SavedEpisodeCard({ item, onRemoved, onCollectionChanged, isOffline, isListened = false }: SavedEpisodeCardProps) {
+export function SavedEpisodeCard({
+  item,
+  onRemoved,
+  onCollectionChanged,
+  isOffline,
+  isListened = false,
+}: SavedEpisodeCardProps) {
   const [isRemoving, setIsRemoving] = useState(false);
   const [isPending, startTransition] = useTransition();
   const [isExpanded, setIsExpanded] = useState(false);
@@ -75,189 +76,155 @@ export function SavedEpisodeCard({ item, onRemoved, onCollectionChanged, isOffli
     });
   };
 
-  const worthItScore = episode.worthItScore ? parseFloat(episode.worthItScore) : null;
+  const meta = [
+    ...(episode.publishDate
+      ? [
+          <div key="date" className="flex items-center gap-1">
+            <Calendar className="h-3 w-3" />
+            <span>{formatDate(episode.publishDate)}</span>
+          </div>,
+        ]
+      : []),
+    ...(episode.duration && episode.duration > 0
+      ? [
+          <div key="duration" className="flex items-center gap-1">
+            <Clock className="h-3 w-3" />
+            <span>{formatDuration(episode.duration)}</span>
+          </div>,
+        ]
+      : []),
+    ...(hasNotes
+      ? [
+          <div key="notes" className="flex items-center gap-1 text-primary">
+            <StickyNote className="h-3 w-3" />
+            <span>Has notes</span>
+          </div>,
+        ]
+      : []),
+    ...(item.rating
+      ? [
+          <div key="rating" className="flex items-center gap-1 text-brand">
+            <Star className="h-3 w-3 fill-current" />
+            <span>{item.rating}/5</span>
+          </div>,
+        ]
+      : []),
+    <span key="saved">Saved {formatDate(item.savedAt)}</span>,
+    ...(collection
+      ? [
+          <Badge key="collection" variant="outline" className="text-xs">
+            <Folder className="mr-1 h-3 w-3" />
+            {collection.name}
+          </Badge>,
+        ]
+      : []),
+  ];
+
+  const secondaryActions = (
+    <>
+      {!isOffline && (
+        <ListenedButton
+          podcastIndexEpisodeId={episode.podcastIndexId}
+          isListened={isListened}
+        />
+      )}
+      <CollapsibleTrigger asChild>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-8 px-2 text-muted-foreground"
+        >
+          {isExpanded ? (
+            <ChevronUp className="h-4 w-4" />
+          ) : (
+            <ChevronDown className="h-4 w-4" />
+          )}
+          <span className="ml-1 text-xs">{isExpanded ? "Less" : "More"}</span>
+        </Button>
+      </CollapsibleTrigger>
+      {!isOffline && (
+        <MoveToCollection
+          libraryEntryId={item.id}
+          currentCollectionId={item.collectionId}
+          onMoved={onCollectionChanged}
+        />
+      )}
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={handleRemove}
+        disabled={isPending || isRemoving || isOffline}
+        className="h-8 px-2 text-muted-foreground hover:text-destructive"
+        title={isOffline ? "Unavailable offline" : undefined}
+      >
+        {isPending || isRemoving ? (
+          <Loader2 className="h-4 w-4 animate-spin" />
+        ) : (
+          <Trash2 className="h-4 w-4" />
+        )}
+      </Button>
+    </>
+  );
 
   return (
     <Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
-      <Card className="transition-colors hover:bg-accent/50">
-        <CardContent className="p-4">
-          <div className="flex gap-4">
-            {/* Podcast artwork */}
-            <Link
-              href={`/episode/${episode.podcastIndexId}`}
-              className="shrink-0"
-            >
-              <div className="relative h-20 w-20 overflow-hidden rounded-lg bg-muted">
-                {podcast.imageUrl ? (
-                  <Image
-                    src={podcast.imageUrl}
-                    alt={podcast.title}
-                    fill
-                    className="object-cover"
-                    sizes="80px"
-                  />
-                ) : (
-                  <div className="flex h-full w-full items-center justify-center text-muted-foreground">
-                    <Rss className="h-8 w-8" />
-                  </div>
-                )}
+      <EpisodeCard
+        artwork={podcast.imageUrl}
+        podcastTitle={podcast.title}
+        podcastHref={`/podcast/${podcast.podcastIndexId}?from=library`}
+        title={episode.title}
+        href={`/episode/${episode.podcastIndexId}`}
+        description={
+          episode.description ? stripHtml(episode.description) : undefined
+        }
+        score={episode.worthItScore}
+        meta={meta}
+        secondaryActions={secondaryActions}
+        accent="none"
+        isListened={isListened}
+      />
+      <CollapsibleContent>
+        <div className="mt-1 space-y-4 rounded-b-lg border border-t-0 p-4">
+          {!isOffline && (
+            <>
+              <div>
+                <h4 className="mb-2 text-sm font-medium">Your Rating</h4>
+                <RatingInput
+                  initialRating={item.rating}
+                  onRatingChange={async (rating) => {
+                    return await updateLibraryRating(
+                      episode.podcastIndexId,
+                      rating
+                    );
+                  }}
+                  size="md"
+                  showLabel={true}
+                />
               </div>
-            </Link>
-
-            {/* Episode info */}
-            <div className="min-w-0 flex-1">
-              <Link href={`/episode/${episode.podcastIndexId}`}>
-                <h3 className="line-clamp-1 font-semibold hover:text-primary">
-                  {episode.title}
-                </h3>
-              </Link>
-              <Link
-                href={`/podcast/${podcast.podcastIndexId}?from=library`}
-                className="text-sm text-muted-foreground hover:text-primary"
-              >
-                {podcast.title}
-              </Link>
-
-              {episode.description && (
-                <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
-                  {stripHtml(episode.description)}
-                </p>
-              )}
-
-              {/* Metadata row */}
-              <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                {episode.publishDate && (
-                  <div className="flex items-center gap-1">
-                    <Calendar className="h-3 w-3" />
-                    <span>{formatDate(episode.publishDate)}</span>
-                  </div>
-                )}
-                {episode.duration && episode.duration > 0 && (
-                  <div className="flex items-center gap-1">
-                    <Clock className="h-3 w-3" />
-                    <span>{formatDuration(episode.duration)}</span>
-                  </div>
-                )}
-                {worthItScore !== null && (
-                  <WorthItBadge score={worthItScore} />
-                )}
-                {hasNotes && (
-                  <div className="flex items-center gap-1 text-primary">
-                    <StickyNote className="h-3 w-3" />
-                    <span>Has notes</span>
-                  </div>
-                )}
-                {item.rating && (
-                  <div className="flex items-center gap-1 text-brand">
-                    <Star className="h-3 w-3 fill-current" />
-                    <span>{item.rating}/5</span>
-                  </div>
-                )}
-              </div>
-
-              {/* Saved date, collection, and actions */}
-              <div className="mt-2 flex items-center justify-between">
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <span>Saved {formatDate(item.savedAt)}</span>
-                  {collection && (
-                    <Badge variant="outline" className="text-xs">
-                      <Folder className="mr-1 h-3 w-3" />
-                      {collection.name}
-                    </Badge>
-                  )}
-                </div>
-                <div className="flex items-center gap-1">
-                  {!isOffline && (
-                    <ListenedButton
-                      podcastIndexEpisodeId={episode.podcastIndexId}
-                      isListened={isListened}
-                    />
-                  )}
-                  <CollapsibleTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 px-2 text-muted-foreground"
-                    >
-                      {isExpanded ? (
-                        <ChevronUp className="h-4 w-4" />
-                      ) : (
-                        <ChevronDown className="h-4 w-4" />
-                      )}
-                      <span className="ml-1 text-xs">
-                        {isExpanded ? "Less" : "More"}
-                      </span>
-                    </Button>
-                  </CollapsibleTrigger>
-                  {!isOffline && (
-                    <MoveToCollection
-                      libraryEntryId={item.id}
-                      currentCollectionId={item.collectionId}
-                      onMoved={onCollectionChanged}
-                    />
-                  )}
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleRemove}
-                    disabled={isPending || isRemoving || isOffline}
-                    className="h-8 px-2 text-muted-foreground hover:text-destructive"
-                    title={isOffline ? "Unavailable offline" : undefined}
-                  >
-                    {isPending || isRemoving ? (
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                    ) : (
-                      <Trash2 className="h-4 w-4" />
-                    )}
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Expandable notes, rating, and bookmarks section */}
-          <CollapsibleContent>
-            <div className="mt-4 space-y-4 border-t pt-4">
-              {!isOffline && (
-                <>
-                  {/* Your Rating */}
-                  <div>
-                    <h4 className="mb-2 text-sm font-medium">Your Rating</h4>
-                    <RatingInput
-                      initialRating={item.rating}
-                      onRatingChange={async (rating) => {
-                        return await updateLibraryRating(episode.podcastIndexId, rating);
-                      }}
-                      size="md"
-                      showLabel={true}
-                    />
-                  </div>
-                  <NotesEditor
-                    episodePodcastIndexId={episode.podcastIndexId}
-                    initialNotes={item.notes || ""}
-                  />
-                  <BookmarksList
-                    libraryEntryId={item.id}
-                    episodeDuration={episode.duration}
-                    episodeAudioData={
-                      episode.audioUrl
-                        ? {
-                            podcastIndexId: episode.podcastIndexId,
-                            title: episode.title,
-                            podcastTitle: podcast.title,
-                            audioUrl: episode.audioUrl,
-                            artwork: podcast.imageUrl || undefined,
-                            duration: episode.duration || undefined,
-                          }
-                        : undefined
-                    }
-                  />
-                </>
-              )}
-            </div>
-          </CollapsibleContent>
-        </CardContent>
-      </Card>
+              <NotesEditor
+                episodePodcastIndexId={episode.podcastIndexId}
+                initialNotes={item.notes || ""}
+              />
+              <BookmarksList
+                libraryEntryId={item.id}
+                episodeDuration={episode.duration}
+                episodeAudioData={
+                  episode.audioUrl
+                    ? {
+                        podcastIndexId: episode.podcastIndexId,
+                        title: episode.title,
+                        podcastTitle: podcast.title,
+                        audioUrl: episode.audioUrl,
+                        artwork: podcast.imageUrl || undefined,
+                        duration: episode.duration || undefined,
+                      }
+                    : undefined
+                }
+              />
+            </>
+          )}
+        </div>
+      </CollapsibleContent>
     </Collapsible>
   );
 }

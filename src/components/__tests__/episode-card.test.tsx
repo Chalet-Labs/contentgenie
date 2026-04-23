@@ -3,6 +3,29 @@ import { render, screen } from "@testing-library/react";
 import { EpisodeCard } from "@/components/podcasts/episode-card";
 import type { PodcastIndexEpisode } from "@/lib/podcastindex";
 
+vi.mock("next/image", () => ({
+  default: ({ src, alt }: { src: string; alt: string }) => (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src={src} alt={alt} />
+  ),
+}));
+
+vi.mock("next/link", () => ({
+  default: ({
+    href,
+    children,
+    className,
+  }: {
+    href: string;
+    children: React.ReactNode;
+    className?: string;
+  }) => (
+    <a href={href} className={className}>
+      {children}
+    </a>
+  ),
+}));
+
 vi.mock("@/app/actions/listen-history", () => ({
   recordListenEvent: vi.fn().mockResolvedValue({ success: true }),
   getListenedEpisodeIds: vi.fn().mockResolvedValue(new Set()),
@@ -39,7 +62,7 @@ const mockEpisode: PodcastIndexEpisode = {
   transcripts: [],
 };
 
-describe("EpisodeCard", () => {
+describe("EpisodeCard (podcasts wrapper)", () => {
   it("renders episode title", () => {
     render(<EpisodeCard episode={mockEpisode} />);
     expect(screen.getByText("Test Episode Title")).toBeInTheDocument();
@@ -65,8 +88,9 @@ describe("EpisodeCard", () => {
 
   it("links to episode detail page", () => {
     render(<EpisodeCard episode={mockEpisode} />);
-    const link = screen.getByRole("link");
-    expect(link).toHaveAttribute("href", "/episode/789");
+    const links = screen.getAllByRole("link");
+    const hrefs = links.map((l) => l.getAttribute("href"));
+    expect(hrefs).toContain("/episode/789");
   });
 
   it("does not show episode type badge for 'full' episodes", () => {
@@ -89,7 +113,7 @@ describe("EpisodeCard", () => {
     expect(screen.getByText("Season 2")).toBeInTheDocument();
   });
 
-  it("handles missing description", () => {
+  it("handles missing description with fallback text", () => {
     render(
       <EpisodeCard episode={{ ...mockEpisode, description: "" }} />
     );
@@ -98,62 +122,32 @@ describe("EpisodeCard", () => {
     ).toBeInTheDocument();
   });
 
-  it("shows left border accent when summaryStatus is completed", () => {
-    const { container } = render(
-      <EpisodeCard episode={mockEpisode} summaryStatus="completed" />
-    );
-    const card = container.querySelector("[class*='border-l-2']");
-    expect(card).toBeInTheDocument();
-    expect(card).toHaveClass("border-primary");
-  });
-
-  it("does not show left border accent without summaryStatus", () => {
-    const { container } = render(
-      <EpisodeCard episode={mockEpisode} />
-    );
-    const card = container.querySelector("[class*='border-l-2']");
-    expect(card).not.toBeInTheDocument();
-  });
-
-  it("maps high score (>= 8) to the exceptional band", () => {
+  it("renders score pill when worthItScore is provided", () => {
     render(
       <EpisodeCard episode={mockEpisode} summaryStatus="completed" worthItScore="8.50" />
     );
-    const scoreContainer = screen.getByText("8.5").closest("[data-score-band]");
-    expect(scoreContainer).toHaveAttribute("data-score-band", "exceptional");
-    expect(scoreContainer).toHaveClass("text-score-exceptional-text");
+    expect(screen.getByText(/8\.5/)).toBeInTheDocument();
   });
 
-  it("maps mid score (6–7.99) to the above band", () => {
-    render(
-      <EpisodeCard episode={mockEpisode} summaryStatus="completed" worthItScore="6.00" />
-    );
-    const scoreContainer = screen.getByText("6.0").closest("[data-score-band]");
-    expect(scoreContainer).toHaveAttribute("data-score-band", "above");
-    expect(scoreContainer).toHaveClass("text-score-above-text");
-  });
-
-  it("maps low score (2–3.99) to the below band", () => {
-    render(
-      <EpisodeCard episode={mockEpisode} summaryStatus="completed" worthItScore="3.50" />
-    );
-    const scoreContainer = screen.getByText("3.5").closest("[data-score-band]");
-    expect(scoreContainer).toHaveAttribute("data-score-band", "below");
-    expect(scoreContainer).toHaveClass("text-score-below-text");
-  });
-
-  it("maps very low score (< 2) to the skip band", () => {
-    render(
-      <EpisodeCard episode={mockEpisode} summaryStatus="completed" worthItScore="1.50" />
-    );
-    const scoreContainer = screen.getByText("1.5").closest("[data-score-band]");
-    expect(scoreContainer).toHaveAttribute("data-score-band", "skip");
-    expect(scoreContainer).toHaveClass("text-score-skip-text");
-  });
-
-  it("does not render score indicator without worthItScore", () => {
+  it("does not render score pill without worthItScore", () => {
     render(<EpisodeCard episode={mockEpisode} />);
     expect(screen.queryByText(/^\d+\.\d$/)).not.toBeInTheDocument();
+  });
+
+  it("renders processing spinner for running status", () => {
+    render(<EpisodeCard episode={mockEpisode} summaryStatus="running" />);
+    expect(screen.getByLabelText("Processing")).toBeInTheDocument();
+  });
+
+  it("renders failed icon for failed status", () => {
+    render(<EpisodeCard episode={mockEpisode} summaryStatus="failed" />);
+    expect(screen.getByLabelText("Summary failed")).toBeInTheDocument();
+  });
+
+  it("renders no status icon for completed status", () => {
+    render(<EpisodeCard episode={mockEpisode} summaryStatus="completed" worthItScore="7.0" />);
+    expect(screen.queryByLabelText("Processing")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Summary failed")).not.toBeInTheDocument();
   });
 
   it("renders unlistened button by default", () => {

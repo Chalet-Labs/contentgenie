@@ -28,6 +28,7 @@ vi.mock("@/app/actions/notifications", () => ({
 }));
 
 const mockAddToQueue = vi.fn();
+const mockPlayEpisode = vi.fn();
 // Mutable state the mock factory reads on each render — lets individual tests
 // seed a non-empty queue before rendering without resorting to vi.doMock, which
 // does not retroactively re-bind statically imported modules.
@@ -36,7 +37,7 @@ let mockPlayerState: {
   currentEpisode: unknown;
 } = { queue: [], currentEpisode: null };
 vi.mock("@/contexts/audio-player-context", () => ({
-  useAudioPlayerAPI: () => ({ addToQueue: mockAddToQueue }),
+  useAudioPlayerAPI: () => ({ addToQueue: mockAddToQueue, playEpisode: mockPlayEpisode }),
   useAudioPlayerState: () => mockPlayerState,
 }));
 
@@ -76,6 +77,7 @@ const defaultProps = {
 describe("NotificationPageList", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockPlayEpisode.mockImplementation(() => {});
     mockPlayerState = { queue: [], currentEpisode: null };
     mockDismissNotification.mockResolvedValue({ success: true });
     mockMarkNotificationRead.mockResolvedValue({ success: true });
@@ -231,20 +233,35 @@ describe("NotificationPageList", () => {
     expect(mockMarkAllNotificationsRead).not.toHaveBeenCalled();
   });
 
-  // AC-14: row click calls markNotificationRead when unread, then navigates
-  it("row click calls markNotificationRead if unread then navigates", async () => {
+  // AC-14: Listen click calls markNotificationRead when unread, then plays episode
+  it("Listen click calls markNotificationRead if unread then plays episode", async () => {
     const user = userEvent.setup();
     render(<NotificationPageList {...defaultProps} />);
-    const titleLinks = screen.getAllByRole("button", { name: /test episode|new episode/i });
-    await user.click(titleLinks[0]);
+    const listenBtns = screen.getAllByRole("button", { name: /listen/i });
+    await user.click(listenBtns[0]);
     await waitFor(() => {
       expect(mockMarkNotificationRead).toHaveBeenCalledWith(1);
-      expect(mockPush).toHaveBeenCalledWith("/episode/PI-42");
+      expect(mockPlayEpisode).toHaveBeenCalled();
     });
+    expect(mockPush).not.toHaveBeenCalled();
   });
 
-  // AC-14: row click on already-read item skips markNotificationRead
-  it("row click on read item skips markNotificationRead", async () => {
+  // Regression: Listen click must NOT navigate away from the notifications page.
+  // Legacy behavior routed to the episode page; the dedicated Listen CTA is an
+  // in-place action so users can keep triaging while audio plays.
+  it("Listen click does NOT call router.push", async () => {
+    const user = userEvent.setup();
+    render(<NotificationPageList {...defaultProps} />);
+    const listenBtns = screen.getAllByRole("button", { name: /listen/i });
+    await user.click(listenBtns[0]);
+    await waitFor(() => {
+      expect(mockPlayEpisode).toHaveBeenCalled();
+    });
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  // AC-14: Listen click on already-read item skips markNotificationRead
+  it("Listen click on read item skips markNotificationRead", async () => {
     const user = userEvent.setup();
     render(
       <NotificationPageList
@@ -253,12 +270,57 @@ describe("NotificationPageList", () => {
         initialTopicsByEpisode={{}}
       />
     );
-    const titleLinks = screen.getAllByRole("button", { name: /test episode|new episode/i });
-    await user.click(titleLinks[0]);
+    const listenBtns = screen.getAllByRole("button", { name: /listen/i });
+    await user.click(listenBtns[0]);
     await waitFor(() => {
       expect(mockMarkNotificationRead).not.toHaveBeenCalled();
-      expect(mockPush).toHaveBeenCalledWith("/episode/PI-42");
+      expect(mockPlayEpisode).toHaveBeenCalled();
     });
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  // Primary-action fallback: when audioUrl is missing but episode id is present,
+  // show "View episode" outline button that navigates (no playback).
+  // Also locks the read-on-navigate side effect for the fallback path.
+  it("shows View-episode CTA when audioUrl is null and routes via onRowClick", async () => {
+    const user = userEvent.setup();
+    render(
+      <NotificationPageList
+        initialItems={[
+          makeItem({ id: 1, isRead: false, audioUrl: null }),
+        ]}
+        initialHasMore={false}
+        initialTopicsByEpisode={{}}
+      />
+    );
+    const viewBtn = screen.getByRole("button", { name: /view episode/i });
+    await user.click(viewBtn);
+    await waitFor(() => {
+      expect(mockPush).toHaveBeenCalledWith(expect.stringContaining("PI-42"));
+      expect(mockMarkNotificationRead).toHaveBeenCalledWith(1);
+    });
+    expect(mockPlayEpisode).not.toHaveBeenCalled();
+  });
+
+  // Primary-action hidden: when episodePodcastIndexId is missing (data-integrity
+  // contract violation upstream), neither Listen nor View-episode is rendered —
+  // we don't silently route to the dashboard.
+  it("hides primary action when episodePodcastIndexId is null", () => {
+    render(
+      <NotificationPageList
+        initialItems={[
+          makeItem({ id: 1, episodePodcastIndexId: null, audioUrl: null }),
+        ]}
+        initialHasMore={false}
+        initialTopicsByEpisode={{}}
+      />
+    );
+    expect(
+      screen.queryByRole("button", { name: /^listen$/i })
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /view episode/i })
+    ).not.toBeInTheDocument();
   });
 
   // Load more: calls getNotifications with next offset
@@ -351,8 +413,8 @@ describe("NotificationPageList", () => {
     });
   });
 
-  // Regression: row click does NOT mark local as read when server action fails
-  it("row click does NOT flip local isRead when markNotificationRead fails", async () => {
+  // Regression: Listen click does NOT mark local as read when server action fails
+  it("Listen click does NOT flip local isRead when markNotificationRead fails", async () => {
     mockMarkNotificationRead.mockResolvedValue({
       success: false,
       error: "Notification not found",
@@ -363,15 +425,15 @@ describe("NotificationPageList", () => {
     const unreadRow = screen.getAllByRole("article")[0];
     expect(unreadRow).toHaveAttribute("data-read", "false");
 
-    const titleBtns = screen.getAllByRole("button", { name: /test episode|new episode/i });
-    await user.click(titleBtns[0]);
+    const listenBtns = screen.getAllByRole("button", { name: /listen/i });
+    await user.click(listenBtns[0]);
 
     await waitFor(() => {
       expect(mockMarkNotificationRead).toHaveBeenCalledWith(1);
-      expect(mockPush).toHaveBeenCalledWith("/episode/PI-42");
     });
     // Row should still render as unread because server rejected
     expect(screen.getAllByRole("article")[0]).toHaveAttribute("data-read", "false");
+    expect(mockPush).not.toHaveBeenCalled();
   });
 
   // Regression: Load more fetch failure preserves hasMore and surfaces toast with Retry
@@ -425,20 +487,36 @@ describe("NotificationPageList", () => {
     expect(screen.getAllByRole("article")[0]).toHaveAttribute("data-read", "false");
   });
 
-  // Regression: row click that throws still navigates and toasts (not silent)
-  it("row click that throws still navigates and surfaces a toast", async () => {
+  // Regression: Listen click that throws still plays and toasts (not silent)
+  it("Listen click that throws still plays episode and surfaces a toast", async () => {
     mockMarkNotificationRead.mockRejectedValue(new Error("network"));
     const user = userEvent.setup();
     render(<NotificationPageList {...defaultProps} />);
 
-    const titleBtns = screen.getAllByRole("button", { name: /test episode|new episode/i });
-    await user.click(titleBtns[0]);
+    const listenBtns = screen.getAllByRole("button", { name: /listen/i });
+    await user.click(listenBtns[0]);
 
     await waitFor(() => {
       expect(mockToastError).toHaveBeenCalledWith(
-        expect.stringMatching(/couldn't mark as read|couldn’t mark as read/i)
+        expect.stringMatching(/couldn.t mark as read/i)
       );
-      expect(mockPush).toHaveBeenCalledWith("/episode/PI-42");
+      expect(mockPlayEpisode).toHaveBeenCalled();
+    });
+    expect(mockPush).not.toHaveBeenCalled();
+  });
+
+  // Regression (Gemini review): clicking the title link marks the notification
+  // as read so navigation via the primary nav target doesn't leave unread state
+  // behind. Legacy row-level onClick handled this; the split primary/View flow
+  // dropped it, so the primitive now exposes onTitleClick which wires into
+  // markReadOptimistic.
+  it("clicking the title link marks the notification as read", async () => {
+    const user = userEvent.setup();
+    render(<NotificationPageList {...defaultProps} />);
+    const titleLink = screen.getAllByRole("link", { name: /test episode/i })[0];
+    await user.click(titleLink);
+    await waitFor(() => {
+      expect(mockMarkNotificationRead).toHaveBeenCalledWith(1);
     });
   });
 

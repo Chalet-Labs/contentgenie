@@ -13,12 +13,12 @@ import {
 } from "@/app/actions/notifications";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { WorthItBadge } from "@/components/episodes/worth-it-badge";
 import { AddToQueueButton } from "@/components/audio-player/add-to-queue-button";
+import { EpisodeCard } from "@/components/episodes/episode-card";
 import { formatRelativeTime } from "@/lib/utils";
 import { ROUTES } from "@/lib/routes";
 import { NOTIFICATIONS_PAGE_SIZE } from "@/lib/notifications-constants";
+import { useAudioPlayerAPI } from "@/contexts/audio-player-context";
 
 type NotificationItem = Awaited<
   ReturnType<typeof getNotifications>
@@ -86,39 +86,43 @@ export function NotificationPageList({
     []
   );
 
-  const handleRowClick = (item: NotificationItem) => {
-    if (!item.isRead) {
-      // Optimistic flip + rollback on failure keeps navigation snappy without
-      // letting a stale read=true linger if the server rejects the mutation.
-      setItems((prev) =>
-        prev.map((n) => (n.id === item.id ? { ...n, isRead: true } : n))
-      );
-      markNotificationRead(item.id)
-        .then((result) => {
-          if (!result.success) {
-            setItems((prev) =>
-              prev.map((n) =>
-                n.id === item.id ? { ...n, isRead: false } : n
-              )
-            );
-            toast.error(result.error ?? "Couldn't mark as read");
-          }
-        })
-        .catch(() => {
+  const markReadOptimistic = useCallback((item: NotificationItem) => {
+    if (item.isRead) return;
+    // Optimistic flip + rollback on failure keeps interactions snappy without
+    // letting a stale read=true linger if the server rejects the mutation.
+    setItems((prev) =>
+      prev.map((n) => (n.id === item.id ? { ...n, isRead: true } : n))
+    );
+    markNotificationRead(item.id)
+      .then((result) => {
+        if (!result.success) {
           setItems((prev) =>
             prev.map((n) =>
               n.id === item.id ? { ...n, isRead: false } : n
             )
           );
-          toast.error("Couldn't mark as read");
-        });
-    }
-    router.push(
-      item.episodePodcastIndexId
-        ? ROUTES.episode(item.episodePodcastIndexId)
-        : ROUTES.DASHBOARD
-    );
-  };
+          toast.error(result.error ?? "Couldn't mark as read");
+        }
+      })
+      .catch(() => {
+        setItems((prev) =>
+          prev.map((n) =>
+            n.id === item.id ? { ...n, isRead: false } : n
+          )
+        );
+        toast.error("Couldn't mark as read");
+      });
+  }, []);
+
+  const handleRowClick = useCallback(
+    (item: NotificationItem) => {
+      markReadOptimistic(item);
+      if (item.episodePodcastIndexId) {
+        router.push(ROUTES.episode(item.episodePodcastIndexId));
+      }
+    },
+    [markReadOptimistic, router]
+  );
 
   const handleMarkAllRead = useCallback(async () => {
     const retry = () => handleMarkAllRead();
@@ -195,6 +199,7 @@ export function NotificationPageList({
                     : undefined) ?? []
                 }
                 onRowClick={handleRowClick}
+                onMarkRead={markReadOptimistic}
                 onDismiss={handleDismiss}
               />
             ))}
@@ -277,75 +282,87 @@ function NotificationRow({
   item,
   topics,
   onRowClick,
+  onMarkRead,
   onDismiss,
 }: {
   item: NotificationItem;
   topics: string[];
   onRowClick: (item: NotificationItem) => void;
+  onMarkRead: (item: NotificationItem) => void;
   onDismiss: (id: number) => void;
 }) {
-  const worthItScore =
-    item.worthItScore !== null ? parseFloat(item.worthItScore) : null;
+  const handleTitleNavigate = () => onMarkRead(item);
+  const { playEpisode } = useAudioPlayerAPI();
 
   const audioEpisode =
     item.audioUrl && item.episodePodcastIndexId
       ? {
           id: item.episodePodcastIndexId,
           title: item.episodeTitle ?? item.title,
-          podcastTitle: item.podcastTitle ?? "",
+          podcastTitle: item.podcastTitle ?? "Podcast",
           audioUrl: item.audioUrl,
           ...(item.artwork ? { artwork: item.artwork } : {}),
           ...(item.duration ? { duration: item.duration } : {}),
         }
       : null;
 
+  const handleListen = () => {
+    if (!audioEpisode) return;
+    onMarkRead(item);
+    playEpisode(audioEpisode);
+  };
+
+  let primaryAction: React.ReactNode = null;
+  if (audioEpisode) {
+    primaryAction = (
+      <Button size="sm" onClick={handleListen}>
+        Listen
+      </Button>
+    );
+  } else if (item.episodePodcastIndexId) {
+    primaryAction = (
+      <Button size="sm" variant="outline" onClick={() => onRowClick(item)}>
+        View episode
+      </Button>
+    );
+  }
+
   return (
-    <article
-      data-read={item.isRead}
-      className={`relative flex items-start gap-3 rounded-lg border p-4 ${
-        !item.isRead ? "bg-accent/10" : ""
-      }`}
-    >
-      <div className="flex-1 min-w-0 space-y-1">
-        <button
-          className="text-sm font-medium hover:underline text-left w-full truncate"
-          onClick={() => onRowClick(item)}
-        >
-          {item.episodeTitle ?? item.title}
-        </button>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <WorthItBadge score={worthItScore} />
-          {topics.slice(0, 3).map((topic) => (
-            <Badge key={topic} variant="secondary" className="text-xs">
-              {topic}
-            </Badge>
-          ))}
-        </div>
-
-        {item.podcastTitle && (
-          <p className="text-xs text-muted-foreground">{item.podcastTitle}</p>
-        )}
-
-        <p className="text-xs text-muted-foreground">
-          {formatRelativeTime(item.createdAt)}
-        </p>
-      </div>
-
-      <div className="flex items-center gap-1 shrink-0">
-        {audioEpisode && (
-          <AddToQueueButton episode={audioEpisode} variant="icon" />
-        )}
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8"
-          aria-label="Dismiss"
-          onClick={() => onDismiss(item.id)}
-        >
-          <X className="h-4 w-4" />
-        </Button>
-      </div>
+    <article data-read={item.isRead}>
+      <EpisodeCard
+        artwork={item.artwork}
+        podcastTitle={item.podcastTitle ?? "Podcast"}
+        title={item.episodeTitle ?? item.title}
+        href={
+          item.episodePodcastIndexId
+            ? ROUTES.episode(item.episodePodcastIndexId)
+            : undefined
+        }
+        onTitleClick={handleTitleNavigate}
+        topics={topics}
+        score={item.worthItScore}
+        accent={item.isRead ? "none" : "unread"}
+        meta={[
+          <span key="time">{formatRelativeTime(item.createdAt)}</span>,
+        ]}
+        primaryAction={primaryAction}
+        secondaryActions={
+          <>
+            {audioEpisode && (
+              <AddToQueueButton episode={audioEpisode} variant="icon" />
+            )}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              aria-label="Dismiss"
+              onClick={() => onDismiss(item.id)}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </>
+        }
+      />
     </article>
   );
 }

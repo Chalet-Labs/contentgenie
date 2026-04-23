@@ -94,6 +94,20 @@ export const SummarizedLowScore: Story = {
   },
 };
 
+export const Processing: Story = {
+  args: {
+    episode: baseEpisode,
+    summaryStatus: "running",
+  },
+};
+
+export const Failed: Story = {
+  args: {
+    episode: baseEpisode,
+    summaryStatus: "failed",
+  },
+};
+
 export const NoSummaryData: Story = {
   args: {
     episode: baseEpisode,
