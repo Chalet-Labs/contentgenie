@@ -291,6 +291,11 @@ components:
     height: 36px
     padding: 0 16px
     shadow: "{elevation.sm}"
+  button-secondary-hover:
+    # Mirrors Tailwind `hover:bg-secondary/80` — background alpha to 80%,
+    # label color unchanged. Same semantics as button-primary-hover.
+    backgroundColor: "{colors.secondary}"
+    backgroundColorOpacity: 0.8
   button-ghost:
     backgroundColor: transparent
     textColor: "{colors.foreground}"
@@ -309,6 +314,11 @@ components:
     height: 36px
     padding: 0 16px
     shadow: "{elevation.sm}"
+  button-destructive-hover:
+    # Mirrors Tailwind `hover:bg-destructive/90` — background alpha to 90%,
+    # label color unchanged. Same semantics as button-primary-hover.
+    backgroundColor: "{colors.destructive}"
+    backgroundColorOpacity: 0.9
   button-outline:
     backgroundColor: "{colors.background}"
     textColor: "{colors.foreground}"
