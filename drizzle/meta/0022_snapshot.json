@@ -1,5 +1,5 @@
 {
-  "id": "6b5e1e7f-d064-4146-ba96-4e49466e073f",
+  "id": "f359d653-2fd5-4306-ae2e-7d0419ca7c34",
   "prevId": "b6a22458-ea9e-4f05-a01c-c44a642dd5d1",
   "version": "7",
   "dialect": "postgresql",
@@ -1757,7 +1757,7 @@
           ],
           "isUnique": false,
           "where": "\"user_subscriptions\".\"is_pinned\" = true",
-          "concurrently": false,
+          "concurrently": true,
           "method": "btree",
           "with": {}
         }

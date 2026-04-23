@@ -16,6 +16,16 @@ import {
 import { relations, sql } from "drizzle-orm";
 import type { WorthItSignals } from "@/lib/openrouter";
 
+// Single source of truth for the /subscriptions sort modes. Used by the typed
+// JSON shape below and by server-action Zod validation in the next sub-issue.
+export const SUBSCRIPTION_SORTS = [
+  "recently-added",
+  "title-asc",
+  "latest-episode",
+  "recently-listened",
+] as const;
+export type SubscriptionSort = (typeof SUBSCRIPTION_SORTS)[number];
+
 // Rate limits table (managed by rate-limiter-flexible, see ADR-001).
 // Defined here so drizzle-kit push doesn't try to drop it.
 export const rateLimits = pgTable("rate_limits", {
@@ -37,11 +47,7 @@ export const users = pgTable("users", {
     digestFrequency?: "realtime" | "daily" | "weekly";
     pushEnabled?: boolean;
     lastDigestSentAt?: string; // ISO 8601
-    subscriptionSort?:
-      | "recently-added"
-      | "title-asc"
-      | "latest-episode"
-      | "recently-listened";
+    subscriptionSort?: SubscriptionSort;
   }>(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -163,6 +169,7 @@ export const userSubscriptions = pgTable(
     index("user_subscriptions_user_id_idx").on(table.userId),
     index("user_subscriptions_pinned_idx")
       .on(table.userId)
+      .concurrently()
       .where(sql`${table.isPinned} = true`),
   ]
 );
@@ -566,10 +573,6 @@ export type NewEpisode = typeof episodes.$inferInsert;
 
 export type UserSubscription = typeof userSubscriptions.$inferSelect;
 export type NewUserSubscription = typeof userSubscriptions.$inferInsert;
-
-export type SubscriptionSort = NonNullable<
-  NonNullable<User["preferences"]>["subscriptionSort"]
->;
 
 export type Collection = typeof collections.$inferSelect;
 export type NewCollection = typeof collections.$inferInsert;

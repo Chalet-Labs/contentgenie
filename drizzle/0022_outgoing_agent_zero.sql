@@ -1,2 +1,0 @@
-ALTER TABLE "user_subscriptions" ADD COLUMN "is_pinned" boolean DEFAULT false NOT NULL;--> statement-breakpoint
-CREATE INDEX "user_subscriptions_pinned_idx" ON "user_subscriptions" USING btree ("user_id") WHERE "user_subscriptions"."is_pinned" = true;
