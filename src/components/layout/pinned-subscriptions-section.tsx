@@ -78,7 +78,7 @@ export function PinnedSubscriptionsSection({ inSheet }: { inSheet: boolean }) {
   if (pinned.length === 0) return null;
 
   return (
-    <ul className="ml-6 mt-1 space-y-0.5" role="list">
+    <ul className="ml-6 mt-1 space-y-0.5">
       {pinned.map((pin) => (
         <PinnedRow
           key={pin.id}
