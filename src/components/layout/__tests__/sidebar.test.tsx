@@ -1,9 +1,15 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, within, fireEvent } from "@testing-library/react";
-import { Sidebar } from "@/components/layout/sidebar";
+import { render, screen, within, fireEvent, act } from "@testing-library/react";
+import {
+  PINNED_EXPANDED_STORAGE_NAME,
+  PINNED_EXPANDED_STORAGE_VALUE,
+  Sidebar,
+} from "@/components/layout/sidebar";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { installLocalStorageMock } from "@/test/mocks/local-storage";
 
 const mockUseSidebarCounts = vi.fn();
+const mockUsePinnedSubscriptionsOptional = vi.fn();
 const mockUsePathname = vi.fn(() => "/");
 
 vi.mock("next/navigation", () => ({
@@ -46,6 +52,18 @@ vi.mock("@clerk/nextjs", () => ({
   OrganizationSwitcher: () => <div data-testid="org-switcher" />,
 }));
 
+vi.mock("@/contexts/pinned-subscriptions-context", () => ({
+  usePinnedSubscriptionsOptional: () => mockUsePinnedSubscriptionsOptional(),
+}));
+
+vi.mock("@/components/layout/pinned-subscriptions-section", () => ({
+  PinnedSubscriptionsSection: ({ inSheet }: { inSheet: boolean }) => (
+    <div data-testid="pinned-section" data-in-sheet={inSheet}>
+      pinned section
+    </div>
+  ),
+}));
+
 vi.mock("@/components/ui/sheet", async () => {
   const { createSheetMock } =
     await vi.importActual<typeof import("@/test/mocks/sheet")>(
@@ -55,10 +73,16 @@ vi.mock("@/components/ui/sheet", async () => {
 });
 
 beforeEach(() => {
+  installLocalStorageMock();
   mockUseSidebarCounts.mockReturnValue({
     subscriptionCount: 0,
     savedCount: 0,
     isLoading: false,
+  });
+  mockUsePinnedSubscriptionsOptional.mockReturnValue({
+    pinned: [],
+    isLoading: false,
+    refreshPins: vi.fn(),
   });
   mockUsePathname.mockReturnValue("/");
 });
@@ -223,5 +247,175 @@ describe("Sidebar — inSheet mode", () => {
     expect(
       within(sheetContent).getByRole("link", { name: /library/i }),
     ).toHaveTextContent("42");
+  });
+});
+
+describe("Sidebar — pinned podcasts chevron", () => {
+  it("does not render chevron when pinned is empty", () => {
+    render(<Sidebar isAdmin={false} />);
+    expect(screen.queryByLabelText("Toggle pinned podcasts")).toBeNull();
+  });
+
+  it("renders chevron when pinned.length > 0 but section is collapsed by default", () => {
+    mockUsePinnedSubscriptionsOptional.mockReturnValue({
+      pinned: [
+        {
+          id: 1,
+          podcastId: 10,
+          podcastIndexId: "10",
+          title: "A",
+          imageUrl: null,
+        },
+        {
+          id: 2,
+          podcastId: 20,
+          podcastIndexId: "20",
+          title: "B",
+          imageUrl: null,
+        },
+      ],
+      isLoading: false,
+      refreshPins: vi.fn(),
+    });
+    render(<Sidebar isAdmin={false} />);
+
+    expect(screen.getByLabelText("Toggle pinned podcasts")).toBeInTheDocument();
+    expect(screen.queryByTestId("pinned-section")).toBeNull();
+  });
+
+  it("clicking chevron expands section and sets localStorage", async () => {
+    mockUsePinnedSubscriptionsOptional.mockReturnValue({
+      pinned: [
+        {
+          id: 1,
+          podcastId: 10,
+          podcastIndexId: "10",
+          title: "A",
+          imageUrl: null,
+        },
+      ],
+      isLoading: false,
+      refreshPins: vi.fn(),
+    });
+    render(<Sidebar isAdmin={false} />);
+
+    const chevron = screen.getByLabelText("Toggle pinned podcasts");
+    expect(chevron).toHaveAttribute("aria-expanded", "false");
+
+    await act(async () => {
+      fireEvent.click(chevron);
+    });
+
+    expect(screen.getByTestId("pinned-section")).toBeInTheDocument();
+    expect(localStorage.getItem(PINNED_EXPANDED_STORAGE_NAME)).toBe(
+      PINNED_EXPANDED_STORAGE_VALUE,
+    );
+    expect(chevron).toHaveAttribute("aria-expanded", "true");
+  });
+
+  it("does not expand on mount when localStorage value is anything other than '1'", () => {
+    localStorage.setItem(PINNED_EXPANDED_STORAGE_NAME, "true");
+    mockUsePinnedSubscriptionsOptional.mockReturnValue({
+      pinned: [
+        {
+          id: 1,
+          podcastId: 10,
+          podcastIndexId: "10",
+          title: "A",
+          imageUrl: null,
+        },
+      ],
+      isLoading: false,
+      refreshPins: vi.fn(),
+    });
+
+    render(<Sidebar isAdmin={false} />);
+
+    expect(screen.queryByTestId("pinned-section")).toBeNull();
+    expect(screen.getByLabelText("Toggle pinned podcasts")).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
+  });
+
+  it("clicking chevron twice collapses section and removes localStorage key", async () => {
+    mockUsePinnedSubscriptionsOptional.mockReturnValue({
+      pinned: [
+        {
+          id: 1,
+          podcastId: 10,
+          podcastIndexId: "10",
+          title: "A",
+          imageUrl: null,
+        },
+      ],
+      isLoading: false,
+      refreshPins: vi.fn(),
+    });
+    render(<Sidebar isAdmin={false} />);
+
+    await act(async () => {
+      fireEvent.click(screen.getByLabelText("Toggle pinned podcasts"));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByLabelText("Toggle pinned podcasts"));
+    });
+
+    expect(screen.queryByTestId("pinned-section")).toBeNull();
+    expect(localStorage.getItem(PINNED_EXPANDED_STORAGE_NAME)).toBeNull();
+  });
+
+  it("reads localStorage on mount and expands section when pre-seeded to '1'", async () => {
+    localStorage.setItem(
+      PINNED_EXPANDED_STORAGE_NAME,
+      PINNED_EXPANDED_STORAGE_VALUE,
+    );
+    mockUsePinnedSubscriptionsOptional.mockReturnValue({
+      pinned: [
+        {
+          id: 1,
+          podcastId: 10,
+          podcastIndexId: "10",
+          title: "A",
+          imageUrl: null,
+        },
+      ],
+      isLoading: false,
+      refreshPins: vi.fn(),
+    });
+
+    render(<Sidebar isAdmin={false} />);
+
+    // Wait for the post-mount effect to fire
+    await act(async () => {});
+
+    expect(screen.getByTestId("pinned-section")).toBeInTheDocument();
+  });
+
+  it("clicking the Subscriptions link does not trigger the chevron toggle", async () => {
+    mockUsePinnedSubscriptionsOptional.mockReturnValue({
+      pinned: [
+        {
+          id: 1,
+          podcastId: 10,
+          podcastIndexId: "10",
+          title: "A",
+          imageUrl: null,
+        },
+      ],
+      isLoading: false,
+      refreshPins: vi.fn(),
+    });
+    render(<Sidebar isAdmin={false} />);
+
+    // Click the link — section should stay collapsed
+    fireEvent.click(screen.getByRole("link", { name: /subscriptions/i }));
+
+    expect(screen.queryByTestId("pinned-section")).toBeNull();
+    expect(localStorage.getItem(PINNED_EXPANDED_STORAGE_NAME)).toBeNull();
+
+    // Chevron is a separate button target
+    const chevron = screen.getByLabelText("Toggle pinned podcasts");
+    expect(chevron.tagName).toBe("BUTTON");
   });
 });

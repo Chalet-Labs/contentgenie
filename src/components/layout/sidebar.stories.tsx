@@ -1,11 +1,16 @@
 import type { Decorator, Meta, StoryObj } from "@storybook/nextjs-vite";
 import { SidebarCountsProvider } from "@/contexts/sidebar-counts-context";
+import { PinnedSubscriptionsProvider } from "@/contexts/pinned-subscriptions-context";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
-import { Sidebar } from "@/components/layout/sidebar";
+import {
+  PINNED_EXPANDED_STORAGE_NAME,
+  PINNED_EXPANDED_STORAGE_VALUE,
+  Sidebar,
+} from "@/components/layout/sidebar";
 
-// `@/app/actions/dashboard` is aliased in .storybook/main.ts to mocks/actions.ts,
-// which stubs getDashboardStats with non-zero counts so badges render without
-// network calls. See .storybook/mocks/actions.ts for the concrete values.
+// `@/app/actions/dashboard` and `@/app/actions/subscriptions` are aliased in
+// .storybook/main.ts to mocks/actions.ts. getDashboardStats stubs non-zero
+// counts and getPinnedSubscriptions stubs 3 seeded pins.
 
 const sheetDecorator: Decorator = (Story) => (
   <Sheet defaultOpen>
@@ -18,6 +23,19 @@ const sheetDecorator: Decorator = (Story) => (
   </Sheet>
 );
 
+const withProviders: Decorator = (Story) => (
+  <SidebarCountsProvider>
+    <PinnedSubscriptionsProvider>
+      <div className="flex h-screen bg-background">
+        <Story />
+        <div className="flex-1 p-6">
+          <p className="text-sm text-muted-foreground">App content area</p>
+        </div>
+      </div>
+    </PinnedSubscriptionsProvider>
+  </SidebarCountsProvider>
+);
+
 const meta: Meta<typeof Sidebar> = {
   title: "Layout/Sidebar",
   component: Sidebar,
@@ -25,17 +43,12 @@ const meta: Meta<typeof Sidebar> = {
   parameters: {
     layout: "fullscreen",
   },
-  decorators: [
-    (Story) => (
-      <SidebarCountsProvider>
-        <div className="flex h-screen bg-background">
-          <Story />
-          <div className="flex-1 p-6">
-            <p className="text-sm text-muted-foreground">App content area</p>
-          </div>
-        </div>
-      </SidebarCountsProvider>
-    ),
+  decorators: [withProviders],
+  loaders: [
+    async () => {
+      localStorage.removeItem(PINNED_EXPANDED_STORAGE_NAME);
+      return {};
+    },
   ],
 };
 
@@ -82,4 +95,45 @@ export const InSheetWithAdmin: Story = {
       },
     },
   },
+};
+
+export const WithPinnedPodcasts: Story = {
+  parameters: {
+    docs: {
+      description: {
+        story: "Sidebar with a populated pinned-podcasts section expanded.",
+      },
+    },
+  },
+  loaders: [
+    async () => {
+      localStorage.setItem(
+        PINNED_EXPANDED_STORAGE_NAME,
+        PINNED_EXPANDED_STORAGE_VALUE,
+      );
+      return {};
+    },
+  ],
+};
+
+export const WithPinnedPodcastsInSheet: Story = {
+  decorators: [sheetDecorator],
+  args: { inSheet: true },
+  parameters: {
+    docs: {
+      description: {
+        story:
+          "Sidebar in mobile sheet mode with a populated pinned-podcasts section expanded.",
+      },
+    },
+  },
+  loaders: [
+    async () => {
+      localStorage.setItem(
+        PINNED_EXPANDED_STORAGE_NAME,
+        PINNED_EXPANDED_STORAGE_VALUE,
+      );
+      return {};
+    },
+  ],
 };

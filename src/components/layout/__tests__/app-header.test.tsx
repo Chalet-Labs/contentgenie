@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, fireEvent, within } from "@testing-library/react";
 import { AppHeader } from "@/components/layout/app-header";
+import { installLocalStorageMock } from "@/test/mocks/local-storage";
 import React from "react";
 
 const mockUsePathname = vi.fn(() => "/dashboard");
@@ -45,6 +46,18 @@ vi.mock("next-themes", () => ({
 
 vi.mock("@/components/notifications/notification-bell", () => ({
   NotificationBell: () => null,
+}));
+
+vi.mock("@/contexts/pinned-subscriptions-context", () => ({
+  usePinnedSubscriptionsOptional: () => ({
+    pinned: [],
+    isLoading: false,
+    refreshPins: vi.fn(),
+  }),
+}));
+
+vi.mock("@/components/layout/pinned-subscriptions-section", () => ({
+  PinnedSubscriptionsSection: () => null,
 }));
 
 vi.mock("@/components/ui/button", () => ({
@@ -93,6 +106,7 @@ vi.mock("@/components/ui/sheet", async () => {
 });
 
 beforeEach(() => {
+  installLocalStorageMock();
   mockUsePathname.mockReturnValue("/dashboard");
   mockCounts.subscriptionCount = 0;
   mockCounts.savedCount = 0;

@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { OrganizationSwitcher } from "@clerk/nextjs";
@@ -12,13 +12,17 @@ import {
   Library,
   Settings,
   Shield,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react";
-import { SheetClose } from "@/components/ui/sheet";
 import {
   useSidebarCountsOptional,
   getBadgeCount,
   NavBadge,
 } from "@/contexts/sidebar-counts-context";
+import { usePinnedSubscriptionsOptional } from "@/contexts/pinned-subscriptions-context";
+import { PinnedSubscriptionsSection } from "@/components/layout/pinned-subscriptions-section";
+import { MaybeSheetClose } from "@/components/layout/maybe-sheet-close";
 
 const sidebarLinks = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -29,14 +33,34 @@ const sidebarLinks = [
 
 const bottomLinks = [{ href: "/settings", label: "Settings", icon: Settings }];
 
-function MaybeSheetClose({
-  inSheet,
-  children,
-}: {
-  inSheet: boolean;
-  children: React.ReactElement;
-}) {
-  return inSheet ? <SheetClose asChild>{children}</SheetClose> : children;
+export const PINNED_EXPANDED_STORAGE_NAME = "sidebar:pinned-expanded";
+export const PINNED_EXPANDED_STORAGE_VALUE = "1";
+
+function readPinnedExpanded(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return (
+      localStorage.getItem(PINNED_EXPANDED_STORAGE_NAME) ===
+      PINNED_EXPANDED_STORAGE_VALUE
+    );
+  } catch {
+    return false;
+  }
+}
+
+function writePinnedExpanded(next: boolean): void {
+  try {
+    if (next) {
+      localStorage.setItem(
+        PINNED_EXPANDED_STORAGE_NAME,
+        PINNED_EXPANDED_STORAGE_VALUE,
+      );
+    } else {
+      localStorage.removeItem(PINNED_EXPANDED_STORAGE_NAME);
+    }
+  } catch {
+    // localStorage may be unavailable (e.g. private browsing quota exceeded)
+  }
 }
 
 function SidebarNav({
@@ -48,6 +72,19 @@ function SidebarNav({
 }) {
   const pathname = usePathname();
   const counts = useSidebarCountsOptional();
+  const { pinned } = usePinnedSubscriptionsOptional();
+
+  const [pinnedExpanded, setPinnedExpanded] = useState(false);
+
+  useEffect(() => {
+    setPinnedExpanded(readPinnedExpanded());
+  }, []);
+
+  const togglePinned = () => {
+    const next = !pinnedExpanded;
+    setPinnedExpanded(next);
+    writePinnedExpanded(next);
+  };
 
   return (
     <div className="flex h-full flex-col">
@@ -58,6 +95,49 @@ function SidebarNav({
             const isActive =
               pathname === link.href || pathname?.startsWith(`${link.href}/`);
             const badge = getBadgeCount(link.href, counts);
+
+            if (link.href === "/subscriptions") {
+              return (
+                <div key={link.href}>
+                  <div className="flex items-center gap-1">
+                    <MaybeSheetClose inSheet={inSheet}>
+                      <Link
+                        href={link.href}
+                        className={cn(
+                          "flex flex-1 items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                          isActive
+                            ? "bg-accent text-accent-foreground"
+                            : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+                        )}
+                      >
+                        <Icon className="h-4 w-4" />
+                        {link.label}
+                        {badge !== null && <NavBadge count={badge} />}
+                      </Link>
+                    </MaybeSheetClose>
+                    {pinned.length > 0 && (
+                      <button
+                        type="button"
+                        aria-label="Toggle pinned podcasts"
+                        aria-expanded={pinnedExpanded}
+                        onClick={togglePinned}
+                        className="rounded-md p-2 text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                      >
+                        {pinnedExpanded ? (
+                          <ChevronDown className="h-4 w-4" />
+                        ) : (
+                          <ChevronRight className="h-4 w-4" />
+                        )}
+                      </button>
+                    )}
+                  </div>
+                  {pinnedExpanded && pinned.length > 0 && (
+                    <PinnedSubscriptionsSection inSheet={inSheet} />
+                  )}
+                </div>
+              );
+            }
+
             return (
               <MaybeSheetClose key={link.href} inSheet={inSheet}>
                 <Link

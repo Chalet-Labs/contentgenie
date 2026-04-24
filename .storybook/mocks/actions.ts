@@ -32,3 +32,29 @@ export const getDashboardStats = async () => ({
   error: null,
 });
 export const getQueueEpisodeScores = async () => ({});
+export const getPinnedSubscriptions = async () => ({
+  success: true as const,
+  data: [
+    {
+      id: 1,
+      podcastId: 101,
+      podcastIndexId: "101",
+      title: "Lex Fridman Podcast",
+      imageUrl: null,
+    },
+    {
+      id: 2,
+      podcastId: 102,
+      podcastIndexId: "102",
+      title: "Search Engine",
+      imageUrl: null,
+    },
+    {
+      id: 3,
+      podcastId: 103,
+      podcastIndexId: "103",
+      title: "The Daily",
+      imageUrl: null,
+    },
+  ],
+});
