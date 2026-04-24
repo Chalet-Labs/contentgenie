@@ -90,8 +90,11 @@ vi.mock("@/components/ui/dropdown-menu", () => ({
   }: {
     children: React.ReactNode;
     onClick?: () => void;
-    // eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events -- Radix DropdownMenuItem test mock; real DOM renders a proper menuitem role
-  }) => <div onClick={onClick}>{children}</div>,
+  }) => (
+    <button type="button" onClick={onClick}>
+      {children}
+    </button>
+  ),
 }));
 
 vi.mock("@/components/ui/separator", () => ({

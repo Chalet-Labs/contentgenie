@@ -62,10 +62,9 @@ export function createSheetMock(options: { includeSheetTitle?: boolean } = {}) {
       } as Record<string, unknown>);
     }
     return (
-      // eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events -- Radix Sheet test mock fallback; real DOM uses a proper button via asChild cloneElement above
-      <div data-testid="sheet-trigger" onClick={open}>
+      <button type="button" data-testid="sheet-trigger" onClick={open}>
         {children}
-      </div>
+      </button>
     );
   };
 
@@ -95,10 +94,9 @@ export function createSheetMock(options: { includeSheetTitle?: boolean } = {}) {
       });
     }
     return (
-      // eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events -- Radix SheetClose test mock fallback; real DOM uses a proper button via asChild cloneElement above
-      <div data-testid="sheet-close" onClick={close}>
+      <button type="button" data-testid="sheet-close" onClick={close}>
         {children}
-      </div>
+      </button>
     );
   };
 
