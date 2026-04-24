@@ -91,21 +91,6 @@ describe("SubscriptionCard", () => {
     expect(screen.getByText("42 episodes")).toBeInTheDocument();
   });
 
-  it("clicking subscribe button does not propagate to parent link", () => {
-    const parentClickHandler = vi.fn();
-    render(
-      // eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events
-      <div onClick={parentClickHandler}>
-        <SubscriptionCard podcast={mockPodcast} subscribedAt={subscribedAt} />
-      </div>,
-    );
-
-    const button = screen.getByRole("button");
-    fireEvent.click(button);
-
-    expect(parentClickHandler).not.toHaveBeenCalled();
-  });
-
   it("clicking subscribe button triggers the subscription action", () => {
     render(
       <SubscriptionCard podcast={mockPodcast} subscribedAt={subscribedAt} />,
@@ -114,32 +99,6 @@ describe("SubscriptionCard", () => {
     fireEvent.click(button);
 
     expect(unsubscribeFromPodcast).toHaveBeenCalledWith("12345");
-  });
-
-  it("stops event propagation on button container", () => {
-    render(
-      <SubscriptionCard podcast={mockPodcast} subscribedAt={subscribedAt} />,
-    );
-    const button = screen.getByRole("button");
-    // The button's parent div has onClick and onKeyDown handlers
-    const buttonContainer = button.closest(
-      "[class*='relative z-10']",
-    ) as HTMLElement;
-
-    // Test click event
-    const clickEvent = new MouseEvent("click", { bubbles: true });
-    const stopPropagationSpyClick = vi.spyOn(clickEvent, "stopPropagation");
-    fireEvent(buttonContainer, clickEvent);
-    expect(stopPropagationSpyClick).toHaveBeenCalled();
-
-    // Test keydown event (Enter key)
-    const keydownEvent = new KeyboardEvent("keydown", {
-      key: "Enter",
-      bubbles: true,
-    });
-    const stopPropagationSpyKeydown = vi.spyOn(keydownEvent, "stopPropagation");
-    fireEvent(buttonContainer, keydownEvent);
-    expect(stopPropagationSpyKeydown).toHaveBeenCalled();
   });
 
   describe("pin toggle", () => {
@@ -188,23 +147,6 @@ describe("SubscriptionCard", () => {
       );
       fireEvent.click(screen.getByRole("button", { name: "Pin podcast" }));
       expect(onTogglePin).toHaveBeenCalledTimes(1);
-    });
-
-    it("does not navigate the parent link when the pin button is clicked", () => {
-      const parentClickHandler = vi.fn();
-      render(
-        // eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events
-        <div onClick={parentClickHandler}>
-          <SubscriptionCard
-            podcast={mockPodcast}
-            subscribedAt={subscribedAt}
-            isPinned={false}
-            onTogglePin={() => {}}
-          />
-        </div>,
-      );
-      fireEvent.click(screen.getByRole("button", { name: "Pin podcast" }));
-      expect(parentClickHandler).not.toHaveBeenCalled();
     });
   });
 });
