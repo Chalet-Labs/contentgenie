@@ -106,23 +106,21 @@ Must exit 0. If it fails, fix the root cause (not a suppression, not a workaroun
 
 Launch three reviews in parallel (one message, three independent tool calls):
 
-1. **Codex review** — external perspective. The `/codex:review` slash command is marked `disable-model-invocation`, so the agent cannot call it via the Skill tool. Dispatch a `Task` subagent (`run_in_background: true`) to run the CLI equivalent — this matches the async semantics of the original `--background` slash flag without blocking the orchestrator:
+1. **Codex review** — dispatch a `Task` subagent with `run_in_background: true` to run `codex review --base main` via Bash. The background flag lets the orchestrator proceed without waiting; you'll be notified on completion.
 
    ```
    Agent({
      subagent_type: "general-purpose",
      description: "Codex review vs main",
      run_in_background: true,
-     prompt: `Run \`codex review --base main\` from the repo root (cwd: <absolute repo path>) via Bash. Collect the full output. Return findings as a concise list: file:line, issue, suggested fix. If the CLI errors (auth, network, missing binary), report the failure verbatim and exit.`
+     prompt: `Run \`codex review --base main\` from <absolute repo path> via Bash. Return findings as file:line, issue, suggested fix. If the CLI errors (auth, network, missing binary), report the failure verbatim.`
    })
    ```
 
-   You'll be notified when it completes. Don't poll, don't sleep — continue with the other reviewers in parallel.
+2. `/pr-review-toolkit:review-pr all` — code-reviewer, pr-test-analyzer, silent-failure-hunter, type-design-analyzer, comment-analyzer, code-simplifier.
+3. `/simplify` — reuse/quality/efficiency pass.
 
-2. `/pr-review-toolkit:review-pr all` — specialized agents: code-reviewer, pr-test-analyzer, silent-failure-hunter, type-design-analyzer, comment-analyzer, code-simplifier. Invokable via Skill.
-3. `/simplify` — reuse/quality/efficiency pass. Invokable via Skill.
-
-Launch all three in the same message so they run concurrently. Don't enter Phase 3 until the background Codex task has reported back and the two Skill calls have returned. Don't run `codex:setup` — it's one-time init, not part of the pipeline.
+Launch all three in the same message. Don't enter Phase 3 until the Codex task callback arrives and both Skill calls have returned. Don't run `codex:setup` — it's one-time init, not part of the pipeline.
 
 ### Phase 3 — Collect & Validate Findings
 
