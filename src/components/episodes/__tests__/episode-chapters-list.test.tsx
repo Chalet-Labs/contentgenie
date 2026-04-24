@@ -6,15 +6,17 @@ import type { UseChaptersState } from "@/hooks/use-chapters";
 import type { AudioEpisode } from "@/contexts/audio-player-context";
 
 const mocks = vi.hoisted(() => ({
-  useAudioPlayerState: vi.fn<() => { currentEpisode: { id: string } | null }>(
-    () => ({
-      currentEpisode: null,
-    }),
-  ),
+  useAudioPlayerState: vi.fn<
+    () => { currentEpisode: { id: string } | null; isPlaying: boolean }
+  >(() => ({
+    currentEpisode: null,
+    isPlaying: false,
+  })),
   useAudioPlayerProgress: vi.fn(() => ({ currentTime: 0, buffered: 0 })),
   useAudioPlayerAPI: vi.fn(() => ({
     playEpisode: vi.fn(),
     seek: vi.fn(),
+    togglePlay: vi.fn(),
   })),
 }));
 
@@ -44,7 +46,10 @@ const readyState = (count = 3): UseChaptersState => ({
 describe("EpisodeChaptersList", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mocks.useAudioPlayerState.mockReturnValue({ currentEpisode: null });
+    mocks.useAudioPlayerState.mockReturnValue({
+      currentEpisode: null,
+      isPlaying: false,
+    });
     mocks.useAudioPlayerProgress.mockReturnValue({
       currentTime: 0,
       buffered: 0,
@@ -111,6 +116,7 @@ describe("EpisodeChaptersList", () => {
     mocks.useAudioPlayerAPI.mockReturnValue({
       playEpisode,
       seek: vi.fn(),
+      togglePlay: vi.fn(),
     });
 
     render(
@@ -126,13 +132,15 @@ describe("EpisodeChaptersList", () => {
     expect(playEpisode).toHaveBeenCalledWith(sampleEpisode, { startAt: 300 });
   });
 
-  it("seeks (instead of re-playing) when the current episode matches", async () => {
+  it("seeks and resumes playback when the current episode matches and is paused", async () => {
     const seek = vi.fn();
     const playEpisode = vi.fn();
+    const togglePlay = vi.fn();
     mocks.useAudioPlayerState.mockReturnValue({
       currentEpisode: { id: sampleEpisode.id },
+      isPlaying: false,
     });
-    mocks.useAudioPlayerAPI.mockReturnValue({ seek, playEpisode });
+    mocks.useAudioPlayerAPI.mockReturnValue({ seek, playEpisode, togglePlay });
 
     render(
       <EpisodeChaptersList
@@ -145,12 +153,39 @@ describe("EpisodeChaptersList", () => {
     await user.click(screen.getByText("Chapter 2"));
 
     expect(seek).toHaveBeenCalledWith(300);
+    expect(togglePlay).toHaveBeenCalledTimes(1);
+    expect(playEpisode).not.toHaveBeenCalled();
+  });
+
+  it("only seeks (does not toggle) when the current episode is already playing", async () => {
+    const seek = vi.fn();
+    const playEpisode = vi.fn();
+    const togglePlay = vi.fn();
+    mocks.useAudioPlayerState.mockReturnValue({
+      currentEpisode: { id: sampleEpisode.id },
+      isPlaying: true,
+    });
+    mocks.useAudioPlayerAPI.mockReturnValue({ seek, playEpisode, togglePlay });
+
+    render(
+      <EpisodeChaptersList
+        state={readyState(2)}
+        audioEpisode={sampleEpisode}
+      />,
+    );
+
+    const user = userEvent.setup();
+    await user.click(screen.getByText("Chapter 2"));
+
+    expect(seek).toHaveBeenCalledWith(300);
+    expect(togglePlay).not.toHaveBeenCalled();
     expect(playEpisode).not.toHaveBeenCalled();
   });
 
   it("highlights the active chapter with aria-current when the current episode is playing past its start time", () => {
     mocks.useAudioPlayerState.mockReturnValue({
       currentEpisode: { id: sampleEpisode.id },
+      isPlaying: true,
     });
     mocks.useAudioPlayerProgress.mockReturnValue({
       currentTime: 310, // inside chapter 2

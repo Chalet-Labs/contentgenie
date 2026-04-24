@@ -6,9 +6,11 @@ import type { Chapter } from "@/lib/chapters";
 const mockState: {
   chapters: Chapter[] | null;
   chaptersLoading: boolean;
+  isPlaying: boolean;
 } = {
   chapters: null,
   chaptersLoading: false,
+  isPlaying: false,
 };
 
 const mockProgress = {
@@ -61,6 +63,7 @@ describe("ChapterList", () => {
     vi.clearAllMocks();
     mockState.chapters = null;
     mockState.chaptersLoading = false;
+    mockState.isPlaying = false;
     mockProgress.currentTime = 0;
   });
 
@@ -97,16 +100,32 @@ describe("ChapterList", () => {
     expect(screen.getByText("5:00")).toBeInTheDocument();
   });
 
-  it("calls seek with correct time when a chapter is clicked", () => {
+  it("seeks and resumes playback when a chapter is clicked while paused", () => {
     mockState.chapters = [
       { startTime: 0, title: "Introduction" },
       { startTime: 120, title: "Main Topic" },
     ];
+    mockState.isPlaying = false;
 
     render(<ChapterList />);
 
     fireEvent.click(screen.getByText("Main Topic"));
     expect(mockAPI.seek).toHaveBeenCalledWith(120);
+    expect(mockAPI.togglePlay).toHaveBeenCalledTimes(1);
+  });
+
+  it("only seeks (does not toggle) when a chapter is clicked while playing", () => {
+    mockState.chapters = [
+      { startTime: 0, title: "Introduction" },
+      { startTime: 120, title: "Main Topic" },
+    ];
+    mockState.isPlaying = true;
+
+    render(<ChapterList />);
+
+    fireEvent.click(screen.getByText("Main Topic"));
+    expect(mockAPI.seek).toHaveBeenCalledWith(120);
+    expect(mockAPI.togglePlay).not.toHaveBeenCalled();
   });
 
   it("highlights the active chapter", () => {

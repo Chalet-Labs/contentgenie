@@ -64,6 +64,9 @@ export function EpisodeChaptersList({
       const handleSelect = (chapter: Chapter) => {
         if (isCurrentEpisode) {
           playerAPI.seek(chapter.startTime);
+          if (!playerState.isPlaying) {
+            playerAPI.togglePlay();
+          }
         } else {
           playerAPI.playEpisode(audioEpisode, { startAt: chapter.startTime });
         }
