@@ -1,6 +1,6 @@
 ---
 name: pre-pr-validation
-description: Use before any `gh pr create` — invoke this skill as soon as the user asks to open, create, submit, or file a pull request, without waiting for the hook to bounce the command. Runs the full pre-PR pipeline: sync with main, verification gate (lint/test/build), parallel multi-tool review (`/codex:review`, `/pr-review-toolkit:review-pr all`, `/simplify`), validates every finding, fixes all valid ones, re-verifies, pushes, writes the sentinel that unblocks PR creation. A PreToolUse hook blocks `gh pr create` until this skill has run and written a fresh sentinel, so triggering it proactively whenever PRs are mentioned is the path of least friction.
+description: Use before any `gh pr create` — invoke this skill as soon as the user asks to open, create, submit, or file a pull request, without waiting for the hook to bounce the command. Runs the full pre-PR pipeline: sync with main, build check (tsc/lint/test are already enforced per commit by the husky hook), parallel multi-tool review (`/codex:review`, `/pr-review-toolkit:review-pr all`, `/simplify`), validates every finding, fixes all valid ones, re-verifies, pushes, writes the sentinel that unblocks PR creation. A PreToolUse hook blocks `gh pr create` until this skill has run and written a fresh sentinel, so triggering it proactively whenever PRs are mentioned is the path of least friction.
 ---
 
 # Pre-PR Validation
@@ -80,12 +80,12 @@ A branch behind main can pass local verification but fail CI after the PR opens 
 Run fresh:
 
 ```bash
-bun run lint
-bun run test
 bun run build
 ```
 
-All three must exit 0. If any fail, fix the root cause (not a suppression, not a workaround) and re-run the failing command. Don't enter Phase 2 with a red build — reviewers waste cycles on broken code.
+Must exit 0. If it fails, fix the root cause (not a suppression, not a workaround) and re-run. Don't enter Phase 2 with a red build — reviewers waste cycles on broken code.
+
+**Why only build?** The husky pre-commit hook already runs `tsc --noEmit`, `bun run lint`, and `bun run test` on every commit, so every commit that got us to this point has passed those three. `bun run build` is the gap the hook doesn't cover — notably Next.js page-export restrictions only surface here. If you suspect the hook was bypassed (`--no-verify`), also run `bun run lint` and `bun run test` explicitly before proceeding.
 
 ### Phase 2 — Multi-Tool Review
 
@@ -121,17 +121,13 @@ Per user memory, commit messages should not mention Claude, AI, or automated gen
 
 ### Phase 5 — Re-Verify
 
-Re-run Phase 1 commands fresh:
-
 ```bash
-bun run lint
-bun run test
 bun run build
 ```
 
-All three must exit 0.
+Must exit 0. Phase 4's commits already triggered the pre-commit hook (tsc + lint + test), so only the build gap needs re-checking here.
 
-If a fix introduced a regression, loop back to Phase 3 for the regressing finding (was it valid? is the fix correct?). Cap retries at 2. If still failing after 2 retries, stop and surface to the user with the specific failure — don't write the sentinel.
+If build fails, loop back to Phase 3 for the regressing finding (was it valid? is the fix correct?). Cap retries at 2. If still failing after 2 retries, stop and surface to the user with the specific failure — don't write the sentinel.
 
 ### Phase 6 — Push the Branch
 
@@ -185,7 +181,7 @@ Title: `type: Description`, under 70 characters, same convention as commits. Use
 | Symptom | Action |
 |---------|--------|
 | Phase 0 rebase conflicts | If trivial, resolve and continue. If not, stop and surface to the user. |
-| Phase 1 lint/test/build fails | Fix root cause, re-run. Don't proceed. |
+| Phase 1 build fails | Fix root cause, re-run. Don't proceed. |
 | `/codex:status` stuck > 15 min | `/codex:cancel`, surface to user. |
 | Reviewers disagree | Apply project conventions; document the choice in the finding. |
 | Phase 5 fails after fixes | Retry up to 2×. Then surface with the specific failure. |
