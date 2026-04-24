@@ -215,17 +215,21 @@ export function NotificationPageList({
         let newTopics: Record<number, string[]> = {};
         let newListenedPiIds: string[] = [];
         if (newEpisodeIds.length > 0) {
-          try {
-            newTopics = await getEpisodeTopics(newEpisodeIds);
-          } catch (err) {
+          const [topicsResult, listenedResult] = await Promise.allSettled([
+            getEpisodeTopics(newEpisodeIds),
+            getListenedEpisodeIds(newEpisodeIds),
+          ]);
+          if (topicsResult.status === "fulfilled") {
+            newTopics = topicsResult.value;
+          } else {
             // Degrade gracefully — append rows without topic chips.
-            console.error("[notifications] getEpisodeTopics failed", err);
-            newTopics = {};
-          }
-          try {
-            const listenedDbIds = new Set(
-              await getListenedEpisodeIds(newEpisodeIds),
+            console.error(
+              "[notifications] getEpisodeTopics failed",
+              topicsResult.reason,
             );
+          }
+          if (listenedResult.status === "fulfilled") {
+            const listenedDbIds = new Set(listenedResult.value);
             newListenedPiIds = newItems
               .filter(
                 (n) =>
@@ -234,17 +238,21 @@ export function NotificationPageList({
                   n.episodePodcastIndexId,
               )
               .map((n) => n.episodePodcastIndexId as string);
-          } catch (err) {
+          } else {
             // Degrade gracefully — rows stay "unlistened" on failure; the
             // user can re-mark if needed.
-            console.error("[notifications] getListenedEpisodeIds failed", err);
-            newListenedPiIds = [];
+            console.error(
+              "[notifications] getListenedEpisodeIds failed",
+              listenedResult.reason,
+            );
           }
         }
         setItems((prev) => [...prev, ...newItems]);
         setTopicsByEpisode((prev) => ({ ...prev, ...newTopics }));
         if (newListenedPiIds.length > 0) {
-          setListenedIds((prev) => [...prev, ...newListenedPiIds]);
+          setListenedIds((prev) =>
+            Array.from(new Set([...prev, ...newListenedPiIds])),
+          );
         }
         offsetRef.current = offsetRef.current + NOTIFICATIONS_PAGE_SIZE;
         setHasMore(result.hasMore ?? false);
@@ -381,7 +389,7 @@ function NotificationRow({
           podcastTitle: item.podcastTitle ?? "Podcast",
           audioUrl: item.audioUrl,
           ...(item.artwork ? { artwork: item.artwork } : {}),
-          ...(item.duration ? { duration: item.duration } : {}),
+          ...(item.duration != null ? { duration: item.duration } : {}),
         }
       : null;
 

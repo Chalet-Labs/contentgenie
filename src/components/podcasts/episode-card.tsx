@@ -39,6 +39,7 @@ export function EpisodeCard({
         audioUrl: episode.enclosureUrl,
         ...(episode.feedImage ? { artwork: episode.feedImage } : {}),
         ...(episode.duration ? { duration: episode.duration } : {}),
+        ...(episode.chaptersUrl ? { chaptersUrl: episode.chaptersUrl } : {}),
       }
     : null;
 
