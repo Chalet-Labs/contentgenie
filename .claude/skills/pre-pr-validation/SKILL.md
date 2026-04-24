@@ -27,13 +27,14 @@ Borrowed from `superpowers:verification-before-completion`:
 
 > NO COMPLETION CLAIMS WITHOUT FRESH VERIFICATION EVIDENCE
 
-The sentinel is a completion claim. Don't write it until Phase 5 has produced green evidence *in this session, this turn, with these commands* and Phase 6 has pushed the branch. Previous runs don't count.
+The sentinel is a completion claim. Don't write it until Phase 5 has produced green evidence _in this session, this turn, with these commands_ and Phase 6 has pushed the branch. Previous runs don't count.
 
 ## Unattended execution policy (read before Phase 3)
 
 After Phase 2 returns findings, **do not stop to ask the user for approval before fixing them.** Validate each finding (Phase 3), then apply every valid fix (Phase 4) in one continuous run. The user has already opted into this policy by invoking the skill — pausing to triage defeats the point.
 
 Exceptions (the only times you stop):
+
 - A finding requires judgement the skill can't make (e.g., "rename this product concept" — ask).
 - Two reviewers propose opposite changes and project conventions don't resolve it.
 - The fix would touch code outside the PR's stated scope in a way that surprises the caller.
@@ -65,7 +66,7 @@ bun run build
 
 Must exit 0. If it fails, fix the root cause (not a suppression, not a workaround) and re-run. Don't enter Phase 2 with a red build — reviewers waste cycles on broken code.
 
-**Why only build?** Husky's pre-commit runs `tsc --noEmit`, `bun run lint`, and `bun run test` on every *new* commit, so in the common case the only remaining gap is `bun run build` (Next.js page-export restrictions surface only here). However, `git rebase` reapplies commits **without** firing pre-commit — same for any prior `--no-verify` / `HUSKY=0` commits. If Phase 0 rewrote history (compare `git rev-parse HEAD` before and after, or just check `HEAD@{1}` ≠ `HEAD`), run `bun run lint` and `bun run test` here before the build.
+**Why only build?** Husky's pre-commit runs `tsc --noEmit`, `bun run lint`, and `bun run test` on every _new_ commit, so in the common case the only remaining gap is `bun run build` (Next.js page-export restrictions surface only here). However, `git rebase` reapplies commits **without** firing pre-commit — same for any prior `--no-verify` / `HUSKY=0` commits. If Phase 0 rewrote history (compare `git rev-parse HEAD` before and after, or just check `HEAD@{1}` ≠ `HEAD`), run `bun run lint` and `bun run test` here before the build.
 
 ### Phase 2 — Multi-Tool Review
 
@@ -93,7 +94,7 @@ For every finding from every tool:
 
 1. **Verify the claim.** Read the cited file and line. Does the problem actually exist as described? Reject hallucinations, stale line numbers, and refs to code that no longer exists.
 2. **Check for conflicts.** If two tools propose opposite changes, apply project conventions (AGENTS.md, CLAUDE.md, user memory) to pick one. Record the decision in the finding.
-3. **Mark valid or invalid.** A finding is valid if the claim is technically correct on the current code. Severity (critical/important/suggestion) does *not* affect validity — all valid findings get fixed.
+3. **Mark valid or invalid.** A finding is valid if the claim is technically correct on the current code. Severity (critical/important/suggestion) does _not_ affect validity — all valid findings get fixed.
 
 Don't skip a finding because it seems minor. Per the unattended execution policy above, every valid finding goes straight to Phase 4 without an approval pause.
 
@@ -172,13 +173,13 @@ Title: `type: Description`, under 70 characters, same convention as commits. Use
 
 ## Failure modes
 
-| Symptom | Action |
-|---------|--------|
-| Phase 0 rebase conflicts | If trivial, resolve and continue. If not, stop and surface to the user. |
-| Phase 1 build fails | Fix root cause, re-run. Don't proceed. |
-| Codex `Task` subagent stuck > 15 min | Abandon the background task, proceed with the remaining reviewers, and surface to user. |
-| Reviewers disagree | Apply project conventions; document the choice in the finding. |
-| Phase 5 fails after fixes | Retry up to 2×. Then surface with the specific failure. |
-| Phase 6 push rejected (non-fast-forward) | Rebase onto current `origin/<branch>`, re-run Phase 5, retry push. No default force-push. |
-| `/simplify` or `/pr-review-toolkit:review-pr` unavailable | Log it, continue with the remaining reviewers. Not fatal. |
+| Symptom                                                      | Action                                                                                                                                                                                  |
+| ------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Phase 0 rebase conflicts                                     | If trivial, resolve and continue. If not, stop and surface to the user.                                                                                                                 |
+| Phase 1 build fails                                          | Fix root cause, re-run. Don't proceed.                                                                                                                                                  |
+| Codex `Task` subagent stuck > 15 min                         | Abandon the background task, proceed with the remaining reviewers, and surface to user.                                                                                                 |
+| Reviewers disagree                                           | Apply project conventions; document the choice in the finding.                                                                                                                          |
+| Phase 5 fails after fixes                                    | Retry up to 2×. Then surface with the specific failure.                                                                                                                                 |
+| Phase 6 push rejected (non-fast-forward)                     | Rebase onto current `origin/<branch>`, re-run Phase 5, retry push. No default force-push.                                                                                               |
+| `/simplify` or `/pr-review-toolkit:review-pr` unavailable    | Log it, continue with the remaining reviewers. Not fatal.                                                                                                                               |
 | Hook fires on a legitimate command mentioning `gh pr create` | Known limitation — the regex is best-effort. Work around by invoking the real `gh pr create` after the skill completes normally, or adjust the command to not embed the literal phrase. |

@@ -38,7 +38,7 @@ export function generateAllPairs<T>(items: T[]): [T, T][] {
 export function aggregateWinCounts(
   results: PairwiseResult[],
   episodeIds: number[],
-  scores: Map<number, number>
+  scores: Map<number, number>,
 ): RankedEpisode[] {
   const wins = new Map<number, number>();
   for (const id of episodeIds) {
@@ -56,10 +56,12 @@ export function aggregateWinCounts(
     }
   }
 
-  const sorted = Array.from(wins.entries()).sort(([idA, winsA], [idB, winsB]) => {
-    if (winsB !== winsA) return winsB - winsA;
-    return (scores.get(idB) ?? 0) - (scores.get(idA) ?? 0);
-  });
+  const sorted = Array.from(wins.entries()).sort(
+    ([idA, winsA], [idB, winsB]) => {
+      if (winsB !== winsA) return winsB - winsA;
+      return (scores.get(idB) ?? 0) - (scores.get(idA) ?? 0);
+    },
+  );
 
   return sorted.map(([episodeId, w], index) => ({
     episodeId,
@@ -76,8 +78,13 @@ export { parseScore } from "@/lib/score-utils";
  * <= ADAPTIVE_THRESHOLD topics → EPISODES_CAP_HIGH, otherwise → EPISODES_CAP_LOW.
  */
 export function getEpisodeCap(topicCount: number): number {
-  return topicCount <= ADAPTIVE_THRESHOLD ? EPISODES_CAP_HIGH : EPISODES_CAP_LOW;
+  return topicCount <= ADAPTIVE_THRESHOLD
+    ? EPISODES_CAP_HIGH
+    : EPISODES_CAP_LOW;
 }
 
 // Convenience re-export so callers can import all ranking utilities from one place
-export { TOPIC_RANKING_SYSTEM_PROMPT, getTopicComparisonPrompt } from "@/lib/prompts";
+export {
+  TOPIC_RANKING_SYSTEM_PROMPT,
+  getTopicComparisonPrompt,
+} from "@/lib/prompts";

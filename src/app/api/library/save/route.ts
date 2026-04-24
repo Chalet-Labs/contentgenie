@@ -10,10 +10,14 @@ export async function POST(request: NextRequest) {
   try {
     const { userId } = await auth();
     if (!userId) {
-      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json(
+        { success: false, error: "Unauthorized" },
+        { status: 401 },
+      );
     }
 
-    const contentType = request.headers.get("content-type")?.toLowerCase() ?? "";
+    const contentType =
+      request.headers.get("content-type")?.toLowerCase() ?? "";
     if (!contentType.includes("application/json")) {
       return NextResponse.json(
         { success: false, error: "Unsupported Media Type" },
@@ -47,7 +51,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { podcastIndexId, title, description, audioUrl, duration, publishDate, podcast } = result.data;
+    const {
+      podcastIndexId,
+      title,
+      description,
+      audioUrl,
+      duration,
+      publishDate,
+      podcast,
+    } = result.data;
 
     const publishDateValue = safeParseDate(publishDate);
 
@@ -55,15 +67,18 @@ export async function POST(request: NextRequest) {
 
     // Upsert podcast
     const podcastRecord = {
-      id: await upsertPodcast({
-        podcastIndexId: podcast.podcastIndexId,
-        title: podcast.title,
-        description: podcast.description,
-        publisher: podcast.publisher,
-        imageUrl: podcast.imageUrl,
-        categories: podcast.categories,
-        totalEpisodes: podcast.totalEpisodes,
-      }, { updateOnConflict: "safe" }),
+      id: await upsertPodcast(
+        {
+          podcastIndexId: podcast.podcastIndexId,
+          title: podcast.title,
+          description: podcast.description,
+          publisher: podcast.publisher,
+          imageUrl: podcast.imageUrl,
+          categories: podcast.categories,
+          totalEpisodes: podcast.totalEpisodes,
+        },
+        { updateOnConflict: "safe" },
+      ),
     };
 
     // Upsert episode
@@ -92,13 +107,19 @@ export async function POST(request: NextRequest) {
       .returning({ id: userLibrary.id });
 
     if (libraryResult.length === 0) {
-      return NextResponse.json({ success: true, message: "Episode already in library" });
+      return NextResponse.json({
+        success: true,
+        message: "Episode already in library",
+      });
     }
 
     revalidatePath("/library");
     revalidatePath(`/episode/${podcastIndexId}`);
 
-    return NextResponse.json({ success: true, message: "Episode saved to library" });
+    return NextResponse.json({
+      success: true,
+      message: "Episode saved to library",
+    });
   } catch (error) {
     console.error("Error saving episode to library:", error);
     return NextResponse.json(

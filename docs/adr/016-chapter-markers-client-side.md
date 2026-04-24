@@ -9,6 +9,7 @@
 Issue #97 adds chapter marker display and navigation to the audio player. Podcasts using the Podcasting 2.0 `<podcast:chapters>` tag include a `chaptersUrl` in their PodcastIndex episode metadata pointing to a JSON Chapters file. The PodcastIndex API already returns `chaptersUrl` on the `PodcastIndexEpisode` type (`src/lib/podcastindex.ts:95`). The question is where and how to fetch, store, and surface chapter data.
 
 Key constraints:
+
 1. Chapter data is only needed when an episode is actively playing.
 2. Fetching must be non-blocking (don't delay playback start).
 3. Chapters are optional — many episodes have no chapters.

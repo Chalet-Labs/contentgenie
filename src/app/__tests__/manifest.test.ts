@@ -24,17 +24,20 @@ describe("manifest", () => {
       expect.arrayContaining([
         expect.objectContaining({ sizes: "192x192", type: "image/png" }),
         expect.objectContaining({ sizes: "512x512", type: "image/png" }),
-      ])
+      ]),
     );
   });
 
   it("includes a maskable icon", () => {
-    const maskable = result.icons?.find((icon) =>
-      typeof icon === "object" && "purpose" in icon && icon.purpose === "maskable"
+    const maskable = result.icons?.find(
+      (icon) =>
+        typeof icon === "object" &&
+        "purpose" in icon &&
+        icon.purpose === "maskable",
     );
     expect(maskable).toBeDefined();
     expect(maskable).toEqual(
-      expect.objectContaining({ sizes: "512x512", type: "image/png" })
+      expect.objectContaining({ sizes: "512x512", type: "image/png" }),
     );
   });
 

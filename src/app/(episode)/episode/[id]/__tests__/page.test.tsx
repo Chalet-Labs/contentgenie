@@ -42,14 +42,14 @@ describe("EpisodePage", () => {
     render(
       (await EpisodePage({
         params: { id: "123" },
-      })) as React.ReactElement
+      })) as React.ReactElement,
     );
 
     expect(screen.getByTestId("public-episode-detail")).toHaveTextContent(
-      "public:123"
+      "public:123",
     );
     expect(
-      screen.queryByTestId("authenticated-episode-detail")
+      screen.queryByTestId("authenticated-episode-detail"),
     ).not.toBeInTheDocument();
   });
 
@@ -62,12 +62,14 @@ describe("EpisodePage", () => {
     render(
       (await EpisodePage({
         params: { id: "123" },
-      })) as React.ReactElement
+      })) as React.ReactElement,
     );
 
     expect(
-      screen.getByTestId("authenticated-episode-detail")
+      screen.getByTestId("authenticated-episode-detail"),
     ).toHaveTextContent("auth:123:user-1:true");
-    expect(screen.queryByTestId("public-episode-detail")).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId("public-episode-detail"),
+    ).not.toBeInTheDocument();
   });
 });

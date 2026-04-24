@@ -10,10 +10,14 @@ export async function POST(request: NextRequest) {
   try {
     const { userId } = await auth();
     if (!userId) {
-      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json(
+        { success: false, error: "Unauthorized" },
+        { status: 401 },
+      );
     }
 
-    const contentType = request.headers.get("content-type")?.toLowerCase() ?? "";
+    const contentType =
+      request.headers.get("content-type")?.toLowerCase() ?? "";
     if (!contentType.includes("application/json")) {
       return NextResponse.json(
         { success: false, error: "Unsupported Media Type" },
@@ -48,8 +52,14 @@ export async function POST(request: NextRequest) {
     }
 
     const {
-      podcastIndexId, title, description, publisher,
-      imageUrl, categories, totalEpisodes, latestEpisodeDate,
+      podcastIndexId,
+      title,
+      description,
+      publisher,
+      imageUrl,
+      categories,
+      totalEpisodes,
+      latestEpisodeDate,
     } = result.data;
 
     const latestEpisodeDateValue = safeParseDate(latestEpisodeDate);
@@ -58,16 +68,19 @@ export async function POST(request: NextRequest) {
 
     // Upsert podcast
     const podcast = {
-      id: await upsertPodcast({
-        podcastIndexId,
-        title,
-        description,
-        publisher,
-        imageUrl,
-        categories,
-        totalEpisodes,
-        latestEpisodeDate: latestEpisodeDateValue,
-      }, { updateOnConflict: "safe" }),
+      id: await upsertPodcast(
+        {
+          podcastIndexId,
+          title,
+          description,
+          publisher,
+          imageUrl,
+          categories,
+          totalEpisodes,
+          latestEpisodeDate: latestEpisodeDateValue,
+        },
+        { updateOnConflict: "safe" },
+      ),
     };
 
     // Insert subscription (idempotent)
@@ -78,13 +91,19 @@ export async function POST(request: NextRequest) {
       .returning({ id: userSubscriptions.id });
 
     if (subResult.length === 0) {
-      return NextResponse.json({ success: true, message: "Already subscribed" });
+      return NextResponse.json({
+        success: true,
+        message: "Already subscribed",
+      });
     }
 
     revalidatePath("/subscriptions");
     revalidatePath(`/podcast/${podcastIndexId}`);
 
-    return NextResponse.json({ success: true, message: "Subscribed successfully" });
+    return NextResponse.json({
+      success: true,
+      message: "Subscribed successfully",
+    });
   } catch (error) {
     console.error("Error subscribing to podcast:", error);
     return NextResponse.json(

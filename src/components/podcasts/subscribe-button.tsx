@@ -6,10 +6,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { useOnlineStatus } from "@/hooks/use-online-status";
 import { useSyncQueue } from "@/hooks/use-sync-queue";
-import {
-  offlineSubscribe,
-  offlineUnsubscribe,
-} from "@/lib/offline-actions";
+import { offlineSubscribe, offlineUnsubscribe } from "@/lib/offline-actions";
 import { useSidebarCountsOptional } from "@/contexts/sidebar-counts-context";
 
 interface SubscribeButtonProps {
@@ -80,9 +77,10 @@ export function SubscribeButton({
             rssFeedUrl,
             categories,
             totalEpisodes,
-            latestEpisodeDate: latestEpisodeDate != null
-              ? new Date(latestEpisodeDate * 1000)
-              : undefined,
+            latestEpisodeDate:
+              latestEpisodeDate != null
+                ? new Date(latestEpisodeDate * 1000)
+                : undefined,
           },
           isOnline,
         );
@@ -102,9 +100,13 @@ export function SubscribeButton({
         }
       }
     } catch (error) {
-      toast.error(isSubscribed ? "Failed to unsubscribe" : "Failed to subscribe", {
-        description: error instanceof Error ? error.message : "Please try again",
-      });
+      toast.error(
+        isSubscribed ? "Failed to unsubscribe" : "Failed to subscribe",
+        {
+          description:
+            error instanceof Error ? error.message : "Please try again",
+        },
+      );
     } finally {
       setIsLoading(false);
     }
@@ -127,7 +129,10 @@ export function SubscribeButton({
         {isFailedSync ? (
           <>
             <span className="sr-only">Sync failed</span>
-            <AlertCircle aria-hidden="true" className="ml-1 h-3 w-3 text-destructive" />
+            <AlertCircle
+              aria-hidden="true"
+              className="ml-1 h-3 w-3 text-destructive"
+            />
           </>
         ) : isPendingSync ? (
           <Clock className="ml-1 h-3 w-3 text-muted-foreground" />
@@ -147,7 +152,10 @@ export function SubscribeButton({
       {isFailedSync ? (
         <>
           <span className="sr-only">Sync failed</span>
-          <AlertCircle aria-hidden="true" className="ml-1 h-3 w-3 text-destructive" />
+          <AlertCircle
+            aria-hidden="true"
+            className="ml-1 h-3 w-3 text-destructive"
+          />
         </>
       ) : isPendingSync ? (
         <Clock className="ml-1 h-3 w-3 text-muted-foreground" />

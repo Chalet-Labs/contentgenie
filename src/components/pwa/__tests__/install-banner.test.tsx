@@ -43,9 +43,7 @@ describe("InstallBanner", () => {
     render(<InstallBanner />);
 
     expect(screen.getByText("Install ContentGenie")).toBeInTheDocument();
-    expect(
-      screen.getByText("Get the full app experience"),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Get the full app experience")).toBeInTheDocument();
   });
 
   it("calls promptInstall when Install button is clicked", async () => {

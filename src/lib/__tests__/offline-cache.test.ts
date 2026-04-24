@@ -150,8 +150,12 @@ describe("clearUserCache", () => {
   it("clears all entries for a specific user", async () => {
     await cacheLibrary("user-1", li([{ id: 1 }]));
     await cacheEpisode("user-1", "ep1", {
-      episode: { id: 1 } as unknown as import("@/lib/offline-cache").EpisodeData,
-      podcast: { id: 1 } as unknown as import("@/lib/offline-cache").PodcastData,
+      episode: {
+        id: 1,
+      } as unknown as import("@/lib/offline-cache").EpisodeData,
+      podcast: {
+        id: 1,
+      } as unknown as import("@/lib/offline-cache").PodcastData,
       summary: null,
     });
     await cacheLibrary("user-2", li([{ id: 2 }]));
@@ -183,7 +187,9 @@ describe("evictExpiredEntries", () => {
     // Expired entry should be gone
     // Reset Date.now for getCachedLibrary TTL check
     expect(await getCachedLibrary("user-1")).toBeUndefined();
-    expect(await getCachedLibrary("user-2")).toEqual([{ id: 2, title: "Fresh" }]);
+    expect(await getCachedLibrary("user-2")).toEqual([
+      { id: 2, title: "Fresh" },
+    ]);
   });
 });
 
@@ -214,7 +220,9 @@ describe("graceful degradation", () => {
     _forceIdbUnavailableForTesting();
 
     // Should not throw and should return without writing anything
-    await expect(cacheLibrary("user-1", li([{ id: 1 }]))).resolves.not.toThrow();
+    await expect(
+      cacheLibrary("user-1", li([{ id: 1 }])),
+    ).resolves.not.toThrow();
   });
 
   it("getCachedLibrary returns undefined when IndexedDB is forced unavailable", async () => {

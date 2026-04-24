@@ -13,7 +13,7 @@ export async function GET(request: NextRequest) {
   if (!url) {
     return NextResponse.json(
       { error: "Missing url parameter" },
-      { status: 400 }
+      { status: 400 },
     );
   }
 
@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
   } catch {
     return NextResponse.json(
       { error: "Failed to fetch chapters" },
-      { status: 502 }
+      { status: 502 },
     );
   }
 
@@ -38,13 +38,17 @@ export async function GET(request: NextRequest) {
   } catch {
     return NextResponse.json(
       { error: "Invalid JSON response from chapters URL" },
-      { status: 502 }
+      { status: 502 },
     );
   }
 
   const chapters = parseChapters(json);
   return NextResponse.json(
     { chapters },
-    { headers: { "Cache-Control": "public, max-age=300, stale-while-revalidate=3600" } }
+    {
+      headers: {
+        "Cache-Control": "public, max-age=300, stale-while-revalidate=3600",
+      },
+    },
   );
 }

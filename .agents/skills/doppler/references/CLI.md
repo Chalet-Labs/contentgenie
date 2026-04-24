@@ -340,19 +340,19 @@ doppler completion fish > ~/.config/fish/completions/doppler.fish
 
 These flags work with any command:
 
-| Flag | Description |
-|------|-------------|
-| `--json` | Output in JSON format |
-| `--silent` | Suppress info messages |
-| `--debug` | Show debug output |
-| `-t, --token` | Use a specific Doppler token |
-| `--scope` | Directory scope for config (default `.`) |
-| `--config-dir` | Config directory (default `~/.doppler`) |
-| `--no-check-version` | Skip update checks |
-| `--no-timeout` | Disable HTTP timeout |
-| `--timeout` | HTTP request timeout (default 10s) |
-| `--attempts` | HTTP retry attempts (default 5) |
-| `--print-config` | Show active configuration |
+| Flag                 | Description                              |
+| -------------------- | ---------------------------------------- |
+| `--json`             | Output in JSON format                    |
+| `--silent`           | Suppress info messages                   |
+| `--debug`            | Show debug output                        |
+| `-t, --token`        | Use a specific Doppler token             |
+| `--scope`            | Directory scope for config (default `.`) |
+| `--config-dir`       | Config directory (default `~/.doppler`)  |
+| `--no-check-version` | Skip update checks                       |
+| `--no-timeout`       | Disable HTTP timeout                     |
+| `--timeout`          | HTTP request timeout (default 10s)       |
+| `--attempts`         | HTTP retry attempts (default 5)          |
+| `--print-config`     | Show active configuration                |
 
 ## OIDC
 

@@ -24,7 +24,7 @@ Sort episodes within a topic by their existing `worthItScore`.
 Sort by the `relevance` column in `episode_topics`.
 
 - **Pro:** Topic-specific. No LLM calls.
-- **Con:** Relevance measures how central the topic is *to that episode*, not how well the episode covers the topic compared to other episodes. Two episodes with relevance 0.9 are not meaningfully distinguished.
+- **Con:** Relevance measures how central the topic is _to that episode_, not how well the episode covers the topic compared to other episodes. Two episodes with relevance 0.9 are not meaningfully distinguished.
 
 ### Option C: Pairwise LLM comparison (chosen)
 
@@ -49,7 +49,7 @@ For N <= 10 episodes per topic (capped), we run an exhaustive round-robin: every
 
 ### Adaptive episode cap
 
-For a topic with N episodes, pairwise comparisons = N*(N-1)/2. The episode cap adapts to the number of qualifying topics to stay within the 10-minute task budget:
+For a topic with N episodes, pairwise comparisons = N\*(N-1)/2. The episode cap adapts to the number of qualifying topics to stay within the 10-minute task budget:
 
 - **<= 20 topics:** cap at 10 episodes/topic (45 comparisons/topic, 900 max total)
 - **> 20 topics:** cap at 5 episodes/topic (10 comparisons/topic, 500 max total)

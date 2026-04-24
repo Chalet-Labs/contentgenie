@@ -33,6 +33,7 @@ Query episodes in the API route, call `summarizeEpisode.batchTrigger()` directly
 ### Option C: Parent task with chunked `batchTriggerAndWait` + `metadata.root.increment` for progress (chosen)
 
 A Trigger.dev parent task that:
+
 1. Queries the database for matching episodes.
 2. Initializes progress metadata: `metadata.set("progress", { total, completed: 0, failed: 0, ... })`.
 3. Chunks episode IDs (max 500 per `batchTriggerAndWait` call, the SDK limit).
@@ -65,7 +66,7 @@ Parent task fires off all children via `batchTrigger` and polls `runs.retrieve` 
 4. **Existing `summarize-episode` is modified minimally.** Two lines are added at the end of `run()` and in `onFailure`:
    - `run()`: `metadata.root.increment("completed", 1)` after `metadata.set("step", "completed")`.
    - `onFailure`: `metadata.root.increment("failed", 1)` after the DB status update.
-   These are no-ops when the task runs standalone (no root task context). When called from the bulk parent, they provide real-time progress.
+     These are no-ops when the task runs standalone (no root task context). When called from the bulk parent, they provide real-time progress.
 
 5. **Cancellation via `runs.cancel`.** The API exposes a cancel endpoint that calls `runs.cancel(runId)`. When a parent task is canceled, Trigger.dev automatically cancels all in-progress child runs. Note: running children only stop at their next await/checkpoint, so an active AssemblyAI transcription may take minutes to abort.
 

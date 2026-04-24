@@ -52,8 +52,10 @@ const mockExtractTranscriptUrl = vi.fn();
 const mockFetchTranscriptFromUrl = vi.fn();
 vi.mock("@/trigger/helpers/transcript", () => ({
   fetchTranscript: (...args: unknown[]) => mockFetchTranscript(...args),
-  extractTranscriptUrl: (...args: unknown[]) => mockExtractTranscriptUrl(...args),
-  fetchTranscriptFromUrl: (...args: unknown[]) => mockFetchTranscriptFromUrl(...args),
+  extractTranscriptUrl: (...args: unknown[]) =>
+    mockExtractTranscriptUrl(...args),
+  fetchTranscriptFromUrl: (...args: unknown[]) =>
+    mockFetchTranscriptFromUrl(...args),
 }));
 
 const mockPersistTranscript = vi.fn();
@@ -74,7 +76,10 @@ vi.mock("@/trigger/summarize-episode", () => ({
 }));
 
 import { fetchTranscriptTask } from "@/trigger/fetch-transcript";
-import { submitTranscriptionAsync, getTranscriptionStatus } from "@/lib/assemblyai";
+import {
+  submitTranscriptionAsync,
+  getTranscriptionStatus,
+} from "@/lib/assemblyai";
 import { db } from "@/db";
 
 // The task mock returns the raw config object, so `.run` and `.onFailure` are available at runtime
@@ -86,11 +91,16 @@ const taskConfig = fetchTranscriptTask as unknown as {
     transcripts?: Array<{ url: string; type: string }>;
     force?: boolean;
     triggerSummarize?: boolean;
-  }) => Promise<{ transcript: string | undefined; source: string | null | undefined }>;
+  }) => Promise<{
+    transcript: string | undefined;
+    source: string | null | undefined;
+  }>;
   onFailure: (params: { payload: { episodeId: number } }) => Promise<void>;
 };
 
-const mockTranscripts = [{ url: "https://example.com/transcript.txt", type: "text/plain" }];
+const mockTranscripts = [
+  { url: "https://example.com/transcript.txt", type: "text/plain" },
+];
 
 describe("fetch-transcript task", () => {
   beforeEach(() => {
@@ -108,18 +118,28 @@ describe("fetch-transcript task", () => {
   });
 
   it("cache hit with force=false returns cached transcript, source undefined, no external fetches", async () => {
-    mockFindFirst.mockResolvedValue({ transcription: "Cached transcript text" });
+    mockFindFirst.mockResolvedValue({
+      transcription: "Cached transcript text",
+    });
 
-    const result = await taskConfig.run({ episodeId: 123, transcripts: mockTranscripts });
+    const result = await taskConfig.run({
+      episodeId: 123,
+      transcripts: mockTranscripts,
+    });
 
-    expect(result).toEqual({ transcript: "Cached transcript text", source: undefined });
+    expect(result).toEqual({
+      transcript: "Cached transcript text",
+      source: undefined,
+    });
     expect(mockFetchTranscript).not.toHaveBeenCalled();
     expect(vi.mocked(submitTranscriptionAsync)).not.toHaveBeenCalled();
     expect(mockPersistTranscript).not.toHaveBeenCalled();
   });
 
   it("cache hit with force=true ignores cache and proceeds to PodcastIndex waterfall", async () => {
-    mockFindFirst.mockResolvedValue({ transcription: "Cached transcript text" });
+    mockFindFirst.mockResolvedValue({
+      transcription: "Cached transcript text",
+    });
     mockFetchTranscript.mockResolvedValue("PodcastIndex transcript");
 
     const result = await taskConfig.run({
@@ -128,23 +148,42 @@ describe("fetch-transcript task", () => {
       force: true,
     });
 
-    expect(result).toEqual({ transcript: "PodcastIndex transcript", source: "podcastindex" });
+    expect(result).toEqual({
+      transcript: "PodcastIndex transcript",
+      source: "podcastindex",
+    });
     expect(mockFetchTranscript).toHaveBeenCalled();
-    expect(mockPersistTranscript).toHaveBeenCalledWith(123, "PodcastIndex transcript", "podcastindex");
+    expect(mockPersistTranscript).toHaveBeenCalledWith(
+      123,
+      "PodcastIndex transcript",
+      "podcastindex",
+    );
   });
 
   it("PodcastIndex transcript found returns correct result and calls persistTranscript", async () => {
     mockFetchTranscript.mockResolvedValue("PodcastIndex transcript text");
 
-    const result = await taskConfig.run({ episodeId: 123, transcripts: mockTranscripts });
+    const result = await taskConfig.run({
+      episodeId: 123,
+      transcripts: mockTranscripts,
+    });
 
-    expect(result).toEqual({ transcript: "PodcastIndex transcript text", source: "podcastindex" });
-    expect(mockPersistTranscript).toHaveBeenCalledWith(123, "PodcastIndex transcript text", "podcastindex");
+    expect(result).toEqual({
+      transcript: "PodcastIndex transcript text",
+      source: "podcastindex",
+    });
+    expect(mockPersistTranscript).toHaveBeenCalledWith(
+      123,
+      "PodcastIndex transcript text",
+      "podcastindex",
+    );
   });
 
   it("description URL fallback when PodcastIndex returns nothing", async () => {
     mockFetchTranscript.mockResolvedValue(undefined);
-    mockExtractTranscriptUrl.mockReturnValue("https://example.com/transcript.txt");
+    mockExtractTranscriptUrl.mockReturnValue(
+      "https://example.com/transcript.txt",
+    );
     mockFetchTranscriptFromUrl.mockResolvedValue("Description URL transcript");
 
     const result = await taskConfig.run({
@@ -153,15 +192,25 @@ describe("fetch-transcript task", () => {
       description: "See transcript at https://example.com/transcript.txt",
     });
 
-    expect(result).toEqual({ transcript: "Description URL transcript", source: "description-url" });
-    expect(mockPersistTranscript).toHaveBeenCalledWith(123, "Description URL transcript", "description-url");
+    expect(result).toEqual({
+      transcript: "Description URL transcript",
+      source: "description-url",
+    });
+    expect(mockPersistTranscript).toHaveBeenCalledWith(
+      123,
+      "Description URL transcript",
+      "description-url",
+    );
     expect(vi.mocked(submitTranscriptionAsync)).not.toHaveBeenCalled();
   });
 
   it("AssemblyAI fallback when PodcastIndex and description URL both fail", async () => {
     mockFetchTranscript.mockResolvedValue(undefined);
     mockExtractTranscriptUrl.mockReturnValue(null);
-    const mockToken = { id: "token-1", url: "https://hooks.trigger.dev/token/1" };
+    const mockToken = {
+      id: "token-1",
+      url: "https://hooks.trigger.dev/token/1",
+    };
     mockCreateToken.mockResolvedValue(mockToken);
     vi.mocked(submitTranscriptionAsync).mockResolvedValue("transcript-abc");
     mockForToken.mockResolvedValue({
@@ -169,7 +218,10 @@ describe("fetch-transcript task", () => {
       output: { transcript_id: "transcript-abc", status: "completed" },
     });
     vi.mocked(getTranscriptionStatus).mockResolvedValue({
-      id: "transcript-abc", status: "completed", text: "AssemblyAI transcript", error: null,
+      id: "transcript-abc",
+      status: "completed",
+      text: "AssemblyAI transcript",
+      error: null,
     });
 
     const result = await taskConfig.run({
@@ -178,15 +230,27 @@ describe("fetch-transcript task", () => {
       enclosureUrl: "https://example.com/audio.mp3",
     });
 
-    expect(result).toEqual({ transcript: "AssemblyAI transcript", source: "assemblyai" });
-    expect(mockPersistTranscript).toHaveBeenCalledWith(123, "AssemblyAI transcript", "assemblyai");
+    expect(result).toEqual({
+      transcript: "AssemblyAI transcript",
+      source: "assemblyai",
+    });
+    expect(mockPersistTranscript).toHaveBeenCalledWith(
+      123,
+      "AssemblyAI transcript",
+      "assemblyai",
+    );
   });
 
   it("all sources fail returns transcript: undefined, source: null, no persistTranscript call", async () => {
     mockFetchTranscript.mockResolvedValue(undefined);
     mockExtractTranscriptUrl.mockReturnValue(null);
-    mockCreateToken.mockResolvedValue({ id: "token-1", url: "https://hooks.trigger.dev/token/1" });
-    vi.mocked(submitTranscriptionAsync).mockRejectedValue(new Error("AssemblyAI unavailable"));
+    mockCreateToken.mockResolvedValue({
+      id: "token-1",
+      url: "https://hooks.trigger.dev/token/1",
+    });
+    vi.mocked(submitTranscriptionAsync).mockRejectedValue(
+      new Error("AssemblyAI unavailable"),
+    );
 
     const result = await taskConfig.run({
       episodeId: 123,
@@ -201,7 +265,10 @@ describe("fetch-transcript task", () => {
   it("AssemblyAI token timeout returns transcript: undefined, source: null", async () => {
     mockFetchTranscript.mockResolvedValue(undefined);
     mockExtractTranscriptUrl.mockReturnValue(null);
-    mockCreateToken.mockResolvedValue({ id: "token-1", url: "https://hooks.trigger.dev/token/1" });
+    mockCreateToken.mockResolvedValue({
+      id: "token-1",
+      url: "https://hooks.trigger.dev/token/1",
+    });
     vi.mocked(submitTranscriptionAsync).mockResolvedValue("transcript-timeout");
     mockForToken.mockResolvedValue({ ok: false });
 
@@ -218,14 +285,20 @@ describe("fetch-transcript task", () => {
   it("AssemblyAI error status returns transcript: undefined, source: null", async () => {
     mockFetchTranscript.mockResolvedValue(undefined);
     mockExtractTranscriptUrl.mockReturnValue(null);
-    mockCreateToken.mockResolvedValue({ id: "token-1", url: "https://hooks.trigger.dev/token/1" });
+    mockCreateToken.mockResolvedValue({
+      id: "token-1",
+      url: "https://hooks.trigger.dev/token/1",
+    });
     vi.mocked(submitTranscriptionAsync).mockResolvedValue("transcript-err");
     mockForToken.mockResolvedValue({
       ok: true,
       output: { transcript_id: "transcript-err", status: "error" },
     });
     vi.mocked(getTranscriptionStatus).mockResolvedValue({
-      id: "transcript-err", status: "error", text: null, error: "Audio processing failed",
+      id: "transcript-err",
+      status: "error",
+      text: null,
+      error: "Audio processing failed",
     });
 
     const result = await taskConfig.run({
@@ -243,7 +316,7 @@ describe("fetch-transcript task", () => {
     mockPersistTranscript.mockRejectedValue(new Error("DB unavailable"));
 
     await expect(
-      taskConfig.run({ episodeId: 123, transcripts: mockTranscripts })
+      taskConfig.run({ episodeId: 123, transcripts: mockTranscripts }),
     ).rejects.toThrow("DB unavailable");
     expect(mockPersistTranscript).toHaveBeenCalled();
   });
@@ -252,9 +325,15 @@ describe("fetch-transcript task", () => {
     mockFindFirst.mockResolvedValue({ transcription: "   \n  " });
     mockFetchTranscript.mockResolvedValue("PodcastIndex fallback transcript");
 
-    const result = await taskConfig.run({ episodeId: 123, transcripts: mockTranscripts });
+    const result = await taskConfig.run({
+      episodeId: 123,
+      transcripts: mockTranscripts,
+    });
 
-    expect(result).toEqual({ transcript: "PodcastIndex fallback transcript", source: "podcastindex" });
+    expect(result).toEqual({
+      transcript: "PodcastIndex fallback transcript",
+      source: "podcastindex",
+    });
     expect(mockFetchTranscript).toHaveBeenCalled();
   });
 
@@ -271,14 +350,20 @@ describe("fetch-transcript task", () => {
 
   it("clears transcriptRunId after successful transcript fetch", async () => {
     mockFetchTranscript.mockResolvedValue("PodcastIndex transcript");
-    const mockSet = vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue(undefined) });
+    const mockSet = vi
+      .fn()
+      .mockReturnValue({ where: vi.fn().mockResolvedValue(undefined) });
     vi.mocked(db.update).mockReturnValue({ set: mockSet } as never);
 
     await taskConfig.run({ episodeId: 123, transcripts: mockTranscripts });
 
     const setCalls = mockSet.mock.calls;
     const clearCall = setCalls.find(
-      (call: unknown[]) => call[0] && typeof call[0] === "object" && "transcriptRunId" in (call[0] as Record<string, unknown>) && (call[0] as Record<string, unknown>).transcriptRunId === null
+      (call: unknown[]) =>
+        call[0] &&
+        typeof call[0] === "object" &&
+        "transcriptRunId" in (call[0] as Record<string, unknown>) &&
+        (call[0] as Record<string, unknown>).transcriptRunId === null,
     );
     expect(clearCall).toBeDefined();
   });
@@ -286,14 +371,20 @@ describe("fetch-transcript task", () => {
   it("clears transcriptRunId when no transcript found (all sources fail)", async () => {
     mockFetchTranscript.mockResolvedValue(undefined);
     mockExtractTranscriptUrl.mockReturnValue(null);
-    const mockSet = vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue(undefined) });
+    const mockSet = vi
+      .fn()
+      .mockReturnValue({ where: vi.fn().mockResolvedValue(undefined) });
     vi.mocked(db.update).mockReturnValue({ set: mockSet } as never);
 
     await taskConfig.run({ episodeId: 123, transcripts: [] });
 
     const setCalls = mockSet.mock.calls;
     const clearCall = setCalls.find(
-      (call: unknown[]) => call[0] && typeof call[0] === "object" && "transcriptRunId" in (call[0] as Record<string, unknown>) && (call[0] as Record<string, unknown>).transcriptRunId === null
+      (call: unknown[]) =>
+        call[0] &&
+        typeof call[0] === "object" &&
+        "transcriptRunId" in (call[0] as Record<string, unknown>) &&
+        (call[0] as Record<string, unknown>).transcriptRunId === null,
     );
     expect(clearCall).toBeDefined();
     // Should also set transcriptStatus to "missing" when no transcript found
@@ -341,7 +432,7 @@ describe("fetch-transcript triggerSummarize chaining", () => {
 
     expect(mockSummarizeTrigger).toHaveBeenCalledWith(
       { episodeId: 123 },
-      { idempotencyKey: "poll-summarize-123" }
+      { idempotencyKey: "poll-summarize-123" },
     );
   });
 
@@ -356,7 +447,7 @@ describe("fetch-transcript triggerSummarize chaining", () => {
 
     expect(mockSummarizeTrigger).toHaveBeenCalledWith(
       { episodeId: 456 },
-      { idempotencyKey: "poll-summarize-456" }
+      { idempotencyKey: "poll-summarize-456" },
     );
   });
 
@@ -386,14 +477,16 @@ describe("fetch-transcript triggerSummarize chaining", () => {
 
   it("propagates summarize trigger failure so Trigger.dev retries the task", async () => {
     mockFetchTranscript.mockResolvedValue("PodcastIndex transcript");
-    mockSummarizeTrigger.mockRejectedValue(new Error("Trigger.dev API timeout"));
+    mockSummarizeTrigger.mockRejectedValue(
+      new Error("Trigger.dev API timeout"),
+    );
 
     await expect(
       taskConfig.run({
         episodeId: 123,
         transcripts: [{ url: "https://example.com/t.txt", type: "text/plain" }],
         triggerSummarize: true,
-      })
+      }),
     ).rejects.toThrow("Trigger.dev API timeout");
 
     // Transcript was still persisted before the error
@@ -415,7 +508,10 @@ describe("fetch-transcript onFailure", () => {
 
     expect(db.update).toHaveBeenCalled();
     expect(mockSet).toHaveBeenCalledWith(
-      expect.objectContaining({ transcriptRunId: null, transcriptStatus: "failed" })
+      expect.objectContaining({
+        transcriptRunId: null,
+        transcriptStatus: "failed",
+      }),
     );
   });
 
@@ -426,6 +522,8 @@ describe("fetch-transcript onFailure", () => {
       }),
     } as never);
 
-    await expect(taskConfig.onFailure({ payload: { episodeId: 456 } })).resolves.not.toThrow();
+    await expect(
+      taskConfig.onFailure({ payload: { episodeId: 456 } }),
+    ).resolves.not.toThrow();
   });
 });

@@ -63,7 +63,8 @@ vi.mock("@/lib/openrouter", () => ({
 }));
 
 vi.mock("@/trigger/helpers/topic-ranking", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/trigger/helpers/topic-ranking")>();
+  const actual =
+    await importOriginal<typeof import("@/trigger/helpers/topic-ranking")>();
   return {
     ...actual,
     // Keep all real implementations — only need actual logic
@@ -73,7 +74,12 @@ vi.mock("@/trigger/helpers/topic-ranking", async (importOriginal) => {
 import { rankEpisodeTopics } from "@/trigger/rank-episode-topics";
 
 const taskConfig = rankEpisodeTopics as unknown as {
-  run: () => Promise<{ topicsRanked: number; comparisonsRun: number; comparisonsFailed: number; writeFailed: number }>;
+  run: () => Promise<{
+    topicsRanked: number;
+    comparisonsRun: number;
+    comparisonsFailed: number;
+    writeFailed: number;
+  }>;
 };
 
 // Build a chainable select mock that resolves to `rows` at the end
@@ -90,7 +96,10 @@ function buildSelectChain(rows: unknown[]) {
 }
 
 // Set up db.select to return different chains for topic query vs episode query
-function setupSelectSequence(topicRows: unknown[], ...episodeRowSets: unknown[][]) {
+function setupSelectSequence(
+  topicRows: unknown[],
+  ...episodeRowSets: unknown[][]
+) {
   let callCount = 0;
   mockSelect.mockImplementation(() => {
     if (callCount === 0) {
@@ -139,7 +148,12 @@ describe("rank-episode-topics task", () => {
 
     const result = await taskConfig.run();
 
-    expect(result).toEqual({ topicsRanked: 0, comparisonsRun: 0, comparisonsFailed: 0, writeFailed: 0 });
+    expect(result).toEqual({
+      topicsRanked: 0,
+      comparisonsRun: 0,
+      comparisonsFailed: 0,
+      writeFailed: 0,
+    });
     expect(mockGenerateCompletion).not.toHaveBeenCalled();
     expect(mockUpdate).not.toHaveBeenCalled();
   });
@@ -147,9 +161,24 @@ describe("rank-episode-topics task", () => {
   it("ranks 3 episodes for a single topic (3 comparisons)", async () => {
     const topicRows = [{ topic: "Machine Learning", episodeCount: 3 }];
     const episodeRows = [
-      { episodeId: 1, title: "Ep 1", summary: "Summary 1", worthItScore: "8.00" },
-      { episodeId: 2, title: "Ep 2", summary: "Summary 2", worthItScore: "7.00" },
-      { episodeId: 3, title: "Ep 3", summary: "Summary 3", worthItScore: "6.00" },
+      {
+        episodeId: 1,
+        title: "Ep 1",
+        summary: "Summary 1",
+        worthItScore: "8.00",
+      },
+      {
+        episodeId: 2,
+        title: "Ep 2",
+        summary: "Summary 2",
+        worthItScore: "7.00",
+      },
+      {
+        episodeId: 3,
+        title: "Ep 3",
+        summary: "Summary 3",
+        worthItScore: "6.00",
+      },
     ];
 
     setupSelectSequence(topicRows, episodeRows);
@@ -171,9 +200,24 @@ describe("rank-episode-topics task", () => {
   it("skips failed LLM comparison and still produces partial ranking", async () => {
     const topicRows = [{ topic: "AI", episodeCount: 3 }];
     const episodeRows = [
-      { episodeId: 1, title: "Ep 1", summary: "Summary 1", worthItScore: "8.00" },
-      { episodeId: 2, title: "Ep 2", summary: "Summary 2", worthItScore: "7.00" },
-      { episodeId: 3, title: "Ep 3", summary: "Summary 3", worthItScore: "6.00" },
+      {
+        episodeId: 1,
+        title: "Ep 1",
+        summary: "Summary 1",
+        worthItScore: "8.00",
+      },
+      {
+        episodeId: 2,
+        title: "Ep 2",
+        summary: "Summary 2",
+        worthItScore: "7.00",
+      },
+      {
+        episodeId: 3,
+        title: "Ep 3",
+        summary: "Summary 3",
+        worthItScore: "6.00",
+      },
     ];
 
     setupSelectSequence(topicRows, episodeRows);
@@ -198,9 +242,24 @@ describe("rank-episode-topics task", () => {
   it("increments comparisonsFailed when LLM returns an invalid winner value", async () => {
     const topicRows = [{ topic: "AI", episodeCount: 3 }];
     const episodeRows = [
-      { episodeId: 1, title: "Ep 1", summary: "Summary 1", worthItScore: "8.00" },
-      { episodeId: 2, title: "Ep 2", summary: "Summary 2", worthItScore: "7.00" },
-      { episodeId: 3, title: "Ep 3", summary: "Summary 3", worthItScore: "6.00" },
+      {
+        episodeId: 1,
+        title: "Ep 1",
+        summary: "Summary 1",
+        worthItScore: "8.00",
+      },
+      {
+        episodeId: 2,
+        title: "Ep 2",
+        summary: "Summary 2",
+        worthItScore: "7.00",
+      },
+      {
+        episodeId: 3,
+        title: "Ep 3",
+        summary: "Summary 3",
+        worthItScore: "6.00",
+      },
     ];
 
     setupSelectSequence(topicRows, episodeRows);
@@ -221,9 +280,24 @@ describe("rank-episode-topics task", () => {
     const { logger } = await import("@trigger.dev/sdk");
     const topicRows = [{ topic: "Broken", episodeCount: 3 }];
     const episodeRows = [
-      { episodeId: 1, title: "Ep 1", summary: "Summary 1", worthItScore: "8.00" },
-      { episodeId: 2, title: "Ep 2", summary: "Summary 2", worthItScore: "7.00" },
-      { episodeId: 3, title: "Ep 3", summary: "Summary 3", worthItScore: "6.00" },
+      {
+        episodeId: 1,
+        title: "Ep 1",
+        summary: "Summary 1",
+        worthItScore: "8.00",
+      },
+      {
+        episodeId: 2,
+        title: "Ep 2",
+        summary: "Summary 2",
+        worthItScore: "7.00",
+      },
+      {
+        episodeId: 3,
+        title: "Ep 3",
+        summary: "Summary 3",
+        worthItScore: "6.00",
+      },
     ];
 
     setupSelectSequence(topicRows, episodeRows);
@@ -236,7 +310,7 @@ describe("rank-episode-topics task", () => {
     expect(mockUpdate).not.toHaveBeenCalled();
     expect(logger.warn).toHaveBeenCalledWith(
       "All comparisons failed for topic; skipping",
-      expect.objectContaining({ topic: "Broken" })
+      expect.objectContaining({ topic: "Broken" }),
     );
   });
 
@@ -264,7 +338,7 @@ describe("rank-episode-topics task", () => {
     expect(result.topicsRanked).toBe(50);
     expect(logger.warn).toHaveBeenCalledWith(
       "Qualifying topics exceeded cap; some topics will be skipped",
-      expect.objectContaining({ total: 51, cap: 50 })
+      expect.objectContaining({ total: 51, cap: 50 }),
     );
   });
 
@@ -339,7 +413,10 @@ describe("rank-episode-topics task", () => {
 
     setupSelectSequence(topicRows, episodeRows);
     mockGenerateCompletion.mockResolvedValue("ok");
-    mockParseJsonResponse.mockReturnValue({ winner: "tie", reason: "Equal coverage" });
+    mockParseJsonResponse.mockReturnValue({
+      winner: "tie",
+      reason: "Equal coverage",
+    });
 
     const result = await taskConfig.run();
 
@@ -371,7 +448,9 @@ describe("rank-episode-topics task", () => {
     expect(result.topicsRanked).toBe(1);
 
     // Verify db.update was called with topicRank values (filter out the stale-rank clear call)
-    const setCalls = mockSet.mock.calls.filter((args) => args[0]?.topicRank !== null);
+    const setCalls = mockSet.mock.calls.filter(
+      (args) => args[0]?.topicRank !== null,
+    );
     expect(setCalls.some((args) => args[0]?.topicRank === 1)).toBe(true);
     expect(setCalls.some((args) => args[0]?.topicRank === 2)).toBe(true);
     expect(setCalls.some((args) => args[0]?.topicRank === 3)).toBe(true);

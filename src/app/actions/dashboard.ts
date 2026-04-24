@@ -2,7 +2,16 @@
 
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
-import { eq, desc, and, gte, isNotNull, notInArray, inArray, sql } from "drizzle-orm";
+import {
+  eq,
+  desc,
+  and,
+  gte,
+  isNotNull,
+  notInArray,
+  inArray,
+  sql,
+} from "drizzle-orm";
 import { db } from "@/db";
 import {
   userSubscriptions,
@@ -40,7 +49,7 @@ async function fetchUserTopicProfile(userId: string) {
       db
         .select({ episodeId: userLibrary.episodeId })
         .from(userLibrary)
-        .where(eq(userLibrary.userId, userId))
+        .where(eq(userLibrary.userId, userId)),
     );
 
   const totalConsumed = consumedRows.length;
@@ -79,9 +88,10 @@ export async function hasAnySubscriptions(): Promise<boolean> {
 const BATCH_FETCH_MULTIPLIER = 5;
 
 // Get recent episodes from subscribed podcasts
-export async function getRecentEpisodesFromSubscriptions(
-  { limit = 10, since }: { limit?: number; since?: number } = {}
-) {
+export async function getRecentEpisodesFromSubscriptions({
+  limit = 10,
+  since,
+}: { limit?: number; since?: number } = {}) {
   const safeLimit =
     Number.isInteger(limit) && limit > 0 ? Math.min(limit, 25) : 10;
   const safeSince =
@@ -92,7 +102,11 @@ export async function getRecentEpisodesFromSubscriptions(
   const { userId } = await auth();
 
   if (!userId) {
-    return { episodes: [], hasSubscriptions: false, error: "You must be signed in to view episodes" };
+    return {
+      episodes: [],
+      hasSubscriptions: false,
+      error: "You must be signed in to view episodes",
+    };
   }
 
   let hasSubscriptions = false;
@@ -123,7 +137,7 @@ export async function getRecentEpisodesFromSubscriptions(
     // Instead of making one request per subscription, we make one request for all.
     // Expected impact: Reduces latency by up to ~90% for users with 10 subscriptions.
     const podcastMap = new Map(
-      subscriptions.map((sub) => [sub.podcast.podcastIndexId, sub.podcast])
+      subscriptions.map((sub) => [sub.podcast.podcastIndexId, sub.podcast]),
     );
 
     const numericFeedIds = subscriptions
@@ -135,22 +149,32 @@ export async function getRecentEpisodesFromSubscriptions(
     }
 
     // Fetch episodes from all podcasts in one batch (pass `since` to the API for server-side filtering)
-    const batchResponse = await getEpisodesByFeedId(numericFeedIds.join(","), safeLimit * BATCH_FETCH_MULTIPLIER, safeSince);
+    const batchResponse = await getEpisodesByFeedId(
+      numericFeedIds.join(","),
+      safeLimit * BATCH_FETCH_MULTIPLIER,
+      safeSince,
+    );
     const rawEpisodes = batchResponse.items || [];
 
     // Apply time filter if `since` is provided (Unix seconds)
-    const batchEpisodes = safeSince !== undefined
-      ? rawEpisodes.filter((ep) => (ep.datePublished || 0) >= safeSince)
-      : rawEpisodes;
+    const batchEpisodes =
+      safeSince !== undefined
+        ? rawEpisodes.filter((ep) => (ep.datePublished || 0) >= safeSince)
+        : rawEpisodes;
 
     // Map back to our RecentEpisode type and group by feed to maintain variety (max 3 per podcast)
-    const episodesByFeed = new Map<string, Omit<RecentEpisode, "worthItScore">[]>();
+    const episodesByFeed = new Map<
+      string,
+      Omit<RecentEpisode, "worthItScore">[]
+    >();
 
     for (const ep of batchEpisodes) {
       const pIndexId = String(ep.feedId);
       const podcast = podcastMap.get(pIndexId);
       if (!podcast) {
-        console.debug(`Episode ${ep.id} has feedId ${pIndexId} not in subscribed podcasts`);
+        console.debug(
+          `Episode ${ep.id} has feedId ${pIndexId} not in subscribed podcasts`,
+        );
         continue;
       }
 
@@ -183,10 +207,11 @@ export async function getRecentEpisodesFromSubscriptions(
 
     const scoreMap = new Map<string, number | null>();
     for (const row of scoreRows) {
-      const parsed = row.worthItScore !== null ? parseFloat(row.worthItScore) : null;
+      const parsed =
+        row.worthItScore !== null ? parseFloat(row.worthItScore) : null;
       scoreMap.set(
         row.podcastIndexId,
-        parsed !== null && Number.isFinite(parsed) ? parsed : null
+        parsed !== null && Number.isFinite(parsed) ? parsed : null,
       );
     }
 
@@ -209,7 +234,11 @@ export async function getRecentEpisodesFromSubscriptions(
     return { episodes: sortedEpisodes, hasSubscriptions: true, error: null };
   } catch (error) {
     console.error("Error fetching recent episodes:", error);
-    return { episodes: [], hasSubscriptions, error: "Failed to load recent episodes" };
+    return {
+      episodes: [],
+      hasSubscriptions,
+      error: "Failed to load recent episodes",
+    };
   }
 }
 
@@ -218,7 +247,7 @@ const SCORE_THRESHOLD = "6.00";
 // Get cross-user episode recommendations ranked by worth-it score,
 // excluding episodes from subscribed podcasts, saved episodes, and listened episodes.
 export async function getRecommendedEpisodes(
-  limit: number = 10
+  limit: number = 10,
 ): Promise<{ episodes: RecommendedEpisodeDTO[]; error: string | null }> {
   const { userId } = await auth();
 
@@ -263,17 +292,24 @@ export async function getRecommendedEpisodes(
           gte(episodes.worthItScore, SCORE_THRESHOLD),
           notInArray(episodes.podcastId, subscribedPodcastIds),
           notInArray(episodes.id, savedEpisodeIds),
-          notInArray(episodes.id, listenedEpisodeIds)
-        )
+          notInArray(episodes.id, listenedEpisodeIds),
+        ),
       )
       // isNotNull above filters null scores, but NULLS LAST is used for consistency
       // with the rest of the codebase and to stay correct if the filter is ever dropped.
-      .orderBy(sql`${episodes.worthItScore} DESC NULLS LAST`, desc(episodes.publishDate))
+      .orderBy(
+        sql`${episodes.worthItScore} DESC NULLS LAST`,
+        desc(episodes.publishDate),
+      )
       .limit(limit);
 
     // Separate query to avoid aggregation expanding the outer LIMIT result set
     const episodeIds = results.map((r) => r.id);
-    let topicRankRows: Array<{ episodeId: number; bestRank: number; topTopic: string }> = [];
+    let topicRankRows: Array<{
+      episodeId: number;
+      bestRank: number;
+      topTopic: string;
+    }> = [];
     if (episodeIds.length > 0) {
       try {
         topicRankRows = await db
@@ -287,18 +323,22 @@ export async function getRecommendedEpisodes(
             and(
               inArray(episodeTopics.episodeId, episodeIds),
               isNotNull(episodeTopics.topicRank),
-              gte(episodeTopics.rankedAt, new Date(Date.now() - 30 * 24 * 60 * 60 * 1000))
-            )
+              gte(
+                episodeTopics.rankedAt,
+                new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
+              ),
+            ),
           )
           .groupBy(episodeTopics.episodeId);
       } catch (err) {
-        console.error("Failed to fetch topic rank enrichment; returning episodes without rank data:", err);
+        console.error(
+          "Failed to fetch topic rank enrichment; returning episodes without rank data:",
+          err,
+        );
       }
     }
 
-    const rankMap = new Map(
-      topicRankRows.map((r) => [r.episodeId, r])
-    );
+    const rankMap = new Map(topicRankRows.map((r) => [r.episodeId, r]));
 
     const baseEnriched = results.map((r) => {
       const rankData = rankMap.get(r.id);
@@ -311,11 +351,16 @@ export async function getRecommendedEpisodes(
 
     let overlapEnriched: RecommendedEpisodeDTO[] = baseEnriched;
     try {
-      const { profile: userProfile, totalConsumed } = await fetchUserTopicProfile(userId);
+      const { profile: userProfile, totalConsumed } =
+        await fetchUserTopicProfile(userId);
 
       // Batch-query topics for all candidate episodes
       const candidateIds = baseEnriched.map((r) => r.id);
-      let candidateTopicRows: Array<{ episodeId: number; topic: string; relevance: string }> = [];
+      let candidateTopicRows: Array<{
+        episodeId: number;
+        topic: string;
+        relevance: string;
+      }> = [];
       if (candidateIds.length > 0) {
         candidateTopicRows = await db
           .select({
@@ -329,7 +374,10 @@ export async function getRecommendedEpisodes(
       }
 
       // Group candidate topics by episode
-      const candidateTopicMap = new Map<number, Array<{ topic: string; relevance: string }>>();
+      const candidateTopicMap = new Map<
+        number,
+        Array<{ topic: string; relevance: string }>
+      >();
       for (const row of candidateTopicRows) {
         const existing = candidateTopicMap.get(row.episodeId) ?? [];
         existing.push({ topic: row.topic, relevance: row.relevance });
@@ -339,7 +387,12 @@ export async function getRecommendedEpisodes(
       // Compute overlap for each candidate and attach to DTO
       const withOverlap: RecommendedEpisodeDTO[] = baseEnriched.map((r) => {
         const epTopics = candidateTopicMap.get(r.id) ?? [];
-        const overlap = computeTopicOverlap(userProfile, epTopics, totalConsumed, r.bestTopicRank);
+        const overlap = computeTopicOverlap(
+          userProfile,
+          epTopics,
+          totalConsumed,
+          r.bestTopicRank,
+        );
         return {
           ...r,
           overlapCount: overlap.overlapCount,
@@ -351,11 +404,18 @@ export async function getRecommendedEpisodes(
 
       // Stable partition sort: non-overlapping (overlapCount < 3) first, overlapping last.
       // Within each partition, original order (worthItScore DESC) is preserved.
-      const nonOverlapping = withOverlap.filter((r) => (r.overlapCount ?? 0) < HIGH_OVERLAP_THRESHOLD);
-      const overlapping = withOverlap.filter((r) => (r.overlapCount ?? 0) >= HIGH_OVERLAP_THRESHOLD);
+      const nonOverlapping = withOverlap.filter(
+        (r) => (r.overlapCount ?? 0) < HIGH_OVERLAP_THRESHOLD,
+      );
+      const overlapping = withOverlap.filter(
+        (r) => (r.overlapCount ?? 0) >= HIGH_OVERLAP_THRESHOLD,
+      );
       overlapEnriched = [...nonOverlapping, ...overlapping];
     } catch (err) {
-      console.error("Failed to compute topic overlap; returning recommendations without overlap data:", err);
+      console.error(
+        "Failed to compute topic overlap; returning recommendations without overlap data:",
+        err,
+      );
     }
 
     return { episodes: overlapEnriched, error: null };
@@ -366,9 +426,7 @@ export async function getRecommendedEpisodes(
 }
 
 // Get topic overlap for a single episode — used by the episode detail page.
-export async function getEpisodeTopicOverlap(
-  podcastIndexEpisodeId: string
-) {
+export async function getEpisodeTopicOverlap(podcastIndexEpisodeId: string) {
   if (!podcastIndexEpisodeId) return EMPTY_OVERLAP_RESULT;
 
   const { userId } = await auth();
@@ -399,7 +457,10 @@ export async function getEpisodeTopicOverlap(
       .where(eq(episodeTopics.episodeId, episodeDbId))
       .orderBy(desc(episodeTopics.relevance));
 
-    const epTopics = epTopicRows.map((r) => ({ topic: r.topic, relevance: r.relevance }));
+    const epTopics = epTopicRows.map((r) => ({
+      topic: r.topic,
+      relevance: r.relevance,
+    }));
     const bestRank = epTopicRows.reduce<number | null>((best, r) => {
       if (r.topicRank === null) return best;
       if (best === null) return r.topicRank;
@@ -438,7 +499,11 @@ export async function getDashboardStats() {
     };
   } catch (error) {
     console.error("Error fetching dashboard stats:", error);
-    return { subscriptionCount: 0, savedCount: 0, error: "Failed to load stats" };
+    return {
+      subscriptionCount: 0,
+      savedCount: 0,
+      error: "Failed to load stats",
+    };
   }
 }
 
@@ -487,12 +552,16 @@ export type TrendingTopicDetailResult =
     }
   | { kind: "error"; message: string };
 
-export async function getTrendingTopicBySlug(slug: string): Promise<TrendingTopicDetailResult> {
+export async function getTrendingTopicBySlug(
+  slug: string,
+): Promise<TrendingTopicDetailResult> {
   const { userId } = await auth();
   if (!userId) {
     // Encode the slug so a value like `foo&evil=injected` can't smuggle extra
     // query parameters into the /sign-in URL.
-    redirect(`/sign-in?redirect_url=${encodeURIComponent(`/trending/${slug}`)}`);
+    redirect(
+      `/sign-in?redirect_url=${encodeURIComponent(`/trending/${slug}`)}`,
+    );
   }
 
   try {
@@ -506,11 +575,21 @@ export async function getTrendingTopicBySlug(slug: string): Promise<TrendingTopi
     const topic = allTopics.find((t) => getTopicSlug(t) === slug);
 
     if (!topic) {
-      return { kind: "unknown-slug", allTopics, generatedAt: latest.generatedAt };
+      return {
+        kind: "unknown-slug",
+        allTopics,
+        generatedAt: latest.generatedAt,
+      };
     }
 
     if (topic.episodeIds.length === 0) {
-      return { kind: "found", topic, allTopics, episodes: [], generatedAt: latest.generatedAt };
+      return {
+        kind: "found",
+        topic,
+        allTopics,
+        episodes: [],
+        generatedAt: latest.generatedAt,
+      };
     }
 
     // Safety cap against corrupted/malicious snapshots with huge episodeIds arrays.
@@ -544,7 +623,10 @@ export async function getTrendingTopicBySlug(slug: string): Promise<TrendingTopi
       .where(inArray(episodes.id, episodeIds))
       // Postgres defaults DESC to NULLS FIRST; we want unscored episodes at the
       // bottom, and drizzle's desc() helper doesn't expose the nulls-ordering flag.
-      .orderBy(sql`${episodes.worthItScore} DESC NULLS LAST`, desc(episodes.publishDate))
+      .orderBy(
+        sql`${episodes.worthItScore} DESC NULLS LAST`,
+        desc(episodes.publishDate),
+      )
       // Display cap — bounds page render cost. Sort runs over the full candidate
       // set above so top-scored episodes can't be missed beyond this limit.
       .limit(50);
@@ -555,7 +637,13 @@ export async function getTrendingTopicBySlug(slug: string): Promise<TrendingTopi
       topRankedTopic: null,
     }));
 
-    return { kind: "found", topic, allTopics, episodes: episodesList, generatedAt: latest.generatedAt };
+    return {
+      kind: "found",
+      topic,
+      allTopics,
+      episodes: episodesList,
+      generatedAt: latest.generatedAt,
+    };
   } catch (error) {
     console.error("Error fetching trending topic by slug:", { slug, error });
     return { kind: "error", message: "Failed to load topic" };

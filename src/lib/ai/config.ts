@@ -26,12 +26,15 @@ export async function getActiveAiConfig(
       throw error;
     }
 
-    console.error("[ai-config] Failed to read AI config from database, using default", {
-      event: "ai_config_db_error",
-      error: error instanceof Error ? error.message : String(error),
-      stack: error instanceof Error ? error.stack : undefined,
-      fallbackConfig: DEFAULT_AI_CONFIG,
-    });
+    console.error(
+      "[ai-config] Failed to read AI config from database, using default",
+      {
+        event: "ai_config_db_error",
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        fallbackConfig: DEFAULT_AI_CONFIG,
+      },
+    );
     return DEFAULT_AI_CONFIG;
   }
 

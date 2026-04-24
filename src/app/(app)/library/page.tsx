@@ -3,7 +3,16 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useAuth } from "@clerk/nextjs";
-import { Bookmark, Search, ArrowUpDown, Star, Calendar, Clock, Type, WifiOff } from "lucide-react";
+import {
+  Bookmark,
+  Search,
+  ArrowUpDown,
+  Star,
+  Calendar,
+  Clock,
+  Type,
+  WifiOff,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -14,7 +23,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { SavedEpisodeCard } from "@/components/library/saved-episode-card";
-import { getUserLibrary, type LibrarySortOption, type SortDirection } from "@/app/actions/library";
+import {
+  getUserLibrary,
+  type LibrarySortOption,
+  type SortDirection,
+} from "@/app/actions/library";
 import { getListenedEpisodeIds } from "@/app/actions/listen-history";
 import { useOnlineStatus } from "@/hooks/use-online-status";
 import { OfflineBanner } from "@/components/ui/offline-banner";
@@ -48,8 +61,10 @@ export default function LibraryPage() {
       setIsFromCache(false);
 
       if (isOnline) {
-        const ids = await getListenedEpisodeIds(libraryItems.map((i) => i.episode.id))
-        setListenedSet(new Set(ids))
+        const ids = await getListenedEpisodeIds(
+          libraryItems.map((i) => i.episode.id),
+        );
+        setListenedSet(new Set(ids));
       }
 
       // Cache library data for offline use
@@ -107,7 +122,8 @@ export default function LibraryPage() {
       setListenedSet(new Set(listenedIds));
     };
     window.addEventListener(LISTEN_STATE_CHANGED_EVENT, refresh);
-    return () => window.removeEventListener(LISTEN_STATE_CHANGED_EVENT, refresh);
+    return () =>
+      window.removeEventListener(LISTEN_STATE_CHANGED_EVENT, refresh);
   }, [isOnline, items]);
 
   const handleRemoved = () => {
@@ -119,7 +135,7 @@ export default function LibraryPage() {
   };
 
   const toggleSortDirection = () => {
-    setSortDirection(prev => prev === "desc" ? "asc" : "desc");
+    setSortDirection((prev) => (prev === "desc" ? "asc" : "desc"));
   };
 
   return (
@@ -133,8 +149,8 @@ export default function LibraryPage() {
             {isLoading
               ? "Loading your saved episodes..."
               : items.length > 0
-              ? `${items.length} saved episode${items.length === 1 ? "" : "s"}`
-              : "Your saved episodes, collections, and notes."}
+                ? `${items.length} saved episode${items.length === 1 ? "" : "s"}`
+                : "Your saved episodes, collections, and notes."}
           </p>
         </div>
       </div>
@@ -143,7 +159,10 @@ export default function LibraryPage() {
       {!isLoading && !error && items.length > 0 && isOnline && (
         <div className="flex items-center gap-2">
           <span className="text-sm text-muted-foreground">Sort by:</span>
-          <Select value={sortBy} onValueChange={(value) => setSortBy(value as LibrarySortOption)}>
+          <Select
+            value={sortBy}
+            onValueChange={(value) => setSortBy(value as LibrarySortOption)}
+          >
             <SelectTrigger className="w-[160px]">
               <SelectValue placeholder="Sort by..." />
             </SelectTrigger>
@@ -179,9 +198,13 @@ export default function LibraryPage() {
             size="icon"
             onClick={toggleSortDirection}
             className="shrink-0"
-            title={sortDirection === "desc" ? "Sort descending" : "Sort ascending"}
+            title={
+              sortDirection === "desc" ? "Sort descending" : "Sort ascending"
+            }
           >
-            <ArrowUpDown className={`h-4 w-4 transition-transform ${sortDirection === "asc" ? "rotate-180" : ""}`} />
+            <ArrowUpDown
+              className={`h-4 w-4 transition-transform ${sortDirection === "asc" ? "rotate-180" : ""}`}
+            />
           </Button>
         </div>
       )}
@@ -219,37 +242,44 @@ export default function LibraryPage() {
       )}
 
       {/* Empty state - offline with no cache */}
-      {!isLoading && !error && items.length === 0 && !isOnline && isFromCache && (
-        <div className="flex flex-col items-center justify-center rounded-lg border bg-card p-12 text-center">
-          <div className="mb-4 rounded-full bg-muted p-4">
-            <WifiOff className="h-8 w-8 text-muted-foreground" />
+      {!isLoading &&
+        !error &&
+        items.length === 0 &&
+        !isOnline &&
+        isFromCache && (
+          <div className="flex flex-col items-center justify-center rounded-lg border bg-card p-12 text-center">
+            <div className="mb-4 rounded-full bg-muted p-4">
+              <WifiOff className="h-8 w-8 text-muted-foreground" />
+            </div>
+            <h2 className="text-lg font-semibold">No cached data available</h2>
+            <p className="mt-2 max-w-sm text-sm text-muted-foreground">
+              Visit your library while online to enable offline access.
+            </p>
           </div>
-          <h2 className="text-lg font-semibold">No cached data available</h2>
-          <p className="mt-2 max-w-sm text-sm text-muted-foreground">
-            Visit your library while online to enable offline access.
-          </p>
-        </div>
-      )}
+        )}
 
       {/* Empty state - online */}
-      {!isLoading && !error && items.length === 0 && (isOnline || !isFromCache) && (
-        <div className="flex flex-col items-center justify-center rounded-lg border bg-card p-12 text-center">
-          <div className="mb-4 rounded-full bg-muted p-4">
-            <Bookmark className="h-8 w-8 text-muted-foreground" />
+      {!isLoading &&
+        !error &&
+        items.length === 0 &&
+        (isOnline || !isFromCache) && (
+          <div className="flex flex-col items-center justify-center rounded-lg border bg-card p-12 text-center">
+            <div className="mb-4 rounded-full bg-muted p-4">
+              <Bookmark className="h-8 w-8 text-muted-foreground" />
+            </div>
+            <h2 className="text-lg font-semibold">Your library is empty</h2>
+            <p className="mt-2 max-w-sm text-sm text-muted-foreground">
+              Save episodes to build your collection. Browse podcasts and click
+              the save button to add episodes here.
+            </p>
+            <Button asChild className="mt-6">
+              <Link href="/discover">
+                <Search className="mr-2 h-4 w-4" />
+                Discover Podcasts
+              </Link>
+            </Button>
           </div>
-          <h2 className="text-lg font-semibold">Your library is empty</h2>
-          <p className="mt-2 max-w-sm text-sm text-muted-foreground">
-            Save episodes to build your collection. Browse podcasts and click the
-            save button to add episodes here.
-          </p>
-          <Button asChild className="mt-6">
-            <Link href="/discover">
-              <Search className="mr-2 h-4 w-4" />
-              Discover Podcasts
-            </Link>
-          </Button>
-        </div>
-      )}
+        )}
 
       {/* Saved episodes list */}
       {!isLoading && !error && items.length > 0 && (
@@ -259,7 +289,9 @@ export default function LibraryPage() {
               key={item.id}
               item={item}
               onRemoved={isOnline ? handleRemoved : undefined}
-              onCollectionChanged={isOnline ? handleCollectionChanged : undefined}
+              onCollectionChanged={
+                isOnline ? handleCollectionChanged : undefined
+              }
               isOffline={!isOnline}
               isListened={listenedSet.has(item.episode.id)}
             />

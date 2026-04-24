@@ -1,165 +1,168 @@
-"use client"
+"use client";
 
-import { useState, useEffect, useRef, useCallback, useTransition } from "react"
-import { Bookmark, Loader2 } from "lucide-react"
-import { toast } from "sonner"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
+import { useState, useEffect, useRef, useCallback, useTransition } from "react";
+import { Bookmark, Loader2 } from "lucide-react";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "@/components/ui/popover"
+} from "@/components/ui/popover";
 import {
   useAudioPlayerState,
   useAudioPlayerProgress,
-} from "@/contexts/audio-player-context"
+} from "@/contexts/audio-player-context";
 import {
   getLibraryEntryByEpisodeId,
   addBookmark,
   updateBookmark,
-} from "@/app/actions/library"
-import { formatTime } from "@/lib/format-time"
-import { BOOKMARK_CHANGED_EVENT } from "@/lib/events"
-import { MAX_SHORT_TEXT } from "@/lib/schemas/library"
+} from "@/app/actions/library";
+import { formatTime } from "@/lib/format-time";
+import { BOOKMARK_CHANGED_EVENT } from "@/lib/events";
+import { MAX_SHORT_TEXT } from "@/lib/schemas/library";
 
-const AUTO_DISMISS_MS = 5000
+const AUTO_DISMISS_MS = 5000;
 
 export function BookmarkButton() {
-  const { currentEpisode } = useAudioPlayerState()
-  const { currentTime } = useAudioPlayerProgress()
-  const [libraryEntryId, setLibraryEntryId] = useState<number | null>(null)
-  const [isResolving, setIsResolving] = useState(false)
-  const [isPending, startTransition] = useTransition()
-  const [noteOpen, setNoteOpen] = useState(false)
-  const [noteText, setNoteText] = useState("")
-  const [lastBookmarkId, setLastBookmarkId] = useState<number | null>(null)
-  const dismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const currentTimeRef = useRef(currentTime)
-  currentTimeRef.current = currentTime
+  const { currentEpisode } = useAudioPlayerState();
+  const { currentTime } = useAudioPlayerProgress();
+  const [libraryEntryId, setLibraryEntryId] = useState<number | null>(null);
+  const [isResolving, setIsResolving] = useState(false);
+  const [isPending, startTransition] = useTransition();
+  const [noteOpen, setNoteOpen] = useState(false);
+  const [noteText, setNoteText] = useState("");
+  const [lastBookmarkId, setLastBookmarkId] = useState<number | null>(null);
+  const dismissTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const currentTimeRef = useRef(currentTime);
+  currentTimeRef.current = currentTime;
 
   // Resolve library entry ID when episode changes
   useEffect(() => {
     // Reset transient bookmark-note UI when episode context changes
     if (dismissTimerRef.current) {
-      clearTimeout(dismissTimerRef.current)
-      dismissTimerRef.current = null
+      clearTimeout(dismissTimerRef.current);
+      dismissTimerRef.current = null;
     }
-    setNoteOpen(false)
-    setNoteText("")
-    setLastBookmarkId(null)
+    setNoteOpen(false);
+    setNoteText("");
+    setLastBookmarkId(null);
 
     if (!currentEpisode) {
-      setLibraryEntryId(null)
-      setIsResolving(false)
-      return
+      setLibraryEntryId(null);
+      setIsResolving(false);
+      return;
     }
 
-    let cancelled = false
-    setLibraryEntryId(null)
-    setIsResolving(true)
+    let cancelled = false;
+    setLibraryEntryId(null);
+    setIsResolving(true);
     getLibraryEntryByEpisodeId(currentEpisode.id)
       .then((result) => {
         if (!cancelled) {
-          setLibraryEntryId(result?.libraryEntryId ?? null)
+          setLibraryEntryId(result?.libraryEntryId ?? null);
         }
       })
       .catch(() => {
         if (!cancelled) {
-          setLibraryEntryId(null)
+          setLibraryEntryId(null);
         }
       })
       .finally(() => {
         if (!cancelled) {
-          setIsResolving(false)
+          setIsResolving(false);
         }
-      })
+      });
 
     return () => {
-      cancelled = true
-    }
-  }, [currentEpisode?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+      cancelled = true;
+    };
+  }, [currentEpisode?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const clearDismissTimer = useCallback(() => {
     if (dismissTimerRef.current) {
-      clearTimeout(dismissTimerRef.current)
-      dismissTimerRef.current = null
+      clearTimeout(dismissTimerRef.current);
+      dismissTimerRef.current = null;
     }
-  }, [])
+  }, []);
 
   const startDismissTimer = useCallback(() => {
-    clearDismissTimer()
+    clearDismissTimer();
     dismissTimerRef.current = setTimeout(() => {
-      setNoteOpen(false)
-      setNoteText("")
-      setLastBookmarkId(null)
-    }, AUTO_DISMISS_MS)
-  }, [clearDismissTimer])
+      setNoteOpen(false);
+      setNoteText("");
+      setLastBookmarkId(null);
+    }, AUTO_DISMISS_MS);
+  }, [clearDismissTimer]);
 
   // Clean up timer on unmount
   useEffect(() => {
-    return () => clearDismissTimer()
-  }, [clearDismissTimer])
+    return () => clearDismissTimer();
+  }, [clearDismissTimer]);
 
   const handleBookmark = () => {
-    if (libraryEntryId === null) return
+    if (libraryEntryId === null) return;
 
-    const timestamp = Math.floor(currentTimeRef.current)
+    const timestamp = Math.floor(currentTimeRef.current);
 
     startTransition(async () => {
-      const result = await addBookmark(libraryEntryId, timestamp)
+      const result = await addBookmark(libraryEntryId, timestamp);
       if (result.success && result.bookmark) {
-        toast.success(`Bookmarked at ${formatTime(timestamp)}`)
-        setLastBookmarkId(result.bookmark.id)
-        setNoteOpen(true)
-        startDismissTimer()
-        window.dispatchEvent(new CustomEvent(BOOKMARK_CHANGED_EVENT))
+        toast.success(`Bookmarked at ${formatTime(timestamp)}`);
+        setLastBookmarkId(result.bookmark.id);
+        setNoteOpen(true);
+        startDismissTimer();
+        window.dispatchEvent(new CustomEvent(BOOKMARK_CHANGED_EVENT));
       } else {
-        toast.error(result.error || "Failed to add bookmark")
+        toast.error(result.error || "Failed to add bookmark");
       }
-    })
-  }
+    });
+  };
 
   const handleNoteSubmit = () => {
-    const normalizedNote = noteText.normalize("NFKC").trim()
-    if (!lastBookmarkId || !normalizedNote) return
+    const normalizedNote = noteText.normalize("NFKC").trim();
+    if (!lastBookmarkId || !normalizedNote) return;
 
     if (normalizedNote.length > MAX_SHORT_TEXT) {
-      toast.error(`Note is too long (max ${MAX_SHORT_TEXT} characters)`)
-      return
+      toast.error(`Note is too long (max ${MAX_SHORT_TEXT} characters)`);
+      return;
     }
 
-    clearDismissTimer()
+    clearDismissTimer();
     startTransition(async () => {
-      const result = await updateBookmark(lastBookmarkId, normalizedNote)
+      const result = await updateBookmark(lastBookmarkId, normalizedNote);
       if (result.success) {
-        toast.success("Note saved")
-        window.dispatchEvent(new CustomEvent(BOOKMARK_CHANGED_EVENT))
-        setNoteOpen(false)
-        setNoteText("")
-        setLastBookmarkId(null)
+        toast.success("Note saved");
+        window.dispatchEvent(new CustomEvent(BOOKMARK_CHANGED_EVENT));
+        setNoteOpen(false);
+        setNoteText("");
+        setLastBookmarkId(null);
       } else {
-        toast.error("Failed to save note")
+        toast.error("Failed to save note");
       }
-    })
-  }
+    });
+  };
 
   const handleNoteKeyDown = () => {
-    startDismissTimer()
-  }
+    startDismissTimer();
+  };
 
   // Hide button while resolving or if episode not in library
-  if (isResolving || libraryEntryId === null) return null
+  if (isResolving || libraryEntryId === null) return null;
 
   return (
-    <Popover open={noteOpen} onOpenChange={(open) => {
-      if (!open) {
-        clearDismissTimer()
-        setNoteOpen(false)
-        setNoteText("")
-        setLastBookmarkId(null)
-      }
-    }}>
+    <Popover
+      open={noteOpen}
+      onOpenChange={(open) => {
+        if (!open) {
+          clearDismissTimer();
+          setNoteOpen(false);
+          setNoteText("");
+          setLastBookmarkId(null);
+        }
+      }}
+    >
       <PopoverTrigger asChild>
         <Button
           variant="ghost"
@@ -181,15 +184,22 @@ export function BookmarkButton() {
         className="w-64 p-3"
         onOpenAutoFocus={(e) => e.preventDefault()}
       >
-        <form onSubmit={(e) => { e.preventDefault(); handleNoteSubmit(); }}>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            handleNoteSubmit();
+          }}
+        >
           <div className="space-y-2">
-            <p className="text-xs text-muted-foreground">Add a note (optional)</p>
+            <p className="text-xs text-muted-foreground">
+              Add a note (optional)
+            </p>
             <Input
               placeholder="Key insight mentioned here..."
               value={noteText}
               onChange={(e) => {
-                setNoteText(e.target.value)
-                startDismissTimer()
+                setNoteText(e.target.value);
+                startDismissTimer();
               }}
               onKeyDown={handleNoteKeyDown}
               maxLength={MAX_SHORT_TEXT}
@@ -208,5 +218,5 @@ export function BookmarkButton() {
         </form>
       </PopoverContent>
     </Popover>
-  )
+  );
 }

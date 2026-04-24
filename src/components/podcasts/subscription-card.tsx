@@ -88,7 +88,7 @@ export function SubscriptionCard({
                         month: "short",
                         day: "numeric",
                         year: "numeric",
-                      }
+                      },
                     )}
                   </span>
                 )}
@@ -136,7 +136,7 @@ export function SubscriptionCard({
                 latestEpisodeDate={
                   podcast.latestEpisodeDate
                     ? Math.floor(
-                        new Date(podcast.latestEpisodeDate).getTime() / 1000
+                        new Date(podcast.latestEpisodeDate).getTime() / 1000,
                       )
                     : undefined
                 }

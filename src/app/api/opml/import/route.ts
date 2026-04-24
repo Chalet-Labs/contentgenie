@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
       console.warn("No email found for user during OPML import", { userId });
       return NextResponse.json(
         { error: "Unable to resolve user email. Please try again." },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -45,8 +45,11 @@ export async function POST(request: NextRequest) {
     const rateLimit = await checkImportRateLimit(userId);
     if (!rateLimit.allowed) {
       return NextResponse.json(
-        { error: "Rate limit exceeded. Please wait a few minutes before importing again." },
-        { status: 429 }
+        {
+          error:
+            "Rate limit exceeded. Please wait a few minutes before importing again.",
+        },
+        { status: 429 },
       );
     }
 
@@ -57,7 +60,7 @@ export async function POST(request: NextRequest) {
     if (!file || !(file instanceof File)) {
       return NextResponse.json(
         { error: "An OPML file is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -65,7 +68,7 @@ export async function POST(request: NextRequest) {
     if (file.size > MAX_FILE_SIZE) {
       return NextResponse.json(
         { error: "File is too large. Maximum size is 1MB." },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -82,7 +85,7 @@ export async function POST(request: NextRequest) {
               ? error.message
               : "Failed to parse OPML file",
         },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -101,12 +104,12 @@ export async function POST(request: NextRequest) {
       existingSubscriptions
         .map((s) => s.rssFeedUrl)
         .filter((url): url is string => url !== null)
-        .map((url) => url.toLowerCase())
+        .map((url) => url.toLowerCase()),
     );
 
     // Filter out already-subscribed feeds (case-insensitive URL comparison)
     const newFeeds = feeds.filter(
-      (f) => !subscribedUrls.has(f.feedUrl.toLowerCase())
+      (f) => !subscribedUrls.has(f.feedUrl.toLowerCase()),
     );
     const alreadySubscribed = total - newFeeds.length;
 
@@ -143,7 +146,7 @@ export async function POST(request: NextRequest) {
         total,
         alreadySubscribed,
       },
-      { status: 202 }
+      { status: 202 },
     );
   } catch (error) {
     console.error("Error processing OPML import:", error);
@@ -151,7 +154,7 @@ export async function POST(request: NextRequest) {
       {
         error: "Failed to process OPML import",
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

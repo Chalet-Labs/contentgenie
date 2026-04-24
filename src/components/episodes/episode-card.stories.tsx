@@ -54,7 +54,9 @@ function withAudioPlayer(Story: React.ComponentType) {
   return (
     <AudioPlayerAPIContext.Provider value={noopAPI}>
       <AudioPlayerStateContext.Provider value={mockPlayerState}>
-        <AudioPlayerProgressContext.Provider value={{ currentTime: 0, buffered: 0 }}>
+        <AudioPlayerProgressContext.Provider
+          value={{ currentTime: 0, buffered: 0 }}
+        >
           <Story />
         </AudioPlayerProgressContext.Provider>
       </AudioPlayerStateContext.Provider>

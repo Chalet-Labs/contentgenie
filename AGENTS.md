@@ -22,21 +22,21 @@ Podcast discovery, AI-powered summarization, and library management for busy pro
 
 ## Architecture map
 
-| Path | Purpose |
-|------|---------|
-| `src/app/` | Next.js App Router pages, route groups `(app)` and `(auth)` |
-| `src/app/actions/` | Server actions — all mutations (`"use server"`) |
-| `src/app/api/` | Route handlers for external API proxying & Trigger.dev orchestration |
-| `src/components/` | Shared React components (feature + UI) |
-| `src/components/ui/` | shadcn/ui primitives (do not edit by hand) |
-| `src/lib/` | Shared domain logic |
-| `src/db/` | Drizzle schema and client — the database schema is defined in `@/db/schema.ts`. Reference it anytime you need to understand the structure of data stored in the database. |
-| `src/trigger/` | Trigger.dev task definitions (background jobs) |
-| `src/hooks/`, `src/contexts/` | Client-side React hooks and context providers |
-| `src/types/` | Shared TypeScript types and type helpers |
-| `src/test/` | Test setup (`src/test/setup.ts`) and global fixtures |
-| `src/middleware.ts` | Next.js middleware (request-time auth/session) |
-| `docs/adr/` | 30+ ADRs — grep by topic before modifying related code |
+| Path                          | Purpose                                                                                                                                                                   |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/app/`                    | Next.js App Router pages, route groups `(app)` and `(auth)`                                                                                                               |
+| `src/app/actions/`            | Server actions — all mutations (`"use server"`)                                                                                                                           |
+| `src/app/api/`                | Route handlers for external API proxying & Trigger.dev orchestration                                                                                                      |
+| `src/components/`             | Shared React components (feature + UI)                                                                                                                                    |
+| `src/components/ui/`          | shadcn/ui primitives (do not edit by hand)                                                                                                                                |
+| `src/lib/`                    | Shared domain logic                                                                                                                                                       |
+| `src/db/`                     | Drizzle schema and client — the database schema is defined in `@/db/schema.ts`. Reference it anytime you need to understand the structure of data stored in the database. |
+| `src/trigger/`                | Trigger.dev task definitions (background jobs)                                                                                                                            |
+| `src/hooks/`, `src/contexts/` | Client-side React hooks and context providers                                                                                                                             |
+| `src/types/`                  | Shared TypeScript types and type helpers                                                                                                                                  |
+| `src/test/`                   | Test setup (`src/test/setup.ts`) and global fixtures                                                                                                                      |
+| `src/middleware.ts`           | Next.js middleware (request-time auth/session)                                                                                                                            |
+| `docs/adr/`                   | 30+ ADRs — grep by topic before modifying related code                                                                                                                    |
 
 Coverage: Vitest enforces an 80% line-coverage threshold globally across `src/app/api/`, `src/app/actions/`, `src/components/` (excluding `ui/`), `src/lib/`, and `src/trigger/`. See `vitest.config.ts` for the exact include/exclude lists.
 
@@ -98,6 +98,7 @@ See [.impeccable.md](.impeccable.md) for design context: users, brand personalit
 Secrets are managed via **Doppler** (not `.env` files). Run `doppler setup` after cloning.
 
 See [docs/secrets-management.md](docs/secrets-management.md) for the full variable reference and per-environment setup. Key points:
+
 - `NEXT_PUBLIC_*` variables are inlined at build time — rebuild after changing them in Doppler.
 - Vercel environments sync from Doppler automatically; Trigger.dev Prod secrets are set manually.
 

@@ -1,10 +1,10 @@
-import type { Meta, StoryObj } from "@storybook/nextjs-vite"
+import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import {
   EpisodeRecommendations,
   EpisodeRecommendationsLoading,
   EPISODES_INITIAL,
-} from "@/components/dashboard/episode-recommendations"
-import type { RecommendedEpisodeDTO } from "@/db/library-columns"
+} from "@/components/dashboard/episode-recommendations";
+import type { RecommendedEpisodeDTO } from "@/db/library-columns";
 
 // ---------------------------------------------------------------------------
 // Sample data
@@ -14,7 +14,7 @@ function makeEpisode(
   id: number,
   title: string,
   podcastTitle: string,
-  overrides: Partial<RecommendedEpisodeDTO> = {}
+  overrides: Partial<RecommendedEpisodeDTO> = {},
 ): RecommendedEpisodeDTO {
   return {
     id,
@@ -34,22 +34,32 @@ function makeEpisode(
     overlapLabel: null,
     overlapLabelKind: null,
     ...overrides,
-  }
+  };
 }
 
 const sampleEpisodes: RecommendedEpisodeDTO[] = [
-  makeEpisode(1, "How AI is Changing Software Engineering", "Software Unscripted", {
-    worthItScore: "8.5",
-    duration: 3120,
-    publishDate: new Date("2026-01-10"),
-    overlapLabel: "Overlaps with 3 of your saved topics",
-    overlapLabelKind: "high-overlap",
-  }),
-  makeEpisode(2, "The Future of Remote Work After 2025", "The Knowledge Project", {
-    worthItScore: "7.2",
-    duration: 2700,
-    publishDate: new Date("2026-01-12"),
-  }),
+  makeEpisode(
+    1,
+    "How AI is Changing Software Engineering",
+    "Software Unscripted",
+    {
+      worthItScore: "8.5",
+      duration: 3120,
+      publishDate: new Date("2026-01-10"),
+      overlapLabel: "Overlaps with 3 of your saved topics",
+      overlapLabelKind: "high-overlap",
+    },
+  ),
+  makeEpisode(
+    2,
+    "The Future of Remote Work After 2025",
+    "The Knowledge Project",
+    {
+      worthItScore: "7.2",
+      duration: 2700,
+      publishDate: new Date("2026-01-12"),
+    },
+  ),
   makeEpisode(3, "Climate Policy: What Actually Works", "Ezra Klein Show", {
     worthItScore: "9.1",
     duration: 4200,
@@ -57,15 +67,25 @@ const sampleEpisodes: RecommendedEpisodeDTO[] = [
     overlapLabel: "New topic you haven't explored yet",
     overlapLabelKind: "new-topic",
   }),
-  makeEpisode(4, "Startup Funding in a High-Rate Environment", "My First Million", {
-    duration: 5400,
-    publishDate: new Date("2026-01-14"),
-  }),
-  makeEpisode(5, "Inside the Mental Health Crisis at Work", "WorkLife with Adam Grant", {
-    worthItScore: "8.8",
-    duration: 2400,
-    publishDate: new Date("2026-01-11"),
-  }),
+  makeEpisode(
+    4,
+    "Startup Funding in a High-Rate Environment",
+    "My First Million",
+    {
+      duration: 5400,
+      publishDate: new Date("2026-01-14"),
+    },
+  ),
+  makeEpisode(
+    5,
+    "Inside the Mental Health Crisis at Work",
+    "WorkLife with Adam Grant",
+    {
+      worthItScore: "8.8",
+      duration: 2400,
+      publishDate: new Date("2026-01-11"),
+    },
+  ),
   makeEpisode(6, "Crypto Regulation: Where Things Stand", "Unchained", {
     worthItScore: "6.5",
     duration: 3600,
@@ -75,7 +95,7 @@ const sampleEpisodes: RecommendedEpisodeDTO[] = [
     duration: 2880,
     publishDate: new Date("2026-01-07"),
   }),
-]
+];
 
 // ---------------------------------------------------------------------------
 // Meta
@@ -94,10 +114,10 @@ const meta: Meta<typeof EpisodeRecommendations> = {
       </div>
     ),
   ],
-}
+};
 
-export default meta
-type Story = StoryObj<typeof EpisodeRecommendations>
+export default meta;
+type Story = StoryObj<typeof EpisodeRecommendations>;
 
 // ---------------------------------------------------------------------------
 // Stories
@@ -108,21 +128,21 @@ export const Default: Story = {
   args: {
     episodes: sampleEpisodes,
   },
-}
+};
 
 // Exactly EPISODES_INITIAL episodes — toggle button must NOT appear (N > N is false).
 export const ExactThreshold: Story = {
   args: {
     episodes: sampleEpisodes.slice(0, EPISODES_INITIAL),
   },
-}
+};
 
 export const Empty: Story = {
   args: {
     episodes: [],
   },
-}
+};
 
 export const Loading: StoryObj<typeof EpisodeRecommendationsLoading> = {
   render: () => <EpisodeRecommendationsLoading />,
-}
+};

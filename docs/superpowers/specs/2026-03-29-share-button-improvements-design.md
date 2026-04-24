@@ -17,11 +17,11 @@ Upgrade the share button from a single-action clipboard copy to a dropdown menu 
 
 Replace the single-action button with a `DropdownMenu` (shadcn/ui). Options:
 
-| Option | When shown | Action |
-|---|---|---|
-| **Share** | `navigator.share` available | Opens native OS share sheet with title, summary (if provided), and URL |
-| **Copy link** | Always | Copies URL to clipboard |
-| **Copy with summary** | `summary` prop provided | Copies formatted text + URL to clipboard |
+| Option                | When shown                  | Action                                                                 |
+| --------------------- | --------------------------- | ---------------------------------------------------------------------- |
+| **Share**             | `navigator.share` available | Opens native OS share sheet with title, summary (if provided), and URL |
+| **Copy link**         | Always                      | Copies URL to clipboard                                                |
+| **Copy with summary** | `summary` prop provided     | Copies formatted text + URL to clipboard                               |
 
 The button trigger renders identically to the current button (Share2 icon + "Share" label). Existing `size` and `variant` props continue to work.
 

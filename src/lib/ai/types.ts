@@ -13,7 +13,7 @@ export interface AiProvider {
   readonly name: AiProviderName;
   generateCompletion(
     messages: AiMessage[],
-    options: AiCompletionOptions
+    options: AiCompletionOptions,
   ): Promise<string>;
 }
 

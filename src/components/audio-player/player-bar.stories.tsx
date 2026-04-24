@@ -1,5 +1,5 @@
-import type { Meta, StoryObj } from "@storybook/nextjs-vite"
-import type { ReactNode } from "react"
+import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import type { ReactNode } from "react";
 import {
   AudioPlayerAPIContext,
   AudioPlayerStateContext,
@@ -7,8 +7,8 @@ import {
   type AudioPlayerState,
   type AudioPlayerProgress,
   type AudioPlayerAPI,
-} from "@/contexts/audio-player-context"
-import { PlayerBar } from "./player-bar"
+} from "@/contexts/audio-player-context";
+import { PlayerBar } from "./player-bar";
 
 const noopAPI: AudioPlayerAPI = {
   playEpisode: () => {},
@@ -27,12 +27,12 @@ const noopAPI: AudioPlayerAPI = {
   setSleepTimer: () => {},
   cancelSleepTimer: () => {},
   getCurrentTime: () => 0,
-}
+};
 
 const defaultProgress: AudioPlayerProgress = {
   currentTime: 45,
   buffered: 120,
-}
+};
 
 const baseState: AudioPlayerState = {
   currentEpisode: null,
@@ -48,7 +48,7 @@ const baseState: AudioPlayerState = {
   chapters: null,
   chaptersLoading: false,
   sleepTimer: null,
-}
+};
 
 const testEpisode = {
   id: "ep-1",
@@ -57,25 +57,26 @@ const testEpisode = {
   audioUrl: "https://example.com/audio.mp3",
   artwork: "https://picsum.photos/seed/podcast/300/300",
   duration: 2400,
-}
+};
 
 const longTitleEpisode = {
   id: "ep-2",
-  title: "The Extremely Long Episode Title That Should Be Truncated Because It Exceeds The Available Width In The Player Bar Component",
+  title:
+    "The Extremely Long Episode Title That Should Be Truncated Because It Exceeds The Available Width In The Player Bar Component",
   podcastTitle: "My Very Long Podcast Name That Also Needs Truncation",
   audioUrl: "https://example.com/audio.mp3",
   artwork: "https://picsum.photos/seed/podcast2/300/300",
   duration: 5400,
-}
+};
 
 function MockProvider({
   state,
   progress = defaultProgress,
   children,
 }: {
-  state: AudioPlayerState
-  progress?: AudioPlayerProgress
-  children: ReactNode
+  state: AudioPlayerState;
+  progress?: AudioPlayerProgress;
+  children: ReactNode;
 }) {
   return (
     <AudioPlayerAPIContext.Provider value={noopAPI}>
@@ -85,7 +86,7 @@ function MockProvider({
         </AudioPlayerProgressContext.Provider>
       </AudioPlayerStateContext.Provider>
     </AudioPlayerAPIContext.Provider>
-  )
+  );
 }
 
 const meta: Meta<typeof PlayerBar> = {
@@ -94,10 +95,10 @@ const meta: Meta<typeof PlayerBar> = {
   parameters: {
     layout: "fullscreen",
   },
-}
+};
 
-export default meta
-type Story = StoryObj<typeof PlayerBar>
+export default meta;
+type Story = StoryObj<typeof PlayerBar>;
 
 export const Hidden: Story = {
   decorators: [
@@ -109,7 +110,7 @@ export const Hidden: Story = {
       </MockProvider>
     ),
   ],
-}
+};
 
 export const Playing: Story = {
   decorators: [
@@ -130,7 +131,7 @@ export const Playing: Story = {
       </MockProvider>
     ),
   ],
-}
+};
 
 export const Paused: Story = {
   decorators: [
@@ -151,7 +152,7 @@ export const Paused: Story = {
       </MockProvider>
     ),
   ],
-}
+};
 
 export const LongTitle: Story = {
   decorators: [
@@ -172,7 +173,7 @@ export const LongTitle: Story = {
       </MockProvider>
     ),
   ],
-}
+};
 
 export const Buffering: Story = {
   decorators: [
@@ -194,7 +195,7 @@ export const Buffering: Story = {
       </MockProvider>
     ),
   ],
-}
+};
 
 export const WithQueue: Story = {
   decorators: [
@@ -233,7 +234,7 @@ export const WithQueue: Story = {
       </MockProvider>
     ),
   ],
-}
+};
 
 export const MobileViewport: Story = {
   parameters: {
@@ -258,14 +259,14 @@ export const MobileViewport: Story = {
       </MockProvider>
     ),
   ],
-}
+};
 
 const sampleChapters = [
   { startTime: 0, title: "Introduction" },
   { startTime: 300, title: "Guest Interview" },
   { startTime: 900, title: "Deep Dive" },
   { startTime: 1800, title: "Q&A" },
-]
+];
 
 export const WithChapters: Story = {
   decorators: [
@@ -288,7 +289,7 @@ export const WithChapters: Story = {
       </MockProvider>
     ),
   ],
-}
+};
 
 export const WithoutChapters: Story = {
   decorators: [
@@ -311,7 +312,7 @@ export const WithoutChapters: Story = {
       </MockProvider>
     ),
   ],
-}
+};
 
 export const ChaptersLoading: Story = {
   decorators: [
@@ -334,4 +335,4 @@ export const ChaptersLoading: Story = {
       </MockProvider>
     ),
   ],
-}
+};

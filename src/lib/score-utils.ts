@@ -113,7 +113,10 @@ export function parseScoreOrNull(raw: string | null): number | null {
 }
 
 /** Compute the worth-it score from boolean signals + adjustment. Range: [1, 10]. */
-export function computeSignalScore(signals: WorthItSignals, adjustment: number): number {
+export function computeSignalScore(
+  signals: WorthItSignals,
+  adjustment: number,
+): number {
   const trueCount = WORTH_IT_SIGNAL_KEYS.filter((k) => signals[k]).length;
   const base = 1 + trueCount;
   const clampedAdj = clampAdjustment(adjustment);

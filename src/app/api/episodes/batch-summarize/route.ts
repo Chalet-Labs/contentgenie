@@ -4,7 +4,11 @@ import { tasks, auth } from "@trigger.dev/sdk";
 import { inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { episodes } from "@/db/schema";
-import { checkRateLimit, checkDailyLimit, DAILY_SUMMARIZE_LIMIT } from "@/lib/rate-limit";
+import {
+  checkRateLimit,
+  checkDailyLimit,
+  DAILY_SUMMARIZE_LIMIT,
+} from "@/lib/rate-limit";
 import { BATCH_SUMMARIZE_LIMIT } from "@/lib/batch-summarize";
 import type { batchSummarizeEpisodes } from "@/trigger/batch-summarize-episodes";
 
@@ -23,46 +27,43 @@ export async function POST(request: NextRequest) {
     if (!Array.isArray(episodeIds) || episodeIds.length === 0) {
       return NextResponse.json(
         { error: "episodeIds must be a non-empty array" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     if (episodeIds.length > BATCH_SUMMARIZE_LIMIT) {
       return NextResponse.json(
         { error: `Maximum ${BATCH_SUMMARIZE_LIMIT} episodes per batch` },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     if (
       !episodeIds.every(
         (id: unknown) =>
-          typeof id === "number" && Number.isFinite(id) && id > 0
+          typeof id === "number" && Number.isFinite(id) && id > 0,
       )
     ) {
       return NextResponse.json(
         { error: "All episode IDs must be positive numbers" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     // Query DB for already-processed episodes
     const existingEpisodes = await db.query.episodes.findMany({
-      where: inArray(
-        episodes.podcastIndexId,
-        episodeIds.map(String)
-      ),
+      where: inArray(episodes.podcastIndexId, episodeIds.map(String)),
       columns: { podcastIndexId: true, processedAt: true },
     });
 
     const cachedIds = new Set(
       existingEpisodes
         .filter((e) => e.processedAt !== null)
-        .map((e) => Number(e.podcastIndexId))
+        .map((e) => Number(e.podcastIndexId)),
     );
 
     const cachedCount = episodeIds.filter((id: number) =>
-      cachedIds.has(id)
+      cachedIds.has(id),
     ).length;
 
     // If all episodes are already cached, return immediately
@@ -74,20 +75,19 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const uncachedIds = episodeIds.filter(
-      (id: number) => !cachedIds.has(id)
-    );
+    const uncachedIds = episodeIds.filter((id: number) => !cachedIds.has(id));
 
     // Daily rate limit check (only count uncached episodes against quota)
     const dailyLimit = await checkDailyLimit(userId, uncachedIds.length);
     if (!dailyLimit.allowed) {
       return NextResponse.json(
         {
-          error: "Daily summarization limit reached. Please try again tomorrow.",
+          error:
+            "Daily summarization limit reached. Please try again tomorrow.",
           retryAfterMs: dailyLimit.retryAfterMs,
           dailyLimit: DAILY_SUMMARIZE_LIMIT,
         },
-        { status: 429 }
+        { status: 429 },
       );
     }
 
@@ -99,7 +99,7 @@ export async function POST(request: NextRequest) {
           error: "Rate limit exceeded. Please try again later.",
           retryAfterMs: rateLimit.retryAfterMs,
         },
-        { status: 429 }
+        { status: 429 },
       );
     }
 
@@ -110,7 +110,7 @@ export async function POST(request: NextRequest) {
         episodeIds: uncachedIds,
         skippedCount: cachedCount,
         totalRequested: episodeIds.length,
-      }
+      },
     );
 
     // Generate public access token for realtime frontend subscription
@@ -130,7 +130,7 @@ export async function POST(request: NextRequest) {
         total: episodeIds.length,
         skipped: cachedCount,
       },
-      { status: 202 }
+      { status: 202 },
     );
   } catch (error) {
     console.error("Error triggering batch summarization:", error);
@@ -139,7 +139,7 @@ export async function POST(request: NextRequest) {
         error: "Failed to trigger batch summarization",
         details: error instanceof Error ? error.message : "Unknown error",
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

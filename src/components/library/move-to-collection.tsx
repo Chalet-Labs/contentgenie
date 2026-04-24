@@ -12,7 +12,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { FolderPlus, FolderInput, Check, Plus, Loader2 } from "lucide-react";
-import { getUserCollections, moveEpisodeToCollection } from "@/app/actions/collections";
+import {
+  getUserCollections,
+  moveEpisodeToCollection,
+} from "@/app/actions/collections";
 import { CollectionDialog } from "./collection-dialog";
 import type { Collection } from "@/db/schema";
 
@@ -49,7 +52,10 @@ export function MoveToCollection({
     if (collectionId === currentCollectionId) return;
 
     startTransition(async () => {
-      const result = await moveEpisodeToCollection(libraryEntryId, collectionId);
+      const result = await moveEpisodeToCollection(
+        libraryEntryId,
+        collectionId,
+      );
       if (result.success) {
         onMoved?.();
         if (collectionId === null) {

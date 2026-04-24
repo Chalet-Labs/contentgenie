@@ -1,6 +1,13 @@
 "use client";
 
-import { useState, useTransition, useCallback, useRef, useMemo, useEffect } from "react";
+import {
+  useState,
+  useTransition,
+  useCallback,
+  useRef,
+  useMemo,
+  useEffect,
+} from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Bell, X } from "lucide-react";
@@ -69,8 +76,9 @@ export function NotificationPageList({
   // cause "Load more" to skip unfetched rows.
   const offsetRef = useRef(initialItems.length);
   const [activeTab, setActiveTab] = useState<Tab>("all");
-  const [topicsByEpisode, setTopicsByEpisode] =
-    useState<Record<number, string[]>>(initialTopicsByEpisode);
+  const [topicsByEpisode, setTopicsByEpisode] = useState<
+    Record<number, string[]>
+  >(initialTopicsByEpisode);
   const [isPending, startTransition] = useTransition();
 
   const visibleItems = items.filter((n) => !n.pendingDismiss);
@@ -106,7 +114,10 @@ export function NotificationPageList({
           // alike. Treat empty-while-prev-non-empty as a likely failure and
           // preserve prev so a transient server glitch doesn't wipe every row.
           if (piIds.length === 0 && prev.length > 0) return prev;
-          if (prev.length === piIds.length && prev.every((id, i) => id === piIds[i])) {
+          if (
+            prev.length === piIds.length &&
+            prev.every((id, i) => id === piIds[i])
+          ) {
             return prev;
           }
           return piIds;
@@ -120,54 +131,45 @@ export function NotificationPageList({
       window.removeEventListener(LISTEN_STATE_CHANGED_EVENT, refresh);
   }, []);
 
-  const handleDismiss = useCallback(
-    (id: number) => {
-      startTransition(async () => {
+  const handleDismiss = useCallback((id: number) => {
+    startTransition(async () => {
+      setItems((prev) =>
+        prev.map((n) => (n.id === id ? { ...n, pendingDismiss: true } : n)),
+      );
+      const result = await dismissNotification(id);
+      if (result.success) {
+        setItems((prev) => prev.filter((n) => n.id !== id));
+        offsetRef.current = Math.max(0, offsetRef.current - 1);
+      } else {
         setItems((prev) =>
-          prev.map((n) => (n.id === id ? { ...n, pendingDismiss: true } : n))
+          prev.map((n) => (n.id === id ? { ...n, pendingDismiss: false } : n)),
         );
-        const result = await dismissNotification(id);
-        if (result.success) {
-          setItems((prev) => prev.filter((n) => n.id !== id));
-          offsetRef.current = Math.max(0, offsetRef.current - 1);
-        } else {
-          setItems((prev) =>
-            prev.map((n) =>
-              n.id === id ? { ...n, pendingDismiss: false } : n
-            )
-          );
-          toastErrorWithRetry("Failed to dismiss notification", () =>
-            handleDismiss(id)
-          );
-        }
-      });
-    },
-    []
-  );
+        toastErrorWithRetry("Failed to dismiss notification", () =>
+          handleDismiss(id),
+        );
+      }
+    });
+  }, []);
 
   const markReadOptimistic = useCallback((item: NotificationItem) => {
     if (item.isRead) return;
     // Optimistic flip + rollback on failure keeps interactions snappy without
     // letting a stale read=true linger if the server rejects the mutation.
     setItems((prev) =>
-      prev.map((n) => (n.id === item.id ? { ...n, isRead: true } : n))
+      prev.map((n) => (n.id === item.id ? { ...n, isRead: true } : n)),
     );
     markNotificationRead(item.id)
       .then((result) => {
         if (!result.success) {
           setItems((prev) =>
-            prev.map((n) =>
-              n.id === item.id ? { ...n, isRead: false } : n
-            )
+            prev.map((n) => (n.id === item.id ? { ...n, isRead: false } : n)),
           );
           toast.error(result.error ?? "Couldn't mark as read");
         }
       })
       .catch(() => {
         setItems((prev) =>
-          prev.map((n) =>
-            n.id === item.id ? { ...n, isRead: false } : n
-          )
+          prev.map((n) => (n.id === item.id ? { ...n, isRead: false } : n)),
         );
         toast.error("Couldn't mark as read");
       });
@@ -180,7 +182,7 @@ export function NotificationPageList({
         router.push(ROUTES.episode(item.episodePodcastIndexId));
       }
     },
-    [markReadOptimistic, router]
+    [markReadOptimistic, router],
   );
 
   const handleMarkAllRead = useCallback(async () => {
@@ -192,7 +194,7 @@ export function NotificationPageList({
       } else {
         toastErrorWithRetry(
           result.error ?? "Failed to mark all as read",
-          retry
+          retry,
         );
       }
     } catch {
@@ -207,7 +209,7 @@ export function NotificationPageList({
         const result = await getNotifications(
           NOTIFICATIONS_PAGE_SIZE,
           offsetRef.current,
-          filter
+          filter,
         );
         if (result.error) {
           toastErrorWithRetry("Failed to load more notifications", retry);
@@ -335,8 +337,14 @@ export function NotificationPageList({
         {/* Render a TabsContent per tab so each trigger's aria-controls resolves
          * to a mounted panel; Radix hides inactive ones via data-state. */}
         {renderPanel("all", visibleItems)}
-        {renderPanel("unread", visibleItems.filter((n) => !n.isRead))}
-        {renderPanel("read", visibleItems.filter((n) => n.isRead))}
+        {renderPanel(
+          "unread",
+          visibleItems.filter((n) => !n.isRead),
+        )}
+        {renderPanel(
+          "read",
+          visibleItems.filter((n) => n.isRead),
+        )}
       </Tabs>
     </div>
   );
@@ -434,9 +442,7 @@ function NotificationRow({
         score={item.worthItScore}
         accent={item.isRead ? "none" : "unread"}
         isListened={isListened}
-        meta={[
-          <span key="time">{formatRelativeTime(item.createdAt)}</span>,
-        ]}
+        meta={[<span key="time">{formatRelativeTime(item.createdAt)}</span>]}
         primaryAction={primaryAction}
         secondaryActions={
           <>

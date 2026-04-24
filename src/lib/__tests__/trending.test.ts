@@ -37,17 +37,23 @@ describe("isTrendingSnapshotStale", () => {
   });
 
   it("returns false just inside the 48h threshold", () => {
-    const oneSecondInside = new Date(MOCK_NOW.getTime() - STALE_THRESHOLD_MS + 1_000);
+    const oneSecondInside = new Date(
+      MOCK_NOW.getTime() - STALE_THRESHOLD_MS + 1_000,
+    );
     expect(isTrendingSnapshotStale(oneSecondInside)).toBe(false);
   });
 
   it("returns false exactly at the threshold boundary", () => {
-    const exactlyAtThreshold = new Date(MOCK_NOW.getTime() - STALE_THRESHOLD_MS);
+    const exactlyAtThreshold = new Date(
+      MOCK_NOW.getTime() - STALE_THRESHOLD_MS,
+    );
     expect(isTrendingSnapshotStale(exactlyAtThreshold)).toBe(false);
   });
 
   it("returns true just past the 48h threshold", () => {
-    const oneSecondPast = new Date(MOCK_NOW.getTime() - STALE_THRESHOLD_MS - 1_000);
+    const oneSecondPast = new Date(
+      MOCK_NOW.getTime() - STALE_THRESHOLD_MS - 1_000,
+    );
     expect(isTrendingSnapshotStale(oneSecondPast)).toBe(true);
   });
 

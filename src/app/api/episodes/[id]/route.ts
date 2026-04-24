@@ -48,14 +48,14 @@ function withPublicCache(response: NextResponse): NextResponse {
 
 function withConditionalPublicCache(
   response: NextResponse,
-  isAnonymousRequest: boolean
+  isAnonymousRequest: boolean,
 ): NextResponse {
   return isAnonymousRequest ? withPublicCache(response) : response;
 }
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: { id: string } },
 ) {
   try {
     const { userId } = await auth();
@@ -74,7 +74,7 @@ export async function GET(
           {
             status: 429,
             headers: { "Retry-After": String(retryAfterSeconds) },
-          }
+          },
         );
       }
     }
@@ -101,7 +101,7 @@ export async function GET(
       if (!dbEpisode) {
         return NextResponse.json(
           { error: "Episode not found" },
-          { status: 404 }
+          { status: 404 },
         );
       }
 
@@ -160,7 +160,7 @@ export async function GET(
           transcriptStatus: dbEpisode.transcriptStatus ?? null,
           episodeDbId: dbEpisode.id,
         }),
-        isAnonymousRequest
+        isAnonymousRequest,
       );
     }
 
@@ -168,14 +168,14 @@ export async function GET(
     if (!/^\d+$/.test(id)) {
       return NextResponse.json(
         { error: "Invalid episode ID" },
-        { status: 400 }
+        { status: 400 },
       );
     }
     const episodeId = Number(id);
     if (!Number.isSafeInteger(episodeId)) {
       return NextResponse.json(
         { error: "Invalid episode ID" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -184,17 +184,14 @@ export async function GET(
     try {
       episodeResponse = await getEpisodeById(episodeId);
     } catch (error) {
-      console.error("Error fetching episode from PodcastIndex:", { episodeId, error });
-      return NextResponse.json(
-        { error: "Episode not found" },
-        { status: 404 }
-      );
+      console.error("Error fetching episode from PodcastIndex:", {
+        episodeId,
+        error,
+      });
+      return NextResponse.json({ error: "Episode not found" }, { status: 404 });
     }
     if (!episodeResponse?.episode) {
-      return NextResponse.json(
-        { error: "Episode not found" },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: "Episode not found" }, { status: 404 });
     }
 
     const episode = episodeResponse.episode;
@@ -211,7 +208,11 @@ export async function GET(
 
     // Check if we have a cached summary in the database
     let summary = null;
-    let transcriptSource: "podcastindex" | "assemblyai" | "description-url" | null = null;
+    let transcriptSource:
+      | "podcastindex"
+      | "assemblyai"
+      | "description-url"
+      | null = null;
     let episodeDbId: number | null = null;
     let transcriptStatus: string | null = null;
     try {
@@ -259,13 +260,13 @@ export async function GET(
         transcriptStatus,
         episodeDbId,
       }),
-      isAnonymousRequest
+      isAnonymousRequest,
     );
   } catch (error) {
     console.error("Error fetching episode:", error);
     return NextResponse.json(
       { error: "Failed to fetch episode" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

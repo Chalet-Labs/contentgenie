@@ -7,7 +7,7 @@ import {
 describe("episode-detail-shared", () => {
   it("builds sign-up redirects for internal paths", () => {
     expect(buildSignUpHref("/episode/123")).toBe(
-      "/sign-up?redirect_url=%2Fepisode%2F123"
+      "/sign-up?redirect_url=%2Fepisode%2F123",
     );
   });
 

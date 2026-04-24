@@ -35,11 +35,14 @@ vi.mock("@/db", () => ({
 }));
 
 function makeRequest(body: unknown) {
-  return new NextRequest("http://localhost:3000/api/subscriptions/unsubscribe", {
-    method: "POST",
-    body: JSON.stringify(body),
-    headers: { "Content-Type": "application/json" },
-  });
+  return new NextRequest(
+    "http://localhost:3000/api/subscriptions/unsubscribe",
+    {
+      method: "POST",
+      body: JSON.stringify(body),
+      headers: { "Content-Type": "application/json" },
+    },
+  );
 }
 
 describe("POST /api/subscriptions/unsubscribe", () => {
@@ -83,7 +86,7 @@ describe("POST /api/subscriptions/unsubscribe", () => {
       new NextRequest("http://localhost:3000/api/subscriptions/unsubscribe", {
         method: "POST",
         body: "not-json",
-      })
+      }),
     );
 
     expect(response.status).toBe(415);
@@ -93,7 +96,9 @@ describe("POST /api/subscriptions/unsubscribe", () => {
     mockPodcastsFindFirst.mockResolvedValue(null);
 
     const { POST } = await import("@/app/api/subscriptions/unsubscribe/route");
-    const response = await POST(makeRequest({ podcastIndexId: "pod-nonexistent" }));
+    const response = await POST(
+      makeRequest({ podcastIndexId: "pod-nonexistent" }),
+    );
 
     expect(response.status).toBe(404);
     const data = await response.json();

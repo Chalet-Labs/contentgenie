@@ -174,9 +174,7 @@ describe("parseChapters", () => {
 
   it("ignores empty img and url strings", () => {
     const input = {
-      chapters: [
-        { startTime: 0, title: "Test", img: "", url: "  " },
-      ],
+      chapters: [{ startTime: 0, title: "Test", img: "", url: "  " }],
     };
 
     const result = parseChapters(input);
@@ -215,13 +213,7 @@ describe("parseChapters", () => {
 
   it("skips non-object entries in chapters array", () => {
     const input = {
-      chapters: [
-        null,
-        42,
-        "string",
-        { startTime: 10, title: "Valid" },
-        true,
-      ],
+      chapters: [null, 42, "string", { startTime: 10, title: "Valid" }, true],
     };
 
     const result = parseChapters(input);
@@ -244,7 +236,12 @@ describe("parseChapters", () => {
           url: "https://sponsor.example.com",
         },
         { startTime: 120, title: "Interview: Part 1" },
-        { startTime: 600, title: "", img: "https://cdn.example.com/ad.jpg", toc: false },
+        {
+          startTime: 600,
+          title: "",
+          img: "https://cdn.example.com/ad.jpg",
+          toc: false,
+        },
         { startTime: 630, title: "Interview: Part 2" },
         { startTime: 1800, title: "Listener Questions" },
         { startTime: 2400, title: "Outro" },

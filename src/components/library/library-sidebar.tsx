@@ -6,7 +6,12 @@ import { usePathname } from "next/navigation";
 import { Folder, Plus, Bookmark, Library } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Sheet, SheetClose, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import {
+  Sheet,
+  SheetClose,
+  SheetContent,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import { CollectionDialog } from "./collection-dialog";
 import { getUserCollections } from "@/app/actions/collections";
 import type { Collection } from "@/db/schema";
@@ -42,12 +47,12 @@ function SidebarNav({
           href="/library"
           className={cn(
             "flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-accent",
-            pathname === "/library" && "bg-accent font-medium"
+            pathname === "/library" && "bg-accent font-medium",
           )}
         >
           <Bookmark className="h-4 w-4" />
           All Saved
-        </Link>
+        </Link>,
       )}
 
       <div className="pt-4">
@@ -93,17 +98,17 @@ function SidebarNav({
                     className={cn(
                       "flex items-center justify-between gap-3 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-accent",
                       pathname === `/library/collection/${collection.id}` &&
-                        "bg-accent font-medium"
+                        "bg-accent font-medium",
                     )}
                   >
-                    <div className="flex items-center gap-3 min-w-0">
+                    <div className="flex min-w-0 items-center gap-3">
                       <Folder className="h-4 w-4 shrink-0" />
                       <span className="truncate">{collection.name}</span>
                     </div>
                     <span className="text-xs text-muted-foreground">
                       {collection.episodeCount}
                     </span>
-                  </Link>
+                  </Link>,
                 )}
               </Fragment>
             ))}
@@ -154,7 +159,7 @@ export function LibrarySidebar() {
 
   return (
     <>
-      <div className="md:hidden mb-4">
+      <div className="mb-4 md:hidden">
         <Sheet>
           <SheetTrigger asChild>
             <Button variant="outline" size="sm" className="gap-2">
@@ -177,7 +182,7 @@ export function LibrarySidebar() {
         </Sheet>
       </div>
 
-      <aside className="hidden md:block w-64 shrink-0 border-r pr-6">
+      <aside className="hidden w-64 shrink-0 border-r pr-6 md:block">
         <SidebarNav
           pathname={pathname}
           collections={collections}

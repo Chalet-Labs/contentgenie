@@ -21,7 +21,9 @@ function pluralEpisode(count: number): string {
 }
 
 function pluralNotification(count: number): string {
-  return count === 1 ? "1 unread notification" : `${count} unread notifications`;
+  return count === 1
+    ? "1 unread notification"
+    : `${count} unread notifications`;
 }
 
 function SummaryRow({
@@ -38,7 +40,7 @@ function SummaryRow({
       <Link
         href={href}
         onClick={onClick}
-        className="flex items-center justify-between px-4 py-3 text-sm hover:bg-accent/50 focus-visible:outline-none focus-visible:bg-accent/50"
+        className="flex items-center justify-between px-4 py-3 text-sm hover:bg-accent/50 focus-visible:bg-accent/50 focus-visible:outline-none"
       >
         {children}
       </Link>
@@ -118,7 +120,9 @@ export function NotificationSummaryList({
             );
           default: {
             const _exhaustive: never = group;
-            throw new Error(`Unhandled NotificationGroup: ${JSON.stringify(_exhaustive)}`);
+            throw new Error(
+              `Unhandled NotificationGroup: ${JSON.stringify(_exhaustive)}`,
+            );
           }
         }
       })}

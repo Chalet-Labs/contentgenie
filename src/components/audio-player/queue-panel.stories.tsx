@@ -1,6 +1,6 @@
-import type { Meta, StoryObj } from "@storybook/nextjs-vite"
-import type { ReactNode } from "react"
-import { ListMusic } from "lucide-react"
+import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import type { ReactNode } from "react";
+import { ListMusic } from "lucide-react";
 import {
   AudioPlayerAPIContext,
   AudioPlayerStateContext,
@@ -8,9 +8,9 @@ import {
   type AudioPlayerState,
   type AudioPlayerAPI,
   type AudioEpisode,
-} from "@/contexts/audio-player-context"
-import { Button } from "@/components/ui/button"
-import { QueuePanel } from "@/components/audio-player/queue-panel"
+} from "@/contexts/audio-player-context";
+import { Button } from "@/components/ui/button";
+import { QueuePanel } from "@/components/audio-player/queue-panel";
 
 const noopAPI: AudioPlayerAPI = {
   playEpisode: () => {},
@@ -29,7 +29,7 @@ const noopAPI: AudioPlayerAPI = {
   setSleepTimer: () => {},
   cancelSleepTimer: () => {},
   getCurrentTime: () => 0,
-}
+};
 
 const playingEpisode: AudioEpisode = {
   id: "ep-playing",
@@ -37,7 +37,7 @@ const playingEpisode: AudioEpisode = {
   podcastTitle: "Some Podcast",
   audioUrl: "https://example.com/playing.mp3",
   duration: 1800,
-}
+};
 
 const queueEpisodes: AudioEpisode[] = [
   {
@@ -64,7 +64,7 @@ const queueEpisodes: AudioEpisode[] = [
     audioUrl: "https://example.com/audio3.mp3",
     duration: 1200,
   },
-]
+];
 
 const baseState: AudioPlayerState = {
   currentEpisode: playingEpisode,
@@ -80,14 +80,14 @@ const baseState: AudioPlayerState = {
   chapters: null,
   chaptersLoading: false,
   sleepTimer: null,
-}
+};
 
 function MockProvider({
   state,
   children,
 }: {
-  state: AudioPlayerState
-  children: ReactNode
+  state: AudioPlayerState;
+  children: ReactNode;
 }) {
   return (
     <AudioPlayerAPIContext.Provider value={noopAPI}>
@@ -99,22 +99,22 @@ function MockProvider({
         </AudioPlayerProgressContext.Provider>
       </AudioPlayerStateContext.Provider>
     </AudioPlayerAPIContext.Provider>
-  )
+  );
 }
 
 const queueTrigger = (
   <Button variant="ghost" size="icon" aria-label="Queue">
     <ListMusic className="h-4 w-4" />
   </Button>
-)
+);
 
 const meta: Meta<typeof QueuePanel> = {
   title: "AudioPlayer/QueuePanel",
   component: QueuePanel,
-}
+};
 
-export default meta
-type Story = StoryObj<typeof QueuePanel>
+export default meta;
+type Story = StoryObj<typeof QueuePanel>;
 
 export const EmptyQueue: Story = {
   args: {
@@ -131,7 +131,7 @@ export const EmptyQueue: Story = {
       </MockProvider>
     ),
   ],
-}
+};
 
 export const MultipleItems: Story = {
   args: {
@@ -148,7 +148,7 @@ export const MultipleItems: Story = {
       </MockProvider>
     ),
   ],
-}
+};
 
 export const SingleItem: Story = {
   args: {
@@ -158,16 +158,14 @@ export const SingleItem: Story = {
   },
   decorators: [
     (Story) => (
-      <MockProvider
-        state={{ ...baseState, queue: [queueEpisodes[0]] }}
-      >
+      <MockProvider state={{ ...baseState, queue: [queueEpisodes[0]] }}>
         <div className="flex min-h-[400px] items-end justify-end p-4">
           <Story />
         </div>
       </MockProvider>
     ),
   ],
-}
+};
 
 export const LongTitles: Story = {
   args: {
@@ -208,7 +206,7 @@ export const LongTitles: Story = {
       </MockProvider>
     ),
   ],
-}
+};
 
 export const MobileSheet: Story = {
   parameters: {
@@ -229,4 +227,4 @@ export const MobileSheet: Story = {
       </MockProvider>
     ),
   ],
-}
+};

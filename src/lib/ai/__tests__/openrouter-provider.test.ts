@@ -22,10 +22,9 @@ describe("OpenRouterProvider", () => {
   it("throws when API key is missing", async () => {
     vi.stubEnv("OPENROUTER_API_KEY", "");
     await expect(
-      provider.generateCompletion(
-        [{ role: "user", content: "test" }],
-        { model: "test-model" }
-      )
+      provider.generateCompletion([{ role: "user", content: "test" }], {
+        model: "test-model",
+      }),
     ).rejects.toThrow("OpenRouter API key is not configured");
   });
 
@@ -41,10 +40,11 @@ describe("OpenRouterProvider", () => {
     });
     vi.stubGlobal("fetch", mockFetch);
 
-    await provider.generateCompletion(
-      [{ role: "user", content: "hello" }],
-      { model: "test-model", maxTokens: 100, temperature: 0.5 }
-    );
+    await provider.generateCompletion([{ role: "user", content: "hello" }], {
+      model: "test-model",
+      maxTokens: 100,
+      temperature: 0.5,
+    });
 
     expect(mockFetch).toHaveBeenCalledOnce();
     const [url, options] = mockFetch.mock.calls[0];
@@ -71,12 +71,12 @@ describe("OpenRouterProvider", () => {
           Promise.resolve({
             choices: [{ message: { content: "hello world" } }],
           }),
-      })
+      }),
     );
 
     const result = await provider.generateCompletion(
       [{ role: "user", content: "test" }],
-      { model: "test-model" }
+      { model: "test-model" },
     );
     expect(result).toBe("hello world");
   });
@@ -89,14 +89,13 @@ describe("OpenRouterProvider", () => {
         ok: false,
         status: 429,
         text: () => Promise.resolve("Rate limited"),
-      })
+      }),
     );
 
     await expect(
-      provider.generateCompletion(
-        [{ role: "user", content: "test" }],
-        { model: "test-model" }
-      )
+      provider.generateCompletion([{ role: "user", content: "test" }], {
+        model: "test-model",
+      }),
     ).rejects.toThrow("OpenRouter API error: 429 - Rate limited");
   });
 
@@ -107,14 +106,13 @@ describe("OpenRouterProvider", () => {
       vi.fn().mockResolvedValue({
         ok: true,
         json: () => Promise.resolve({ choices: [] }),
-      })
+      }),
     );
 
     await expect(
-      provider.generateCompletion(
-        [{ role: "user", content: "test" }],
-        { model: "test-model" }
-      )
+      provider.generateCompletion([{ role: "user", content: "test" }], {
+        model: "test-model",
+      }),
     ).rejects.toThrow("No response from OpenRouter");
   });
 
@@ -129,10 +127,9 @@ describe("OpenRouterProvider", () => {
     });
     vi.stubGlobal("fetch", mockFetch);
 
-    await provider.generateCompletion(
-      [{ role: "user", content: "test" }],
-      { model: "test-model" }
-    );
+    await provider.generateCompletion([{ role: "user", content: "test" }], {
+      model: "test-model",
+    });
 
     const body = JSON.parse(mockFetch.mock.calls[0][1].body);
     expect(body.max_tokens).toBe(4096);

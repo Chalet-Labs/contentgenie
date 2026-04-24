@@ -1,10 +1,6 @@
 import { task, retry, logger, metadata } from "@trigger.dev/sdk";
 import { db } from "@/db";
-import {
-  users,
-  episodes,
-  userSubscriptions,
-} from "@/db/schema";
+import { users, episodes, userSubscriptions } from "@/db/schema";
 import { upsertPodcast } from "@/db/helpers";
 import { getPodcastByFeedUrl } from "@/trigger/helpers/podcastindex";
 import {
@@ -124,7 +120,7 @@ async function importSingleFeed(userId: string, feed: OpmlFeed): Promise<void> {
   try {
     const response = await retry.onThrow(
       async () => getPodcastByFeedUrl(feedUrl),
-      { maxAttempts: 2 }
+      { maxAttempts: 2 },
     );
 
     if (response?.feed) {
@@ -136,19 +132,23 @@ async function importSingleFeed(userId: string, feed: OpmlFeed): Promise<void> {
       });
 
       // Upsert podcast with PodcastIndex data
-      const podcastId = await upsertPodcast({
-        podcastIndexId: String(piFeed.id),
-        title: piFeed.title,
-        description: piFeed.description,
-        publisher: piFeed.author,
-        imageUrl: piFeed.artwork || piFeed.image,
-        rssFeedUrl: piFeed.url || piFeed.originalUrl || feedUrl,
-        categories: piFeed.categories && Object.keys(piFeed.categories).length > 0
-          ? Object.values(piFeed.categories)
-          : undefined,
-        totalEpisodes: piFeed.episodeCount,
-        source: "podcastindex",
-      }, { updateOnConflict: "full" });
+      const podcastId = await upsertPodcast(
+        {
+          podcastIndexId: String(piFeed.id),
+          title: piFeed.title,
+          description: piFeed.description,
+          publisher: piFeed.author,
+          imageUrl: piFeed.artwork || piFeed.image,
+          rssFeedUrl: piFeed.url || piFeed.originalUrl || feedUrl,
+          categories:
+            piFeed.categories && Object.keys(piFeed.categories).length > 0
+              ? Object.values(piFeed.categories)
+              : undefined,
+          totalEpisodes: piFeed.episodeCount,
+          source: "podcastindex",
+        },
+        { updateOnConflict: "full" },
+      );
 
       // Create subscription
       await db
@@ -170,20 +170,23 @@ async function importSingleFeed(userId: string, feed: OpmlFeed): Promise<void> {
 
   const parsedFeed = await retry.onThrow(
     async () => parsePodcastFeed(feedUrl),
-    { maxAttempts: 2 }
+    { maxAttempts: 2 },
   );
 
   const syntheticPodcastId = generatePodcastSyntheticId(feedUrl);
 
-  const podcastId = await upsertPodcast({
-    podcastIndexId: syntheticPodcastId,
-    title: parsedFeed.title,
-    description: parsedFeed.description ?? undefined,
-    publisher: parsedFeed.author ?? undefined,
-    imageUrl: parsedFeed.imageUrl ?? undefined,
-    rssFeedUrl: feedUrl,
-    source: "rss",
-  }, { updateOnConflict: "full" });
+  const podcastId = await upsertPodcast(
+    {
+      podcastIndexId: syntheticPodcastId,
+      title: parsedFeed.title,
+      description: parsedFeed.description ?? undefined,
+      publisher: parsedFeed.author ?? undefined,
+      imageUrl: parsedFeed.imageUrl ?? undefined,
+      rssFeedUrl: feedUrl,
+      source: "rss",
+    },
+    { updateOnConflict: "full" },
+  );
 
   // Insert episodes (max 50, newest first)
   const sortedEpisodes = [...parsedFeed.episodes].sort((a, b) => {
@@ -205,10 +208,7 @@ async function importSingleFeed(userId: string, feed: OpmlFeed): Promise<void> {
       rssGuid: ep.guid,
     }));
 
-    await db
-      .insert(episodes)
-      .values(episodeValues)
-      .onConflictDoNothing();
+    await db.insert(episodes).values(episodeValues).onConflictDoNothing();
   }
 
   // Create subscription

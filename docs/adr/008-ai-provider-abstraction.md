@@ -71,6 +71,7 @@ The `AiProvider` abstraction covers **non-streaming completions only**. The admi
 This is an intentional, documented exception. The implementation lives in `src/lib/admin/stream-completion.ts`. The `AiProvider.generateCompletion` interface is not changed.
 
 **When to use the abstraction vs. the streaming path:**
+
 - Non-streaming completions (summarization, trending topics, etc.): use `generateCompletion` via `@/lib/ai`.
 - Streaming completions (prompt playground, or future streaming features): use `streamCompletion` from `@/lib/admin/stream-completion`, or extend that helper. Do not add the Vercel AI SDK unless there is a compelling need beyond what the raw SSE approach supports.
 

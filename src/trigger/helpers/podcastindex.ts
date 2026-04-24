@@ -1,4 +1,9 @@
-export { getEpisodeById, getEpisodesByFeedId, getPodcastById, getPodcastByFeedUrl } from "@/lib/podcastindex";
+export {
+  getEpisodeById,
+  getEpisodesByFeedId,
+  getPodcastById,
+  getPodcastByFeedUrl,
+} from "@/lib/podcastindex";
 export type {
   PodcastIndexEpisode,
   PodcastIndexPodcast,

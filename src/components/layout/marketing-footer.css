@@ -4,7 +4,9 @@
   font-size: 13px;
   color: hsl(var(--muted-foreground));
 }
-.lp-footer .lp-brand { font-size: 13px; }
+.lp-footer .lp-brand {
+  font-size: 13px;
+}
 .lp-foot-inner {
   max-width: 1200px;
   margin: 0 auto;
@@ -15,8 +17,15 @@
   gap: 16px;
   flex-wrap: wrap;
 }
-.lp-foot-links { display: flex; gap: 20px; }
-.lp-foot-links a:hover { color: hsl(var(--foreground)); }
+.lp-foot-links {
+  display: flex;
+  gap: 20px;
+}
+.lp-foot-links a:hover {
+  color: hsl(var(--foreground));
+}
 @media (max-width: 640px) {
-  .lp-foot-inner { padding: 0 20px; }
+  .lp-foot-inner {
+    padding: 0 20px;
+  }
 }

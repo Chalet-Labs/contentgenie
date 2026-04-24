@@ -28,7 +28,16 @@ interface EpisodeListProps {
   topicsByPodcastIndexId?: Record<string, string[]>;
 }
 
-export function EpisodeList({ episodes, isLoading, error, statusMap, scoreMap, listenedIds, knownIds, topicsByPodcastIndexId }: EpisodeListProps) {
+export function EpisodeList({
+  episodes,
+  isLoading,
+  error,
+  statusMap,
+  scoreMap,
+  listenedIds,
+  knownIds,
+  topicsByPodcastIndexId,
+}: EpisodeListProps) {
   const [query, setQuery] = useState("");
   const trimmedQuery = query.trim();
   const normalizedQuery = trimmedQuery.toLowerCase();

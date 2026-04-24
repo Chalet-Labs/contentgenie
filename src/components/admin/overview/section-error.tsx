@@ -1,22 +1,22 @@
-"use client"
+"use client";
 
-import { Component, type ReactNode } from "react"
-import { Card, CardContent } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
+import { Component, type ReactNode } from "react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 
 interface Props {
-  children: ReactNode
+  children: ReactNode;
 }
 
 interface State {
-  error: Error | null
+  error: Error | null;
 }
 
 export class SectionErrorBoundary extends Component<Props, State> {
-  state: State = { error: null }
+  state: State = { error: null };
 
   static getDerivedStateFromError(error: Error): State {
-    return { error }
+    return { error };
   }
 
   render() {
@@ -24,7 +24,7 @@ export class SectionErrorBoundary extends Component<Props, State> {
       return (
         <Card className="border-destructive/50">
           <CardContent className="py-6 text-center">
-            <p className="text-sm text-muted-foreground mb-2">
+            <p className="mb-2 text-sm text-muted-foreground">
               Failed to load this section.
             </p>
             <Button
@@ -36,9 +36,9 @@ export class SectionErrorBoundary extends Component<Props, State> {
             </Button>
           </CardContent>
         </Card>
-      )
+      );
     }
 
-    return this.props.children
+    return this.props.children;
   }
 }

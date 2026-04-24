@@ -66,7 +66,11 @@ export function CollectionDialog({
 
   const onSubmit = async (values: CollectionValues) => {
     const result = isEditing
-      ? await updateCollection(collection.id, values.name, values.description ?? "")
+      ? await updateCollection(
+          collection.id,
+          values.name,
+          values.description ?? "",
+        )
       : await createCollection(values.name, values.description ?? "");
 
     if (result.success) {
@@ -83,10 +87,13 @@ export function CollectionDialog({
   };
 
   return (
-    <Dialog open={open} onOpenChange={(nextOpen) => {
+    <Dialog
+      open={open}
+      onOpenChange={(nextOpen) => {
         if (form.formState.isSubmitting) return;
         onOpenChange(nextOpen);
-      }}>
+      }}
+    >
       <DialogContent className="sm:max-w-[425px]">
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)}>
@@ -125,7 +132,7 @@ export function CollectionDialog({
                   <FormItem>
                     <FormLabel>
                       Description
-                      <span className="text-muted-foreground font-normal">
+                      <span className="font-normal text-muted-foreground">
                         {" "}
                         (optional)
                       </span>

@@ -12,6 +12,7 @@ Two surfaces in the app manage URL search params manually:
 2. **Admin episodes page** (`/admin/episodes`) — six params (`podcastId`, `transcriptStatus[]`, `summaryStatus[]`, `dateFrom`, `dateTo`, `page`), managed via a custom `parseEpisodeFilters` function on the server and a local `filters` state + `URLSearchParams` construction on the client.
 
 Both patterns share the same problems:
+
 - Manual serialization/deserialization with no type safety — a mistyped key or wrong parser silently produces `undefined`
 - Arrays require careful repeated-key handling (`URLSearchParams.append`) that diverges between client construction and server parsing
 - Client state must be manually kept in sync with the URL (via `useEffect` + `router.replace`)
@@ -29,6 +30,7 @@ Install `nuqs` and wrap root layout children with `<NuqsAdapter>` from `nuqs/ada
 ### Parser definitions
 
 Shared parser maps live in `src/lib/search-params/`:
+
 - `discover.ts` — exports `discoverSearchParams` for the `q` param
 - `admin-episodes.ts` — exports `adminEpisodeSearchParams` (client parsers) and `loadAdminEpisodeSearchParams` (server loader via `createLoader`)
 
@@ -61,9 +63,9 @@ This is a breaking change for persisted URLs (bookmarks, shared links). However,
 
 ## Migration scope
 
-| Surface | Before | After |
-|---------|--------|-------|
-| Discover `q` param | `useSearchParams` + `useRouter` | `useQueryState` |
+| Surface               | Before                                                  | After                             |
+| --------------------- | ------------------------------------------------------- | --------------------------------- |
+| Discover `q` param    | `useSearchParams` + `useRouter`                         | `useQueryState`                   |
 | Admin episode filters | `parseEpisodeFilters` + local state + `URLSearchParams` | `useQueryStates` + `createLoader` |
 
 The `EpisodeFilters` interface and `buildEpisodeWhereConditions()` Drizzle query builder are unchanged — they consume the same typed shape regardless of how params are parsed.

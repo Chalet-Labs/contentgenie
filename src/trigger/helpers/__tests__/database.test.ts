@@ -26,7 +26,11 @@ vi.mock("@/db", () => ({
 vi.mock("@/db/schema", () => ({
   episodes: { podcastIndexId: "podcastIndexId", id: "id" },
   podcasts: { podcastIndexId: "podcastIndexId" },
-  episodeTopics: { episodeId: "episodeId", topic: "topic", relevance: "relevance" },
+  episodeTopics: {
+    episodeId: "episodeId",
+    topic: "topic",
+    relevance: "relevance",
+  },
 }));
 
 vi.mock("drizzle-orm", () => ({
@@ -104,7 +108,7 @@ describe("persistTranscript", () => {
         transcriptFetchedAt: expect.any(Date),
         transcriptError: null,
         transcriptRunId: null,
-      })
+      }),
     );
   });
 
@@ -116,7 +120,7 @@ describe("persistTranscript", () => {
     await persistTranscript(99, "transcript", "assemblyai");
 
     expect(chain.set).toHaveBeenCalledWith(
-      expect.objectContaining({ transcriptSource: "assemblyai" })
+      expect.objectContaining({ transcriptSource: "assemblyai" }),
     );
   });
 
@@ -126,7 +130,7 @@ describe("persistTranscript", () => {
 
     const { persistTranscript } = await import("@/trigger/helpers/database");
     await expect(
-      persistTranscript(999, "text", "description-url")
+      persistTranscript(999, "text", "description-url"),
     ).rejects.toThrow("Episode 999 not found for transcript persistence");
   });
 });
@@ -136,7 +140,8 @@ describe("persistEpisodeSummary", () => {
     summary: "Summary text",
     keyTakeaways: ["point 1"],
     worthItScore: 7,
-    worthItReason: "6/8 signals: actionable insights, focused, beyond surface, well-structured, time justified, concrete examples. Adjustment: 0 (signals capture quality accurately).",
+    worthItReason:
+      "6/8 signals: actionable insights, focused, beyond surface, well-structured, time justified, concrete examples. Adjustment: 0 (signals capture quality accurately).",
     worthItDimensions: {
       kind: "signals" as const,
       signals: {
@@ -177,7 +182,8 @@ describe("persistEpisodeSummary", () => {
     mockEpisodesFindFirst.mockResolvedValue({ id: 10 });
     const chain = makeSimpleUpdateChain();
 
-    const { persistEpisodeSummary } = await import("@/trigger/helpers/database");
+    const { persistEpisodeSummary } =
+      await import("@/trigger/helpers/database");
     await persistEpisodeSummary(baseEpisode as never, undefined, baseSummary);
 
     expect(chain.set).toHaveBeenCalledWith(
@@ -185,7 +191,7 @@ describe("persistEpisodeSummary", () => {
         summary: "Summary text",
         summaryStatus: "completed",
         summaryRunId: null,
-      })
+      }),
     );
   });
 
@@ -194,7 +200,8 @@ describe("persistEpisodeSummary", () => {
     mockEpisodesFindFirst.mockResolvedValue({ id: 10 });
     const chain = makeSimpleUpdateChain();
 
-    const { persistEpisodeSummary } = await import("@/trigger/helpers/database");
+    const { persistEpisodeSummary } =
+      await import("@/trigger/helpers/database");
     await persistEpisodeSummary(baseEpisode as never, undefined, baseSummary);
 
     const setArgs = chain.set.mock.calls[0][0] as Record<string, unknown>;
@@ -212,14 +219,15 @@ describe("persistEpisodeSummary", () => {
     const episodesChain = makeInsertChain([{ id: 42 }]);
     mockInsert.mockReturnValue(episodesChain);
 
-    const { persistEpisodeSummary } = await import("@/trigger/helpers/database");
+    const { persistEpisodeSummary } =
+      await import("@/trigger/helpers/database");
     await persistEpisodeSummary(baseEpisode as never, undefined, baseSummary);
 
     expect(episodesChain.values).toHaveBeenCalledWith(
       expect.objectContaining({
         summary: "Summary text",
         summaryStatus: "completed",
-      })
+      }),
     );
     expect(episodesChain.returning).toHaveBeenCalled();
   });
@@ -231,7 +239,8 @@ describe("persistEpisodeSummary", () => {
     const chain = makeInsertChain([{ id: 42 }]);
     mockInsert.mockReturnValue(chain);
 
-    const { persistEpisodeSummary } = await import("@/trigger/helpers/database");
+    const { persistEpisodeSummary } =
+      await import("@/trigger/helpers/database");
     await persistEpisodeSummary(baseEpisode as never, undefined, baseSummary);
 
     const valuesArgs = chain.values.mock.calls[0][0] as Record<string, unknown>;
@@ -245,9 +254,10 @@ describe("persistEpisodeSummary", () => {
   it("throws when podcast cannot be resolved", async () => {
     mockPodcastsFindFirst.mockResolvedValue(null);
 
-    const { persistEpisodeSummary } = await import("@/trigger/helpers/database");
+    const { persistEpisodeSummary } =
+      await import("@/trigger/helpers/database");
     await expect(
-      persistEpisodeSummary(baseEpisode as never, undefined, baseSummary)
+      persistEpisodeSummary(baseEpisode as never, undefined, baseSummary),
     ).rejects.toThrow("Could not find or create podcast in database");
   });
 
@@ -269,8 +279,13 @@ describe("persistEpisodeSummary", () => {
       const topicsChain = makeInsertChain([]);
       mockInsert.mockReturnValue(topicsChain);
 
-      const { persistEpisodeSummary } = await import("@/trigger/helpers/database");
-      await persistEpisodeSummary(baseEpisode as never, undefined, summaryWithTopics);
+      const { persistEpisodeSummary } =
+        await import("@/trigger/helpers/database");
+      await persistEpisodeSummary(
+        baseEpisode as never,
+        undefined,
+        summaryWithTopics,
+      );
 
       expect(mockDelete).toHaveBeenCalledTimes(1);
       expect(mockInsert).toHaveBeenCalledTimes(1);
@@ -287,10 +302,17 @@ describe("persistEpisodeSummary", () => {
       makeDeleteChain();
       const episodesChain = makeInsertChain([{ id: 42 }]);
       const topicsChain = makeInsertChain([]);
-      mockInsert.mockReturnValueOnce(episodesChain).mockReturnValueOnce(topicsChain);
+      mockInsert
+        .mockReturnValueOnce(episodesChain)
+        .mockReturnValueOnce(topicsChain);
 
-      const { persistEpisodeSummary } = await import("@/trigger/helpers/database");
-      await persistEpisodeSummary(baseEpisode as never, undefined, summaryWithTopics);
+      const { persistEpisodeSummary } =
+        await import("@/trigger/helpers/database");
+      await persistEpisodeSummary(
+        baseEpisode as never,
+        undefined,
+        summaryWithTopics,
+      );
 
       expect(episodesChain.returning).toHaveBeenCalled();
       expect(mockDelete).toHaveBeenCalledTimes(1);
@@ -305,8 +327,12 @@ describe("persistEpisodeSummary", () => {
       mockEpisodesFindFirst.mockResolvedValue({ id: 10 });
       makeSimpleUpdateChain();
 
-      const { persistEpisodeSummary } = await import("@/trigger/helpers/database");
-      await persistEpisodeSummary(baseEpisode as never, undefined, { ...baseSummary, topics: [] });
+      const { persistEpisodeSummary } =
+        await import("@/trigger/helpers/database");
+      await persistEpisodeSummary(baseEpisode as never, undefined, {
+        ...baseSummary,
+        topics: [],
+      });
 
       expect(mockDelete).not.toHaveBeenCalled();
       expect(mockInsert).not.toHaveBeenCalled();
@@ -317,7 +343,8 @@ describe("persistEpisodeSummary", () => {
       mockEpisodesFindFirst.mockResolvedValue({ id: 10 });
       makeSimpleUpdateChain();
 
-      const { persistEpisodeSummary } = await import("@/trigger/helpers/database");
+      const { persistEpisodeSummary } =
+        await import("@/trigger/helpers/database");
       await persistEpisodeSummary(baseEpisode as never, undefined, baseSummary);
 
       expect(mockDelete).not.toHaveBeenCalled();
@@ -338,9 +365,14 @@ describe("persistEpisodeSummary", () => {
       });
       mockInsert.mockReturnValue(topicsChain);
 
-      const { persistEpisodeSummary } = await import("@/trigger/helpers/database");
+      const { persistEpisodeSummary } =
+        await import("@/trigger/helpers/database");
       await expect(
-        persistEpisodeSummary(baseEpisode as never, undefined, summaryWithTopics)
+        persistEpisodeSummary(
+          baseEpisode as never,
+          undefined,
+          summaryWithTopics,
+        ),
       ).rejects.toThrow("insert failed");
 
       // Delete ran before the insert failure — topics are cleared until next retry

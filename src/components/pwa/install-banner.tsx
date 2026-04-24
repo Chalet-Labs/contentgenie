@@ -14,11 +14,11 @@ export function InstallBanner() {
     <div
       role="complementary"
       aria-label="Install app"
-      className="fixed bottom-0 left-0 right-0 z-50 p-4 md:hidden animate-in slide-in-from-bottom duration-300"
+      className="fixed bottom-0 left-0 right-0 z-50 p-4 duration-300 animate-in slide-in-from-bottom md:hidden"
     >
       <div className="flex items-center gap-3 rounded-lg border bg-card p-4 shadow-lg">
         <Logo variant="mark" size={40} decorative className="shrink-0" />
-        <div className="flex-1 min-w-0">
+        <div className="min-w-0 flex-1">
           <p className="text-sm font-semibold text-card-foreground">
             Install ContentGenie
           </p>
@@ -26,7 +26,7 @@ export function InstallBanner() {
             Get the full app experience
           </p>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex shrink-0 items-center gap-2">
           <Button size="sm" onClick={() => void promptInstall()}>
             Install
           </Button>

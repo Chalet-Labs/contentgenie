@@ -7,7 +7,9 @@ import { cn } from "@/lib/utils";
 
 interface RatingInputProps {
   initialRating: number | null;
-  onRatingChange: (rating: number) => Promise<{ success: boolean; error?: string }>;
+  onRatingChange: (
+    rating: number,
+  ) => Promise<{ success: boolean; error?: string }>;
   size?: "sm" | "md" | "lg";
   showLabel?: boolean;
   disabled?: boolean;
@@ -94,7 +96,7 @@ export function RatingInput({
               "rounded-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ring",
               disabled || isPending
                 ? "cursor-not-allowed opacity-50"
-                : "cursor-pointer hover:scale-110"
+                : "cursor-pointer hover:scale-110",
             )}
             aria-label={`Rate ${value} stars`}
           >
@@ -104,20 +106,27 @@ export function RatingInput({
                 "transition-colors",
                 value <= displayRating
                   ? "fill-brand text-brand"
-                  : "fill-transparent text-muted-foreground"
+                  : "fill-transparent text-muted-foreground",
               )}
             />
           </button>
         ))}
-        {isPending && <Loader2 className={cn(sizeClasses[size], "ml-2 animate-spin text-muted-foreground")} />}
+        {isPending && (
+          <Loader2
+            className={cn(
+              sizeClasses[size],
+              "ml-2 animate-spin text-muted-foreground",
+            )}
+          />
+        )}
       </div>
       {showLabel && (
         <span className="text-xs text-muted-foreground">
           {hoveredRating
             ? getRatingLabel(hoveredRating)
             : rating
-            ? `Your rating: ${getRatingLabel(rating)}`
-            : "Click to rate"}
+              ? `Your rating: ${getRatingLabel(rating)}`
+              : "Click to rate"}
         </span>
       )}
       {error && <span className="text-xs text-destructive">{error}</span>}

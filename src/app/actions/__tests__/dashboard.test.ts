@@ -149,8 +149,10 @@ vi.mock("@/lib/topic-overlap", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/topic-overlap")>();
   return {
     ...actual,
-    computeTopicOverlap: (...args: unknown[]) => mockComputeTopicOverlap(...args),
-    buildUserTopicProfile: (...args: unknown[]) => mockBuildUserTopicProfile(...args),
+    computeTopicOverlap: (...args: unknown[]) =>
+      mockComputeTopicOverlap(...args),
+    buildUserTopicProfile: (...args: unknown[]) =>
+      mockBuildUserTopicProfile(...args),
   };
 });
 
@@ -203,7 +205,7 @@ describe("getDashboardStats", () => {
     expect(db.$count).toHaveBeenCalledTimes(2);
     expect(db.$count).toHaveBeenCalledWith(
       userSubscriptions,
-      expect.anything()
+      expect.anything(),
     );
     expect(db.$count).toHaveBeenCalledWith(userLibrary, expect.anything());
     expect(eq).toHaveBeenCalledWith("user_id", "user_123");
@@ -348,7 +350,13 @@ describe("getRecommendedEpisodes", () => {
     mockWhere.mockResolvedValue([]);
     mockOrderBy.mockReturnValue([]);
     mockBuildUserTopicProfile.mockReturnValue(new Map());
-    mockComputeTopicOverlap.mockReturnValue({ overlapCount: 0, topOverlapTopic: null, isNewTopic: false, label: null, labelKind: null });
+    mockComputeTopicOverlap.mockReturnValue({
+      overlapCount: 0,
+      topOverlapTopic: null,
+      isNewTopic: false,
+      label: null,
+      labelKind: null,
+    });
   });
 
   afterEach(() => {
@@ -420,7 +428,9 @@ describe("getRecommendedEpisodes", () => {
     expect(result.episodes[0].title).toBe("AI Deep Dive");
     expect(result.episodes[0].worthItScore).toBe("8.50");
     expect(result.episodes[0].podcastTitle).toBe("Tech Talks");
-    expect(result.episodes[0].podcastImageUrl).toBe("https://example.com/image.jpg");
+    expect(result.episodes[0].podcastImageUrl).toBe(
+      "https://example.com/image.jpg",
+    );
     // Second episode — verify nullable fields
     expect(result.episodes[1].description).toBeNull();
     expect(result.episodes[1].audioUrl).toBeNull();
@@ -538,7 +548,10 @@ describe("getRecommendedEpisodes", () => {
     mockLimit.mockResolvedValue(mockEpisodes);
     // User has consumed 4 episodes; union returns 4 rows
     mockUnion.mockResolvedValue([
-      { episodeId: 10 }, { episodeId: 11 }, { episodeId: 12 }, { episodeId: 13 },
+      { episodeId: 10 },
+      { episodeId: 11 },
+      { episodeId: 12 },
+      { episodeId: 13 },
     ]);
     // Topic profile: AI Ethics appears 4 times
     mockBuildUserTopicProfile.mockReturnValue(new Map([["AI Ethics", 4]]));
@@ -556,7 +569,9 @@ describe("getRecommendedEpisodes", () => {
     expect(result.error).toBeNull();
     expect(result.episodes[0].overlapCount).toBe(4);
     expect(result.episodes[0].overlapTopic).toBe("AI Ethics");
-    expect(result.episodes[0].overlapLabel).toBe("You've heard 4 similar episodes");
+    expect(result.episodes[0].overlapLabel).toBe(
+      "You've heard 4 similar episodes",
+    );
   });
 
   it("sorts episodes with overlapCount >= 3 after non-overlapping episodes (stable partition)", async () => {
@@ -599,13 +614,35 @@ describe("getRecommendedEpisodes", () => {
       },
     ];
     mockLimit.mockResolvedValue(mockEpisodes);
-    mockUnion.mockResolvedValue([{ episodeId: 100 }, { episodeId: 101 }, { episodeId: 102 }]);
+    mockUnion.mockResolvedValue([
+      { episodeId: 100 },
+      { episodeId: 101 },
+      { episodeId: 102 },
+    ]);
     mockBuildUserTopicProfile.mockReturnValue(new Map([["AI Ethics", 4]]));
     // ep-1 has high overlap, ep-2 and ep-3 have none
     mockComputeTopicOverlap
-      .mockReturnValueOnce({ overlapCount: 4, topOverlapTopic: "AI Ethics", isNewTopic: false, label: "You've heard 4 similar episodes", labelKind: "high-overlap" })
-      .mockReturnValueOnce({ overlapCount: 0, topOverlapTopic: null, isNewTopic: false, label: null, labelKind: null })
-      .mockReturnValueOnce({ overlapCount: 0, topOverlapTopic: null, isNewTopic: false, label: null, labelKind: null });
+      .mockReturnValueOnce({
+        overlapCount: 4,
+        topOverlapTopic: "AI Ethics",
+        isNewTopic: false,
+        label: "You've heard 4 similar episodes",
+        labelKind: "high-overlap",
+      })
+      .mockReturnValueOnce({
+        overlapCount: 0,
+        topOverlapTopic: null,
+        isNewTopic: false,
+        label: null,
+        labelKind: null,
+      })
+      .mockReturnValueOnce({
+        overlapCount: 0,
+        topOverlapTopic: null,
+        isNewTopic: false,
+        label: null,
+        labelKind: null,
+      });
 
     const { getRecommendedEpisodes } = await import("@/app/actions/dashboard");
     const result = await getRecommendedEpisodes();
@@ -619,37 +656,102 @@ describe("getRecommendedEpisodes", () => {
   it("preserves original order within each partition (stable sort)", async () => {
     const mockEpisodes = [
       {
-        id: 1, podcastIndexId: "ep-1", title: "A", description: null, audioUrl: null,
-        duration: null, publishDate: null, worthItScore: "9.00", podcastTitle: "P", podcastImageUrl: null,
+        id: 1,
+        podcastIndexId: "ep-1",
+        title: "A",
+        description: null,
+        audioUrl: null,
+        duration: null,
+        publishDate: null,
+        worthItScore: "9.00",
+        podcastTitle: "P",
+        podcastImageUrl: null,
       },
       {
-        id: 2, podcastIndexId: "ep-2", title: "B", description: null, audioUrl: null,
-        duration: null, publishDate: null, worthItScore: "8.00", podcastTitle: "P", podcastImageUrl: null,
+        id: 2,
+        podcastIndexId: "ep-2",
+        title: "B",
+        description: null,
+        audioUrl: null,
+        duration: null,
+        publishDate: null,
+        worthItScore: "8.00",
+        podcastTitle: "P",
+        podcastImageUrl: null,
       },
       {
-        id: 3, podcastIndexId: "ep-3", title: "C", description: null, audioUrl: null,
-        duration: null, publishDate: null, worthItScore: "7.00", podcastTitle: "P", podcastImageUrl: null,
+        id: 3,
+        podcastIndexId: "ep-3",
+        title: "C",
+        description: null,
+        audioUrl: null,
+        duration: null,
+        publishDate: null,
+        worthItScore: "7.00",
+        podcastTitle: "P",
+        podcastImageUrl: null,
       },
       {
-        id: 4, podcastIndexId: "ep-4", title: "D", description: null, audioUrl: null,
-        duration: null, publishDate: null, worthItScore: "6.00", podcastTitle: "P", podcastImageUrl: null,
+        id: 4,
+        podcastIndexId: "ep-4",
+        title: "D",
+        description: null,
+        audioUrl: null,
+        duration: null,
+        publishDate: null,
+        worthItScore: "6.00",
+        podcastTitle: "P",
+        podcastImageUrl: null,
       },
     ];
     mockLimit.mockResolvedValue(mockEpisodes);
-    mockUnion.mockResolvedValue([{ episodeId: 99 }, { episodeId: 98 }, { episodeId: 97 }]);
+    mockUnion.mockResolvedValue([
+      { episodeId: 99 },
+      { episodeId: 98 },
+      { episodeId: 97 },
+    ]);
     mockBuildUserTopicProfile.mockReturnValue(new Map());
     // ep-1 and ep-3 have high overlap; ep-2 and ep-4 have none
     mockComputeTopicOverlap
-      .mockReturnValueOnce({ overlapCount: 5, topOverlapTopic: "X", isNewTopic: false, label: "You've heard 5 similar episodes", labelKind: "high-overlap" })
-      .mockReturnValueOnce({ overlapCount: 0, topOverlapTopic: null, isNewTopic: false, label: null, labelKind: null })
-      .mockReturnValueOnce({ overlapCount: 3, topOverlapTopic: "Y", isNewTopic: false, label: "You've heard 3 similar episodes", labelKind: "high-overlap" })
-      .mockReturnValueOnce({ overlapCount: 0, topOverlapTopic: null, isNewTopic: false, label: null, labelKind: null });
+      .mockReturnValueOnce({
+        overlapCount: 5,
+        topOverlapTopic: "X",
+        isNewTopic: false,
+        label: "You've heard 5 similar episodes",
+        labelKind: "high-overlap",
+      })
+      .mockReturnValueOnce({
+        overlapCount: 0,
+        topOverlapTopic: null,
+        isNewTopic: false,
+        label: null,
+        labelKind: null,
+      })
+      .mockReturnValueOnce({
+        overlapCount: 3,
+        topOverlapTopic: "Y",
+        isNewTopic: false,
+        label: "You've heard 3 similar episodes",
+        labelKind: "high-overlap",
+      })
+      .mockReturnValueOnce({
+        overlapCount: 0,
+        topOverlapTopic: null,
+        isNewTopic: false,
+        label: null,
+        labelKind: null,
+      });
 
     const { getRecommendedEpisodes } = await import("@/app/actions/dashboard");
     const result = await getRecommendedEpisodes();
 
     // Non-overlapping in original order: ep-2, ep-4; then overlapping in original order: ep-1, ep-3
-    expect(result.episodes.map((e) => e.podcastIndexId)).toEqual(["ep-2", "ep-4", "ep-1", "ep-3"]);
+    expect(result.episodes.map((e) => e.podcastIndexId)).toEqual([
+      "ep-2",
+      "ep-4",
+      "ep-1",
+      "ep-3",
+    ]);
   });
 
   it("global gate: user with < 3 consumed episodes gets no overlap data", async () => {
@@ -671,7 +773,13 @@ describe("getRecommendedEpisodes", () => {
     // User has only 2 consumed episodes
     mockUnion.mockResolvedValue([{ episodeId: 1 }, { episodeId: 2 }]);
     mockBuildUserTopicProfile.mockReturnValue(new Map());
-    mockComputeTopicOverlap.mockReturnValue({ overlapCount: 0, topOverlapTopic: null, isNewTopic: false, label: null, labelKind: null });
+    mockComputeTopicOverlap.mockReturnValue({
+      overlapCount: 0,
+      topOverlapTopic: null,
+      isNewTopic: false,
+      label: null,
+      labelKind: null,
+    });
 
     const { getRecommendedEpisodes } = await import("@/app/actions/dashboard");
     const result = await getRecommendedEpisodes();
@@ -723,7 +831,13 @@ describe("getEpisodeTopicOverlap", () => {
     mockLimit.mockResolvedValue([]);
     mockOrderBy.mockReturnValue([]);
     mockBuildUserTopicProfile.mockReturnValue(new Map());
-    mockComputeTopicOverlap.mockReturnValue({ overlapCount: 0, topOverlapTopic: null, isNewTopic: false, label: null, labelKind: null });
+    mockComputeTopicOverlap.mockReturnValue({
+      overlapCount: 0,
+      topOverlapTopic: null,
+      isNewTopic: false,
+      label: null,
+      labelKind: null,
+    });
   });
 
   afterEach(() => {
@@ -758,7 +872,11 @@ describe("getEpisodeTopicOverlap", () => {
     mockLimit.mockResolvedValue([{ id: 42 }]);
     // User has 5 consumed episodes
     mockUnion.mockResolvedValue([
-      { episodeId: 1 }, { episodeId: 2 }, { episodeId: 3 }, { episodeId: 4 }, { episodeId: 5 },
+      { episodeId: 1 },
+      { episodeId: 2 },
+      { episodeId: 3 },
+      { episodeId: 4 },
+      { episodeId: 5 },
     ]);
     mockBuildUserTopicProfile.mockReturnValue(new Map([["Leadership", 4]]));
     // Episode topics returned by where().orderBy()
@@ -783,11 +901,21 @@ describe("getEpisodeTopicOverlap", () => {
 
   it("returns null result when episode has no topic tags", async () => {
     mockLimit.mockResolvedValue([{ id: 42 }]);
-    mockUnion.mockResolvedValue([{ episodeId: 1 }, { episodeId: 2 }, { episodeId: 3 }]);
+    mockUnion.mockResolvedValue([
+      { episodeId: 1 },
+      { episodeId: 2 },
+      { episodeId: 3 },
+    ]);
     mockBuildUserTopicProfile.mockReturnValue(new Map());
     // No topics for this episode
     mockWhere.mockResolvedValue([]);
-    mockComputeTopicOverlap.mockReturnValue({ overlapCount: 0, topOverlapTopic: null, isNewTopic: false, label: null, labelKind: null });
+    mockComputeTopicOverlap.mockReturnValue({
+      overlapCount: 0,
+      topOverlapTopic: null,
+      isNewTopic: false,
+      label: null,
+      labelKind: null,
+    });
 
     const { getEpisodeTopicOverlap } = await import("@/app/actions/dashboard");
     const result = await getEpisodeTopicOverlap("ep-42");
@@ -861,7 +989,8 @@ describe("getRecentEpisodesFromSubscriptions", () => {
   it("returns error when not authenticated", async () => {
     mockAuth.mockResolvedValue({ userId: null });
 
-    const { getRecentEpisodesFromSubscriptions } = await import("@/app/actions/dashboard");
+    const { getRecentEpisodesFromSubscriptions } =
+      await import("@/app/actions/dashboard");
     const result = await getRecentEpisodesFromSubscriptions();
 
     expect(result.episodes).toEqual([]);
@@ -872,7 +1001,8 @@ describe("getRecentEpisodesFromSubscriptions", () => {
   it("returns empty episodes and hasSubscriptions=false when user has no subscriptions", async () => {
     mockFindMany.mockResolvedValue([]);
 
-    const { getRecentEpisodesFromSubscriptions } = await import("@/app/actions/dashboard");
+    const { getRecentEpisodesFromSubscriptions } =
+      await import("@/app/actions/dashboard");
     const result = await getRecentEpisodesFromSubscriptions();
 
     expect(result.episodes).toEqual([]);
@@ -884,7 +1014,8 @@ describe("getRecentEpisodesFromSubscriptions", () => {
     mockFindMany.mockResolvedValue([makeSubscription("123")]);
     mockGetEpisodesByFeedId.mockResolvedValue({ items: [] });
 
-    const { getRecentEpisodesFromSubscriptions } = await import("@/app/actions/dashboard");
+    const { getRecentEpisodesFromSubscriptions } =
+      await import("@/app/actions/dashboard");
     const result = await getRecentEpisodesFromSubscriptions();
 
     expect(result.episodes).toEqual([]);
@@ -902,7 +1033,8 @@ describe("getRecentEpisodesFromSubscriptions", () => {
       ],
     });
 
-    const { getRecentEpisodesFromSubscriptions } = await import("@/app/actions/dashboard");
+    const { getRecentEpisodesFromSubscriptions } =
+      await import("@/app/actions/dashboard");
     const result = await getRecentEpisodesFromSubscriptions({ since });
 
     expect(result.episodes).toHaveLength(1);
@@ -918,7 +1050,8 @@ describe("getRecentEpisodesFromSubscriptions", () => {
       ],
     });
 
-    const { getRecentEpisodesFromSubscriptions } = await import("@/app/actions/dashboard");
+    const { getRecentEpisodesFromSubscriptions } =
+      await import("@/app/actions/dashboard");
     const result = await getRecentEpisodesFromSubscriptions();
 
     expect(result.episodes).toHaveLength(2);
@@ -941,7 +1074,8 @@ describe("getRecentEpisodesFromSubscriptions", () => {
       { podcastIndexId: "30", worthItScore: String(scoreHigh) },
     ]);
 
-    const { getRecentEpisodesFromSubscriptions } = await import("@/app/actions/dashboard");
+    const { getRecentEpisodesFromSubscriptions } =
+      await import("@/app/actions/dashboard");
     const result = await getRecentEpisodesFromSubscriptions();
 
     // Scored episodes first: ep30 (9.0) then ep10 (5.0), then unscored ep20
@@ -960,7 +1094,8 @@ describe("getRecentEpisodesFromSubscriptions", () => {
     });
     mockWhere.mockResolvedValue([]); // no DB rows
 
-    const { getRecentEpisodesFromSubscriptions } = await import("@/app/actions/dashboard");
+    const { getRecentEpisodesFromSubscriptions } =
+      await import("@/app/actions/dashboard");
     const result = await getRecentEpisodesFromSubscriptions();
 
     expect(result.episodes).toHaveLength(1);
@@ -972,9 +1107,12 @@ describe("getRecentEpisodesFromSubscriptions", () => {
     mockGetEpisodesByFeedId.mockResolvedValue({
       items: [makeApiEpisode({ id: 55, feedId: 222 })],
     });
-    mockWhere.mockResolvedValue([{ podcastIndexId: "55", worthItScore: "7.75" }]);
+    mockWhere.mockResolvedValue([
+      { podcastIndexId: "55", worthItScore: "7.75" },
+    ]);
 
-    const { getRecentEpisodesFromSubscriptions } = await import("@/app/actions/dashboard");
+    const { getRecentEpisodesFromSubscriptions } =
+      await import("@/app/actions/dashboard");
     const result = await getRecentEpisodesFromSubscriptions();
 
     expect(result.episodes[0].worthItScore).toBe(parseFloat("7.75"));
@@ -984,7 +1122,8 @@ describe("getRecentEpisodesFromSubscriptions", () => {
     mockFindMany.mockResolvedValue([makeSubscription("111")]);
     mockGetEpisodesByFeedId.mockRejectedValue(new Error("API failure"));
 
-    const { getRecentEpisodesFromSubscriptions } = await import("@/app/actions/dashboard");
+    const { getRecentEpisodesFromSubscriptions } =
+      await import("@/app/actions/dashboard");
     const result = await getRecentEpisodesFromSubscriptions();
 
     expect(result.episodes).toEqual([]);
@@ -1056,7 +1195,9 @@ describe("getTrendingTopicBySlug", () => {
 
     const { getTrendingTopicBySlug } = await import("@/app/actions/dashboard");
 
-    await expect(getTrendingTopicBySlug("artificial-intelligence")).rejects.toThrow(/NEXT_REDIRECT/);
+    await expect(
+      getTrendingTopicBySlug("artificial-intelligence"),
+    ).rejects.toThrow(/NEXT_REDIRECT/);
     expect(mockRedirect).toHaveBeenCalledWith(
       `/sign-in?redirect_url=${encodeURIComponent("/trending/artificial-intelligence")}`,
     );
@@ -1068,10 +1209,14 @@ describe("getTrendingTopicBySlug", () => {
     const { getTrendingTopicBySlug } = await import("@/app/actions/dashboard");
 
     // A slug with reserved URL chars: `&` would break the /sign-in querystring without encoding.
-    await expect(getTrendingTopicBySlug("foo&evil=injected")).rejects.toThrow(/NEXT_REDIRECT/);
+    await expect(getTrendingTopicBySlug("foo&evil=injected")).rejects.toThrow(
+      /NEXT_REDIRECT/,
+    );
     const redirectedTo = mockRedirect.mock.calls[0][0] as string;
     expect(redirectedTo).not.toContain("&evil=injected");
-    expect(redirectedTo).toBe(`/sign-in?redirect_url=${encodeURIComponent("/trending/foo&evil=injected")}`);
+    expect(redirectedTo).toBe(
+      `/sign-in?redirect_url=${encodeURIComponent("/trending/foo&evil=injected")}`,
+    );
   });
 
   it("returns { kind: 'no-snapshot' } when no snapshot exists", async () => {
@@ -1096,7 +1241,10 @@ describe("getTrendingTopicBySlug", () => {
 
     expect(result.kind).toBe("found");
     if (result.kind !== "found") throw new Error("expected found");
-    expect(result.topic).toMatchObject({ name: "Artificial Intelligence", slug: "artificial-intelligence" });
+    expect(result.topic).toMatchObject({
+      name: "Artificial Intelligence",
+      slug: "artificial-intelligence",
+    });
     expect(result.allTopics).toHaveLength(2);
     expect(result.generatedAt).toEqual(GENERATED_AT);
     expect(result.episodes).toHaveLength(2);
@@ -1109,8 +1257,11 @@ describe("getTrendingTopicBySlug", () => {
     const orderArgs = mockOrderBy.mock.calls[0];
     expect(orderArgs).toBeDefined();
     const rawSqlClauses = orderArgs
-      .filter((arg: unknown): arg is { _op: "sql"; raw: string } =>
-        typeof arg === "object" && arg !== null && (arg as { _op?: string })._op === "sql",
+      .filter(
+        (arg: unknown): arg is { _op: "sql"; raw: string } =>
+          typeof arg === "object" &&
+          arg !== null &&
+          (arg as { _op?: string })._op === "sql",
       )
       .map((arg) => arg.raw);
     expect(rawSqlClauses.join(" ")).toContain("DESC NULLS LAST");
@@ -1142,7 +1293,8 @@ describe("getTrendingTopicBySlug", () => {
     const result = await getTrendingTopicBySlug("unknown-slug-garbage");
 
     expect(result.kind).toBe("unknown-slug");
-    if (result.kind !== "unknown-slug") throw new Error("expected unknown-slug");
+    if (result.kind !== "unknown-slug")
+      throw new Error("expected unknown-slug");
     expect(result.allTopics).toHaveLength(2);
     expect(result.generatedAt).toEqual(GENERATED_AT);
   });
@@ -1179,7 +1331,12 @@ describe("getTrendingTopicBySlug", () => {
 
     // The log must carry the slug so ops can correlate failures to requests.
     const loggedSlug = errorSpy.mock.calls.some((args) =>
-      args.some((arg) => typeof arg === "object" && arg !== null && (arg as { slug?: string }).slug === "artificial-intelligence"),
+      args.some(
+        (arg) =>
+          typeof arg === "object" &&
+          arg !== null &&
+          (arg as { slug?: string }).slug === "artificial-intelligence",
+      ),
     );
     expect(loggedSlug).toBe(true);
   });

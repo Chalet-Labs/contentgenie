@@ -79,7 +79,7 @@ function idbDelete(db, key) {
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(CACHE_VERSION).then((cache) => cache.add("/offline"))
+    caches.open(CACHE_VERSION).then((cache) => cache.add("/offline")),
   );
   self.skipWaiting();
 });
@@ -88,19 +88,23 @@ self.addEventListener("activate", (event) => {
   event.waitUntil(
     Promise.all([
       // Clean old caches
-      caches.keys().then((keys) =>
-        Promise.all(
-          keys
-            .filter((key) => key !== CACHE_VERSION)
-            .map((key) => caches.delete(key))
-        )
-      ),
+      caches
+        .keys()
+        .then((keys) =>
+          Promise.all(
+            keys
+              .filter((key) => key !== CACHE_VERSION)
+              .map((key) => caches.delete(key)),
+          ),
+        ),
       // Reset stale in-flight items to pending (SW restart recovery)
       // Acquire replay lock to prevent racing with an in-progress replay
       navigator.locks
-        ? navigator.locks.request(SYNC_REPLAY_LOCK, () => resetStaleInFlightItems())
+        ? navigator.locks.request(SYNC_REPLAY_LOCK, () =>
+            resetStaleInFlightItems(),
+          )
         : resetStaleInFlightItems(),
-    ])
+    ]),
   );
   self.clients.claim();
 });
@@ -119,7 +123,10 @@ async function resetStaleInFlightItems() {
     for (const entry of allEntries) {
       if (entry.value && entry.value.status === "in-flight") {
         // Only reset items whose lease has expired (missing inFlightAt = legacy, treat as expired)
-        if (!entry.value.inFlightAt || now - entry.value.inFlightAt >= IN_FLIGHT_LEASE_MS) {
+        if (
+          !entry.value.inFlightAt ||
+          now - entry.value.inFlightAt >= IN_FLIGHT_LEASE_MS
+        ) {
           entry.value.status = "pending";
           await idbPut(db, entry.key, entry.value);
         }
@@ -136,9 +143,7 @@ self.addEventListener("fetch", (event) => {
 
   // Navigation requests: network-first with offline fallback
   if (request.mode === "navigate") {
-    event.respondWith(
-      fetch(request).catch(() => caches.match("/offline"))
-    );
+    event.respondWith(fetch(request).catch(() => caches.match("/offline")));
     return;
   }
 
@@ -161,8 +166,8 @@ self.addEventListener("fetch", (event) => {
                 .catch((err) => console.error("SW cache.put failed:", err));
             }
             return response;
-          })
-      )
+          }),
+      ),
     );
     return;
   }
@@ -205,7 +210,7 @@ self.addEventListener("push", (event) => {
   };
 
   event.waitUntil(
-    self.registration.showNotification(data.title || "ContentGenie", options)
+    self.registration.showNotification(data.title || "ContentGenie", options),
   );
 });
 
@@ -231,7 +236,7 @@ self.addEventListener("notificationclick", (event) => {
         }
         // No existing window — open a new one
         return self.clients.openWindow(url);
-      })
+      }),
   );
 });
 
@@ -265,7 +270,7 @@ async function handleSync(lastChance = false) {
     // of skipping — otherwise pending items are stranded until app reopens.
     if (lastChance) {
       return navigator.locks.request(SYNC_REPLAY_LOCK, () =>
-        handleSyncInner(true)
+        handleSyncInner(true),
       );
     }
     return navigator.locks.request(
@@ -274,7 +279,7 @@ async function handleSync(lastChance = false) {
       async (lock) => {
         if (!lock) return; // Another replay is in progress
         return handleSyncInner(false);
-      }
+      },
     );
   }
   // Fallback: proceed without lock (older browsers)
@@ -295,7 +300,7 @@ async function handleSyncInner(lastChance = false) {
   try {
     const allEntries = await idbGetAll(db);
     const pendingItems = allEntries.filter(
-      (entry) => entry.value && entry.value.status === "pending"
+      (entry) => entry.value && entry.value.status === "pending",
     );
 
     for (const entry of pendingItems) {
@@ -306,7 +311,11 @@ async function handleSyncInner(lastChance = false) {
       if (!route) {
         // Unknown action — remove from queue
         await idbDelete(db, key);
-        results.push({ id: item.id, status: "removed", reason: "unknown-action" });
+        results.push({
+          id: item.id,
+          status: "removed",
+          reason: "unknown-action",
+        });
         continue;
       }
 
@@ -332,14 +341,22 @@ async function handleSyncInner(lastChance = false) {
         } else if (response.status === 401) {
           // Session expired — drain immediately, don't retry
           await idbDelete(db, key);
-          results.push({ id: item.id, status: "drained", reason: "unauthorized" });
+          results.push({
+            id: item.id,
+            status: "drained",
+            reason: "unauthorized",
+          });
         } else {
           // Server error — increment attempts
-          results.push(await handleFailedAttempt(db, item, key, lastChance, "max-retries"));
+          results.push(
+            await handleFailedAttempt(db, item, key, lastChance, "max-retries"),
+          );
         }
       } catch {
         // Network error during fetch
-        results.push(await handleFailedAttempt(db, item, key, lastChance, "network-error"));
+        results.push(
+          await handleFailedAttempt(db, item, key, lastChance, "network-error"),
+        );
       }
     }
   } finally {

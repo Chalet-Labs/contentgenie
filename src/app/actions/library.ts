@@ -48,22 +48,28 @@ export async function saveEpisodeToLibrary(episodeData: EpisodeData) {
       publishDate: episodeData.publishDate?.toISOString(),
     });
     if (!parsed.success) {
-      console.warn("[saveEpisodeToLibrary] validation failed", parsed.error.issues);
+      console.warn(
+        "[saveEpisodeToLibrary] validation failed",
+        parsed.error.issues,
+      );
       return { success: false, error: "Invalid episode data" };
     }
     const { podcast: podcastInput } = parsed.data;
 
     await ensureUserExists(userId);
 
-    const podcastId = await upsertPodcast({
-      podcastIndexId: podcastInput.podcastIndexId,
-      title: podcastInput.title,
-      description: podcastInput.description,
-      publisher: podcastInput.publisher,
-      imageUrl: podcastInput.imageUrl,
-      categories: podcastInput.categories,
-      totalEpisodes: podcastInput.totalEpisodes,
-    }, { updateOnConflict: "safe" });
+    const podcastId = await upsertPodcast(
+      {
+        podcastIndexId: podcastInput.podcastIndexId,
+        title: podcastInput.title,
+        description: podcastInput.description,
+        publisher: podcastInput.publisher,
+        imageUrl: podcastInput.imageUrl,
+        categories: podcastInput.categories,
+        totalEpisodes: podcastInput.totalEpisodes,
+      },
+      { updateOnConflict: "safe" },
+    );
 
     const publishDate = safeParseDate(parsed.data.publishDate);
 
@@ -109,7 +115,10 @@ export async function saveEpisodeToLibrary(episodeData: EpisodeData) {
     return { success: true, message: "Episode saved to library" };
   } catch (error) {
     console.error("Error saving episode to library:", error);
-    return { success: false, error: "Failed to save episode. Please try again." };
+    return {
+      success: false,
+      error: "Failed to save episode. Please try again.",
+    };
   }
 }
 
@@ -118,7 +127,10 @@ export async function removeEpisodeFromLibrary(episodePodcastIndexId: string) {
   const { userId } = await auth();
 
   if (!userId) {
-    return { success: false, error: "You must be signed in to remove episodes" };
+    return {
+      success: false,
+      error: "You must be signed in to remove episodes",
+    };
   }
 
   try {
@@ -138,8 +150,8 @@ export async function removeEpisodeFromLibrary(episodePodcastIndexId: string) {
       .where(
         and(
           eq(userLibrary.userId, userId),
-          eq(userLibrary.episodeId, episode.id)
-        )
+          eq(userLibrary.episodeId, episode.id),
+        ),
       );
 
     revalidatePath("/library");
@@ -148,12 +160,17 @@ export async function removeEpisodeFromLibrary(episodePodcastIndexId: string) {
     return { success: true, message: "Episode removed from library" };
   } catch (error) {
     console.error("Error removing episode from library:", error);
-    return { success: false, error: "Failed to remove episode. Please try again." };
+    return {
+      success: false,
+      error: "Failed to remove episode. Please try again.",
+    };
   }
 }
 
 // Check if an episode is saved to the user's library
-export async function isEpisodeSaved(episodePodcastIndexId: string): Promise<boolean> {
+export async function isEpisodeSaved(
+  episodePodcastIndexId: string,
+): Promise<boolean> {
   const { userId } = await auth();
 
   if (!userId) {
@@ -171,8 +188,8 @@ export async function isEpisodeSaved(episodePodcastIndexId: string): Promise<boo
       .where(
         and(
           eq(userLibrary.userId, userId),
-          eq(episodes.podcastIndexId, episodePodcastIndexId)
-        )
+          eq(episodes.podcastIndexId, episodePodcastIndexId),
+        ),
       )
       .limit(1);
 
@@ -189,7 +206,7 @@ export type SortDirection = "asc" | "desc";
 // Get all saved episodes for the current user
 export async function getUserLibrary(
   sortBy: LibrarySortOption = "savedAt",
-  sortDirection: SortDirection = "desc"
+  sortDirection: SortDirection = "desc",
 ): Promise<{ items: SavedItemDTO[]; error: string | null }> {
   const { userId } = await auth();
 
@@ -260,7 +277,7 @@ export async function getUserLibrary(
 // Update notes for a library entry
 export async function updateLibraryNotes(
   episodePodcastIndexId: string,
-  notes: string
+  notes: string,
 ) {
   const { userId } = await auth();
 
@@ -282,7 +299,7 @@ export async function updateLibraryNotes(
     const libraryEntry = await db.query.userLibrary.findFirst({
       where: and(
         eq(userLibrary.userId, userId),
-        eq(userLibrary.episodeId, episode.id)
+        eq(userLibrary.episodeId, episode.id),
       ),
     });
 
@@ -300,7 +317,10 @@ export async function updateLibraryNotes(
     return { success: true, message: "Notes updated" };
   } catch (error) {
     console.error("Error updating notes:", error);
-    return { success: false, error: "Failed to update notes. Please try again." };
+    return {
+      success: false,
+      error: "Failed to update notes. Please try again.",
+    };
   }
 }
 
@@ -308,7 +328,7 @@ export async function updateLibraryNotes(
 export async function addBookmark(
   libraryEntryId: number,
   timestamp: number,
-  note?: string
+  note?: string,
 ) {
   const { userId } = await auth();
 
@@ -321,7 +341,7 @@ export async function addBookmark(
     const libraryEntry = await db.query.userLibrary.findFirst({
       where: and(
         eq(userLibrary.id, libraryEntryId),
-        eq(userLibrary.userId, userId)
+        eq(userLibrary.userId, userId),
       ),
     });
 
@@ -343,7 +363,10 @@ export async function addBookmark(
     return { success: true, bookmark };
   } catch (error) {
     console.error("Error adding bookmark:", error);
-    return { success: false, error: "Failed to add bookmark. Please try again." };
+    return {
+      success: false,
+      error: "Failed to add bookmark. Please try again.",
+    };
   }
 }
 
@@ -352,7 +375,10 @@ export async function updateBookmark(bookmarkId: number, note: string) {
   const { userId } = await auth();
 
   if (!userId) {
-    return { success: false, error: "You must be signed in to update bookmarks" };
+    return {
+      success: false,
+      error: "You must be signed in to update bookmarks",
+    };
   }
 
   try {
@@ -378,7 +404,10 @@ export async function updateBookmark(bookmarkId: number, note: string) {
     return { success: true, message: "Bookmark updated" };
   } catch (error) {
     console.error("Error updating bookmark:", error);
-    return { success: false, error: "Failed to update bookmark. Please try again." };
+    return {
+      success: false,
+      error: "Failed to update bookmark. Please try again.",
+    };
   }
 }
 
@@ -387,7 +416,10 @@ export async function deleteBookmark(bookmarkId: number) {
   const { userId } = await auth();
 
   if (!userId) {
-    return { success: false, error: "You must be signed in to delete bookmarks" };
+    return {
+      success: false,
+      error: "You must be signed in to delete bookmarks",
+    };
   }
 
   try {
@@ -410,14 +442,17 @@ export async function deleteBookmark(bookmarkId: number) {
     return { success: true, message: "Bookmark deleted" };
   } catch (error) {
     console.error("Error deleting bookmark:", error);
-    return { success: false, error: "Failed to delete bookmark. Please try again." };
+    return {
+      success: false,
+      error: "Failed to delete bookmark. Please try again.",
+    };
   }
 }
 
 // Update rating for a library entry
 export async function updateLibraryRating(
   episodePodcastIndexId: string,
-  rating: number
+  rating: number,
 ) {
   const { userId } = await auth();
 
@@ -443,7 +478,7 @@ export async function updateLibraryRating(
     const libraryEntry = await db.query.userLibrary.findFirst({
       where: and(
         eq(userLibrary.userId, userId),
-        eq(userLibrary.episodeId, episode.id)
+        eq(userLibrary.episodeId, episode.id),
       ),
     });
 
@@ -461,7 +496,10 @@ export async function updateLibraryRating(
     return { success: true, message: "Rating updated" };
   } catch (error) {
     console.error("Error updating rating:", error);
-    return { success: false, error: "Failed to update rating. Please try again." };
+    return {
+      success: false,
+      error: "Failed to update rating. Please try again.",
+    };
   }
 }
 
@@ -478,8 +516,8 @@ export async function getEpisodeAverageRating(episodePodcastIndexId: string) {
       .where(
         and(
           eq(episodes.podcastIndexId, episodePodcastIndexId),
-          isNotNull(userLibrary.rating)
-        )
+          isNotNull(userLibrary.rating),
+        ),
       );
 
     const ratingCount = Number(result?.ratingCount || 0);
@@ -494,13 +532,17 @@ export async function getEpisodeAverageRating(episodePodcastIndexId: string) {
     };
   } catch (error) {
     console.error("Error fetching average rating:", error);
-    return { averageRating: null, ratingCount: 0, error: "Failed to load ratings" };
+    return {
+      averageRating: null,
+      ratingCount: 0,
+      error: "Failed to load ratings",
+    };
   }
 }
 
 // Resolve a PodcastIndex episode ID to the user's library entry ID
 export async function getLibraryEntryByEpisodeId(
-  episodePodcastIndexId: string
+  episodePodcastIndexId: string,
 ): Promise<{ libraryEntryId: number; episodeId: number } | null> {
   const { userId } = await auth();
 
@@ -516,8 +558,8 @@ export async function getLibraryEntryByEpisodeId(
       .where(
         and(
           eq(userLibrary.userId, userId),
-          eq(episodes.podcastIndexId, episodePodcastIndexId)
-        )
+          eq(episodes.podcastIndexId, episodePodcastIndexId),
+        ),
       )
       .limit(1);
 
@@ -541,7 +583,7 @@ export async function getBookmarks(libraryEntryId: number) {
     const libraryEntry = await db.query.userLibrary.findFirst({
       where: and(
         eq(userLibrary.id, libraryEntryId),
-        eq(userLibrary.userId, userId)
+        eq(userLibrary.userId, userId),
       ),
     });
 

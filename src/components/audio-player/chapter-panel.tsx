@@ -1,10 +1,10 @@
-"use client"
+"use client";
 
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "@/components/ui/popover"
+} from "@/components/ui/popover";
 import {
   Sheet,
   SheetContent,
@@ -12,18 +12,22 @@ import {
   SheetTitle,
   SheetDescription,
   SheetTrigger,
-} from "@/components/ui/sheet"
-import { useMediaQuery } from "@/hooks/use-media-query"
-import { ChapterList } from "@/components/audio-player/chapter-list"
+} from "@/components/ui/sheet";
+import { useMediaQuery } from "@/hooks/use-media-query";
+import { ChapterList } from "@/components/audio-player/chapter-list";
 
 interface ChapterPanelProps {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  trigger: React.ReactElement
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  trigger: React.ReactElement;
 }
 
-export function ChapterPanel({ open, onOpenChange, trigger }: ChapterPanelProps) {
-  const isDesktop = useMediaQuery("(min-width: 768px)")
+export function ChapterPanel({
+  open,
+  onOpenChange,
+  trigger,
+}: ChapterPanelProps) {
+  const isDesktop = useMediaQuery("(min-width: 768px)");
 
   if (isDesktop) {
     return (
@@ -38,7 +42,7 @@ export function ChapterPanel({ open, onOpenChange, trigger }: ChapterPanelProps)
           <ChapterList />
         </PopoverContent>
       </Popover>
-    )
+    );
   }
 
   return (
@@ -56,5 +60,5 @@ export function ChapterPanel({ open, onOpenChange, trigger }: ChapterPanelProps)
         </div>
       </SheetContent>
     </Sheet>
-  )
+  );
 }

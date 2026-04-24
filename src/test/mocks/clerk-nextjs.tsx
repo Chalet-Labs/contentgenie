@@ -1,6 +1,6 @@
-import React from "react"
+import React from "react";
 
-export type ClerkMockState = { signedIn: boolean }
+export type ClerkMockState = { signedIn: boolean };
 
 // Factory for mocking @clerk/nextjs primitives in Vitest suites. Callers own
 // the `state` ref (typically via vi.hoisted) and mutate `state.signedIn` per
@@ -20,8 +20,12 @@ export function createClerkMock(state: ClerkMockState) {
       state.signedIn ? <>{children}</> : null,
     SignedOut: ({ children }: { children: React.ReactNode }) =>
       state.signedIn ? null : <>{children}</>,
-    SignInButton: ({ children }: { children: React.ReactNode }) => <>{children}</>,
-    SignUpButton: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+    SignInButton: ({ children }: { children: React.ReactNode }) => (
+      <>{children}</>
+    ),
+    SignUpButton: ({ children }: { children: React.ReactNode }) => (
+      <>{children}</>
+    ),
     UserButton: () => <div data-testid="user-button" />,
-  }
+  };
 }

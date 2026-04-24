@@ -132,7 +132,9 @@ describe("parseOpml", () => {
   });
 
   it("throws on invalid XML (non-OPML content)", () => {
-    expect(() => parseOpml("not xml at all {{{")).toThrow("missing <opml> root element");
+    expect(() => parseOpml("not xml at all {{{")).toThrow(
+      "missing <opml> root element",
+    );
   });
 
   it("throws on missing <opml> root element", () => {

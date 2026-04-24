@@ -19,7 +19,8 @@ vi.mock("@/lib/openrouter", async (importOriginal) => {
 
 vi.mock("@/lib/prompts", () => ({
   SYSTEM_PROMPT: "system prompt",
-  getSummarizationPrompt: (...args: unknown[]) => mockGetSummarizationPrompt(...args),
+  getSummarizationPrompt: (...args: unknown[]) =>
+    mockGetSummarizationPrompt(...args),
 }));
 
 vi.mock("@/lib/admin/prompt-utils", () => ({
@@ -27,7 +28,10 @@ vi.mock("@/lib/admin/prompt-utils", () => ({
 }));
 
 import { generateEpisodeSummary } from "@/trigger/helpers/ai-summary";
-import type { PodcastIndexEpisode, PodcastIndexPodcast } from "@/lib/podcastindex";
+import type {
+  PodcastIndexEpisode,
+  PodcastIndexPodcast,
+} from "@/lib/podcastindex";
 
 const mockEpisode = {
   id: 1,
@@ -87,7 +91,11 @@ describe("generateEpisodeSummary", () => {
     /** Shorthand: mock topics from LLM, run summarization, return result */
     async function summarizeWithTopics(topics: unknown) {
       mockParseJsonResponse.mockReturnValue({ ...mockSummaryResult, topics });
-      return generateEpisodeSummary(mockPodcast, mockEpisode, "transcript text");
+      return generateEpisodeSummary(
+        mockPodcast,
+        mockEpisode,
+        "transcript text",
+      );
     }
 
     it("includes valid topics sorted by relevance descending", async () => {
@@ -105,12 +113,16 @@ describe("generateEpisodeSummary", () => {
     });
 
     it("clamps relevance below 0 to 0", async () => {
-      const result = await summarizeWithTopics([{ name: "Topic One", relevance: -0.5 }]);
+      const result = await summarizeWithTopics([
+        { name: "Topic One", relevance: -0.5 },
+      ]);
       expect(result.topics).toEqual([{ name: "Topic One", relevance: 0 }]);
     });
 
     it("clamps relevance above 1 to 1", async () => {
-      const result = await summarizeWithTopics([{ name: "Topic One", relevance: 1.5 }]);
+      const result = await summarizeWithTopics([
+        { name: "Topic One", relevance: 1.5 },
+      ]);
       expect(result.topics).toEqual([{ name: "Topic One", relevance: 1 }]);
     });
 
@@ -126,7 +138,11 @@ describe("generateEpisodeSummary", () => {
 
       expect(result.topics).toHaveLength(5);
       expect(result.topics!.map((t) => t.name)).toEqual([
-        "Topic A", "Topic B", "Topic C", "Topic D", "Topic E",
+        "Topic A",
+        "Topic B",
+        "Topic C",
+        "Topic D",
+        "Topic E",
       ]);
     });
 
@@ -138,7 +154,10 @@ describe("generateEpisodeSummary", () => {
       ]);
 
       expect(result.topics).toHaveLength(1);
-      expect(result.topics![0]).toEqual({ name: "Machine Learning", relevance: 0.85 });
+      expect(result.topics![0]).toEqual({
+        name: "Machine Learning",
+        relevance: 0.85,
+      });
     });
 
     it("filters out entries with name exceeding 100 characters", async () => {
@@ -211,10 +230,12 @@ describe("generateEpisodeSummary", () => {
         mockPodcast,
         mockEpisode,
         "transcript text",
-        "Custom {{transcript}}"
+        "Custom {{transcript}}",
       );
 
-      expect(result.topics).toEqual([{ name: "Custom Prompt Topic", relevance: 0.8 }]);
+      expect(result.topics).toEqual([
+        { name: "Custom Prompt Topic", relevance: 0.8 },
+      ]);
     });
 
     it("returns no topics field on LLM parse failure (fallback path)", async () => {
@@ -223,7 +244,11 @@ describe("generateEpisodeSummary", () => {
         throw new Error("JSON parse error");
       });
 
-      const result = await generateEpisodeSummary(mockPodcast, mockEpisode, "transcript text");
+      const result = await generateEpisodeSummary(
+        mockPodcast,
+        mockEpisode,
+        "transcript text",
+      );
 
       expect(Object.hasOwn(result, "topics")).toBe(false);
     });
@@ -237,20 +262,30 @@ describe("generateEpisodeSummary", () => {
       "Test Episode",
       "A test description",
       3600,
-      "transcript text"
+      "transcript text",
     );
     expect(mockInterpolatePrompt).not.toHaveBeenCalled();
   });
 
   it("uses default prompt when customPrompt is null", async () => {
-    await generateEpisodeSummary(mockPodcast, mockEpisode, "transcript text", null);
+    await generateEpisodeSummary(
+      mockPodcast,
+      mockEpisode,
+      "transcript text",
+      null,
+    );
 
     expect(mockGetSummarizationPrompt).toHaveBeenCalled();
     expect(mockInterpolatePrompt).not.toHaveBeenCalled();
   });
 
   it("uses default prompt when customPrompt is undefined", async () => {
-    await generateEpisodeSummary(mockPodcast, mockEpisode, "transcript text", undefined);
+    await generateEpisodeSummary(
+      mockPodcast,
+      mockEpisode,
+      "transcript text",
+      undefined,
+    );
 
     expect(mockGetSummarizationPrompt).toHaveBeenCalled();
     expect(mockInterpolatePrompt).not.toHaveBeenCalled();
@@ -258,7 +293,12 @@ describe("generateEpisodeSummary", () => {
 
   it("uses interpolatePrompt when customPrompt is provided", async () => {
     const customPrompt = "Analyze {{transcript}} for {{title}}";
-    await generateEpisodeSummary(mockPodcast, mockEpisode, "transcript text", customPrompt);
+    await generateEpisodeSummary(
+      mockPodcast,
+      mockEpisode,
+      "transcript text",
+      customPrompt,
+    );
 
     expect(mockInterpolatePrompt).toHaveBeenCalledWith(customPrompt, {
       title: "Test Episode",
@@ -274,7 +314,12 @@ describe("generateEpisodeSummary", () => {
     const customPrompt = "Custom {{transcript}}";
     mockInterpolatePrompt.mockReturnValue("Custom transcript text");
 
-    await generateEpisodeSummary(mockPodcast, mockEpisode, "transcript text", customPrompt);
+    await generateEpisodeSummary(
+      mockPodcast,
+      mockEpisode,
+      "transcript text",
+      customPrompt,
+    );
 
     expect(mockGenerateCompletion).toHaveBeenCalledWith([
       { role: "system", content: "system prompt" },
@@ -283,21 +328,30 @@ describe("generateEpisodeSummary", () => {
   });
 
   it("falls back to 'Unknown Podcast' when podcast is undefined", async () => {
-    await generateEpisodeSummary(undefined, mockEpisode, "transcript text", null);
+    await generateEpisodeSummary(
+      undefined,
+      mockEpisode,
+      "transcript text",
+      null,
+    );
 
     expect(mockGetSummarizationPrompt).toHaveBeenCalledWith(
       "Unknown Podcast",
       expect.any(String),
       expect.any(String),
       expect.any(Number),
-      expect.any(String)
+      expect.any(String),
     );
   });
 
   describe("signal score computation", () => {
     it("computes score as 1 + trueCount + adjustment from signals", async () => {
       mockParseJsonResponse.mockReturnValue({ ...mockSignalResult });
-      const result = await generateEpisodeSummary(mockPodcast, mockEpisode, "transcript text");
+      const result = await generateEpisodeSummary(
+        mockPodcast,
+        mockEpisode,
+        "transcript text",
+      );
 
       // 5 true signals → base 6, adj 0 → score 6
       expect(result.worthItScore).toBe(6);
@@ -305,16 +359,24 @@ describe("generateEpisodeSummary", () => {
 
     it("stores worthItDimensions with kind 'signals'", async () => {
       mockParseJsonResponse.mockReturnValue({ ...mockSignalResult });
-      const result = await generateEpisodeSummary(mockPodcast, mockEpisode, "transcript text");
+      const result = await generateEpisodeSummary(
+        mockPodcast,
+        mockEpisode,
+        "transcript text",
+      );
 
       expect(result.worthItDimensions).toEqual(
-        expect.objectContaining({ kind: "signals" })
+        expect.objectContaining({ kind: "signals" }),
       );
     });
 
     it("includes signal summary in worthItReason", async () => {
       mockParseJsonResponse.mockReturnValue({ ...mockSignalResult });
-      const result = await generateEpisodeSummary(mockPodcast, mockEpisode, "transcript text");
+      const result = await generateEpisodeSummary(
+        mockPodcast,
+        mockEpisode,
+        "transcript text",
+      );
 
       expect(result.worthItReason).toContain("5/8 signals");
     });
@@ -322,7 +384,11 @@ describe("generateEpisodeSummary", () => {
     it("carries the editorial-focused SIGNAL_LABELS wording into worthItReason", async () => {
       // staysFocused=true in mockSignalResult, so its label flows through the fired-signal summary.
       mockParseJsonResponse.mockReturnValue({ ...mockSignalResult });
-      const result = await generateEpisodeSummary(mockPodcast, mockEpisode, "transcript text");
+      const result = await generateEpisodeSummary(
+        mockPodcast,
+        mockEpisode,
+        "transcript text",
+      );
 
       expect(result.worthItReason).toMatch(/editorial/i);
     });
@@ -331,18 +397,22 @@ describe("generateEpisodeSummary", () => {
       mockParseJsonResponse.mockReturnValue({
         ...mockSignalResult,
         worthItSignals: {
-          hasActionableInsights: 1,          // number 1 → true
-          hasNearTermApplicability: "true",  // string "true" → true
-          staysFocused: 0,                   // number 0 → false
-          goesBeyondSurface: "",             // unrecognized → false
-          isWellStructured: true,            // boolean → true
-          timeJustified: false,              // boolean → false
-          hasConcreteExamples: null,         // null → false
-          hasExpertPerspectives: undefined,  // undefined → false
+          hasActionableInsights: 1, // number 1 → true
+          hasNearTermApplicability: "true", // string "true" → true
+          staysFocused: 0, // number 0 → false
+          goesBeyondSurface: "", // unrecognized → false
+          isWellStructured: true, // boolean → true
+          timeJustified: false, // boolean → false
+          hasConcreteExamples: null, // null → false
+          hasExpertPerspectives: undefined, // undefined → false
         },
       });
 
-      const result = await generateEpisodeSummary(mockPodcast, mockEpisode, "transcript text");
+      const result = await generateEpisodeSummary(
+        mockPodcast,
+        mockEpisode,
+        "transcript text",
+      );
 
       // True: 1, "true", true → 3 true signals. base=4, adj=0 → score 4
       expect(result.worthItScore).toBe(4);
@@ -367,7 +437,9 @@ describe("generateEpisodeSummary", () => {
       await generateEpisodeSummary(mockPodcast, mockEpisode, "transcript text");
 
       const signalWarns = warnSpy.mock.calls.filter(
-        (args) => typeof args[0] === "string" && args[0].includes("non-boolean signal coerced")
+        (args) =>
+          typeof args[0] === "string" &&
+          args[0].includes("non-boolean signal coerced"),
       );
       expect(signalWarns).toHaveLength(1);
       expect(signalWarns[0][0]).toContain("hasActionableInsights");
@@ -387,7 +459,9 @@ describe("generateEpisodeSummary", () => {
       await generateEpisodeSummary(mockPodcast, mockEpisode, "transcript text");
 
       const signalWarns = warnSpy.mock.calls.filter(
-        (args) => typeof args[0] === "string" && args[0].includes("non-boolean signal coerced")
+        (args) =>
+          typeof args[0] === "string" &&
+          args[0].includes("non-boolean signal coerced"),
       );
       expect(signalWarns).toHaveLength(0);
       warnSpy.mockRestore();
@@ -400,7 +474,9 @@ describe("generateEpisodeSummary", () => {
       await generateEpisodeSummary(mockPodcast, mockEpisode, "transcript text");
 
       const signalWarns = warnSpy.mock.calls.filter(
-        (args) => typeof args[0] === "string" && args[0].includes("non-boolean signal coerced")
+        (args) =>
+          typeof args[0] === "string" &&
+          args[0].includes("non-boolean signal coerced"),
       );
       expect(signalWarns).toHaveLength(0);
       warnSpy.mockRestore();
@@ -411,7 +487,11 @@ describe("generateEpisodeSummary", () => {
         ...mockSignalResult,
         worthItAdjustment: 5,
       });
-      const result = await generateEpisodeSummary(mockPodcast, mockEpisode, "transcript text");
+      const result = await generateEpisodeSummary(
+        mockPodcast,
+        mockEpisode,
+        "transcript text",
+      );
 
       // 5 true signals → base 6, adj clamped to 1 → score 7
       expect(result.worthItScore).toBe(7);
@@ -420,7 +500,11 @@ describe("generateEpisodeSummary", () => {
     it("defaults missing adjustment to 0", async () => {
       const { worthItAdjustment: _, ...withoutAdj } = mockSignalResult;
       mockParseJsonResponse.mockReturnValue(withoutAdj);
-      const result = await generateEpisodeSummary(mockPodcast, mockEpisode, "transcript text");
+      const result = await generateEpisodeSummary(
+        mockPodcast,
+        mockEpisode,
+        "transcript text",
+      );
 
       // 5 true → base 6, adj 0 → score 6
       expect(result.worthItScore).toBe(6);
@@ -429,10 +513,14 @@ describe("generateEpisodeSummary", () => {
     it("defaults missing adjustmentReason to empty string", async () => {
       const { worthItAdjustmentReason: _, ...withoutReason } = mockSignalResult;
       mockParseJsonResponse.mockReturnValue(withoutReason);
-      const result = await generateEpisodeSummary(mockPodcast, mockEpisode, "transcript text");
+      const result = await generateEpisodeSummary(
+        mockPodcast,
+        mockEpisode,
+        "transcript text",
+      );
 
       expect(result.worthItDimensions).toEqual(
-        expect.objectContaining({ adjustmentReason: "" })
+        expect.objectContaining({ adjustmentReason: "" }),
       );
     });
   });
@@ -441,12 +529,15 @@ describe("generateEpisodeSummary", () => {
     it("averages dimensions when LLM returns old format", async () => {
       mockParseJsonResponse.mockReturnValue({ ...mockLegacyDimensionResult });
       const result = await generateEpisodeSummary(
-        mockPodcast, mockEpisode, "transcript text", "custom prompt"
+        mockPodcast,
+        mockEpisode,
+        "transcript text",
+        "custom prompt",
       );
 
       expect(result.worthItScore).toBe(7);
       expect(result.worthItDimensions).toEqual(
-        expect.objectContaining({ kind: "dimensions" })
+        expect.objectContaining({ kind: "dimensions" }),
       );
     });
 
@@ -458,7 +549,10 @@ describe("generateEpisodeSummary", () => {
         worthItReason: "custom reason",
       });
       const result = await generateEpisodeSummary(
-        mockPodcast, mockEpisode, "transcript text", "custom prompt"
+        mockPodcast,
+        mockEpisode,
+        "transcript text",
+        "custom prompt",
       );
 
       expect(result.worthItScore).toBe(8.5);
@@ -471,7 +565,10 @@ describe("generateEpisodeSummary", () => {
         worthItReason: "custom reason",
       });
       const result = await generateEpisodeSummary(
-        mockPodcast, mockEpisode, "transcript text", "custom prompt"
+        mockPodcast,
+        mockEpisode,
+        "transcript text",
+        "custom prompt",
       );
 
       expect(result.worthItScore).toBe(5);

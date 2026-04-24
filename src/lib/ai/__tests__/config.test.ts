@@ -33,7 +33,11 @@ describe("getActiveAiConfig", () => {
     });
 
     const config = await getActiveAiConfig();
-    expect(config).toEqual({ provider: "zai", model: "glm-4.7-flash", summarizationPrompt: null });
+    expect(config).toEqual({
+      provider: "zai",
+      model: "glm-4.7-flash",
+      summarizationPrompt: null,
+    });
   });
 
   it("returns DEFAULT_AI_CONFIG when no rows exist", async () => {
@@ -50,7 +54,7 @@ describe("getActiveAiConfig", () => {
     beforeEach(() => {
       errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
       vi.mocked(db.query.aiConfig.findFirst).mockRejectedValue(
-        new Error("Connection refused")
+        new Error("Connection refused"),
       );
     });
 
@@ -64,7 +68,7 @@ describe("getActiveAiConfig", () => {
 
       expect(errorSpy).toHaveBeenCalledOnce();
       expect(errorSpy.mock.calls[0][0]).toBe(
-        "[ai-config] Failed to read AI config from database, using default"
+        "[ai-config] Failed to read AI config from database, using default",
       );
       expect(errorSpy.mock.calls[0][1]).toMatchObject({
         event: "ai_config_db_error",
@@ -74,7 +78,7 @@ describe("getActiveAiConfig", () => {
 
     it("throws on DB error when throwOnDbError option is set", async () => {
       await expect(getActiveAiConfig({ throwOnDbError: true })).rejects.toThrow(
-        "Connection refused"
+        "Connection refused",
       );
     });
   });

@@ -73,10 +73,7 @@ describe("send-notification-digests", () => {
     vi.restoreAllMocks();
   });
 
-  function setupSelectChain(
-    digestUsers: unknown[],
-    unreadCountValue: number
-  ) {
+  function setupSelectChain(digestUsers: unknown[], unreadCountValue: number) {
     // First select: query digest users
     // Second select (per user): count unread notifications
     const unreadResult = [{ value: unreadCountValue }];
@@ -127,7 +124,7 @@ describe("send-notification-digests", () => {
         tag: "digest",
         data: { url: "/dashboard" },
       }),
-      expect.any(Object)
+      expect.any(Object),
     );
   });
 
@@ -149,7 +146,7 @@ describe("send-notification-digests", () => {
     expect(mockSendPushToUser).toHaveBeenCalledWith(
       "user-1",
       expect.objectContaining({ body: "You have 1 new update" }),
-      expect.any(Object)
+      expect.any(Object),
     );
   });
 
@@ -249,7 +246,7 @@ describe("send-notification-digests", () => {
           pushEnabled: true,
           lastDigestSentAt: expect.any(String),
         }),
-      })
+      }),
     );
   });
 

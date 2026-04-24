@@ -4,7 +4,7 @@ import { getAiProvider } from "@/lib/ai/provider-factory";
 
 export async function generateCompletion(
   messages: AiMessage[],
-  options?: { model?: string; maxTokens?: number; temperature?: number }
+  options?: { model?: string; maxTokens?: number; temperature?: number },
 ): Promise<string> {
   const config = await getActiveAiConfig();
   const provider = getAiProvider(config.provider);

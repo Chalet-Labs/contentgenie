@@ -13,44 +13,44 @@ import {
   audioEpisodeSchema,
   MAX_QUEUE_ITEMS,
   type AudioEpisode,
-} from "@/lib/schemas/listening-queue"
+} from "@/lib/schemas/listening-queue";
 
-const STORAGE_KEY = "contentgenie-player-queue"
+const STORAGE_KEY = "contentgenie-player-queue";
 
 export function loadQueue(): AudioEpisode[] {
-  if (typeof window === "undefined") return []
+  if (typeof window === "undefined") return [];
 
   try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return []
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return [];
 
-    const parsed: unknown = JSON.parse(raw)
-    if (!Array.isArray(parsed)) return []
+    const parsed: unknown = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
 
-    const seen = new Set<string>()
-    const valid: AudioEpisode[] = []
+    const seen = new Set<string>();
+    const valid: AudioEpisode[] = [];
     for (const item of parsed) {
-      const result = audioEpisodeSchema.safeParse(item)
-      if (!result.success) continue
+      const result = audioEpisodeSchema.safeParse(item);
+      if (!result.success) continue;
       // De-duplicate by ID (keep first occurrence) to prevent dnd-kit key conflicts
-      if (seen.has(result.data.id)) continue
-      seen.add(result.data.id)
-      valid.push(result.data)
+      if (seen.has(result.data.id)) continue;
+      seen.add(result.data.id);
+      valid.push(result.data);
       // Stop at the shared server cap — otherwise an oversized local queue
       // would hydrate the UI but fail `setQueue` during migration.
-      if (valid.length >= MAX_QUEUE_ITEMS) break
+      if (valid.length >= MAX_QUEUE_ITEMS) break;
     }
-    return valid
+    return valid;
   } catch {
-    return []
+    return [];
   }
 }
 
 export function saveQueue(queue: AudioEpisode[]): void {
-  if (typeof window === "undefined") return
+  if (typeof window === "undefined") return;
 
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(queue))
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(queue));
   } catch {
     // localStorage may be unavailable (e.g. private browsing quota exceeded)
   }

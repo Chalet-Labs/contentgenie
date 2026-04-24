@@ -83,7 +83,7 @@ describe("POST /api/library/unsave", () => {
       new NextRequest("http://localhost:3000/api/library/unsave", {
         method: "POST",
         body: "not-json",
-      })
+      }),
     );
 
     expect(response.status).toBe(415);
@@ -93,7 +93,9 @@ describe("POST /api/library/unsave", () => {
     mockEpisodesFindFirst.mockResolvedValue(null);
 
     const { POST } = await import("@/app/api/library/unsave/route");
-    const response = await POST(makeRequest({ podcastIndexId: "ep-nonexistent" }));
+    const response = await POST(
+      makeRequest({ podcastIndexId: "ep-nonexistent" }),
+    );
 
     expect(response.status).toBe(404);
     const data = await response.json();

@@ -16,9 +16,9 @@ vi.mock("next-themes", () => ({
 }));
 
 vi.mock("@clerk/nextjs", async () => {
-  const { createClerkMock } = await vi.importActual<typeof import("@/test/mocks/clerk-nextjs")>(
-    "@/test/mocks/clerk-nextjs",
-  );
+  const { createClerkMock } = await vi.importActual<
+    typeof import("@/test/mocks/clerk-nextjs")
+  >("@/test/mocks/clerk-nextjs");
   return createClerkMock(clerkState);
 });
 
@@ -39,23 +39,45 @@ describe("MarketingHeader — signed out", () => {
 
   it("renders Sign in and Join beta CTAs when signed out", () => {
     render(<MarketingHeader />);
-    expect(screen.getByRole("button", { name: /sign in/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /join beta/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /sign in/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /join beta/i }),
+    ).toBeInTheDocument();
   });
 
   it("renders marketing nav links with absolute hrefs", () => {
     render(<MarketingHeader />);
-    expect(screen.getByRole("link", { name: /product/i })).toHaveAttribute("href", "/#product");
-    expect(screen.getByRole("link", { name: /how it works/i })).toHaveAttribute("href", "/#how");
-    expect(screen.getByRole("link", { name: /example/i })).toHaveAttribute("href", "/#example");
-    expect(screen.getByRole("link", { name: /pricing/i })).toHaveAttribute("href", "/#pricing");
+    expect(screen.getByRole("link", { name: /product/i })).toHaveAttribute(
+      "href",
+      "/#product",
+    );
+    expect(screen.getByRole("link", { name: /how it works/i })).toHaveAttribute(
+      "href",
+      "/#how",
+    );
+    expect(screen.getByRole("link", { name: /example/i })).toHaveAttribute(
+      "href",
+      "/#example",
+    );
+    expect(screen.getByRole("link", { name: /pricing/i })).toHaveAttribute(
+      "href",
+      "/#pricing",
+    );
   });
 
   it("does not render in-app nav links", () => {
     render(<MarketingHeader />);
-    expect(screen.queryByRole("link", { name: /dashboard/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: /discover/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: /library/i })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: /dashboard/i }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: /discover/i }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("link", { name: /library/i }),
+    ).not.toBeInTheDocument();
   });
 });
 
@@ -87,7 +109,11 @@ describe("MarketingHeader — signed in", () => {
   it("does not render signed-out CTAs", () => {
     clerkState.signedIn = true;
     render(<MarketingHeader />);
-    expect(screen.queryByRole("button", { name: /sign in/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /join beta/i })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /sign in/i }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /join beta/i }),
+    ).not.toBeInTheDocument();
   });
 });

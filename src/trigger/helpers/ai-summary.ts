@@ -3,12 +3,23 @@ import { parseJsonResponse, type SummaryResult } from "@/lib/openrouter";
 import { WORTH_IT_SIGNAL_KEYS, SIGNAL_LABELS } from "@/lib/openrouter";
 import { SYSTEM_PROMPT, getSummarizationPrompt } from "@/lib/prompts";
 import { interpolatePrompt } from "@/lib/admin/prompt-utils";
-import { computeSignalScore, coerceSignals, clampAdjustment, toSignalBoolean } from "@/lib/score-utils";
-import type { PodcastIndexPodcast, PodcastIndexEpisode } from "@/lib/podcastindex";
+import {
+  computeSignalScore,
+  coerceSignals,
+  clampAdjustment,
+  toSignalBoolean,
+} from "@/lib/score-utils";
+import type {
+  PodcastIndexPodcast,
+  PodcastIndexEpisode,
+} from "@/lib/podcastindex";
 
 // File-private helper — not exported. If a second consumer appears, extract it then.
 function toTitleCase(str: string): string {
-  return str.replace(/\w\S*/g, (word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase());
+  return str.replace(
+    /\w\S*/g,
+    (word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase(),
+  );
 }
 
 export type { SummaryResult } from "@/lib/openrouter";
@@ -17,24 +28,23 @@ export async function generateEpisodeSummary(
   podcast: PodcastIndexPodcast | undefined,
   episode: PodcastIndexEpisode,
   transcript: string,
-  customPrompt?: string | null
+  customPrompt?: string | null,
 ): Promise<SummaryResult> {
-  const prompt =
-    customPrompt
-      ? interpolatePrompt(customPrompt, {
-          title: episode.title,
-          podcastName: podcast?.title || "Unknown Podcast",
-          description: episode.description || "",
-          duration: episode.duration || 0,
-          transcript,
-        })
-      : getSummarizationPrompt(
-          podcast?.title || "Unknown Podcast",
-          episode.title,
-          episode.description || "",
-          episode.duration || 0,
-          transcript
-        );
+  const prompt = customPrompt
+    ? interpolatePrompt(customPrompt, {
+        title: episode.title,
+        podcastName: podcast?.title || "Unknown Podcast",
+        description: episode.description || "",
+        duration: episode.duration || 0,
+        transcript,
+      })
+    : getSummarizationPrompt(
+        podcast?.title || "Unknown Podcast",
+        episode.title,
+        episode.description || "",
+        episode.duration || 0,
+        transcript,
+      );
 
   const completion = await generateCompletion([
     { role: "system", content: SYSTEM_PROMPT },
@@ -53,7 +63,7 @@ export async function generateEpisodeSummary(
       for (const key of WORTH_IT_SIGNAL_KEYS) {
         if (key in signalObj && typeof signalObj[key] !== "boolean") {
           console.warn(
-            `[ai-summary] non-boolean signal coerced: ${key}=${signalObj[key]} → ${toSignalBoolean(signalObj[key])}`
+            `[ai-summary] non-boolean signal coerced: ${key}=${signalObj[key]} → ${toSignalBoolean(signalObj[key])}`,
           );
         }
       }
@@ -73,20 +83,26 @@ export async function generateEpisodeSummary(
       };
 
       // Build a compact worthItReason from fired signals
-      const firedLabels = WORTH_IT_SIGNAL_KEYS
-        .filter((k) => signals[k])
-        .map((k) => SIGNAL_LABELS[k].toLowerCase());
+      const firedLabels = WORTH_IT_SIGNAL_KEYS.filter((k) => signals[k]).map(
+        (k) => SIGNAL_LABELS[k].toLowerCase(),
+      );
       const firedCount = firedLabels.length;
       const adjText =
         adjustment === 0
           ? `Adjustment: 0 (${adjustmentReason || "signals capture quality accurately"}).`
           : `Adjustment: ${adjustment > 0 ? "+1" : "-1"} (${adjustmentReason}).`;
       const signalSummary = `${firedCount}/8 signals: ${firedLabels.join(", ") || "none"}. ${adjText}`;
-      const llmReason = typeof raw.worthItReason === "string" ? raw.worthItReason.trim() : "";
-      result.worthItReason = llmReason ? `${llmReason} (${signalSummary})` : signalSummary;
+      const llmReason =
+        typeof raw.worthItReason === "string" ? raw.worthItReason.trim() : "";
+      result.worthItReason = llmReason
+        ? `${llmReason} (${signalSummary})`
+        : signalSummary;
     }
     // Legacy dimension-averaging (backward compat for custom prompts)
-    else if (raw.worthItDimensions && typeof raw.worthItDimensions === "object") {
+    else if (
+      raw.worthItDimensions &&
+      typeof raw.worthItDimensions === "object"
+    ) {
       const dims = raw.worthItDimensions as Record<string, unknown>;
       if (
         typeof dims.uniqueness === "number" &&
@@ -94,10 +110,12 @@ export async function generateEpisodeSummary(
         typeof dims.timeValue === "number"
       ) {
         const { uniqueness, actionability, timeValue } = dims;
-        const computed = parseFloat(((uniqueness + actionability + timeValue) / 3).toFixed(1));
+        const computed = parseFloat(
+          ((uniqueness + actionability + timeValue) / 3).toFixed(1),
+        );
         if (result.worthItScore !== computed) {
           console.warn(
-            `[ai-summary] worthItScore mismatch: LLM=${result.worthItScore}, computed=${computed}. Using computed value.`
+            `[ai-summary] worthItScore mismatch: LLM=${result.worthItScore}, computed=${computed}. Using computed value.`,
           );
         }
         result.worthItScore = computed;
@@ -125,7 +143,7 @@ export async function generateEpisodeSummary(
           t.name.trim().length > 0 &&
           t.name.trim().length <= 100 &&
           typeof t.relevance === "number" &&
-          !Number.isNaN(t.relevance)
+          !Number.isNaN(t.relevance),
       );
       // 2. Normalize: title-case name, clamp relevance to [0, 1]
       // 3. Deduplicate by normalized name using Map for O(1) lookup (keep highest relevance)

@@ -64,7 +64,9 @@ describe("GET /api/episodes/[id]", () => {
       feed: mockPodcast as never,
       description: "",
     });
-    vi.mocked(db.query.episodes.findFirst).mockResolvedValue(undefined as never);
+    vi.mocked(db.query.episodes.findFirst).mockResolvedValue(
+      undefined as never,
+    );
 
     const request = new NextRequest("http://localhost:3000/api/episodes/123");
     const response = await GET(request, { params: { id: "123" } });
@@ -73,7 +75,7 @@ describe("GET /api/episodes/[id]", () => {
     expect(response.status).toBe(200);
     expect(data.episode).toEqual(mockEpisode);
     expect(response.headers.get("cache-control")).toBe(
-      "public, s-maxage=300, stale-while-revalidate=600"
+      "public, s-maxage=300, stale-while-revalidate=600",
     );
     expect(response.headers.get("vary")?.split(/,\s*/)).toContain("Cookie");
   });
@@ -93,14 +95,16 @@ describe("GET /api/episodes/[id]", () => {
       feed: mockPodcast as never,
       description: "",
     });
-    vi.mocked(db.query.episodes.findFirst).mockResolvedValue(undefined as never);
+    vi.mocked(db.query.episodes.findFirst).mockResolvedValue(
+      undefined as never,
+    );
 
     const request = new NextRequest("http://localhost:3000/api/episodes/123");
     const response = await GET(request, { params: { id: "123" } });
 
     expect(response.status).toBe(200);
     expect(response.headers.get("cache-control")).not.toBe(
-      "public, s-maxage=300, stale-while-revalidate=600"
+      "public, s-maxage=300, stale-while-revalidate=600",
     );
   });
 
@@ -144,7 +148,7 @@ describe("GET /api/episodes/[id]", () => {
     } as never);
 
     const request = new NextRequest(
-      "http://localhost:3000/api/episodes/rss-abc"
+      "http://localhost:3000/api/episodes/rss-abc",
     );
     const response = await GET(request, { params: { id: "rss-abc" } });
     const data = await response.json();
@@ -152,7 +156,7 @@ describe("GET /api/episodes/[id]", () => {
     expect(response.status).toBe(200);
     expect(data.episode.id).toBe("rss-abc");
     expect(response.headers.get("cache-control")).toBe(
-      "public, s-maxage=300, stale-while-revalidate=600"
+      "public, s-maxage=300, stale-while-revalidate=600",
     );
     expect(response.headers.get("vary")?.split(/,\s*/)).toContain("Cookie");
   });
@@ -199,13 +203,13 @@ describe("GET /api/episodes/[id]", () => {
     } as never);
 
     const request = new NextRequest(
-      "http://localhost:3000/api/episodes/rss-abc"
+      "http://localhost:3000/api/episodes/rss-abc",
     );
     const response = await GET(request, { params: { id: "rss-abc" } });
 
     expect(response.status).toBe(200);
     expect(response.headers.get("cache-control")).not.toBe(
-      "public, s-maxage=300, stale-while-revalidate=600"
+      "public, s-maxage=300, stale-while-revalidate=600",
     );
   });
 
@@ -244,7 +248,9 @@ describe("GET /api/episodes/[id]", () => {
       feed: mockPodcast as never,
       description: "",
     });
-    vi.mocked(db.query.episodes.findFirst).mockResolvedValue(undefined as never);
+    vi.mocked(db.query.episodes.findFirst).mockResolvedValue(
+      undefined as never,
+    );
 
     const request = new NextRequest("http://localhost:3000/api/episodes/123", {
       headers: {
@@ -280,11 +286,11 @@ describe("GET /api/episodes/[id]", () => {
     vi.mocked(auth).mockResolvedValue({ userId: "user-1" } as never);
 
     vi.mocked(getEpisodeById).mockRejectedValue(
-      new Error("PodcastIndex API error: 400 Bad Request")
+      new Error("PodcastIndex API error: 400 Bad Request"),
     );
 
     const request = new NextRequest(
-      "http://localhost:3000/api/episodes/49731529531"
+      "http://localhost:3000/api/episodes/49731529531",
     );
     const response = await GET(request, {
       params: { id: "49731529531" },
@@ -312,7 +318,7 @@ describe("GET /api/episodes/[id]", () => {
       description: "",
     });
     vi.mocked(db.query.episodes.findFirst).mockRejectedValue(
-      new Error("DB connection failed")
+      new Error("DB connection failed"),
     );
 
     const request = new NextRequest("http://localhost:3000/api/episodes/123");
@@ -407,7 +413,9 @@ describe("GET /api/episodes/[id]", () => {
       feed: null as never,
       description: "",
     });
-    vi.mocked(db.query.episodes.findFirst).mockResolvedValue(undefined as never);
+    vi.mocked(db.query.episodes.findFirst).mockResolvedValue(
+      undefined as never,
+    );
 
     const request = new NextRequest("http://localhost:3000/api/episodes/123");
     const response = await GET(request, { params: { id: "123" } });
@@ -479,7 +487,7 @@ describe("GET /api/episodes/[id]", () => {
     } as never);
 
     const request = new NextRequest(
-      "http://localhost:3000/api/episodes/rss-abc"
+      "http://localhost:3000/api/episodes/rss-abc",
     );
     const response = await GET(request, { params: { id: "rss-abc" } });
     const data = await response.json();
@@ -514,7 +522,7 @@ describe("GET /api/episodes/[id]", () => {
     } as never);
 
     const request = new NextRequest(
-      "http://localhost:3000/api/episodes/rss-xyz"
+      "http://localhost:3000/api/episodes/rss-xyz",
     );
     const response = await GET(request, { params: { id: "rss-xyz" } });
     const data = await response.json();

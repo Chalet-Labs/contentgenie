@@ -42,9 +42,7 @@
       "Read(~/.ssh/**)",
       "Read(~/.aws/**)"
     ],
-    "ask": [
-      "Bash(rm *)"
-    ],
+    "ask": ["Bash(rm *)"],
     "defaultMode": "acceptEdits"
   },
   "enabledPlugins": {

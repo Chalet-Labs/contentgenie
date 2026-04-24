@@ -1,7 +1,13 @@
 "use client";
 
 import { useState } from "react";
-import { Bookmark, BookmarkCheck, Loader2, Clock, AlertCircle } from "lucide-react";
+import {
+  Bookmark,
+  BookmarkCheck,
+  Loader2,
+  Clock,
+  AlertCircle,
+} from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { useOnlineStatus } from "@/hooks/use-online-status";
@@ -67,7 +73,9 @@ export function SaveButton({
           setIsSaved(false);
           if (!result.queued) refreshCounts();
           toast.success(
-            result.queued ? "Removed (will sync when online)" : "Removed from library",
+            result.queued
+              ? "Removed (will sync when online)"
+              : "Removed from library",
             { description: `"${episodeData.title}" has been removed` },
           );
         } else {
@@ -81,7 +89,9 @@ export function SaveButton({
           setIsSaved(true);
           if (!result.queued) refreshCounts();
           toast.success(
-            result.queued ? "Saved (will sync when online)" : "Saved to library!",
+            result.queued
+              ? "Saved (will sync when online)"
+              : "Saved to library!",
             { description: `"${episodeData.title}" has been saved` },
           );
         } else {
@@ -92,7 +102,8 @@ export function SaveButton({
       }
     } catch (error) {
       toast.error(isSaved ? "Failed to remove" : "Failed to save", {
-        description: error instanceof Error ? error.message : "Please try again",
+        description:
+          error instanceof Error ? error.message : "Please try again",
       });
     } finally {
       setIsLoading(false);
@@ -117,7 +128,10 @@ export function SaveButton({
       {isFailedSync ? (
         <>
           <span className="sr-only">Sync failed</span>
-          <AlertCircle aria-hidden="true" className="ml-1 h-3 w-3 text-destructive" />
+          <AlertCircle
+            aria-hidden="true"
+            className="ml-1 h-3 w-3 text-destructive"
+          />
         </>
       ) : isPendingSync ? (
         <Clock className="ml-1 h-3 w-3 text-muted-foreground" />

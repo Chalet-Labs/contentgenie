@@ -13,9 +13,9 @@
  * it into an action file doesn't expose it as a server action — only the
  * module's own exports become server actions.
  */
-import { auth } from "@clerk/nextjs/server"
+import { auth } from "@clerk/nextjs/server";
 
-type UnauthorizedFailure = { success: false; error: "Unauthorized" }
+type UnauthorizedFailure = { success: false; error: "Unauthorized" };
 
 /**
  * Runs `fn` with the authenticated `userId`. Returns an `Unauthorized`
@@ -25,7 +25,7 @@ type UnauthorizedFailure = { success: false; error: "Unauthorized" }
 export async function withAuthAction<T>(
   fn: (userId: string) => Promise<T>,
 ): Promise<T | UnauthorizedFailure> {
-  const { userId } = await auth()
-  if (!userId) return { success: false, error: "Unauthorized" }
-  return fn(userId)
+  const { userId } = await auth();
+  if (!userId) return { success: false, error: "Unauthorized" };
+  return fn(userId);
 }

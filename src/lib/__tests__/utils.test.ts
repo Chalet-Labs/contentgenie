@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { cn, stripHtml, formatDate, formatDuration, slugify } from "@/lib/utils";
+import {
+  cn,
+  stripHtml,
+  formatDate,
+  formatDuration,
+  slugify,
+} from "@/lib/utils";
 
 describe("cn", () => {
   it("merges class names", () => {
@@ -109,7 +115,9 @@ describe("slugify", () => {
   });
 
   it("handles slashes and em-dashes", () => {
-    expect(slugify("Crypto/Blockchain — On-chain")).toBe("crypto-blockchain-on-chain");
+    expect(slugify("Crypto/Blockchain — On-chain")).toBe(
+      "crypto-blockchain-on-chain",
+    );
   });
 
   it("returns empty string for empty input", () => {

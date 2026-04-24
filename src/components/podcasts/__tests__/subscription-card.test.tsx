@@ -39,18 +39,15 @@ const subscribedAt = new Date("2026-01-15");
 describe("SubscriptionCard", () => {
   it("renders as a link to the podcast detail page", () => {
     render(
-      <SubscriptionCard podcast={mockPodcast} subscribedAt={subscribedAt} />
+      <SubscriptionCard podcast={mockPodcast} subscribedAt={subscribedAt} />,
     );
     const link = screen.getByRole("link");
-    expect(link).toHaveAttribute(
-      "href",
-      "/podcast/12345?from=subscriptions"
-    );
+    expect(link).toHaveAttribute("href", "/podcast/12345?from=subscriptions");
   });
 
   it("renders only one link wrapping the card", () => {
     render(
-      <SubscriptionCard podcast={mockPodcast} subscribedAt={subscribedAt} />
+      <SubscriptionCard podcast={mockPodcast} subscribedAt={subscribedAt} />,
     );
     const links = screen.getAllByRole("link");
     expect(links).toHaveLength(1);
@@ -58,21 +55,21 @@ describe("SubscriptionCard", () => {
 
   it("renders the podcast title", () => {
     render(
-      <SubscriptionCard podcast={mockPodcast} subscribedAt={subscribedAt} />
+      <SubscriptionCard podcast={mockPodcast} subscribedAt={subscribedAt} />,
     );
     expect(screen.getByText("Test Podcast")).toBeInTheDocument();
   });
 
   it("renders the publisher name", () => {
     render(
-      <SubscriptionCard podcast={mockPodcast} subscribedAt={subscribedAt} />
+      <SubscriptionCard podcast={mockPodcast} subscribedAt={subscribedAt} />,
     );
     expect(screen.getByText("Test Publisher")).toBeInTheDocument();
   });
 
   it("renders up to 3 categories", () => {
     render(
-      <SubscriptionCard podcast={mockPodcast} subscribedAt={subscribedAt} />
+      <SubscriptionCard podcast={mockPodcast} subscribedAt={subscribedAt} />,
     );
     expect(screen.getByText("Technology")).toBeInTheDocument();
     expect(screen.getByText("Science")).toBeInTheDocument();
@@ -82,14 +79,14 @@ describe("SubscriptionCard", () => {
 
   it("renders the subscribed date", () => {
     render(
-      <SubscriptionCard podcast={mockPodcast} subscribedAt={subscribedAt} />
+      <SubscriptionCard podcast={mockPodcast} subscribedAt={subscribedAt} />,
     );
     expect(screen.getByText(/Subscribed\s+Jan 15/)).toBeInTheDocument();
   });
 
   it("renders episode count", () => {
     render(
-      <SubscriptionCard podcast={mockPodcast} subscribedAt={subscribedAt} />
+      <SubscriptionCard podcast={mockPodcast} subscribedAt={subscribedAt} />,
     );
     expect(screen.getByText("42 episodes")).toBeInTheDocument();
   });
@@ -100,7 +97,7 @@ describe("SubscriptionCard", () => {
       // eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events
       <div onClick={parentClickHandler}>
         <SubscriptionCard podcast={mockPodcast} subscribedAt={subscribedAt} />
-      </div>
+      </div>,
     );
 
     const button = screen.getByRole("button");
@@ -111,7 +108,7 @@ describe("SubscriptionCard", () => {
 
   it("clicking subscribe button triggers the subscription action", () => {
     render(
-      <SubscriptionCard podcast={mockPodcast} subscribedAt={subscribedAt} />
+      <SubscriptionCard podcast={mockPodcast} subscribedAt={subscribedAt} />,
     );
     const button = screen.getByRole("button");
     fireEvent.click(button);
@@ -121,12 +118,12 @@ describe("SubscriptionCard", () => {
 
   it("stops event propagation on button container", () => {
     render(
-      <SubscriptionCard podcast={mockPodcast} subscribedAt={subscribedAt} />
+      <SubscriptionCard podcast={mockPodcast} subscribedAt={subscribedAt} />,
     );
     const button = screen.getByRole("button");
     // The button's parent div has onClick and onKeyDown handlers
     const buttonContainer = button.closest(
-      "[class*='relative z-10']"
+      "[class*='relative z-10']",
     ) as HTMLElement;
 
     // Test click event
@@ -140,10 +137,7 @@ describe("SubscriptionCard", () => {
       key: "Enter",
       bubbles: true,
     });
-    const stopPropagationSpyKeydown = vi.spyOn(
-      keydownEvent,
-      "stopPropagation"
-    );
+    const stopPropagationSpyKeydown = vi.spyOn(keydownEvent, "stopPropagation");
     fireEvent(buttonContainer, keydownEvent);
     expect(stopPropagationSpyKeydown).toHaveBeenCalled();
   });
@@ -151,7 +145,7 @@ describe("SubscriptionCard", () => {
   describe("pin toggle", () => {
     it("does not render a pin button when onTogglePin is not supplied", () => {
       render(
-        <SubscriptionCard podcast={mockPodcast} subscribedAt={subscribedAt} />
+        <SubscriptionCard podcast={mockPodcast} subscribedAt={subscribedAt} />,
       );
       expect(screen.queryByRole("button", { name: /pin/i })).toBeNull();
     });
@@ -163,7 +157,7 @@ describe("SubscriptionCard", () => {
           subscribedAt={subscribedAt}
           isPinned={false}
           onTogglePin={() => {}}
-        />
+        />,
       );
       const pin = screen.getByRole("button", { name: "Pin podcast" });
       expect(pin).toHaveAttribute("aria-pressed", "false");
@@ -176,7 +170,7 @@ describe("SubscriptionCard", () => {
           subscribedAt={subscribedAt}
           isPinned={true}
           onTogglePin={() => {}}
-        />
+        />,
       );
       const pin = screen.getByRole("button", { name: "Unpin podcast" });
       expect(pin).toHaveAttribute("aria-pressed", "true");
@@ -190,7 +184,7 @@ describe("SubscriptionCard", () => {
           subscribedAt={subscribedAt}
           isPinned={false}
           onTogglePin={onTogglePin}
-        />
+        />,
       );
       fireEvent.click(screen.getByRole("button", { name: "Pin podcast" }));
       expect(onTogglePin).toHaveBeenCalledTimes(1);
@@ -207,7 +201,7 @@ describe("SubscriptionCard", () => {
             isPinned={false}
             onTogglePin={() => {}}
           />
-        </div>
+        </div>,
       );
       fireEvent.click(screen.getByRole("button", { name: "Pin podcast" }));
       expect(parentClickHandler).not.toHaveBeenCalled();

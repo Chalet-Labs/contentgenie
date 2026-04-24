@@ -1,5 +1,5 @@
-import type { Meta, StoryObj } from "@storybook/nextjs-vite"
-import type { ReactNode } from "react"
+import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import type { ReactNode } from "react";
 import {
   AudioPlayerAPIContext,
   AudioPlayerStateContext,
@@ -7,8 +7,8 @@ import {
   type AudioPlayerState,
   type AudioPlayerAPI,
   type AudioEpisode,
-} from "@/contexts/audio-player-context"
-import { QueueSection } from "@/components/dashboard/queue-section"
+} from "@/contexts/audio-player-context";
+import { QueueSection } from "@/components/dashboard/queue-section";
 
 // ---------------------------------------------------------------------------
 // Mock provider — same pattern as queue-panel.stories.tsx
@@ -31,7 +31,7 @@ const noopAPI: AudioPlayerAPI = {
   setSleepTimer: () => {},
   cancelSleepTimer: () => {},
   getCurrentTime: () => 0,
-}
+};
 
 const baseState: AudioPlayerState = {
   currentEpisode: null,
@@ -47,14 +47,14 @@ const baseState: AudioPlayerState = {
   chapters: null,
   chaptersLoading: false,
   sleepTimer: null,
-}
+};
 
 function MockProvider({
   state,
   children,
 }: {
-  state: AudioPlayerState
-  children: ReactNode
+  state: AudioPlayerState;
+  children: ReactNode;
 }) {
   return (
     <AudioPlayerAPIContext.Provider value={noopAPI}>
@@ -66,7 +66,7 @@ function MockProvider({
         </AudioPlayerProgressContext.Provider>
       </AudioPlayerStateContext.Provider>
     </AudioPlayerAPIContext.Provider>
-  )
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -80,7 +80,7 @@ const nowPlayingEpisode: AudioEpisode = {
   audioUrl: "https://example.com/playing.mp3",
   artwork: "https://picsum.photos/seed/podcast1/300/300",
   duration: 3600,
-}
+};
 
 const queueEpisodes: AudioEpisode[] = [
   {
@@ -101,12 +101,13 @@ const queueEpisodes: AudioEpisode[] = [
   },
   {
     id: "1003",
-    title: "An Extremely Long Episode Title That Should Be Truncated When Displayed Inside the Queue Section Card Component",
+    title:
+      "An Extremely Long Episode Title That Should Be Truncated When Displayed Inside the Queue Section Card Component",
     podcastTitle: "The Very Verbose and Long-Winded Podcast About Everything",
     audioUrl: "https://example.com/audio3.mp3",
     duration: 1200,
   },
-]
+];
 
 // ---------------------------------------------------------------------------
 // Meta
@@ -118,10 +119,10 @@ const meta: Meta<typeof QueueSection> = {
   parameters: {
     layout: "padded",
   },
-}
+};
 
-export default meta
-type Story = StoryObj<typeof QueueSection>
+export default meta;
+type Story = StoryObj<typeof QueueSection>;
 
 // ---------------------------------------------------------------------------
 // Stories
@@ -137,13 +138,17 @@ export const EmptyState: Story = {
       </MockProvider>
     ),
   ],
-}
+};
 
 export const NowPlayingOnly: Story = {
   decorators: [
     (Story) => (
       <MockProvider
-        state={{ ...baseState, currentEpisode: nowPlayingEpisode, isPlaying: true }}
+        state={{
+          ...baseState,
+          currentEpisode: nowPlayingEpisode,
+          isPlaying: true,
+        }}
       >
         <div className="max-w-2xl">
           <Story />
@@ -151,7 +156,7 @@ export const NowPlayingOnly: Story = {
       </MockProvider>
     ),
   ],
-}
+};
 
 export const QueueWithoutCurrentEpisode: Story = {
   decorators: [
@@ -163,7 +168,7 @@ export const QueueWithoutCurrentEpisode: Story = {
       </MockProvider>
     ),
   ],
-}
+};
 
 export const NowPlayingWithQueue: Story = {
   decorators: [
@@ -182,7 +187,7 @@ export const NowPlayingWithQueue: Story = {
       </MockProvider>
     ),
   ],
-}
+};
 
 export const SingleQueueItem: Story = {
   decorators: [
@@ -194,7 +199,7 @@ export const SingleQueueItem: Story = {
       </MockProvider>
     ),
   ],
-}
+};
 
 export const LongTitles: Story = {
   decorators: [
@@ -204,8 +209,10 @@ export const LongTitles: Story = {
           ...baseState,
           currentEpisode: {
             id: "long-0",
-            title: "An Episode With An Extremely Long Title That Will Definitely Overflow And Need Truncation In The Queue Section On The Dashboard Page",
-            podcastTitle: "A Podcast With An Equally Long And Verbose Name That Also Needs Truncation To Fit",
+            title:
+              "An Episode With An Extremely Long Title That Will Definitely Overflow And Need Truncation In The Queue Section On The Dashboard Page",
+            podcastTitle:
+              "A Podcast With An Equally Long And Verbose Name That Also Needs Truncation To Fit",
             audioUrl: "https://example.com/audio-long-0.mp3",
           },
           queue: [queueEpisodes[2]],
@@ -217,7 +224,7 @@ export const LongTitles: Story = {
       </MockProvider>
     ),
   ],
-}
+};
 
 export const NoArtwork: Story = {
   decorators: [
@@ -247,4 +254,4 @@ export const NoArtwork: Story = {
       </MockProvider>
     ),
   ],
-}
+};

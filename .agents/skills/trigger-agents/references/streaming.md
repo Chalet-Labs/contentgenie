@@ -45,7 +45,7 @@ export const processItems = task({
           current: i + 1,
           total: items.length,
           status: `Processing ${item.name}`,
-        })
+        }),
       );
     }
 
@@ -93,10 +93,9 @@ export const workerTask = task({
     const result = await processItem(item);
 
     // Emit to PARENT's stream, not this task's
-    progressStream.append(
-      JSON.stringify({ item: item.id, status: "done" }),
-      { target: "parent" }
-    );
+    progressStream.append(JSON.stringify({ item: item.id, status: "done" }), {
+      target: "parent",
+    });
 
     return result;
   },
@@ -108,7 +107,7 @@ export const orchestrator = task({
   run: async ({ items }) => {
     // Child emits bubble up to this task's stream
     return workerTask.batchTriggerAndWait(
-      items.map(item => ({ payload: { item } }))
+      items.map((item) => ({ payload: { item } })),
     );
   },
 });
@@ -124,7 +123,13 @@ export const orchestrator = task({
 import { useRealtimeStream } from "@trigger.dev/react-hooks";
 import type { progressStream } from "@/trigger/streams";
 
-function Progress({ runId, accessToken }: { runId: string; accessToken: string }) {
+function Progress({
+  runId,
+  accessToken,
+}: {
+  runId: string;
+  accessToken: string;
+}) {
   const { data } = useRealtimeStream<typeof progressStream>(runId, {
     accessToken,
     stream: "progress",
@@ -151,10 +156,10 @@ import { useRealtimeRunWithStreams } from "@trigger.dev/react-hooks";
 import type { processItems, STREAMS } from "@/trigger/tasks";
 
 function TaskProgress({ runId, accessToken }: Props) {
-  const { run, streams } = useRealtimeRunWithStreams<typeof processItems, STREAMS>(
-    runId,
-    { accessToken }
-  );
+  const { run, streams } = useRealtimeRunWithStreams<
+    typeof processItems,
+    STREAMS
+  >(runId, { accessToken });
 
   const progressUpdates = streams.progress ?? [];
   const latest = progressUpdates[progressUpdates.length - 1];
@@ -200,12 +205,16 @@ Streams serialize as strings. For objects, use JSON:
 
 ```typescript
 // Define helper functions
-export function emitProgress(update: ProgressUpdate, options?: { target: "parent" }) {
+export function emitProgress(
+  update: ProgressUpdate,
+  options?: { target: "parent" },
+) {
   progressStream.append(JSON.stringify(update), options);
 }
 
 // Parse on frontend
-const updates = streams.progress?.map(s => JSON.parse(s) as ProgressUpdate) ?? [];
+const updates =
+  streams.progress?.map((s) => JSON.parse(s) as ProgressUpdate) ?? [];
 ```
 
 ---
@@ -218,7 +227,7 @@ Prevent excessive re-renders:
 const { data } = useRealtimeStream<typeof progressStream>(runId, {
   accessToken,
   stream: "progress",
-  throttleInMs: 100,  // Max 10 updates/second
+  throttleInMs: 100, // Max 10 updates/second
 });
 ```
 
@@ -234,11 +243,12 @@ const { streams } = useRealtimeRunWithStreams<typeof aiTask, STREAMS>(runId, {
 });
 
 // streams.openai is TextStreamPart[]
-const toolCalls = streams.openai?.filter(s => s.type === "tool-call") ?? [];
-const toolResults = streams.openai?.filter(s => s.type === "tool-result") ?? [];
-const textDeltas = streams.openai?.filter(s => s.type === "text-delta") ?? [];
+const toolCalls = streams.openai?.filter((s) => s.type === "tool-call") ?? [];
+const toolResults =
+  streams.openai?.filter((s) => s.type === "tool-result") ?? [];
+const textDeltas = streams.openai?.filter((s) => s.type === "text-delta") ?? [];
 
-const fullText = textDeltas.map(d => d.textDelta).join("");
+const fullText = textDeltas.map((d) => d.textDelta).join("");
 ```
 
 ---

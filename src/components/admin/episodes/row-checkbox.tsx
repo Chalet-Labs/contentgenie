@@ -1,14 +1,14 @@
-"use client"
+"use client";
 
-import { Checkbox } from "@/components/ui/checkbox"
-import { useSelection } from "@/components/admin/episodes/selection-context"
+import { Checkbox } from "@/components/ui/checkbox";
+import { useSelection } from "@/components/admin/episodes/selection-context";
 
 interface RowCheckboxProps {
-  episodeId: number
+  episodeId: number;
 }
 
 export function RowCheckbox({ episodeId }: RowCheckboxProps) {
-  const { selectedIds, toggle } = useSelection()
+  const { selectedIds, toggle } = useSelection();
 
   return (
     <Checkbox
@@ -16,5 +16,5 @@ export function RowCheckbox({ episodeId }: RowCheckboxProps) {
       onCheckedChange={() => toggle(episodeId)}
       aria-label={`Select episode ${episodeId}`}
     />
-  )
+  );
 }

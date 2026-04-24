@@ -9,13 +9,13 @@ import { batch, task } from "@trigger.dev/sdk";
 
 // Trigger different tasks, get typed results
 const { runs } = await batch.triggerByTaskAndWait([
-  { task: taskA, payload: { foo: "bar" } },  // payload typed to taskA
-  { task: taskB, payload: { num: 42 } },     // payload typed to taskB
+  { task: taskA, payload: { foo: "bar" } }, // payload typed to taskA
+  { task: taskB, payload: { num: 42 } }, // payload typed to taskB
 ]);
 
 // Results are typed based on position
 if (runs[0].ok) {
-  console.log(runs[0].output);  // typed as taskA output
+  console.log(runs[0].output); // typed as taskA output
 }
 ```
 
@@ -47,7 +47,7 @@ const { runs } = await batch.triggerByTaskAndWait([
 ]);
 
 // Individual error handling
-const results = runs.map(run => {
+const results = runs.map((run) => {
   if (run.ok) {
     return { success: true, data: run.output };
   }
@@ -60,7 +60,7 @@ const results = runs.map(run => {
 });
 
 // Or throw if any failed
-const failed = runs.filter(r => !r.ok);
+const failed = runs.filter((r) => !r.ok);
 if (failed.length > 0) {
   throw new Error(`${failed.length} tasks failed`);
 }
@@ -74,22 +74,24 @@ When running mixed task types, filter results by `taskIdentifier`:
 
 ```typescript
 const { runs } = await batch.triggerByTaskAndWait([
-  ...claims.map(c => ({ task: verifySource, payload: c })),
-  ...claims.map(c => ({ task: analyzeHistory, payload: c })),
+  ...claims.map((c) => ({ task: verifySource, payload: c })),
+  ...claims.map((c) => ({ task: analyzeHistory, payload: c })),
 ]);
 
 // Filter to specific task results
 const verifications = runs
-  .filter((r): r is typeof r & { ok: true } =>
-    r.ok && r.taskIdentifier === "verify-source"
+  .filter(
+    (r): r is typeof r & { ok: true } =>
+      r.ok && r.taskIdentifier === "verify-source",
   )
-  .map(r => r.output as SourceVerification);
+  .map((r) => r.output as SourceVerification);
 
 const analyses = runs
-  .filter((r): r is typeof r & { ok: true } =>
-    r.ok && r.taskIdentifier === "analyze-history"
+  .filter(
+    (r): r is typeof r & { ok: true } =>
+      r.ok && r.taskIdentifier === "analyze-history",
   )
-  .map(r => r.output as HistoricalAnalysis);
+  .map((r) => r.output as HistoricalAnalysis);
 ```
 
 ---
@@ -102,18 +104,18 @@ export const processItems = task({
   run: async ({ items }) => {
     // Fan-out: process all items in parallel
     const { runs } = await batch.triggerByTaskAndWait(
-      items.map(item => ({ task: processItem, payload: item }))
+      items.map((item) => ({ task: processItem, payload: item })),
     );
 
     // Fan-in: aggregate results
-    const successful = runs.filter(r => r.ok).map(r => r.output);
-    const failed = runs.filter(r => !r.ok);
+    const successful = runs.filter((r) => r.ok).map((r) => r.output);
+    const failed = runs.filter((r) => !r.ok);
 
     return {
       processed: successful.length,
       failed: failed.length,
       results: successful,
-      errors: failed.map(f => ({ id: f.id, error: f.error })),
+      errors: failed.map((f) => ({ id: f.id, error: f.error })),
     };
   },
 });
@@ -128,7 +130,9 @@ export const orchestrator = task({
   id: "orchestrator",
   run: async ({ input }) => {
     // Step 1: Sequential preprocessing
-    const { runs: [prepResult] } = await batch.triggerByTaskAndWait([
+    const {
+      runs: [prepResult],
+    } = await batch.triggerByTaskAndWait([
       { task: preprocess, payload: { input } },
     ]);
 
@@ -140,12 +144,17 @@ export const orchestrator = task({
 
     // Step 2: Parallel processing
     const { runs } = await batch.triggerByTaskAndWait(
-      items.map(item => ({ task: processItem, payload: item }))
+      items.map((item) => ({ task: processItem, payload: item })),
     );
 
     // Step 3: Sequential aggregation
-    const { runs: [aggResult] } = await batch.triggerByTaskAndWait([
-      { task: aggregate, payload: { results: runs.filter(r => r.ok).map(r => r.output) } },
+    const {
+      runs: [aggResult],
+    } = await batch.triggerByTaskAndWait([
+      {
+        task: aggregate,
+        payload: { results: runs.filter((r) => r.ok).map((r) => r.output) },
+      },
     ]);
 
     return aggResult.ok ? aggResult.output : null;
@@ -186,7 +195,7 @@ import { queue, task } from "@trigger.dev/sdk";
 
 const rateLimitedQueue = queue({
   name: "api-calls",
-  concurrencyLimit: 5,  // Max 5 concurrent
+  concurrencyLimit: 5, // Max 5 concurrent
 });
 
 export const callExternalApi = task({
@@ -204,7 +213,7 @@ export const batchProcess = task({
   run: async ({ urls }) => {
     // Will queue up, respecting concurrencyLimit: 5
     return callExternalApi.batchTriggerAndWait(
-      urls.map(url => ({ payload: { url } }))
+      urls.map((url) => ({ payload: { url } })),
     );
   },
 });

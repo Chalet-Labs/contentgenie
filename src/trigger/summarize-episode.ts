@@ -1,13 +1,32 @@
-import { task, retry, logger, metadata, AbortTaskRunError } from "@trigger.dev/sdk";
+import {
+  task,
+  retry,
+  logger,
+  metadata,
+  AbortTaskRunError,
+} from "@trigger.dev/sdk";
 import { eq } from "drizzle-orm";
 import { getEpisodeById, getPodcastById } from "@/trigger/helpers/podcastindex";
-import { generateEpisodeSummary, type SummaryResult } from "@/trigger/helpers/ai-summary";
-import { trackEpisodeRun, persistEpisodeSummary, updateEpisodeStatus } from "@/trigger/helpers/database";
-import { markSummaryReady, resolvePodcastId } from "@/trigger/helpers/notifications";
+import {
+  generateEpisodeSummary,
+  type SummaryResult,
+} from "@/trigger/helpers/ai-summary";
+import {
+  trackEpisodeRun,
+  persistEpisodeSummary,
+  updateEpisodeStatus,
+} from "@/trigger/helpers/database";
+import {
+  markSummaryReady,
+  resolvePodcastId,
+} from "@/trigger/helpers/notifications";
 import { getActiveAiConfig } from "@/lib/ai/config";
 import { db } from "@/db";
 import { episodes } from "@/db/schema";
-import type { PodcastIndexEpisode, PodcastIndexPodcast } from "@/lib/podcastindex";
+import type {
+  PodcastIndexEpisode,
+  PodcastIndexPodcast,
+} from "@/lib/podcastindex";
 import type { SummarizationStep } from "@/trigger/types";
 
 function setStep(step: SummarizationStep) {
@@ -71,7 +90,10 @@ export const summarizeEpisode = task({
     }
     metadata.root.increment("failed", 1);
   },
-  run: async (payload: SummarizeEpisodePayload, { ctx }): Promise<SummaryResult> => {
+  run: async (
+    payload: SummarizeEpisodePayload,
+    { ctx },
+  ): Promise<SummaryResult> => {
     const { episodeId } = payload;
 
     // Step 1: Fetch episode from PodcastIndex
@@ -80,18 +102,21 @@ export const summarizeEpisode = task({
 
     const episodeResponse = await retry.onThrow(
       async () => getEpisodeById(episodeId),
-      { maxAttempts: 3 }
+      { maxAttempts: 3 },
     );
 
     if (!episodeResponse?.episode) {
       const errorMsg = `Episode ${episodeId} not found in PodcastIndex`;
       try {
-        await db.update(episodes).set({
-          summaryStatus: "failed",
-          summaryRunId: null,
-          processingError: errorMsg,
-          updatedAt: new Date(),
-        }).where(eq(episodes.podcastIndexId, String(episodeId)));
+        await db
+          .update(episodes)
+          .set({
+            summaryStatus: "failed",
+            summaryRunId: null,
+            processingError: errorMsg,
+            updatedAt: new Date(),
+          })
+          .where(eq(episodes.podcastIndexId, String(episodeId)));
       } catch (dbErr) {
         logger.warn("Failed to write processingError before abort", {
           episodeId,
@@ -102,7 +127,10 @@ export const summarizeEpisode = task({
     }
 
     const episode: PodcastIndexEpisode = episodeResponse.episode;
-    logger.info("Episode fetched", { title: episode.title, feedId: episode.feedId });
+    logger.info("Episode fetched", {
+      title: episode.title,
+      feedId: episode.feedId,
+    });
 
     // Step 2: Fetch podcast context
     setStep("fetching-podcast");
@@ -112,7 +140,7 @@ export const summarizeEpisode = task({
     try {
       const podcastResponse = await retry.onThrow(
         async () => getPodcastById(episode.feedId),
-        { maxAttempts: 3 }
+        { maxAttempts: 3 },
       );
       podcast = podcastResponse?.feed;
     } catch (error) {
@@ -134,11 +162,12 @@ export const summarizeEpisode = task({
     logger.info("Reading transcript from database", { episodeId });
 
     const episodeRow = await retry.onThrow(
-      async () => db.query.episodes.findFirst({
-        where: eq(episodes.podcastIndexId, String(episodeId)),
-        columns: { transcription: true },
-      }),
-      { maxAttempts: 3 }
+      async () =>
+        db.query.episodes.findFirst({
+          where: eq(episodes.podcastIndexId, String(episodeId)),
+          columns: { transcription: true },
+        }),
+      { maxAttempts: 3 },
     );
 
     const transcript = episodeRow?.transcription?.trim() || null;
@@ -146,12 +175,15 @@ export const summarizeEpisode = task({
     if (!transcript) {
       const errorMsg = `Episode ${episodeId} has no transcript available — run fetch-transcript first`;
       try {
-        await db.update(episodes).set({
-          summaryStatus: "failed",
-          summaryRunId: null,
-          processingError: errorMsg,
-          updatedAt: new Date(),
-        }).where(eq(episodes.podcastIndexId, String(episodeId)));
+        await db
+          .update(episodes)
+          .set({
+            summaryStatus: "failed",
+            summaryRunId: null,
+            processingError: errorMsg,
+            updatedAt: new Date(),
+          })
+          .where(eq(episodes.podcastIndexId, String(episodeId)));
       } catch (dbErr) {
         logger.warn("Failed to write processingError before abort", {
           episodeId,
@@ -178,8 +210,14 @@ export const summarizeEpisode = task({
     }
 
     const summary = await retry.onThrow(
-      async () => generateEpisodeSummary(podcast, episode, transcript, aiConfig.summarizationPrompt),
-      { maxAttempts: 3, minTimeoutInMs: 5000, maxTimeoutInMs: 60000 }
+      async () =>
+        generateEpisodeSummary(
+          podcast,
+          episode,
+          transcript,
+          aiConfig.summarizationPrompt,
+        ),
+      { maxAttempts: 3, minTimeoutInMs: 5000, maxTimeoutInMs: 60000 },
     );
 
     logger.info("Summary generated", {
@@ -193,7 +231,7 @@ export const summarizeEpisode = task({
 
     await retry.onThrow(
       async () => persistEpisodeSummary(episode, podcast, summary),
-      { maxAttempts: 3 }
+      { maxAttempts: 3 },
     );
 
     logger.info("Summary persisted successfully");
@@ -214,17 +252,18 @@ export const summarizeEpisode = task({
             episodeDbId,
             String(episodeId),
             podcast?.title ?? episode.title,
-            `Summary ready: ${episode.title}`
+            `Summary ready: ${episode.title}`,
           );
         } else {
-          logger.warn("Could not resolve episode DB id for markSummaryReady", { episodeId });
+          logger.warn("Could not resolve episode DB id for markSummaryReady", {
+            episodeId,
+          });
         }
       }
     } catch (notifErr) {
       logger.warn("Failed to update notifications", {
         episodeId,
-        error:
-          notifErr instanceof Error ? notifErr.message : String(notifErr),
+        error: notifErr instanceof Error ? notifErr.message : String(notifErr),
       });
     }
 

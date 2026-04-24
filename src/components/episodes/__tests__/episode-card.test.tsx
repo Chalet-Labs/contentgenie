@@ -49,7 +49,7 @@ describe("EpisodeCard", () => {
   it("renders title and podcast title", () => {
     render(<EpisodeCard {...baseProps} />);
     expect(
-      screen.getByText("How AI is Transforming Podcast Discovery")
+      screen.getByText("How AI is Transforming Podcast Discovery"),
     ).toBeInTheDocument();
     expect(screen.getByText("Tech Talk Daily")).toBeInTheDocument();
   });
@@ -66,7 +66,7 @@ describe("EpisodeCard", () => {
 
   it("renders up to 3 topic chips and caps extras", () => {
     render(
-      <EpisodeCard {...baseProps} topics={["AI", "Tech", "Future", "Extra"]} />
+      <EpisodeCard {...baseProps} topics={["AI", "Tech", "Future", "Extra"]} />,
     );
     expect(screen.getByText("AI")).toBeInTheDocument();
     expect(screen.getByText("Tech")).toBeInTheDocument();
@@ -129,27 +129,24 @@ describe("EpisodeCard", () => {
 
   it("exposes data-status='completed' for completed-state styling hooks", () => {
     const { container } = render(
-      <EpisodeCard {...baseProps} status="completed" />
+      <EpisodeCard {...baseProps} status="completed" />,
     );
     expect(container.firstChild).toHaveAttribute("data-status", "completed");
   });
 
   it("exposes data-status for non-completed statuses", () => {
     const { container } = render(
-      <EpisodeCard {...baseProps} status="running" />
+      <EpisodeCard {...baseProps} status="running" />,
     );
     expect(container.firstChild).toHaveAttribute("data-status", "running");
   });
 
   it("wraps podcastTitle in a Link when podcastHref is provided", () => {
     const { container } = render(
-      <EpisodeCard
-        {...baseProps}
-        podcastHref="/podcast/PI-99?from=library"
-      />
+      <EpisodeCard {...baseProps} podcastHref="/podcast/PI-99?from=library" />,
     );
     const link = container.querySelector<HTMLAnchorElement>(
-      'a[href="/podcast/PI-99?from=library"]'
+      'a[href="/podcast/PI-99?from=library"]',
     );
     expect(link).not.toBeNull();
     expect(link?.textContent).toBe("Tech Talk Daily");
@@ -157,16 +154,14 @@ describe("EpisodeCard", () => {
 
   it("renders podcastTitle as plain text when podcastHref is omitted", () => {
     const { container } = render(<EpisodeCard {...baseProps} />);
-    const podcastLink = container.querySelector(
-      'a[href^="/podcast/"]'
-    );
+    const podcastLink = container.querySelector('a[href^="/podcast/"]');
     expect(podcastLink).toBeNull();
     expect(screen.getByText("Tech Talk Daily").tagName).toBe("P");
   });
 
   it("renders artwork image when artwork string is provided", () => {
     const { container } = render(
-      <EpisodeCard {...baseProps} artwork="https://example.com/art.jpg" />
+      <EpisodeCard {...baseProps} artwork="https://example.com/art.jpg" />,
     );
     // Artwork Link is aria-hidden, so role-based queries skip it; query by tag.
     const img = container.querySelector("img");
@@ -193,7 +188,7 @@ describe("EpisodeCard", () => {
 
   it("exposes data-accent='unread' for accent=unread", () => {
     const { container } = render(
-      <EpisodeCard {...baseProps} accent="unread" />
+      <EpisodeCard {...baseProps} accent="unread" />,
     );
     expect(container.firstChild).toHaveAttribute("data-accent", "unread");
   });
@@ -205,7 +200,7 @@ describe("EpisodeCard", () => {
 
   it("sets data-listened attribute from isListened prop", () => {
     const { container } = render(
-      <EpisodeCard {...baseProps} isListened={true} />
+      <EpisodeCard {...baseProps} isListened={true} />,
     );
     const card = container.firstChild as HTMLElement;
     expect(card).toHaveAttribute("data-listened", "true");
@@ -213,10 +208,7 @@ describe("EpisodeCard", () => {
 
   it("renders primaryAction slot", () => {
     render(
-      <EpisodeCard
-        {...baseProps}
-        primaryAction={<button>Listen</button>}
-      />
+      <EpisodeCard {...baseProps} primaryAction={<button>Listen</button>} />,
     );
     expect(screen.getByRole("button", { name: "Listen" })).toBeInTheDocument();
   });
@@ -226,11 +218,9 @@ describe("EpisodeCard", () => {
       <EpisodeCard
         {...baseProps}
         secondaryActions={<button aria-label="Dismiss">X</button>}
-      />
+      />,
     );
-    expect(
-      screen.getByRole("button", { name: "Dismiss" })
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Dismiss" })).toBeInTheDocument();
   });
 
   it("uses href on the title link", () => {
@@ -246,21 +236,23 @@ describe("EpisodeCard", () => {
         {...baseProps}
         href={undefined}
         artwork="https://example.com/art.jpg"
-      />
+      />,
     );
     // With href undefined, both the title Link and ArtworkTile's Link drop out —
     // the card should contain zero anchors. Asserting absence-by-count is
     // stronger than probing for a never-set aria-label.
     expect(container.querySelectorAll("a")).toHaveLength(0);
     const titleNode = screen.getByText(
-      "How AI is Transforming Podcast Discovery"
+      "How AI is Transforming Podcast Discovery",
     );
     expect(titleNode.tagName).toBe("H3");
     expect(titleNode.closest("a")).toBeNull();
   });
 
   it("renders meta nodes", () => {
-    render(<EpisodeCard {...baseProps} meta={[<span key="t">2 hours ago</span>]} />);
+    render(
+      <EpisodeCard {...baseProps} meta={[<span key="t">2 hours ago</span>]} />,
+    );
     expect(screen.getByText("2 hours ago")).toBeInTheDocument();
   });
 
@@ -305,7 +297,7 @@ describe("EpisodeCard", () => {
     const user = userEvent.setup();
     render(<EpisodeCard {...baseProps} onTitleClick={onTitleClick} />);
     await user.click(
-      screen.getByText("How AI is Transforming Podcast Discovery")
+      screen.getByText("How AI is Transforming Podcast Discovery"),
     );
     expect(onTitleClick).toHaveBeenCalledTimes(1);
   });
@@ -318,10 +310,10 @@ describe("EpisodeCard", () => {
         {...baseProps}
         artwork="https://example.com/art.jpg"
         onTitleClick={onTitleClick}
-      />
+      />,
     );
     const artworkLink = container.querySelector<HTMLAnchorElement>(
-      'a[href="/episode/PI-42"][aria-hidden="true"]'
+      'a[href="/episode/PI-42"][aria-hidden="true"]',
     );
     expect(artworkLink).not.toBeNull();
     await user.click(artworkLink!);
@@ -330,10 +322,10 @@ describe("EpisodeCard", () => {
 
   it("marks the artwork link as aria-hidden to avoid duplicate screen-reader announcements", () => {
     const { container } = render(
-      <EpisodeCard {...baseProps} artwork="https://example.com/art.jpg" />
+      <EpisodeCard {...baseProps} artwork="https://example.com/art.jpg" />,
     );
     const artworkLink = container.querySelector<HTMLAnchorElement>(
-      'a[href="/episode/PI-42"][aria-hidden="true"]'
+      'a[href="/episode/PI-42"][aria-hidden="true"]',
     );
     expect(artworkLink).not.toBeNull();
     expect(artworkLink).toHaveAttribute("tabindex", "-1");

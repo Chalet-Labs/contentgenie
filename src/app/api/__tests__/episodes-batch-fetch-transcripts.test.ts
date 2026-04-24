@@ -26,7 +26,11 @@ vi.mock("@/db/schema", () => ({
 }));
 
 vi.mock("drizzle-orm", () => ({
-  inArray: vi.fn((col: unknown, vals: unknown) => ({ type: "inArray", col, vals })),
+  inArray: vi.fn((col: unknown, vals: unknown) => ({
+    type: "inArray",
+    col,
+    vals,
+  })),
 }));
 
 // tasks.batchTrigger returns { batchId, runCount, publicAccessToken } — no .runs array
@@ -75,7 +79,7 @@ function makeRequest(body: unknown) {
     {
       method: "POST",
       body: JSON.stringify(body),
-    }
+    },
   );
 }
 
@@ -95,9 +99,8 @@ describe("POST /api/episodes/batch-fetch-transcripts", () => {
   it("returns 401 when not authenticated", async () => {
     vi.mocked(auth).mockResolvedValue({ userId: null, has: vi.fn() } as never);
 
-    const { POST } = await import(
-      "@/app/api/episodes/batch-fetch-transcripts/route"
-    );
+    const { POST } =
+      await import("@/app/api/episodes/batch-fetch-transcripts/route");
     const response = await POST(makeRequest({ episodeIds: [1, 2] }));
     const data = await response.json();
 
@@ -111,9 +114,8 @@ describe("POST /api/episodes/batch-fetch-transcripts", () => {
       has: vi.fn().mockReturnValue(false),
     } as never);
 
-    const { POST } = await import(
-      "@/app/api/episodes/batch-fetch-transcripts/route"
-    );
+    const { POST } =
+      await import("@/app/api/episodes/batch-fetch-transcripts/route");
     const response = await POST(makeRequest({ episodeIds: [1, 2] }));
     const data = await response.json();
 
@@ -127,9 +129,8 @@ describe("POST /api/episodes/batch-fetch-transcripts", () => {
       has: vi.fn().mockReturnValue(true),
     } as never);
 
-    const { POST } = await import(
-      "@/app/api/episodes/batch-fetch-transcripts/route"
-    );
+    const { POST } =
+      await import("@/app/api/episodes/batch-fetch-transcripts/route");
     const response = await POST(makeRequest({ episodeIds: [] }));
     const data = await response.json();
 
@@ -143,9 +144,8 @@ describe("POST /api/episodes/batch-fetch-transcripts", () => {
       has: vi.fn().mockReturnValue(true),
     } as never);
 
-    const { POST } = await import(
-      "@/app/api/episodes/batch-fetch-transcripts/route"
-    );
+    const { POST } =
+      await import("@/app/api/episodes/batch-fetch-transcripts/route");
     const response = await POST(makeRequest({ episodeIds: 42 }));
     const data = await response.json();
 
@@ -160,9 +160,8 @@ describe("POST /api/episodes/batch-fetch-transcripts", () => {
     } as never);
 
     const ids = Array.from({ length: 21 }, (_, i) => i + 1);
-    const { POST } = await import(
-      "@/app/api/episodes/batch-fetch-transcripts/route"
-    );
+    const { POST } =
+      await import("@/app/api/episodes/batch-fetch-transcripts/route");
     const response = await POST(makeRequest({ episodeIds: ids }));
     const data = await response.json();
 
@@ -176,9 +175,8 @@ describe("POST /api/episodes/batch-fetch-transcripts", () => {
       has: vi.fn().mockReturnValue(true),
     } as never);
 
-    const { POST } = await import(
-      "@/app/api/episodes/batch-fetch-transcripts/route"
-    );
+    const { POST } =
+      await import("@/app/api/episodes/batch-fetch-transcripts/route");
     const response = await POST(makeRequest({ episodeIds: [1, 2.5, 3] }));
     const data = await response.json();
 
@@ -192,9 +190,8 @@ describe("POST /api/episodes/batch-fetch-transcripts", () => {
       has: vi.fn().mockReturnValue(true),
     } as never);
 
-    const { POST } = await import(
-      "@/app/api/episodes/batch-fetch-transcripts/route"
-    );
+    const { POST } =
+      await import("@/app/api/episodes/batch-fetch-transcripts/route");
     const response = await POST(makeRequest({ episodeIds: [1, -2] }));
     const data = await response.json();
 
@@ -210,9 +207,8 @@ describe("POST /api/episodes/batch-fetch-transcripts", () => {
     // Only returns 1 of the 2 requested episodes
     mockEpisodeSelect([makeEpisode(1, "111")]);
 
-    const { POST } = await import(
-      "@/app/api/episodes/batch-fetch-transcripts/route"
-    );
+    const { POST } =
+      await import("@/app/api/episodes/batch-fetch-transcripts/route");
     const response = await POST(makeRequest({ episodeIds: [1, 2] }));
     const data = await response.json();
 
@@ -228,9 +224,8 @@ describe("POST /api/episodes/batch-fetch-transcripts", () => {
     } as never);
     mockEpisodeSelect([makeEpisode(1, "111"), makeEpisode(2, "222")]);
 
-    const { POST } = await import(
-      "@/app/api/episodes/batch-fetch-transcripts/route"
-    );
+    const { POST } =
+      await import("@/app/api/episodes/batch-fetch-transcripts/route");
     const response = await POST(makeRequest({ episodeIds: [1, 2] }));
     const data = await response.json();
 
@@ -247,16 +242,15 @@ describe("POST /api/episodes/batch-fetch-transcripts", () => {
     } as never);
     mockEpisodeSelect([makeEpisode(1, "111"), makeEpisode(2, "222")]);
 
-    const { POST } = await import(
-      "@/app/api/episodes/batch-fetch-transcripts/route"
-    );
+    const { POST } =
+      await import("@/app/api/episodes/batch-fetch-transcripts/route");
     await POST(makeRequest({ episodeIds: [1, 2] }));
 
     const { tasks } = await import("@trigger.dev/sdk");
     expect(tasks.batchTrigger).toHaveBeenCalledTimes(1);
     expect(tasks.batchTrigger).toHaveBeenCalledWith(
       "fetch-transcript",
-      expect.any(Array)
+      expect.any(Array),
     );
   });
 
@@ -268,14 +262,16 @@ describe("POST /api/episodes/batch-fetch-transcripts", () => {
     mockEpisodeSelect([makeEpisode(1, "111"), makeEpisode(2, "222")]);
     const { setMock } = mockUpdateChain();
 
-    const { POST } = await import(
-      "@/app/api/episodes/batch-fetch-transcripts/route"
-    );
+    const { POST } =
+      await import("@/app/api/episodes/batch-fetch-transcripts/route");
     await POST(makeRequest({ episodeIds: [1, 2] }));
 
     expect(db.update).toHaveBeenCalled();
     expect(setMock).toHaveBeenCalledWith(
-      expect.objectContaining({ transcriptStatus: "fetching", transcriptError: null })
+      expect.objectContaining({
+        transcriptStatus: "fetching",
+        transcriptError: null,
+      }),
     );
   });
 
@@ -286,9 +282,8 @@ describe("POST /api/episodes/batch-fetch-transcripts", () => {
     } as never);
     mockEpisodeSelect([makeEpisode(1, "11111"), makeEpisode(2, "22222")]);
 
-    const { POST } = await import(
-      "@/app/api/episodes/batch-fetch-transcripts/route"
-    );
+    const { POST } =
+      await import("@/app/api/episodes/batch-fetch-transcripts/route");
     await POST(makeRequest({ episodeIds: [1, 2] }));
 
     const { tasks } = await import("@trigger.dev/sdk");
@@ -308,9 +303,8 @@ describe("POST /api/episodes/batch-fetch-transcripts", () => {
     } as never);
     mockEpisodeSelect([makeEpisode(1, "111"), makeEpisode(2, "222")]);
 
-    const { POST } = await import(
-      "@/app/api/episodes/batch-fetch-transcripts/route"
-    );
+    const { POST } =
+      await import("@/app/api/episodes/batch-fetch-transcripts/route");
     const response = await POST(makeRequest({ episodeIds: [1, 2] }));
     const data = await response.json();
 
@@ -328,9 +322,8 @@ describe("POST /api/episodes/batch-fetch-transcripts", () => {
     const episodes = ids.map((id) => makeEpisode(id, String(id * 100)));
     mockEpisodeSelect(episodes);
 
-    const { POST } = await import(
-      "@/app/api/episodes/batch-fetch-transcripts/route"
-    );
+    const { POST } =
+      await import("@/app/api/episodes/batch-fetch-transcripts/route");
     const response = await POST(makeRequest({ episodeIds: ids }));
 
     expect(response.status).toBe(202);
@@ -342,12 +335,15 @@ describe("POST /api/episodes/batch-fetch-transcripts", () => {
       has: vi.fn().mockReturnValue(true),
     } as never);
 
-    const { POST } = await import(
-      "@/app/api/episodes/batch-fetch-transcripts/route"
-    );
+    const { POST } =
+      await import("@/app/api/episodes/batch-fetch-transcripts/route");
     const badRequest = new NextRequest(
       "http://localhost:3000/api/episodes/batch-fetch-transcripts",
-      { method: "POST", body: "not json", headers: { "Content-Type": "application/json" } }
+      {
+        method: "POST",
+        body: "not json",
+        headers: { "Content-Type": "application/json" },
+      },
     );
     const response = await POST(badRequest);
 
@@ -363,11 +359,12 @@ describe("POST /api/episodes/batch-fetch-transcripts", () => {
     } as never);
     mockEpisodeSelect([makeEpisode(1, "111"), makeEpisode(2, "222")]);
     const { tasks } = await import("@trigger.dev/sdk");
-    vi.mocked(tasks.batchTrigger).mockRejectedValue(new Error("Trigger.dev down"));
-
-    const { POST } = await import(
-      "@/app/api/episodes/batch-fetch-transcripts/route"
+    vi.mocked(tasks.batchTrigger).mockRejectedValue(
+      new Error("Trigger.dev down"),
     );
+
+    const { POST } =
+      await import("@/app/api/episodes/batch-fetch-transcripts/route");
     const response = await POST(makeRequest({ episodeIds: [1, 2] }));
 
     expect(response.status).toBe(500);

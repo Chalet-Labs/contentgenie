@@ -76,10 +76,13 @@ const handle = await tasks.trigger<typeof processData>("process-data", {
 });
 
 // Batch trigger (up to 1,000 items, 3MB per payload)
-const batchHandle = await tasks.batchTrigger<typeof processData>("process-data", [
-  { payload: { userId: "123", data: [] } },
-  { payload: { userId: "456", data: [] } },
-]);
+const batchHandle = await tasks.batchTrigger<typeof processData>(
+  "process-data",
+  [
+    { payload: { userId: "123", data: [] } },
+    { payload: { userId: "456", data: [] } },
+  ],
+);
 ```
 
 ### From Inside Tasks
@@ -183,7 +186,7 @@ await myTask.trigger(
       delay: "5s",
       mode: "trailing", // Use latest payload (default: "leading")
     },
-  }
+  },
 );
 ```
 
@@ -226,10 +229,9 @@ export const resilientTask = task({
   },
   run: async (payload) => {
     // Retry specific operations
-    const result = await retry.onThrow(
-      async () => unstableApiCall(payload),
-      { maxAttempts: 3 }
-    );
+    const result = await retry.onThrow(async () => unstableApiCall(payload), {
+      maxAttempts: 3,
+    });
 
     // HTTP retries with conditions
     const response = await retry.fetch("https://api.example.com", {
@@ -310,7 +312,7 @@ export const processUser = task({
 // Trigger with tags
 await processUser.trigger(
   { userId: "123" },
-  { tags: ["priority", "user_123"] }
+  { tags: ["priority", "user_123"] },
 );
 ```
 
@@ -325,15 +327,15 @@ export const heavyTask = task({
 });
 ```
 
-| Preset | vCPU | RAM |
-|--------|------|-----|
-| micro | 0.25 | 0.25 GB |
-| small-1x | 0.5 | 0.5 GB (default) |
-| small-2x | 1 | 1 GB |
-| medium-1x | 1 | 2 GB |
-| medium-2x | 2 | 4 GB |
-| large-1x | 4 | 8 GB |
-| large-2x | 8 | 16 GB |
+| Preset    | vCPU | RAM              |
+| --------- | ---- | ---------------- |
+| micro     | 0.25 | 0.25 GB          |
+| small-1x  | 0.5  | 0.5 GB (default) |
+| small-2x  | 1    | 1 GB             |
+| medium-1x | 1    | 2 GB             |
+| medium-2x | 2    | 4 GB             |
+| large-1x  | 4    | 8 GB             |
+| large-2x  | 8    | 16 GB            |
 
 ## Best Practices
 

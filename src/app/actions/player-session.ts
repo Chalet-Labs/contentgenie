@@ -1,17 +1,17 @@
-"use server"
+"use server";
 
-import { eq } from "drizzle-orm"
-import { db } from "@/db"
-import { ensureUserExists } from "@/db/helpers"
-import { userPlayerSession } from "@/db/schema"
-import { withAuthAction } from "@/lib/auth-wrapper"
+import { eq } from "drizzle-orm";
+import { db } from "@/db";
+import { ensureUserExists } from "@/db/helpers";
+import { userPlayerSession } from "@/db/schema";
+import { withAuthAction } from "@/lib/auth-wrapper";
 import {
   savePlayerSessionSchema,
   toAudioEpisode,
   toEpisodeDenormRow,
   type AudioEpisode,
-} from "@/lib/schemas/listening-queue"
-import type { ActionResult } from "@/types/action-result"
+} from "@/lib/schemas/listening-queue";
+import type { ActionResult } from "@/types/action-result";
 
 export async function getPlayerSession(): Promise<
   ActionResult<{ episode: AudioEpisode; currentTime: number } | null>
@@ -20,9 +20,9 @@ export async function getPlayerSession(): Promise<
     try {
       const row = await db.query.userPlayerSession.findFirst({
         where: eq(userPlayerSession.userId, userId),
-      })
+      });
 
-      if (!row) return { success: true as const, data: null }
+      if (!row) return { success: true as const, data: null };
 
       return {
         success: true as const,
@@ -30,12 +30,12 @@ export async function getPlayerSession(): Promise<
           episode: toAudioEpisode(row),
           currentTime: Number(row.currentTime),
         },
-      }
+      };
     } catch (e) {
-      console.error("Failed to get player session:", e)
-      return { success: false as const, error: "Failed to get player session" }
+      console.error("Failed to get player session:", e);
+      return { success: false as const, error: "Failed to get player session" };
     }
-  })
+  });
 }
 
 /**
@@ -50,25 +50,29 @@ export async function getPlayerSession(): Promise<
  */
 export async function savePlayerSession(
   episode: AudioEpisode,
-  currentTime: number
+  currentTime: number,
 ): Promise<ActionResult> {
   return withAuthAction(async (userId) => {
-    const parsed = savePlayerSessionSchema.safeParse({ episode, currentTime })
+    const parsed = savePlayerSessionSchema.safeParse({ episode, currentTime });
     if (!parsed.success) {
-      console.warn("[savePlayerSession] validation failed", parsed.error.issues)
-      return { success: false as const, error: "Invalid session data" }
+      console.warn(
+        "[savePlayerSession] validation failed",
+        parsed.error.issues,
+      );
+      return { success: false as const, error: "Invalid session data" };
     }
 
-    const { episode: validEpisode, currentTime: validCurrentTime } = parsed.data
+    const { episode: validEpisode, currentTime: validCurrentTime } =
+      parsed.data;
 
     try {
-      await ensureUserExists(userId)
+      await ensureUserExists(userId);
 
       const updateValues = {
         ...toEpisodeDenormRow(validEpisode),
         currentTime: String(validCurrentTime),
         updatedAt: new Date(),
-      }
+      };
 
       await db
         .insert(userPlayerSession)
@@ -76,14 +80,17 @@ export async function savePlayerSession(
         .onConflictDoUpdate({
           target: userPlayerSession.userId,
           set: updateValues,
-        })
+        });
 
-      return { success: true as const }
+      return { success: true as const };
     } catch (e) {
-      console.error("Failed to save player session:", e)
-      return { success: false as const, error: "Failed to save player session" }
+      console.error("Failed to save player session:", e);
+      return {
+        success: false as const,
+        error: "Failed to save player session",
+      };
     }
-  })
+  });
 }
 
 export async function clearPlayerSession(): Promise<ActionResult> {
@@ -91,11 +98,14 @@ export async function clearPlayerSession(): Promise<ActionResult> {
     try {
       await db
         .delete(userPlayerSession)
-        .where(eq(userPlayerSession.userId, userId))
-      return { success: true as const }
+        .where(eq(userPlayerSession.userId, userId));
+      return { success: true as const };
     } catch (e) {
-      console.error("Failed to clear player session:", e)
-      return { success: false as const, error: "Failed to clear player session" }
+      console.error("Failed to clear player session:", e);
+      return {
+        success: false as const,
+        error: "Failed to clear player session",
+      };
     }
-  })
+  });
 }

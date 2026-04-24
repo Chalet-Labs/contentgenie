@@ -79,7 +79,7 @@ describe("PublicEpisodeDetail", () => {
         }
 
         return Promise.reject(new Error(`Unexpected fetch call: ${input}`));
-      })
+      }),
     );
   });
 
@@ -93,24 +93,22 @@ describe("PublicEpisodeDetail", () => {
     await screen.findByRole("heading", { name: "Public Episode" });
 
     expect(
-      screen.getByText(/sign up to save episodes and discover more/i)
+      screen.getByText(/sign up to save episodes and discover more/i),
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole("link", { name: /sign up/i })
-    ).toHaveAttribute(
+    expect(screen.getByRole("link", { name: /sign up/i })).toHaveAttribute(
       "href",
-      "/sign-up?redirect_url=%2Fepisode%2F123"
+      "/sign-up?redirect_url=%2Fepisode%2F123",
     );
 
     expect(
-      screen.getByRole("link", { name: "Public Podcast" })
+      screen.getByRole("link", { name: "Public Podcast" }),
     ).toHaveAttribute("href", "/sign-up?redirect_url=%2Fpodcast%2F456");
 
     const audio = container.querySelector("audio");
     expect(audio).not.toBeNull();
     expect(audio).toHaveAttribute(
       "src",
-      "https://example.com/public-episode.mp3"
+      "https://example.com/public-episode.mp3",
     );
 
     await waitFor(() => {
@@ -120,7 +118,7 @@ describe("PublicEpisodeDetail", () => {
 
     expect(fetch).toHaveBeenCalledWith("/api/episodes/123");
     expect(fetch).not.toHaveBeenCalledWith(
-      expect.stringContaining("/api/episodes/summarize")
+      expect.stringContaining("/api/episodes/summarize"),
     );
   });
 
@@ -151,18 +149,14 @@ describe("PublicEpisodeDetail", () => {
           transcriptStatus: null,
           episodeDbId: null,
         }),
-      })
+      }),
     );
 
     render(<PublicEpisodeDetail episodeId="123" />);
 
     await screen.findByRole("heading", { name: "Public Episode" });
-    expect(
-      screen.getByText(/summary not yet available/i)
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText(/sign up to request one/i)
-    ).toBeInTheDocument();
+    expect(screen.getByText(/summary not yet available/i)).toBeInTheDocument();
+    expect(screen.getByText(/sign up to request one/i)).toBeInTheDocument();
   });
 
   it("ignores stale fetch responses after episodeId changes", async () => {
@@ -213,7 +207,7 @@ describe("PublicEpisodeDetail", () => {
         }
 
         return Promise.reject(new Error(`Unexpected fetch call: ${input}`));
-      })
+      }),
     );
 
     const { rerender } = render(<PublicEpisodeDetail episodeId="123" />);
@@ -251,12 +245,12 @@ describe("PublicEpisodeDetail", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByRole("heading", { name: "Second Episode" })
+        screen.getByRole("heading", { name: "Second Episode" }),
       ).toBeInTheDocument();
     });
 
     expect(
-      screen.queryByRole("heading", { name: "First Episode" })
+      screen.queryByRole("heading", { name: "First Episode" }),
     ).not.toBeInTheDocument();
   });
 });

@@ -34,17 +34,24 @@ export async function POST(request: NextRequest) {
 
     if (!hasFilter && all !== true) {
       return NextResponse.json(
-        { error: "At least one filter is required, or set all: true to re-summarize all episodes" },
-        { status: 400 }
+        {
+          error:
+            "At least one filter is required, or set all: true to re-summarize all episodes",
+        },
+        { status: 400 },
       );
     }
 
     // Validate individual filter values
     if (podcastId !== undefined) {
-      if (typeof podcastId !== "number" || !Number.isInteger(podcastId) || podcastId <= 0) {
+      if (
+        typeof podcastId !== "number" ||
+        !Number.isInteger(podcastId) ||
+        podcastId <= 0
+      ) {
         return NextResponse.json(
           { error: "podcastId must be a positive integer" },
-          { status: 400 }
+          { status: 400 },
         );
       }
     }
@@ -53,7 +60,7 @@ export async function POST(request: NextRequest) {
       if (typeof minDate !== "string" || isNaN(Date.parse(minDate))) {
         return NextResponse.json(
           { error: "minDate must be a valid ISO date string" },
-          { status: 400 }
+          { status: 400 },
         );
       }
     }
@@ -62,16 +69,21 @@ export async function POST(request: NextRequest) {
       if (typeof maxDate !== "string" || isNaN(Date.parse(maxDate))) {
         return NextResponse.json(
           { error: "maxDate must be a valid ISO date string" },
-          { status: 400 }
+          { status: 400 },
         );
       }
     }
 
     if (maxScore !== undefined) {
-      if (typeof maxScore !== "number" || !Number.isFinite(maxScore) || maxScore < 0 || maxScore > 10) {
+      if (
+        typeof maxScore !== "number" ||
+        !Number.isFinite(maxScore) ||
+        maxScore < 0 ||
+        maxScore > 10
+      ) {
         return NextResponse.json(
           { error: "maxScore must be a number between 0 and 10" },
-          { status: 400 }
+          { status: 400 },
         );
       }
     }
@@ -81,13 +93,16 @@ export async function POST(request: NextRequest) {
       const subscription = await db.query.userSubscriptions.findFirst({
         where: and(
           eq(userSubscriptions.userId, userId),
-          eq(userSubscriptions.podcastId, podcastId)
+          eq(userSubscriptions.podcastId, podcastId),
         ),
       });
       if (!subscription) {
         return NextResponse.json(
-          { error: "You must be subscribed to this podcast to re-summarize its episodes" },
-          { status: 403 }
+          {
+            error:
+              "You must be subscribed to this podcast to re-summarize its episodes",
+          },
+          { status: 403 },
         );
       }
     }
@@ -98,14 +113,22 @@ export async function POST(request: NextRequest) {
       const rateLimit = await checkBulkRateLimit(userId);
       if (!rateLimit.allowed) {
         return NextResponse.json(
-          { error: "Rate limit exceeded. Only 1 bulk re-summarization per hour." },
-          { status: 429 }
+          {
+            error:
+              "Rate limit exceeded. Only 1 bulk re-summarization per hour.",
+          },
+          { status: 429 },
         );
       }
     }
 
     // Count matching episodes for estimate
-    const conditions = buildResummarizeConditions({ podcastId, minDate, maxDate, maxScore });
+    const conditions = buildResummarizeConditions({
+      podcastId,
+      minDate,
+      maxDate,
+      maxScore,
+    });
 
     const [countResult] = await db
       .select({ count: count() })
@@ -118,12 +141,15 @@ export async function POST(request: NextRequest) {
     const handle = await tasks.trigger<typeof bulkResummarize>(
       "bulk-resummarize",
       { podcastId, minDate, maxDate, maxScore, all },
-      { tags: [`user:${userId}`] }
+      { tags: [`user:${userId}`] },
     );
 
     // Dynamic token expiry: scale with expected processing time
     // 3 concurrent * ~2 min each = ~2/3 min per episode
-    const expiryMinutes = Math.min(60, Math.max(15, Math.ceil((estimatedEpisodes * 2) / 3)));
+    const expiryMinutes = Math.min(
+      60,
+      Math.max(15, Math.ceil((estimatedEpisodes * 2) / 3)),
+    );
     const publicAccessToken = await auth.createPublicToken({
       scopes: {
         read: {
@@ -139,7 +165,7 @@ export async function POST(request: NextRequest) {
         publicAccessToken,
         estimatedEpisodes,
       },
-      { status: 202 }
+      { status: 202 },
     );
   } catch (error) {
     console.error("Error triggering bulk re-summarization:", error);
@@ -148,7 +174,7 @@ export async function POST(request: NextRequest) {
         error: "Failed to trigger bulk re-summarization",
         details: error instanceof Error ? error.message : "Unknown error",
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -164,10 +190,7 @@ export async function DELETE(request: NextRequest) {
     const { runId } = body;
 
     if (!runId || typeof runId !== "string") {
-      return NextResponse.json(
-        { error: "runId is required" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "runId is required" }, { status: 400 });
     }
 
     // Verify the authenticated user owns this run
@@ -175,7 +198,7 @@ export async function DELETE(request: NextRequest) {
     if (!run.tags?.includes(`user:${userId}`)) {
       return NextResponse.json(
         { error: "Forbidden: cannot cancel another user's run" },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
@@ -189,7 +212,7 @@ export async function DELETE(request: NextRequest) {
         error: "Failed to cancel bulk re-summarization",
         details: error instanceof Error ? error.message : "Unknown error",
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

@@ -114,7 +114,9 @@ describe("isSafeUrl", () => {
 
   it("blocks private IPs", async () => {
     expect(await isSafeUrl("http://127.0.0.1/feed.xml")).toBe(false);
-    expect(await isSafeUrl("http://169.254.169.254/latest/meta-data/")).toBe(false);
+    expect(await isSafeUrl("http://169.254.169.254/latest/meta-data/")).toBe(
+      false,
+    );
     expect(await isSafeUrl("http://[::1]/feed.xml")).toBe(false);
   });
 
@@ -151,7 +153,9 @@ describe("isSafeUrl", () => {
         (callback as Function)(new Error("ENOTFOUND"));
       },
     );
-    expect(await isSafeUrl("https://nonexistent.example.com/feed.xml")).toBe(false);
+    expect(await isSafeUrl("https://nonexistent.example.com/feed.xml")).toBe(
+      false,
+    );
   });
 });
 
@@ -193,9 +197,9 @@ describe("safeFetch", () => {
   });
 
   it("still rejects unsafe URLs before fetching", async () => {
-    await expect(
-      safeFetch("http://127.0.0.1/feed.xml"),
-    ).rejects.toThrow(/Unsafe URL/);
+    await expect(safeFetch("http://127.0.0.1/feed.xml")).rejects.toThrow(
+      /Unsafe URL/,
+    );
 
     // fetch should not have been called
     expect(fetchSpy).not.toHaveBeenCalled();
@@ -251,10 +255,14 @@ describe("safeFetch DNS rebinding protection", () => {
         callCount++;
         if (callCount === 1) {
           // isSafeUrl pre-check: returns public IP — passes validation
-          (callback as Function)(null, [{ address: "93.184.216.34", family: 4 }]);
+          (callback as Function)(null, [
+            { address: "93.184.216.34", family: 4 },
+          ]);
         } else {
           // pinnedLookup at connection time: DNS has rebinding to private IP
-          (callback as Function)(null, [{ address: "169.254.169.254", family: 4 }]);
+          (callback as Function)(null, [
+            { address: "169.254.169.254", family: 4 },
+          ]);
         }
       },
     );
@@ -287,7 +295,9 @@ describe("safeFetch DNS rebinding protection", () => {
         callCount++;
         if (callCount <= 3) {
           // First 3 calls: all safe (isSafeUrl + fetch for first URL, isSafeUrl for redirect)
-          (callback as Function)(null, [{ address: "93.184.216.34", family: 4 }]);
+          (callback as Function)(null, [
+            { address: "93.184.216.34", family: 4 },
+          ]);
         } else {
           // 4th call: pinnedLookup for redirect target rebinds to private IP
           (callback as Function)(null, [{ address: "10.0.0.1", family: 4 }]);
@@ -295,9 +305,9 @@ describe("safeFetch DNS rebinding protection", () => {
       },
     );
 
-    await expect(
-      safeFetch("https://safe-origin.com/feed.xml"),
-    ).rejects.toThrow(/private IP|10\.0\.0\.1/);
+    await expect(safeFetch("https://safe-origin.com/feed.xml")).rejects.toThrow(
+      /private IP|10\.0\.0\.1/,
+    );
   });
 
   it("passes dnsPinningAgent as dispatcher on every redirect hop", async () => {

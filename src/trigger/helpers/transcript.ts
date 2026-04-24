@@ -21,10 +21,13 @@ export function stripVttTimestamps(raw: string): string {
   text = text.replace(/^WEBVTT[^\n]*\n([^\n]+\n)*\n/m, "");
   text = text.replace(/^(?:NOTE|STYLE|REGION)[^\n]*(?:\n[^\n]+)*/gm, "");
   // Cue IDs must be removed before timing lines — the lookahead needs the timing line present
-  text = text.replace(/^\d+\s*$(?=\n(?:\d{2}:)?\d{2}:\d{2}\.\d{3}\s+-->)/gm, "");
+  text = text.replace(
+    /^\d+\s*$(?=\n(?:\d{2}:)?\d{2}:\d{2}\.\d{3}\s+-->)/gm,
+    "",
+  );
   text = text.replace(
     /^(?:\d{2}:)?\d{2}:\d{2}\.\d{3}\s+-->\s+(?:\d{2}:)?\d{2}:\d{2}\.\d{3}[^\n]*$/gm,
-    ""
+    "",
   );
 
   // Timestamp tags must be removed before named tags to avoid partial matches
@@ -50,7 +53,10 @@ export function stripHtmlTranscript(raw: string): string {
   text = text.replace(/<[^>]+>/g, " ");
   text = he.decode(text);
   text = text.replace(/<[^>]+>/g, " ");
-  text = text.replace(/[ \t]+/g, " ").replace(/\n{3,}/g, "\n\n").trim();
+  text = text
+    .replace(/[ \t]+/g, " ")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 
   return text;
 }
@@ -73,16 +79,16 @@ export function normalizeTranscriptContent(raw: string, type: string): string {
 }
 
 export async function fetchTranscript(
-  episode: Pick<PodcastIndexEpisode, "transcripts">
+  episode: Pick<PodcastIndexEpisode, "transcripts">,
 ): Promise<string | undefined> {
   if (!episode.transcripts || episode.transcripts.length === 0) {
     return undefined;
   }
 
   // Priority: least processing needed → most processing needed
-  const transcriptEntry = SUPPORTED_TRANSCRIPT_TYPES
-    .map((type) => episode.transcripts.find((t) => t.type === type && t.url))
-    .find((entry) => entry != null);
+  const transcriptEntry = SUPPORTED_TRANSCRIPT_TYPES.map((type) =>
+    episode.transcripts.find((t) => t.type === type && t.url),
+  ).find((entry) => entry != null);
 
   if (!transcriptEntry?.url) {
     return undefined;
@@ -93,7 +99,9 @@ export async function fetchTranscript(
 
   let transcript: string;
   try {
-    transcript = await safeFetch(transcriptEntry.url, { signal: controller.signal });
+    transcript = await safeFetch(transcriptEntry.url, {
+      signal: controller.signal,
+    });
   } finally {
     clearTimeout(timeout);
   }
@@ -113,7 +121,8 @@ export async function fetchTranscript(
   }
   if (transcript.length > MAX_TRANSCRIPT_LENGTH) {
     transcript =
-      transcript.slice(0, MAX_TRANSCRIPT_LENGTH) + "\n\n[Transcript truncated...]";
+      transcript.slice(0, MAX_TRANSCRIPT_LENGTH) +
+      "\n\n[Transcript truncated...]";
   }
 
   return transcript;
@@ -129,7 +138,7 @@ export function extractTranscriptUrl(description: string): string | null {
   // Extract URLs from anchor tags where the link text mentions "transcript" — must run
   // before HTML stripping, which would otherwise destroy the href attribute value.
   const anchorMatch = description.match(
-    /<a\s[^>]*href=["']?(https?:\/\/[^"'\s>]+)["']?[^>]*>[^<]*transcripts?[^<]*<\/a>/i
+    /<a\s[^>]*href=["']?(https?:\/\/[^"'\s>]+)["']?[^>]*>[^<]*transcripts?[^<]*<\/a>/i,
   );
   if (anchorMatch?.[1]) {
     return anchorMatch[1].replace(/[).,;:]+$/, "");
@@ -139,7 +148,7 @@ export function extractTranscriptUrl(description: string): string | null {
   const decoded = he.decode(text);
 
   const match = decoded.match(
-    /(?:full\s+)?transcripts?(?:\s+available)?[\s:]+\n?\s*(https?:\/\/\S+)/i
+    /(?:full\s+)?transcripts?(?:\s+available)?[\s:]+\n?\s*(https?:\/\/\S+)/i,
   );
 
   if (!match?.[1]) return null;
@@ -151,7 +160,7 @@ export function extractTranscriptUrl(description: string): string | null {
  * Returns undefined on any error (non-fatal fallback).
  */
 export async function fetchTranscriptFromUrl(
-  url: string
+  url: string,
 ): Promise<string | undefined> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
@@ -167,7 +176,8 @@ export async function fetchTranscriptFromUrl(
 
     if (content.length > MAX_TRANSCRIPT_LENGTH) {
       content =
-        content.slice(0, MAX_TRANSCRIPT_LENGTH) + "\n\n[Transcript truncated...]";
+        content.slice(0, MAX_TRANSCRIPT_LENGTH) +
+        "\n\n[Transcript truncated...]";
     }
 
     return content;

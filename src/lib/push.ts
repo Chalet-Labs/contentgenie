@@ -40,9 +40,7 @@ function redactEndpoint(endpoint: string): string {
     const pathParts = url.pathname.split("/");
     const token = pathParts[pathParts.length - 1];
     const short =
-      token.length > 12
-        ? `${token.slice(0, 6)}…${token.slice(-4)}`
-        : token;
+      token.length > 12 ? `${token.slice(0, 6)}…${token.slice(-4)}` : token;
     return `${url.origin}/…/${short}`;
   } catch {
     return endpoint.length > 20
@@ -65,7 +63,7 @@ function ensureVapidConfigured(): void {
   const subject = process.env.VAPID_SUBJECT;
   if (!publicKey || !privateKey || !subject) {
     throw new Error(
-      "VAPID keys not configured. Set NEXT_PUBLIC_VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, and VAPID_SUBJECT."
+      "VAPID keys not configured. Set NEXT_PUBLIC_VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, and VAPID_SUBJECT.",
     );
   }
   webpush.setVapidDetails(subject, publicKey, privateKey);
@@ -85,7 +83,7 @@ export async function sendPushToUser(
     tag?: string;
     data?: { url?: string };
   },
-  logger: PushLogger = consolePushLogger
+  logger: PushLogger = consolePushLogger,
 ): Promise<PushResult> {
   try {
     ensureVapidConfigured();
@@ -126,7 +124,7 @@ export async function sendPushToUser(
           {
             TTL: 86400,
             ...(topic ? { topic } : {}),
-          }
+          },
         );
       } catch (err: unknown) {
         const statusCode =
@@ -141,8 +139,8 @@ export async function sendPushToUser(
               .where(
                 and(
                   eq(pushSubscriptions.userId, userId),
-                  eq(pushSubscriptions.endpoint, sub.endpoint)
-                )
+                  eq(pushSubscriptions.endpoint, sub.endpoint),
+                ),
               );
           } catch (deleteErr) {
             logger.error("Failed to delete stale push subscription", {
@@ -162,7 +160,7 @@ export async function sendPushToUser(
         }
         throw err;
       }
-    })
+    }),
   );
 
   let sent = 0;

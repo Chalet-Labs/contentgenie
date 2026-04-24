@@ -1,33 +1,36 @@
-"use client"
+"use client";
 
-import { useCallback, useRef } from "react"
-import { Volume2, VolumeX } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Slider } from "@/components/ui/slider"
-import { useAudioPlayerState, useAudioPlayerAPI } from "@/contexts/audio-player-context"
+import { useCallback, useRef } from "react";
+import { Volume2, VolumeX } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Slider } from "@/components/ui/slider";
+import {
+  useAudioPlayerState,
+  useAudioPlayerAPI,
+} from "@/contexts/audio-player-context";
 
 export function VolumeControl() {
-  const { volume } = useAudioPlayerState()
-  const { setVolume } = useAudioPlayerAPI()
-  const previousVolumeRef = useRef(1)
+  const { volume } = useAudioPlayerState();
+  const { setVolume } = useAudioPlayerAPI();
+  const previousVolumeRef = useRef(1);
 
   const handleVolumeChange = useCallback(
     (value: number[]) => {
-      setVolume(value[0])
+      setVolume(value[0]);
     },
-    [setVolume]
-  )
+    [setVolume],
+  );
 
   const toggleMute = useCallback(() => {
     if (volume > 0) {
-      previousVolumeRef.current = volume
-      setVolume(0)
+      previousVolumeRef.current = volume;
+      setVolume(0);
     } else {
-      setVolume(previousVolumeRef.current || 1)
+      setVolume(previousVolumeRef.current || 1);
     }
-  }, [volume, setVolume])
+  }, [volume, setVolume]);
 
-  const isMuted = volume === 0
+  const isMuted = volume === 0;
 
   return (
     <div className="hidden items-center gap-2 md:flex">
@@ -54,5 +57,5 @@ export function VolumeControl() {
         className="w-24"
       />
     </div>
-  )
+  );
 }

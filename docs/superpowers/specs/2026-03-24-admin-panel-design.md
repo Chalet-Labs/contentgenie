@@ -27,6 +27,7 @@ Routes live inside the `(app)` route group to inherit the existing `AppShell` (s
 ## Settings Page Cleanup
 
 Remove from `/settings/page.tsx`:
+
 - `AiProviderCard` (moves to admin settings)
 - `MissingTranscriptsCard` (replaced by admin episodes table)
 - `BulkResummarizeCard` (moves to admin-only). **Deliberate decision**: Regular users lose access to bulk re-summarization. Rationale: re-summarization is an expensive AI operation that should be controlled by admins. Individual episode re-summarization (via the episode page) remains available to all users as before.
@@ -39,15 +40,15 @@ Server component with aggregation queries against Neon. Each stat section wrappe
 
 ### Stats Grid
 
-| Stat | Query Approach |
-|------|---------------|
-| Total podcasts | `COUNT(*)` on podcasts |
-| Total episodes | `COUNT(*)` on episodes |
-| Transcript coverage % | `COUNT(transcriptStatus = 'available') / COUNT(*)` |
-| Summary coverage % | `COUNT(summaryStatus = 'completed' AND processedAt IS NOT NULL) / COUNT(*)` |
-| Episodes processed today | `COUNT(processedAt >= today)` |
-| Queue depth | `COUNT(summaryStatus IN ('queued', 'running', 'summarizing'))` |
-| Active jobs | Queue depth + `COUNT(transcriptStatus = 'fetching')` |
+| Stat                     | Query Approach                                                              |
+| ------------------------ | --------------------------------------------------------------------------- |
+| Total podcasts           | `COUNT(*)` on podcasts                                                      |
+| Total episodes           | `COUNT(*)` on episodes                                                      |
+| Transcript coverage %    | `COUNT(transcriptStatus = 'available') / COUNT(*)`                          |
+| Summary coverage %       | `COUNT(summaryStatus = 'completed' AND processedAt IS NOT NULL) / COUNT(*)` |
+| Episodes processed today | `COUNT(processedAt >= today)`                                               |
+| Queue depth              | `COUNT(summaryStatus IN ('queued', 'running', 'summarizing'))`              |
+| Active jobs              | Queue depth + `COUNT(transcriptStatus = 'fetching')`                        |
 
 ### Breakdown Cards
 
@@ -63,6 +64,7 @@ All queries are simple aggregations — single DB round-trip with a few `COUNT`/
 ### AI Config Card
 
 Migrated from existing `AiProviderCard` — no functional changes:
+
 - Provider select: `openrouter` | `zai`
 - Model text input (free-text)
 - Save button → calls existing `updateAiConfig` server action
@@ -72,17 +74,20 @@ Migrated from existing `AiProviderCard` — no functional changes:
 `"use client"` component with three areas:
 
 **Editor area:**
+
 - Large `<textarea>` with the current system prompt template.
 - Supports placeholder variables: `{{title}}`, `{{transcript}}`, `{{podcastName}}`, `{{description}}`, etc.
 - Reference list of available placeholders shown below the textarea.
 
 **Preview/test area:**
+
 - Episode picker: server-side search combobox with debounced autocomplete. Fetches a limited result set (max 20) matching the search query from episodes with `transcriptStatus = 'available'`. Shows podcast name + episode title. Does not load all episodes into the client.
 - "Test Prompt" button: Takes the current textarea content (unsaved), interpolates the selected episode's data, sends to the AI model (using currently configured provider/model), and streams the response back.
 - Result display: Scrollable area showing the streamed AI response. Dry run only — nothing saved to the episode record.
 - Loading/error states: Spinner during generation, error display on failure.
 
 **Actions:**
+
 - Save button: Persists prompt template to DB. Disabled while a test is running.
 - Reset to default button: Restores the hardcoded prompt from code (with confirmation dialog).
 
@@ -111,17 +116,17 @@ Server component with URL-driven filters via `searchParams`.
 
 ### Table Columns
 
-| Column | Source | Notes |
-|--------|--------|-------|
-| Checkbox | — | Multi-select for batch actions |
-| Podcast | `podcasts.title` (join) | Small artwork thumbnail + name |
-| Episode | `episodes.title` | Truncated, links to `/episode/[id]` |
-| Published | `episodes.datePublished` | Relative date (e.g. "3 days ago") |
-| Transcript | `episodes.transcriptStatus` | Badge: available (green), fetching (yellow), missing (gray), failed (red) |
-| Source | `episodes.transcriptSource` | Only shown when transcript available; dash otherwise |
-| Summary | `episodes.summaryStatus` | Badge: completed (green), running/summarizing (yellow), queued (blue), failed (red), none (gray) |
-| Score | `episodes.worthItScore` | Numeric 0–10, blank if not scored |
-| Actions | — | Direct buttons (not dropdown) |
+| Column     | Source                      | Notes                                                                                            |
+| ---------- | --------------------------- | ------------------------------------------------------------------------------------------------ |
+| Checkbox   | —                           | Multi-select for batch actions                                                                   |
+| Podcast    | `podcasts.title` (join)     | Small artwork thumbnail + name                                                                   |
+| Episode    | `episodes.title`            | Truncated, links to `/episode/[id]`                                                              |
+| Published  | `episodes.datePublished`    | Relative date (e.g. "3 days ago")                                                                |
+| Transcript | `episodes.transcriptStatus` | Badge: available (green), fetching (yellow), missing (gray), failed (red)                        |
+| Source     | `episodes.transcriptSource` | Only shown when transcript available; dash otherwise                                             |
+| Summary    | `episodes.summaryStatus`    | Badge: completed (green), running/summarizing (yellow), queued (blue), failed (red), none (gray) |
+| Score      | `episodes.worthItScore`     | Numeric 0–10, blank if not scored                                                                |
+| Actions    | —                           | Direct buttons (not dropdown)                                                                    |
 
 ### Filters (URL `searchParams`-driven, server-side)
 
@@ -154,15 +159,15 @@ Action buttons are small client islands. After triggering an action, they optimi
 
 ## New API Routes Summary
 
-| Route | Method | Purpose |
-|-------|--------|---------|
-| `POST /api/admin/test-prompt` | POST | Dry-run prompt template against an episode, stream AI response |
-| `POST /api/admin/batch-resummarize` | POST | Bulk re-summarize selected episodes by ID (admin-only, no rate limit). Input: `{ episodeIds: number[] }` |
+| Route                               | Method | Purpose                                                                                                  |
+| ----------------------------------- | ------ | -------------------------------------------------------------------------------------------------------- |
+| `POST /api/admin/test-prompt`       | POST   | Dry-run prompt template against an episode, stream AI response                                           |
+| `POST /api/admin/batch-resummarize` | POST   | Bulk re-summarize selected episodes by ID (admin-only, no rate limit). Input: `{ episodeIds: number[] }` |
 
 ## DB Schema Changes
 
-| Table | Column | Type | Notes |
-|-------|--------|------|-------|
+| Table      | Column                | Type           | Notes                          |
+| ---------- | --------------------- | -------------- | ------------------------------ |
 | `aiConfig` | `summarizationPrompt` | text, nullable | `null` = use hardcoded default |
 
 ### Migration

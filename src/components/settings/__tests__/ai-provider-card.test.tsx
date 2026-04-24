@@ -78,8 +78,8 @@ describe("AiProviderCard", () => {
     expect(screen.getByText("AI Provider")).toBeInTheDocument();
     expect(
       screen.getByText(
-        "Configure the AI provider and model used for episode summarization."
-      )
+        "Configure the AI provider and model used for episode summarization.",
+      ),
     ).toBeInTheDocument();
 
     await waitFor(() => {
@@ -118,10 +118,10 @@ describe("AiProviderCard", () => {
     await waitFor(() => {
       expect(mockUpdateAiConfig).toHaveBeenCalledWith(
         "openrouter",
-        "google/gemini-2.0-flash-001"
+        "google/gemini-2.0-flash-001",
       );
       expect(toast.success).toHaveBeenCalledWith(
-        "AI provider configuration saved"
+        "AI provider configuration saved",
       );
     });
   });

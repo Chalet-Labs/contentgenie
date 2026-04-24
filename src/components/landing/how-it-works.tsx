@@ -41,7 +41,9 @@ export function HowItWorks() {
               <span className="lp-step-n">{s.n}</span>
               <h4>{s.title}</h4>
               <p>{s.desc}</p>
-              <span className="lp-tick"><span className="lp-b" /> {s.tick}</span>
+              <span className="lp-tick">
+                <span className="lp-b" /> {s.tick}
+              </span>
             </div>
           ))}
         </div>

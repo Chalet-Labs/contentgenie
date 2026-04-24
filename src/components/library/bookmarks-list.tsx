@@ -93,7 +93,7 @@ const bookmarkSchema = z.object({
     .min(1, "Timestamp is required")
     .refine(
       (val) => parseTimestamp(val) !== null,
-      "Invalid format. Use MM:SS or HH:MM:SS"
+      "Invalid format. Use MM:SS or HH:MM:SS",
     ),
   note: z.string().max(MAX_SHORT_TEXT).optional(),
 });
@@ -145,7 +145,9 @@ export function BookmarksList({
     const timestamp = parseTimestamp(values.timestamp)!;
 
     if (episodeDuration && timestamp > episodeDuration) {
-      form.setError("timestamp", { message: "Timestamp exceeds episode duration" });
+      form.setError("timestamp", {
+        message: "Timestamp exceeds episode duration",
+      });
       return;
     }
 
@@ -165,7 +167,9 @@ export function BookmarksList({
         description: `Bookmark at ${formatTimestamp(timestamp)} created`,
       });
     } else {
-      form.setError("root", { message: result.error || "Failed to add bookmark" });
+      form.setError("root", {
+        message: result.error || "Failed to add bookmark",
+      });
     }
   };
 
@@ -225,10 +229,13 @@ export function BookmarksList({
           <Bookmark className="h-4 w-4" />
           Bookmarks
         </span>
-        <Dialog open={isDialogOpen} onOpenChange={(nextOpen) => {
+        <Dialog
+          open={isDialogOpen}
+          onOpenChange={(nextOpen) => {
             if (form.formState.isSubmitting) return;
             setIsDialogOpen(nextOpen);
-          }}>
+          }}
+        >
           <DialogTrigger asChild>
             <Button variant="outline" size="sm">
               <Plus className="mr-1 h-3 w-3" />
@@ -333,13 +340,13 @@ export function BookmarksList({
                   type="button"
                   onClick={() => handleSeekToBookmark(bookmark.timestamp)}
                   aria-label={`Seek to ${formatTimestamp(bookmark.timestamp)}`}
-                  className="flex shrink-0 items-center gap-1 rounded bg-muted px-2 py-1 text-sm font-mono hover:bg-primary/20 transition-colors cursor-pointer"
+                  className="flex shrink-0 cursor-pointer items-center gap-1 rounded bg-muted px-2 py-1 font-mono text-sm transition-colors hover:bg-primary/20"
                 >
                   <Clock className="h-3 w-3" />
                   {formatTimestamp(bookmark.timestamp)}
                 </button>
               ) : (
-                <div className="flex shrink-0 items-center gap-1 rounded bg-muted px-2 py-1 text-sm font-mono">
+                <div className="flex shrink-0 items-center gap-1 rounded bg-muted px-2 py-1 font-mono text-sm">
                   <Clock className="h-3 w-3" />
                   {formatTimestamp(bookmark.timestamp)}
                 </div>
@@ -348,7 +355,7 @@ export function BookmarksList({
                 {bookmark.note ? (
                   <p className="text-sm">{bookmark.note}</p>
                 ) : (
-                  <p className="text-sm text-muted-foreground italic">
+                  <p className="text-sm italic text-muted-foreground">
                     No note
                   </p>
                 )}

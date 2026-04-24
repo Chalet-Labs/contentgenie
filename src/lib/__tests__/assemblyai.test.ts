@@ -21,7 +21,7 @@ describe("submitTranscription", () => {
   it("throws when API key is missing", async () => {
     vi.stubEnv("ASSEMBLYAI_API_KEY", "");
     await expect(
-      submitTranscription("https://example.com/audio.mp3")
+      submitTranscription("https://example.com/audio.mp3"),
     ).rejects.toThrow("AssemblyAI API key is not configured");
   });
 
@@ -54,11 +54,11 @@ describe("submitTranscription", () => {
         ok: false,
         status: 401,
         text: () => Promise.resolve("Unauthorized"),
-      })
+      }),
     );
 
     await expect(
-      submitTranscription("https://example.com/audio.mp3")
+      submitTranscription("https://example.com/audio.mp3"),
     ).rejects.toThrow("AssemblyAI API error: 401 - Unauthorized");
   });
 
@@ -69,13 +69,13 @@ describe("submitTranscription", () => {
       vi.fn().mockResolvedValue({
         ok: true,
         json: () => Promise.resolve({ status: "queued" }),
-      })
+      }),
     );
 
     await expect(
-      submitTranscription("https://example.com/audio.mp3")
+      submitTranscription("https://example.com/audio.mp3"),
     ).rejects.toThrow(
-      "AssemblyAI API error: submit response did not include a transcript ID"
+      "AssemblyAI API error: submit response did not include a transcript ID",
     );
   });
 });
@@ -96,13 +96,14 @@ describe("submitTranscriptionAsync", () => {
     vi.stubEnv("ASSEMBLYAI_API_KEY", "test-api-key");
     const mockFetch = vi.fn().mockResolvedValue({
       ok: true,
-      json: () => Promise.resolve({ id: "transcript-async-123", status: "queued" }),
+      json: () =>
+        Promise.resolve({ id: "transcript-async-123", status: "queued" }),
     });
     vi.stubGlobal("fetch", mockFetch);
 
     const result = await submitTranscriptionAsync(
       "https://example.com/audio.mp3",
-      "https://hooks.trigger.dev/token/abc"
+      "https://hooks.trigger.dev/token/abc",
     );
 
     expect(result).toBe("transcript-async-123");
@@ -123,14 +124,14 @@ describe("submitTranscriptionAsync", () => {
         ok: false,
         status: 500,
         text: () => Promise.resolve("Internal Server Error"),
-      })
+      }),
     );
 
     await expect(
       submitTranscriptionAsync(
         "https://example.com/audio.mp3",
-        "https://hooks.trigger.dev/token/abc"
-      )
+        "https://hooks.trigger.dev/token/abc",
+      ),
     ).rejects.toThrow("AssemblyAI API error: 500 - Internal Server Error");
   });
 
@@ -141,16 +142,16 @@ describe("submitTranscriptionAsync", () => {
       vi.fn().mockResolvedValue({
         ok: true,
         json: () => Promise.resolve({ status: "queued" }),
-      })
+      }),
     );
 
     await expect(
       submitTranscriptionAsync(
         "https://example.com/audio.mp3",
-        "https://hooks.trigger.dev/token/abc"
-      )
+        "https://hooks.trigger.dev/token/abc",
+      ),
     ).rejects.toThrow(
-      "AssemblyAI API error: submit response did not include a transcript ID"
+      "AssemblyAI API error: submit response did not include a transcript ID",
     );
   });
 });
@@ -180,7 +181,7 @@ describe("getTranscriptionStatus", () => {
             text: "Hello world",
             error: null,
           }),
-      })
+      }),
     );
 
     const result = await getTranscriptionStatus("transcript-123");
@@ -206,7 +207,7 @@ describe("getTranscriptionStatus", () => {
             text: null,
             error: "Download error",
           }),
-      })
+      }),
     );
 
     const result = await getTranscriptionStatus("transcript-456");
@@ -227,11 +228,11 @@ describe("getTranscriptionStatus", () => {
         ok: false,
         status: 404,
         text: () => Promise.resolve("Not found"),
-      })
+      }),
     );
 
     await expect(getTranscriptionStatus("bad-id")).rejects.toThrow(
-      "AssemblyAI API error: 404 - Not found"
+      "AssemblyAI API error: 404 - Not found",
     );
   });
 
@@ -242,11 +243,11 @@ describe("getTranscriptionStatus", () => {
       vi.fn().mockResolvedValue({
         ok: true,
         json: () => Promise.resolve({ text: "some text" }),
-      })
+      }),
     );
 
     await expect(getTranscriptionStatus("transcript-123")).rejects.toThrow(
-      "AssemblyAI API error: invalid response from status check"
+      "AssemblyAI API error: invalid response from status check",
     );
   });
 });
@@ -273,8 +274,7 @@ describe("transcribeAudio", () => {
       // First call: submitTranscription
       .mockResolvedValueOnce({
         ok: true,
-        json: () =>
-          Promise.resolve({ id: "transcript-789", status: "queued" }),
+        json: () => Promise.resolve({ id: "transcript-789", status: "queued" }),
       })
       // Second call: getTranscriptionStatus (processing)
       .mockResolvedValueOnce({
@@ -321,8 +321,7 @@ describe("transcribeAudio", () => {
       .fn()
       .mockResolvedValueOnce({
         ok: true,
-        json: () =>
-          Promise.resolve({ id: "transcript-err", status: "queued" }),
+        json: () => Promise.resolve({ id: "transcript-err", status: "queued" }),
       })
       .mockResolvedValueOnce({
         ok: true,
@@ -373,7 +372,7 @@ describe("transcribeAudio", () => {
       transcribeAudio("https://example.com/audio.mp3", {
         pollIntervalMs: 100,
         maxWaitMs: 250,
-      })
+      }),
     ).rejects.toThrow("Transcription timed out after 250ms");
   });
 
@@ -381,7 +380,7 @@ describe("transcribeAudio", () => {
     vi.stubEnv("ASSEMBLYAI_API_KEY", "");
 
     await expect(
-      transcribeAudio("https://example.com/audio.mp3")
+      transcribeAudio("https://example.com/audio.mp3"),
     ).rejects.toThrow("AssemblyAI API key is not configured");
   });
 });

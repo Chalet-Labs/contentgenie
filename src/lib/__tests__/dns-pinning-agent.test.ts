@@ -12,7 +12,8 @@ vi.mock("node:dns", () => ({
 vi.mock("@/lib/security", () => ({
   isPrivateIP: (ip: string): boolean => {
     // Minimal private IP check for tests — matches the real implementation's behavior
-    if (ip === "127.0.0.1" || ip === "10.0.0.1" || ip === "192.168.1.1") return true;
+    if (ip === "127.0.0.1" || ip === "10.0.0.1" || ip === "192.168.1.1")
+      return true;
     if (ip === "169.254.169.254") return true;
     if (ip === "::1") return true;
     if (ip === "::ffff:127.0.0.1") return true;
@@ -20,9 +21,7 @@ vi.mock("@/lib/security", () => ({
   },
 }));
 
-function mockDnsLookup(
-  results: { address: string; family: number }[] | Error,
-) {
+function mockDnsLookup(results: { address: string; family: number }[] | Error) {
   (dns.lookup as unknown as ReturnType<typeof vi.fn>).mockImplementation(
     (
       _hostname: string,
@@ -63,13 +62,20 @@ function lookupAllAsync(
   return new Promise((resolve, reject) => {
     // Cast needed: TS types define single-address callback but undici 7+
     // runtime passes all:true and expects the array-format callback.
-    (pinnedLookup as Function)(hostname, { all: true }, (err: NodeJS.ErrnoException | null, addresses: { address: string; family: number }[]) => {
-      if (err) {
-        reject(err);
-      } else {
-        resolve(addresses);
-      }
-    });
+    (pinnedLookup as Function)(
+      hostname,
+      { all: true },
+      (
+        err: NodeJS.ErrnoException | null,
+        addresses: { address: string; family: number }[],
+      ) => {
+        if (err) {
+          reject(err);
+        } else {
+          resolve(addresses);
+        }
+      },
+    );
   });
 }
 

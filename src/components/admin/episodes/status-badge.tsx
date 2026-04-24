@@ -1,5 +1,5 @@
-import { cn } from "@/lib/utils"
-import { Badge } from "@/components/ui/badge"
+import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
 
 const statusStyles: Record<string, string> = {
   available: "bg-status-success-bg text-status-success-text",
@@ -10,12 +10,12 @@ const statusStyles: Record<string, string> = {
   queued: "bg-status-info-bg text-status-info-text",
   failed: "bg-status-danger-bg text-status-danger-text",
   missing: "bg-status-neutral-bg text-status-neutral-text",
-}
+};
 
-const fallbackStyle = "bg-status-neutral-bg text-status-neutral-text"
+const fallbackStyle = "bg-status-neutral-bg text-status-neutral-text";
 
 interface StatusBadgeProps {
-  status: string | null | undefined
+  status: string | null | undefined;
 }
 
 export function StatusBadge({ status }: StatusBadgeProps) {
@@ -26,5 +26,5 @@ export function StatusBadge({ status }: StatusBadgeProps) {
     >
       {status ?? "unprocessed"}
     </Badge>
-  )
+  );
 }

@@ -105,10 +105,21 @@ export async function getEpisodesByFeedId() {
   return { status: "true", items: [], count: 0, query: "", description: "" };
 }
 export async function getEpisodeById() {
-  return { status: "true", episode: {} as PodcastIndexEpisode, description: "" };
+  return {
+    status: "true",
+    episode: {} as PodcastIndexEpisode,
+    description: "",
+  };
 }
 export async function getTrendingPodcasts() {
-  return { status: "true", feeds: [], count: 0, max: 0, since: 0, description: "" };
+  return {
+    status: "true",
+    feeds: [],
+    count: 0,
+    max: 0,
+    since: 0,
+    description: "",
+  };
 }
 export async function searchEpisodes() {
   return { status: "true", items: [], count: 0, query: "", description: "" };

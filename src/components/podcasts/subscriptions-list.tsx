@@ -16,7 +16,10 @@ import {
   togglePinSubscription,
   type SubscriptionWithPodcast,
 } from "@/app/actions/subscriptions";
-import { SUBSCRIPTION_SORTS, type SubscriptionSort } from "@/db/subscription-sorts";
+import {
+  SUBSCRIPTION_SORTS,
+  type SubscriptionSort,
+} from "@/db/subscription-sorts";
 
 interface SubscriptionsListProps {
   subscriptions: SubscriptionWithPodcast[];

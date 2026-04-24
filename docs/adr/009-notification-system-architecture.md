@@ -9,6 +9,7 @@
 ContentGenie users need to know when new episodes appear from subscribed podcasts and when AI-generated summaries complete. Currently, users only discover new content by manually visiting the dashboard or podcast pages. The codebase has a registered service worker (`public/sw.js`) with caching strategies and offline support, a PWA registration component, per-subscription `notificationsEnabled` flags, and placeholder notification settings UI with "Coming Soon" buttons -- but no functional notification delivery.
 
 Issue #39 requires two notification channels:
+
 1. **In-app notifications:** A bell icon in the header with an unread count badge and a dropdown listing recent notifications (new episodes and completed summaries). Clicking a notification navigates to the episode page and marks it as read.
 2. **PWA push notifications:** Web Push notifications delivered via the service worker, with click-to-open behavior navigating to the episode page. Users can configure global push toggle, per-subscription opt-out, and digest frequency (realtime, daily, weekly).
 

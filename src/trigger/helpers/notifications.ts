@@ -15,7 +15,7 @@ async function getSubscribers(podcastId: number) {
   return db.query.userSubscriptions.findMany({
     where: and(
       eq(userSubscriptions.podcastId, podcastId),
-      eq(userSubscriptions.notificationsEnabled, true)
+      eq(userSubscriptions.notificationsEnabled, true),
     ),
     columns: { userId: true },
   });
@@ -41,13 +41,17 @@ async function dispatchPush(
   title: string,
   body: string,
   tag: string,
-  episodePushUrl: string
+  episodePushUrl: string,
 ) {
   if (userIds.length === 0) return;
   await Promise.allSettled(
     userIds.map((userId) =>
-      sendPushToUser(userId, { title, body, tag, data: { url: episodePushUrl } }, logger)
-    )
+      sendPushToUser(
+        userId,
+        { title, body, tag, data: { url: episodePushUrl } },
+        logger,
+      ),
+    ),
   );
 }
 
@@ -55,7 +59,7 @@ async function dispatchPush(
 // touched (INSERT/UPDATE `.returning()`), avoiding a fan-out fetch across
 // every subscriber followed by a post-filter.
 async function realtimePushTargets(
-  affectedRows: { userId: string }[]
+  affectedRows: { userId: string }[],
 ): Promise<string[]> {
   if (affectedRows.length === 0) return [];
   const uniqueUserIds = Array.from(new Set(affectedRows.map((r) => r.userId)));
@@ -80,7 +84,7 @@ export type NewEpisodeInput = {
  */
 export async function createEpisodeNotifications(
   podcastId: number,
-  episodes: NewEpisodeInput[]
+  episodes: NewEpisodeInput[],
 ): Promise<void> {
   if (episodes.length === 0) return;
 
@@ -97,7 +101,7 @@ export async function createEpisodeNotifications(
       episodeId: ep.episodeId,
       title: ep.title,
       body: ep.body,
-    }))
+    })),
   );
 
   // `where` predicate mirrors the partial unique index (drizzle/0019):
@@ -150,7 +154,7 @@ export async function createEpisodeNotifications(
       ep.title,
       ep.body,
       episodeTag(ep.episodeId),
-      ROUTES.episode(ep.podcastIndexEpisodeId)
+      ROUTES.episode(ep.podcastIndexEpisodeId),
     );
   }
 }
@@ -164,7 +168,7 @@ export async function markSummaryReady(
   episodeId: number,
   podcastIndexEpisodeId: string,
   title: string,
-  body: string
+  body: string,
 ): Promise<void> {
   const subscribers = await getSubscribers(podcastId);
 
@@ -185,16 +189,19 @@ export async function markSummaryReady(
       and(
         eq(notifications.episodeId, episodeId),
         eq(notifications.type, "new_episode"),
-        inArray(notifications.userId, subscriberIds)
-      )
+        inArray(notifications.userId, subscriberIds),
+      ),
     )
     .returning({ userId: notifications.userId });
 
   if (updatedRows.length === 0) {
-    logger.info("markSummaryReady: no existing notification rows to update — no-op", {
-      podcastId,
-      episodeId,
-    });
+    logger.info(
+      "markSummaryReady: no existing notification rows to update — no-op",
+      {
+        podcastId,
+        episodeId,
+      },
+    );
     return;
   }
 
@@ -211,7 +218,7 @@ export async function markSummaryReady(
     title,
     body,
     episodeTag(episodeId),
-    ROUTES.episode(podcastIndexEpisodeId)
+    ROUTES.episode(podcastIndexEpisodeId),
   );
 }
 
@@ -219,7 +226,7 @@ export async function markSummaryReady(
  * Resolve a PodcastIndex feed ID to an internal podcast serial PK.
  */
 export async function resolvePodcastId(
-  podcastIndexId: string | number
+  podcastIndexId: string | number,
 ): Promise<number | null> {
   const podcast = await db.query.podcasts.findFirst({
     where: eq(podcasts.podcastIndexId, String(podcastIndexId)),

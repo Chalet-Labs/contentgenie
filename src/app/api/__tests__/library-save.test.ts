@@ -127,7 +127,10 @@ describe("POST /api/library/save", () => {
   it("returns 400 for missing podcastIndexId", async () => {
     const { POST } = await import("@/app/api/library/save/route");
     const response = await POST(
-      makeRequest({ title: "Test", podcast: { podcastIndexId: "pod-1", title: "P" } })
+      makeRequest({
+        title: "Test",
+        podcast: { podcastIndexId: "pod-1", title: "P" },
+      }),
     );
 
     expect(response.status).toBe(400);
@@ -138,7 +141,10 @@ describe("POST /api/library/save", () => {
   it("returns 400 for missing title", async () => {
     const { POST } = await import("@/app/api/library/save/route");
     const response = await POST(
-      makeRequest({ podcastIndexId: "ep-1", podcast: { podcastIndexId: "pod-1", title: "P" } })
+      makeRequest({
+        podcastIndexId: "ep-1",
+        podcast: { podcastIndexId: "pod-1", title: "P" },
+      }),
     );
 
     expect(response.status).toBe(400);
@@ -146,7 +152,9 @@ describe("POST /api/library/save", () => {
 
   it("returns 400 for missing podcast data", async () => {
     const { POST } = await import("@/app/api/library/save/route");
-    const response = await POST(makeRequest({ podcastIndexId: "ep-1", title: "Test" }));
+    const response = await POST(
+      makeRequest({ podcastIndexId: "ep-1", title: "Test" }),
+    );
 
     expect(response.status).toBe(400);
   });
@@ -158,7 +166,7 @@ describe("POST /api/library/save", () => {
         podcastIndexId: "ep-1",
         title: "Test",
         podcast: { title: "P" },
-      })
+      }),
     );
 
     expect(response.status).toBe(400);
@@ -201,7 +209,9 @@ describe("POST /api/library/save", () => {
       return {
         values: vi.fn().mockReturnThis(),
         onConflictDoUpdate: vi.fn().mockReturnValue({
-          returning: vi.fn().mockRejectedValue(new Error("DB connection failed")),
+          returning: vi
+            .fn()
+            .mockRejectedValue(new Error("DB connection failed")),
         }),
       };
     });

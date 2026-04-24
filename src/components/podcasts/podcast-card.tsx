@@ -68,7 +68,11 @@ export function PodcastCard({ podcast }: PodcastCardProps) {
                 {categories.length > 0 && (
                   <div className="flex flex-wrap gap-1">
                     {categories.map((category, index) => (
-                      <Badge key={index} variant="secondary" className="text-xs">
+                      <Badge
+                        key={index}
+                        variant="secondary"
+                        className="text-xs"
+                      >
                         {category}
                       </Badge>
                     ))}
@@ -87,4 +91,3 @@ export function PodcastCard({ podcast }: PodcastCardProps) {
     </Link>
   );
 }
-

@@ -83,9 +83,15 @@ export function supportsEpisodeProcessing(episodeId: string): boolean {
 
 export function getEpisodeArtworkUrl(
   episode: EpisodeData,
-  podcast: PodcastData | null
+  podcast: PodcastData | null,
 ): string {
-  return episode.image || episode.feedImage || podcast?.artwork || podcast?.image || "";
+  return (
+    episode.image ||
+    episode.feedImage ||
+    podcast?.artwork ||
+    podcast?.image ||
+    ""
+  );
 }
 
 export function getSafeEpisodeLink(link: string): string | null {

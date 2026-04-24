@@ -13,13 +13,14 @@ export function Hero() {
             Now in public beta
           </span>
           <h1 className="lp-hero-title">
-            Triage the podcasts<br />
+            Triage the podcasts
+            <br />
             worth your time. <em>Skip the rest.</em>
           </h1>
           <p className="lp-hero-sub">
-            ContentGenie rates every episode with an AI-generated Worth-It score,
-            distills the key takeaways, and lets you save only what&apos;s actually
-            useful — so you stop mining 90 minutes for 9.
+            ContentGenie rates every episode with an AI-generated Worth-It
+            score, distills the key takeaways, and lets you save only
+            what&apos;s actually useful — so you stop mining 90 minutes for 9.
           </p>
           <div className="lp-hero-cta">
             <JoinBetaButton />
@@ -28,9 +29,33 @@ export function Hero() {
             </Button>
           </div>
           <div className="lp-hero-meta">
-            <span><Check className="lp-check" size={13} strokeWidth={3} aria-hidden="true" /> Free while in beta</span>
-            <span><Check className="lp-check" size={13} strokeWidth={3} aria-hidden="true" /> 50% off forever</span>
-            <span><Check className="lp-check" size={13} strokeWidth={3} aria-hidden="true" /> Cancel anytime</span>
+            <span>
+              <Check
+                className="lp-check"
+                size={13}
+                strokeWidth={3}
+                aria-hidden="true"
+              />{" "}
+              Free while in beta
+            </span>
+            <span>
+              <Check
+                className="lp-check"
+                size={13}
+                strokeWidth={3}
+                aria-hidden="true"
+              />{" "}
+              50% off forever
+            </span>
+            <span>
+              <Check
+                className="lp-check"
+                size={13}
+                strokeWidth={3}
+                aria-hidden="true"
+              />{" "}
+              Cancel anytime
+            </span>
           </div>
         </div>
 

@@ -22,10 +22,9 @@ describe("ZaiProvider", () => {
   it("throws when API key is missing", async () => {
     vi.stubEnv("ZAI_API_KEY", "");
     await expect(
-      provider.generateCompletion(
-        [{ role: "user", content: "test" }],
-        { model: "glm-4.7-flash" }
-      )
+      provider.generateCompletion([{ role: "user", content: "test" }], {
+        model: "glm-4.7-flash",
+      }),
     ).rejects.toThrow("Z.AI API key is not configured");
   });
 
@@ -35,15 +34,18 @@ describe("ZaiProvider", () => {
       ok: true,
       json: () =>
         Promise.resolve({
-          choices: [{ message: { content: "response" }, finish_reason: "stop" }],
+          choices: [
+            { message: { content: "response" }, finish_reason: "stop" },
+          ],
         }),
     });
     vi.stubGlobal("fetch", mockFetch);
 
-    await provider.generateCompletion(
-      [{ role: "user", content: "hello" }],
-      { model: "glm-4.7-flash", maxTokens: 200, temperature: 0.3 }
-    );
+    await provider.generateCompletion([{ role: "user", content: "hello" }], {
+      model: "glm-4.7-flash",
+      maxTokens: 200,
+      temperature: 0.3,
+    });
 
     expect(mockFetch).toHaveBeenCalledOnce();
     const [url, options] = mockFetch.mock.calls[0];
@@ -68,14 +70,16 @@ describe("ZaiProvider", () => {
         ok: true,
         json: () =>
           Promise.resolve({
-            choices: [{ message: { content: "hello world" }, finish_reason: "stop" }],
+            choices: [
+              { message: { content: "hello world" }, finish_reason: "stop" },
+            ],
           }),
-      })
+      }),
     );
 
     const result = await provider.generateCompletion(
       [{ role: "user", content: "test" }],
-      { model: "glm-4.7-flash" }
+      { model: "glm-4.7-flash" },
     );
     expect(result).toBe("hello world");
   });
@@ -88,14 +92,13 @@ describe("ZaiProvider", () => {
         ok: false,
         status: 401,
         text: () => Promise.resolve("Unauthorized"),
-      })
+      }),
     );
 
     await expect(
-      provider.generateCompletion(
-        [{ role: "user", content: "test" }],
-        { model: "glm-4.7-flash" }
-      )
+      provider.generateCompletion([{ role: "user", content: "test" }], {
+        model: "glm-4.7-flash",
+      }),
     ).rejects.toThrow("Z.AI API error: 401 - Unauthorized");
   });
 
@@ -106,14 +109,13 @@ describe("ZaiProvider", () => {
       vi.fn().mockResolvedValue({
         ok: true,
         json: () => Promise.resolve({ choices: [] }),
-      })
+      }),
     );
 
     await expect(
-      provider.generateCompletion(
-        [{ role: "user", content: "test" }],
-        { model: "glm-4.7-flash" }
-      )
+      provider.generateCompletion([{ role: "user", content: "test" }], {
+        model: "glm-4.7-flash",
+      }),
     ).rejects.toThrow("No response from Z.AI");
   });
 
@@ -125,18 +127,15 @@ describe("ZaiProvider", () => {
         ok: true,
         json: () =>
           Promise.resolve({
-            choices: [
-              { message: { content: "" }, finish_reason: "sensitive" },
-            ],
+            choices: [{ message: { content: "" }, finish_reason: "sensitive" }],
           }),
-      })
+      }),
     );
 
     await expect(
-      provider.generateCompletion(
-        [{ role: "user", content: "test" }],
-        { model: "glm-4.7-flash" }
-      )
+      provider.generateCompletion([{ role: "user", content: "test" }], {
+        model: "glm-4.7-flash",
+      }),
     ).rejects.toThrow("Z.AI content filter");
   });
 
@@ -152,14 +151,13 @@ describe("ZaiProvider", () => {
               { message: { content: "" }, finish_reason: "network_error" },
             ],
           }),
-      })
+      }),
     );
 
     await expect(
-      provider.generateCompletion(
-        [{ role: "user", content: "test" }],
-        { model: "glm-4.7-flash" }
-      )
+      provider.generateCompletion([{ role: "user", content: "test" }], {
+        model: "glm-4.7-flash",
+      }),
     ).rejects.toThrow("Z.AI network error");
   });
 
@@ -186,15 +184,14 @@ describe("ZaiProvider", () => {
               completion_tokens_details: { reasoning_tokens: 50 },
             },
           }),
-      })
+      }),
     );
 
     let caught: Error | null = null;
     try {
-      await provider.generateCompletion(
-        [{ role: "user", content: "test" }],
-        { model: "glm-5.1" }
-      );
+      await provider.generateCompletion([{ role: "user", content: "test" }], {
+        model: "glm-5.1",
+      });
     } catch (err) {
       caught = err as Error;
     }
@@ -220,14 +217,13 @@ describe("ZaiProvider", () => {
           Promise.resolve({
             choices: [{ message: { content: "" }, finish_reason: "stop" }],
           }),
-      })
+      }),
     );
 
     await expect(
-      provider.generateCompletion(
-        [{ role: "user", content: "test" }],
-        { model: "glm-5.1" }
-      )
+      provider.generateCompletion([{ role: "user", content: "test" }], {
+        model: "glm-5.1",
+      }),
     ).rejects.toThrow(
       "Invalid response format from Z.AI: empty content (finish_reason=stop, completion_tokens=unknown, reasoning_tokens=unknown).",
     );
@@ -237,40 +233,42 @@ describe("ZaiProvider", () => {
     { label: "undefined", value: undefined },
     { label: "null", value: null },
     { label: "empty string", value: "" },
-  ])("does not emit debug log when reasoning_content is $label (even with debug flag)", async ({ value }) => {
-    vi.stubEnv("ZAI_API_KEY", "zai-test-key");
-    vi.stubEnv(ZAI_DEBUG_REASONING_ENV, "1");
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    try {
-      vi.stubGlobal(
-        "fetch",
-        vi.fn().mockResolvedValue({
-          ok: true,
-          json: () =>
-            Promise.resolve({
-              choices: [
-                {
-                  message: { content: "", reasoning_content: value },
-                  finish_reason: "length",
-                },
-              ],
-              usage: { completion_tokens: 10 },
-            }),
-        })
-      );
+  ])(
+    "does not emit debug log when reasoning_content is $label (even with debug flag)",
+    async ({ value }) => {
+      vi.stubEnv("ZAI_API_KEY", "zai-test-key");
+      vi.stubEnv(ZAI_DEBUG_REASONING_ENV, "1");
+      const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
+      try {
+        vi.stubGlobal(
+          "fetch",
+          vi.fn().mockResolvedValue({
+            ok: true,
+            json: () =>
+              Promise.resolve({
+                choices: [
+                  {
+                    message: { content: "", reasoning_content: value },
+                    finish_reason: "length",
+                  },
+                ],
+                usage: { completion_tokens: 10 },
+              }),
+          }),
+        );
 
-      await expect(
-        provider.generateCompletion(
-          [{ role: "user", content: "test" }],
-          { model: "glm-5.1" }
-        )
-      ).rejects.toThrow(/Invalid response format/);
+        await expect(
+          provider.generateCompletion([{ role: "user", content: "test" }], {
+            model: "glm-5.1",
+          }),
+        ).rejects.toThrow(/Invalid response format/);
 
-      expect(warnSpy).not.toHaveBeenCalled();
-    } finally {
-      warnSpy.mockRestore();
-    }
-  });
+        expect(warnSpy).not.toHaveBeenCalled();
+      } finally {
+        warnSpy.mockRestore();
+      }
+    },
+  );
 
   it("emits debug log with reasoning snippet only when ZAI_DEBUG_REASONING=1", async () => {
     vi.stubEnv("ZAI_API_KEY", "zai-test-key");
@@ -297,14 +295,13 @@ describe("ZaiProvider", () => {
                 completion_tokens_details: { reasoning_tokens: 50 },
               },
             }),
-        })
+        }),
       );
 
       await expect(
-        provider.generateCompletion(
-          [{ role: "user", content: "test" }],
-          { model: "glm-5.1" }
-        )
+        provider.generateCompletion([{ role: "user", content: "test" }], {
+          model: "glm-5.1",
+        }),
       ).rejects.toThrow();
 
       expect(warnSpy).toHaveBeenCalledWith(
@@ -312,7 +309,7 @@ describe("ZaiProvider", () => {
         expect.objectContaining({
           finish_reason: "length",
           reasoning_snippet: "Long reasoning trace here",
-        })
+        }),
       );
     } finally {
       warnSpy.mockRestore();
@@ -338,14 +335,13 @@ describe("ZaiProvider", () => {
               ],
               usage: { completion_tokens: 50 },
             }),
-        })
+        }),
       );
 
       await expect(
-        provider.generateCompletion(
-          [{ role: "user", content: "test" }],
-          { model: "glm-5.1" }
-        )
+        provider.generateCompletion([{ role: "user", content: "test" }], {
+          model: "glm-5.1",
+        }),
       ).rejects.toThrow();
 
       expect(warnSpy).not.toHaveBeenCalled();
@@ -365,10 +361,9 @@ describe("ZaiProvider", () => {
     });
     vi.stubGlobal("fetch", mockFetch);
 
-    await provider.generateCompletion(
-      [{ role: "user", content: "test" }],
-      { model: "glm-4.7-flash" }
-    );
+    await provider.generateCompletion([{ role: "user", content: "test" }], {
+      model: "glm-4.7-flash",
+    });
 
     const body = JSON.parse(mockFetch.mock.calls[0][1].body);
     expect(body.max_tokens).toBe(4096);

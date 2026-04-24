@@ -9,23 +9,23 @@
 export function createLocalStorageMock(): Storage {
   // Map (not plain object) so inherited prototype keys like `toString` can't
   // be returned from getItem/length/key, and `__proto__` stays immutable.
-  const store = new Map<string, string>()
+  const store = new Map<string, string>();
   return {
     getItem: (key: string) => store.get(key) ?? null,
     setItem: (key: string, value: string) => {
-      store.set(key, value)
+      store.set(key, value);
     },
     removeItem: (key: string) => {
-      store.delete(key)
+      store.delete(key);
     },
     clear: () => {
-      store.clear()
+      store.clear();
     },
     get length() {
-      return store.size
+      return store.size;
     },
     key: (index: number) => Array.from(store.keys())[index] ?? null,
-  }
+  };
 }
 
 /**
@@ -34,13 +34,13 @@ export function createLocalStorageMock(): Storage {
  * test). Use in `beforeEach` to guarantee an isolated storage per case.
  */
 export function installLocalStorageMock(): Storage {
-  const mock = createLocalStorageMock()
+  const mock = createLocalStorageMock();
   Object.defineProperty(window, "localStorage", {
     value: mock,
     writable: true,
     configurable: true,
-  })
-  return mock
+  });
+  return mock;
 }
 
 /**
@@ -49,18 +49,18 @@ export function installLocalStorageMock(): Storage {
  * gracefully without throwing.
  */
 export function installQuotaExceededLocalStorage(): Storage {
-  const mock = createLocalStorageMock()
+  const mock = createLocalStorageMock();
   mock.setItem = () => {
     // Pass the error name as the second argument so `error.name ===
     // "QuotaExceededError"` checks in production code match.
-    throw new DOMException("Quota exceeded", "QuotaExceededError")
-  }
+    throw new DOMException("Quota exceeded", "QuotaExceededError");
+  };
   Object.defineProperty(window, "localStorage", {
     value: mock,
     writable: true,
     configurable: true,
-  })
-  return mock
+  });
+  return mock;
 }
 
 /**
@@ -68,12 +68,12 @@ export function installQuotaExceededLocalStorage(): Storage {
  * Restores the original `window` even if `fn` throws.
  */
 export function withoutWindow(fn: () => void): void {
-  const originalWindow = globalThis.window
+  const originalWindow = globalThis.window;
   try {
     // @ts-expect-error -- simulating SSR
-    delete globalThis.window
-    fn()
+    delete globalThis.window;
+    fn();
   } finally {
-    globalThis.window = originalWindow
+    globalThis.window = originalWindow;
   }
 }

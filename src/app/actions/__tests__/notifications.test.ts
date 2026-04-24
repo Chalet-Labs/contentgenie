@@ -115,7 +115,8 @@ describe("notification server actions", () => {
   describe("markNotificationRead", () => {
     it("returns error when not authenticated", async () => {
       mockAuth.mockResolvedValue({ userId: null });
-      const { markNotificationRead } = await import("@/app/actions/notifications");
+      const { markNotificationRead } =
+        await import("@/app/actions/notifications");
       const result = await markNotificationRead(1);
       expect(result.success).toBe(false);
       expect(result.error).toBe("You must be signed in");
@@ -127,7 +128,8 @@ describe("notification server actions", () => {
       const mockSet = vi.fn().mockReturnValue({ where: mockWhere });
       mockUpdate.mockReturnValue({ set: mockSet });
 
-      const { markNotificationRead } = await import("@/app/actions/notifications");
+      const { markNotificationRead } =
+        await import("@/app/actions/notifications");
       const result = await markNotificationRead(1);
       expect(result.success).toBe(true);
     });
@@ -138,7 +140,8 @@ describe("notification server actions", () => {
       const mockSet = vi.fn().mockReturnValue({ where: mockWhere });
       mockUpdate.mockReturnValue({ set: mockSet });
 
-      const { markNotificationRead } = await import("@/app/actions/notifications");
+      const { markNotificationRead } =
+        await import("@/app/actions/notifications");
       const result = await markNotificationRead(999);
       expect(result.success).toBe(false);
       expect(result.error).toBe("Notification not found");
@@ -148,7 +151,8 @@ describe("notification server actions", () => {
   describe("markAllNotificationsRead", () => {
     it("returns error when not authenticated", async () => {
       mockAuth.mockResolvedValue({ userId: null });
-      const { markAllNotificationsRead } = await import("@/app/actions/notifications");
+      const { markAllNotificationsRead } =
+        await import("@/app/actions/notifications");
       const result = await markAllNotificationsRead();
       expect(result.success).toBe(false);
     });
@@ -158,7 +162,8 @@ describe("notification server actions", () => {
       const mockSet = vi.fn().mockReturnValue({ where: mockWhere });
       mockUpdate.mockReturnValue({ set: mockSet });
 
-      const { markAllNotificationsRead } = await import("@/app/actions/notifications");
+      const { markAllNotificationsRead } =
+        await import("@/app/actions/notifications");
       const result = await markAllNotificationsRead();
       expect(result.success).toBe(true);
     });
@@ -167,9 +172,8 @@ describe("notification server actions", () => {
   describe("updateNotificationPreferences", () => {
     it("returns error when not authenticated", async () => {
       mockAuth.mockResolvedValue({ userId: null });
-      const { updateNotificationPreferences } = await import(
-        "@/app/actions/notifications"
-      );
+      const { updateNotificationPreferences } =
+        await import("@/app/actions/notifications");
       const result = await updateNotificationPreferences({
         digestFrequency: "daily",
       });
@@ -185,9 +189,8 @@ describe("notification server actions", () => {
       const mockSet = vi.fn().mockReturnValue({ where: mockWhere });
       mockUpdate.mockReturnValue({ set: mockSet });
 
-      const { updateNotificationPreferences } = await import(
-        "@/app/actions/notifications"
-      );
+      const { updateNotificationPreferences } =
+        await import("@/app/actions/notifications");
       const result = await updateNotificationPreferences({
         digestFrequency: "weekly",
       });
@@ -201,7 +204,7 @@ describe("notification server actions", () => {
             defaultView: "grid",
             digestFrequency: "weekly",
           }),
-        })
+        }),
       );
     });
   });
@@ -235,7 +238,9 @@ describe("notification server actions", () => {
       const mockOrderBy = vi.fn().mockReturnValue({ limit: mockLimit });
       const mockWhere = vi.fn().mockReturnValue({ orderBy: mockOrderBy });
       const mockLeftJoin2 = vi.fn().mockReturnValue({ where: mockWhere });
-      const mockLeftJoin1 = vi.fn().mockReturnValue({ leftJoin: mockLeftJoin2 });
+      const mockLeftJoin1 = vi
+        .fn()
+        .mockReturnValue({ leftJoin: mockLeftJoin2 });
       const mockFrom = vi.fn().mockReturnValue({ leftJoin: mockLeftJoin1 });
       mockSelect.mockReturnValue({ from: mockFrom });
 
@@ -279,7 +284,9 @@ describe("notification server actions", () => {
       const mockOrderBy = vi.fn().mockReturnValue({ limit: mockLimit });
       const mockWhere = vi.fn().mockReturnValue({ orderBy: mockOrderBy });
       const mockLeftJoin2 = vi.fn().mockReturnValue({ where: mockWhere });
-      const mockLeftJoin1 = vi.fn().mockReturnValue({ leftJoin: mockLeftJoin2 });
+      const mockLeftJoin1 = vi
+        .fn()
+        .mockReturnValue({ leftJoin: mockLeftJoin2 });
       const mockFrom = vi.fn().mockReturnValue({ leftJoin: mockLeftJoin1 });
       mockSelect.mockReturnValue({ from: mockFrom });
       return { mockWhere, mockLimit, mockOffset };
@@ -312,7 +319,10 @@ describe("notification server actions", () => {
       const { getNotifications } = await import("@/app/actions/notifications");
       await getNotifications();
       // Verify select was called with an object containing the expected keys
-      const selectArg = mockSelect.mock.calls[0]?.[0] as Record<string, unknown>;
+      const selectArg = mockSelect.mock.calls[0]?.[0] as Record<
+        string,
+        unknown
+      >;
       expect(selectArg).toHaveProperty("episodeDbId");
       expect(selectArg).toHaveProperty("worthItScore");
       expect(selectArg).toHaveProperty("audioUrl");
@@ -367,21 +377,24 @@ describe("notification server actions", () => {
   describe("dismissNotification", () => {
     it("returns error when unauthenticated", async () => {
       mockAuth.mockResolvedValue({ userId: null });
-      const { dismissNotification } = await import("@/app/actions/notifications");
+      const { dismissNotification } =
+        await import("@/app/actions/notifications");
       const result = await dismissNotification(1);
       expect(result.success).toBe(false);
       expect(result.error).toBe("You must be signed in");
     });
 
     it("returns error for non-integer id", async () => {
-      const { dismissNotification } = await import("@/app/actions/notifications");
+      const { dismissNotification } =
+        await import("@/app/actions/notifications");
       const result = await dismissNotification(1.5);
       expect(result.success).toBe(false);
       expect(result.error).toBe("Invalid notification id");
     });
 
     it("returns error for id <= 0", async () => {
-      const { dismissNotification } = await import("@/app/actions/notifications");
+      const { dismissNotification } =
+        await import("@/app/actions/notifications");
       const result = await dismissNotification(0);
       expect(result.success).toBe(false);
       expect(result.error).toBe("Invalid notification id");
@@ -393,7 +406,8 @@ describe("notification server actions", () => {
       const mockSet = vi.fn().mockReturnValue({ where: mockWhere });
       mockUpdate.mockReturnValue({ set: mockSet });
 
-      const { dismissNotification } = await import("@/app/actions/notifications");
+      const { dismissNotification } =
+        await import("@/app/actions/notifications");
       const result = await dismissNotification(5);
       expect(result.success).toBe(true);
       expect(mockSet).toHaveBeenCalledWith({ isDismissed: true });
@@ -405,7 +419,8 @@ describe("notification server actions", () => {
       const mockSet = vi.fn().mockReturnValue({ where: mockWhere });
       mockUpdate.mockReturnValue({ set: mockSet });
 
-      const { dismissNotification } = await import("@/app/actions/notifications");
+      const { dismissNotification } =
+        await import("@/app/actions/notifications");
       const result = await dismissNotification(999);
       expect(result.success).toBe(false);
       expect(result.error).toBe("Notification not found");
@@ -418,7 +433,8 @@ describe("notification server actions", () => {
       mockUpdate.mockReturnValue({ set: mockSet });
       const { and: mockAnd, eq: mockEq } = await import("drizzle-orm");
 
-      const { dismissNotification } = await import("@/app/actions/notifications");
+      const { dismissNotification } =
+        await import("@/app/actions/notifications");
       await dismissNotification(1);
       expect(mockAnd).toHaveBeenCalled();
       expect(mockEq).toHaveBeenCalledWith("notifications.userId", "user-1");
@@ -437,7 +453,7 @@ describe("notification server actions", () => {
     // so each query in the real code pulls the next rowset in order.
     function buildTopicChain(
       notifRows: Array<{ episodeId: number | null }>,
-      topicRows: unknown[]
+      topicRows: unknown[],
     ) {
       const firstWhere = vi.fn().mockResolvedValue(notifRows);
       const firstFrom = vi.fn().mockReturnValue({ where: firstWhere });
@@ -480,7 +496,7 @@ describe("notification server actions", () => {
           { episodeId: 1, topic: "Topic C", topicRank: 3, relevance: "0.70" },
           { episodeId: 1, topic: "Topic D", topicRank: 4, relevance: "0.60" },
           { episodeId: 2, topic: "Topic E", topicRank: 1, relevance: "0.95" },
-        ]
+        ],
       );
       const { getEpisodeTopics } = await import("@/app/actions/notifications");
       const result = await getEpisodeTopics([1, 2]);
@@ -491,7 +507,10 @@ describe("notification server actions", () => {
     });
 
     it("uses inArray for episodeId filtering", async () => {
-      buildTopicChain([{ episodeId: 1 }, { episodeId: 2 }, { episodeId: 3 }], []);
+      buildTopicChain(
+        [{ episodeId: 1 }, { episodeId: 2 }, { episodeId: 3 }],
+        [],
+      );
       const { inArray: mockInArray } = await import("drizzle-orm");
       const { getEpisodeTopics } = await import("@/app/actions/notifications");
       await getEpisodeTopics([1, 2, 3]);
@@ -499,7 +518,10 @@ describe("notification server actions", () => {
       const calls = (mockInArray as unknown as { mock: { calls: unknown[][] } })
         .mock.calls;
       expect(calls.length).toBeGreaterThanOrEqual(2);
-      expect(calls[calls.length - 1]).toEqual(["episodeTopics.episodeId", [1, 2, 3]]);
+      expect(calls[calls.length - 1]).toEqual([
+        "episodeTopics.episodeId",
+        [1, 2, 3],
+      ]);
     });
 
     it("orders topicRank NULLS LAST so ranked topics win over unranked", async () => {
@@ -512,8 +534,8 @@ describe("notification server actions", () => {
         .mock.calls;
       const hasNullsLast = sqlCalls.some((call) =>
         (call[0] as readonly string[]).some((part) =>
-          part.includes("NULLS LAST")
-        )
+          part.includes("NULLS LAST"),
+        ),
       );
       expect(hasNullsLast).toBe(true);
     });
@@ -522,7 +544,8 @@ describe("notification server actions", () => {
   describe("getNotificationPreferences", () => {
     it("returns defaults when not authenticated", async () => {
       mockAuth.mockResolvedValue({ userId: null });
-      const { getNotificationPreferences } = await import("@/app/actions/notifications");
+      const { getNotificationPreferences } =
+        await import("@/app/actions/notifications");
       const result = await getNotificationPreferences();
       expect(result.digestFrequency).toBe("realtime");
       expect(result.pushEnabled).toBe(false);
@@ -533,7 +556,8 @@ describe("notification server actions", () => {
         preferences: { digestFrequency: "weekly", pushEnabled: true },
       });
 
-      const { getNotificationPreferences } = await import("@/app/actions/notifications");
+      const { getNotificationPreferences } =
+        await import("@/app/actions/notifications");
       const result = await getNotificationPreferences();
       expect(result.digestFrequency).toBe("weekly");
       expect(result.pushEnabled).toBe(true);
@@ -542,7 +566,8 @@ describe("notification server actions", () => {
     it("returns realtime/false defaults when user has no preferences set", async () => {
       mockFindFirst.mockResolvedValue({ preferences: null });
 
-      const { getNotificationPreferences } = await import("@/app/actions/notifications");
+      const { getNotificationPreferences } =
+        await import("@/app/actions/notifications");
       const result = await getNotificationPreferences();
       expect(result.digestFrequency).toBe("realtime");
       expect(result.pushEnabled).toBe(false);
@@ -565,7 +590,7 @@ describe("notification server actions", () => {
         podcastId: number | null;
         podcastTitle: string | null;
         count: string;
-      }>
+      }>,
     ) {
       const firstWhere = vi.fn().mockResolvedValue([{ value: totalUnread }]);
       const firstFrom = vi.fn().mockReturnValue({ where: firstWhere });
@@ -577,7 +602,9 @@ describe("notification server actions", () => {
       const thirdGroupBy = vi.fn().mockReturnValue({ orderBy: thirdOrderBy });
       const thirdWhere = vi.fn().mockReturnValue({ groupBy: thirdGroupBy });
       const thirdLeftJoin2 = vi.fn().mockReturnValue({ where: thirdWhere });
-      const thirdLeftJoin1 = vi.fn().mockReturnValue({ leftJoin: thirdLeftJoin2 });
+      const thirdLeftJoin1 = vi
+        .fn()
+        .mockReturnValue({ leftJoin: thirdLeftJoin2 });
       const thirdFrom = vi.fn().mockReturnValue({ leftJoin: thirdLeftJoin1 });
 
       mockSelect
@@ -588,14 +615,16 @@ describe("notification server actions", () => {
 
     it("(a) returns zero summary when signed out", async () => {
       mockAuth.mockResolvedValue({ userId: null });
-      const { getNotificationSummary } = await import("@/app/actions/notifications");
+      const { getNotificationSummary } =
+        await import("@/app/actions/notifications");
       const result = await getNotificationSummary();
       expect(result).toEqual({ totalUnread: 0, groups: [] });
     });
 
     it("(b) returns zero groups when user has no notifications", async () => {
       buildSummaryChain(0, [{ lastSeen: null }], []);
-      const { getNotificationSummary } = await import("@/app/actions/notifications");
+      const { getNotificationSummary } =
+        await import("@/app/actions/notifications");
       const result = await getNotificationSummary();
       expect(result.totalUnread).toBe(0);
       expect(result.groups).toEqual([]);
@@ -605,9 +634,10 @@ describe("notification server actions", () => {
       buildSummaryChain(
         3,
         [{ lastSeen: null }],
-        [{ podcastId: 1, podcastTitle: "Test Pod", count: "3" }]
+        [{ podcastId: 1, podcastTitle: "Test Pod", count: "3" }],
       );
-      const { getNotificationSummary } = await import("@/app/actions/notifications");
+      const { getNotificationSummary } =
+        await import("@/app/actions/notifications");
       const result = await getNotificationSummary();
       expect(result.totalUnread).toBe(3);
       expect(result.groups).toHaveLength(1);
@@ -626,13 +656,20 @@ describe("notification server actions", () => {
         [
           { podcastId: 2, podcastTitle: "Alpha Pod", count: "5" },
           { podcastId: 3, podcastTitle: "Beta Pod", count: "2" },
-        ]
+        ],
       );
-      const { getNotificationSummary } = await import("@/app/actions/notifications");
+      const { getNotificationSummary } =
+        await import("@/app/actions/notifications");
       const result = await getNotificationSummary();
       expect(result.totalUnread).toBe(7);
-      expect(result.groups[0]).toMatchObject({ kind: "episodes_by_podcast", podcastId: 2 });
-      expect(result.groups[1]).toMatchObject({ kind: "episodes_by_podcast", podcastId: 3 });
+      expect(result.groups[0]).toMatchObject({
+        kind: "episodes_by_podcast",
+        podcastId: 2,
+      });
+      expect(result.groups[1]).toMatchObject({
+        kind: "episodes_by_podcast",
+        podcastId: 3,
+      });
     });
 
     it("(e) emits episodes_since_last_seen with sinceIso when unread-since < newEpisodeUnread", async () => {
@@ -643,16 +680,19 @@ describe("notification server actions", () => {
         [
           { podcastId: 1, podcastTitle: "Pod A", count: "3" },
           { podcastId: 2, podcastTitle: "Pod B", count: "2" },
-        ]
+        ],
       );
       // Simulate: 2 are newer than lastSeen, 3 are older → since_count < newEpisodeUnread (5)
       const fourthWhere = vi.fn().mockResolvedValue([{ sinceCount: "2" }]);
       const fourthFrom = vi.fn().mockReturnValue({ where: fourthWhere });
       mockSelect.mockReturnValueOnce({ from: fourthFrom });
 
-      const { getNotificationSummary } = await import("@/app/actions/notifications");
+      const { getNotificationSummary } =
+        await import("@/app/actions/notifications");
       const result = await getNotificationSummary();
-      const sinceGroup = result.groups.find((g) => g.kind === "episodes_since_last_seen");
+      const sinceGroup = result.groups.find(
+        (g) => g.kind === "episodes_since_last_seen",
+      );
       expect(sinceGroup).toBeDefined();
       expect(sinceGroup).toEqual({
         kind: "episodes_since_last_seen",
@@ -666,15 +706,18 @@ describe("notification server actions", () => {
       buildSummaryChain(
         3,
         [{ lastSeen }],
-        [{ podcastId: 1, podcastTitle: "Pod A", count: "3" }]
+        [{ podcastId: 1, podcastTitle: "Pod A", count: "3" }],
       );
       const fourthWhere = vi.fn().mockResolvedValue([{ sinceCount: "3" }]);
       const fourthFrom = vi.fn().mockReturnValue({ where: fourthWhere });
       mockSelect.mockReturnValueOnce({ from: fourthFrom });
 
-      const { getNotificationSummary } = await import("@/app/actions/notifications");
+      const { getNotificationSummary } =
+        await import("@/app/actions/notifications");
       const result = await getNotificationSummary();
-      const sinceGroup = result.groups.find((g) => g.kind === "episodes_since_last_seen");
+      const sinceGroup = result.groups.find(
+        (g) => g.kind === "episodes_since_last_seen",
+      );
       expect(sinceGroup).toBeUndefined();
     });
 
@@ -682,18 +725,22 @@ describe("notification server actions", () => {
       buildSummaryChain(
         3,
         [{ lastSeen: null }],
-        [{ podcastId: 1, podcastTitle: "Pod A", count: "3" }]
+        [{ podcastId: 1, podcastTitle: "Pod A", count: "3" }],
       );
-      const { getNotificationSummary } = await import("@/app/actions/notifications");
+      const { getNotificationSummary } =
+        await import("@/app/actions/notifications");
       const result = await getNotificationSummary();
-      const sinceGroup = result.groups.find((g) => g.kind === "episodes_since_last_seen");
+      const sinceGroup = result.groups.find(
+        (g) => g.kind === "episodes_since_last_seen",
+      );
       expect(sinceGroup).toBeUndefined();
     });
 
     it("(h) dismissed notifications excluded from groups", async () => {
       buildSummaryChain(0, [{ lastSeen: null }], []);
       const { eq: mockEq } = await import("drizzle-orm");
-      const { getNotificationSummary } = await import("@/app/actions/notifications");
+      const { getNotificationSummary } =
+        await import("@/app/actions/notifications");
       await getNotificationSummary();
       expect(mockEq).toHaveBeenCalledWith("notifications.isDismissed", false);
     });
@@ -701,7 +748,8 @@ describe("notification server actions", () => {
     it("(i) read notifications excluded from groups (isRead = false predicate)", async () => {
       buildSummaryChain(0, [{ lastSeen: null }], []);
       const { eq: mockEq } = await import("drizzle-orm");
-      const { getNotificationSummary } = await import("@/app/actions/notifications");
+      const { getNotificationSummary } =
+        await import("@/app/actions/notifications");
       await getNotificationSummary();
       expect(mockEq).toHaveBeenCalledWith("notifications.isRead", false);
     });
@@ -718,16 +766,19 @@ describe("notification server actions", () => {
           { podcastId: 1, podcastTitle: "Pod A", count: "3" },
           { podcastId: 2, podcastTitle: "Pod B", count: "2" },
           { podcastId: null, podcastTitle: null, count: "1" },
-        ]
+        ],
       );
       const { eq: mockEq } = await import("drizzle-orm");
-      const { getNotificationSummary } = await import("@/app/actions/notifications");
+      const { getNotificationSummary } =
+        await import("@/app/actions/notifications");
       const result = await getNotificationSummary();
       // totalUnread reflects ALL unread (parity with getUnreadCount).
       expect(result.totalUnread).toBe(6);
       // groups drop the null-podcast row; only two valid podcast groups survive.
       expect(result.groups).toHaveLength(2);
-      expect(result.groups.every((g) => g.kind === "episodes_by_podcast")).toBe(true);
+      expect(result.groups.every((g) => g.kind === "episodes_by_podcast")).toBe(
+        true,
+      );
       // type='new_episode' predicate must be applied on the grouped query.
       expect(mockEq).toHaveBeenCalledWith("notifications.type", "new_episode");
     });
@@ -737,9 +788,10 @@ describe("notification server actions", () => {
       buildSummaryChain(
         4,
         [{ lastSeen: null }],
-        [{ podcastId: 1, podcastTitle: "Pod A", count: "2" }]
+        [{ podcastId: 1, podcastTitle: "Pod A", count: "2" }],
       );
-      const { getNotificationSummary } = await import("@/app/actions/notifications");
+      const { getNotificationSummary } =
+        await import("@/app/actions/notifications");
       const result = await getNotificationSummary();
       expect(result.totalUnread).toBe(4);
       // groups still only contain the 2 new_episode rows
@@ -760,21 +812,32 @@ describe("notification server actions", () => {
 
       const stubOrderBy = vi.fn().mockResolvedValue([]);
       const stubGroupBy = vi.fn().mockReturnValue({ orderBy: stubOrderBy });
-      const stubGroupedWhere = vi.fn().mockReturnValue({ groupBy: stubGroupBy });
-      const stubLeftJoin2 = vi.fn().mockReturnValue({ where: stubGroupedWhere });
-      const stubLeftJoin1 = vi.fn().mockReturnValue({ leftJoin: stubLeftJoin2 });
-      const stubGroupedFrom = vi.fn().mockReturnValue({ leftJoin: stubLeftJoin1 });
+      const stubGroupedWhere = vi
+        .fn()
+        .mockReturnValue({ groupBy: stubGroupBy });
+      const stubLeftJoin2 = vi
+        .fn()
+        .mockReturnValue({ where: stubGroupedWhere });
+      const stubLeftJoin1 = vi
+        .fn()
+        .mockReturnValue({ leftJoin: stubLeftJoin2 });
+      const stubGroupedFrom = vi
+        .fn()
+        .mockReturnValue({ leftJoin: stubLeftJoin1 });
 
       mockSelect
         .mockReturnValueOnce({ from: rejectingFrom })
         .mockReturnValueOnce({ from: stubFrom })
         .mockReturnValueOnce({ from: stubGroupedFrom });
 
-      const { getNotificationSummary } = await import("@/app/actions/notifications");
-      await expect(getNotificationSummary()).rejects.toThrow("connection refused");
+      const { getNotificationSummary } =
+        await import("@/app/actions/notifications");
+      await expect(getNotificationSummary()).rejects.toThrow(
+        "connection refused",
+      );
       expect(errorSpy).toHaveBeenCalledWith(
         "Error fetching notification summary:",
-        dbError
+        dbError,
       );
       errorSpy.mockRestore();
     });
@@ -791,13 +854,14 @@ describe("notification server actions", () => {
         [
           { podcastId: 1, podcastTitle: "Pod A", count: "3" },
           { podcastId: 2, podcastTitle: "Pod B", count: "2" },
-        ]
+        ],
       );
       const fourthWhere = vi.fn().mockResolvedValue([{ sinceCount: "2" }]);
       const fourthFrom = vi.fn().mockReturnValue({ where: fourthWhere });
       mockSelect.mockReturnValueOnce({ from: fourthFrom });
 
-      const { getNotificationSummary } = await import("@/app/actions/notifications");
+      const { getNotificationSummary } =
+        await import("@/app/actions/notifications");
       const result = await getNotificationSummary();
       expect(result.groups).toContainEqual({
         kind: "episodes_since_last_seen",
@@ -818,7 +882,9 @@ describe("notification server actions", () => {
       const mockOrderBy = vi.fn().mockReturnValue({ limit: mockLimit });
       const mockWhere = vi.fn().mockReturnValue({ orderBy: mockOrderBy });
       const mockLeftJoin2 = vi.fn().mockReturnValue({ where: mockWhere });
-      const mockLeftJoin1 = vi.fn().mockReturnValue({ leftJoin: mockLeftJoin2 });
+      const mockLeftJoin1 = vi
+        .fn()
+        .mockReturnValue({ leftJoin: mockLeftJoin2 });
       const mockFrom = vi.fn().mockReturnValue({ leftJoin: mockLeftJoin1 });
       mockSelect.mockReturnValue({ from: mockFrom });
       return { mockWhere };

@@ -109,8 +109,7 @@ export async function addPodcastByRssUrl(
     } catch {
       return {
         success: false,
-        error:
-          "Could not parse the RSS feed. Check the URL and try again.",
+        error: "Could not parse the RSS feed. Check the URL and try again.",
       };
     }
 
@@ -139,7 +138,10 @@ export async function addPodcastByRssUrl(
         columns: { id: true },
       });
       if (!existing) {
-        return { success: false, error: "Failed to add podcast. Please try again." };
+        return {
+          success: false,
+          error: "Failed to add podcast. Please try again.",
+        };
       }
       podcastId = existing.id;
     }
@@ -230,7 +232,10 @@ export async function subscribeToPodcast(podcastData: PodcastData) {
       latestEpisodeDate: podcastData.latestEpisodeDate?.toISOString(),
     });
     if (!parsed.success) {
-      console.warn("[subscribeToPodcast] validation failed", parsed.error.issues);
+      console.warn(
+        "[subscribeToPodcast] validation failed",
+        parsed.error.issues,
+      );
       return { success: false, error: "Invalid podcast data" };
     }
     const input = parsed.data;
@@ -239,16 +244,19 @@ export async function subscribeToPodcast(podcastData: PodcastData) {
 
     const latestEpisodeDate = safeParseDate(input.latestEpisodeDate);
 
-    const podcastId = await upsertPodcast({
-      podcastIndexId: input.podcastIndexId,
-      title: input.title,
-      description: input.description,
-      publisher: input.publisher,
-      imageUrl: input.imageUrl,
-      categories: input.categories,
-      totalEpisodes: input.totalEpisodes,
-      latestEpisodeDate,
-    }, { updateOnConflict: "safe" });
+    const podcastId = await upsertPodcast(
+      {
+        podcastIndexId: input.podcastIndexId,
+        title: input.title,
+        description: input.description,
+        publisher: input.publisher,
+        imageUrl: input.imageUrl,
+        categories: input.categories,
+        totalEpisodes: input.totalEpisodes,
+        latestEpisodeDate,
+      },
+      { updateOnConflict: "safe" },
+    );
 
     // BOLT OPTIMIZATION: Use onConflictDoNothing to handle already subscribed case in one query.
     // This replaces a separate existence check and reduces total round-trips from ~5 to 3.
@@ -300,8 +308,8 @@ export async function unsubscribeFromPodcast(podcastIndexId: string) {
       .where(
         and(
           eq(userSubscriptions.userId, userId),
-          eq(userSubscriptions.podcastId, podcast.id)
-        )
+          eq(userSubscriptions.podcastId, podcast.id),
+        ),
       );
 
     revalidatePath("/subscriptions");
@@ -310,13 +318,16 @@ export async function unsubscribeFromPodcast(podcastIndexId: string) {
     return { success: true, message: "Unsubscribed successfully" };
   } catch (error) {
     console.error("Error unsubscribing from podcast:", error);
-    return { success: false, error: "Failed to unsubscribe. Please try again." };
+    return {
+      success: false,
+      error: "Failed to unsubscribe. Please try again.",
+    };
   }
 }
 
 // Check if user is subscribed to a podcast
 export async function isSubscribedToPodcast(
-  podcastIndexId: string
+  podcastIndexId: string,
 ): Promise<boolean> {
   const { userId } = await auth();
 
@@ -333,8 +344,8 @@ export async function isSubscribedToPodcast(
       .where(
         and(
           eq(userSubscriptions.userId, userId),
-          eq(podcasts.podcastIndexId, podcastIndexId)
-        )
+          eq(podcasts.podcastIndexId, podcastIndexId),
+        ),
       )
       .limit(1);
 
@@ -374,7 +385,7 @@ export async function refreshPodcastFeed(podcastId: number) {
     const subscription = await db.query.userSubscriptions.findFirst({
       where: and(
         eq(userSubscriptions.userId, userId),
-        eq(userSubscriptions.podcastId, podcastId)
+        eq(userSubscriptions.podcastId, podcastId),
       ),
     });
 
@@ -400,9 +411,11 @@ export async function refreshPodcastFeed(podcastId: number) {
         .from(episodes)
         .where(inArray(episodes.podcastIndexId, fetchedIds));
 
-      const existingIds = new Set(existingEpisodes.map((e) => e.podcastIndexId));
+      const existingIds = new Set(
+        existingEpisodes.map((e) => e.podcastIndexId),
+      );
       newEpisodes = fetchedEpisodes.filter(
-        (ep) => !existingIds.has(String(ep.id))
+        (ep) => !existingIds.has(String(ep.id)),
       );
 
       // Trigger summarization for new episodes (fire-and-forget from server context)
@@ -413,10 +426,7 @@ export async function refreshPodcastFeed(podcastId: number) {
           options: { idempotencyKey: `refresh-summarize-${ep.id}` },
         }));
 
-        await tasks.batchTrigger(
-          "summarize-episode",
-          batchItems
-        );
+        await tasks.batchTrigger("summarize-episode", batchItems);
       }
     }
 
@@ -481,10 +491,9 @@ function buildRecentlyListenedQuery(userId: string) {
   const lastListened = db
     .select({
       podcastId: episodes.podcastId,
-      lastStartedAt:
-        sql<string | null>`MAX(${listenHistory.startedAt})`.as(
-          "last_started_at",
-        ),
+      lastStartedAt: sql<string | null>`MAX(${listenHistory.startedAt})`.as(
+        "last_started_at",
+      ),
     })
     .from(listenHistory)
     .innerJoin(episodes, eq(episodes.id, listenHistory.episodeId))
@@ -566,7 +575,11 @@ export async function getUserSubscriptions(sort?: SubscriptionSort) {
 
     return { subscriptions, error: null };
   } catch (error) {
-    console.error("[getUserSubscriptions] failed", { userId, sort: resolved, error });
+    console.error("[getUserSubscriptions] failed", {
+      userId,
+      sort: resolved,
+      error,
+    });
     return { subscriptions: [], error: "Failed to load subscriptions" };
   }
 }

@@ -121,7 +121,9 @@ export const analyzeContent = task({
   id: "analyze-content",
   run: async ({ text }) => {
     // All three run in parallel
-    const { runs: [sentiment, summary, moderation] } = await batch.triggerByTaskAndWait([
+    const {
+      runs: [sentiment, summary, moderation],
+    } = await batch.triggerByTaskAndWait([
       { task: analyzeSentiment, payload: { text } },
       { task: summarizeText, payload: { text } },
       { task: moderateContent, payload: { text } },
@@ -155,7 +157,9 @@ export const factChecker = task({
   id: "fact-checker",
   run: async ({ article }) => {
     // Step 1: Extract claims (sequential - need output first)
-    const { runs: [extractResult] } = await batch.triggerByTaskAndWait([
+    const {
+      runs: [extractResult],
+    } = await batch.triggerByTaskAndWait([
       { task: extractClaims, payload: { article } },
     ]);
 
@@ -164,13 +168,13 @@ export const factChecker = task({
 
     // Step 2: Fan-out - verify all claims in parallel
     const { runs } = await batch.triggerByTaskAndWait(
-      claims.map(claim => ({ task: verifyClaim, payload: claim }))
+      claims.map((claim) => ({ task: verifyClaim, payload: claim })),
     );
 
     // Step 3: Fan-in - aggregate results
     const verified = runs
       .filter((r): r is typeof r & { ok: true } => r.ok)
-      .map(r => r.output);
+      .map((r) => r.output);
 
     return { claims, verifications: verified };
   },
@@ -211,16 +215,22 @@ export const refineTranslation = task({
     });
 
     if (evaluation.text.includes("APPROVED")) {
-      return { text: translation.text, status: "APPROVED", attempts: attempt + 1 };
+      return {
+        text: translation.text,
+        status: "APPROVED",
+        attempts: attempt + 1,
+      };
     }
 
     // Recursive self-call with feedback
-    return refineTranslation.triggerAndWait({
-      text,
-      targetLanguage,
-      feedback: evaluation.text,
-      attempt: attempt + 1,
-    }).unwrap();
+    return refineTranslation
+      .triggerAndWait({
+        text,
+        targetLanguage,
+        feedback: evaluation.text,
+        attempt: attempt + 1,
+      })
+      .unwrap();
   },
 });
 ```
@@ -229,12 +239,12 @@ export const refineTranslation = task({
 
 ## Trigger-Specific Features
 
-| Feature | What it enables | Reference |
-|---------|-----------------|-----------|
-| **Waitpoints** | Human approval gates, external callbacks | `references/waitpoints.md` |
-| **Streams** | Real-time progress to frontend | `references/streaming.md` |
-| **ai.tool** | Let LLMs call your tasks as tools | `references/ai-tool.md` |
-| **batch.triggerByTaskAndWait** | Typed parallel execution | `references/orchestration.md` |
+| Feature                        | What it enables                          | Reference                     |
+| ------------------------------ | ---------------------------------------- | ----------------------------- |
+| **Waitpoints**                 | Human approval gates, external callbacks | `references/waitpoints.md`    |
+| **Streams**                    | Real-time progress to frontend           | `references/streaming.md`     |
+| **ai.tool**                    | Let LLMs call your tasks as tools        | `references/ai-tool.md`       |
+| **batch.triggerByTaskAndWait** | Typed parallel execution                 | `references/orchestration.md` |
 
 ---
 

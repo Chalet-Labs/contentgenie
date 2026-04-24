@@ -64,12 +64,9 @@ export function parseDuration(
   return null;
 }
 
-function parseEpisodeItem(
-  item: Parser.Item & CustomItem,
-): ParsedEpisode {
+function parseEpisodeItem(item: Parser.Item & CustomItem): ParsedEpisode {
   const publishDate = item.pubDate ? new Date(item.pubDate) : null;
-  const guid =
-    item.guid ?? item.link ?? item.enclosure?.url ?? undefined;
+  const guid = item.guid ?? item.link ?? item.enclosure?.url ?? undefined;
 
   if (!guid) {
     throw new Error(

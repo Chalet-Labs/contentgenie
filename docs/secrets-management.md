@@ -48,38 +48,39 @@ Most `package.json` scripts are wrapped with `doppler run --`, which injects env
 
 ## Environments
 
-| Doppler Config | Purpose | Vercel Environment |
-|---------------|---------|-------------------|
-| `dev` | Local development | Development |
-| `stg` | Staging/preview deployments | Preview |
-| `prd` | Production | Production |
+| Doppler Config | Purpose                     | Vercel Environment |
+| -------------- | --------------------------- | ------------------ |
+| `dev`          | Local development           | Development        |
+| `stg`          | Staging/preview deployments | Preview            |
+| `prd`          | Production                  | Production         |
 
 ## Managed Secrets
 
-| Variable | Type | Description |
-|----------|------|-------------|
-| `DATABASE_URL` | Server | Neon PostgreSQL connection string (Doppler `dev` only; Neon integration handles Vercel) |
-| `PODCASTINDEX_API_KEY` | Server | PodcastIndex API key |
-| `PODCASTINDEX_API_SECRET` | Server | PodcastIndex API secret |
-| `OPENROUTER_API_KEY` | Server | OpenRouter AI API key |
-| `NEXT_PUBLIC_APP_URL` | Public | Application URL (inlined at build time) |
-| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Public | Clerk publishable key (inlined at build time) |
-| `CLERK_SECRET_KEY` | Server | Clerk secret key |
+| Variable                                          | Type   | Description                                                                                                                          |
+| ------------------------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `DATABASE_URL`                                    | Server | Neon PostgreSQL connection string (Doppler `dev` only; Neon integration handles Vercel)                                              |
+| `PODCASTINDEX_API_KEY`                            | Server | PodcastIndex API key                                                                                                                 |
+| `PODCASTINDEX_API_SECRET`                         | Server | PodcastIndex API secret                                                                                                              |
+| `OPENROUTER_API_KEY`                              | Server | OpenRouter AI API key                                                                                                                |
+| `NEXT_PUBLIC_APP_URL`                             | Public | Application URL (inlined at build time)                                                                                              |
+| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`               | Public | Clerk publishable key (inlined at build time)                                                                                        |
+| `CLERK_SECRET_KEY`                                | Server | Clerk secret key                                                                                                                     |
 | `NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL` | Public | Fallback redirect after sign-in (e.g. `/dashboard`); only used when no `redirect_url` query param is present (inlined at build time) |
 | `NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL` | Public | Fallback redirect after sign-up (e.g. `/dashboard`); only used when no `redirect_url` query param is present (inlined at build time) |
-| `NEXT_PUBLIC_CLERK_SIGN_IN_URL` | Public | Clerk sign-in page URL (e.g. `/sign-in`) (inlined at build time) |
-| `NEXT_PUBLIC_CLERK_SIGN_UP_URL` | Public | Clerk sign-up page URL (e.g. `/sign-up`) (inlined at build time) |
-| `TRIGGER_SECRET_KEY` | Server | Trigger.dev secret key (background jobs) |
-| `ZAI_API_KEY` | Server | Z.AI GLM API key (add to Doppler `dev`, `stg`, and `prd` configs) |
-| `ASSEMBLYAI_API_KEY` | Server | AssemblyAI transcription API key |
-| `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | Public | VAPID public key for Web Push (inlined at build time — rebuild after changing) |
-| `VAPID_PRIVATE_KEY` | Server | VAPID private key for Web Push |
-| `VAPID_SUBJECT` | Server | VAPID subject (`mailto:` URL) for Web Push |
-| `DAILY_SUMMARIZE_LIMIT` | Server | Per-user daily summarization limit (default: 5) |
+| `NEXT_PUBLIC_CLERK_SIGN_IN_URL`                   | Public | Clerk sign-in page URL (e.g. `/sign-in`) (inlined at build time)                                                                     |
+| `NEXT_PUBLIC_CLERK_SIGN_UP_URL`                   | Public | Clerk sign-up page URL (e.g. `/sign-up`) (inlined at build time)                                                                     |
+| `TRIGGER_SECRET_KEY`                              | Server | Trigger.dev secret key (background jobs)                                                                                             |
+| `ZAI_API_KEY`                                     | Server | Z.AI GLM API key (add to Doppler `dev`, `stg`, and `prd` configs)                                                                    |
+| `ASSEMBLYAI_API_KEY`                              | Server | AssemblyAI transcription API key                                                                                                     |
+| `NEXT_PUBLIC_VAPID_PUBLIC_KEY`                    | Public | VAPID public key for Web Push (inlined at build time — rebuild after changing)                                                       |
+| `VAPID_PRIVATE_KEY`                               | Server | VAPID private key for Web Push                                                                                                       |
+| `VAPID_SUBJECT`                                   | Server | VAPID subject (`mailto:` URL) for Web Push                                                                                           |
+| `DAILY_SUMMARIZE_LIMIT`                           | Server | Per-user daily summarization limit (default: 5)                                                                                      |
 
 ## Vercel Integration
 
 Doppler syncs secrets to Vercel automatically via the [Doppler Vercel integration](https://docs.doppler.com/docs/vercel):
+
 - Vercel **Development** syncs from Doppler `dev` config
 - Vercel **Preview** syncs from Doppler `stg` config
 - Vercel **Production** syncs from Doppler `prd` config
@@ -130,17 +131,17 @@ For **local development**, `bun run trigger:dev` is already wrapped with `dopple
 
 Set the following variables **manually** in the [Trigger.dev dashboard](https://cloud.trigger.dev) → Environment Variables → **Prod** environment:
 
-| Variable | Where to find the value |
-|----------|------------------------|
-| `DATABASE_URL` | Neon Console → main branch → Connection string |
-| `PODCASTINDEX_API_KEY` | Doppler `prd` config |
-| `PODCASTINDEX_API_SECRET` | Doppler `prd` config |
-| `OPENROUTER_API_KEY` | Doppler `prd` config |
-| `ZAI_API_KEY` | Doppler `prd` config |
-| `ASSEMBLYAI_API_KEY` | Doppler `prd` config |
-| `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | Doppler `prd` config |
-| `VAPID_PRIVATE_KEY` | Doppler `prd` config |
-| `VAPID_SUBJECT` | Doppler `prd` config |
+| Variable                       | Where to find the value                        |
+| ------------------------------ | ---------------------------------------------- |
+| `DATABASE_URL`                 | Neon Console → main branch → Connection string |
+| `PODCASTINDEX_API_KEY`         | Doppler `prd` config                           |
+| `PODCASTINDEX_API_SECRET`      | Doppler `prd` config                           |
+| `OPENROUTER_API_KEY`           | Doppler `prd` config                           |
+| `ZAI_API_KEY`                  | Doppler `prd` config                           |
+| `ASSEMBLYAI_API_KEY`           | Doppler `prd` config                           |
+| `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | Doppler `prd` config                           |
+| `VAPID_PRIVATE_KEY`            | Doppler `prd` config                           |
+| `VAPID_SUBJECT`                | Doppler `prd` config                           |
 
 ### Updating secrets
 
@@ -159,10 +160,10 @@ Trigger.dev tasks are auto-deployed via the [Trigger.dev GitHub integration](htt
 
 The CI workflow uses secrets configured in the [repository settings](https://github.com/Chalet-Labs/contentgenie/settings/secrets/actions):
 
-| Variable | Description |
-|----------|-------------|
+| Variable                  | Description                                                                                                                          |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
 | `DATABASE_URL_PRODUCTION` | Neon production pooler connection string. Used by the `schema-drift` CI job to detect pending schema changes after merges to `main`. |
-| `TRIGGER_ACCESS_TOKEN` | Trigger.dev access token for dry-run deploy validation on PRs. |
+| `TRIGGER_ACCESS_TOKEN`    | Trigger.dev access token for dry-run deploy validation on PRs.                                                                       |
 
 ### Adding `DATABASE_URL_PRODUCTION`
 
@@ -184,5 +185,5 @@ Run `doppler setup` in the project root to link your local environment.
 **"Unable to fetch secrets"**
 Run `doppler login` to re-authenticate, then `doppler setup` to re-link.
 
-**"NEXT_PUBLIC_* variables not available in browser"**
+**"NEXT*PUBLIC*\* variables not available in browser"**
 `NEXT_PUBLIC_*` variables are inlined at build time. If you change them in Doppler, you must rebuild the app (`bun run build`).

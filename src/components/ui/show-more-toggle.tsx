@@ -11,7 +11,12 @@ interface ShowMoreToggleProps {
   className?: string;
 }
 
-export function ShowMoreToggle({ expanded, hiddenCount, onToggle, className }: ShowMoreToggleProps) {
+export function ShowMoreToggle({
+  expanded,
+  hiddenCount,
+  onToggle,
+  className,
+}: ShowMoreToggleProps) {
   return (
     <Button
       type="button"

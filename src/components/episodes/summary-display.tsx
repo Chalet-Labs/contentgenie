@@ -16,7 +16,11 @@ import {
   ChevronUp,
 } from "lucide-react";
 import { getScoreColor, getScoreLabel } from "@/lib/score-utils";
-import { WORTH_IT_SIGNAL_KEYS, SIGNAL_LABELS, type WorthItDimensionsData } from "@/lib/openrouter";
+import {
+  WORTH_IT_SIGNAL_KEYS,
+  SIGNAL_LABELS,
+  type WorthItDimensionsData,
+} from "@/lib/openrouter";
 import type { SummarizationStep } from "@/trigger/types";
 import type { OverlapLabelKind } from "@/lib/topic-overlap";
 
@@ -59,20 +63,28 @@ const DIMENSION_LABELS: Record<string, string> = {
 
 function parseStructuredSections(text: string) {
   const sections = text.split(/^## /m);
-  return sections.map((section, index) => {
-    if (index === 0 && !text.startsWith("## ")) {
-      if (!section.trim()) return null;
-      return { heading: null, body: section.trim() };
-    }
-    const newlineIndex = section.indexOf("\n");
-    const heading = newlineIndex !== -1 ? section.slice(0, newlineIndex).trim() : section.trim();
-    const body = newlineIndex !== -1 ? section.slice(newlineIndex + 1).trim() : "";
-    if (!heading && !body) return null;
-    return { heading, body };
-  }).filter(Boolean) as { heading: string | null; body: string }[];
+  return sections
+    .map((section, index) => {
+      if (index === 0 && !text.startsWith("## ")) {
+        if (!section.trim()) return null;
+        return { heading: null, body: section.trim() };
+      }
+      const newlineIndex = section.indexOf("\n");
+      const heading =
+        newlineIndex !== -1
+          ? section.slice(0, newlineIndex).trim()
+          : section.trim();
+      const body =
+        newlineIndex !== -1 ? section.slice(newlineIndex + 1).trim() : "";
+      if (!heading && !body) return null;
+      return { heading, body };
+    })
+    .filter(Boolean) as { heading: string | null; body: string }[];
 }
 
-function renderSections(sections: { heading: string | null; body: string }[]): React.ReactNode[] {
+function renderSections(
+  sections: { heading: string | null; body: string }[],
+): React.ReactNode[] {
   return sections.map((section, index) => {
     if (!section.heading) {
       return (
@@ -83,9 +95,13 @@ function renderSections(sections: { heading: string | null; body: string }[]): R
     }
     return (
       <div key={index} className="space-y-1">
-        <h3 className="text-sm font-semibold text-foreground">{section.heading}</h3>
+        <h3 className="text-sm font-semibold text-foreground">
+          {section.heading}
+        </h3>
         {section.body && (
-          <div className="whitespace-pre-wrap text-muted-foreground">{section.body}</div>
+          <div className="whitespace-pre-wrap text-muted-foreground">
+            {section.body}
+          </div>
         )}
       </div>
     );
@@ -109,9 +125,7 @@ export function SummaryDisplay({
 
   // Loading state with step progress
   if (isLoading) {
-    const activeStepIndex = currentStep
-      ? STEP_ORDER.indexOf(currentStep)
-      : -1;
+    const activeStepIndex = currentStep ? STEP_ORDER.indexOf(currentStep) : -1;
 
     return (
       <div className="space-y-6">
@@ -129,10 +143,7 @@ export function SummaryDisplay({
                   const isActive = step === currentStep;
                   const isCompleted = index < activeStepIndex;
                   return (
-                    <li
-                      key={step}
-                      className="flex items-center gap-3 text-sm"
-                    >
+                    <li key={step} className="flex items-center gap-3 text-sm">
                       {isCompleted ? (
                         <CheckCircle className="h-4 w-4 shrink-0 text-status-success-text" />
                       ) : isActive ? (
@@ -219,27 +230,40 @@ export function SummaryDisplay({
 
   // Display summary
   const hasStructuredSections = summary.includes("## ");
-  const structuredSections = hasStructuredSections ? parseStructuredSections(summary) : [];
+  const structuredSections = hasStructuredSections
+    ? parseStructuredSections(summary)
+    : [];
   const isLongSummary = hasStructuredSections
     ? structuredSections.length > 1
     : summary.length > 600;
   const displaySummary =
-    isLongSummary && !showFullSummary
-      ? summary.slice(0, 600) + "..."
-      : summary;
+    isLongSummary && !showFullSummary ? summary.slice(0, 600) + "..." : summary;
   const isSignalFormat =
-    worthItDimensions != null && "kind" in worthItDimensions && worthItDimensions.kind === "signals";
+    worthItDimensions != null &&
+    "kind" in worthItDimensions &&
+    worthItDimensions.kind === "signals";
   const isLegacyDimensionFormat =
-    worthItDimensions != null && !isSignalFormat && "uniqueness" in worthItDimensions;
-  const normalizedDimensionEntries = isLegacyDimensionFormat && worthItDimensions
-    ? Object.entries(worthItDimensions).reduce<[string, number][]>((acc, [key, raw]) => {
-        if (key === "kind") return acc;
-        const num = typeof raw === "number" ? raw : typeof raw === "string" ? Number(raw) : NaN;
-        if (!Number.isFinite(num)) return acc;
-        acc.push([key, Math.min(10, Math.max(0, num))]);
-        return acc;
-      }, [])
-    : [];
+    worthItDimensions != null &&
+    !isSignalFormat &&
+    "uniqueness" in worthItDimensions;
+  const normalizedDimensionEntries =
+    isLegacyDimensionFormat && worthItDimensions
+      ? Object.entries(worthItDimensions).reduce<[string, number][]>(
+          (acc, [key, raw]) => {
+            if (key === "kind") return acc;
+            const num =
+              typeof raw === "number"
+                ? raw
+                : typeof raw === "string"
+                  ? Number(raw)
+                  : NaN;
+            if (!Number.isFinite(num)) return acc;
+            acc.push([key, Math.min(10, Math.max(0, num))]);
+            return acc;
+          },
+          [],
+        )
+      : [];
 
   return (
     <div className="space-y-6">
@@ -297,7 +321,9 @@ export function SummaryDisplay({
             )}
             {isSignalFormat && worthItDimensions.kind === "signals" && (
               <div className="mt-4 space-y-2 border-t pt-4">
-                <p className="text-sm font-medium text-foreground">Quality Signals</p>
+                <p className="text-sm font-medium text-foreground">
+                  Quality Signals
+                </p>
                 {WORTH_IT_SIGNAL_KEYS.map((key) => (
                   <div key={key} className="flex items-center gap-2 text-sm">
                     {worthItDimensions.signals[key] ? (
@@ -305,25 +331,36 @@ export function SummaryDisplay({
                     ) : (
                       <XCircle className="h-4 w-4 text-muted-foreground/40" />
                     )}
-                    <span className={worthItDimensions.signals[key] ? "text-foreground" : "text-muted-foreground"}>
+                    <span
+                      className={
+                        worthItDimensions.signals[key]
+                          ? "text-foreground"
+                          : "text-muted-foreground"
+                      }
+                    >
                       {SIGNAL_LABELS[key]}
                     </span>
                   </div>
                 ))}
                 {worthItDimensions.adjustment !== 0 && (
-                  <p className="mt-2 text-xs text-muted-foreground italic">
-                    Adjustment: {worthItDimensions.adjustment > 0 ? "+1" : "-1"} — {worthItDimensions.adjustmentReason}
+                  <p className="mt-2 text-xs italic text-muted-foreground">
+                    Adjustment: {worthItDimensions.adjustment > 0 ? "+1" : "-1"}{" "}
+                    — {worthItDimensions.adjustmentReason}
                   </p>
                 )}
               </div>
             )}
             {normalizedDimensionEntries.length > 0 && (
               <div className="mt-4 space-y-3 border-t pt-4">
-                <p className="text-sm font-medium text-foreground">Score Breakdown</p>
+                <p className="text-sm font-medium text-foreground">
+                  Score Breakdown
+                </p>
                 {normalizedDimensionEntries.map(([key, value]) => (
                   <div key={key} className="space-y-1">
                     <div className="flex items-center justify-between text-xs">
-                      <span className="text-muted-foreground">{DIMENSION_LABELS[key] ?? key}</span>
+                      <span className="text-muted-foreground">
+                        {DIMENSION_LABELS[key] ?? key}
+                      </span>
                       <span className="font-medium">{value.toFixed(1)}</span>
                     </div>
                     <Progress
@@ -353,7 +390,9 @@ export function SummaryDisplay({
           {hasStructuredSections ? (
             <div className="space-y-4">
               {renderSections(
-                showFullSummary ? structuredSections : structuredSections.slice(0, 1)
+                showFullSummary
+                  ? structuredSections
+                  : structuredSections.slice(0, 1),
               )}
             </div>
           ) : (

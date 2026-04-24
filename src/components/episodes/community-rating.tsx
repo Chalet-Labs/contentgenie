@@ -57,14 +57,28 @@ export function CommunityRating({
   if (isLoading) {
     return (
       <div className="flex items-center gap-2">
-        <Skeleton className={cn("rounded", size === "sm" ? "h-3 w-16" : size === "md" ? "h-4 w-20" : "h-5 w-24")} />
+        <Skeleton
+          className={cn(
+            "rounded",
+            size === "sm"
+              ? "h-3 w-16"
+              : size === "md"
+                ? "h-4 w-20"
+                : "h-5 w-24",
+          )}
+        />
       </div>
     );
   }
 
   if (error || averageRating === null || ratingCount === 0) {
     return (
-      <div className={cn("flex items-center gap-1 text-muted-foreground", textSizeClasses[size])}>
+      <div
+        className={cn(
+          "flex items-center gap-1 text-muted-foreground",
+          textSizeClasses[size],
+        )}
+      >
         <Star className={cn(sizeClasses[size], "fill-transparent")} />
         <span>No ratings yet</span>
       </div>
@@ -88,15 +102,16 @@ export function CommunityRating({
         ))}
         {/* Half star (simplified as full for now) */}
         {hasHalfStar && (
-          <Star
-            className={cn(sizeClasses[size], "fill-brand/50 text-brand")}
-          />
+          <Star className={cn(sizeClasses[size], "fill-brand/50 text-brand")} />
         )}
         {/* Empty stars */}
         {Array.from({ length: emptyStars }).map((_, i) => (
           <Star
             key={`empty-${i}`}
-            className={cn(sizeClasses[size], "fill-transparent text-muted-foreground")}
+            className={cn(
+              sizeClasses[size],
+              "fill-transparent text-muted-foreground",
+            )}
           />
         ))}
       </div>

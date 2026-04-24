@@ -29,7 +29,9 @@ export const rankEpisodeTopics = schedules.task({
   maxDuration: 600,
   retry: { maxAttempts: 2 },
   run: async () => {
-    const windowStart = new Date(Date.now() - LOOKBACK_DAYS * 24 * 60 * 60 * 1000);
+    const windowStart = new Date(
+      Date.now() - LOOKBACK_DAYS * 24 * 60 * 60 * 1000,
+    );
 
     logger.info("Starting cross-episode topic ranking", {
       windowStart: windowStart.toISOString(),
@@ -47,8 +49,8 @@ export const rankEpisodeTopics = schedules.task({
         .where(
           and(
             eq(episodes.summaryStatus, "completed"),
-            gte(episodes.processedAt, windowStart)
-          )
+            gte(episodes.processedAt, windowStart),
+          ),
         )
         .groupBy(episodeTopics.topic)
         .having(sql`COUNT(${episodeTopics.episodeId}) >= 3`)
@@ -64,15 +66,23 @@ export const rankEpisodeTopics = schedules.task({
     const qualifyingTopics = topicRows.slice(0, MAX_TOPICS_PER_RUN);
 
     if (topicRows.length > MAX_TOPICS_PER_RUN) {
-      logger.warn("Qualifying topics exceeded cap; some topics will be skipped", {
-        total: topicRows.length,
-        cap: MAX_TOPICS_PER_RUN,
-      });
+      logger.warn(
+        "Qualifying topics exceeded cap; some topics will be skipped",
+        {
+          total: topicRows.length,
+          cap: MAX_TOPICS_PER_RUN,
+        },
+      );
     }
 
     if (qualifyingTopics.length === 0) {
       logger.info("No qualifying topics found");
-      return { topicsRanked: 0, comparisonsRun: 0, comparisonsFailed: 0, writeFailed: 0 };
+      return {
+        topicsRanked: 0,
+        comparisonsRun: 0,
+        comparisonsFailed: 0,
+        writeFailed: 0,
+      };
     }
 
     // Step 1b: Compute adaptive episode cap based on number of qualifying topics
@@ -103,17 +113,20 @@ export const rankEpisodeTopics = schedules.task({
             and(
               eq(episodeTopics.topic, topic),
               eq(episodes.summaryStatus, "completed"),
-              gte(episodes.processedAt, windowStart)
-            )
+              gte(episodes.processedAt, windowStart),
+            ),
           )
           .orderBy(sql`${episodes.worthItScore} DESC NULLS LAST`)
           .limit(episodeCap);
 
         if (episodeRows.length < 3) {
-          logger.info("Topic has fewer than 3 episodes after filtering; skipping", {
-            topic,
-            episodeCount: episodeRows.length,
-          });
+          logger.info(
+            "Topic has fewer than 3 episodes after filtering; skipping",
+            {
+              topic,
+              episodeCount: episodeRows.length,
+            },
+          );
           continue;
         }
 
@@ -127,18 +140,19 @@ export const rankEpisodeTopics = schedules.task({
               epA.title,
               epA.summary ?? "",
               epB.title,
-              epB.summary ?? ""
+              epB.summary ?? "",
             );
             const completion = await generateCompletion(
               [
                 { role: "system", content: TOPIC_RANKING_SYSTEM_PROMPT },
                 { role: "user", content: userPrompt },
               ],
-              { temperature: 0.1, maxTokens: 256 }
+              { temperature: 0.1, maxTokens: 256 },
             );
-            const parsed = parseJsonResponse<{ winner: "A" | "B" | "tie"; reason: string }>(
-              completion
-            );
+            const parsed = parseJsonResponse<{
+              winner: "A" | "B" | "tie";
+              reason: string;
+            }>(completion);
             if (
               parsed.winner !== "A" &&
               parsed.winner !== "B" &&
@@ -157,7 +171,8 @@ export const rankEpisodeTopics = schedules.task({
               topic,
               episodeIdA: epA.episodeId,
               episodeIdB: epB.episodeId,
-              errorType: err instanceof Error ? err.constructor.name : "unknown",
+              errorType:
+                err instanceof Error ? err.constructor.name : "unknown",
               error: err instanceof Error ? err.message : String(err),
             });
             comparisonsFailed++;
@@ -171,7 +186,7 @@ export const rankEpisodeTopics = schedules.task({
 
         const episodeIds = episodeRows.map((r) => r.episodeId);
         const scores = new Map(
-          episodeRows.map((r) => [r.episodeId, parseScore(r.worthItScore)])
+          episodeRows.map((r) => [r.episodeId, parseScore(r.worthItScore)]),
         );
         const ranked = aggregateWinCounts(results, episodeIds, scores);
 
@@ -191,10 +206,10 @@ export const rankEpisodeTopics = schedules.task({
                 .where(
                   and(
                     eq(episodeTopics.episodeId, episodeId),
-                    eq(episodeTopics.topic, topic)
-                  )
-                )
-            )
+                    eq(episodeTopics.topic, topic),
+                  ),
+                ),
+            ),
           );
           topicsRanked++;
         } catch (err) {
@@ -213,7 +228,12 @@ export const rankEpisodeTopics = schedules.task({
       }
     }
 
-    const result = { topicsRanked, comparisonsRun, comparisonsFailed, writeFailed };
+    const result = {
+      topicsRanked,
+      comparisonsRun,
+      comparisonsFailed,
+      writeFailed,
+    };
     logger.info("Topic ranking complete", result);
     return result;
   },

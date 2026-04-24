@@ -22,9 +22,8 @@ vi.mock("@/app/actions/subscriptions", () => ({
 // per call, so we override `useRouter` locally to capture calls across renders.
 const routerRefreshMock = vi.fn();
 vi.mock("next/navigation", async () => {
-  const actual = await vi.importActual<typeof import("next/navigation")>(
-    "next/navigation",
-  );
+  const actual =
+    await vi.importActual<typeof import("next/navigation")>("next/navigation");
   return {
     ...actual,
     useRouter: () => ({
@@ -69,7 +68,9 @@ vi.mock("@/components/ui/select", () => {
       {children}
     </select>
   );
-  const Passthrough = ({ children }: { children?: React.ReactNode }) => <>{children}</>;
+  const Passthrough = ({ children }: { children?: React.ReactNode }) => (
+    <>{children}</>
+  );
   const SelectItem = ({
     value,
     children,
@@ -271,9 +272,10 @@ describe("SubscriptionsList", () => {
     await waitFor(() => {
       expect(toastError).toHaveBeenCalledWith("pin failed");
     });
-    expect(
-      screen.getByRole("button", { name: "Pin podcast" }),
-    ).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByRole("button", { name: "Pin podcast" })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
     expect(routerRefreshMock).not.toHaveBeenCalled();
   });
 
@@ -289,9 +291,10 @@ describe("SubscriptionsList", () => {
     await waitFor(() => {
       expect(toastError).toHaveBeenCalled();
     });
-    expect(
-      screen.getByRole("button", { name: "Pin podcast" }),
-    ).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByRole("button", { name: "Pin podcast" })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
     expect(routerRefreshMock).not.toHaveBeenCalled();
   });
 });

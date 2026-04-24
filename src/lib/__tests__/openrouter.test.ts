@@ -1,5 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { parseJsonResponse, generateCompletion, SIGNAL_LABELS } from "@/lib/openrouter";
+import {
+  parseJsonResponse,
+  generateCompletion,
+  SIGNAL_LABELS,
+} from "@/lib/openrouter";
 
 // generateCompletion routes through @/lib/ai which calls getActiveAiConfig() → DB.
 // Mock the config module so tests never touch the database.
@@ -16,30 +20,24 @@ vi.mock("@/lib/ai/config", () => ({
 
 describe("parseJsonResponse", () => {
   it("parses plain JSON", () => {
-    const result = parseJsonResponse<{ foo: string }>(
-      '{"foo": "bar"}'
-    );
+    const result = parseJsonResponse<{ foo: string }>('{"foo": "bar"}');
     expect(result).toEqual({ foo: "bar" });
   });
 
   it("strips ```json wrapper", () => {
     const result = parseJsonResponse<{ key: number }>(
-      '```json\n{"key": 42}\n```'
+      '```json\n{"key": 42}\n```',
     );
     expect(result).toEqual({ key: 42 });
   });
 
   it("strips ``` wrapper without language tag", () => {
-    const result = parseJsonResponse<{ a: boolean }>(
-      '```\n{"a": true}\n```'
-    );
+    const result = parseJsonResponse<{ a: boolean }>('```\n{"a": true}\n```');
     expect(result).toEqual({ a: true });
   });
 
   it("handles whitespace around content", () => {
-    const result = parseJsonResponse<{ x: string }>(
-      '  \n  {"x": "y"}  \n  '
-    );
+    const result = parseJsonResponse<{ x: string }>('  \n  {"x": "y"}  \n  ');
     expect(result).toEqual({ x: "y" });
   });
 
@@ -48,7 +46,8 @@ describe("parseJsonResponse", () => {
   });
 
   it("includes raw response snippet and parse reason in error when JSON.parse fails", () => {
-    const rawResponse = "This is not valid JSON at all, the LLM hallucinated something completely wrong here";
+    const rawResponse =
+      "This is not valid JSON at all, the LLM hallucinated something completely wrong here";
     expect(() => parseJsonResponse(rawResponse)).toThrow(rawResponse);
   });
 
@@ -56,7 +55,9 @@ describe("parseJsonResponse", () => {
     const rawResponse = "x".repeat(300);
     expect(() => parseJsonResponse(rawResponse)).toThrow("x".repeat(200));
     // Negative assertion requires catching — verify actual truncation
-    try { parseJsonResponse(rawResponse); } catch (e) {
+    try {
+      parseJsonResponse(rawResponse);
+    } catch (e) {
       expect((e as Error).message).not.toContain("x".repeat(201));
     }
   });
@@ -91,7 +92,7 @@ describe("generateCompletion", () => {
   it("throws when API key is missing", async () => {
     vi.stubEnv("OPENROUTER_API_KEY", "");
     await expect(
-      generateCompletion([{ role: "user", content: "test" }])
+      generateCompletion([{ role: "user", content: "test" }]),
     ).rejects.toThrow("OpenRouter API key is not configured");
   });
 
@@ -106,10 +107,11 @@ describe("generateCompletion", () => {
     });
     vi.stubGlobal("fetch", mockFetch);
 
-    await generateCompletion(
-      [{ role: "user", content: "hello" }],
-      { model: "test-model", maxTokens: 100, temperature: 0.5 }
-    );
+    await generateCompletion([{ role: "user", content: "hello" }], {
+      model: "test-model",
+      maxTokens: 100,
+      temperature: 0.5,
+    });
 
     expect(mockFetch).toHaveBeenCalledOnce();
     const [url, options] = mockFetch.mock.calls[0];
@@ -135,7 +137,7 @@ describe("generateCompletion", () => {
           Promise.resolve({
             choices: [{ message: { content: "hello world" } }],
           }),
-      })
+      }),
     );
 
     const result = await generateCompletion([
@@ -152,11 +154,11 @@ describe("generateCompletion", () => {
         ok: false,
         status: 429,
         text: () => Promise.resolve("Rate limited"),
-      })
+      }),
     );
 
     await expect(
-      generateCompletion([{ role: "user", content: "test" }])
+      generateCompletion([{ role: "user", content: "test" }]),
     ).rejects.toThrow("OpenRouter API error: 429 - Rate limited");
   });
 
@@ -167,11 +169,11 @@ describe("generateCompletion", () => {
       vi.fn().mockResolvedValue({
         ok: true,
         json: () => Promise.resolve({ choices: [] }),
-      })
+      }),
     );
 
     await expect(
-      generateCompletion([{ role: "user", content: "test" }])
+      generateCompletion([{ role: "user", content: "test" }]),
     ).rejects.toThrow("No response from OpenRouter");
   });
 

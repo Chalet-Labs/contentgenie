@@ -10,7 +10,8 @@ vi.mock("@/app/actions/dashboard", () => ({
 
 const mockGetListenedEpisodeIds = vi.fn();
 vi.mock("@/app/actions/listen-history", () => ({
-  getListenedEpisodeIds: (...args: unknown[]) => mockGetListenedEpisodeIds(...args),
+  getListenedEpisodeIds: (...args: unknown[]) =>
+    mockGetListenedEpisodeIds(...args),
 }));
 
 import { TrendingDetailContent } from "../trending-detail-content";
@@ -58,17 +59,25 @@ describe("TrendingDetailContent", () => {
   });
 
   it("renders error card when action returns kind=error", async () => {
-    mockGetTrendingTopicBySlug.mockResolvedValue({ kind: "error", message: "Failed to load topic" });
+    mockGetTrendingTopicBySlug.mockResolvedValue({
+      kind: "error",
+      message: "Failed to load topic",
+    });
 
     render(await TrendingDetailContent({ slug: "artificial-intelligence" }));
 
-    expect(screen.getByRole("heading", { name: "Trending topics unavailable" })).toBeInTheDocument();
-    expect(screen.getByText(/refresh the page or try again/i)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Back to dashboard" })).toHaveAttribute(
-      "href",
-      "/dashboard",
-    );
-    expect(screen.queryByRole("heading", { name: "No trending topics right now" })).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Trending topics unavailable" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/refresh the page or try again/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "Back to dashboard" }),
+    ).toHaveAttribute("href", "/dashboard");
+    expect(
+      screen.queryByRole("heading", { name: "No trending topics right now" }),
+    ).not.toBeInTheDocument();
   });
 
   it("renders no-snapshot fallback without a switcher", async () => {
@@ -76,13 +85,18 @@ describe("TrendingDetailContent", () => {
 
     render(await TrendingDetailContent({ slug: "anything" }));
 
-    expect(screen.getByRole("heading", { name: "No trending topics right now" })).toBeInTheDocument();
-    expect(screen.getByText(/new trending topics are generated daily/i)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Back to dashboard" })).toHaveAttribute(
-      "href",
-      "/dashboard",
-    );
-    expect(screen.queryByRole("navigation", { name: "Trending topics" })).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "No trending topics right now" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/new trending topics are generated daily/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "Back to dashboard" }),
+    ).toHaveAttribute("href", "/dashboard");
+    expect(
+      screen.queryByRole("navigation", { name: "Trending topics" }),
+    ).not.toBeInTheDocument();
   });
 
   it("renders unknown-slug fallback with switcher", async () => {
@@ -97,15 +111,15 @@ describe("TrendingDetailContent", () => {
     expect(
       screen.getByRole("heading", { name: "This topic is no longer trending" }),
     ).toBeInTheDocument();
-    expect(screen.getByText(/didn't make the latest trending snapshot/i)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Artificial Intelligence" })).toHaveAttribute(
-      "href",
-      "/trending/artificial-intelligence",
-    );
-    expect(screen.getByRole("link", { name: "Climate Policy" })).toHaveAttribute(
-      "href",
-      "/trending/climate-policy",
-    );
+    expect(
+      screen.getByText(/didn't make the latest trending snapshot/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("link", { name: "Artificial Intelligence" }),
+    ).toHaveAttribute("href", "/trending/artificial-intelligence");
+    expect(
+      screen.getByRole("link", { name: "Climate Policy" }),
+    ).toHaveAttribute("href", "/trending/climate-policy");
   });
 
   it("appends stale notice to unknown-slug fallback when snapshot is stale", async () => {
@@ -133,7 +147,9 @@ describe("TrendingDetailContent", () => {
 
     render(await TrendingDetailContent({ slug: "artificial-intelligence" }));
 
-    expect(screen.getByRole("heading", { level: 1, name: aiTopic.name })).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { level: 1, name: aiTopic.name }),
+    ).toBeInTheDocument();
     expect(screen.queryByText(/may be out of date/i)).not.toBeInTheDocument();
     expect(screen.getByText(aiTopic.description)).toBeInTheDocument();
     expect(screen.getByText(/past 7 days/i)).toBeInTheDocument();
@@ -152,7 +168,9 @@ describe("TrendingDetailContent", () => {
 
     render(await TrendingDetailContent({ slug: "artificial-intelligence" }));
 
-    expect(screen.getByText(/this trending topic may be out of date/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/this trending topic may be out of date/i),
+    ).toBeInTheDocument();
   });
 
   it("renders found + empty-episodes message when episodes is []", async () => {
@@ -166,7 +184,9 @@ describe("TrendingDetailContent", () => {
 
     render(await TrendingDetailContent({ slug: "artificial-intelligence" }));
 
-    expect(screen.getByText(/no episodes available for this topic yet/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/no episodes available for this topic yet/i),
+    ).toBeInTheDocument();
   });
 
   it("skips getListenedEpisodeIds when there are no episodes", async () => {
@@ -191,12 +211,16 @@ describe("TrendingDetailContent", () => {
       episodes: [mockEpisode],
       generatedAt: new Date(Date.now() - 60 * 60 * 1000),
     });
-    mockGetListenedEpisodeIds.mockResolvedValue(new Set<number>([mockEpisode.id]));
+    mockGetListenedEpisodeIds.mockResolvedValue(
+      new Set<number>([mockEpisode.id]),
+    );
 
     render(await TrendingDetailContent({ slug: "artificial-intelligence" }));
 
     expect(mockGetListenedEpisodeIds).toHaveBeenCalledWith([mockEpisode.id]);
-    expect(screen.queryByRole("button", { name: "Mark as listened" })).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: "Mark as listened" }),
+    ).toBeNull();
     expect(screen.getByLabelText("Already listened")).toBeInTheDocument();
   });
 
@@ -212,6 +236,8 @@ describe("TrendingDetailContent", () => {
 
     render(await TrendingDetailContent({ slug: "artificial-intelligence" }));
 
-    expect(screen.getByRole("button", { name: "Mark as listened" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Mark as listened" }),
+    ).toBeInTheDocument();
   });
 });

@@ -1,12 +1,12 @@
-import { describe, it, expect, vi, beforeEach } from "vitest"
+import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const mockSelect = vi.fn()
+const mockSelect = vi.fn();
 
 vi.mock("@/db", () => ({
   db: {
     select: (...args: unknown[]) => mockSelect(...args),
   },
-}))
+}));
 
 vi.mock("@/db/schema", () => ({
   episodes: {
@@ -26,7 +26,7 @@ vi.mock("@/db/schema", () => ({
     title: "title",
     imageUrl: "image_url",
   },
-}))
+}));
 
 vi.mock("drizzle-orm", () => ({
   count: vi.fn(() => "COUNT(*)"),
@@ -36,35 +36,36 @@ vi.mock("drizzle-orm", () => ({
       as: (alias: string) => ({ sql: strings.join(""), alias }),
       toString: () => strings.join(""),
     }),
-    { raw: (s: string) => s }
+    { raw: (s: string) => s },
   ),
   and: vi.fn((...args) => ({ and: args })),
   gte: vi.fn((col, val) => ({ gte: [col, val] })),
   lte: vi.fn((col, val) => ({ lte: [col, val] })),
   inArray: vi.fn((col, vals) => ({ inArray: [col, vals] })),
-}))
+}));
 
 vi.mock("@/lib/admin/episode-filters", () => ({
   buildEpisodeWhereConditions: vi.fn(() => undefined),
   PAGE_SIZE: 25,
-}))
+}));
 
 function makeQueryChain(rows: unknown[]) {
-  const chain: Record<string, unknown> = {}
-  const methods = ["from", "innerJoin", "where", "orderBy", "limit", "offset"]
+  const chain: Record<string, unknown> = {};
+  const methods = ["from", "innerJoin", "where", "orderBy", "limit", "offset"];
   methods.forEach((m) => {
-    chain[m] = vi.fn(() => chain)
-  })
-  chain["then"] = (resolve: (v: unknown) => unknown) => Promise.resolve(rows).then(resolve)
-  return chain
+    chain[m] = vi.fn(() => chain);
+  });
+  chain["then"] = (resolve: (v: unknown) => unknown) =>
+    Promise.resolve(rows).then(resolve);
+  return chain;
 }
 
-import { getFilteredEpisodes } from "@/lib/admin/episode-queries"
+import { getFilteredEpisodes } from "@/lib/admin/episode-queries";
 
 describe("getFilteredEpisodes", () => {
   beforeEach(() => {
-    vi.clearAllMocks()
-  })
+    vi.clearAllMocks();
+  });
 
   it("returns rows with correct worthItScore coercion", async () => {
     const rowsData = [
@@ -81,21 +82,23 @@ describe("getFilteredEpisodes", () => {
         summaryStatus: "completed",
         worthItScore: "8.50",
       },
-    ]
-    const countData = [{ value: 1 }]
+    ];
+    const countData = [{ value: 1 }];
 
-    let callIdx = 0
+    let callIdx = 0;
     mockSelect.mockImplementation(() => {
-      callIdx++
-      return callIdx === 1 ? makeQueryChain(rowsData) : makeQueryChain(countData)
-    })
+      callIdx++;
+      return callIdx === 1
+        ? makeQueryChain(rowsData)
+        : makeQueryChain(countData);
+    });
 
-    const result = await getFilteredEpisodes({ page: 1 })
+    const result = await getFilteredEpisodes({ page: 1 });
 
-    expect(result.rows).toHaveLength(1)
-    expect(result.rows[0].worthItScore).toBe("8.50")
-    expect(result.totalCount).toBe(1)
-  })
+    expect(result.rows).toHaveLength(1);
+    expect(result.rows[0].worthItScore).toBe("8.50");
+    expect(result.totalCount).toBe(1);
+  });
 
   it("returns null worthItScore when score is null", async () => {
     const rowsData = [
@@ -112,43 +115,45 @@ describe("getFilteredEpisodes", () => {
         summaryStatus: null,
         worthItScore: null,
       },
-    ]
-    const countData = [{ value: 1 }]
+    ];
+    const countData = [{ value: 1 }];
 
-    let callIdx = 0
+    let callIdx = 0;
     mockSelect.mockImplementation(() => {
-      callIdx++
-      return callIdx === 1 ? makeQueryChain(rowsData) : makeQueryChain(countData)
-    })
+      callIdx++;
+      return callIdx === 1
+        ? makeQueryChain(rowsData)
+        : makeQueryChain(countData);
+    });
 
-    const result = await getFilteredEpisodes({ page: 1 })
-    expect(result.rows[0].worthItScore).toBeNull()
-  })
+    const result = await getFilteredEpisodes({ page: 1 });
+    expect(result.rows[0].worthItScore).toBeNull();
+  });
 
   it("calculates correct offset for page > 1", async () => {
-    let callIdx = 0
+    let callIdx = 0;
     mockSelect.mockImplementation(() => {
-      callIdx++
-      const chain = makeQueryChain(callIdx === 1 ? [] : [{ value: 0 }])
-      return chain
-    })
+      callIdx++;
+      const chain = makeQueryChain(callIdx === 1 ? [] : [{ value: 0 }]);
+      return chain;
+    });
 
-    await getFilteredEpisodes({ page: 3 })
+    await getFilteredEpisodes({ page: 3 });
 
     // The rows query chain should have .offset(50) called (page 3, PAGE_SIZE 25)
-    const rowsChain = mockSelect.mock.results[0].value
-    expect(rowsChain.offset).toHaveBeenCalledWith(50)
-  })
+    const rowsChain = mockSelect.mock.results[0].value;
+    expect(rowsChain.offset).toHaveBeenCalledWith(50);
+  });
 
   it("returns totalCount 0 when count query returns empty", async () => {
-    let callIdx = 0
+    let callIdx = 0;
     mockSelect.mockImplementation(() => {
-      callIdx++
-      return makeQueryChain(callIdx === 1 ? [] : [])
-    })
+      callIdx++;
+      return makeQueryChain(callIdx === 1 ? [] : []);
+    });
 
-    const result = await getFilteredEpisodes({ page: 1 })
-    expect(result.rows).toHaveLength(0)
-    expect(result.totalCount).toBe(0)
-  })
-})
+    const result = await getFilteredEpisodes({ page: 1 });
+    expect(result.rows).toHaveLength(0);
+    expect(result.totalCount).toBe(0);
+  });
+});

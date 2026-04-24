@@ -123,7 +123,7 @@ describe("POST /api/subscriptions/subscribe", () => {
       new NextRequest("http://localhost:3000/api/subscriptions/subscribe", {
         method: "POST",
         body: "not-json",
-      })
+      }),
     );
 
     expect(response.status).toBe(415);

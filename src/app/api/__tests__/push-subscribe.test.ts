@@ -34,7 +34,7 @@ const TEST_ENDPOINT = "https://fcm.googleapis.com/fcm/send/test-sub-1";
 function createSubscribeRequest(
   method: "POST" | "DELETE",
   body: object,
-  { csrfHeader = "fetch" }: { csrfHeader?: string | null } = {}
+  { csrfHeader = "fetch" }: { csrfHeader?: string | null } = {},
 ) {
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -63,7 +63,7 @@ describe("POST /api/push/subscribe", () => {
     const request = createSubscribeRequest(
       "POST",
       { endpoint: TEST_ENDPOINT, keys: { p256dh: "key", auth: "auth" } },
-      { csrfHeader: null }
+      { csrfHeader: null },
     );
 
     const response = await POST(request);
@@ -76,7 +76,7 @@ describe("POST /api/push/subscribe", () => {
     const request = createSubscribeRequest(
       "POST",
       { endpoint: TEST_ENDPOINT, keys: { p256dh: "key", auth: "auth" } },
-      { csrfHeader: null }
+      { csrfHeader: null },
     );
 
     const response = await POST(request);
@@ -89,7 +89,7 @@ describe("POST /api/push/subscribe", () => {
     const request = createSubscribeRequest(
       "POST",
       { endpoint: TEST_ENDPOINT, keys: { p256dh: "key", auth: "auth" } },
-      { csrfHeader: "XMLHttpRequest" }
+      { csrfHeader: "XMLHttpRequest" },
     );
 
     const response = await POST(request);
@@ -103,7 +103,7 @@ describe("POST /api/push/subscribe", () => {
     const request = createSubscribeRequest(
       "POST",
       { endpoint: TEST_ENDPOINT, keys: { p256dh: "key", auth: "auth" } },
-      { csrfHeader: "fetch" }
+      { csrfHeader: "fetch" },
     );
 
     const response = await POST(request);
@@ -163,7 +163,7 @@ describe("DELETE /api/push/subscribe", () => {
     const request = createSubscribeRequest(
       "DELETE",
       { endpoint: TEST_ENDPOINT },
-      { csrfHeader: null }
+      { csrfHeader: null },
     );
 
     const response = await DELETE(request);
@@ -176,7 +176,7 @@ describe("DELETE /api/push/subscribe", () => {
     const request = createSubscribeRequest(
       "DELETE",
       { endpoint: TEST_ENDPOINT },
-      { csrfHeader: null }
+      { csrfHeader: null },
     );
 
     const response = await DELETE(request);
@@ -189,7 +189,7 @@ describe("DELETE /api/push/subscribe", () => {
     const request = createSubscribeRequest(
       "DELETE",
       { endpoint: TEST_ENDPOINT },
-      { csrfHeader: "XMLHttpRequest" }
+      { csrfHeader: "XMLHttpRequest" },
     );
 
     const response = await DELETE(request);
@@ -203,7 +203,7 @@ describe("DELETE /api/push/subscribe", () => {
     const request = createSubscribeRequest(
       "DELETE",
       { endpoint: TEST_ENDPOINT },
-      { csrfHeader: "fetch" }
+      { csrfHeader: "fetch" },
     );
 
     const response = await DELETE(request);

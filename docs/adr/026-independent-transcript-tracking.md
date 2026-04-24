@@ -19,11 +19,11 @@ The `transcriptSource` column was defined in `schema.ts` in a prior commit with 
 
 Add three new columns to the `episodes` table:
 
-| Column | Type | Purpose |
-|--------|------|---------|
-| `transcript_status` | `text` (CHECK: `missing`, `fetching`, `available`, `failed`) | Independent lifecycle tracking for transcript acquisition |
-| `transcript_fetched_at` | `timestamp` | When the transcript was successfully fetched |
-| `transcript_error` | `text` | Last error message from a failed transcript fetch |
+| Column                  | Type                                                         | Purpose                                                   |
+| ----------------------- | ------------------------------------------------------------ | --------------------------------------------------------- |
+| `transcript_status`     | `text` (CHECK: `missing`, `fetching`, `available`, `failed`) | Independent lifecycle tracking for transcript acquisition |
+| `transcript_fetched_at` | `timestamp`                                                  | When the transcript was successfully fetched              |
+| `transcript_error`      | `text`                                                       | Last error message from a failed transcript fetch         |
 
 ### Design choices
 

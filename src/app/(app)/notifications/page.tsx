@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
 import { auth } from "@clerk/nextjs/server";
 import { AlertCircle } from "lucide-react";
-import { getNotifications, getEpisodeTopics } from "@/app/actions/notifications";
+import {
+  getNotifications,
+  getEpisodeTopics,
+} from "@/app/actions/notifications";
 import { getListenedEpisodeIds } from "@/app/actions/listen-history";
 import { NotificationPageList } from "@/components/notifications/notification-page-list";
 import { NOTIFICATIONS_PAGE_SIZE } from "@/lib/notifications-constants";
@@ -76,7 +79,9 @@ export default async function NotificationsPage({
           <div className="mb-3 rounded-full bg-destructive/10 p-4 text-destructive">
             <AlertCircle className="h-6 w-6" />
           </div>
-          <p className="text-sm font-medium">Couldn&apos;t load notifications</p>
+          <p className="text-sm font-medium">
+            Couldn&apos;t load notifications
+          </p>
           <p className="mt-1 text-xs">Try refreshing the page.</p>
         </div>
       </div>

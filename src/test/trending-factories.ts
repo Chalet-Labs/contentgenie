@@ -7,7 +7,9 @@ import type { TrendingTopic } from "@/db/schema";
  * customize any field, including forcing an empty-string slug to exercise
  * the defensive fallback path.
  */
-export function makeTopic(overrides: Partial<TrendingTopic> = {}): TrendingTopic {
+export function makeTopic(
+  overrides: Partial<TrendingTopic> = {},
+): TrendingTopic {
   const name = overrides.name ?? "Test Topic";
   return {
     name,

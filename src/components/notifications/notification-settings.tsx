@@ -25,9 +25,7 @@ const PUSH_API_HEADERS = {
 
 function urlBase64ToUint8Array(base64String: string): Uint8Array {
   const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
-  const base64 = (base64String + padding)
-    .replace(/-/g, "+")
-    .replace(/_/g, "/");
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
   const rawData = atob(base64);
   const outputArray = new Uint8Array(rawData.length);
   for (let i = 0; i < rawData.length; ++i) {
@@ -53,7 +51,7 @@ export function NotificationSettings() {
       setPushPermission("unsupported");
     } else {
       setPushPermission(
-        Notification.permission as "default" | "granted" | "denied"
+        Notification.permission as "default" | "granted" | "denied",
       );
     }
 
@@ -152,9 +150,7 @@ export function NotificationSettings() {
     }
   };
 
-  const handleDigestChange = async (
-    value: "realtime" | "daily" | "weekly"
-  ) => {
+  const handleDigestChange = async (value: "realtime" | "daily" | "weekly") => {
     const prev = digestFrequency;
     setDigestFrequency(value);
     const result = await updateNotificationPreferences({
@@ -224,7 +220,10 @@ export function NotificationSettings() {
         </div>
         {isLoaded ? (
           <Select value={digestFrequency} onValueChange={handleDigestChange}>
-            <SelectTrigger className="w-[140px]" aria-labelledby="digest-frequency-label">
+            <SelectTrigger
+              className="w-[140px]"
+              aria-labelledby="digest-frequency-label"
+            >
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

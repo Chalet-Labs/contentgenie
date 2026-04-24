@@ -34,26 +34,35 @@ export function Pricing() {
               PUBLIC BETA · LIMITED SEATS
             </div>
             <div className="lp-beta-price">
-              <span className="lp-beta-strike">$9<span className="lp-beta-per">/mo</span></span>
+              <span className="lp-beta-strike">
+                $9<span className="lp-beta-per">/mo</span>
+              </span>
               <span className="lp-beta-now">$0</span>
               <span className="lp-beta-until">while in beta</span>
             </div>
             <p className="lp-beta-pitch">
-              Every ContentGenie feature — unlimited summaries, unlimited library,
-              priority queue, OPML import — free for everyone who joins before we
-              leave beta. Your account is grandfathered:{" "}
+              Every ContentGenie feature — unlimited summaries, unlimited
+              library, priority queue, OPML import — free for everyone who joins
+              before we leave beta. Your account is grandfathered:{" "}
               <strong>50% off forever</strong> when we start charging.
             </p>
             <div className="lp-beta-cta">
-              <JoinBetaButton label="Claim your seat — free" withArrow={false} />
-              <span className="lp-beta-note">No credit card. 30-second sign-up.</span>
+              <JoinBetaButton
+                label="Claim your seat — free"
+                withArrow={false}
+              />
+              <span className="lp-beta-note">
+                No credit card. 30-second sign-up.
+              </span>
             </div>
           </div>
           <div className="lp-beta-right">
             <ul className="lp-beta-feat">
               {features.map((f) => (
                 <li key={f}>
-                  <span className="lp-check" aria-hidden>✓</span>
+                  <span className="lp-check" aria-hidden>
+                    ✓
+                  </span>
                   {f}
                 </li>
               ))}

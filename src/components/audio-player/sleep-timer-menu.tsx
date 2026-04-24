@@ -1,59 +1,64 @@
-"use client"
+"use client";
 
-import { useEffect, useReducer } from "react"
-import { Moon, Check } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { useEffect, useReducer } from "react";
+import { Moon, Check } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+} from "@/components/ui/dropdown-menu";
 import {
   useAudioPlayerState,
   useAudioPlayerAPI,
-} from "@/contexts/audio-player-context"
-import { formatTime } from "@/lib/format-time"
+} from "@/contexts/audio-player-context";
+import { formatTime } from "@/lib/format-time";
 
-const PRESETS = [15, 30, 45, 60] as const
+const PRESETS = [15, 30, 45, 60] as const;
 
 export function SleepTimerMenu() {
-  const { sleepTimer } = useAudioPlayerState()
-  const { setSleepTimer, cancelSleepTimer } = useAudioPlayerAPI()
+  const { sleepTimer } = useAudioPlayerState();
+  const { setSleepTimer, cancelSleepTimer } = useAudioPlayerAPI();
 
   // Local tick drives countdown display — avoids 1/sec re-renders in shared state context
-  const [, tick] = useReducer((x: number) => x + 1, 0)
+  const [, tick] = useReducer((x: number) => x + 1, 0);
 
   useEffect(() => {
-    if (!sleepTimer || sleepTimer.type !== "duration" || sleepTimer.endTime === null) return
-    const id = setInterval(tick, 1000)
+    if (
+      !sleepTimer ||
+      sleepTimer.type !== "duration" ||
+      sleepTimer.endTime === null
+    )
+      return;
+    const id = setInterval(tick, 1000);
     const onVisibility = () => {
-      if (document.visibilityState === "visible") tick()
-    }
-    document.addEventListener("visibilitychange", onVisibility)
+      if (document.visibilityState === "visible") tick();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
     return () => {
-      clearInterval(id)
-      document.removeEventListener("visibilitychange", onVisibility)
-    }
-  }, [sleepTimer])
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, [sleepTimer]);
 
-  const isActive = sleepTimer !== null
-  const isDuration = sleepTimer?.type === "duration"
-  const isEndOfEpisode = sleepTimer?.type === "end-of-episode"
+  const isActive = sleepTimer !== null;
+  const isDuration = sleepTimer?.type === "duration";
+  const isEndOfEpisode = sleepTimer?.type === "end-of-episode";
 
   const remainingSeconds = sleepTimer?.endTime
     ? Math.max(0, Math.ceil((sleepTimer.endTime - Date.now()) / 1000))
-    : 0
+    : 0;
 
-  const minutesRemaining = Math.max(0, Math.ceil(remainingSeconds / 60))
-  const minuteUnit = minutesRemaining === 1 ? "minute" : "minutes"
+  const minutesRemaining = Math.max(0, Math.ceil(remainingSeconds / 60));
+  const minuteUnit = minutesRemaining === 1 ? "minute" : "minutes";
 
   const ariaLabel = isActive
     ? isDuration
       ? `Sleep timer — ${minutesRemaining} ${minuteUnit} remaining`
       : "Sleep timer — end of episode"
-    : "Sleep timer"
+    : "Sleep timer";
 
   return (
     <DropdownMenu>
@@ -102,5 +107,5 @@ export function SleepTimerMenu() {
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
-  )
+  );
 }

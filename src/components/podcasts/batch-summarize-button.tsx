@@ -61,7 +61,7 @@ export function BatchSummarizeButton({
     // Check for terminal states
     if (
       TERMINAL_STATUSES.includes(
-        run.status as (typeof TERMINAL_STATUSES)[number]
+        run.status as (typeof TERMINAL_STATUSES)[number],
       )
     ) {
       if (run.status === "COMPLETED") {
@@ -69,7 +69,9 @@ export function BatchSummarizeButton({
         toast.success("Batch summarization complete");
       } else {
         setState("error");
-        setErrorMessage(`Batch run ${run.status.toLowerCase().replace("_", " ")}`);
+        setErrorMessage(
+          `Batch run ${run.status.toLowerCase().replace("_", " ")}`,
+        );
         toast.error("Batch summarization failed");
       }
       setRunId(null);
@@ -89,7 +91,7 @@ export function BatchSummarizeButton({
 
   const numericIds = useMemo(
     () => episodeIds.map(Number).filter((id) => id > 0 && Number.isFinite(id)),
-    [episodeIds]
+    [episodeIds],
   );
 
   const handleConfirm = useCallback(async () => {
@@ -110,7 +112,7 @@ export function BatchSummarizeButton({
         setErrorMessage(
           data.dailyLimit
             ? `Daily limit reached. You can summarize up to ${data.dailyLimit} episodes per day.`
-            : "Rate limit exceeded. Please try again later."
+            : "Rate limit exceeded. Please try again later.",
         );
         return;
       }
@@ -197,13 +199,20 @@ export function BatchSummarizeButton({
 
     return (
       <div
-        className="flex items-center gap-3 min-w-[200px]"
+        className="flex min-w-[200px] items-center gap-3"
         role="status"
         aria-live="polite"
       >
-        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" aria-hidden="true" />
+        <Loader2
+          className="h-4 w-4 animate-spin text-muted-foreground"
+          aria-hidden="true"
+        />
         <div className="flex-1 space-y-1">
-          <Progress value={pct} className="h-2" aria-label="Batch summarization progress" />
+          <Progress
+            value={pct}
+            className="h-2"
+            aria-label="Batch summarization progress"
+          />
           <p className="text-xs text-muted-foreground">
             Processing {completed}/{total} episodes...
           </p>
@@ -219,7 +228,10 @@ export function BatchSummarizeButton({
 
     return (
       <div className="flex items-center gap-2" aria-live="polite">
-        <CheckCircle2 className="h-4 w-4 text-status-success-text" aria-hidden="true" />
+        <CheckCircle2
+          className="h-4 w-4 text-status-success-text"
+          aria-hidden="true"
+        />
         <span className="text-sm text-muted-foreground">
           {succeeded} summarized, {skipped} skipped
           {failed > 0 && (

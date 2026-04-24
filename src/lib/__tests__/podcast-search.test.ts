@@ -51,17 +51,21 @@ vi.mock("@/db", () => ({
 }));
 
 vi.mock("@/db/schema", () => ({
-  podcasts: { id: "id", podcastIndexId: "podcastIndexId", title: "title", publisher: "publisher", description: "description", source: "source" },
+  podcasts: {
+    id: "id",
+    podcastIndexId: "podcastIndexId",
+    title: "title",
+    publisher: "publisher",
+    description: "description",
+    source: "source",
+  },
 }));
 
 vi.mock("drizzle-orm", () => ({
   eq: vi.fn(),
 }));
 
-import {
-  searchLocalPodcasts,
-  invalidateIndex,
-} from "@/lib/podcast-search";
+import { searchLocalPodcasts, invalidateIndex } from "@/lib/podcast-search";
 
 describe("podcast-search", () => {
   beforeEach(() => {

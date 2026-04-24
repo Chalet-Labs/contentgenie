@@ -2,7 +2,11 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { NextRequest } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { db } from "@/db";
-import { checkRateLimit, checkDailyLimit, DAILY_SUMMARIZE_LIMIT } from "@/lib/rate-limit";
+import {
+  checkRateLimit,
+  checkDailyLimit,
+  DAILY_SUMMARIZE_LIMIT,
+} from "@/lib/rate-limit";
 import { POST, GET } from "@/app/api/episodes/summarize/route";
 
 vi.mock("@clerk/nextjs/server", () => ({
@@ -67,7 +71,7 @@ describe("POST /api/episodes/summarize", () => {
       {
         method: "POST",
         body: JSON.stringify({ episodeId: "123" }),
-      }
+      },
     );
     const response = await POST(request);
     const data = await response.json();
@@ -77,14 +81,17 @@ describe("POST /api/episodes/summarize", () => {
   });
 
   it("returns 400 when episodeId is missing", async () => {
-    vi.mocked(auth).mockResolvedValue({ userId: "user-1", has: () => false } as never);
+    vi.mocked(auth).mockResolvedValue({
+      userId: "user-1",
+      has: () => false,
+    } as never);
 
     const request = new NextRequest(
       "http://localhost:3000/api/episodes/summarize",
       {
         method: "POST",
         body: JSON.stringify({}),
-      }
+      },
     );
     const response = await POST(request);
     const data = await response.json();
@@ -94,7 +101,10 @@ describe("POST /api/episodes/summarize", () => {
   });
 
   it("returns cached summary when exists", async () => {
-    vi.mocked(auth).mockResolvedValue({ userId: "user-1", has: () => false } as never);
+    vi.mocked(auth).mockResolvedValue({
+      userId: "user-1",
+      has: () => false,
+    } as never);
 
     vi.mocked(db.query.episodes.findFirst).mockResolvedValue({
       summary: "Cached summary",
@@ -108,7 +118,7 @@ describe("POST /api/episodes/summarize", () => {
       {
         method: "POST",
         body: JSON.stringify({ episodeId: "123" }),
-      }
+      },
     );
     const response = await POST(request);
     const data = await response.json();
@@ -120,7 +130,10 @@ describe("POST /api/episodes/summarize", () => {
   });
 
   it("returns 202 with run handle when triggering new summarization", async () => {
-    vi.mocked(auth).mockResolvedValue({ userId: "user-1", has: () => false } as never);
+    vi.mocked(auth).mockResolvedValue({
+      userId: "user-1",
+      has: () => false,
+    } as never);
 
     vi.mocked(db.query.episodes.findFirst).mockResolvedValue(null as never);
 
@@ -131,7 +144,7 @@ describe("POST /api/episodes/summarize", () => {
       {
         method: "POST",
         body: JSON.stringify({ episodeId: "123" }),
-      }
+      },
     );
     const response = await POST(request);
     const data = await response.json();
@@ -143,21 +156,27 @@ describe("POST /api/episodes/summarize", () => {
     expect(tasks.trigger).toHaveBeenCalledWith(
       "summarize-episode",
       { episodeId: 123 },
-      { idempotencyKey: "summarize-episode-123", idempotencyKeyTTL: "10m" }
+      { idempotencyKey: "summarize-episode-123", idempotencyKeyTTL: "10m" },
     );
   });
 
   it("returns 429 when hourly rate limit is exceeded", async () => {
-    vi.mocked(auth).mockResolvedValue({ userId: "user-1", has: () => false } as never);
+    vi.mocked(auth).mockResolvedValue({
+      userId: "user-1",
+      has: () => false,
+    } as never);
     vi.mocked(db.query.episodes.findFirst).mockResolvedValue(null as never);
-    vi.mocked(checkRateLimit).mockResolvedValue({ allowed: false, retryAfterMs: 3600000 });
+    vi.mocked(checkRateLimit).mockResolvedValue({
+      allowed: false,
+      retryAfterMs: 3600000,
+    });
 
     const request = new NextRequest(
       "http://localhost:3000/api/episodes/summarize",
       {
         method: "POST",
         body: JSON.stringify({ episodeId: "123" }),
-      }
+      },
     );
     const response = await POST(request);
     const data = await response.json();
@@ -167,28 +186,39 @@ describe("POST /api/episodes/summarize", () => {
   });
 
   it("returns 429 with daily limit info when daily limit is exceeded", async () => {
-    vi.mocked(auth).mockResolvedValue({ userId: "user-1", has: () => false } as never);
+    vi.mocked(auth).mockResolvedValue({
+      userId: "user-1",
+      has: () => false,
+    } as never);
     vi.mocked(db.query.episodes.findFirst).mockResolvedValue(null as never);
-    vi.mocked(checkDailyLimit).mockResolvedValue({ allowed: false, retryAfterMs: 43200000 });
+    vi.mocked(checkDailyLimit).mockResolvedValue({
+      allowed: false,
+      retryAfterMs: 43200000,
+    });
 
     const request = new NextRequest(
       "http://localhost:3000/api/episodes/summarize",
       {
         method: "POST",
         body: JSON.stringify({ episodeId: "123" }),
-      }
+      },
     );
     const response = await POST(request);
     const data = await response.json();
 
     expect(response.status).toBe(429);
-    expect(data.error).toBe("Daily summarization limit reached. Please try again tomorrow.");
+    expect(data.error).toBe(
+      "Daily summarization limit reached. Please try again tomorrow.",
+    );
     expect(data.dailyLimit).toBe(DAILY_SUMMARIZE_LIMIT);
     expect(data.retryAfterMs).toBe(43200000);
   });
 
   it("does not consume rate limit for cached summaries", async () => {
-    vi.mocked(auth).mockResolvedValue({ userId: "user-1", has: () => false } as never);
+    vi.mocked(auth).mockResolvedValue({
+      userId: "user-1",
+      has: () => false,
+    } as never);
 
     vi.mocked(db.query.episodes.findFirst).mockResolvedValue({
       summary: "Cached summary",
@@ -202,7 +232,7 @@ describe("POST /api/episodes/summarize", () => {
       {
         method: "POST",
         body: JSON.stringify({ episodeId: "123" }),
-      }
+      },
     );
     const response = await POST(request);
 
@@ -212,7 +242,10 @@ describe("POST /api/episodes/summarize", () => {
   });
 
   it("returns 202 for existing in-progress run", async () => {
-    vi.mocked(auth).mockResolvedValue({ userId: "user-1", has: () => false } as never);
+    vi.mocked(auth).mockResolvedValue({
+      userId: "user-1",
+      has: () => false,
+    } as never);
 
     vi.mocked(db.query.episodes.findFirst).mockResolvedValue({
       summaryStatus: "running",
@@ -224,7 +257,7 @@ describe("POST /api/episodes/summarize", () => {
       {
         method: "POST",
         body: JSON.stringify({ episodeId: "123" }),
-      }
+      },
     );
     const response = await POST(request);
     const data = await response.json();
@@ -251,7 +284,7 @@ describe("GET /api/episodes/summarize", () => {
     vi.mocked(auth).mockResolvedValue({ userId: null } as never);
 
     const request = new NextRequest(
-      "http://localhost:3000/api/episodes/summarize?episodeId=123"
+      "http://localhost:3000/api/episodes/summarize?episodeId=123",
     );
     const response = await GET(request);
     const data = await response.json();
@@ -261,7 +294,10 @@ describe("GET /api/episodes/summarize", () => {
   });
 
   it("returns existing summary status", async () => {
-    vi.mocked(auth).mockResolvedValue({ userId: "user-1", has: () => false } as never);
+    vi.mocked(auth).mockResolvedValue({
+      userId: "user-1",
+      has: () => false,
+    } as never);
 
     vi.mocked(db.query.episodes.findFirst).mockResolvedValue({
       summary: "Summary text",
@@ -271,7 +307,7 @@ describe("GET /api/episodes/summarize", () => {
     } as never);
 
     const request = new NextRequest(
-      "http://localhost:3000/api/episodes/summarize?episodeId=123"
+      "http://localhost:3000/api/episodes/summarize?episodeId=123",
     );
     const response = await GET(request);
     const data = await response.json();
@@ -282,12 +318,15 @@ describe("GET /api/episodes/summarize", () => {
   });
 
   it("returns exists=false when no summary", async () => {
-    vi.mocked(auth).mockResolvedValue({ userId: "user-1", has: () => false } as never);
+    vi.mocked(auth).mockResolvedValue({
+      userId: "user-1",
+      has: () => false,
+    } as never);
 
     vi.mocked(db.query.episodes.findFirst).mockResolvedValue(null as never);
 
     const request = new NextRequest(
-      "http://localhost:3000/api/episodes/summarize?episodeId=123"
+      "http://localhost:3000/api/episodes/summarize?episodeId=123",
     );
     const response = await GET(request);
     const data = await response.json();
@@ -297,7 +336,10 @@ describe("GET /api/episodes/summarize", () => {
   });
 
   it("returns in-progress run info when summary is being generated", async () => {
-    vi.mocked(auth).mockResolvedValue({ userId: "user-1", has: () => false } as never);
+    vi.mocked(auth).mockResolvedValue({
+      userId: "user-1",
+      has: () => false,
+    } as never);
 
     vi.mocked(db.query.episodes.findFirst).mockResolvedValue({
       summaryRunId: "run_inprogress",
@@ -305,7 +347,7 @@ describe("GET /api/episodes/summarize", () => {
     } as never);
 
     const request = new NextRequest(
-      "http://localhost:3000/api/episodes/summarize?episodeId=123"
+      "http://localhost:3000/api/episodes/summarize?episodeId=123",
     );
     const response = await GET(request);
     const data = await response.json();

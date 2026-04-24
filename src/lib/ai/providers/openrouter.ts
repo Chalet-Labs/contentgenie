@@ -7,7 +7,7 @@ export class OpenRouterProvider implements AiProvider {
 
   async generateCompletion(
     messages: AiMessage[],
-    options: AiCompletionOptions
+    options: AiCompletionOptions,
   ): Promise<string> {
     const apiKey = process.env.OPENROUTER_API_KEY || "";
     if (!apiKey) {
@@ -34,7 +34,7 @@ export class OpenRouterProvider implements AiProvider {
     if (!response.ok) {
       const errorText = await response.text();
       throw new Error(
-        `OpenRouter API error: ${response.status} - ${errorText}`
+        `OpenRouter API error: ${response.status} - ${errorText}`,
       );
     }
 

@@ -2,7 +2,11 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { NextRequest } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { db } from "@/db";
-import { checkRateLimit, checkDailyLimit, DAILY_SUMMARIZE_LIMIT } from "@/lib/rate-limit";
+import {
+  checkRateLimit,
+  checkDailyLimit,
+  DAILY_SUMMARIZE_LIMIT,
+} from "@/lib/rate-limit";
 import { POST } from "@/app/api/episodes/batch-summarize/route";
 
 vi.mock("@clerk/nextjs/server", () => ({
@@ -43,13 +47,10 @@ vi.mock("@trigger.dev/sdk", () => ({
 vi.mock("@/trigger/batch-summarize-episodes", () => ({}));
 
 function makeRequest(body: unknown) {
-  return new NextRequest(
-    "http://localhost:3000/api/episodes/batch-summarize",
-    {
-      method: "POST",
-      body: JSON.stringify(body),
-    }
-  );
+  return new NextRequest("http://localhost:3000/api/episodes/batch-summarize", {
+    method: "POST",
+    body: JSON.stringify(body),
+  });
 }
 
 describe("POST /api/episodes/batch-summarize", () => {
@@ -167,10 +168,11 @@ describe("POST /api/episodes/batch-summarize", () => {
     expect(data.publicAccessToken).toBe("test-public-token");
     expect(data.total).toBe(3);
     expect(data.skipped).toBe(0);
-    expect(tasks.trigger).toHaveBeenCalledWith(
-      "batch-summarize-episodes",
-      { episodeIds: [1, 2, 3], skippedCount: 0, totalRequested: 3 }
-    );
+    expect(tasks.trigger).toHaveBeenCalledWith("batch-summarize-episodes", {
+      episodeIds: [1, 2, 3],
+      skippedCount: 0,
+      totalRequested: 3,
+    });
   });
 
   it("returns 202 with correct skipped count for partial cache", async () => {
@@ -190,16 +192,20 @@ describe("POST /api/episodes/batch-summarize", () => {
     expect(data.total).toBe(3);
     expect(data.skipped).toBe(1);
     // Only uncached IDs (2, 3) should be sent to the task
-    expect(tasks.trigger).toHaveBeenCalledWith(
-      "batch-summarize-episodes",
-      { episodeIds: [2, 3], skippedCount: 1, totalRequested: 3 }
-    );
+    expect(tasks.trigger).toHaveBeenCalledWith("batch-summarize-episodes", {
+      episodeIds: [2, 3],
+      skippedCount: 1,
+      totalRequested: 3,
+    });
   });
 
   it("returns 429 when hourly rate limit is exceeded", async () => {
     vi.mocked(auth).mockResolvedValue({ userId: "rate-limit-user" } as never);
     vi.mocked(db.query.episodes.findMany).mockResolvedValue([] as never);
-    vi.mocked(checkRateLimit).mockResolvedValue({ allowed: false, retryAfterMs: 3600000 });
+    vi.mocked(checkRateLimit).mockResolvedValue({
+      allowed: false,
+      retryAfterMs: 3600000,
+    });
 
     const response = await POST(makeRequest({ episodeIds: [100] }));
     const data = await response.json();
@@ -211,13 +217,18 @@ describe("POST /api/episodes/batch-summarize", () => {
   it("returns 429 with daily limit info when daily limit is exceeded", async () => {
     vi.mocked(auth).mockResolvedValue({ userId: "user-1" } as never);
     vi.mocked(db.query.episodes.findMany).mockResolvedValue([] as never);
-    vi.mocked(checkDailyLimit).mockResolvedValue({ allowed: false, retryAfterMs: 43200000 });
+    vi.mocked(checkDailyLimit).mockResolvedValue({
+      allowed: false,
+      retryAfterMs: 43200000,
+    });
 
     const response = await POST(makeRequest({ episodeIds: [1, 2, 3] }));
     const data = await response.json();
 
     expect(response.status).toBe(429);
-    expect(data.error).toBe("Daily summarization limit reached. Please try again tomorrow.");
+    expect(data.error).toBe(
+      "Daily summarization limit reached. Please try again tomorrow.",
+    );
     expect(data.dailyLimit).toBe(DAILY_SUMMARIZE_LIMIT);
     expect(data.retryAfterMs).toBe(43200000);
     expect(checkDailyLimit).toHaveBeenCalledWith("user-1", 3);
@@ -229,7 +240,7 @@ describe("POST /api/episodes/batch-summarize", () => {
       Array.from({ length: 20 }, (_, i) => ({
         podcastIndexId: String(i + 1),
         processedAt: new Date(),
-      })) as never
+      })) as never,
     );
 
     const ids = Array.from({ length: 20 }, (_, i) => i + 1);
@@ -244,7 +255,7 @@ describe("POST /api/episodes/batch-summarize", () => {
   it("returns 500 when an unexpected error occurs", async () => {
     vi.mocked(auth).mockResolvedValue({ userId: "user-1" } as never);
     vi.mocked(db.query.episodes.findMany).mockRejectedValue(
-      new Error("DB connection failed")
+      new Error("DB connection failed"),
     );
 
     const response = await POST(makeRequest({ episodeIds: [1] }));

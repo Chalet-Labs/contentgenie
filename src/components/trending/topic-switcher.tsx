@@ -27,7 +27,7 @@ export function TopicSwitcher({ topics, activeSlug }: TopicSwitcherProps) {
                 "rounded-full px-4 py-1.5 text-sm font-medium transition-colors",
                 isActive
                   ? "bg-primary text-primary-foreground"
-                  : "bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                  : "bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground",
               )}
             >
               {topic.name}

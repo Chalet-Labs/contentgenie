@@ -79,7 +79,7 @@ describe("EpisodeCard (podcasts wrapper)", () => {
   it("renders episode description", () => {
     render(<EpisodeCard episode={mockEpisode} />);
     expect(
-      screen.getByText("An episode about testing things")
+      screen.getByText("An episode about testing things"),
     ).toBeInTheDocument();
   });
 
@@ -108,9 +108,7 @@ describe("EpisodeCard (podcasts wrapper)", () => {
 
   it("shows episode type badge for non-full episodes", () => {
     render(
-      <EpisodeCard
-        episode={{ ...mockEpisode, episodeType: "trailer" }}
-      />
+      <EpisodeCard episode={{ ...mockEpisode, episodeType: "trailer" }} />,
     );
     expect(screen.getByText("trailer")).toBeInTheDocument();
   });
@@ -122,17 +120,17 @@ describe("EpisodeCard (podcasts wrapper)", () => {
   });
 
   it("handles missing description with fallback text", () => {
-    render(
-      <EpisodeCard episode={{ ...mockEpisode, description: "" }} />
-    );
-    expect(
-      screen.getByText("No description available")
-    ).toBeInTheDocument();
+    render(<EpisodeCard episode={{ ...mockEpisode, description: "" }} />);
+    expect(screen.getByText("No description available")).toBeInTheDocument();
   });
 
   it("renders score pill when worthItScore is provided", () => {
     render(
-      <EpisodeCard episode={mockEpisode} summaryStatus="completed" worthItScore="8.50" />
+      <EpisodeCard
+        episode={mockEpisode}
+        summaryStatus="completed"
+        worthItScore="8.50"
+      />,
     );
     expect(screen.getByText(/8\.5/)).toBeInTheDocument();
   });
@@ -153,19 +151,29 @@ describe("EpisodeCard (podcasts wrapper)", () => {
   });
 
   it("renders no status icon for completed status", () => {
-    render(<EpisodeCard episode={mockEpisode} summaryStatus="completed" worthItScore="7.0" />);
+    render(
+      <EpisodeCard
+        episode={mockEpisode}
+        summaryStatus="completed"
+        worthItScore="7.0"
+      />,
+    );
     expect(screen.queryByLabelText("Processing")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Summary failed")).not.toBeInTheDocument();
   });
 
   it("renders unlistened button by default", () => {
     render(<EpisodeCard episode={mockEpisode} />);
-    expect(screen.getByRole("button", { name: "Mark as listened" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Mark as listened" }),
+    ).toBeInTheDocument();
   });
 
   it("renders listened indicator when isListened is true", () => {
     render(<EpisodeCard episode={mockEpisode} isListened={true} />);
-    expect(screen.queryByRole("button", { name: "Mark as listened" })).toBeNull();
+    expect(
+      screen.queryByRole("button", { name: "Mark as listened" }),
+    ).toBeNull();
     expect(screen.getByLabelText("Already listened")).toBeInTheDocument();
   });
 });

@@ -15,14 +15,18 @@ describe("interpolatePrompt", () => {
       "{{title}} from {{podcastName}}: {{description}} ({{duration}} min)\n{{transcript}}";
     const result = interpolatePrompt(template, baseVars);
     expect(result).toBe(
-      "Test Episode from Test Podcast: A great episode (60 min)\nThis is the transcript text."
+      "Test Episode from Test Podcast: A great episode (60 min)\nThis is the transcript text.",
     );
   });
 
   it("converts duration to minutes (integer, rounded)", () => {
     const template = "{{duration}}";
-    expect(interpolatePrompt(template, { ...baseVars, duration: 3661 })).toBe("61");
-    expect(interpolatePrompt(template, { ...baseVars, duration: 90 })).toBe("2");
+    expect(interpolatePrompt(template, { ...baseVars, duration: 3661 })).toBe(
+      "61",
+    );
+    expect(interpolatePrompt(template, { ...baseVars, duration: 90 })).toBe(
+      "2",
+    );
     expect(interpolatePrompt(template, { ...baseVars, duration: 0 })).toBe("0");
   });
 
@@ -44,7 +48,10 @@ describe("interpolatePrompt", () => {
 
   it("handles transcript placeholder", () => {
     const template = "Analyze: {{transcript}}";
-    const result = interpolatePrompt(template, { ...baseVars, transcript: "Hello world" });
+    const result = interpolatePrompt(template, {
+      ...baseVars,
+      transcript: "Hello world",
+    });
     expect(result).toBe("Analyze: Hello world");
   });
 });

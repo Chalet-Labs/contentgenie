@@ -15,12 +15,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import {
-  Upload,
-  Loader2,
-  CheckCircle2,
-  XCircle,
-} from "lucide-react";
+import { Upload, Loader2, CheckCircle2, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import type { importOpml } from "@/trigger/import-opml";
 
@@ -76,7 +71,7 @@ export function OpmlImportForm() {
 
     if (
       TERMINAL_STATUSES.includes(
-        run.status as (typeof TERMINAL_STATUSES)[number]
+        run.status as (typeof TERMINAL_STATUSES)[number],
       )
     ) {
       if (run.status === "COMPLETED") {
@@ -112,7 +107,7 @@ export function OpmlImportForm() {
       setFile(selected);
       setErrorMessage(null);
     },
-    []
+    [],
   );
 
   const startUpload = useCallback(async () => {
@@ -135,7 +130,7 @@ export function OpmlImportForm() {
       if (res.status === 429) {
         setState("error");
         setErrorMessage(
-          "Rate limit exceeded. Please wait a few minutes before importing again."
+          "Rate limit exceeded. Please wait a few minutes before importing again.",
         );
         return;
       }
@@ -156,9 +151,7 @@ export function OpmlImportForm() {
           completed: data.total,
         });
         setState("done");
-        toast.info(
-          `All ${data.total} feeds are already in your subscriptions`
-        );
+        toast.info(`All ${data.total} feeds are already in your subscriptions`);
         return;
       }
 
@@ -203,7 +196,7 @@ export function OpmlImportForm() {
 
       startUpload();
     },
-    [file, startUpload]
+    [file, startUpload],
   );
 
   const handleLargeImportConfirm = useCallback(() => {
@@ -253,11 +246,7 @@ export function OpmlImportForm() {
         </div>
 
         {state === "processing" && progress && (
-          <div
-            className="mt-3 space-y-1"
-            role="status"
-            aria-live="polite"
-          >
+          <div className="mt-3 space-y-1" role="status" aria-live="polite">
             <Progress
               value={
                 progress.total > 0
@@ -281,7 +270,8 @@ export function OpmlImportForm() {
             />
             <span className="text-sm text-muted-foreground">
               {progress.succeeded} subscribed
-              {progress.skipped > 0 && `, ${progress.skipped} already subscribed`}
+              {progress.skipped > 0 &&
+                `, ${progress.skipped} already subscribed`}
               {progress.failed > 0 && (
                 <span className="text-status-warning-text">
                   , {progress.failed} failed
@@ -296,14 +286,16 @@ export function OpmlImportForm() {
             className="mt-3 flex flex-wrap items-center gap-2"
             aria-live="assertive"
           >
-            <XCircle
-              className="h-4 w-4 text-destructive"
-              aria-hidden="true"
-            />
+            <XCircle className="h-4 w-4 text-destructive" aria-hidden="true" />
             <span className="text-sm text-destructive">
               {errorMessage || "Something went wrong"}
             </span>
-            <Button variant="outline" size="sm" type="button" onClick={handleRetry}>
+            <Button
+              variant="outline"
+              size="sm"
+              type="button"
+              onClick={handleRetry}
+            >
               Retry
             </Button>
           </div>

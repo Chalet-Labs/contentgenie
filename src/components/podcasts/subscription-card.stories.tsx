@@ -6,7 +6,8 @@ const basePodcast: Podcast = {
   id: 1,
   podcastIndexId: "12345",
   title: "The Daily Tech Briefing",
-  description: "A daily podcast covering the latest in technology, startups, and innovation.",
+  description:
+    "A daily podcast covering the latest in technology, startups, and innovation.",
   publisher: "Jane Smith",
   imageUrl: "https://picsum.photos/seed/podcast1/300/300",
   rssFeedUrl: "https://example.com/feed.xml",

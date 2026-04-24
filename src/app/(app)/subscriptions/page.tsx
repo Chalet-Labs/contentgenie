@@ -64,10 +64,7 @@ export default async function SubscriptionsPage() {
           </Button>
         </div>
       ) : (
-        <SubscriptionsList
-          subscriptions={subscriptions}
-          initialSort={sort}
-        />
+        <SubscriptionsList subscriptions={subscriptions} initialSort={sort} />
       )}
     </div>
   );

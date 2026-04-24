@@ -36,6 +36,7 @@ Resolve DNS ourselves, validate IPs, then fetch using the resolved IP directly (
 ### Option C: Custom `http.Agent`/`https.Agent` with `createConnection` override (chosen)
 
 Create Node.js `http.Agent` and `https.Agent` subclasses that override `createConnection` to:
+
 1. Resolve DNS for the target hostname.
 2. Validate all resolved IPs against `isPrivateIP()`.
 3. If all IPs are safe, connect directly to a validated IP.

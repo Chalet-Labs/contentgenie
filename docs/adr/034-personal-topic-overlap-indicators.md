@@ -19,6 +19,7 @@ The stored `worth_it_score` column is never modified. Topic overlap is computed 
 A "user topic profile" is a `Map<string, number>` mapping normalized topic strings to the count of distinct consumed episodes tagged with that topic. "Consumed" means the episode appears in either `listen_history` or `user_library` (union, deduplicated by episode ID).
 
 The profile is built via two batch queries:
+
 1. Get consumed episode IDs: `SELECT episode_id FROM listen_history WHERE user_id = ? UNION SELECT episode_id FROM user_library WHERE user_id = ?`
 2. Get topic tags for those episodes: `SELECT topic, COUNT(DISTINCT episode_id) FROM episode_topics WHERE episode_id IN (?) GROUP BY topic`
 
@@ -27,11 +28,13 @@ This avoids N+1 by doing exactly 2 queries regardless of how many episodes the u
 ### Overlap computation
 
 A pure function in `src/lib/topic-overlap.ts` takes:
+
 - User topic profile: `Map<string, number>`
 - Episode topics: `Array<{ topic: string; relevance: string }>`
 - Total consumed episode count: `number`
 
 And returns:
+
 ```typescript
 interface TopicOverlapResult {
   /**
@@ -42,14 +45,15 @@ interface TopicOverlapResult {
    * overlapCount = 5 (the max), topOverlapTopic = "AI".
    */
   overlapCount: number;
-  topOverlapTopic: string | null;  // the topic with highest overlap
-  isNewTopic: boolean;         // true if ALL episode topics are new to the user
-  label: string | null;        // pre-computed display label, null if no indicator
+  topOverlapTopic: string | null; // the topic with highest overlap
+  isNewTopic: boolean; // true if ALL episode topics are new to the user
+  label: string | null; // pre-computed display label, null if no indicator
   labelKind: "high-overlap" | "top-pick" | "new-topic" | null; // discriminator for UI styling
 }
 ```
 
 Label rules (evaluated in priority order, first match wins):
+
 1. **Global gate**: `totalConsumed < 3` → `null` — applies to ALL labels including "Top pick." A user with 1-2 consumed episodes has too little history for any personalized indicator.
 2. `overlapCount >= 3`: `"You've heard N similar episodes"` (amber)
 3. `overlapCount === 0 && topicRank === 1`: `"Top pick for [topic]"` (green, highest priority among positive labels)
@@ -59,6 +63,7 @@ Label rules (evaluated in priority order, first match wins):
 ### Recommendation sort adjustment
 
 In `getRecommendedEpisodes()`, after computing overlap for each candidate:
+
 1. Partition into two groups: `overlapCount >= 3` (deprioritized) and the rest
 2. Within each group, preserve the existing sort (worthItScore DESC, publishDate DESC)
 3. Concatenate: non-deprioritized first, then deprioritized
@@ -68,6 +73,7 @@ This is a stable partition, not a re-sort. Episodes with heavy topic overlap flo
 ### DTO extension
 
 `RecommendedEpisodeDTO` gains optional overlap fields:
+
 ```typescript
 overlapCount?: number;
 overlapTopic?: string | null;
@@ -80,6 +86,7 @@ These are optional so existing consumers (tests, other call sites) don't break. 
 ### UI indicators
 
 Three display surfaces:
+
 1. **`episode-recommendations.tsx`**: Compact label below the WorthItBadge — colored text with no icon, matching existing metadata density
 2. **`summary-display.tsx`**: Overlap label rendered inside the Worth-It Score card, below the score progress bar. Uses a colored `<p>` element matching existing metadata density.
 3. **`worth-it-badge.tsx`**: No change — the badge shows the score only. Adding overlap to the badge would conflate two different signals.

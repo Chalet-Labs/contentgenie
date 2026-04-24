@@ -32,7 +32,9 @@ function TrendingDetailLoading() {
   );
 }
 
-export default async function TrendingDetailPage({ params }: TrendingDetailPageProps) {
+export default async function TrendingDetailPage({
+  params,
+}: TrendingDetailPageProps) {
   return (
     <div className="space-y-6">
       <Suspense fallback={<TrendingDetailLoading />}>

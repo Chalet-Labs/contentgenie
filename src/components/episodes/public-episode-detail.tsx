@@ -40,9 +40,7 @@ interface PublicEpisodeDetailProps {
   episodeId: string;
 }
 
-export function PublicEpisodeDetail({
-  episodeId,
-}: PublicEpisodeDetailProps) {
+export function PublicEpisodeDetail({ episodeId }: PublicEpisodeDetailProps) {
   const isOnline = useOnlineStatus();
 
   const [episode, setEpisode] = useState<EpisodeData | null>(null);
@@ -60,7 +58,7 @@ export function PublicEpisodeDetail({
 
       try {
         const response = await fetch(
-          `/api/episodes/${encodeURIComponent(episodeId)}`
+          `/api/episodes/${encodeURIComponent(episodeId)}`,
         );
         const data = await response.json();
 
@@ -82,7 +80,7 @@ export function PublicEpisodeDetail({
                 worthItDimensions: data.summary.worthItDimensions ?? null,
                 cached: true,
               }
-            : null
+            : null,
         );
       } catch (error) {
         if (ignore) return;
@@ -91,7 +89,7 @@ export function PublicEpisodeDetail({
         setPodcast(null);
         setSummaryData(null);
         setEpisodeError(
-          error instanceof Error ? error.message : "Failed to load episode"
+          error instanceof Error ? error.message : "Failed to load episode",
         );
       } finally {
         if (!ignore) {
@@ -146,7 +144,9 @@ export function PublicEpisodeDetail({
 
   const artworkUrl = getEpisodeArtworkUrl(episode, podcast);
   const safeEpisodeLink = getSafeEpisodeLink(episode.link);
-  const categories = podcast?.categories ? Object.values(podcast.categories) : [];
+  const categories = podcast?.categories
+    ? Object.values(podcast.categories)
+    : [];
   const currentEpisodeHref = buildSignUpHref(`/episode/${episodeId}`);
   const browseHref = podcast
     ? buildSignUpHref(`/podcast/${podcast.id}`)
@@ -250,7 +250,9 @@ export function PublicEpisodeDetail({
           {episode.enclosureUrl && (
             <Card>
               <CardContent className="p-4">
-                <p className="mb-3 text-sm font-medium">Listen to this episode</p>
+                <p className="mb-3 text-sm font-medium">
+                  Listen to this episode
+                </p>
                 <audio
                   className="w-full"
                   controls

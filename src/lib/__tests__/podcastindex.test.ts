@@ -201,12 +201,12 @@ describe("PodcastIndex API functions", () => {
         ok: false,
         status: 500,
         statusText: "Internal Server Error",
-      })
+      }),
     );
 
     const { searchPodcasts } = await import("@/lib/podcastindex");
     await expect(searchPodcasts("test")).rejects.toThrow(
-      "PodcastIndex API error"
+      "PodcastIndex API error",
     );
   });
 

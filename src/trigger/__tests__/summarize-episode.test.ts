@@ -78,8 +78,14 @@ vi.mock("@/lib/ai/config", () => ({
 
 import { getEpisodeById, getPodcastById } from "@/trigger/helpers/podcastindex";
 import { generateEpisodeSummary } from "@/trigger/helpers/ai-summary";
-import { persistEpisodeSummary, updateEpisodeStatus } from "@/trigger/helpers/database";
-import { markSummaryReady, resolvePodcastId } from "@/trigger/helpers/notifications";
+import {
+  persistEpisodeSummary,
+  updateEpisodeStatus,
+} from "@/trigger/helpers/database";
+import {
+  markSummaryReady,
+  resolvePodcastId,
+} from "@/trigger/helpers/notifications";
 import { summarizeEpisode } from "@/trigger/summarize-episode";
 
 // The task mock returns the raw config object, so `.run` and `.onFailure` are available at runtime
@@ -97,7 +103,9 @@ const mockEpisode = {
   feedId: 456,
   duration: 3600,
   enclosureUrl: "https://example.com/audio.mp3",
-  transcripts: [{ url: "https://example.com/transcript.txt", type: "text/plain" }],
+  transcripts: [
+    { url: "https://example.com/transcript.txt", type: "text/plain" },
+  ],
 };
 
 const mockPodcast = {
@@ -136,7 +144,9 @@ describe("summarize-episode task", () => {
   });
 
   it("completes the full pipeline successfully", async () => {
-    vi.mocked(getEpisodeById).mockResolvedValue({ episode: mockEpisode } as never);
+    vi.mocked(getEpisodeById).mockResolvedValue({
+      episode: mockEpisode,
+    } as never);
     vi.mocked(getPodcastById).mockResolvedValue({ feed: mockPodcast } as never);
     vi.mocked(generateEpisodeSummary).mockResolvedValue(mockSummary);
     vi.mocked(persistEpisodeSummary).mockResolvedValue(undefined);
@@ -150,17 +160,19 @@ describe("summarize-episode task", () => {
       mockPodcast,
       mockEpisode,
       "Full transcript text",
-      null
+      null,
     );
     expect(persistEpisodeSummary).toHaveBeenCalledWith(
       mockEpisode,
       mockPodcast,
-      mockSummary
+      mockSummary,
     );
   });
 
   it("reads transcript from DB (does not call fetch-transcript)", async () => {
-    vi.mocked(getEpisodeById).mockResolvedValue({ episode: mockEpisode } as never);
+    vi.mocked(getEpisodeById).mockResolvedValue({
+      episode: mockEpisode,
+    } as never);
     vi.mocked(getPodcastById).mockResolvedValue({ feed: mockPodcast } as never);
     vi.mocked(generateEpisodeSummary).mockResolvedValue(mockSummary);
     vi.mocked(persistEpisodeSummary).mockResolvedValue(undefined);
@@ -173,27 +185,29 @@ describe("summarize-episode task", () => {
       mockPodcast,
       mockEpisode,
       "Full transcript text",
-      null
+      null,
     );
   });
 
   it("throws AbortTaskRunError when episode is not found", async () => {
     vi.mocked(getEpisodeById).mockResolvedValue({ episode: null } as never);
 
-    await expect(
-      taskConfig.run({ episodeId: 999 }, mockCtx)
-    ).rejects.toThrow("Episode 999 not found");
+    await expect(taskConfig.run({ episodeId: 999 }, mockCtx)).rejects.toThrow(
+      "Episode 999 not found",
+    );
   });
 
   it("aborts when transcript is missing — writes failed status to DB before throwing", async () => {
-    vi.mocked(getEpisodeById).mockResolvedValue({ episode: mockEpisode } as never);
+    vi.mocked(getEpisodeById).mockResolvedValue({
+      episode: mockEpisode,
+    } as never);
     vi.mocked(getPodcastById).mockResolvedValue({ feed: mockPodcast } as never);
     mockFindFirst.mockResolvedValue(null);
     const { setFn } = makeUpdateChain();
 
-    await expect(
-      taskConfig.run({ episodeId: 123 }, mockCtx)
-    ).rejects.toThrow("has no transcript available");
+    await expect(taskConfig.run({ episodeId: 123 }, mockCtx)).rejects.toThrow(
+      "has no transcript available",
+    );
 
     // DB write must happen before the abort
     expect(mockUpdate).toHaveBeenCalled();
@@ -205,20 +219,24 @@ describe("summarize-episode task", () => {
   });
 
   it("aborts when transcript is whitespace-only — writes failed status to DB before throwing", async () => {
-    vi.mocked(getEpisodeById).mockResolvedValue({ episode: mockEpisode } as never);
+    vi.mocked(getEpisodeById).mockResolvedValue({
+      episode: mockEpisode,
+    } as never);
     vi.mocked(getPodcastById).mockResolvedValue({ feed: mockPodcast } as never);
     mockFindFirst.mockResolvedValue({ transcription: "   \n  " });
     const { setFn } = makeUpdateChain();
 
-    await expect(
-      taskConfig.run({ episodeId: 123 }, mockCtx)
-    ).rejects.toThrow("has no transcript available");
+    await expect(taskConfig.run({ episodeId: 123 }, mockCtx)).rejects.toThrow(
+      "has no transcript available",
+    );
 
     expect(setFn.mock.calls[0][0].summaryStatus).toBe("failed");
   });
 
   it("aborts when transcript is missing even if DB write fails", async () => {
-    vi.mocked(getEpisodeById).mockResolvedValue({ episode: mockEpisode } as never);
+    vi.mocked(getEpisodeById).mockResolvedValue({
+      episode: mockEpisode,
+    } as never);
     vi.mocked(getPodcastById).mockResolvedValue({ feed: mockPodcast } as never);
     mockFindFirst.mockResolvedValue(null);
     const whereFn = vi.fn().mockRejectedValue(new Error("DB unavailable"));
@@ -226,13 +244,15 @@ describe("summarize-episode task", () => {
     mockUpdate.mockReturnValue({ set: setFn });
 
     // AbortTaskRunError must still be thrown even though the DB write fails
-    await expect(
-      taskConfig.run({ episodeId: 123 }, mockCtx)
-    ).rejects.toThrow("has no transcript available");
+    await expect(taskConfig.run({ episodeId: 123 }, mockCtx)).rejects.toThrow(
+      "has no transcript available",
+    );
   });
 
   it("proceeds without podcast context when fetch fails", async () => {
-    vi.mocked(getEpisodeById).mockResolvedValue({ episode: mockEpisode } as never);
+    vi.mocked(getEpisodeById).mockResolvedValue({
+      episode: mockEpisode,
+    } as never);
     vi.mocked(getPodcastById).mockRejectedValue(new Error("Podcast not found"));
     vi.mocked(generateEpisodeSummary).mockResolvedValue(mockSummary);
     vi.mocked(persistEpisodeSummary).mockResolvedValue(undefined);
@@ -244,23 +264,30 @@ describe("summarize-episode task", () => {
       undefined,
       mockEpisode,
       "Full transcript text",
-      null
+      null,
     );
   });
 
   it("calls updateEpisodeStatus('summarizing') before generating summary", async () => {
-    vi.mocked(getEpisodeById).mockResolvedValue({ episode: mockEpisode } as never);
+    vi.mocked(getEpisodeById).mockResolvedValue({
+      episode: mockEpisode,
+    } as never);
     vi.mocked(getPodcastById).mockResolvedValue({ feed: mockPodcast } as never);
     vi.mocked(generateEpisodeSummary).mockResolvedValue(mockSummary);
     vi.mocked(persistEpisodeSummary).mockResolvedValue(undefined);
 
     await taskConfig.run({ episodeId: 123 }, mockCtx);
 
-    expect(vi.mocked(updateEpisodeStatus)).toHaveBeenCalledWith(123, "summarizing");
+    expect(vi.mocked(updateEpisodeStatus)).toHaveBeenCalledWith(
+      123,
+      "summarizing",
+    );
   });
 
   it("calls metadata.root.increment('completed', 1) after successful run", async () => {
-    vi.mocked(getEpisodeById).mockResolvedValue({ episode: mockEpisode } as never);
+    vi.mocked(getEpisodeById).mockResolvedValue({
+      episode: mockEpisode,
+    } as never);
     vi.mocked(getPodcastById).mockResolvedValue({ feed: mockPodcast } as never);
     vi.mocked(generateEpisodeSummary).mockResolvedValue(mockSummary);
     vi.mocked(persistEpisodeSummary).mockResolvedValue(undefined);
@@ -271,7 +298,9 @@ describe("summarize-episode task", () => {
   });
 
   it("calls metadata.root.increment('completed', 1) exactly once per successful run", async () => {
-    vi.mocked(getEpisodeById).mockResolvedValue({ episode: mockEpisode } as never);
+    vi.mocked(getEpisodeById).mockResolvedValue({
+      episode: mockEpisode,
+    } as never);
     vi.mocked(getPodcastById).mockResolvedValue({ feed: mockPodcast } as never);
     vi.mocked(generateEpisodeSummary).mockResolvedValue(mockSummary);
     vi.mocked(persistEpisodeSummary).mockResolvedValue(undefined);
@@ -279,7 +308,7 @@ describe("summarize-episode task", () => {
     await taskConfig.run({ episodeId: 123 }, mockCtx);
 
     const completedCalls = mockMetadataRootIncrement.mock.calls.filter(
-      ([key]) => key === "completed"
+      ([key]) => key === "completed",
     );
     expect(completedCalls).toHaveLength(1);
     expect(completedCalls[0]).toEqual(["completed", 1]);
@@ -288,19 +317,20 @@ describe("summarize-episode task", () => {
   it("does not call metadata.root.increment('completed') when episode is not found", async () => {
     vi.mocked(getEpisodeById).mockResolvedValue({ episode: null } as never);
 
-    await expect(
-      taskConfig.run({ episodeId: 999 }, mockCtx)
-    ).rejects.toThrow("Episode 999 not found");
+    await expect(taskConfig.run({ episodeId: 999 }, mockCtx)).rejects.toThrow(
+      "Episode 999 not found",
+    );
 
     const completedCalls = mockMetadataRootIncrement.mock.calls.filter(
-      ([key]) => key === "completed"
+      ([key]) => key === "completed",
     );
     expect(completedCalls).toHaveLength(0);
   });
 
   it("onFailure preserves existing processingError instead of overwriting", async () => {
     mockFindFirst.mockResolvedValueOnce({
-      processingError: "Episode 42 has no transcript available — run fetch-transcript first",
+      processingError:
+        "Episode 42 has no transcript available — run fetch-transcript first",
     });
     const { setFn } = makeUpdateChain();
 
@@ -308,7 +338,7 @@ describe("summarize-episode task", () => {
 
     const setArgs = setFn.mock.calls[0][0];
     expect(setArgs.processingError).toBe(
-      "Episode 42 has no transcript available — run fetch-transcript first"
+      "Episode 42 has no transcript available — run fetch-transcript first",
     );
     expect(setArgs.summaryStatus).toBe("failed");
   });
@@ -321,7 +351,7 @@ describe("summarize-episode task", () => {
 
     const setArgs = setFn.mock.calls[0][0];
     expect(setArgs.processingError).toBe(
-      "Summarization failed after maximum retry attempts"
+      "Summarization failed after maximum retry attempts",
     );
   });
 
@@ -336,7 +366,7 @@ describe("summarize-episode task", () => {
     const setArgs = setFn.mock.calls[0][0];
     expect(setArgs.summaryStatus).toBe("failed");
     expect(setArgs.processingError).toBe(
-      "Summarization failed after maximum retry attempts"
+      "Summarization failed after maximum retry attempts",
     );
   });
 
@@ -357,7 +387,9 @@ describe("summarize-episode task", () => {
   });
 
   it("calls markSummaryReady on the happy path with correct args", async () => {
-    vi.mocked(getEpisodeById).mockResolvedValue({ episode: mockEpisode } as never);
+    vi.mocked(getEpisodeById).mockResolvedValue({
+      episode: mockEpisode,
+    } as never);
     vi.mocked(getPodcastById).mockResolvedValue({ feed: mockPodcast } as never);
     vi.mocked(generateEpisodeSummary).mockResolvedValue(mockSummary);
     vi.mocked(persistEpisodeSummary).mockResolvedValue(undefined);
@@ -374,13 +406,15 @@ describe("summarize-episode task", () => {
       42,
       "123",
       mockPodcast.title,
-      `Summary ready: ${mockEpisode.title}`
+      `Summary ready: ${mockEpisode.title}`,
     );
     expect(markSummaryReady).toHaveBeenCalledTimes(1);
   });
 
   it("only calls markSummaryReady once — no separate new_episode notification on re-summarization", async () => {
-    vi.mocked(getEpisodeById).mockResolvedValue({ episode: mockEpisode } as never);
+    vi.mocked(getEpisodeById).mockResolvedValue({
+      episode: mockEpisode,
+    } as never);
     vi.mocked(getPodcastById).mockResolvedValue({ feed: mockPodcast } as never);
     vi.mocked(generateEpisodeSummary).mockResolvedValue(mockSummary);
     vi.mocked(persistEpisodeSummary).mockResolvedValue(undefined);

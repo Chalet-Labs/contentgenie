@@ -1,5 +1,5 @@
 ---
-applyTo: '**/*.js,**/*.jsx,**/*.m,**/*.mjs,**/*.yaml,**/*.yml'
+applyTo: "**/*.js,**/*.jsx,**/*.m,**/*.mjs,**/*.yaml,**/*.yml"
 description: Privacy & data protection (minimization, classification, encryption, rights, transparency)
 version: 1.3.0
 ---
@@ -7,7 +7,7 @@ version: 1.3.0
 rule_id: codeguard-0-privacy-data-protection
 
 - Implement strong cryptography, enforce HTTPS with HSTS, enable certificate pinning,
-and provide user privacy features to protect data and anonymity.
+  and provide user privacy features to protect data and anonymity.
 - Use strong, up-to-date cryptographic algorithms for data in transit and at rest; securely hash passwords with established libraries.
 - Enforce HTTPS exclusively and implement HTTP Strict Transport Security (HSTS).
 - Implement certificate pinning to prevent man-in-the-middle attacks even if CAs are compromised.

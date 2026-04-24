@@ -46,7 +46,7 @@ export function MarketingHeader() {
             aria-label="Toggle theme"
             title="Toggle theme"
           >
-            {mounted ? (isDark ? <Sun /> : <Moon />) : null}
+            {mounted ? isDark ? <Sun /> : <Moon /> : null}
           </Button>
           <SignedOut>
             <SignInButton>

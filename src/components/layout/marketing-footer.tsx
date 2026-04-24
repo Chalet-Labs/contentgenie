@@ -11,10 +11,20 @@ export function MarketingFooter() {
           ContentGenie
         </div>
         <div className="lp-foot-links">
-          <Link href="/privacy" prefetch={false}>Privacy</Link>
-          <Link href="/terms" prefetch={false}>Terms</Link>
-          <Link href="/changelog" prefetch={false}>Changelog</Link>
-          <a href="https://twitter.com/contentgenie" target="_blank" rel="noopener noreferrer">
+          <Link href="/privacy" prefetch={false}>
+            Privacy
+          </Link>
+          <Link href="/terms" prefetch={false}>
+            Terms
+          </Link>
+          <Link href="/changelog" prefetch={false}>
+            Changelog
+          </Link>
+          <a
+            href="https://twitter.com/contentgenie"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
             @contentgenie
           </a>
         </div>

@@ -39,7 +39,8 @@ export function SearchResults({
     return (
       <div className="rounded-lg border bg-card p-6 text-center">
         <p className="text-sm text-muted-foreground">
-          No podcasts found for &quot;{query}&quot;. Try a different search term.
+          No podcasts found for &quot;{query}&quot;. Try a different search
+          term.
         </p>
       </div>
     );
@@ -58,7 +59,8 @@ export function SearchResults({
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">
-        Found {podcasts.length} podcast{podcasts.length !== 1 ? "s" : ""} for &quot;{query}&quot;
+        Found {podcasts.length} podcast{podcasts.length !== 1 ? "s" : ""} for
+        &quot;{query}&quot;
       </p>
       <div className="grid gap-4 md:grid-cols-2">
         {podcasts.map((podcast) => (

@@ -32,18 +32,18 @@ export const generateTrendingTopics = schedules.task({
   retry: { maxAttempts: MAX_ATTEMPTS },
   run: async (
     _payload: unknown,
-    options?: { ctx?: { attempt?: { number?: number } } }
+    options?: { ctx?: { attempt?: { number?: number } } },
   ) => {
     const attemptNumber = options?.ctx?.attempt?.number ?? MAX_ATTEMPTS;
     const now = new Date();
     const periodStart = new Date(
-      now.getTime() - LOOKBACK_DAYS * 24 * 60 * 60 * 1000
+      now.getTime() - LOOKBACK_DAYS * 24 * 60 * 60 * 1000,
     );
     const periodEnd = now;
 
     const persistSnapshot = async (
       topics: TrendingTopic[],
-      episodeCount: number
+      episodeCount: number,
     ) => {
       await db.insert(trendingTopics).values({
         topics,
@@ -72,16 +72,19 @@ export const generateTrendingTopics = schedules.task({
           eq(episodes.summaryStatus, "completed"),
           isNotNull(episodes.processedAt),
           gte(episodes.processedAt, periodStart),
-          lte(episodes.processedAt, periodEnd)
-        )
+          lte(episodes.processedAt, periodEnd),
+        ),
       )
       .orderBy(desc(episodes.processedAt))
       .limit(MAX_EPISODES);
 
     if (recentEpisodes.length === MAX_EPISODES) {
-      logger.warn("Episode query hit MAX_EPISODES cap; snapshot may be incomplete", {
-        cap: MAX_EPISODES,
-      });
+      logger.warn(
+        "Episode query hit MAX_EPISODES cap; snapshot may be incomplete",
+        {
+          cap: MAX_EPISODES,
+        },
+      );
     }
 
     logger.info("Found summarized episodes in window", {
@@ -99,7 +102,7 @@ export const generateTrendingTopics = schedules.task({
     const episodesWithSummary = recentEpisodes
       .filter(
         (ep): ep is typeof ep & { summary: string } =>
-          typeof ep.summary === "string" && ep.summary.trim().length > 0
+          typeof ep.summary === "string" && ep.summary.trim().length > 0,
       )
       .map((ep) => ({
         id: ep.id,
@@ -128,7 +131,7 @@ export const generateTrendingTopics = schedules.task({
           { role: "system", content: TRENDING_TOPICS_SYSTEM_PROMPT },
           { role: "user", content: prompt },
         ],
-        { maxTokens: TRENDING_MAX_TOKENS }
+        { maxTokens: TRENDING_MAX_TOKENS },
       );
     } catch (err) {
       logger.error("LLM call failed in trending topics generation", {
@@ -159,7 +162,7 @@ export const generateTrendingTopics = schedules.task({
           typeof t.name === "string" &&
           typeof t.description === "string" &&
           Array.isArray(t.episodeIds) &&
-          t.episodeIds.every((id: unknown) => Number.isInteger(id))
+          t.episodeIds.every((id: unknown) => Number.isInteger(id)),
       );
     } catch (err) {
       logger.error("Failed to parse LLM response", {
@@ -173,7 +176,9 @@ export const generateTrendingTopics = schedules.task({
     // If parsing failed completely, store empty snapshot explicitly
     if (topics.length === 0) {
       await persistSnapshot([], recentEpisodes.length);
-      logger.info("No valid topics after parsing/validation, stored empty snapshot");
+      logger.info(
+        "No valid topics after parsing/validation, stored empty snapshot",
+      );
       return { episodeCount: recentEpisodes.length, topicCount: 0 };
     }
 
@@ -182,7 +187,7 @@ export const generateTrendingTopics = schedules.task({
     const mappedTopics = topics
       .map((topic) => {
         const filteredIds = Array.from(new Set(topic.episodeIds)).filter((id) =>
-          validEpisodeIds.has(id)
+          validEpisodeIds.has(id),
         );
         return {
           name: topic.name,
@@ -201,10 +206,13 @@ export const generateTrendingTopics = schedules.task({
       else keptTopics.push(topic);
     }
     if (droppedNames.length > 0) {
-      logger.warn("Dropped trending topics with empty slug (non-ASCII or punctuation-only names)", {
-        droppedCount: droppedNames.length,
-        droppedNames: droppedNames.slice(0, 10),
-      });
+      logger.warn(
+        "Dropped trending topics with empty slug (non-ASCII or punctuation-only names)",
+        {
+          droppedCount: droppedNames.length,
+          droppedNames: droppedNames.slice(0, 10),
+        },
+      );
     }
 
     const validatedTopics = keptTopics
@@ -228,9 +236,12 @@ export const generateTrendingTopics = schedules.task({
     }
 
     if (validatedTopics.length === 0 && topics.length > 0) {
-      logger.warn("All LLM topics referenced invalid episode IDs, storing empty snapshot", {
-        parsedTopicCount: topics.length,
-      });
+      logger.warn(
+        "All LLM topics referenced invalid episode IDs, storing empty snapshot",
+        {
+          parsedTopicCount: topics.length,
+        },
+      );
     }
 
     // Store snapshot

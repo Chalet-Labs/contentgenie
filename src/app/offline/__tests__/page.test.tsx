@@ -11,14 +11,12 @@ describe("OfflinePage", () => {
   it("renders explanatory text", () => {
     render(<OfflinePage />);
     expect(
-      screen.getByText(/contentgenie needs an internet connection/i)
+      screen.getByText(/contentgenie needs an internet connection/i),
     ).toBeInTheDocument();
   });
 
   it("renders a Retry button", () => {
     render(<OfflinePage />);
-    expect(
-      screen.getByRole("button", { name: /retry/i })
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /retry/i })).toBeInTheDocument();
   });
 });

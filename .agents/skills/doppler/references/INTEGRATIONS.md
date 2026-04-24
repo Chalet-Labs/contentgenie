@@ -134,12 +134,16 @@ Instead of service tokens, configure a GitHub Actions sync in the Doppler dashbo
 
 ```json
 {
-  "containerDefinitions": [{
-    "secrets": [{
-      "name": "DATABASE_URL",
-      "valueFrom": "arn:aws:secretsmanager:us-east-1:123456:secret:doppler-backend-prd"
-    }]
-  }]
+  "containerDefinitions": [
+    {
+      "secrets": [
+        {
+          "name": "DATABASE_URL",
+          "valueFrom": "arn:aws:secretsmanager:us-east-1:123456:secret:doppler-backend-prd"
+        }
+      ]
+    }
+  ]
 }
 ```
 
@@ -179,6 +183,7 @@ Configure via Doppler dashboard: Integrations → Azure Key Vault. Secrets are s
 ### App Service / Functions
 
 Reference synced Key Vault secrets in application settings:
+
 ```
 @Microsoft.KeyVault(SecretUri=https://my-vault.vault.azure.net/secrets/DATABASE-URL/)
 ```

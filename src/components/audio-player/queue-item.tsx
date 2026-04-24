@@ -1,17 +1,17 @@
-"use client"
+"use client";
 
-import { useSortable } from "@dnd-kit/sortable"
-import { CSS } from "@dnd-kit/utilities"
-import Image from "next/image"
-import { GripVertical, X, Rss } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { cn } from "@/lib/utils"
-import type { AudioEpisode } from "@/contexts/audio-player-context"
+import { useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import Image from "next/image";
+import { GripVertical, X, Rss } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
+import type { AudioEpisode } from "@/contexts/audio-player-context";
 
 interface QueueItemProps {
-  episode: AudioEpisode
-  onRemove: () => void
-  onPlay: () => void
+  episode: AudioEpisode;
+  onRemove: () => void;
+  onPlay: () => void;
 }
 
 export function QueueItem({ episode, onRemove, onPlay }: QueueItemProps) {
@@ -22,12 +22,12 @@ export function QueueItem({ episode, onRemove, onPlay }: QueueItemProps) {
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: episode.id })
+  } = useSortable({ id: episode.id });
 
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
-  }
+  };
 
   return (
     <div
@@ -35,7 +35,9 @@ export function QueueItem({ episode, onRemove, onPlay }: QueueItemProps) {
       style={style}
       className={cn(
         "flex items-center gap-2 rounded-md p-2",
-        isDragging ? "z-10 bg-accent opacity-80 shadow-md" : "hover:bg-accent/50"
+        isDragging
+          ? "z-10 bg-accent opacity-80 shadow-md"
+          : "hover:bg-accent/50",
       )}
     >
       <button
@@ -90,5 +92,5 @@ export function QueueItem({ episode, onRemove, onPlay }: QueueItemProps) {
         <X className="h-3.5 w-3.5" />
       </Button>
     </div>
-  )
+  );
 }

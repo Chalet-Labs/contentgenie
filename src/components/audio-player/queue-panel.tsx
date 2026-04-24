@@ -1,4 +1,4 @@
-"use client"
+"use client";
 
 import {
   DndContext,
@@ -9,20 +9,20 @@ import {
   useSensor,
   useSensors,
   type DragEndEvent,
-} from "@dnd-kit/core"
+} from "@dnd-kit/core";
 import {
   SortableContext,
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
-} from "@dnd-kit/sortable"
-import { ListMusic, Trash2, Volume2, Rss } from "lucide-react"
-import Image from "next/image"
-import { Button } from "@/components/ui/button"
+} from "@dnd-kit/sortable";
+import { ListMusic, Trash2, Volume2, Rss } from "lucide-react";
+import Image from "next/image";
+import { Button } from "@/components/ui/button";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "@/components/ui/popover"
+} from "@/components/ui/popover";
 import {
   Sheet,
   SheetContent,
@@ -30,20 +30,22 @@ import {
   SheetTitle,
   SheetDescription,
   SheetTrigger,
-} from "@/components/ui/sheet"
+} from "@/components/ui/sheet";
 import {
   useAudioPlayerState,
   useAudioPlayerAPI,
-} from "@/contexts/audio-player-context"
-import { useMediaQuery } from "@/hooks/use-media-query"
-import { QueueItem } from "@/components/audio-player/queue-item"
+} from "@/contexts/audio-player-context";
+import { useMediaQuery } from "@/hooks/use-media-query";
+import { QueueItem } from "@/components/audio-player/queue-item";
 
-const TOUCH_SENSOR_OPTIONS = { activationConstraint: { delay: 250, tolerance: 5 } }
+const TOUCH_SENSOR_OPTIONS = {
+  activationConstraint: { delay: 250, tolerance: 5 },
+};
 
 function NowPlaying() {
-  const { currentEpisode } = useAudioPlayerState()
+  const { currentEpisode } = useAudioPlayerState();
 
-  if (!currentEpisode) return null
+  if (!currentEpisode) return null;
 
   return (
     <div className="border-b pb-3">
@@ -68,7 +70,10 @@ function NowPlaying() {
           )}
         </div>
         <div className="min-w-0">
-          <p className="truncate text-sm font-medium" title={currentEpisode.title}>
+          <p
+            className="truncate text-sm font-medium"
+            title={currentEpisode.title}
+          >
             {currentEpisode.title}
           </p>
           <p
@@ -80,29 +85,29 @@ function NowPlaying() {
         </div>
       </div>
     </div>
-  )
+  );
 }
 
 function QueueList() {
-  const { queue } = useAudioPlayerState()
+  const { queue } = useAudioPlayerState();
   const { removeFromQueue, reorderQueue, clearQueue, playEpisode } =
-    useAudioPlayerAPI()
+    useAudioPlayerAPI();
 
-  const mouseSensor = useSensor(MouseSensor)
-  const touchSensor = useSensor(TouchSensor, TOUCH_SENSOR_OPTIONS)
+  const mouseSensor = useSensor(MouseSensor);
+  const touchSensor = useSensor(TouchSensor, TOUCH_SENSOR_OPTIONS);
   const keyboardSensor = useSensor(KeyboardSensor, {
     coordinateGetter: sortableKeyboardCoordinates,
-  })
-  const sensors = useSensors(mouseSensor, touchSensor, keyboardSensor)
+  });
+  const sensors = useSensors(mouseSensor, touchSensor, keyboardSensor);
 
   function handleDragEnd(event: DragEndEvent) {
-    const { active, over } = event
-    if (!over || active.id === over.id) return
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
 
-    const oldIndex = queue.findIndex((ep) => ep.id === active.id)
-    const newIndex = queue.findIndex((ep) => ep.id === over.id)
+    const oldIndex = queue.findIndex((ep) => ep.id === active.id);
+    const newIndex = queue.findIndex((ep) => ep.id === over.id);
     if (oldIndex !== -1 && newIndex !== -1) {
-      reorderQueue(oldIndex, newIndex)
+      reorderQueue(oldIndex, newIndex);
     }
   }
 
@@ -122,7 +127,7 @@ function QueueList() {
           </p>
         </div>
       </div>
-    )
+    );
   }
 
   return (
@@ -161,8 +166,8 @@ function QueueList() {
                 episode={episode}
                 onRemove={() => removeFromQueue(episode.id)}
                 onPlay={() => {
-                  playEpisode(episode)
-                  removeFromQueue(episode.id)
+                  playEpisode(episode);
+                  removeFromQueue(episode.id);
                 }}
               />
             ))}
@@ -170,17 +175,17 @@ function QueueList() {
         </DndContext>
       </div>
     </div>
-  )
+  );
 }
 
 interface QueuePanelProps {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  trigger: React.ReactElement
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  trigger: React.ReactElement;
 }
 
 export function QueuePanel({ open, onOpenChange, trigger }: QueuePanelProps) {
-  const isDesktop = useMediaQuery("(min-width: 768px)")
+  const isDesktop = useMediaQuery("(min-width: 768px)");
 
   if (isDesktop) {
     return (
@@ -195,7 +200,7 @@ export function QueuePanel({ open, onOpenChange, trigger }: QueuePanelProps) {
           <QueueList />
         </PopoverContent>
       </Popover>
-    )
+    );
   }
 
   return (
@@ -213,5 +218,5 @@ export function QueuePanel({ open, onOpenChange, trigger }: QueuePanelProps) {
         </div>
       </SheetContent>
     </Sheet>
-  )
+  );
 }

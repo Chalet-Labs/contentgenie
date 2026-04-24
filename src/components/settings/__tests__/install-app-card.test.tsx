@@ -56,9 +56,7 @@ describe("InstallAppCard", () => {
     hookReturn.isInstallable = true;
     render(<InstallAppCard />);
 
-    expect(
-      screen.getByRole("button", { name: "Install" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Install" })).toBeInTheDocument();
   });
 
   it("Install button calls promptInstall", async () => {

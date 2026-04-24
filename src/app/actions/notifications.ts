@@ -3,7 +3,13 @@
 import { auth } from "@clerk/nextjs/server";
 import { eq, and, desc, gte, sql, count, inArray } from "drizzle-orm";
 import { db } from "@/db";
-import { notifications, episodes, podcasts, users, episodeTopics } from "@/db/schema";
+import {
+  notifications,
+  episodes,
+  podcasts,
+  users,
+  episodeTopics,
+} from "@/db/schema";
 
 // Postgres `serial` upper bound — reject IDs that would overflow the DB column
 // before binding them into an `eq(podcasts.id, …)` predicate.
@@ -45,22 +51,20 @@ export async function getNotificationSummary(): Promise<NotificationSummary> {
           and(
             eq(notifications.userId, userId),
             eq(notifications.isRead, false),
-            eq(notifications.isDismissed, false)
-          )
+            eq(notifications.isDismissed, false),
+          ),
         ),
       db
         .select({
-          lastSeen: sql<
-            Date | string | null
-          >`MAX(${notifications.createdAt})`,
+          lastSeen: sql<Date | string | null>`MAX(${notifications.createdAt})`,
         })
         .from(notifications)
         .where(
           and(
             eq(notifications.userId, userId),
             eq(notifications.isRead, true),
-            eq(notifications.isDismissed, false)
-          )
+            eq(notifications.isDismissed, false),
+          ),
         ),
       // `type = 'new_episode'` is load-bearing: summary_completed rows have null
       // episodeId and would corrupt the podcast join.
@@ -78,8 +82,8 @@ export async function getNotificationSummary(): Promise<NotificationSummary> {
             eq(notifications.userId, userId),
             eq(notifications.isRead, false),
             eq(notifications.isDismissed, false),
-            eq(notifications.type, "new_episode")
-          )
+            eq(notifications.type, "new_episode"),
+          ),
         )
         .groupBy(podcasts.id, podcasts.title)
         .orderBy(desc(count()), podcasts.title),
@@ -101,7 +105,7 @@ export async function getNotificationSummary(): Promise<NotificationSummary> {
     const podcastGroups: PodcastGroupRow[] = groupRows
       .filter(
         (r): r is RawGroupRow & { podcastId: number; podcastTitle: string } =>
-          r.podcastId !== null && r.podcastTitle !== null
+          r.podcastId !== null && r.podcastTitle !== null,
       )
       .map((r) => ({
         podcastId: r.podcastId,
@@ -126,8 +130,8 @@ export async function getNotificationSummary(): Promise<NotificationSummary> {
             eq(notifications.isRead, false),
             eq(notifications.isDismissed, false),
             eq(notifications.type, "new_episode"),
-            gte(notifications.createdAt, lastSeenAt)
-          )
+            gte(notifications.createdAt, lastSeenAt),
+          ),
         );
       const sinceCount = Number(sinceRow?.sinceCount ?? 0);
       if (sinceCount > 0 && sinceCount < newEpisodeUnread) {
@@ -153,11 +157,15 @@ export async function getNotificationSummary(): Promise<NotificationSummary> {
 export async function getNotifications(
   limit = 50,
   offset = 0,
-  filter?: { podcastId?: number; since?: Date }
+  filter?: { podcastId?: number; since?: Date },
 ) {
   const { userId } = await auth();
   if (!userId) {
-    return { notifications: [], hasMore: false, error: "You must be signed in" };
+    return {
+      notifications: [],
+      hasMore: false,
+      error: "You must be signed in",
+    };
   }
 
   const safeLimit = Number.isInteger(limit)
@@ -208,8 +216,8 @@ export async function getNotifications(
             : undefined,
           validSince !== undefined
             ? gte(notifications.createdAt, validSince)
-            : undefined
-        )
+            : undefined,
+        ),
       )
       // id is the deterministic tie-breaker; rows that share a createdAt
       // (common during bulk inserts) would otherwise drift between pages.
@@ -225,7 +233,11 @@ export async function getNotifications(
     };
   } catch (error) {
     console.error("Error fetching notifications:", error);
-    return { notifications: [], hasMore: false, error: "Failed to load notifications" };
+    return {
+      notifications: [],
+      hasMore: false,
+      error: "Failed to load notifications",
+    };
   }
 }
 
@@ -242,8 +254,8 @@ export async function getUnreadCount(): Promise<number> {
       and(
         eq(notifications.userId, userId),
         eq(notifications.isRead, false),
-        eq(notifications.isDismissed, false)
-      )
+        eq(notifications.isDismissed, false),
+      ),
     );
 
   return result?.value ?? 0;
@@ -265,8 +277,8 @@ export async function markNotificationRead(notificationId: number) {
       .where(
         and(
           eq(notifications.id, notificationId),
-          eq(notifications.userId, userId)
-        )
+          eq(notifications.userId, userId),
+        ),
       )
       .returning({ id: notifications.id });
 
@@ -292,10 +304,7 @@ export async function markAllNotificationsRead() {
       .update(notifications)
       .set({ isRead: true })
       .where(
-        and(
-          eq(notifications.userId, userId),
-          eq(notifications.isRead, false)
-        )
+        and(eq(notifications.userId, userId), eq(notifications.isRead, false)),
       );
 
     return { success: true };
@@ -324,8 +333,8 @@ export async function dismissNotification(notificationId: number) {
       .where(
         and(
           eq(notifications.id, notificationId),
-          eq(notifications.userId, userId)
-        )
+          eq(notifications.userId, userId),
+        ),
       )
       .returning({ id: notifications.id });
 
@@ -341,7 +350,7 @@ export async function dismissNotification(notificationId: number) {
 }
 
 export async function getEpisodeTopics(
-  episodeIds: number[]
+  episodeIds: number[],
 ): Promise<Record<number, string[]>> {
   const { userId } = await auth();
   const safeEpisodeIds = Array.from(new Set(episodeIds))
@@ -359,15 +368,15 @@ export async function getEpisodeTopics(
         and(
           eq(notifications.userId, userId),
           eq(notifications.isDismissed, false),
-          inArray(notifications.episodeId, safeEpisodeIds)
-        )
+          inArray(notifications.episodeId, safeEpisodeIds),
+        ),
       );
     const allowedEpisodeIds = Array.from(
       new Set(
         allowedRows
           .map((r) => r.episodeId)
-          .filter((id): id is number => id !== null)
-      )
+          .filter((id): id is number => id !== null),
+      ),
     );
     if (allowedEpisodeIds.length === 0) return {};
 
@@ -382,7 +391,7 @@ export async function getEpisodeTopics(
       .where(inArray(episodeTopics.episodeId, allowedEpisodeIds))
       .orderBy(
         sql`${episodeTopics.topicRank} ASC NULLS LAST`,
-        desc(episodeTopics.relevance)
+        desc(episodeTopics.relevance),
       );
 
     // Plain object rather than Map — Server Action return values travel over

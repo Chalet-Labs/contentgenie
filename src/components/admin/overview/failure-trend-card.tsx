@@ -1,9 +1,16 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import type { FailureTrendEntry } from "@/lib/admin/overview-queries"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import type { FailureTrendEntry } from "@/lib/admin/overview-queries";
 
 interface FailureTrendCardProps {
-  trend: FailureTrendEntry[]
+  trend: FailureTrendEntry[];
 }
 
 export function FailureTrendCard({ trend }: FailureTrendCardProps) {
@@ -26,7 +33,9 @@ export function FailureTrendCard({ trend }: FailureTrendCardProps) {
                 <TableCell className="text-sm">{row.day}</TableCell>
                 <TableCell className="text-right text-sm">
                   {row.count > 0 ? (
-                    <span className="text-destructive font-medium">{row.count}</span>
+                    <span className="font-medium text-destructive">
+                      {row.count}
+                    </span>
                   ) : (
                     <span className="text-muted-foreground">0</span>
                   )}
@@ -37,5 +46,5 @@ export function FailureTrendCard({ trend }: FailureTrendCardProps) {
         </Table>
       </CardContent>
     </Card>
-  )
+  );
 }

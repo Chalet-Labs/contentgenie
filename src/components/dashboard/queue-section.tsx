@@ -35,14 +35,14 @@ interface SummarizeState {
 function setMapEntry(
   setter: React.Dispatch<React.SetStateAction<Map<string, SummarizeState>>>,
   id: string,
-  state: SummarizeState
+  state: SummarizeState,
 ) {
   setter((prev) => new Map(prev).set(id, state));
 }
 
 function deleteMapEntry(
   setter: React.Dispatch<React.SetStateAction<Map<string, SummarizeState>>>,
-  id: string
+  id: string,
 ) {
   setter((prev) => {
     const next = new Map(prev);
@@ -57,10 +57,7 @@ function deleteMapEntry(
 
 function QueueScoreBadge({ score }: { score: number }) {
   return (
-    <Badge
-      variant="score"
-      className={cn("px-2", getScoreColor(score))}
-    >
+    <Badge variant="score" className={cn("px-2", getScoreColor(score))}>
       {score.toFixed(1)}
     </Badge>
   );
@@ -113,7 +110,7 @@ function SummarizeTracker({
       } else {
         console.error(
           "SummarizeTracker: missing worthItScore in run output for episode %s",
-          episodeId
+          episodeId,
         );
         onError(episodeId, "Score not available");
       }
@@ -122,13 +119,13 @@ function SummarizeTracker({
 
     if (
       TERMINAL_STATUSES.includes(
-        run.status as (typeof TERMINAL_STATUSES)[number]
+        run.status as (typeof TERMINAL_STATUSES)[number],
       )
     ) {
       handledRef.current = true;
       onError(
         episodeId,
-        `Summarization ${run.status.toLowerCase().replace(/_/g, " ")}`
+        `Summarization ${run.status.toLowerCase().replace(/_/g, " ")}`,
       );
     }
   }, [run, episodeId, onScoreReceived, onError]);
@@ -162,11 +159,17 @@ function QueueEpisodeRow({
   onSummarizeError,
 }: QueueEpisodeRowProps) {
   return (
-    <div className={cn(
-      "flex items-center gap-3 rounded-lg p-2",
-      isNowPlaying && "bg-accent/50"
-    )}>
-      <span aria-hidden="true" title="Drag to reorder" className="shrink-0 cursor-grab">
+    <div
+      className={cn(
+        "flex items-center gap-3 rounded-lg p-2",
+        isNowPlaying && "bg-accent/50",
+      )}
+    >
+      <span
+        aria-hidden="true"
+        title="Drag to reorder"
+        className="shrink-0 cursor-grab"
+      >
         <GripVertical
           aria-hidden="true"
           className="h-4 w-4 text-muted-foreground/50"
@@ -275,7 +278,7 @@ export function QueueSection() {
       (currentEpisode ? currentEpisode.id : "") +
       "|" +
       queue.map((ep) => ep.id).join(","),
-    [currentEpisode, queue]
+    [currentEpisode, queue],
   );
 
   // Fetch scores whenever the set of episode IDs changes
@@ -289,7 +292,7 @@ export function QueueSection() {
 
     // Only fetch IDs we don't already have scores for
     const unknownIds = allIds.filter(
-      (id) => !Object.hasOwn(scoresRef.current, id)
+      (id) => !Object.hasOwn(scoresRef.current, id),
     );
 
     if (unknownIds.length === 0) return;
@@ -328,7 +331,7 @@ export function QueueSection() {
         console.error(
           "handleGetScore: non-JSON response (status %d) for episode %s",
           res.status,
-          episodeId
+          episodeId,
         );
         toast.error("Failed to start summarization");
         setMapEntry(setSummarizeStates, episodeId, {
@@ -363,7 +366,7 @@ export function QueueSection() {
       if (res.status === 429) {
         if (typeof data.dailyLimit === "number") {
           toast.error(
-            `Daily limit reached. You can summarize up to ${data.dailyLimit} episodes per day.`
+            `Daily limit reached. You can summarize up to ${data.dailyLimit} episodes per day.`,
           );
         } else {
           toast.error("Rate limit exceeded. Please try again later.");
@@ -386,7 +389,11 @@ export function QueueSection() {
         errorMessage: message,
       });
     } catch (err) {
-      console.error("handleGetScore: network error for episode %s:", episodeId, err);
+      console.error(
+        "handleGetScore: network error for episode %s:",
+        episodeId,
+        err,
+      );
       toast.error("Network error. Please try again.");
       setMapEntry(setSummarizeStates, episodeId, {
         status: "error",
@@ -400,7 +407,7 @@ export function QueueSection() {
       setScores((prev) => ({ ...prev, [episodeId]: score }));
       deleteMapEntry(setSummarizeStates, episodeId);
     },
-    []
+    [],
   );
 
   const handleSummarizeError = useCallback(
@@ -410,7 +417,7 @@ export function QueueSection() {
         errorMessage: message,
       });
     },
-    []
+    [],
   );
 
   const handleRetry = useCallback(
@@ -418,7 +425,7 @@ export function QueueSection() {
       deleteMapEntry(setSummarizeStates, episodeId);
       handleGetScore(episodeId);
     },
-    [handleGetScore]
+    [handleGetScore],
   );
 
   const isEmpty = !currentEpisode && queue.length === 0;

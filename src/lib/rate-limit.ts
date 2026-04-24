@@ -1,8 +1,5 @@
 import { Pool } from "@neondatabase/serverless";
-import {
-  RateLimiterPostgres,
-  RateLimiterMemory,
-} from "rate-limiter-flexible";
+import { RateLimiterPostgres, RateLimiterMemory } from "rate-limiter-flexible";
 
 const RATE_LIMIT_POINTS = 10;
 const RATE_LIMIT_DURATION = 3600; // 1 hour in seconds
@@ -23,26 +20,29 @@ function getLimiter(): Promise<RateLimiterPostgres> {
         }
         const pool = new Pool({ connectionString });
 
-        const limiter = new RateLimiterPostgres({
-          storeClient: pool,
-          storeType: "pool",
-          points: RATE_LIMIT_POINTS,
-          duration: RATE_LIMIT_DURATION,
-          tableName: "rate_limits",
-          keyPrefix: "summarize",
-          clearExpiredByTimeout: false,
-          insuranceLimiter: new RateLimiterMemory({
+        const limiter = new RateLimiterPostgres(
+          {
+            storeClient: pool,
+            storeType: "pool",
             points: RATE_LIMIT_POINTS,
             duration: RATE_LIMIT_DURATION,
-          }),
-        }, (err?: Error) => {
-          if (err) {
-            limiterPromise = null;
-            reject(err);
-          } else {
-            resolve(limiter);
-          }
-        });
+            tableName: "rate_limits",
+            keyPrefix: "summarize",
+            clearExpiredByTimeout: false,
+            insuranceLimiter: new RateLimiterMemory({
+              points: RATE_LIMIT_POINTS,
+              duration: RATE_LIMIT_DURATION,
+            }),
+          },
+          (err?: Error) => {
+            if (err) {
+              limiterPromise = null;
+              reject(err);
+            } else {
+              resolve(limiter);
+            }
+          },
+        );
       } catch (err) {
         limiterPromise = null;
         reject(err);
@@ -54,7 +54,7 @@ function getLimiter(): Promise<RateLimiterPostgres> {
 
 export async function checkRateLimit(
   userId: string,
-  points = 1
+  points = 1,
 ): Promise<{ allowed: boolean; retryAfterMs?: number }> {
   const limiter = await getLimiter();
   try {
@@ -85,7 +85,10 @@ export function createRateLimitChecker(config: {
   points: number;
   duration: number;
   keyPrefix: string;
-}): (userId: string, points?: number) => Promise<{ allowed: boolean; retryAfterMs?: number }> {
+}): (
+  userId: string,
+  points?: number,
+) => Promise<{ allowed: boolean; retryAfterMs?: number }> {
   let promise: Promise<RateLimiterPostgres> | null = null;
 
   function getLimiterInstance(): Promise<RateLimiterPostgres> {
@@ -98,26 +101,29 @@ export function createRateLimitChecker(config: {
           }
           const pool = new Pool({ connectionString });
 
-          const limiter = new RateLimiterPostgres({
-            storeClient: pool,
-            storeType: "pool",
-            points: config.points,
-            duration: config.duration,
-            tableName: "rate_limits",
-            keyPrefix: config.keyPrefix,
-            clearExpiredByTimeout: false,
-            insuranceLimiter: new RateLimiterMemory({
+          const limiter = new RateLimiterPostgres(
+            {
+              storeClient: pool,
+              storeType: "pool",
               points: config.points,
               duration: config.duration,
-            }),
-          }, (err?: Error) => {
-            if (err) {
-              promise = null;
-              reject(err);
-            } else {
-              resolve(limiter);
-            }
-          });
+              tableName: "rate_limits",
+              keyPrefix: config.keyPrefix,
+              clearExpiredByTimeout: false,
+              insuranceLimiter: new RateLimiterMemory({
+                points: config.points,
+                duration: config.duration,
+              }),
+            },
+            (err?: Error) => {
+              if (err) {
+                promise = null;
+                reject(err);
+              } else {
+                resolve(limiter);
+              }
+            },
+          );
         } catch (err) {
           promise = null;
           reject(err);
@@ -137,7 +143,8 @@ export function createRateLimitChecker(config: {
         rejection &&
         typeof rejection === "object" &&
         "msBeforeNext" in rejection &&
-        typeof (rejection as { msBeforeNext: unknown }).msBeforeNext === "number"
+        typeof (rejection as { msBeforeNext: unknown }).msBeforeNext ===
+          "number"
       ) {
         return {
           allowed: false,

@@ -4,7 +4,9 @@ import { slugify } from "@/lib/utils";
 // Trending snapshots regenerate daily; allow one missed cycle before flagging.
 export const STALE_THRESHOLD_MS = 48 * 60 * 60 * 1000;
 
-export function isTrendingSnapshotStale(generatedAt: Date | null | undefined): boolean {
+export function isTrendingSnapshotStale(
+  generatedAt: Date | null | undefined,
+): boolean {
   if (!generatedAt) return false;
   return Date.now() - generatedAt.getTime() > STALE_THRESHOLD_MS;
 }
@@ -18,9 +20,12 @@ export function getTopicSlug(topic: TrendingTopic): string {
   // them so a real upstream data regression doesn't look identical to expected
   // legacy rows once pre-#279 snapshots age out.
   if (topic.slug === "") {
-    console.warn("Trending topic has empty-string slug; falling back to slugify(name):", {
-      name: topic.name,
-    });
+    console.warn(
+      "Trending topic has empty-string slug; falling back to slugify(name):",
+      {
+        name: topic.name,
+      },
+    );
   }
   return topic.slug || slugify(topic.name);
 }
@@ -33,6 +38,9 @@ export function getTopicSlug(topic: TrendingTopic): string {
 export function dedupeTopics(
   topics: TrendingTopic[],
 ): Array<{ topic: TrendingTopic; slug: string }> {
-  const withSlugs = topics.map((topic) => ({ topic, slug: getTopicSlug(topic) }));
+  const withSlugs = topics.map((topic) => ({
+    topic,
+    slug: getTopicSlug(topic),
+  }));
   return Array.from(new Map(withSlugs.map((e) => [e.slug, e])).values());
 }

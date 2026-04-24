@@ -76,9 +76,8 @@ describe("trigger/helpers/notifications", () => {
     it("returns internal podcast ID for a valid PodcastIndex ID", async () => {
       mockFindFirst.mockResolvedValueOnce({ id: 42 });
 
-      const { resolvePodcastId } = await import(
-        "@/trigger/helpers/notifications"
-      );
+      const { resolvePodcastId } =
+        await import("@/trigger/helpers/notifications");
       const result = await resolvePodcastId("12345");
 
       expect(result).toBe(42);
@@ -87,9 +86,8 @@ describe("trigger/helpers/notifications", () => {
     it("returns null when podcast is not found", async () => {
       mockFindFirst.mockResolvedValueOnce(null);
 
-      const { resolvePodcastId } = await import(
-        "@/trigger/helpers/notifications"
-      );
+      const { resolvePodcastId } =
+        await import("@/trigger/helpers/notifications");
       const result = await resolvePodcastId("nonexistent");
 
       expect(result).toBeNull();
@@ -98,9 +96,8 @@ describe("trigger/helpers/notifications", () => {
     it("accepts numeric PodcastIndex ID and converts to string", async () => {
       mockFindFirst.mockResolvedValueOnce({ id: 7 });
 
-      const { resolvePodcastId } = await import(
-        "@/trigger/helpers/notifications"
-      );
+      const { resolvePodcastId } =
+        await import("@/trigger/helpers/notifications");
       const result = await resolvePodcastId(99999);
 
       expect(result).toBe(7);
@@ -119,8 +116,12 @@ describe("trigger/helpers/notifications", () => {
 
     const stubInsertChain = (returning: unknown[]) => {
       const mockReturning = vi.fn().mockResolvedValue(returning);
-      const mockOnConflict = vi.fn().mockReturnValue({ returning: mockReturning });
-      const mockValues = vi.fn().mockReturnValue({ onConflictDoNothing: mockOnConflict });
+      const mockOnConflict = vi
+        .fn()
+        .mockReturnValue({ returning: mockReturning });
+      const mockValues = vi
+        .fn()
+        .mockReturnValue({ onConflictDoNothing: mockOnConflict });
       mockInsert.mockReturnValue({ values: mockValues });
       return { mockReturning, mockOnConflict, mockValues };
     };
@@ -132,23 +133,48 @@ describe("trigger/helpers/notifications", () => {
       ]);
       const { mockValues } = stubInsertChain([]);
 
-      const { createEpisodeNotifications } = await import(
-        "@/trigger/helpers/notifications"
-      );
+      const { createEpisodeNotifications } =
+        await import("@/trigger/helpers/notifications");
       await createEpisodeNotifications(1, [
-        { episodeId: 100, podcastIndexEpisodeId: "PI-100", title: "Test Podcast", body: "New episode: Ep X" },
-        { episodeId: 101, podcastIndexEpisodeId: "PI-101", title: "Test Podcast", body: "New episode: Ep Y" },
+        {
+          episodeId: 100,
+          podcastIndexEpisodeId: "PI-100",
+          title: "Test Podcast",
+          body: "New episode: Ep X",
+        },
+        {
+          episodeId: 101,
+          podcastIndexEpisodeId: "PI-101",
+          title: "Test Podcast",
+          body: "New episode: Ep Y",
+        },
       ]);
 
       // 2 subscribers × 2 episodes = 4 records
       expect(mockValues.mock.calls[0][0]).toHaveLength(4);
       expect(mockValues).toHaveBeenCalledWith(
         expect.arrayContaining([
-          expect.objectContaining({ userId: "user-1", episodeId: 100, type: "new_episode" }),
-          expect.objectContaining({ userId: "user-1", episodeId: 101, type: "new_episode" }),
-          expect.objectContaining({ userId: "user-2", episodeId: 100, type: "new_episode" }),
-          expect.objectContaining({ userId: "user-2", episodeId: 101, type: "new_episode" }),
-        ])
+          expect.objectContaining({
+            userId: "user-1",
+            episodeId: 100,
+            type: "new_episode",
+          }),
+          expect.objectContaining({
+            userId: "user-1",
+            episodeId: 101,
+            type: "new_episode",
+          }),
+          expect.objectContaining({
+            userId: "user-2",
+            episodeId: 100,
+            type: "new_episode",
+          }),
+          expect.objectContaining({
+            userId: "user-2",
+            episodeId: 101,
+            type: "new_episode",
+          }),
+        ]),
       );
     });
 
@@ -156,15 +182,16 @@ describe("trigger/helpers/notifications", () => {
       mockUserSubsFindMany.mockResolvedValueOnce([{ userId: "user-1" }]);
       const { mockValues } = stubInsertChain([]);
 
-      const { createEpisodeNotifications } = await import(
-        "@/trigger/helpers/notifications"
-      );
+      const { createEpisodeNotifications } =
+        await import("@/trigger/helpers/notifications");
       await createEpisodeNotifications(1, singleEpisode);
 
       expect(mockValues).toHaveBeenCalledWith(
         expect.arrayContaining([
-          expect.objectContaining({ body: expect.stringMatching(/^New episode: /) }),
-        ])
+          expect.objectContaining({
+            body: expect.stringMatching(/^New episode: /),
+          }),
+        ]),
       );
     });
 
@@ -172,13 +199,14 @@ describe("trigger/helpers/notifications", () => {
       mockUserSubsFindMany.mockResolvedValueOnce([{ userId: "user-1" }]);
       const { mockOnConflict } = stubInsertChain([]);
 
-      const { createEpisodeNotifications } = await import(
-        "@/trigger/helpers/notifications"
-      );
+      const { createEpisodeNotifications } =
+        await import("@/trigger/helpers/notifications");
       await createEpisodeNotifications(1, singleEpisode);
 
       expect(mockOnConflict).toHaveBeenCalledWith(
-        expect.objectContaining({ target: expect.arrayContaining(["userId", "episodeId"]) })
+        expect.objectContaining({
+          target: expect.arrayContaining(["userId", "episodeId"]),
+        }),
       );
     });
 
@@ -192,15 +220,14 @@ describe("trigger/helpers/notifications", () => {
       ]);
       stubInsertChain([{ userId: "user-realtime", episodeId: 100 }]);
 
-      const { createEpisodeNotifications } = await import(
-        "@/trigger/helpers/notifications"
-      );
+      const { createEpisodeNotifications } =
+        await import("@/trigger/helpers/notifications");
       await createEpisodeNotifications(1, singleEpisode);
 
       expect(mockSendPushToUser).toHaveBeenCalledWith(
         "user-realtime",
         expect.objectContaining({ tag: "episode-100" }),
-        expect.anything()
+        expect.anything(),
       );
     });
 
@@ -214,17 +241,23 @@ describe("trigger/helpers/notifications", () => {
       ]);
       stubInsertChain([{ userId: "user-realtime", episodeId: 100 }]);
 
-      const { createEpisodeNotifications } = await import(
-        "@/trigger/helpers/notifications"
-      );
+      const { createEpisodeNotifications } =
+        await import("@/trigger/helpers/notifications");
       await createEpisodeNotifications(1, [
-        { episodeId: 100, podcastIndexEpisodeId: "PI-999", title: "Test Podcast", body: "New episode: Test" },
+        {
+          episodeId: 100,
+          podcastIndexEpisodeId: "PI-999",
+          title: "Test Podcast",
+          body: "New episode: Test",
+        },
       ]);
 
       expect(mockSendPushToUser).toHaveBeenCalledWith(
         "user-realtime",
-        expect.objectContaining({ data: expect.objectContaining({ url: "/episode/PI-999" }) }),
-        expect.anything()
+        expect.objectContaining({
+          data: expect.objectContaining({ url: "/episode/PI-999" }),
+        }),
+        expect.anything(),
       );
     });
 
@@ -232,9 +265,8 @@ describe("trigger/helpers/notifications", () => {
       mockUserSubsFindMany.mockResolvedValueOnce([{ userId: "user-realtime" }]);
       stubInsertChain([]);
 
-      const { createEpisodeNotifications } = await import(
-        "@/trigger/helpers/notifications"
-      );
+      const { createEpisodeNotifications } =
+        await import("@/trigger/helpers/notifications");
       await createEpisodeNotifications(1, singleEpisode);
 
       expect(mockSendPushToUser).not.toHaveBeenCalled();
@@ -246,52 +278,75 @@ describe("trigger/helpers/notifications", () => {
         { userId: "user-b" },
       ]);
       mockUsersFindMany.mockResolvedValueOnce([
-        { id: "user-a", preferences: { digestFrequency: "realtime", pushEnabled: true } },
-        { id: "user-b", preferences: { digestFrequency: "realtime", pushEnabled: true } },
+        {
+          id: "user-a",
+          preferences: { digestFrequency: "realtime", pushEnabled: true },
+        },
+        {
+          id: "user-b",
+          preferences: { digestFrequency: "realtime", pushEnabled: true },
+        },
       ]);
       stubInsertChain([{ userId: "user-a", episodeId: 100 }]);
 
-      const { createEpisodeNotifications } = await import(
-        "@/trigger/helpers/notifications"
-      );
+      const { createEpisodeNotifications } =
+        await import("@/trigger/helpers/notifications");
       await createEpisodeNotifications(1, singleEpisode);
 
       expect(mockSendPushToUser).toHaveBeenCalledTimes(1);
       expect(mockSendPushToUser).toHaveBeenCalledWith(
         "user-a",
         expect.anything(),
-        expect.anything()
+        expect.anything(),
       );
     });
 
     it("groups pushes by episode — each recipient gets the right tag+url per episode", async () => {
       mockUserSubsFindMany.mockResolvedValueOnce([{ userId: "user-1" }]);
       mockUsersFindMany.mockResolvedValueOnce([
-        { id: "user-1", preferences: { digestFrequency: "realtime", pushEnabled: true } },
+        {
+          id: "user-1",
+          preferences: { digestFrequency: "realtime", pushEnabled: true },
+        },
       ]);
       stubInsertChain([
         { userId: "user-1", episodeId: 100 },
         { userId: "user-1", episodeId: 101 },
       ]);
 
-      const { createEpisodeNotifications } = await import(
-        "@/trigger/helpers/notifications"
-      );
+      const { createEpisodeNotifications } =
+        await import("@/trigger/helpers/notifications");
       await createEpisodeNotifications(1, [
-        { episodeId: 100, podcastIndexEpisodeId: "PI-100", title: "Show", body: "New episode: A" },
-        { episodeId: 101, podcastIndexEpisodeId: "PI-101", title: "Show", body: "New episode: B" },
+        {
+          episodeId: 100,
+          podcastIndexEpisodeId: "PI-100",
+          title: "Show",
+          body: "New episode: A",
+        },
+        {
+          episodeId: 101,
+          podcastIndexEpisodeId: "PI-101",
+          title: "Show",
+          body: "New episode: B",
+        },
       ]);
 
       expect(mockSendPushToUser).toHaveBeenCalledTimes(2);
       expect(mockSendPushToUser).toHaveBeenCalledWith(
         "user-1",
-        expect.objectContaining({ tag: "episode-100", data: { url: "/episode/PI-100" } }),
-        expect.anything()
+        expect.objectContaining({
+          tag: "episode-100",
+          data: { url: "/episode/PI-100" },
+        }),
+        expect.anything(),
       );
       expect(mockSendPushToUser).toHaveBeenCalledWith(
         "user-1",
-        expect.objectContaining({ tag: "episode-101", data: { url: "/episode/PI-101" } }),
-        expect.anything()
+        expect.objectContaining({
+          tag: "episode-101",
+          data: { url: "/episode/PI-101" },
+        }),
+        expect.anything(),
       );
     });
 
@@ -300,20 +355,18 @@ describe("trigger/helpers/notifications", () => {
       mockUserSubsFindMany.mockResolvedValueOnce([{ userId: "user-1" }]);
       const { mockOnConflict } = stubInsertChain([]);
 
-      const { createEpisodeNotifications } = await import(
-        "@/trigger/helpers/notifications"
-      );
+      const { createEpisodeNotifications } =
+        await import("@/trigger/helpers/notifications");
       await createEpisodeNotifications(1, singleEpisode);
 
       expect(mockOnConflict).toHaveBeenCalledWith(
-        expect.objectContaining({ where: expect.anything() })
+        expect.objectContaining({ where: expect.anything() }),
       );
     });
 
     it("no-ops when episodes array is empty", async () => {
-      const { createEpisodeNotifications } = await import(
-        "@/trigger/helpers/notifications"
-      );
+      const { createEpisodeNotifications } =
+        await import("@/trigger/helpers/notifications");
       await createEpisodeNotifications(1, []);
 
       expect(mockUserSubsFindMany).not.toHaveBeenCalled();
@@ -324,9 +377,8 @@ describe("trigger/helpers/notifications", () => {
     it("no-ops when no subscribers have notifications enabled", async () => {
       mockUserSubsFindMany.mockResolvedValueOnce([]);
 
-      const { createEpisodeNotifications } = await import(
-        "@/trigger/helpers/notifications"
-      );
+      const { createEpisodeNotifications } =
+        await import("@/trigger/helpers/notifications");
       await createEpisodeNotifications(1, singleEpisode);
 
       expect(mockInsert).not.toHaveBeenCalled();
@@ -343,9 +395,8 @@ describe("trigger/helpers/notifications", () => {
       ]);
       stubInsertChain([{ userId: "user-daily", episodeId: 100 }]);
 
-      const { createEpisodeNotifications } = await import(
-        "@/trigger/helpers/notifications"
-      );
+      const { createEpisodeNotifications } =
+        await import("@/trigger/helpers/notifications");
       await createEpisodeNotifications(1, singleEpisode);
 
       expect(mockSendPushToUser).not.toHaveBeenCalled();
@@ -359,13 +410,15 @@ describe("trigger/helpers/notifications", () => {
         { userId: "user-conflicted" },
       ]);
       mockUsersFindMany.mockResolvedValueOnce([
-        { id: "user-inserted", preferences: { digestFrequency: "realtime", pushEnabled: true } },
+        {
+          id: "user-inserted",
+          preferences: { digestFrequency: "realtime", pushEnabled: true },
+        },
       ]);
       stubInsertChain([{ userId: "user-inserted", episodeId: 100 }]);
 
-      const { createEpisodeNotifications } = await import(
-        "@/trigger/helpers/notifications"
-      );
+      const { createEpisodeNotifications } =
+        await import("@/trigger/helpers/notifications");
       await createEpisodeNotifications(1, singleEpisode);
 
       expect(mockUsersFindMany).toHaveBeenCalledTimes(1);
@@ -378,9 +431,7 @@ describe("trigger/helpers/notifications", () => {
 
   describe("markSummaryReady", () => {
     it("updates body starting with 'Summary ready: ' and sets isRead=false", async () => {
-      mockUserSubsFindMany.mockResolvedValueOnce([
-        { userId: "user-1" },
-      ]);
+      mockUserSubsFindMany.mockResolvedValueOnce([{ userId: "user-1" }]);
       mockUsersFindMany.mockResolvedValueOnce([
         { id: "user-1", preferences: {} },
       ]);
@@ -390,16 +441,21 @@ describe("trigger/helpers/notifications", () => {
       const mockSet = vi.fn().mockReturnValue({ where: mockWhere });
       mockUpdate.mockReturnValue({ set: mockSet });
 
-      const { markSummaryReady } = await import(
-        "@/trigger/helpers/notifications"
+      const { markSummaryReady } =
+        await import("@/trigger/helpers/notifications");
+      await markSummaryReady(
+        1,
+        100,
+        "PI-100",
+        "Test Podcast",
+        "Summary ready: Test Episode",
       );
-      await markSummaryReady(1, 100, "PI-100", "Test Podcast", "Summary ready: Test Episode");
 
       expect(mockSet).toHaveBeenCalledWith(
         expect.objectContaining({
           body: expect.stringMatching(/^Summary ready: /),
           isRead: false,
-        })
+        }),
       );
     });
 
@@ -414,13 +470,18 @@ describe("trigger/helpers/notifications", () => {
       const mockSet = vi.fn().mockReturnValue({ where: mockWhere });
       mockUpdate.mockReturnValue({ set: mockSet });
 
-      const { markSummaryReady } = await import(
-        "@/trigger/helpers/notifications"
+      const { markSummaryReady } =
+        await import("@/trigger/helpers/notifications");
+      await markSummaryReady(
+        1,
+        100,
+        "PI-100",
+        "Test Podcast",
+        "Summary ready: Test Episode",
       );
-      await markSummaryReady(1, 100, "PI-100", "Test Podcast", "Summary ready: Test Episode");
 
       expect(mockSet).toHaveBeenCalledWith(
-        expect.objectContaining({ title: "Test Podcast" })
+        expect.objectContaining({ title: "Test Podcast" }),
       );
     });
 
@@ -436,10 +497,15 @@ describe("trigger/helpers/notifications", () => {
       const mockSet = vi.fn().mockReturnValue({ where: mockWhere });
       mockUpdate.mockReturnValue({ set: mockSet });
 
-      const { markSummaryReady } = await import(
-        "@/trigger/helpers/notifications"
+      const { markSummaryReady } =
+        await import("@/trigger/helpers/notifications");
+      await markSummaryReady(
+        1,
+        100,
+        "PI-100",
+        "Test Podcast",
+        "Summary ready: Test Episode",
       );
-      await markSummaryReady(1, 100, "PI-100", "Test Podcast", "Summary ready: Test Episode");
 
       expect(mockSet).toHaveBeenCalledTimes(1);
       expect(mockSet.mock.calls[0][0]).toEqual({
@@ -458,27 +524,37 @@ describe("trigger/helpers/notifications", () => {
         },
       ]);
 
-      const mockReturning = vi.fn().mockResolvedValue([{ userId: "user-realtime" }]);
+      const mockReturning = vi
+        .fn()
+        .mockResolvedValue([{ userId: "user-realtime" }]);
       const mockWhere = vi.fn().mockReturnValue({ returning: mockReturning });
       const mockSet = vi.fn().mockReturnValue({ where: mockWhere });
       mockUpdate.mockReturnValue({ set: mockSet });
 
-      const { markSummaryReady } = await import(
-        "@/trigger/helpers/notifications"
+      const { markSummaryReady } =
+        await import("@/trigger/helpers/notifications");
+      await markSummaryReady(
+        1,
+        100,
+        "PI-100",
+        "Test Podcast",
+        "Summary ready: Test Episode",
       );
-      await markSummaryReady(1, 100, "PI-100", "Test Podcast", "Summary ready: Test Episode");
 
       expect(mockSendPushToUser).toHaveBeenCalledWith(
         "user-realtime",
         expect.objectContaining({ tag: "episode-100" }),
-        expect.anything()
+        expect.anything(),
       );
     });
 
     it("returns silently with zero DB changes and zero pushes when no rows match", async () => {
       mockUserSubsFindMany.mockResolvedValueOnce([{ userId: "user-1" }]);
       mockUsersFindMany.mockResolvedValueOnce([
-        { id: "user-1", preferences: { digestFrequency: "realtime", pushEnabled: true } },
+        {
+          id: "user-1",
+          preferences: { digestFrequency: "realtime", pushEnabled: true },
+        },
       ]);
 
       const mockReturning = vi.fn().mockResolvedValue([]);
@@ -486,10 +562,15 @@ describe("trigger/helpers/notifications", () => {
       const mockSet = vi.fn().mockReturnValue({ where: mockWhere });
       mockUpdate.mockReturnValue({ set: mockSet });
 
-      const { markSummaryReady } = await import(
-        "@/trigger/helpers/notifications"
+      const { markSummaryReady } =
+        await import("@/trigger/helpers/notifications");
+      await markSummaryReady(
+        1,
+        100,
+        "PI-100",
+        "Test Podcast",
+        "Summary ready: Test Episode",
       );
-      await markSummaryReady(1, 100, "PI-100", "Test Podcast", "Summary ready: Test Episode");
 
       expect(mockSendPushToUser).not.toHaveBeenCalled();
     });
@@ -510,31 +591,43 @@ describe("trigger/helpers/notifications", () => {
       ]);
 
       // Only user-updated had a matching row
-      const mockReturning = vi.fn().mockResolvedValue([{ userId: "user-updated" }]);
+      const mockReturning = vi
+        .fn()
+        .mockResolvedValue([{ userId: "user-updated" }]);
       const mockWhere = vi.fn().mockReturnValue({ returning: mockReturning });
       const mockSet = vi.fn().mockReturnValue({ where: mockWhere });
       mockUpdate.mockReturnValue({ set: mockSet });
 
-      const { markSummaryReady } = await import(
-        "@/trigger/helpers/notifications"
+      const { markSummaryReady } =
+        await import("@/trigger/helpers/notifications");
+      await markSummaryReady(
+        1,
+        100,
+        "PI-100",
+        "Test Podcast",
+        "Summary ready: Test Episode",
       );
-      await markSummaryReady(1, 100, "PI-100", "Test Podcast", "Summary ready: Test Episode");
 
       expect(mockSendPushToUser).toHaveBeenCalledTimes(1);
       expect(mockSendPushToUser).toHaveBeenCalledWith(
         "user-updated",
         expect.anything(),
-        expect.anything()
+        expect.anything(),
       );
     });
 
     it("no-ops entirely when no subscribers exist", async () => {
       mockUserSubsFindMany.mockResolvedValueOnce([]);
 
-      const { markSummaryReady } = await import(
-        "@/trigger/helpers/notifications"
+      const { markSummaryReady } =
+        await import("@/trigger/helpers/notifications");
+      await markSummaryReady(
+        1,
+        100,
+        "PI-100",
+        "Test Podcast",
+        "Summary ready: Test Episode",
       );
-      await markSummaryReady(1, 100, "PI-100", "Test Podcast", "Summary ready: Test Episode");
 
       expect(mockUpdate).not.toHaveBeenCalled();
       expect(mockSendPushToUser).not.toHaveBeenCalled();
@@ -549,20 +642,29 @@ describe("trigger/helpers/notifications", () => {
         },
       ]);
 
-      const mockReturning = vi.fn().mockResolvedValue([{ userId: "user-realtime" }]);
+      const mockReturning = vi
+        .fn()
+        .mockResolvedValue([{ userId: "user-realtime" }]);
       const mockWhere = vi.fn().mockReturnValue({ returning: mockReturning });
       const mockSet = vi.fn().mockReturnValue({ where: mockWhere });
       mockUpdate.mockReturnValue({ set: mockSet });
 
-      const { markSummaryReady } = await import(
-        "@/trigger/helpers/notifications"
+      const { markSummaryReady } =
+        await import("@/trigger/helpers/notifications");
+      await markSummaryReady(
+        1,
+        100,
+        "PI-456",
+        "Test Podcast",
+        "Summary ready: Test Episode",
       );
-      await markSummaryReady(1, 100, "PI-456", "Test Podcast", "Summary ready: Test Episode");
 
       expect(mockSendPushToUser).toHaveBeenCalledWith(
         "user-realtime",
-        expect.objectContaining({ data: expect.objectContaining({ url: "/episode/PI-456" }) }),
-        expect.anything()
+        expect.objectContaining({
+          data: expect.objectContaining({ url: "/episode/PI-456" }),
+        }),
+        expect.anything(),
       );
     });
   });

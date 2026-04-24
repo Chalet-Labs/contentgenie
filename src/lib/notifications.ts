@@ -9,9 +9,7 @@ import { eq, inArray } from "drizzle-orm";
 import { sendPushToUser, consolePushLogger } from "@/lib/push";
 import { ROUTES } from "@/lib/routes";
 
-async function getNotificationPrefs(
-  userId: string
-): Promise<{
+async function getNotificationPrefs(userId: string): Promise<{
   digestFrequency: "realtime" | "daily" | "weekly";
   pushEnabled: boolean;
 }> {
@@ -63,15 +61,21 @@ export async function createNotification(params: {
         if (episode?.podcastIndexId) {
           pushUrl = ROUTES.episode(episode.podcastIndexId);
         } else {
-          console.warn("[notifications] Episode not found for push URL, falling back to dashboard", {
-            episodeId: params.episodeId,
-          });
+          console.warn(
+            "[notifications] Episode not found for push URL, falling back to dashboard",
+            {
+              episodeId: params.episodeId,
+            },
+          );
         }
       } catch (err) {
-        console.error("[notifications] Failed to resolve episode for push URL", {
-          episodeId: params.episodeId,
-          error: err instanceof Error ? err.message : String(err),
-        });
+        console.error(
+          "[notifications] Failed to resolve episode for push URL",
+          {
+            episodeId: params.episodeId,
+            error: err instanceof Error ? err.message : String(err),
+          },
+        );
       }
     }
     await sendPushToUser(
@@ -84,7 +88,7 @@ export async function createNotification(params: {
           : params.type,
         data: { url: pushUrl },
       },
-      consolePushLogger
+      consolePushLogger,
     );
   }
 }
@@ -100,7 +104,7 @@ export async function createBulkNotifications(
     episodeId?: number;
     title: string;
     body: string;
-  }>
+  }>,
 ): Promise<void> {
   if (items.length === 0) return;
 
@@ -136,7 +140,11 @@ export async function createBulkNotifications(
   // Resolve PodcastIndex IDs for episodes that will generate a push (skip digest/disabled users)
   const realtimeItems = items.filter((item) => realtimeUsers.has(item.userId));
   const episodeDbIds = Array.from(
-    new Set(realtimeItems.map((i) => i.episodeId).filter((id): id is number => id != null))
+    new Set(
+      realtimeItems
+        .map((i) => i.episodeId)
+        .filter((id): id is number => id != null),
+    ),
   );
   const episodePodcastIndexMap = new Map<number, string>();
   if (episodeDbIds.length > 0) {
@@ -148,39 +156,48 @@ export async function createBulkNotifications(
       for (const row of episodeRows) {
         episodePodcastIndexMap.set(row.id, row.podcastIndexId);
       }
-      const missing = episodeDbIds.filter((id) => !episodePodcastIndexMap.has(id));
+      const missing = episodeDbIds.filter(
+        (id) => !episodePodcastIndexMap.has(id),
+      );
       if (missing.length > 0) {
-        console.warn("[notifications] Episodes not found for push URLs, falling back to dashboard", {
-          missingEpisodeIds: missing,
-        });
+        console.warn(
+          "[notifications] Episodes not found for push URLs, falling back to dashboard",
+          {
+            missingEpisodeIds: missing,
+          },
+        );
       }
     } catch (err) {
-      console.error("[notifications] Failed to resolve episodes for push URLs", {
-        episodeDbIds,
-        error: err instanceof Error ? err.message : String(err),
-      });
+      console.error(
+        "[notifications] Failed to resolve episodes for push URLs",
+        {
+          episodeDbIds,
+          error: err instanceof Error ? err.message : String(err),
+        },
+      );
     }
   }
 
   // Dispatch push for realtime users
   await Promise.allSettled(
     realtimeItems.map((item) => {
-      const podcastIndexId = item.episodeId != null
-        ? episodePodcastIndexMap.get(item.episodeId)
-        : undefined;
-      const pushUrl = podcastIndexId ? ROUTES.episode(podcastIndexId) : ROUTES.DASHBOARD;
+      const podcastIndexId =
+        item.episodeId != null
+          ? episodePodcastIndexMap.get(item.episodeId)
+          : undefined;
+      const pushUrl = podcastIndexId
+        ? ROUTES.episode(podcastIndexId)
+        : ROUTES.DASHBOARD;
       return sendPushToUser(
         item.userId,
         {
           title: item.title,
           body: item.body,
-          tag: item.episodeId
-            ? `${item.type}-${item.episodeId}`
-            : item.type,
+          tag: item.episodeId ? `${item.type}-${item.episodeId}` : item.type,
           data: { url: pushUrl },
         },
-        consolePushLogger
+        consolePushLogger,
       );
-    })
+    }),
   );
 }

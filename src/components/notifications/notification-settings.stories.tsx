@@ -55,7 +55,10 @@ export const Default: Story = {
           </p>
         </div>
         <Select defaultValue="realtime">
-          <SelectTrigger className="w-[140px]" aria-labelledby="digest-frequency-label">
+          <SelectTrigger
+            className="w-[140px]"
+            aria-labelledby="digest-frequency-label"
+          >
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -98,7 +101,10 @@ export const Granted: Story = {
           </p>
         </div>
         <Select defaultValue="daily">
-          <SelectTrigger className="w-[140px]" aria-labelledby="digest-frequency-label">
+          <SelectTrigger
+            className="w-[140px]"
+            aria-labelledby="digest-frequency-label"
+          >
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -147,7 +153,10 @@ export const Denied: Story = {
           </p>
         </div>
         <Select defaultValue="realtime">
-          <SelectTrigger className="w-[140px]" aria-labelledby="digest-frequency-label">
+          <SelectTrigger
+            className="w-[140px]"
+            aria-labelledby="digest-frequency-label"
+          >
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -195,7 +204,10 @@ export const Unsupported: Story = {
           </p>
         </div>
         <Select defaultValue="realtime">
-          <SelectTrigger className="w-[140px]" aria-labelledby="digest-frequency-label">
+          <SelectTrigger
+            className="w-[140px]"
+            aria-labelledby="digest-frequency-label"
+          >
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -240,7 +252,10 @@ export const Enabling: Story = {
           </p>
         </div>
         <Select defaultValue="realtime">
-          <SelectTrigger className="w-[140px]" aria-labelledby="digest-frequency-label">
+          <SelectTrigger
+            className="w-[140px]"
+            aria-labelledby="digest-frequency-label"
+          >
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
