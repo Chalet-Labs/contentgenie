@@ -169,9 +169,11 @@ If the push is rejected (non-fast-forward), rebase onto the current `origin/<bra
 Once Phase 5 is green and Phase 6 has pushed, write the sentinel **atomically** (tmp+mv) so a racing hook read can't see a half-written file:
 
 ```bash
+repo_root=$(git rev-parse --show-toplevel)
 branch=$(git rev-parse --abbrev-ref HEAD)
 sha=$(git rev-parse HEAD)
-sentinel=".claude/.pr-validated"
+sentinel="$repo_root/.claude/.pr-validated"
+mkdir -p "$repo_root/.claude"
 printf '%s %s\n' "$branch" "$sha" > "$sentinel.tmp" && mv "$sentinel.tmp" "$sentinel"
 ```
 
