@@ -100,7 +100,7 @@ bun run build
 
 Must exit 0. If it fails, fix the root cause (not a suppression, not a workaround) and re-run. Don't enter Phase 2 with a red build — reviewers waste cycles on broken code.
 
-**Why only build?** Husky's pre-commit runs `tsc --noEmit`, `bun run lint`, and `bun run test` on every *new* commit, so in the common case the only remaining gap is `bun run build` (Next.js page-export restrictions surface only here). However, Phase 0 may have just rebased, and `git rebase` reapplies commits **without** firing pre-commit — same for any prior `--no-verify` / `HUSKY=0` commits. If Phase 0 reported any "Applying: …" lines (or you can't rule it out), run `bun run lint` and `bun run test` here before the build.
+**Why only build?** Husky's pre-commit runs `tsc --noEmit`, `bun run lint`, and `bun run test` on every *new* commit, so in the common case the only remaining gap is `bun run build` (Next.js page-export restrictions surface only here). However, `git rebase` reapplies commits **without** firing pre-commit — same for any prior `--no-verify` / `HUSKY=0` commits. If Phase 0 rewrote history (compare `git rev-parse HEAD` before and after, or just check `HEAD@{1}` ≠ `HEAD`), run `bun run lint` and `bun run test` here before the build.
 
 ### Phase 2 — Multi-Tool Review
 
