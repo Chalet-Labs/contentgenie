@@ -13,48 +13,13 @@ The hook is a best-effort guardrail — not a security boundary. A sufficiently 
 
 You should invoke this skill proactively the moment a PR is discussed — don't wait for the hook to reject `gh pr create`.
 
-## Context hygiene — decide how to run this
+## Run inline — do not dispatch to a subagent
 
-Before starting the pipeline, decide: **run inline in this session, or dispatch to a fresh Task subagent?**
+Run this pipeline inline in the calling session. Don't wrap it in a `Task` subagent.
 
-Skills run inline in the calling agent's context. Sub-tools (`/codex:review`, `/pr-review-toolkit:review-pr`, `/simplify`) delegate their heavy thinking to fresh contexts, but the skill's orchestration — Phase 3 (validate findings), Phase 4 (apply fixes), and the git/verification phases — runs wherever you invoked it. If the caller has been doing feature work (lots of file reads, debugging conversations, long planning threads), that cluttered context will hurt triage quality and risks hitting limits mid-pipeline.
+The sub-tools this skill invokes (`/codex:review`, `/pr-review-toolkit:review-pr`, `/simplify`) already isolate their heavy review work in their own freshly-spawned subagents — each reviewer (code-reviewer, pr-test-analyzer, silent-failure-hunter, type-design-analyzer, comment-analyzer, code-simplifier) gets a clean context. Context hygiene is handled there, not here. Wrapping the whole pipeline in an outer subagent adds a layer that can't dispatch further Task/Agent calls (subagents can't spawn subagents), which breaks the Codex-review path (Phase 2a requires `Task({run_in_background: true})`) and may also affect Skill availability for the other two reviewers. Net result: weaker review coverage, no context win.
 
-**Rule of thumb:**
-
-- **Inline** is fine if the session is fresh — you just started, or you're coming off light work (docs, a small fix, a config change).
-- **Dispatch** otherwise. Reviewers are meant to judge the diff on its merits, not on the story of how it got written; losing the conversational context is a feature, not a bug.
-
-When in doubt, dispatch.
-
-### How to dispatch
-
-Launch a `Task` subagent. The subagent has the same skill registry, so it re-invokes this skill in its own fresh context and drives the pipeline end-to-end:
-
-```
-Task({
-  subagent_type: "general-purpose",
-  description: "Pre-PR validation pipeline",
-  prompt: `Run the full pre-PR validation pipeline for this branch.
-
-Working directory: <absolute path to repo>
-Branch: <current branch name>
-Base branch: origin/main
-
-Invoke the \`pre-pr-validation\` skill and execute every phase (0 through 8) in order. Apply the validated findings unattended — do NOT pause to ask for approval. Report back only after Phase 8 (PR created) or on genuine escalation (see below).
-
-Stop and surface to the caller only if:
-- Phase 0 rebase conflicts are non-trivial
-- Reviewers disagree and project conventions don't resolve it
-- Phase 5 fails after 2 retry rounds
-- The external Codex review is stuck > 15 minutes
-
-On escalation, dump: phases completed, full findings list with validity marks, commits made, failing command + output, and what you tried. Don't truncate — the caller needs the state to decide next steps.
-
-On success, report: PR URL and a one-sentence summary of the scope.`
-})
-```
-
-Wait for the subagent's completion message, then relay the PR URL to the user. If the subagent stopped mid-pipeline, read its escalation report and handle it yourself.
+If the caller's context is cluttered, the cost is mildly worse triage in Phase 3 — not broken reviews. That trade-off goes in favour of running inline.
 
 ## Core principle
 
