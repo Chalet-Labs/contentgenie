@@ -253,6 +253,7 @@ export function PublicEpisodeDetail({ episodeId }: PublicEpisodeDetailProps) {
                 <p className="mb-3 text-sm font-medium">
                   Listen to this episode
                 </p>
+                {/* eslint-disable-next-line jsx-a11y/media-has-caption -- podcast enclosures do not ship caption tracks; transcript is surfaced separately on the episode page */}
                 <audio
                   className="w-full"
                   controls

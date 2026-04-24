@@ -237,6 +237,8 @@ export function PromptTemplateCard({ initialPrompt }: PromptTemplateCardProps) {
               <Button
                 variant="outline"
                 role="combobox"
+                aria-expanded={pickerOpen}
+                aria-controls="prompt-episode-picker"
                 className="w-full justify-between"
               >
                 {selectedEpisode
@@ -248,7 +250,10 @@ export function PromptTemplateCard({ initialPrompt }: PromptTemplateCardProps) {
                 />
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-[500px] p-0">
+            <PopoverContent
+              id="prompt-episode-picker"
+              className="w-[500px] p-0"
+            >
               <Command shouldFilter={false}>
                 <CommandInput
                   placeholder="Search episodes with transcripts…"

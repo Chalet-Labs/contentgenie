@@ -1429,6 +1429,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
         <AudioPlayerProgressContext.Provider value={progress}>
           {children}
           {/* Hidden audio element */}
+          {/* eslint-disable-next-line jsx-a11y/media-has-caption -- podcast enclosures do not ship caption tracks; transcript is surfaced separately */}
           <audio ref={audioRef} preload="metadata" />
           {/* Screen reader time announcements */}
           <div

@@ -203,6 +203,7 @@ export function BookmarkButton() {
               }}
               onKeyDown={handleNoteKeyDown}
               maxLength={MAX_SHORT_TEXT}
+              // eslint-disable-next-line jsx-a11y/no-autofocus -- focus lands on the note input right when the user opens this popover via the bookmark button; without autofocus the popover opens with focus still on the trigger
               autoFocus
             />
             <div className="flex justify-end">

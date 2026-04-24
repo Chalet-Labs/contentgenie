@@ -96,6 +96,7 @@ export function SubscriptionCard({
             </div>
 
             {/* Actions — click isolated */}
+            {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions -- wrapper only exists to stopPropagation so the inner buttons don't trigger the card's parent Link; it adds no interactive behavior of its own */}
             <div
               className="relative z-10 flex shrink-0 flex-col items-end justify-between gap-2"
               onClick={(e) => e.stopPropagation()}
