@@ -47,6 +47,9 @@ export function PlayEpisodeButton({
     }
   }
 
+  // aria-disabled (not the native `disabled` attribute) keeps the button in the
+  // tab order so screen-reader users can reach the "Now playing" state;
+  // handleClick's early-return is what actually blocks the action.
   return (
     <Button
       variant="ghost"

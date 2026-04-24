@@ -1,23 +1,20 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-// Inner chain: select → from → where → as (returns subquery sentinel)
-const mockInnerAs = vi.fn(() => ({ __subquery: true }));
+// Inner chain: select → from → where → as (stand-in for the subquery object).
+const mockInnerAs = vi.fn(() => ({}));
 const mockInnerWhere = vi.fn(() => ({ as: mockInnerAs }));
 const mockInnerFrom = vi.fn(() => ({ where: mockInnerWhere }));
 
-// Outer chain: select → from → where (awaitable terminal)
-const mockOuterWhere = vi.fn();
+// Outer chain: select → from → where → orderBy.
+// Tests set mockOuterOrderBy.mockResolvedValue(...) per case to control awaited rows.
+const mockOuterOrderBy = vi.fn();
+const mockOuterWhere = vi.fn(() => ({ orderBy: mockOuterOrderBy }));
 const mockOuterFrom = vi.fn(() => ({ where: mockOuterWhere }));
 
-// mockSelect alternates: first call → inner chain, second call → outer chain
-let selectCallCount = 0;
-const mockSelect = vi.fn(() => {
-  selectCallCount += 1;
-  if (selectCallCount % 2 === 1) {
-    return { from: mockInnerFrom };
-  }
-  return { from: mockOuterFrom };
-});
+// Production code calls db.select() exactly twice per invocation: subquery
+// (inner) first, outer SELECT second. If that contract changes, update these
+// queued returns in lockstep.
+const mockSelect = vi.fn();
 
 vi.mock("@/db", () => ({
   db: { select: () => mockSelect() },
@@ -49,11 +46,14 @@ import {
   getTopicsByPodcastIndexId,
   TOPICS_PER_EPISODE_LIMIT,
 } from "@/app/(app)/podcast/[id]/topics";
+import { MAX_DISPLAYED_TOPICS } from "@/lib/episodes/topic-display";
 
 describe("getTopicsByPodcastIndexId", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    selectCallCount = 0;
+    mockSelect
+      .mockReturnValueOnce({ from: mockInnerFrom })
+      .mockReturnValueOnce({ from: mockOuterFrom });
   });
 
   it("short-circuits on empty input without hitting the DB", async () => {
@@ -63,19 +63,19 @@ describe("getTopicsByPodcastIndexId", () => {
   });
 
   it("returns {} when no topic rows exist for the requested episodes", async () => {
-    mockOuterWhere.mockResolvedValue([]);
+    mockOuterOrderBy.mockResolvedValue([]);
     const result = await getTopicsByPodcastIndexId([
       { id: 1, podcastIndexId: "PI-1" },
     ]);
     expect(result).toEqual({});
   });
 
-  it("preserves DB order and caps at TOPICS_PER_EPISODE_LIMIT", async () => {
-    mockOuterWhere.mockResolvedValue([
-      { episodeId: 1, topic: "A", topicRank: 1 },
-      { episodeId: 1, topic: "B", topicRank: 2 },
-      { episodeId: 1, topic: "C", topicRank: 3 },
-      { episodeId: 1, topic: "D", topicRank: 4 },
+  it("preserves DB order and returns rows up to TOPICS_PER_EPISODE_LIMIT", async () => {
+    mockOuterOrderBy.mockResolvedValue([
+      { episodeId: 1, topic: "A" },
+      { episodeId: 1, topic: "B" },
+      { episodeId: 1, topic: "C" },
+      { episodeId: 1, topic: "D" },
     ]);
     const result = await getTopicsByPodcastIndexId([
       { id: 1, podcastIndexId: "PI-1" },
@@ -84,10 +84,25 @@ describe("getTopicsByPodcastIndexId", () => {
     expect(result["PI-1"]).toEqual(["A", "B", "C", "D"]);
   });
 
+  it("trusts the DB cap — does not re-cap in JS if extra rows slip through", async () => {
+    // Seed more rows than TOPICS_PER_EPISODE_LIMIT to prove no JS-side cap
+    // exists. If anyone reintroduces a `slice(0, N)` or a break loop, this
+    // assertion fails loudly.
+    const oversized = Array.from({ length: 10 }, (_, i) => ({
+      episodeId: 1,
+      topic: `T${i}`,
+    }));
+    mockOuterOrderBy.mockResolvedValue(oversized);
+    const result = await getTopicsByPodcastIndexId([
+      { id: 1, podcastIndexId: "PI-1" },
+    ]);
+    expect(result["PI-1"]).toHaveLength(oversized.length);
+  });
+
   it("remaps DB ids to PodcastIndex ids in the output keys", async () => {
-    mockOuterWhere.mockResolvedValue([
-      { episodeId: 10, topic: "X", topicRank: 1 },
-      { episodeId: 20, topic: "Y", topicRank: 1 },
+    mockOuterOrderBy.mockResolvedValue([
+      { episodeId: 10, topic: "X" },
+      { episodeId: 20, topic: "Y" },
     ]);
     const result = await getTopicsByPodcastIndexId([
       { id: 10, podcastIndexId: "PI-A" },
@@ -98,7 +113,7 @@ describe("getTopicsByPodcastIndexId", () => {
 
   it("returns {} and logs on DB failure instead of throwing", async () => {
     const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-    mockOuterWhere.mockRejectedValue(new Error("neon unreachable"));
+    mockOuterOrderBy.mockRejectedValue(new Error("neon unreachable"));
     const result = await getTopicsByPodcastIndexId([
       { id: 1, podcastIndexId: "PI-1" },
     ]);
@@ -109,10 +124,14 @@ describe("getTopicsByPodcastIndexId", () => {
     );
     errSpy.mockRestore();
   });
+
+  it("derives TOPICS_PER_EPISODE_LIMIT from MAX_DISPLAYED_TOPICS + 1", () => {
+    expect(TOPICS_PER_EPISODE_LIMIT).toBe(MAX_DISPLAYED_TOPICS + 1);
+  });
 });
 
 describe("getTopicsByPodcastIndexId — SQL shape (QueryBuilder.toSQL)", () => {
-  it("generated SQL contains row_number() window function and lte bound for TOPICS_PER_EPISODE_LIMIT", async () => {
+  it("generated SQL has the window function, the lte bound, and a stable outer ORDER BY", async () => {
     const { QueryBuilder } = await vi.importActual<
       typeof import("drizzle-orm/pg-core")
     >("drizzle-orm/pg-core");
@@ -128,7 +147,6 @@ describe("getTopicsByPodcastIndexId — SQL shape (QueryBuilder.toSQL)", () => {
       .select({
         episodeId: realEpisodeTopics.episodeId,
         topic: realEpisodeTopics.topic,
-        topicRank: realEpisodeTopics.topicRank,
         rn: sql<number>`
           row_number() over (
             partition by ${realEpisodeTopics.episodeId}
@@ -144,15 +162,17 @@ describe("getTopicsByPodcastIndexId — SQL shape (QueryBuilder.toSQL)", () => {
       .select({
         episodeId: sub.episodeId,
         topic: sub.topic,
-        topicRank: sub.topicRank,
       })
       .from(sub)
       .where(lte(sub.rn, TOPICS_PER_EPISODE_LIMIT))
+      .orderBy(sub.episodeId, sub.rn)
       .toSQL();
 
     expect(generatedSql).toContain("row_number()");
+    expect(generatedSql).toContain("partition by");
     expect(generatedSql).toContain("nulls last");
     expect(generatedSql).toMatch(/<=\s*\$\d+/);
+    expect(generatedSql).toMatch(/order by/i);
     expect(params).toContain(TOPICS_PER_EPISODE_LIMIT);
   });
 });

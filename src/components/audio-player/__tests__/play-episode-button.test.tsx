@@ -103,7 +103,7 @@ describe("PlayEpisodeButton", () => {
     ).toBeInTheDocument();
   });
 
-  it("is keyboard-focusable and click no-ops when isActivelyPlaying", async () => {
+  it("stays in the tab order when isActivelyPlaying (aria-disabled, not disabled)", async () => {
     mockCurrentEpisode = episode;
     mockIsPlaying = true;
     const user = userEvent.setup();
@@ -117,8 +117,26 @@ describe("PlayEpisodeButton", () => {
     await user.tab();
     await user.tab();
     expect(btn).toHaveFocus();
-    await user.click(btn);
-    expect(mockPlayEpisode).not.toHaveBeenCalled();
-    expect(mockTogglePlay).not.toHaveBeenCalled();
   });
+
+  // With aria-disabled (unlike native disabled), browsers DO fire click and
+  // keyboard-activation events. The handleClick early-return is what keeps
+  // these no-ops; these tests guard against someone removing that guard.
+  it.each([
+    ["{Enter}", "Enter"],
+    [" ", "Space"],
+  ])(
+    "keyboard activation with %s no-ops when isActivelyPlaying",
+    async (key) => {
+      mockCurrentEpisode = episode;
+      mockIsPlaying = true;
+      const user = userEvent.setup();
+      render(<PlayEpisodeButton episode={episode} />);
+      const btn = screen.getByRole("button", { name: /now playing/i });
+      btn.focus();
+      await user.keyboard(key);
+      expect(mockPlayEpisode).not.toHaveBeenCalled();
+      expect(mockTogglePlay).not.toHaveBeenCalled();
+    },
+  );
 });

@@ -7,9 +7,8 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { WorthItBadge } from "@/components/episodes/worth-it-badge";
 import { parseScoreOrNull } from "@/lib/score-utils";
+import { MAX_DISPLAYED_TOPICS } from "@/lib/episodes/topic-display";
 import type { SummaryStatus } from "@/db/schema";
-
-export const MAX_DISPLAYED_TOPICS = 3;
 
 export interface EpisodeCardProps {
   /** Podcast artwork URL. When omitted, no artwork tile is rendered. */
@@ -28,7 +27,7 @@ export interface EpisodeCardProps {
   href?: string;
   /** Optional description; truncated to line-clamp-2. */
   description?: string | null;
-  /** Topic chips rendered below the description; capped at 3. */
+  /** Topic chips rendered below the description; capped at MAX_DISPLAYED_TOPICS. */
   topics?: string[];
   /**
    * Worth-It score (DB decimal string).

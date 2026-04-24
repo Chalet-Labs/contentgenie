@@ -1,9 +1,9 @@
 import { inArray, lte, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { episodeTopics } from "@/db/schema";
-import { MAX_DISPLAYED_TOPICS } from "@/components/episodes/episode-card";
+import { TOPICS_PER_EPISODE_LIMIT } from "@/lib/episodes/topic-display";
 
-export const TOPICS_PER_EPISODE_LIMIT = MAX_DISPLAYED_TOPICS + 1;
+export { TOPICS_PER_EPISODE_LIMIT };
 
 /**
  * Batch-fetch top topics per episode, keyed by PodcastIndex id.
@@ -16,15 +16,14 @@ export async function getTopicsByPodcastIndexId(
 ): Promise<Record<string, string[]>> {
   if (dbEpisodes.length === 0) return {};
   try {
+    const episodeIds = dbEpisodes.map((e) => e.id);
     const idToPodcastIndexId = new Map(
-      dbEpisodes.map((e) => [e.id, e.podcastIndexId]),
+      dbEpisodes.map((e) => [e.id, e.podcastIndexId] as const),
     );
-    const episodeIds = Array.from(idToPodcastIndexId.keys());
     const sub = db
       .select({
         episodeId: episodeTopics.episodeId,
         topic: episodeTopics.topic,
-        topicRank: episodeTopics.topicRank,
         rn: sql<number>`
           row_number() over (
             partition by ${episodeTopics.episodeId}
@@ -40,18 +39,16 @@ export async function getTopicsByPodcastIndexId(
       .select({
         episodeId: sub.episodeId,
         topic: sub.topic,
-        topicRank: sub.topicRank,
       })
       .from(sub)
-      .where(lte(sub.rn, TOPICS_PER_EPISODE_LIMIT));
+      .where(lte(sub.rn, TOPICS_PER_EPISODE_LIMIT))
+      .orderBy(sub.episodeId, sub.rn);
 
     const out: Record<string, string[]> = {};
     for (const row of rows) {
       const pi = idToPodcastIndexId.get(row.episodeId);
       if (!pi) continue;
-      const bucket = out[pi] ?? [];
-      bucket.push(row.topic);
-      out[pi] = bucket;
+      (out[pi] ??= []).push(row.topic);
     }
     return out;
   } catch (err) {
