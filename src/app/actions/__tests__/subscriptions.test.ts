@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { DEFAULT_SUBSCRIPTION_SORT } from "@/db/subscription-sorts";
 
 // Mock Clerk auth
 const mockAuth = vi.fn();
@@ -856,5 +857,64 @@ describe("setSubscriptionSort", () => {
       error: expect.stringMatching(/failed to save/i),
     });
     expect(mockUpdate).not.toHaveBeenCalled();
+  });
+});
+
+describe("getUserSubscriptionSort", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockAuth.mockResolvedValue({ userId: "user_123" });
+  });
+
+  afterEach(() => {
+    vi.resetModules();
+  });
+
+  it("returns default sort when not authenticated (no DB read)", async () => {
+    mockAuth.mockResolvedValue({ userId: null });
+
+    const { getUserSubscriptionSort } = await import(
+      "@/app/actions/subscriptions"
+    );
+    const result = await getUserSubscriptionSort();
+
+    expect(result).toBe(DEFAULT_SUBSCRIPTION_SORT);
+    expect(mockFindFirstUser).not.toHaveBeenCalled();
+  });
+
+  it("returns default sort when preferences row is null", async () => {
+    mockFindFirstUser.mockResolvedValue({ preferences: null });
+
+    const { getUserSubscriptionSort } = await import(
+      "@/app/actions/subscriptions"
+    );
+    const result = await getUserSubscriptionSort();
+
+    expect(result).toBe(DEFAULT_SUBSCRIPTION_SORT);
+    expect(mockFindFirstUser).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns the stored preference when present and valid", async () => {
+    mockFindFirstUser.mockResolvedValue({
+      preferences: { subscriptionSort: "latest-episode" },
+    });
+
+    const { getUserSubscriptionSort } = await import(
+      "@/app/actions/subscriptions"
+    );
+    const result = await getUserSubscriptionSort();
+
+    expect(result).toBe("latest-episode");
+  });
+
+  it("falls back to default when the preference read throws", async () => {
+    mockFindFirstUser.mockRejectedValue(new Error("prefs read hiccup"));
+
+    const { getUserSubscriptionSort } = await import(
+      "@/app/actions/subscriptions"
+    );
+    const result = await getUserSubscriptionSort();
+
+    expect(result).toBe(DEFAULT_SUBSCRIPTION_SORT);
   });
 });

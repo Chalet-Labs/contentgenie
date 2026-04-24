@@ -16,6 +16,11 @@ export const getEpisodeAverageRating = async () => ({
 });
 export const subscribeToPodcast = noop;
 export const unsubscribeFromPodcast = noop;
+export const setSubscriptionSort = noop;
+export const togglePinSubscription = async () => ({
+  success: true,
+  data: { isPinned: true },
+});
 export const getUserLibrary = async () => ({ items: [], error: null });
 export const isEpisodeSaved = async () => false;
 export const getLibraryEntryByEpisodeId = async (_episodePodcastIndexId: string) => ({ libraryEntryId: 42, episodeId: 10 });

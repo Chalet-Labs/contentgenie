@@ -514,28 +514,31 @@ async function resolveSort(
 ): Promise<SubscriptionSort> {
   if (explicit) return explicit;
 
+  let user: { preferences: typeof users.$inferSelect.preferences } | undefined;
   try {
-    const user = await db.query.users.findFirst({
+    user = await db.query.users.findFirst({
       where: eq(users.id, userId),
       columns: { preferences: true },
     });
-    const stored = user?.preferences?.subscriptionSort;
-    if (!stored) return DEFAULT_SUBSCRIPTION_SORT;
-    if (SUBSCRIPTION_SORTS.includes(stored)) return stored;
-    console.warn("[getUserSubscriptions] unknown stored sort", {
+  } catch (error) {
+    // DB read failure is distinct from "no preference stored": a transient
+    // failure falls back to the default, but logged loudly so ops can tell
+    // apart "user never set one" from "we couldn't read it".
+    console.warn("[resolveSort] preference read failed; using default", {
       userId,
-      stored,
+      error,
     });
     return DEFAULT_SUBSCRIPTION_SORT;
-  } catch (error) {
-    // Preference read is best-effort: a transient failure falls back to the
-    // default sort rather than empty-listing the user's subscriptions.
-    console.warn(
-      "[getUserSubscriptions] failed to read sort preference; using default",
-      { userId, error },
-    );
-    return DEFAULT_SUBSCRIPTION_SORT;
   }
+
+  const stored = user?.preferences?.subscriptionSort;
+  if (!stored) return DEFAULT_SUBSCRIPTION_SORT;
+  if (SUBSCRIPTION_SORTS.includes(stored)) return stored;
+  console.warn("[resolveSort] unknown stored sort; using default", {
+    userId,
+    stored,
+  });
+  return DEFAULT_SUBSCRIPTION_SORT;
 }
 
 export async function getUserSubscriptions(sort?: SubscriptionSort) {
@@ -566,6 +569,16 @@ export async function getUserSubscriptions(sort?: SubscriptionSort) {
     console.error("[getUserSubscriptions] failed", { userId, sort: resolved, error });
     return { subscriptions: [], error: "Failed to load subscriptions" };
   }
+}
+
+export type SubscriptionWithPodcast = Awaited<
+  ReturnType<typeof getUserSubscriptions>
+>["subscriptions"][number];
+
+export async function getUserSubscriptionSort(): Promise<SubscriptionSort> {
+  const { userId } = await auth();
+  if (!userId) return DEFAULT_SUBSCRIPTION_SORT;
+  return resolveSort(userId, undefined);
 }
 
 export async function togglePinSubscription(
