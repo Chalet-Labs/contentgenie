@@ -3,7 +3,7 @@ import { SidebarCountsProvider } from "@/contexts/sidebar-counts-context";
 import { PinnedSubscriptionsProvider } from "@/contexts/pinned-subscriptions-context";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import {
-  PINNED_EXPANDED_STORAGE_KEY,
+  PINNED_EXPANDED_STORAGE_NAME,
   PINNED_EXPANDED_STORAGE_VALUE,
   Sidebar,
 } from "@/components/layout/sidebar";
@@ -46,7 +46,7 @@ const meta: Meta<typeof Sidebar> = {
   decorators: [withProviders],
   loaders: [
     async () => {
-      localStorage.removeItem(PINNED_EXPANDED_STORAGE_KEY);
+      localStorage.removeItem(PINNED_EXPANDED_STORAGE_NAME);
       return {};
     },
   ],
@@ -108,7 +108,7 @@ export const WithPinnedPodcasts: Story = {
   loaders: [
     async () => {
       localStorage.setItem(
-        PINNED_EXPANDED_STORAGE_KEY,
+        PINNED_EXPANDED_STORAGE_NAME,
         PINNED_EXPANDED_STORAGE_VALUE,
       );
       return {};
@@ -130,7 +130,7 @@ export const WithPinnedPodcastsInSheet: Story = {
   loaders: [
     async () => {
       localStorage.setItem(
-        PINNED_EXPANDED_STORAGE_KEY,
+        PINNED_EXPANDED_STORAGE_NAME,
         PINNED_EXPANDED_STORAGE_VALUE,
       );
       return {};

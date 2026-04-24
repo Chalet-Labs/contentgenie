@@ -33,14 +33,14 @@ const sidebarLinks = [
 
 const bottomLinks = [{ href: "/settings", label: "Settings", icon: Settings }];
 
-export const PINNED_EXPANDED_STORAGE_KEY = "sidebar:pinned-expanded";
+export const PINNED_EXPANDED_STORAGE_NAME = "sidebar:pinned-expanded";
 export const PINNED_EXPANDED_STORAGE_VALUE = "1";
 
 function readPinnedExpanded(): boolean {
   if (typeof window === "undefined") return false;
   try {
     return (
-      localStorage.getItem(PINNED_EXPANDED_STORAGE_KEY) ===
+      localStorage.getItem(PINNED_EXPANDED_STORAGE_NAME) ===
       PINNED_EXPANDED_STORAGE_VALUE
     );
   } catch {
@@ -52,11 +52,11 @@ function writePinnedExpanded(next: boolean): void {
   try {
     if (next) {
       localStorage.setItem(
-        PINNED_EXPANDED_STORAGE_KEY,
+        PINNED_EXPANDED_STORAGE_NAME,
         PINNED_EXPANDED_STORAGE_VALUE,
       );
     } else {
-      localStorage.removeItem(PINNED_EXPANDED_STORAGE_KEY);
+      localStorage.removeItem(PINNED_EXPANDED_STORAGE_NAME);
     }
   } catch {
     // localStorage may be unavailable (e.g. private browsing quota exceeded)

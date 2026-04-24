@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, within, fireEvent, act } from "@testing-library/react";
 import {
-  PINNED_EXPANDED_STORAGE_KEY,
+  PINNED_EXPANDED_STORAGE_NAME,
   PINNED_EXPANDED_STORAGE_VALUE,
   Sidebar,
 } from "@/components/layout/sidebar";
@@ -307,14 +307,14 @@ describe("Sidebar — pinned podcasts chevron", () => {
     });
 
     expect(screen.getByTestId("pinned-section")).toBeInTheDocument();
-    expect(localStorage.getItem(PINNED_EXPANDED_STORAGE_KEY)).toBe(
+    expect(localStorage.getItem(PINNED_EXPANDED_STORAGE_NAME)).toBe(
       PINNED_EXPANDED_STORAGE_VALUE,
     );
     expect(chevron).toHaveAttribute("aria-expanded", "true");
   });
 
   it("does not expand on mount when localStorage value is anything other than '1'", () => {
-    localStorage.setItem(PINNED_EXPANDED_STORAGE_KEY, "true");
+    localStorage.setItem(PINNED_EXPANDED_STORAGE_NAME, "true");
     mockUsePinnedSubscriptionsOptional.mockReturnValue({
       pinned: [
         {
@@ -362,12 +362,12 @@ describe("Sidebar — pinned podcasts chevron", () => {
     });
 
     expect(screen.queryByTestId("pinned-section")).toBeNull();
-    expect(localStorage.getItem(PINNED_EXPANDED_STORAGE_KEY)).toBeNull();
+    expect(localStorage.getItem(PINNED_EXPANDED_STORAGE_NAME)).toBeNull();
   });
 
   it("reads localStorage on mount and expands section when pre-seeded to '1'", async () => {
     localStorage.setItem(
-      PINNED_EXPANDED_STORAGE_KEY,
+      PINNED_EXPANDED_STORAGE_NAME,
       PINNED_EXPANDED_STORAGE_VALUE,
     );
     mockUsePinnedSubscriptionsOptional.mockReturnValue({
@@ -412,7 +412,7 @@ describe("Sidebar — pinned podcasts chevron", () => {
     fireEvent.click(screen.getByRole("link", { name: /subscriptions/i }));
 
     expect(screen.queryByTestId("pinned-section")).toBeNull();
-    expect(localStorage.getItem(PINNED_EXPANDED_STORAGE_KEY)).toBeNull();
+    expect(localStorage.getItem(PINNED_EXPANDED_STORAGE_NAME)).toBeNull();
 
     // Chevron is a separate button target
     const chevron = screen.getByLabelText("Toggle pinned podcasts");
