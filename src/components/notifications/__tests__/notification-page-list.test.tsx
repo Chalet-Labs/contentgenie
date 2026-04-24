@@ -617,6 +617,38 @@ describe("NotificationPageList", () => {
     });
   });
 
+  // Regression (ADR-038): NotificationRow must thread isListened through to
+  // EpisodeCard so the listen-state accent bar reflects actual listen state.
+  // Previously isListened was passed only to ListenedButton; forgetting to
+  // forward it to EpisodeCard made listened notifications still show the bar.
+  it("hides the listen-state accent bar on listened notifications", () => {
+    render(
+      <NotificationPageList
+        initialItems={[makeItem({ id: 1, episodePodcastIndexId: "PI-42" })]}
+        initialHasMore={false}
+        initialTopicsByEpisode={{}}
+        initialListenedIds={["PI-42"]}
+      />
+    );
+    const card = screen.getByRole("article").firstElementChild as HTMLElement | null;
+    expect(card).not.toBeNull();
+    expect(card!).toHaveAttribute("data-listened", "true");
+  });
+
+  it("shows the listen-state accent bar on unlistened notifications", () => {
+    render(
+      <NotificationPageList
+        initialItems={[makeItem({ id: 1, episodePodcastIndexId: "PI-42" })]}
+        initialHasMore={false}
+        initialTopicsByEpisode={{}}
+        initialListenedIds={[]}
+      />
+    );
+    const card = screen.getByRole("article").firstElementChild as HTMLElement | null;
+    expect(card).not.toBeNull();
+    expect(card!).toHaveAttribute("data-listened", "false");
+  });
+
   // Regression: Load more degrades gracefully when getEpisodeTopics throws
   it("Load more appends rows even if getEpisodeTopics throws", async () => {
     mockGetNotifications.mockResolvedValue({

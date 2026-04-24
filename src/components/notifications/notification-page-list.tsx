@@ -433,6 +433,7 @@ function NotificationRow({
         topics={topics}
         score={item.worthItScore}
         accent={item.isRead ? "none" : "unread"}
+        isListened={isListened}
         meta={[
           <span key="time">{formatRelativeTime(item.createdAt)}</span>,
         ]}

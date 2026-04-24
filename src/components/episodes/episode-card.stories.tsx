@@ -1,3 +1,4 @@
+// Left-accent bar is driven by isListened: unlistened → bar; listened → no bar (see ADR-038). VRT baselines must be regenerated after any change here.
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -151,6 +152,7 @@ export const ProcessingFailed: Story = {
   args: { status: "failed" },
 };
 
+// VRT contract: this story must render with a brand-colored left bar.
 export const Unlistened: Story = {
   args: {
     isListened: false,
@@ -160,6 +162,7 @@ export const Unlistened: Story = {
   },
 };
 
+// VRT contract: this story must render with no left bar.
 export const Listened: Story = {
   args: {
     isListened: true,
