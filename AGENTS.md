@@ -81,6 +81,7 @@ bun run trigger:deploy # Deploy tasks to Trigger.dev Cloud
 - PR title: same format as commits, under 70 characters. PR body: `## Summary` bullets + `## Test plan` checklist.
 - Always run lint and build before pushing. The CI must pass.
 - Update `CHANGELOG.md` under the `[Unreleased]` section when adding features, fixing bugs, or making breaking changes. Use the appropriate subsection: `Added`, `Changed`, `Fixed`, or `Removed`.
+- See [docs/code-review-checklist.md](docs/code-review-checklist.md) for the review checklist applied before pushing.
 
 ## Design
 
