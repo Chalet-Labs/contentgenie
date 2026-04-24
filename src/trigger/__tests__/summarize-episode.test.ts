@@ -1,30 +1,23 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { createTriggerSdkMock } from "@/test/mocks/trigger-sdk";
 
-// Mock Trigger.dev SDK before imports
 const mockMetadataRootIncrement = vi.fn();
-vi.mock("@trigger.dev/sdk", () => ({
-  task: vi.fn((config) => config),
-  retry: {
-    onThrow: vi.fn(async (fn) => fn()),
-  },
-  logger: {
-    info: vi.fn(),
-    warn: vi.fn(),
-    error: vi.fn(),
-  },
-  metadata: {
-    set: vi.fn(),
-    root: {
-      increment: (...args: unknown[]) => mockMetadataRootIncrement(...args),
+vi.mock("@trigger.dev/sdk", () =>
+  createTriggerSdkMock({
+    metadata: {
+      set: vi.fn(),
+      root: {
+        increment: (...args: unknown[]) => mockMetadataRootIncrement(...args),
+      },
     },
-  },
-  AbortTaskRunError: class AbortTaskRunError extends Error {
-    constructor(message: string) {
-      super(message);
-      this.name = "AbortTaskRunError";
-    }
-  },
-}));
+    AbortTaskRunError: class AbortTaskRunError extends Error {
+      constructor(message: string) {
+        super(message);
+        this.name = "AbortTaskRunError";
+      }
+    },
+  }),
+);
 
 const mockFindFirst = vi.fn().mockResolvedValue(null);
 const mockUpdate = vi.fn();

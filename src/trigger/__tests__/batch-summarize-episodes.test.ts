@@ -1,17 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { createTriggerSdkMock } from "@/test/mocks/trigger-sdk";
 
-// Mock Trigger.dev SDK before imports
-vi.mock("@trigger.dev/sdk", () => ({
-  task: vi.fn((config) => config),
-  metadata: {
-    set: vi.fn(),
-  },
-  logger: {
-    info: vi.fn(),
-    warn: vi.fn(),
-    error: vi.fn(),
-  },
-}));
+vi.mock("@trigger.dev/sdk", () =>
+  createTriggerSdkMock({ metadata: { set: vi.fn() } }),
+);
 
 const mockBatchTriggerAndWait = vi.fn();
 

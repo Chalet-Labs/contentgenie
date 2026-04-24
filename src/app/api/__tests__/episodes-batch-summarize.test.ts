@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { NextRequest } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { db } from "@/db";
+import { makePostRequest } from "@/test/mocks/next-request";
 import {
   checkRateLimit,
   checkDailyLimit,
@@ -46,13 +46,6 @@ vi.mock("@trigger.dev/sdk", () => ({
 
 vi.mock("@/trigger/batch-summarize-episodes", () => ({}));
 
-function makeRequest(body: unknown) {
-  return new NextRequest("http://localhost:3000/api/episodes/batch-summarize", {
-    method: "POST",
-    body: JSON.stringify(body),
-  });
-}
-
 describe("POST /api/episodes/batch-summarize", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -68,7 +61,9 @@ describe("POST /api/episodes/batch-summarize", () => {
   it("returns 401 when unauthenticated", async () => {
     vi.mocked(auth).mockResolvedValue({ userId: null } as never);
 
-    const response = await POST(makeRequest({ episodeIds: [1, 2] }));
+    const response = await POST(
+      makePostRequest("/api/episodes/batch-summarize", { episodeIds: [1, 2] }),
+    );
     const data = await response.json();
 
     expect(response.status).toBe(401);
@@ -78,7 +73,9 @@ describe("POST /api/episodes/batch-summarize", () => {
   it("returns 400 when episodeIds is missing", async () => {
     vi.mocked(auth).mockResolvedValue({ userId: "user-1" } as never);
 
-    const response = await POST(makeRequest({}));
+    const response = await POST(
+      makePostRequest("/api/episodes/batch-summarize", {}),
+    );
     const data = await response.json();
 
     expect(response.status).toBe(400);
@@ -88,7 +85,9 @@ describe("POST /api/episodes/batch-summarize", () => {
   it("returns 400 when episodeIds is empty", async () => {
     vi.mocked(auth).mockResolvedValue({ userId: "user-1" } as never);
 
-    const response = await POST(makeRequest({ episodeIds: [] }));
+    const response = await POST(
+      makePostRequest("/api/episodes/batch-summarize", { episodeIds: [] }),
+    );
     const data = await response.json();
 
     expect(response.status).toBe(400);
@@ -98,7 +97,9 @@ describe("POST /api/episodes/batch-summarize", () => {
   it("returns 400 when episodeIds is not an array", async () => {
     vi.mocked(auth).mockResolvedValue({ userId: "user-1" } as never);
 
-    const response = await POST(makeRequest({ episodeIds: "123" }));
+    const response = await POST(
+      makePostRequest("/api/episodes/batch-summarize", { episodeIds: "123" }),
+    );
     const data = await response.json();
 
     expect(response.status).toBe(400);
@@ -109,7 +110,9 @@ describe("POST /api/episodes/batch-summarize", () => {
     vi.mocked(auth).mockResolvedValue({ userId: "user-1" } as never);
 
     const ids = Array.from({ length: 21 }, (_, i) => i + 1);
-    const response = await POST(makeRequest({ episodeIds: ids }));
+    const response = await POST(
+      makePostRequest("/api/episodes/batch-summarize", { episodeIds: ids }),
+    );
     const data = await response.json();
 
     expect(response.status).toBe(400);
@@ -119,7 +122,11 @@ describe("POST /api/episodes/batch-summarize", () => {
   it("returns 400 when episodeIds contains invalid values", async () => {
     vi.mocked(auth).mockResolvedValue({ userId: "user-1" } as never);
 
-    const response = await POST(makeRequest({ episodeIds: [1, -2, 3] }));
+    const response = await POST(
+      makePostRequest("/api/episodes/batch-summarize", {
+        episodeIds: [1, -2, 3],
+      }),
+    );
     const data = await response.json();
 
     expect(response.status).toBe(400);
@@ -129,7 +136,11 @@ describe("POST /api/episodes/batch-summarize", () => {
   it("returns 400 when episodeIds contains non-numbers", async () => {
     vi.mocked(auth).mockResolvedValue({ userId: "user-1" } as never);
 
-    const response = await POST(makeRequest({ episodeIds: [1, "abc", 3] }));
+    const response = await POST(
+      makePostRequest("/api/episodes/batch-summarize", {
+        episodeIds: [1, "abc", 3],
+      }),
+    );
     const data = await response.json();
 
     expect(response.status).toBe(400);
@@ -144,7 +155,9 @@ describe("POST /api/episodes/batch-summarize", () => {
       { podcastIndexId: "2", processedAt: new Date() },
     ] as never);
 
-    const response = await POST(makeRequest({ episodeIds: [1, 2] }));
+    const response = await POST(
+      makePostRequest("/api/episodes/batch-summarize", { episodeIds: [1, 2] }),
+    );
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -160,7 +173,11 @@ describe("POST /api/episodes/batch-summarize", () => {
 
     const { tasks } = await import("@trigger.dev/sdk");
 
-    const response = await POST(makeRequest({ episodeIds: [1, 2, 3] }));
+    const response = await POST(
+      makePostRequest("/api/episodes/batch-summarize", {
+        episodeIds: [1, 2, 3],
+      }),
+    );
     const data = await response.json();
 
     expect(response.status).toBe(202);
@@ -185,7 +202,11 @@ describe("POST /api/episodes/batch-summarize", () => {
 
     const { tasks } = await import("@trigger.dev/sdk");
 
-    const response = await POST(makeRequest({ episodeIds: [1, 2, 3] }));
+    const response = await POST(
+      makePostRequest("/api/episodes/batch-summarize", {
+        episodeIds: [1, 2, 3],
+      }),
+    );
     const data = await response.json();
 
     expect(response.status).toBe(202);
@@ -207,7 +228,9 @@ describe("POST /api/episodes/batch-summarize", () => {
       retryAfterMs: 3600000,
     });
 
-    const response = await POST(makeRequest({ episodeIds: [100] }));
+    const response = await POST(
+      makePostRequest("/api/episodes/batch-summarize", { episodeIds: [100] }),
+    );
     const data = await response.json();
 
     expect(response.status).toBe(429);
@@ -222,7 +245,11 @@ describe("POST /api/episodes/batch-summarize", () => {
       retryAfterMs: 43200000,
     });
 
-    const response = await POST(makeRequest({ episodeIds: [1, 2, 3] }));
+    const response = await POST(
+      makePostRequest("/api/episodes/batch-summarize", {
+        episodeIds: [1, 2, 3],
+      }),
+    );
     const data = await response.json();
 
     expect(response.status).toBe(429);
@@ -244,7 +271,9 @@ describe("POST /api/episodes/batch-summarize", () => {
     );
 
     const ids = Array.from({ length: 20 }, (_, i) => i + 1);
-    const response = await POST(makeRequest({ episodeIds: ids }));
+    const response = await POST(
+      makePostRequest("/api/episodes/batch-summarize", { episodeIds: ids }),
+    );
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -258,7 +287,9 @@ describe("POST /api/episodes/batch-summarize", () => {
       new Error("DB connection failed"),
     );
 
-    const response = await POST(makeRequest({ episodeIds: [1] }));
+    const response = await POST(
+      makePostRequest("/api/episodes/batch-summarize", { episodeIds: [1] }),
+    );
     const data = await response.json();
 
     expect(response.status).toBe(500);

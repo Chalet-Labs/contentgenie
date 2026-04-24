@@ -1,9 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { makeClerkAuthMock } from "@/test/mocks/clerk-server";
 
 const mockAuth = vi.fn();
-vi.mock("@clerk/nextjs/server", () => ({
-  auth: () => mockAuth(),
-}));
+vi.mock("@clerk/nextjs/server", () => makeClerkAuthMock(() => mockAuth()));
 
 const mockCreatePublicToken = vi.fn();
 vi.mock("@trigger.dev/sdk", () => ({

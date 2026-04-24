@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
+import { makeClerkAuthMock } from "@/test/mocks/clerk-server";
+import { makePostRequest } from "@/test/mocks/next-request";
 
 const mockAuth = vi.fn();
-vi.mock("@clerk/nextjs/server", () => ({
-  auth: () => mockAuth(),
-}));
+vi.mock("@clerk/nextjs/server", () => makeClerkAuthMock(() => mockAuth()));
 
 vi.mock("next/cache", () => ({
   revalidatePath: vi.fn(),
@@ -34,14 +34,6 @@ vi.mock("@/db", () => ({
   },
 }));
 
-function makeRequest(body: unknown) {
-  return new NextRequest("http://localhost:3000/api/library/unsave", {
-    method: "POST",
-    body: JSON.stringify(body),
-    headers: { "Content-Type": "application/json" },
-  });
-}
-
 describe("POST /api/library/unsave", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -54,7 +46,9 @@ describe("POST /api/library/unsave", () => {
     mockAuth.mockResolvedValue({ userId: null });
 
     const { POST } = await import("@/app/api/library/unsave/route");
-    const response = await POST(makeRequest({ podcastIndexId: "ep-123" }));
+    const response = await POST(
+      makePostRequest("/api/library/unsave", { podcastIndexId: "ep-123" }),
+    );
 
     expect(response.status).toBe(401);
     const data = await response.json();
@@ -63,7 +57,7 @@ describe("POST /api/library/unsave", () => {
 
   it("returns 400 for missing podcastIndexId", async () => {
     const { POST } = await import("@/app/api/library/unsave/route");
-    const response = await POST(makeRequest({}));
+    const response = await POST(makePostRequest("/api/library/unsave", {}));
 
     expect(response.status).toBe(400);
     const data = await response.json();
@@ -72,7 +66,9 @@ describe("POST /api/library/unsave", () => {
 
   it("returns 400 for non-string podcastIndexId", async () => {
     const { POST } = await import("@/app/api/library/unsave/route");
-    const response = await POST(makeRequest({ podcastIndexId: 123 }));
+    const response = await POST(
+      makePostRequest("/api/library/unsave", { podcastIndexId: 123 }),
+    );
 
     expect(response.status).toBe(400);
   });
@@ -94,7 +90,9 @@ describe("POST /api/library/unsave", () => {
 
     const { POST } = await import("@/app/api/library/unsave/route");
     const response = await POST(
-      makeRequest({ podcastIndexId: "ep-nonexistent" }),
+      makePostRequest("/api/library/unsave", {
+        podcastIndexId: "ep-nonexistent",
+      }),
     );
 
     expect(response.status).toBe(404);
@@ -104,7 +102,9 @@ describe("POST /api/library/unsave", () => {
 
   it("returns 200 with success:true on valid removal", async () => {
     const { POST } = await import("@/app/api/library/unsave/route");
-    const response = await POST(makeRequest({ podcastIndexId: "ep-123" }));
+    const response = await POST(
+      makePostRequest("/api/library/unsave", { podcastIndexId: "ep-123" }),
+    );
 
     expect(response.status).toBe(200);
     const data = await response.json();
@@ -113,7 +113,9 @@ describe("POST /api/library/unsave", () => {
 
   it("calls db.delete", async () => {
     const { POST } = await import("@/app/api/library/unsave/route");
-    await POST(makeRequest({ podcastIndexId: "ep-123" }));
+    await POST(
+      makePostRequest("/api/library/unsave", { podcastIndexId: "ep-123" }),
+    );
 
     expect(mockDelete).toHaveBeenCalled();
   });
@@ -122,7 +124,9 @@ describe("POST /api/library/unsave", () => {
     mockEpisodesFindFirst.mockRejectedValue(new Error("DB connection failed"));
 
     const { POST } = await import("@/app/api/library/unsave/route");
-    const response = await POST(makeRequest({ podcastIndexId: "ep-123" }));
+    const response = await POST(
+      makePostRequest("/api/library/unsave", { podcastIndexId: "ep-123" }),
+    );
 
     expect(response.status).toBe(500);
     const data = await response.json();

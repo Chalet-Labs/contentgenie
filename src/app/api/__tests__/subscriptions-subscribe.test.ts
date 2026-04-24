@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { NextRequest } from "next/server";
+import { makeClerkAuthMock } from "@/test/mocks/clerk-server";
+import { makePostRequest } from "@/test/mocks/next-request";
 
 const mockAuth = vi.fn();
-vi.mock("@clerk/nextjs/server", () => ({
-  auth: () => mockAuth(),
-}));
+vi.mock("@clerk/nextjs/server", () => makeClerkAuthMock(() => mockAuth()));
 
 vi.mock("next/cache", () => ({
   revalidatePath: vi.fn(),
@@ -38,14 +38,6 @@ const validPodcastPayload = {
   description: "A podcast",
   imageUrl: "https://example.com/art.jpg",
 };
-
-function makeRequest(body: unknown) {
-  return new NextRequest("http://localhost:3000/api/subscriptions/subscribe", {
-    method: "POST",
-    body: JSON.stringify(body),
-    headers: { "Content-Type": "application/json" },
-  });
-}
 
 function setupInsertChains({
   podcastId = 10,
@@ -94,7 +86,9 @@ describe("POST /api/subscriptions/subscribe", () => {
     mockAuth.mockResolvedValue({ userId: null });
 
     const { POST } = await import("@/app/api/subscriptions/subscribe/route");
-    const response = await POST(makeRequest(validPodcastPayload));
+    const response = await POST(
+      makePostRequest("/api/subscriptions/subscribe", validPodcastPayload),
+    );
 
     expect(response.status).toBe(401);
     const data = await response.json();
@@ -103,7 +97,9 @@ describe("POST /api/subscriptions/subscribe", () => {
 
   it("returns 400 for missing podcastIndexId", async () => {
     const { POST } = await import("@/app/api/subscriptions/subscribe/route");
-    const response = await POST(makeRequest({ title: "Test" }));
+    const response = await POST(
+      makePostRequest("/api/subscriptions/subscribe", { title: "Test" }),
+    );
 
     expect(response.status).toBe(400);
     const data = await response.json();
@@ -112,7 +108,11 @@ describe("POST /api/subscriptions/subscribe", () => {
 
   it("returns 400 for missing title", async () => {
     const { POST } = await import("@/app/api/subscriptions/subscribe/route");
-    const response = await POST(makeRequest({ podcastIndexId: "pod-1" }));
+    const response = await POST(
+      makePostRequest("/api/subscriptions/subscribe", {
+        podcastIndexId: "pod-1",
+      }),
+    );
 
     expect(response.status).toBe(400);
   });
@@ -131,7 +131,9 @@ describe("POST /api/subscriptions/subscribe", () => {
 
   it("returns 200 with success:true for valid payload", async () => {
     const { POST } = await import("@/app/api/subscriptions/subscribe/route");
-    const response = await POST(makeRequest(validPodcastPayload));
+    const response = await POST(
+      makePostRequest("/api/subscriptions/subscribe", validPodcastPayload),
+    );
 
     expect(response.status).toBe(200);
     const data = await response.json();
@@ -142,7 +144,9 @@ describe("POST /api/subscriptions/subscribe", () => {
     setupInsertChains({ subResult: [] }); // empty = already subscribed
 
     const { POST } = await import("@/app/api/subscriptions/subscribe/route");
-    const response = await POST(makeRequest(validPodcastPayload));
+    const response = await POST(
+      makePostRequest("/api/subscriptions/subscribe", validPodcastPayload),
+    );
 
     expect(response.status).toBe(200);
     const data = await response.json();
@@ -170,7 +174,9 @@ describe("POST /api/subscriptions/subscribe", () => {
     });
 
     const { POST } = await import("@/app/api/subscriptions/subscribe/route");
-    const response = await POST(makeRequest(validPodcastPayload));
+    const response = await POST(
+      makePostRequest("/api/subscriptions/subscribe", validPodcastPayload),
+    );
 
     expect(response.status).toBe(500);
     const data = await response.json();

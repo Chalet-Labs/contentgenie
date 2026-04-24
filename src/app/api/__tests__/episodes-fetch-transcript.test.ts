@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { NextRequest } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { db } from "@/db";
+import { makePostRequest } from "@/test/mocks/next-request";
 
 vi.mock("@clerk/nextjs/server", () => ({
   auth: vi.fn(),
@@ -174,16 +175,6 @@ function makePiPodcast(overrides: Record<string, unknown> = {}) {
   };
 }
 
-function makeRequest(body: unknown) {
-  return new NextRequest(
-    "http://localhost:3000/api/episodes/fetch-transcript",
-    {
-      method: "POST",
-      body: JSON.stringify(body),
-    },
-  );
-}
-
 describe("POST /api/episodes/fetch-transcript", () => {
   beforeEach(async () => {
     vi.clearAllMocks();
@@ -212,7 +203,9 @@ describe("POST /api/episodes/fetch-transcript", () => {
     vi.mocked(auth).mockResolvedValue({ userId: null, has: vi.fn() } as never);
 
     const { POST } = await import("@/app/api/episodes/fetch-transcript/route");
-    const response = await POST(makeRequest({ episodeId: 5 }));
+    const response = await POST(
+      makePostRequest("/api/episodes/fetch-transcript", { episodeId: 5 }),
+    );
     const data = await response.json();
 
     expect(response.status).toBe(401);
@@ -226,7 +219,9 @@ describe("POST /api/episodes/fetch-transcript", () => {
     } as never);
 
     const { POST } = await import("@/app/api/episodes/fetch-transcript/route");
-    const response = await POST(makeRequest({ episodeId: 5 }));
+    const response = await POST(
+      makePostRequest("/api/episodes/fetch-transcript", { episodeId: 5 }),
+    );
     const data = await response.json();
 
     expect(response.status).toBe(403);
@@ -242,7 +237,9 @@ describe("POST /api/episodes/fetch-transcript", () => {
     } as never);
 
     const { POST } = await import("@/app/api/episodes/fetch-transcript/route");
-    const response = await POST(makeRequest({}));
+    const response = await POST(
+      makePostRequest("/api/episodes/fetch-transcript", {}),
+    );
     const data = await response.json();
 
     expect(response.status).toBe(400);
@@ -256,7 +253,9 @@ describe("POST /api/episodes/fetch-transcript", () => {
     } as never);
 
     const { POST } = await import("@/app/api/episodes/fetch-transcript/route");
-    const response = await POST(makeRequest({ episodeId: 1.5 }));
+    const response = await POST(
+      makePostRequest("/api/episodes/fetch-transcript", { episodeId: 1.5 }),
+    );
     const data = await response.json();
 
     expect(response.status).toBe(400);
@@ -270,7 +269,9 @@ describe("POST /api/episodes/fetch-transcript", () => {
     } as never);
 
     const { POST } = await import("@/app/api/episodes/fetch-transcript/route");
-    const response = await POST(makeRequest({ episodeId: -3 }));
+    const response = await POST(
+      makePostRequest("/api/episodes/fetch-transcript", { episodeId: -3 }),
+    );
     const data = await response.json();
 
     expect(response.status).toBe(400);
@@ -285,7 +286,9 @@ describe("POST /api/episodes/fetch-transcript", () => {
     mockEpisodeSelect(null);
 
     const { POST } = await import("@/app/api/episodes/fetch-transcript/route");
-    const response = await POST(makeRequest({ episodeId: 999 }));
+    const response = await POST(
+      makePostRequest("/api/episodes/fetch-transcript", { episodeId: 999 }),
+    );
     const data = await response.json();
 
     expect(response.status).toBe(404);
@@ -300,7 +303,9 @@ describe("POST /api/episodes/fetch-transcript", () => {
     mockEpisodeSelect(makeEpisode());
 
     const { POST } = await import("@/app/api/episodes/fetch-transcript/route");
-    const response = await POST(makeRequest({ episodeId: 5 }));
+    const response = await POST(
+      makePostRequest("/api/episodes/fetch-transcript", { episodeId: 5 }),
+    );
     const data = await response.json();
 
     expect(response.status).toBe(202);
@@ -318,7 +323,9 @@ describe("POST /api/episodes/fetch-transcript", () => {
     const { setMock } = mockUpdateChain();
 
     const { POST } = await import("@/app/api/episodes/fetch-transcript/route");
-    await POST(makeRequest({ episodeId: 5 }));
+    await POST(
+      makePostRequest("/api/episodes/fetch-transcript", { episodeId: 5 }),
+    );
 
     expect(db.update).toHaveBeenCalled();
     expect(setMock).toHaveBeenCalledWith(
@@ -337,7 +344,9 @@ describe("POST /api/episodes/fetch-transcript", () => {
     mockEpisodeSelect(makeEpisode({ id: 5, podcastIndexId: "98765" }));
 
     const { POST } = await import("@/app/api/episodes/fetch-transcript/route");
-    await POST(makeRequest({ episodeId: 5 }));
+    await POST(
+      makePostRequest("/api/episodes/fetch-transcript", { episodeId: 5 }),
+    );
 
     const { tasks } = await import("@trigger.dev/sdk");
     expect(tasks.trigger).toHaveBeenCalledWith(
@@ -354,7 +363,9 @@ describe("POST /api/episodes/fetch-transcript", () => {
     mockEpisodeSelect(makeEpisode());
 
     const { POST } = await import("@/app/api/episodes/fetch-transcript/route");
-    await POST(makeRequest({ episodeId: 5 }));
+    await POST(
+      makePostRequest("/api/episodes/fetch-transcript", { episodeId: 5 }),
+    );
 
     const { tasks } = await import("@trigger.dev/sdk");
     expect(tasks.trigger).toHaveBeenCalledWith(
@@ -372,7 +383,9 @@ describe("POST /api/episodes/fetch-transcript", () => {
     const { eq } = await import("drizzle-orm");
 
     const { POST } = await import("@/app/api/episodes/fetch-transcript/route");
-    await POST(makeRequest({ episodeId: 5 }));
+    await POST(
+      makePostRequest("/api/episodes/fetch-transcript", { episodeId: 5 }),
+    );
 
     // eq should be called with the "id" column (primary key), value 5
     expect(eq).toHaveBeenCalledWith("id", 5);
@@ -409,7 +422,9 @@ describe("POST /api/episodes/fetch-transcript", () => {
     const { setMock } = mockUpdateChain();
 
     const { POST } = await import("@/app/api/episodes/fetch-transcript/route");
-    await POST(makeRequest({ episodeId: 5 }));
+    await POST(
+      makePostRequest("/api/episodes/fetch-transcript", { episodeId: 5 }),
+    );
 
     const allSetCalls = setMock.mock.calls;
     const runIdCall = allSetCalls.find(
@@ -434,7 +449,9 @@ describe("POST /api/episodes/fetch-transcript", () => {
     vi.mocked(tasks.trigger).mockRejectedValue(new Error("Trigger.dev down"));
 
     const { POST } = await import("@/app/api/episodes/fetch-transcript/route");
-    const response = await POST(makeRequest({ episodeId: 5 }));
+    const response = await POST(
+      makePostRequest("/api/episodes/fetch-transcript", { episodeId: 5 }),
+    );
 
     expect(response.status).toBe(500);
     const data = await response.json();
@@ -467,7 +484,11 @@ describe("POST /api/episodes/fetch-transcript", () => {
       .mockResolvedValue({ id: 7 });
 
     const { POST } = await import("@/app/api/episodes/fetch-transcript/route");
-    const response = await POST(makeRequest({ podcastIndexId: "98765" }));
+    const response = await POST(
+      makePostRequest("/api/episodes/fetch-transcript", {
+        podcastIndexId: "98765",
+      }),
+    );
 
     expect(response.status).toBe(202);
   });
@@ -494,7 +515,11 @@ describe("POST /api/episodes/fetch-transcript", () => {
       .mockResolvedValue({ id: 7 });
 
     const { POST } = await import("@/app/api/episodes/fetch-transcript/route");
-    await POST(makeRequest({ podcastIndexId: "98765" }));
+    await POST(
+      makePostRequest("/api/episodes/fetch-transcript", {
+        podcastIndexId: "98765",
+      }),
+    );
 
     expect(db.insert).toHaveBeenCalled();
   });
@@ -521,7 +546,11 @@ describe("POST /api/episodes/fetch-transcript", () => {
       .mockResolvedValue({ id: 7 });
 
     const { POST } = await import("@/app/api/episodes/fetch-transcript/route");
-    const response = await POST(makeRequest({ podcastIndexId: "98765" }));
+    const response = await POST(
+      makePostRequest("/api/episodes/fetch-transcript", {
+        podcastIndexId: "98765",
+      }),
+    );
     const data = await response.json();
 
     expect(response.status).toBe(202);
@@ -537,7 +566,11 @@ describe("POST /api/episodes/fetch-transcript", () => {
     mockDbQueryEpisodesFindFirst.mockResolvedValue({ id: 5 });
 
     const { POST } = await import("@/app/api/episodes/fetch-transcript/route");
-    const response = await POST(makeRequest({ podcastIndexId: "98765" }));
+    const response = await POST(
+      makePostRequest("/api/episodes/fetch-transcript", {
+        podcastIndexId: "98765",
+      }),
+    );
     const data = await response.json();
 
     expect(response.status).toBe(202);
@@ -552,7 +585,11 @@ describe("POST /api/episodes/fetch-transcript", () => {
     } as never);
 
     const { POST } = await import("@/app/api/episodes/fetch-transcript/route");
-    const response = await POST(makeRequest({ podcastIndexId: "rss-abc123" }));
+    const response = await POST(
+      makePostRequest("/api/episodes/fetch-transcript", {
+        podcastIndexId: "rss-abc123",
+      }),
+    );
     const data = await response.json();
 
     expect(response.status).toBe(400);
@@ -567,7 +604,9 @@ describe("POST /api/episodes/fetch-transcript", () => {
 
     const { POST } = await import("@/app/api/episodes/fetch-transcript/route");
     const response = await POST(
-      makeRequest({ podcastIndexId: "not-a-number" }),
+      makePostRequest("/api/episodes/fetch-transcript", {
+        podcastIndexId: "not-a-number",
+      }),
     );
     await response.json();
 
@@ -584,7 +623,11 @@ describe("POST /api/episodes/fetch-transcript", () => {
     mockDbQueryEpisodesFindFirst.mockResolvedValue(null);
 
     const { POST } = await import("@/app/api/episodes/fetch-transcript/route");
-    const response = await POST(makeRequest({ podcastIndexId: "98765" }));
+    const response = await POST(
+      makePostRequest("/api/episodes/fetch-transcript", {
+        podcastIndexId: "98765",
+      }),
+    );
     const data = await response.json();
 
     expect(response.status).toBe(502);
@@ -605,7 +648,11 @@ describe("POST /api/episodes/fetch-transcript", () => {
     mockDbQueryEpisodesFindFirst.mockResolvedValue(null);
 
     const { POST } = await import("@/app/api/episodes/fetch-transcript/route");
-    const response = await POST(makeRequest({ podcastIndexId: "98765" }));
+    const response = await POST(
+      makePostRequest("/api/episodes/fetch-transcript", {
+        podcastIndexId: "98765",
+      }),
+    );
     const data = await response.json();
 
     expect(response.status).toBe(404);
@@ -634,7 +681,11 @@ describe("POST /api/episodes/fetch-transcript", () => {
       .mockResolvedValue({ id: 7 });
 
     const { POST } = await import("@/app/api/episodes/fetch-transcript/route");
-    await POST(makeRequest({ podcastIndexId: "98765" }));
+    await POST(
+      makePostRequest("/api/episodes/fetch-transcript", {
+        podcastIndexId: "98765",
+      }),
+    );
 
     const { tasks } = await import("@trigger.dev/sdk");
     expect(tasks.trigger).toHaveBeenCalledWith(

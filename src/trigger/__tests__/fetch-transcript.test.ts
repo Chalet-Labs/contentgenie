@@ -1,26 +1,17 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { createTriggerSdkMock } from "@/test/mocks/trigger-sdk";
 
-// Mock Trigger.dev SDK before imports
 const mockCreateToken = vi.fn();
 const mockForToken = vi.fn();
-vi.mock("@trigger.dev/sdk", () => ({
-  task: vi.fn((config) => config),
-  retry: {
-    onThrow: vi.fn(async (fn) => fn()),
-  },
-  logger: {
-    info: vi.fn(),
-    warn: vi.fn(),
-    error: vi.fn(),
-  },
-  metadata: {
-    set: vi.fn(),
-  },
-  wait: {
-    createToken: (...args: unknown[]) => mockCreateToken(...args),
-    forToken: (...args: unknown[]) => mockForToken(...args),
-  },
-}));
+vi.mock("@trigger.dev/sdk", () =>
+  createTriggerSdkMock({
+    metadata: { set: vi.fn() },
+    wait: {
+      createToken: (...args: unknown[]) => mockCreateToken(...args),
+      forToken: (...args: unknown[]) => mockForToken(...args),
+    },
+  }),
+);
 
 const mockFindFirst = vi.fn().mockResolvedValue(null);
 

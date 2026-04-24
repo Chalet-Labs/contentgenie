@@ -1,21 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { createTriggerSdkMock } from "@/test/mocks/trigger-sdk";
 
-// Mock Trigger.dev SDK before imports
 const mockMetadataSet = vi.fn();
-vi.mock("@trigger.dev/sdk", () => ({
-  task: vi.fn((config) => config),
-  retry: {
-    onThrow: vi.fn(async (fn) => fn()),
-  },
-  logger: {
-    info: vi.fn(),
-    warn: vi.fn(),
-    error: vi.fn(),
-  },
-  metadata: {
-    set: (...args: unknown[]) => mockMetadataSet(...args),
-  },
-}));
+vi.mock("@trigger.dev/sdk", () =>
+  createTriggerSdkMock({
+    metadata: { set: (...args: unknown[]) => mockMetadataSet(...args) },
+  }),
+);
 
 // Mock database
 const mockInsertValues = vi.fn();

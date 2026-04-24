@@ -1,10 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { NextRequest } from "next/server";
+import { makeClerkAuthMock } from "@/test/mocks/clerk-server";
+import { makePostRequest } from "@/test/mocks/next-request";
 
 const mockAuth = vi.fn();
-vi.mock("@clerk/nextjs/server", () => ({
-  auth: () => mockAuth(),
-}));
+vi.mock("@clerk/nextjs/server", () => makeClerkAuthMock(() => mockAuth()));
 
 const mockGetClerkEmail = vi.fn();
 vi.mock("@/lib/clerk-helpers", () => ({
@@ -50,14 +49,6 @@ const validEpisodePayload = {
     imageUrl: "https://example.com/art.jpg",
   },
 };
-
-function makeRequest(body: unknown) {
-  return new NextRequest("http://localhost:3000/api/library/save", {
-    method: "POST",
-    body: JSON.stringify(body),
-    headers: { "Content-Type": "application/json" },
-  });
-}
 
 function setupInsertChains({
   podcastId = 10,
@@ -117,7 +108,9 @@ describe("POST /api/library/save", () => {
     mockAuth.mockResolvedValue({ userId: null });
 
     const { POST } = await import("@/app/api/library/save/route");
-    const response = await POST(makeRequest(validEpisodePayload));
+    const response = await POST(
+      makePostRequest("/api/library/save", validEpisodePayload),
+    );
 
     expect(response.status).toBe(401);
     const data = await response.json();
@@ -127,7 +120,7 @@ describe("POST /api/library/save", () => {
   it("returns 400 for missing podcastIndexId", async () => {
     const { POST } = await import("@/app/api/library/save/route");
     const response = await POST(
-      makeRequest({
+      makePostRequest("/api/library/save", {
         title: "Test",
         podcast: { podcastIndexId: "pod-1", title: "P" },
       }),
@@ -141,7 +134,7 @@ describe("POST /api/library/save", () => {
   it("returns 400 for missing title", async () => {
     const { POST } = await import("@/app/api/library/save/route");
     const response = await POST(
-      makeRequest({
+      makePostRequest("/api/library/save", {
         podcastIndexId: "ep-1",
         podcast: { podcastIndexId: "pod-1", title: "P" },
       }),
@@ -153,7 +146,10 @@ describe("POST /api/library/save", () => {
   it("returns 400 for missing podcast data", async () => {
     const { POST } = await import("@/app/api/library/save/route");
     const response = await POST(
-      makeRequest({ podcastIndexId: "ep-1", title: "Test" }),
+      makePostRequest("/api/library/save", {
+        podcastIndexId: "ep-1",
+        title: "Test",
+      }),
     );
 
     expect(response.status).toBe(400);
@@ -162,7 +158,7 @@ describe("POST /api/library/save", () => {
   it("returns 400 for missing podcast.podcastIndexId", async () => {
     const { POST } = await import("@/app/api/library/save/route");
     const response = await POST(
-      makeRequest({
+      makePostRequest("/api/library/save", {
         podcastIndexId: "ep-1",
         title: "Test",
         podcast: { title: "P" },
@@ -174,7 +170,9 @@ describe("POST /api/library/save", () => {
 
   it("returns 200 with success:true for valid payload", async () => {
     const { POST } = await import("@/app/api/library/save/route");
-    const response = await POST(makeRequest(validEpisodePayload));
+    const response = await POST(
+      makePostRequest("/api/library/save", validEpisodePayload),
+    );
 
     expect(response.status).toBe(200);
     const data = await response.json();
@@ -185,7 +183,9 @@ describe("POST /api/library/save", () => {
     setupInsertChains({ libraryResult: [] }); // empty = already exists
 
     const { POST } = await import("@/app/api/library/save/route");
-    const response = await POST(makeRequest(validEpisodePayload));
+    const response = await POST(
+      makePostRequest("/api/library/save", validEpisodePayload),
+    );
 
     expect(response.status).toBe(200);
     const data = await response.json();
@@ -217,7 +217,9 @@ describe("POST /api/library/save", () => {
     });
 
     const { POST } = await import("@/app/api/library/save/route");
-    const response = await POST(makeRequest(validEpisodePayload));
+    const response = await POST(
+      makePostRequest("/api/library/save", validEpisodePayload),
+    );
 
     expect(response.status).toBe(500);
     const data = await response.json();
@@ -238,7 +240,9 @@ describe("POST /api/library/save — Clerk email lookup", () => {
     mockGetClerkEmail.mockResolvedValue("alice@example.com");
 
     const { POST } = await import("@/app/api/library/save/route");
-    const response = await POST(makeRequest(validEpisodePayload));
+    const response = await POST(
+      makePostRequest("/api/library/save", validEpisodePayload),
+    );
 
     expect(response.status).toBe(200);
 
@@ -257,7 +261,9 @@ describe("POST /api/library/save — Clerk email lookup", () => {
     mockGetClerkEmail.mockResolvedValue("");
 
     const { POST } = await import("@/app/api/library/save/route");
-    const response = await POST(makeRequest(validEpisodePayload));
+    const response = await POST(
+      makePostRequest("/api/library/save", validEpisodePayload),
+    );
 
     // Should still succeed — fallback to ""
     expect(response.status).toBe(200);

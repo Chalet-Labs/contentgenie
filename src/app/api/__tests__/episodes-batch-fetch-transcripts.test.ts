@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { NextRequest } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { db } from "@/db";
+import { makePostRequest } from "@/test/mocks/next-request";
 
 vi.mock("@clerk/nextjs/server", () => ({
   auth: vi.fn(),
@@ -73,16 +74,6 @@ function makeEpisode(id: number, podcastIndexId: string) {
   };
 }
 
-function makeRequest(body: unknown) {
-  return new NextRequest(
-    "http://localhost:3000/api/episodes/batch-fetch-transcripts",
-    {
-      method: "POST",
-      body: JSON.stringify(body),
-    },
-  );
-}
-
 describe("POST /api/episodes/batch-fetch-transcripts", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -101,7 +92,11 @@ describe("POST /api/episodes/batch-fetch-transcripts", () => {
 
     const { POST } =
       await import("@/app/api/episodes/batch-fetch-transcripts/route");
-    const response = await POST(makeRequest({ episodeIds: [1, 2] }));
+    const response = await POST(
+      makePostRequest("/api/episodes/batch-fetch-transcripts", {
+        episodeIds: [1, 2],
+      }),
+    );
     const data = await response.json();
 
     expect(response.status).toBe(401);
@@ -116,7 +111,11 @@ describe("POST /api/episodes/batch-fetch-transcripts", () => {
 
     const { POST } =
       await import("@/app/api/episodes/batch-fetch-transcripts/route");
-    const response = await POST(makeRequest({ episodeIds: [1, 2] }));
+    const response = await POST(
+      makePostRequest("/api/episodes/batch-fetch-transcripts", {
+        episodeIds: [1, 2],
+      }),
+    );
     const data = await response.json();
 
     expect(response.status).toBe(403);
@@ -131,7 +130,11 @@ describe("POST /api/episodes/batch-fetch-transcripts", () => {
 
     const { POST } =
       await import("@/app/api/episodes/batch-fetch-transcripts/route");
-    const response = await POST(makeRequest({ episodeIds: [] }));
+    const response = await POST(
+      makePostRequest("/api/episodes/batch-fetch-transcripts", {
+        episodeIds: [],
+      }),
+    );
     const data = await response.json();
 
     expect(response.status).toBe(400);
@@ -146,7 +149,11 @@ describe("POST /api/episodes/batch-fetch-transcripts", () => {
 
     const { POST } =
       await import("@/app/api/episodes/batch-fetch-transcripts/route");
-    const response = await POST(makeRequest({ episodeIds: 42 }));
+    const response = await POST(
+      makePostRequest("/api/episodes/batch-fetch-transcripts", {
+        episodeIds: 42,
+      }),
+    );
     const data = await response.json();
 
     expect(response.status).toBe(400);
@@ -162,7 +169,11 @@ describe("POST /api/episodes/batch-fetch-transcripts", () => {
     const ids = Array.from({ length: 21 }, (_, i) => i + 1);
     const { POST } =
       await import("@/app/api/episodes/batch-fetch-transcripts/route");
-    const response = await POST(makeRequest({ episodeIds: ids }));
+    const response = await POST(
+      makePostRequest("/api/episodes/batch-fetch-transcripts", {
+        episodeIds: ids,
+      }),
+    );
     const data = await response.json();
 
     expect(response.status).toBe(400);
@@ -177,7 +188,11 @@ describe("POST /api/episodes/batch-fetch-transcripts", () => {
 
     const { POST } =
       await import("@/app/api/episodes/batch-fetch-transcripts/route");
-    const response = await POST(makeRequest({ episodeIds: [1, 2.5, 3] }));
+    const response = await POST(
+      makePostRequest("/api/episodes/batch-fetch-transcripts", {
+        episodeIds: [1, 2.5, 3],
+      }),
+    );
     const data = await response.json();
 
     expect(response.status).toBe(400);
@@ -192,7 +207,11 @@ describe("POST /api/episodes/batch-fetch-transcripts", () => {
 
     const { POST } =
       await import("@/app/api/episodes/batch-fetch-transcripts/route");
-    const response = await POST(makeRequest({ episodeIds: [1, -2] }));
+    const response = await POST(
+      makePostRequest("/api/episodes/batch-fetch-transcripts", {
+        episodeIds: [1, -2],
+      }),
+    );
     const data = await response.json();
 
     expect(response.status).toBe(400);
@@ -209,7 +228,11 @@ describe("POST /api/episodes/batch-fetch-transcripts", () => {
 
     const { POST } =
       await import("@/app/api/episodes/batch-fetch-transcripts/route");
-    const response = await POST(makeRequest({ episodeIds: [1, 2] }));
+    const response = await POST(
+      makePostRequest("/api/episodes/batch-fetch-transcripts", {
+        episodeIds: [1, 2],
+      }),
+    );
     const data = await response.json();
 
     expect(response.status).toBe(400);
@@ -226,7 +249,11 @@ describe("POST /api/episodes/batch-fetch-transcripts", () => {
 
     const { POST } =
       await import("@/app/api/episodes/batch-fetch-transcripts/route");
-    const response = await POST(makeRequest({ episodeIds: [1, 2] }));
+    const response = await POST(
+      makePostRequest("/api/episodes/batch-fetch-transcripts", {
+        episodeIds: [1, 2],
+      }),
+    );
     const data = await response.json();
 
     expect(response.status).toBe(202);
@@ -244,7 +271,11 @@ describe("POST /api/episodes/batch-fetch-transcripts", () => {
 
     const { POST } =
       await import("@/app/api/episodes/batch-fetch-transcripts/route");
-    await POST(makeRequest({ episodeIds: [1, 2] }));
+    await POST(
+      makePostRequest("/api/episodes/batch-fetch-transcripts", {
+        episodeIds: [1, 2],
+      }),
+    );
 
     const { tasks } = await import("@trigger.dev/sdk");
     expect(tasks.batchTrigger).toHaveBeenCalledTimes(1);
@@ -264,7 +295,11 @@ describe("POST /api/episodes/batch-fetch-transcripts", () => {
 
     const { POST } =
       await import("@/app/api/episodes/batch-fetch-transcripts/route");
-    await POST(makeRequest({ episodeIds: [1, 2] }));
+    await POST(
+      makePostRequest("/api/episodes/batch-fetch-transcripts", {
+        episodeIds: [1, 2],
+      }),
+    );
 
     expect(db.update).toHaveBeenCalled();
     expect(setMock).toHaveBeenCalledWith(
@@ -284,7 +319,11 @@ describe("POST /api/episodes/batch-fetch-transcripts", () => {
 
     const { POST } =
       await import("@/app/api/episodes/batch-fetch-transcripts/route");
-    await POST(makeRequest({ episodeIds: [1, 2] }));
+    await POST(
+      makePostRequest("/api/episodes/batch-fetch-transcripts", {
+        episodeIds: [1, 2],
+      }),
+    );
 
     const { tasks } = await import("@trigger.dev/sdk");
     const callArg = vi.mocked(tasks.batchTrigger).mock.calls[0][1] as Array<{
@@ -305,7 +344,11 @@ describe("POST /api/episodes/batch-fetch-transcripts", () => {
 
     const { POST } =
       await import("@/app/api/episodes/batch-fetch-transcripts/route");
-    const response = await POST(makeRequest({ episodeIds: [1, 2] }));
+    const response = await POST(
+      makePostRequest("/api/episodes/batch-fetch-transcripts", {
+        episodeIds: [1, 2],
+      }),
+    );
     const data = await response.json();
 
     // publicAccessToken is taken directly from batchResult, not generated via auth.createPublicToken
@@ -324,7 +367,11 @@ describe("POST /api/episodes/batch-fetch-transcripts", () => {
 
     const { POST } =
       await import("@/app/api/episodes/batch-fetch-transcripts/route");
-    const response = await POST(makeRequest({ episodeIds: ids }));
+    const response = await POST(
+      makePostRequest("/api/episodes/batch-fetch-transcripts", {
+        episodeIds: ids,
+      }),
+    );
 
     expect(response.status).toBe(202);
   });
@@ -365,7 +412,11 @@ describe("POST /api/episodes/batch-fetch-transcripts", () => {
 
     const { POST } =
       await import("@/app/api/episodes/batch-fetch-transcripts/route");
-    const response = await POST(makeRequest({ episodeIds: [1, 2] }));
+    const response = await POST(
+      makePostRequest("/api/episodes/batch-fetch-transcripts", {
+        episodeIds: [1, 2],
+      }),
+    );
 
     expect(response.status).toBe(500);
     const data = await response.json();

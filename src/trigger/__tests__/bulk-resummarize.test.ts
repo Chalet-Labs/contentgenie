@@ -1,18 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { createTriggerSdkMock } from "@/test/mocks/trigger-sdk";
 
-// Mock Trigger.dev SDK before imports
 const mockMetadataSet = vi.fn();
-vi.mock("@trigger.dev/sdk", () => ({
-  task: vi.fn((config) => config),
-  metadata: {
-    set: (...args: unknown[]) => mockMetadataSet(...args),
-  },
-  logger: {
-    info: vi.fn(),
-    warn: vi.fn(),
-    error: vi.fn(),
-  },
-}));
+vi.mock("@trigger.dev/sdk", () =>
+  createTriggerSdkMock({
+    metadata: { set: (...args: unknown[]) => mockMetadataSet(...args) },
+  }),
+);
 
 const mockBatchTriggerAndWait = vi.fn();
 
@@ -53,7 +47,6 @@ vi.mock("drizzle-orm", () => ({
 
 import { bulkResummarize } from "@/trigger/bulk-resummarize";
 import type { BulkResummarizePayload } from "@/trigger/bulk-resummarize";
-import { metadata } from "@trigger.dev/sdk";
 
 // The task mock returns the raw config object, so `.run` is available at runtime
 const taskConfig = bulkResummarize as unknown as {

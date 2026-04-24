@@ -77,16 +77,7 @@ export function makeDeleteChain(
   };
 }
 
-/**
- * Module shape for `@clerk/nextjs/server`. Intended for use inside
- * `vi.mock("@clerk/nextjs/server", () => makeClerkAuthMock(() => mockAuth()))`.
- * The global test setup already installs a happy-path Clerk mock; action tests
- * override it so they can drive `userId` per test (e.g. null for the
- * unauthenticated case).
- */
-export function makeClerkAuthMock(authSpy: () => unknown) {
-  return { auth: authSpy };
-}
+export { makeClerkAuthMock } from "@/test/mocks/clerk-server";
 
 /**
  * Module shape for `@/db/helpers`. Intended for use inside
