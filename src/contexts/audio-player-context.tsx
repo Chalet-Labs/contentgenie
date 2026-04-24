@@ -969,6 +969,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       seek: (time: number) => {
         const audio = audioRef.current
         if (!audio) return
+        if (!Number.isFinite(time)) return
         audio.currentTime = Math.max(0, Math.min(time, audio.duration || 0))
       },
 

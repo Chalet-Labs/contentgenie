@@ -4,6 +4,17 @@ export interface MediaSessionTrack {
   artwork?: string
 }
 
+function setActionHandlerSafe(
+  action: MediaSessionAction,
+  handler: MediaSessionActionHandler | null
+): void {
+  try {
+    navigator.mediaSession.setActionHandler(action, handler)
+  } catch {
+    // Action may not be supported on all platforms.
+  }
+}
+
 export function updateMediaSessionMetadata(track: MediaSessionTrack): void {
   if (typeof navigator === "undefined" || !("mediaSession" in navigator)) return
 
@@ -38,21 +49,14 @@ export function setupMediaSessionHandlers(handlers: {
   navigator.mediaSession.setActionHandler("seekbackward", handlers.onSeekBackward)
   navigator.mediaSession.setActionHandler("seekforward", handlers.onSeekForward)
   navigator.mediaSession.setActionHandler("stop", handlers.onStop)
-  // Never register "nexttrack": Chrome on Android's compact notification slot ranks
-  // nexttrack above seekforward, which hides rewind/forward from the lock screen.
-  // Actively null it so re-runs of this effect clear any stale handler.
-  try {
-    navigator.mediaSession.setActionHandler("nexttrack", null)
-  } catch {
-    // "nexttrack" may not be supported on all platforms
-  }
-  try {
-    navigator.mediaSession.setActionHandler("seekto", (details) => {
-      if (typeof details.seekTime === "number") handlers.onSeekTo(details.seekTime)
-    })
-  } catch {
-    // "seekto" may not be supported on all platforms
-  }
+  // Never register "nexttrack": Chrome on Android's compact notification slot ranks it
+  // above seekforward, displacing rewind/forward. Null overwrites any stale handler (#355).
+  setActionHandlerSafe("nexttrack", null)
+  setActionHandlerSafe("seekto", (details) => {
+    if (Number.isFinite(details.seekTime) && (details.seekTime as number) >= 0) {
+      handlers.onSeekTo(details.seekTime as number)
+    }
+  })
 }
 
 export function updateMediaSessionPosition(
@@ -82,14 +86,6 @@ export function clearMediaSession(): void {
   navigator.mediaSession.setActionHandler("seekbackward", null)
   navigator.mediaSession.setActionHandler("seekforward", null)
   navigator.mediaSession.setActionHandler("stop", null)
-  try {
-    navigator.mediaSession.setActionHandler("nexttrack", null)
-  } catch {
-    // "nexttrack" may not be supported on all platforms
-  }
-  try {
-    navigator.mediaSession.setActionHandler("seekto", null)
-  } catch {
-    // "seekto" may not be supported on all platforms
-  }
+  setActionHandlerSafe("nexttrack", null)
+  setActionHandlerSafe("seekto", null)
 }
