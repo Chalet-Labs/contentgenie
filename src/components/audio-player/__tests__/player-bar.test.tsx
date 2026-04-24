@@ -398,17 +398,20 @@ describe("PlayerBar", () => {
       mockAPI.seek.mockImplementation((t: number) => {
         mockProgress.currentTime = t
       })
-      render(<PlayerBar />)
+      try {
+        render(<PlayerBar />)
 
-      const next = screen.getByRole("button", { name: "Next chapter" })
-      await user.click(next)
-      await user.click(next)
-      await user.click(next)
+        const next = screen.getByRole("button", { name: "Next chapter" })
+        await user.click(next)
+        await user.click(next)
+        await user.click(next)
 
-      expect(mockAPI.seek).toHaveBeenNthCalledWith(1, fourChapters[1].startTime)
-      expect(mockAPI.seek).toHaveBeenNthCalledWith(2, fourChapters[2].startTime)
-      expect(mockAPI.seek).toHaveBeenNthCalledWith(3, fourChapters[3].startTime)
-      mockAPI.seek.mockReset()
+        expect(mockAPI.seek).toHaveBeenNthCalledWith(1, fourChapters[1].startTime)
+        expect(mockAPI.seek).toHaveBeenNthCalledWith(2, fourChapters[2].startTime)
+        expect(mockAPI.seek).toHaveBeenNthCalledWith(3, fourChapters[3].startTime)
+      } finally {
+        mockAPI.seek.mockReset()
+      }
     })
 
     it("does not advance the queue while chapters are still loading", async () => {

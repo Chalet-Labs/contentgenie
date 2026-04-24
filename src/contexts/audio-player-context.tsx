@@ -1184,6 +1184,21 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       setProgress(next)
     }
 
+    // Sync progress state immediately after a seek completes so consumers
+    // (e.g. chapter-nav affordances) don't stay stale until the next
+    // `timeupdate` fires ~250ms later.
+    const onSeeked = () => {
+      const next: AudioPlayerProgress = {
+        currentTime: audio.currentTime,
+        buffered:
+          audio.buffered.length > 0
+            ? audio.buffered.end(audio.buffered.length - 1)
+            : 0,
+      }
+      progressRef.current = next
+      setProgress(next)
+    }
+
     const onDurationChange = () => {
       dispatch({ type: "SET_DURATION", duration: audio.duration || 0 })
       // Apply pending seek when the audio element reports a valid duration
@@ -1310,6 +1325,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
 
     audio.addEventListener("timeupdate", onTimeUpdate)
     audio.addEventListener("progress", onProgress)
+    audio.addEventListener("seeked", onSeeked)
     audio.addEventListener("durationchange", onDurationChange)
     audio.addEventListener("playing", onPlaying)
     audio.addEventListener("pause", onPause)
@@ -1321,6 +1337,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
     return () => {
       audio.removeEventListener("timeupdate", onTimeUpdate)
       audio.removeEventListener("progress", onProgress)
+      audio.removeEventListener("seeked", onSeeked)
       audio.removeEventListener("durationchange", onDurationChange)
       audio.removeEventListener("playing", onPlaying)
       audio.removeEventListener("pause", onPause)
