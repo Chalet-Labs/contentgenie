@@ -61,7 +61,7 @@ describe("PlayEpisodeButton", () => {
     const user = userEvent.setup();
     render(<PlayEpisodeButton episode={episode} />);
     const btn = screen.getByRole("button", { name: /now playing/i });
-    expect(btn).toBeDisabled();
+    expect(btn).toHaveAttribute("aria-disabled", "true");
     await user.click(btn);
     expect(mockPlayEpisode).not.toHaveBeenCalled();
     expect(mockTogglePlay).not.toHaveBeenCalled();
@@ -76,7 +76,7 @@ describe("PlayEpisodeButton", () => {
     const user = userEvent.setup();
     render(<PlayEpisodeButton episode={episode} />);
     const btn = screen.getByRole("button", { name: /resume episode/i });
-    expect(btn).not.toBeDisabled();
+    expect(btn).not.toHaveAttribute("aria-disabled", "true");
     await user.click(btn);
     expect(mockTogglePlay).toHaveBeenCalledTimes(1);
     expect(mockPlayEpisode).not.toHaveBeenCalled();
@@ -102,4 +102,41 @@ describe("PlayEpisodeButton", () => {
       screen.getByRole("button", { name: "Play Test Episode" }),
     ).toBeInTheDocument();
   });
+
+  it("stays in the tab order when isActivelyPlaying (aria-disabled, not disabled)", async () => {
+    mockCurrentEpisode = episode;
+    mockIsPlaying = true;
+    const user = userEvent.setup();
+    render(
+      <div>
+        <button>preceding</button>
+        <PlayEpisodeButton episode={episode} />
+      </div>,
+    );
+    const btn = screen.getByRole("button", { name: /now playing/i });
+    await user.tab();
+    await user.tab();
+    expect(btn).toHaveFocus();
+  });
+
+  // With aria-disabled (unlike native disabled), browsers DO fire click and
+  // keyboard-activation events. The handleClick early-return is what keeps
+  // these no-ops; these tests guard against someone removing that guard.
+  it.each([
+    { key: "{Enter}", label: "Enter" },
+    { key: " ", label: "Space" },
+  ])(
+    "keyboard activation with $label no-ops when isActivelyPlaying",
+    async ({ key }) => {
+      mockCurrentEpisode = episode;
+      mockIsPlaying = true;
+      const user = userEvent.setup();
+      render(<PlayEpisodeButton episode={episode} />);
+      const btn = screen.getByRole("button", { name: /now playing/i });
+      btn.focus();
+      await user.keyboard(key);
+      expect(mockPlayEpisode).not.toHaveBeenCalled();
+      expect(mockTogglePlay).not.toHaveBeenCalled();
+    },
+  );
 });

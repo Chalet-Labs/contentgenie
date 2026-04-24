@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { WorthItBadge } from "@/components/episodes/worth-it-badge";
 import { parseScoreOrNull } from "@/lib/score-utils";
+import { MAX_DISPLAYED_TOPICS } from "@/lib/episodes/topic-display";
 import type { SummaryStatus } from "@/db/schema";
 
 export interface EpisodeCardProps {
@@ -26,7 +27,7 @@ export interface EpisodeCardProps {
   href?: string;
   /** Optional description; truncated to line-clamp-2. */
   description?: string | null;
-  /** Topic chips rendered below the description; capped at 3. */
+  /** Topic chips rendered below the description; capped at MAX_DISPLAYED_TOPICS. */
   topics?: string[];
   /**
    * Worth-It score (DB decimal string).
@@ -201,7 +202,7 @@ export function EpisodeCard({
 
             {topics && topics.length > 0 && (
               <div className="mt-2 flex flex-wrap gap-1">
-                {topics.slice(0, 3).map((t) => (
+                {topics.slice(0, MAX_DISPLAYED_TOPICS).map((t) => (
                   <Badge key={t} variant="secondary" className="text-xs">
                     {t}
                   </Badge>
