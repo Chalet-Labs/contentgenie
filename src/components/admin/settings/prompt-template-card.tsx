@@ -240,6 +240,7 @@ export function PromptTemplateCard({ initialPrompt }: PromptTemplateCardProps) {
                 role="combobox"
                 aria-expanded={pickerOpen}
                 aria-controls={pickerId}
+                aria-haspopup="listbox"
                 className="w-full justify-between"
               >
                 {selectedEpisode
