@@ -66,5 +66,18 @@
     "network": {
       "allowLocalBinding": true
     }
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash .claude/skills/pre-pr-validation/hook.sh"
+          }
+        ]
+      }
+    ]
   }
 }
