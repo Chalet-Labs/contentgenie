@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { Chapter } from "@/lib/chapters";
+import { parseChapters, type Chapter } from "@/lib/chapters";
 
 export type UseChaptersState =
   | { status: "idle" }
@@ -16,10 +16,17 @@ export type UseChaptersState =
  * tell `loading` apart from `ready` with an empty feed and render the
  * right skeleton vs. empty-state copy.
  *
- * Routes through the server proxy for the same reason the audio player
- * does: the proxy applies the SSRF guard, enforces a timeout, and sets
- * cacheable response headers. Calling the feed URL directly from the
- * browser would regress on cross-origin feeds and HTTP-only CDNs.
+ * Routes through the server proxy because it applies the SSRF guard and
+ * sets cacheable response headers — calling the feed URL directly from
+ * the browser would regress on cross-origin feeds and HTTP-only CDNs.
+ * The 5s timeout is enforced here on the client with an `AbortController`;
+ * the server proxy itself does not time out `safeFetch` today.
+ *
+ * The aborts-as-errors distinction matters: an unmount/url-change abort
+ * must be ignored silently, while a timeout abort must surface as an
+ * error so the UI leaves the skeleton state. Tracking that with
+ * `controller.signal.aborted` alone conflates the two — we use a
+ * dedicated `didTimeout` flag instead.
  */
 export function useChapters(
   chaptersUrl: string | null | undefined,
@@ -32,34 +39,45 @@ export function useChapters(
       return;
     }
 
+    let ignore = false;
+    let didTimeout = false;
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000);
-    setState({ status: "loading" });
+    const timeoutId = setTimeout(() => {
+      didTimeout = true;
+      controller.abort();
+    }, 5000);
 
-    fetch(`/api/chapters?url=${encodeURIComponent(chaptersUrl)}`, {
-      signal: controller.signal,
-    })
-      .then(async (res) => {
+    async function run() {
+      setState({ status: "loading" });
+      try {
+        const res = await fetch(
+          `/api/chapters?url=${encodeURIComponent(chaptersUrl!)}`,
+          { signal: controller.signal },
+        );
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        return (await res.json()) as { chapters: Chapter[] };
-      })
-      .then(({ chapters }) => {
-        if (!controller.signal.aborted) {
+        const json: unknown = await res.json();
+        const chapters = parseChapters(json);
+        if (!ignore) {
           setState({ status: "ready", chapters });
         }
-      })
-      .catch((err: unknown) => {
-        if (controller.signal.aborted) return;
-        const message =
-          err instanceof Error ? err.message : "Failed to load chapters";
+      } catch (err: unknown) {
+        if (ignore) return;
+        const message = didTimeout
+          ? "Request timed out"
+          : err instanceof Error
+            ? err.message
+            : "Failed to load chapters";
         console.warn("[chapters] fetch failed", { chaptersUrl, message });
         setState({ status: "error", message });
-      })
-      .finally(() => {
+      } finally {
         clearTimeout(timeoutId);
-      });
+      }
+    }
+
+    void run();
 
     return () => {
+      ignore = true;
       clearTimeout(timeoutId);
       controller.abort();
     };

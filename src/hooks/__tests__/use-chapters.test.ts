@@ -154,4 +154,62 @@ describe("useChapters", () => {
     // the console would surface the failure.
     expect(result.current).toEqual({ status: "loading" });
   });
+
+  it("surfaces a timeout as { status: 'error' } instead of getting stuck loading", async () => {
+    vi.useFakeTimers();
+    vi.mocked(fetch).mockImplementationOnce((_input, init) => {
+      return new Promise<Response>((_, reject) => {
+        const signal = (init as RequestInit | undefined)?.signal;
+        signal?.addEventListener("abort", () => {
+          reject(new DOMException("The operation was aborted.", "AbortError"));
+        });
+      });
+    });
+
+    const { result } = renderHook(() =>
+      useChapters("https://example.com/c.json"),
+    );
+    expect(result.current).toEqual({ status: "loading" });
+
+    await act(async () => {
+      vi.advanceTimersByTime(5000);
+      await vi.runAllTimersAsync();
+    });
+
+    expect(result.current).toEqual({
+      status: "error",
+      message: "Request timed out",
+    });
+    vi.useRealTimers();
+  });
+
+  it("validates the response shape via parseChapters and drops malformed entries", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          chapters: [
+            { startTime: 0, title: "Intro" },
+            { startTime: "bogus", title: "Ignored" },
+            { title: "Missing startTime" },
+            { startTime: 60, title: "Outro" },
+          ],
+        }),
+        { status: 200 },
+      ),
+    );
+
+    const { result } = renderHook(() =>
+      useChapters("https://example.com/c.json"),
+    );
+
+    await waitFor(() => {
+      expect(result.current.status).toBe("ready");
+    });
+
+    if (result.current.status !== "ready") throw new Error("unreachable");
+    expect(result.current.chapters).toEqual([
+      { startTime: 0, title: "Intro" },
+      { startTime: 60, title: "Outro" },
+    ]);
+  });
 });

@@ -766,7 +766,7 @@ export function AuthenticatedEpisodeDetail({
                     audioUrl: episode.enclosureUrl,
                     artwork: artworkUrl,
                     duration: episode.duration,
-                    chaptersUrl: episode.chaptersUrl ?? undefined,
+                    chaptersUrl: normalizedChaptersUrl ?? undefined,
                   }}
                 />
               </CardContent>

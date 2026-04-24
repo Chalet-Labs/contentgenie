@@ -5,7 +5,7 @@ import {
   EpisodeTabsContent,
   EpisodeTabsList,
   EpisodeTabsTrigger,
-} from "./episode-tabs";
+} from "@/components/episodes/episode-tabs";
 
 const meta: Meta<typeof EpisodeTabs> = {
   title: "Episodes/EpisodeTabs",
