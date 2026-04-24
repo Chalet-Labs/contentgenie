@@ -60,7 +60,7 @@ The refactor from `getRecommendedEpisodes(12)` → named constant is the canonic
 
 **Example.** `src/components/dashboard/__tests__/trending-topics.test.tsx:282-298`:
 
-```ts
+```tsx
 it("toggle button is absent when raw topics exceed threshold but deduped count does not", () => {
   const uniqueSlugs = Math.max(TOPICS_INITIAL - 1, 1);
   const uniqueTopics = Array.from({ length: uniqueSlugs }, (_, i) =>
