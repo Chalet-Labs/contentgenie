@@ -883,7 +883,7 @@ describe("reorderQueue edge cases", () => {
   })
 })
 
-describe("Media Session nexttrack handler", () => {
+describe("Media Session action handlers", () => {
   beforeEach(() => {
     vi.clearAllMocks()
     playMock.mockResolvedValue(undefined)
@@ -895,7 +895,7 @@ describe("Media Session nexttrack handler", () => {
     vi.restoreAllMocks()
   })
 
-  it("sets nexttrack handler on mount", async () => {
+  it("does not register nexttrack as a function", async () => {
     const { setupMediaSessionHandlers } = await import("@/lib/media-session")
     const mockSetup = vi.mocked(setupMediaSessionHandlers)
 
@@ -905,11 +905,34 @@ describe("Media Session nexttrack handler", () => {
       </AudioPlayerProvider>
     )
 
-    // Handler is always set (checks queue at call-time)
     const calls = mockSetup.mock.calls
     expect(calls.length).toBeGreaterThan(0)
     const lastCall = calls[calls.length - 1]
-    expect(lastCall[0].onNextTrack).toBeTypeOf("function")
+    // Chrome on Android's compact notification ranks nexttrack above seekforward,
+    // so we never register it — the seek buttons must win the compact slot.
+    expect("onNextTrack" in lastCall[0]).toBe(false)
+  })
+
+  it("seekto handler calls api.seek with details.seekTime", async () => {
+    const user = userEvent.setup()
+    const { setupMediaSessionHandlers } = await import("@/lib/media-session")
+    const mockSetup = vi.mocked(setupMediaSessionHandlers)
+
+    render(
+      <AudioPlayerProvider>
+        <TestConsumer />
+      </AudioPlayerProvider>
+    )
+
+    await user.click(screen.getByText("Play Episode"))
+    const audio = getAudioElement()!
+    Object.defineProperty(audio, "duration", { value: 600, configurable: true })
+
+    const lastCall = mockSetup.mock.calls[mockSetup.mock.calls.length - 1]
+    act(() => {
+      lastCall[0].onSeekTo(200)
+    })
+    expect(audio.currentTime).toBe(200)
   })
 })
 

@@ -969,6 +969,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       seek: (time: number) => {
         const audio = audioRef.current
         if (!audio) return
+        if (!Number.isFinite(time)) return
         audio.currentTime = Math.max(0, Math.min(time, audio.duration || 0))
       },
 
@@ -1091,9 +1092,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       onSeekBackward: () => api.skipBack(),
       onSeekForward: () => api.skipForward(),
       onStop: api.closePlayer,
-      onNextTrack: () => {
-        if (stateRef.current.queue.length > 0) api.playNext()
-      },
+      onSeekTo: api.seek,
     })
     return () => clearMediaSession()
   }, [api])
