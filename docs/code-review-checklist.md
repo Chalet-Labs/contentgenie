@@ -6,7 +6,7 @@ Scope: general code-review concerns surfaced across recent PRs. Each entry cites
 
 ## 1. Accessibility patterns
 
-**Rule.** Disclosure buttons need `aria-expanded` paired with `aria-controls` pointing at an `id` on the controlled region. Non-button interactive elements need explicit `role` + `tabIndex`. Form controls need associated labels.
+**Rule.** Disclosure buttons need `aria-expanded` paired with `aria-controls` pointing at an `id` on the controlled region. Non-button interactive elements need explicit `role` + `tabIndex` **and** keyboard event handlers — `role`/`tabIndex` alone only makes the element focusable; Enter/Space activation must be wired explicitly via `onKeyDown`. Form controls need associated labels.
 
 **Example — `aria-expanded` wired directly.** `src/components/ui/show-more-toggle.tsx:25`:
 
@@ -105,5 +105,5 @@ All four conditions held — `aria-expanded` was the newly-introduced contract t
 ## Keeping this checklist alive
 
 - If a reviewer catches something not in here, add it in the same PR — the checklist is a living doc, not a quarterly chore.
-- Scheduled cross-PR sweeps: [`update-review-checklist`](https://github.com/rube-de/cc-skills/issues/216) skill clusters merged-PR review comments and proposes additions here.
-- The checklist is loaded as a rubric by [`pre-pr-validation`](https://github.com/Chalet-Labs/contentgenie/issues/367) before Codex review / `/pr-review-toolkit` / `/simplify` run.
+- **Planned — scheduled cross-PR sweeps:** an `update-review-checklist` skill will cluster merged-PR review comments and propose additions here. Tracked in [rube-de/cc-skills#216](https://github.com/rube-de/cc-skills/issues/216); not yet implemented.
+- **Planned — `pre-pr-validation` integration:** this checklist will be loaded as a rubric before Codex review / `/pr-review-toolkit` / `/simplify` run. Tracked in [#367](https://github.com/Chalet-Labs/contentgenie/issues/367); not yet wired up.
