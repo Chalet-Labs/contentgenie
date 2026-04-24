@@ -1,6 +1,6 @@
 ---
 name: pre-pr-validation
-description: Use before any `gh pr create` — invoke this skill as soon as the user asks to open, create, submit, or file a pull request, without waiting for the hook to bounce the command. Runs the full pre-PR pipeline: rebase onto main, build check (tsc/lint/test are enforced per commit by the husky hook), parallel multi-tool review (`/codex:review`, `/pr-review-toolkit:review-pr all`, `/simplify`), validates every finding, auto-fixes all valid ones without pausing for approval, re-verifies, pushes, writes the sentinel that unblocks PR creation, then opens the PR. A PreToolUse hook guards `gh pr create` until a fresh sentinel exists, so triggering this skill proactively whenever PRs are mentioned is the path of least friction.
+description: Use before any `gh pr create` — invoke this skill as soon as the user asks to open, create, submit, or file a pull request, without waiting for the hook to bounce the command. Runs the full pre-PR pipeline: rebase onto main, build check (tsc/lint/test are enforced per commit by the husky hook), parallel multi-tool review (Codex review via `codex review --base main`, `/pr-review-toolkit:review-pr all`, `/simplify`), validates every finding, auto-fixes all valid ones without pausing for approval, re-verifies, pushes, writes the sentinel that unblocks PR creation, then opens the PR. A PreToolUse hook guards `gh pr create` until a fresh sentinel exists, so triggering this skill proactively whenever PRs are mentioned is the path of least friction.
 ---
 
 # Pre-PR Validation
@@ -100,7 +100,7 @@ bun run build
 
 Must exit 0. If it fails, fix the root cause (not a suppression, not a workaround) and re-run. Don't enter Phase 2 with a red build — reviewers waste cycles on broken code.
 
-**Why only build?** The husky pre-commit hook already runs `tsc --noEmit`, `bun run lint`, and `bun run test` on every commit, so every commit that got us to this point has passed those three. `bun run build` is the gap the hook doesn't cover — notably Next.js page-export restrictions only surface here. Known gap: `git rebase` and `--no-verify` / `HUSKY=0` bypass pre-commit. If you suspect any of those happened, also run `bun run lint` and `bun run test` explicitly before proceeding.
+**Why only build?** Husky's pre-commit runs `tsc --noEmit`, `bun run lint`, and `bun run test` on every *new* commit, so in the common case the only remaining gap is `bun run build` (Next.js page-export restrictions surface only here). However, Phase 0 may have just rebased, and `git rebase` reapplies commits **without** firing pre-commit — same for any prior `--no-verify` / `HUSKY=0` commits. If Phase 0 reported any "Applying: …" lines (or you can't rule it out), run `bun run lint` and `bun run test` here before the build.
 
 ### Phase 2 — Multi-Tool Review
 
@@ -109,7 +109,7 @@ Launch three reviews in parallel (one message, three independent tool calls):
 1. **Codex review** — dispatch a `Task` subagent with `run_in_background: true` to run `codex review --base main` via Bash. The background flag lets the orchestrator proceed without waiting; you'll be notified on completion.
 
    ```
-   Agent({
+   Task({
      subagent_type: "general-purpose",
      description: "Codex review vs main",
      run_in_background: true,
@@ -211,7 +211,7 @@ Title: `type: Description`, under 70 characters, same convention as commits. Use
 |---------|--------|
 | Phase 0 rebase conflicts | If trivial, resolve and continue. If not, stop and surface to the user. |
 | Phase 1 build fails | Fix root cause, re-run. Don't proceed. |
-| `/codex:status` stuck > 15 min | `/codex:cancel`, surface to user. |
+| Codex `Task` subagent stuck > 15 min | Abandon the background task, proceed with the remaining reviewers, and surface to user. |
 | Reviewers disagree | Apply project conventions; document the choice in the finding. |
 | Phase 5 fails after fixes | Retry up to 2×. Then surface with the specific failure. |
 | Phase 6 push rejected (non-fast-forward) | Rebase onto current `origin/<branch>`, re-run Phase 5, retry push. No default force-push. |

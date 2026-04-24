@@ -45,9 +45,13 @@ fi
 # corrupt state). Two rev-parse calls because --abbrev-ref is sticky for
 # all refs in a single invocation — can't mix abbrev and SHA in one call.
 { read -r repo_root; read -r head_sha; } < <(git rev-parse --show-toplevel HEAD 2>/dev/null)
-[ -z "${repo_root:-}" ] || [ -z "${head_sha:-}" ] && exit 0
+if [ -z "${repo_root:-}" ] || [ -z "${head_sha:-}" ]; then
+  exit 0
+fi
 branch=$(git -C "$repo_root" rev-parse --abbrev-ref HEAD 2>/dev/null)
-[ -z "$branch" ] && exit 0
+if [ -z "$branch" ]; then
+  exit 0
+fi
 
 # Detached HEAD cannot be a PR source — refuse instead of letting a
 # `HEAD <sha>` sentinel silently validate.
@@ -59,7 +63,7 @@ fi
 sentinel="$repo_root/.claude/.pr-validated"
 expected="$branch $head_sha"
 sentinel_content=""
-[ -f "$sentinel" ] && sentinel_content=$(tr -d '\n' < "$sentinel" 2>/dev/null || true)
+[ -f "$sentinel" ] && sentinel_content=$(tr -d '\r\n' < "$sentinel" 2>/dev/null || true)
 
 if [ "$sentinel_content" = "$expected" ]; then
   exit 0
