@@ -27,6 +27,12 @@ vi.mock("@/app/actions/notifications", () => ({
   getEpisodeTopics: (...args: unknown[]) => mockGetEpisodeTopics(...args),
 }));
 
+const mockGetListenedEpisodeIds = vi.fn();
+vi.mock("@/app/actions/listen-history", () => ({
+  getListenedEpisodeIds: (...args: unknown[]) => mockGetListenedEpisodeIds(...args),
+  recordListenEvent: vi.fn().mockResolvedValue({ success: true }),
+}));
+
 const mockAddToQueue = vi.fn();
 const mockPlayEpisode = vi.fn();
 // Mutable state the mock factory reads on each render — lets individual tests
@@ -84,6 +90,7 @@ describe("NotificationPageList", () => {
     mockMarkAllNotificationsRead.mockResolvedValue({ success: true });
     mockGetNotifications.mockResolvedValue({ notifications: [], hasMore: false, error: null });
     mockGetEpisodeTopics.mockResolvedValue({});
+    mockGetListenedEpisodeIds.mockResolvedValue([]);
   });
 
   // AC-3: empty state
@@ -237,7 +244,7 @@ describe("NotificationPageList", () => {
   it("Listen click calls markNotificationRead if unread then plays episode", async () => {
     const user = userEvent.setup();
     render(<NotificationPageList {...defaultProps} />);
-    const listenBtns = screen.getAllByRole("button", { name: /listen/i });
+    const listenBtns = screen.getAllByRole("button", { name: /^play episode$/i });
     await user.click(listenBtns[0]);
     await waitFor(() => {
       expect(mockMarkNotificationRead).toHaveBeenCalledWith(1);
@@ -252,7 +259,7 @@ describe("NotificationPageList", () => {
   it("Listen click does NOT call router.push", async () => {
     const user = userEvent.setup();
     render(<NotificationPageList {...defaultProps} />);
-    const listenBtns = screen.getAllByRole("button", { name: /listen/i });
+    const listenBtns = screen.getAllByRole("button", { name: /^play episode$/i });
     await user.click(listenBtns[0]);
     await waitFor(() => {
       expect(mockPlayEpisode).toHaveBeenCalled();
@@ -270,7 +277,7 @@ describe("NotificationPageList", () => {
         initialTopicsByEpisode={{}}
       />
     );
-    const listenBtns = screen.getAllByRole("button", { name: /listen/i });
+    const listenBtns = screen.getAllByRole("button", { name: /^play episode$/i });
     await user.click(listenBtns[0]);
     await waitFor(() => {
       expect(mockMarkNotificationRead).not.toHaveBeenCalled();
@@ -303,9 +310,10 @@ describe("NotificationPageList", () => {
   });
 
   // Primary-action hidden: when episodePodcastIndexId is missing (data-integrity
-  // contract violation upstream), neither Listen nor View-episode is rendered —
-  // we don't silently route to the dashboard.
-  it("hides primary action when episodePodcastIndexId is null", () => {
+  // contract violation upstream), neither Play nor View-episode is rendered —
+  // we don't silently route to the dashboard. ListenedButton is also hidden
+  // because it needs the podcast-index id to target recordListenEvent.
+  it("hides primary action and ListenedButton when episodePodcastIndexId is null", () => {
     render(
       <NotificationPageList
         initialItems={[
@@ -316,11 +324,39 @@ describe("NotificationPageList", () => {
       />
     );
     expect(
-      screen.queryByRole("button", { name: /^listen$/i })
+      screen.queryByRole("button", { name: /^play episode$/i })
     ).not.toBeInTheDocument();
     expect(
       screen.queryByRole("button", { name: /view episode/i })
     ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /mark as listened/i })
+    ).not.toBeInTheDocument();
+  });
+
+  // Listened wiring: initialListenedIds seeds each row's ListenedButton.
+  // A row whose episodePodcastIndexId is in the set renders the "Already listened"
+  // indicator (a span, not a button); a row that isn't renders the clickable
+  // "Mark as listened" button. This proves the Set-lookup plumbing through the
+  // listenedSet memo.
+  it("renders ListenedButton state based on initialListenedIds", () => {
+    render(
+      <NotificationPageList
+        initialItems={[
+          makeItem({ id: 1, episodePodcastIndexId: "PI-unread" }),
+          makeItem({ id: 2, episodePodcastIndexId: "PI-read" }),
+        ]}
+        initialHasMore={false}
+        initialTopicsByEpisode={{}}
+        initialListenedIds={["PI-read"]}
+      />
+    );
+    // Row 1: unlistened → clickable Mark-as-listened button exists.
+    expect(
+      screen.getByRole("button", { name: /mark as listened/i })
+    ).toBeInTheDocument();
+    // Row 2: listened → Already-listened indicator (a span with aria-label).
+    expect(screen.getByLabelText(/already listened/i)).toBeInTheDocument();
   });
 
   // Load more: calls getNotifications with next offset
@@ -425,7 +461,7 @@ describe("NotificationPageList", () => {
     const unreadRow = screen.getAllByRole("article")[0];
     expect(unreadRow).toHaveAttribute("data-read", "false");
 
-    const listenBtns = screen.getAllByRole("button", { name: /listen/i });
+    const listenBtns = screen.getAllByRole("button", { name: /^play episode$/i });
     await user.click(listenBtns[0]);
 
     await waitFor(() => {
@@ -493,7 +529,7 @@ describe("NotificationPageList", () => {
     const user = userEvent.setup();
     render(<NotificationPageList {...defaultProps} />);
 
-    const listenBtns = screen.getAllByRole("button", { name: /listen/i });
+    const listenBtns = screen.getAllByRole("button", { name: /^play episode$/i });
     await user.click(listenBtns[0]);
 
     await waitFor(() => {
@@ -517,6 +553,67 @@ describe("NotificationPageList", () => {
     await user.click(titleLink);
     await waitFor(() => {
       expect(mockMarkNotificationRead).toHaveBeenCalledWith(1);
+    });
+  });
+
+  // Regression (Codex): listened state must stay in sync with ListenedButton
+  // toggles elsewhere on the page (e.g. same episode appearing on two rows).
+  // Before this fix, the parent's listenedSet was only ever seeded from props
+  // and load-more, so a row remount or duplicate would revert to "Mark as
+  // listened" after success.
+  it("refreshes listenedIds from the server when LISTEN_STATE_CHANGED_EVENT fires", async () => {
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    mockGetListenedEpisodeIds.mockResolvedValue([10]);
+    render(
+      <NotificationPageList
+        initialItems={[
+          makeItem({ id: 1, episodeDbId: 10, episodePodcastIndexId: "PI-42" }),
+        ]}
+        initialHasMore={false}
+        initialTopicsByEpisode={{}}
+        initialListenedIds={[]}
+      />,
+    );
+    // Row starts unlistened — Mark-as-listened button visible.
+    expect(
+      screen.getByRole("button", { name: /mark as listened/i }),
+    ).toBeInTheDocument();
+
+    // Simulate the ListenedButton on another row firing the global event.
+    window.dispatchEvent(new CustomEvent("listen-state-changed"));
+
+    await waitFor(() => {
+      expect(mockGetListenedEpisodeIds).toHaveBeenCalledWith([10]);
+      expect(screen.getByLabelText(/already listened/i)).toBeInTheDocument();
+    });
+    errSpy.mockRestore();
+  });
+
+  // Load-more listened-fetch happy path — newly appended rows with episodes
+  // the user has already listened to render the Already-listened indicator.
+  it("Load more fetches listened state and seeds it into the newly appended rows", async () => {
+    mockGetNotifications.mockResolvedValue({
+      notifications: [
+        makeItem({ id: 77, episodeDbId: 77, episodePodcastIndexId: "PI-77" }),
+      ],
+      hasMore: false,
+      error: null,
+    });
+    mockGetEpisodeTopics.mockResolvedValue({});
+    mockGetListenedEpisodeIds.mockResolvedValue([77]);
+    const user = userEvent.setup();
+    render(
+      <NotificationPageList
+        initialItems={defaultProps.initialItems}
+        initialHasMore={true}
+        initialTopicsByEpisode={{}}
+      />,
+    );
+    await user.click(screen.getByRole("button", { name: /load more/i }));
+    await waitFor(() => {
+      expect(mockGetListenedEpisodeIds).toHaveBeenCalledWith([77]);
+      // The appended row for episode 77 renders the Already-listened indicator.
+      expect(screen.getByLabelText(/already listened/i)).toBeInTheDocument();
     });
   });
 

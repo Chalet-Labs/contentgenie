@@ -31,6 +31,14 @@ vi.mock("@/app/actions/listen-history", () => ({
   getListenedEpisodeIds: vi.fn().mockResolvedValue(new Set()),
 }));
 
+vi.mock("@/contexts/audio-player-context", () => ({
+  useAudioPlayerAPI: () => ({
+    playEpisode: vi.fn(),
+    addToQueue: vi.fn(),
+  }),
+  useAudioPlayerState: () => ({ queue: [], currentEpisode: null }),
+}));
+
 const mockEpisode: PodcastIndexEpisode = {
   id: 789,
   title: "Test Episode Title",
