@@ -6,7 +6,7 @@ Scope: general code-review concerns surfaced across recent PRs. Each entry cites
 
 ## 1. Accessibility patterns
 
-**Rule.** Disclosure buttons need `aria-expanded` paired with `aria-controls` pointing at an `id` on the controlled region. Non-button interactive elements need explicit `role` + `tabIndex`. Form controls need associated labels. Route changes should restore focus to a sensible landmark.
+**Rule.** Disclosure buttons need `aria-expanded` paired with `aria-controls` pointing at an `id` on the controlled region. Non-button interactive elements need explicit `role` + `tabIndex`. Form controls need associated labels.
 
 **Example — `aria-expanded` wired directly.** `src/components/ui/show-more-toggle.tsx:25`:
 
@@ -31,12 +31,12 @@ Track as follow-up; cite this section when fixing.
 
 ## 2. Magic numbers in production code
 
-**Rule.** If a named constant is in scope or trivially extractable, use it. Applies equally to production code and tests. `eslint-plugin-no-magic-numbers` catches the obvious cases; the judgment call is when to name-and-hoist a literal that appears exactly once.
+**Rule.** If a named constant is in scope or trivially extractable, use it. Applies equally to production code and tests. No lint rule enforces this today (the core `no-magic-numbers` rule isn't enabled), so reviewer judgment is the gate.
 
 **Example.** `src/app/(app)/dashboard/page.tsx`:
 
 - `:25` — `const RECOMMENDATIONS_FETCH_SIZE = 12;`
-- `:79` — `await getRecommendedEpisodes(RECOMMENDATIONS_FETCH_SIZE)`
+- `:78-79` — `await getRecommendedEpisodes(RECOMMENDATIONS_FETCH_SIZE)`
 
 The refactor from `getRecommendedEpisodes(12)` → named constant is the canonical shape. Applies whether the constant is module-scoped (as above) or imported from a shared module.
 
@@ -93,8 +93,8 @@ Partial matches prefer inlined duplication over a leaky abstraction.
 
 **Example — extraction warranted.** `<ShowMoreToggle>` (`src/components/ui/show-more-toggle.tsx`) + `useExpandable` (`src/hooks/use-expandable.ts`) extracted across:
 
-- `src/components/dashboard/trending-topics.tsx:13,16,38,85`
-- `src/components/dashboard/episode-recommendations.tsx:8,11,51,164`
+- `src/components/dashboard/trending-topics.tsx:38,85` (hook call, component render)
+- `src/components/dashboard/episode-recommendations.tsx:51,164` (hook call, component render)
 
 All four conditions held — `aria-expanded` was the newly-introduced contract that would otherwise have drifted between the two dashboard cards.
 
