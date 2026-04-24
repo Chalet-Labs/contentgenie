@@ -27,6 +27,12 @@ vi.mock("@/app/actions/notifications", () => ({
   getEpisodeTopics: (...args: unknown[]) => mockGetEpisodeTopics(...args),
 }));
 
+const mockGetListenedEpisodeIds = vi.fn();
+vi.mock("@/app/actions/listen-history", () => ({
+  getListenedEpisodeIds: (...args: unknown[]) => mockGetListenedEpisodeIds(...args),
+  recordListenEvent: vi.fn().mockResolvedValue({ success: true }),
+}));
+
 const mockAddToQueue = vi.fn();
 const mockPlayEpisode = vi.fn();
 // Mutable state the mock factory reads on each render — lets individual tests
@@ -84,6 +90,7 @@ describe("NotificationPageList", () => {
     mockMarkAllNotificationsRead.mockResolvedValue({ success: true });
     mockGetNotifications.mockResolvedValue({ notifications: [], hasMore: false, error: null });
     mockGetEpisodeTopics.mockResolvedValue({});
+    mockGetListenedEpisodeIds.mockResolvedValue([]);
   });
 
   // AC-3: empty state
@@ -546,6 +553,67 @@ describe("NotificationPageList", () => {
     await user.click(titleLink);
     await waitFor(() => {
       expect(mockMarkNotificationRead).toHaveBeenCalledWith(1);
+    });
+  });
+
+  // Regression (Codex): listened state must stay in sync with ListenedButton
+  // toggles elsewhere on the page (e.g. same episode appearing on two rows).
+  // Before this fix, the parent's listenedSet was only ever seeded from props
+  // and load-more, so a row remount or duplicate would revert to "Mark as
+  // listened" after success.
+  it("refreshes listenedIds from the server when LISTEN_STATE_CHANGED_EVENT fires", async () => {
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    mockGetListenedEpisodeIds.mockResolvedValue([10]);
+    render(
+      <NotificationPageList
+        initialItems={[
+          makeItem({ id: 1, episodeDbId: 10, episodePodcastIndexId: "PI-42" }),
+        ]}
+        initialHasMore={false}
+        initialTopicsByEpisode={{}}
+        initialListenedIds={[]}
+      />,
+    );
+    // Row starts unlistened — Mark-as-listened button visible.
+    expect(
+      screen.getByRole("button", { name: /mark as listened/i }),
+    ).toBeInTheDocument();
+
+    // Simulate the ListenedButton on another row firing the global event.
+    window.dispatchEvent(new CustomEvent("listen-state-changed"));
+
+    await waitFor(() => {
+      expect(mockGetListenedEpisodeIds).toHaveBeenCalledWith([10]);
+      expect(screen.getByLabelText(/already listened/i)).toBeInTheDocument();
+    });
+    errSpy.mockRestore();
+  });
+
+  // Load-more listened-fetch happy path — newly appended rows with episodes
+  // the user has already listened to render the Already-listened indicator.
+  it("Load more fetches listened state and seeds it into the newly appended rows", async () => {
+    mockGetNotifications.mockResolvedValue({
+      notifications: [
+        makeItem({ id: 77, episodeDbId: 77, episodePodcastIndexId: "PI-77" }),
+      ],
+      hasMore: false,
+      error: null,
+    });
+    mockGetEpisodeTopics.mockResolvedValue({});
+    mockGetListenedEpisodeIds.mockResolvedValue([77]);
+    const user = userEvent.setup();
+    render(
+      <NotificationPageList
+        initialItems={defaultProps.initialItems}
+        initialHasMore={true}
+        initialTopicsByEpisode={{}}
+      />,
+    );
+    await user.click(screen.getByRole("button", { name: /load more/i }));
+    await waitFor(() => {
+      expect(mockGetListenedEpisodeIds).toHaveBeenCalledWith([77]);
+      // The appended row for episode 77 renders the Already-listened indicator.
+      expect(screen.getByLabelText(/already listened/i)).toBeInTheDocument();
     });
   });
 

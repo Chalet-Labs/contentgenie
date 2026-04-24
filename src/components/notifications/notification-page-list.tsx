@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, useCallback, useRef, useMemo } from "react";
+import { useState, useTransition, useCallback, useRef, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Bell, X } from "lucide-react";
@@ -20,6 +20,7 @@ import { EpisodeCard } from "@/components/episodes/episode-card";
 import { ListenedButton } from "@/components/episodes/listened-button";
 import { formatRelativeTime } from "@/lib/utils";
 import { ROUTES } from "@/lib/routes";
+import { LISTEN_STATE_CHANGED_EVENT } from "@/lib/events";
 import { NOTIFICATIONS_PAGE_SIZE } from "@/lib/notifications-constants";
 
 type NotificationItem = Awaited<
@@ -73,6 +74,36 @@ export function NotificationPageList({
   const [isPending, startTransition] = useTransition();
 
   const visibleItems = items.filter((n) => !n.pendingDismiss);
+
+  // Refresh listened state when any ListenedButton fires a mark. Without this,
+  // remounted rows or duplicate-episode notifications would revert to the
+  // "Mark as listened" affordance after a successful toggle elsewhere. Mirrors
+  // the library page pattern in `src/app/(app)/library/page.tsx`.
+  useEffect(() => {
+    const refresh = async () => {
+      const dbIds = items
+        .map((n) => n.episodeDbId)
+        .filter((id): id is number => id !== null);
+      if (dbIds.length === 0) return;
+      try {
+        const listenedDbIds = new Set(await getListenedEpisodeIds(dbIds));
+        const piIds = items
+          .filter(
+            (n) =>
+              n.episodeDbId !== null &&
+              listenedDbIds.has(n.episodeDbId) &&
+              n.episodePodcastIndexId,
+          )
+          .map((n) => n.episodePodcastIndexId as string);
+        setListenedIds(piIds);
+      } catch (err) {
+        console.error("[notifications] listen-state refresh failed", err);
+      }
+    };
+    window.addEventListener(LISTEN_STATE_CHANGED_EVENT, refresh);
+    return () =>
+      window.removeEventListener(LISTEN_STATE_CHANGED_EVENT, refresh);
+  }, [items]);
 
   const handleDismiss = useCallback(
     (id: number) => {
@@ -180,8 +211,9 @@ export function NotificationPageList({
         if (newEpisodeIds.length > 0) {
           try {
             newTopics = await getEpisodeTopics(newEpisodeIds);
-          } catch {
+          } catch (err) {
             // Degrade gracefully — append rows without topic chips.
+            console.error("[notifications] getEpisodeTopics failed", err);
             newTopics = {};
           }
           try {
@@ -196,9 +228,10 @@ export function NotificationPageList({
                   n.episodePodcastIndexId,
               )
               .map((n) => n.episodePodcastIndexId as string);
-          } catch {
+          } catch (err) {
             // Degrade gracefully — rows stay "unlistened" on failure; the
             // user can re-mark if needed.
+            console.error("[notifications] getListenedEpisodeIds failed", err);
             newListenedPiIds = [];
           }
         }

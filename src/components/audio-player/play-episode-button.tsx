@@ -11,9 +11,9 @@ import {
 interface PlayEpisodeButtonProps {
   episode: AudioEpisode;
   /**
-   * Runs synchronously before `playEpisode` — used by notifications to flip
-   * the row to read via `markReadOptimistic` so navigation-free playback still
-   * clears unread state.
+   * Runs synchronously before the player starts or resumes. Use for optimistic
+   * state updates that must land before playback kicks off (e.g. flipping a
+   * notification to read). Skipped when the episode is already playing.
    */
   onBeforePlay?: () => void;
   "aria-label"?: string;
@@ -24,16 +24,27 @@ export function PlayEpisodeButton({
   onBeforePlay,
   "aria-label": ariaLabelProp,
 }: PlayEpisodeButtonProps) {
-  const { playEpisode } = useAudioPlayerAPI();
-  const { currentEpisode } = useAudioPlayerState();
+  const { playEpisode, togglePlay } = useAudioPlayerAPI();
+  const { currentEpisode, isPlaying } = useAudioPlayerState();
 
-  const isNowPlaying = currentEpisode?.id === episode.id;
-  const label = ariaLabelProp ?? (isNowPlaying ? "Now playing" : "Play episode");
+  const isCurrent = currentEpisode?.id === episode.id;
+  const isActivelyPlaying = isCurrent && isPlaying;
+  const label =
+    ariaLabelProp ??
+    (isActivelyPlaying
+      ? "Now playing"
+      : isCurrent
+        ? "Resume episode"
+        : "Play episode");
 
   function handleClick() {
-    if (isNowPlaying) return;
+    if (isActivelyPlaying) return;
     onBeforePlay?.();
-    playEpisode(episode);
+    if (isCurrent) {
+      togglePlay();
+    } else {
+      playEpisode(episode);
+    }
   }
 
   return (
@@ -41,7 +52,7 @@ export function PlayEpisodeButton({
       variant="ghost"
       size="icon"
       onClick={handleClick}
-      disabled={isNowPlaying}
+      disabled={isActivelyPlaying}
       aria-label={label}
       title={label}
       className="h-8 w-8 shrink-0"
