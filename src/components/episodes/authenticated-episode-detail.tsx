@@ -20,6 +20,14 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import {
+  EpisodeTabs,
+  EpisodeTabsContent,
+  EpisodeTabsList,
+  EpisodeTabsTrigger,
+} from "@/components/episodes/episode-tabs";
+import { EpisodeChaptersList } from "@/components/episodes/episode-chapters-list";
+import { useChapters } from "@/hooks/use-chapters";
 import { cn, stripHtml } from "@/lib/utils";
 import {
   useAudioPlayerState,
@@ -80,6 +88,7 @@ export function AuthenticatedEpisodeDetail({
   const playerAPI = useAudioPlayerAPI();
 
   const [episode, setEpisode] = useState<EpisodeData | null>(null);
+  const chaptersState = useChapters(episode?.chaptersUrl);
   const [podcast, setPodcast] = useState<PodcastData | null>(null);
   const [summaryData, setSummaryData] = useState<SummaryData | null>(null);
   const [isLoadingEpisode, setIsLoadingEpisode] = useState(true);
@@ -440,6 +449,10 @@ export function AuthenticatedEpisodeDetail({
     ? Object.values(podcast.categories)
     : [];
 
+  const hasChapters = Boolean(episode.chaptersUrl?.trim());
+  const chaptersCount =
+    chaptersState.status === "ready" ? chaptersState.chapters.length : null;
+
   const isCurrentEpisode =
     playerState.currentEpisode?.id === String(episode.id);
   const isPlayingThis = isCurrentEpisode && playerState.isPlaying;
@@ -690,51 +703,89 @@ export function AuthenticatedEpisodeDetail({
         </div>
       </div>
 
-      {/* Description */}
-      {episode.description && (
-        <Card>
-          <CardContent className="p-6">
-            <h2 className="mb-3 text-lg font-semibold">About This Episode</h2>
-            <p className="whitespace-pre-wrap text-muted-foreground">
-              {stripHtml(episode.description)}
-            </p>
-          </CardContent>
-        </Card>
-      )}
+      <EpisodeTabs defaultValue="insights">
+        <EpisodeTabsList aria-label="Episode sections">
+          <EpisodeTabsTrigger value="insights">Insights</EpisodeTabsTrigger>
+          {hasChapters && (
+            <EpisodeTabsTrigger
+              value="chapters"
+              badge={chaptersCount ?? undefined}
+            >
+              Chapters
+            </EpisodeTabsTrigger>
+          )}
+          <EpisodeTabsTrigger value="about">About</EpisodeTabsTrigger>
+        </EpisodeTabsList>
 
-      {/* AI Summary Section */}
-      <div>
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-xl font-semibold">AI-Powered Insights</h2>
-          {isAdmin &&
-            canRunEpisodeProcessing &&
-            summaryData?.summary &&
-            isOnline &&
-            !isLoadingSummary && (
-              <Button variant="outline" size="sm" onClick={resummarize}>
-                <RefreshCw className="mr-2 h-4 w-4" />
-                Re-summarize
-              </Button>
-            )}
-        </div>
-        <SummaryDisplay
-          summary={summaryData?.summary || null}
-          keyTakeaways={summaryData?.keyTakeaways || null}
-          worthItScore={summaryData?.worthItScore ?? null}
-          worthItReason={summaryData?.worthItReason}
-          worthItDimensions={summaryData?.worthItDimensions}
-          isLoading={isLoadingSummary}
-          error={summaryError}
-          currentStep={
-            (run?.metadata?.step as SummarizationStep | undefined) ?? null
-          }
-          onGenerateSummary={
-            isOnline && canRunEpisodeProcessing ? generateSummary : undefined
-          }
-          overlapLabel={overlapResult.label}
-          overlapLabelKind={overlapResult.labelKind}
-        />
-      </div>
+        <EpisodeTabsContent value="insights">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-xl font-semibold">AI-Powered Insights</h2>
+            {isAdmin &&
+              canRunEpisodeProcessing &&
+              summaryData?.summary &&
+              isOnline &&
+              !isLoadingSummary && (
+                <Button variant="outline" size="sm" onClick={resummarize}>
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  Re-summarize
+                </Button>
+              )}
+          </div>
+          <SummaryDisplay
+            summary={summaryData?.summary || null}
+            keyTakeaways={summaryData?.keyTakeaways || null}
+            worthItScore={summaryData?.worthItScore ?? null}
+            worthItReason={summaryData?.worthItReason}
+            worthItDimensions={summaryData?.worthItDimensions}
+            isLoading={isLoadingSummary}
+            error={summaryError}
+            currentStep={
+              (run?.metadata?.step as SummarizationStep | undefined) ?? null
+            }
+            onGenerateSummary={
+              isOnline && canRunEpisodeProcessing ? generateSummary : undefined
+            }
+            overlapLabel={overlapResult.label}
+            overlapLabelKind={overlapResult.labelKind}
+          />
+        </EpisodeTabsContent>
+
+        {hasChapters && (
+          <EpisodeTabsContent value="chapters">
+            <Card>
+              <CardContent className="p-4">
+                <EpisodeChaptersList
+                  state={chaptersState}
+                  audioEpisode={{
+                    id: String(episode.id),
+                    title: episode.title,
+                    podcastTitle: podcast?.title || "",
+                    audioUrl: episode.enclosureUrl,
+                    artwork: artworkUrl,
+                    duration: episode.duration,
+                    chaptersUrl: episode.chaptersUrl ?? undefined,
+                  }}
+                />
+              </CardContent>
+            </Card>
+          </EpisodeTabsContent>
+        )}
+
+        {episode.description && (
+          <EpisodeTabsContent value="about">
+            <Card>
+              <CardContent className="p-6">
+                <h2 className="mb-3 text-lg font-semibold">
+                  About This Episode
+                </h2>
+                <p className="whitespace-pre-wrap text-muted-foreground">
+                  {stripHtml(episode.description)}
+                </p>
+              </CardContent>
+            </Card>
+          </EpisodeTabsContent>
+        )}
+      </EpisodeTabs>
     </div>
   );
 }
