@@ -575,6 +575,49 @@ export type SubscriptionWithPodcast = Awaited<
   ReturnType<typeof getUserSubscriptions>
 >["subscriptions"][number];
 
+export interface PinnedSubscription {
+  id: number;
+  podcastId: number;
+  podcastIndexId: string;
+  title: string;
+  imageUrl: string | null;
+}
+
+export async function getPinnedSubscriptions(): Promise<
+  ActionResult<PinnedSubscription[]>
+> {
+  const { userId } = await auth();
+  if (!userId) {
+    return {
+      success: false,
+      error: "You must be signed in to view pinned subscriptions",
+    };
+  }
+  try {
+    const rows = await db
+      .select({
+        id: userSubscriptions.id,
+        podcastId: podcasts.id,
+        podcastIndexId: podcasts.podcastIndexId,
+        title: podcasts.title,
+        imageUrl: podcasts.imageUrl,
+      })
+      .from(userSubscriptions)
+      .innerJoin(podcasts, eq(userSubscriptions.podcastId, podcasts.id))
+      .where(
+        and(
+          eq(userSubscriptions.userId, userId),
+          eq(userSubscriptions.isPinned, true),
+        ),
+      )
+      .orderBy(asc(podcasts.title), asc(userSubscriptions.id));
+    return { success: true, data: rows };
+  } catch (error) {
+    console.error("[getPinnedSubscriptions] failed", error, { userId });
+    return { success: false, error: "Failed to load pinned subscriptions" };
+  }
+}
+
 export async function getUserSubscriptionSort(): Promise<SubscriptionSort> {
   const { userId } = await auth();
   if (!userId) return DEFAULT_SUBSCRIPTION_SORT;
