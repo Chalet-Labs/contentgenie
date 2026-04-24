@@ -38,12 +38,14 @@ cat >&2 <<EOF
 Pre-PR validation required before \`gh pr create\`.
 
 Invoke the \`pre-pr-validation\` skill now. It runs:
-  1. Verification gate — bun run lint / test / build
+  0. Rebase onto origin/main
+  1. Verification gate — bun run build (tsc/lint/test are already enforced per commit by the husky hook)
   2. Parallel review — /codex:review --base main --background, /pr-review-toolkit:review-pr all, /simplify
   3. Validate every finding (reject hallucinations, read cited lines)
   4. Fix all valid findings
-  5. Re-verify lint/test/build
-  6. Write sentinel to .claude/.pr-validated (\`<branch> <sha>\`)
+  5. Re-verify build
+  6. Push branch to origin
+  7. Write sentinel to .claude/.pr-validated (\`<branch> <sha>\`)
 
 Only after the skill completes and writes the sentinel will this hook allow \`gh pr create\`.
 
