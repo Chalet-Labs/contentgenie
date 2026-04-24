@@ -5,6 +5,7 @@ import {
   usePinnedSubscriptions,
   usePinnedSubscriptionsOptional,
 } from "@/contexts/pinned-subscriptions-context";
+import { PINS_CHANGED_EVENT } from "@/lib/events";
 
 const mockGetPinnedSubscriptions = vi.fn();
 vi.mock("@/app/actions/subscriptions", () => ({
@@ -218,7 +219,7 @@ describe("PinnedSubscriptionsProvider", () => {
     });
 
     await act(async () => {
-      window.dispatchEvent(new CustomEvent("pins-changed"));
+      window.dispatchEvent(new CustomEvent(PINS_CHANGED_EVENT));
     });
 
     await waitFor(() => {
@@ -270,7 +271,7 @@ describe("PinnedSubscriptionsProvider", () => {
     unmount();
 
     await act(async () => {
-      window.dispatchEvent(new CustomEvent("pins-changed"));
+      window.dispatchEvent(new CustomEvent(PINS_CHANGED_EVENT));
     });
 
     expect(mockGetPinnedSubscriptions.mock.calls.length).toBe(

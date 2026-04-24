@@ -2,7 +2,11 @@ import type { Decorator, Meta, StoryObj } from "@storybook/nextjs-vite";
 import { SidebarCountsProvider } from "@/contexts/sidebar-counts-context";
 import { PinnedSubscriptionsProvider } from "@/contexts/pinned-subscriptions-context";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
-import { Sidebar } from "@/components/layout/sidebar";
+import {
+  PINNED_EXPANDED_STORAGE_KEY,
+  PINNED_EXPANDED_STORAGE_VALUE,
+  Sidebar,
+} from "@/components/layout/sidebar";
 
 // `@/app/actions/dashboard` and `@/app/actions/subscriptions` are aliased in
 // .storybook/main.ts to mocks/actions.ts. getDashboardStats stubs non-zero
@@ -40,6 +44,12 @@ const meta: Meta<typeof Sidebar> = {
     layout: "fullscreen",
   },
   decorators: [withProviders],
+  loaders: [
+    async () => {
+      localStorage.removeItem(PINNED_EXPANDED_STORAGE_KEY);
+      return {};
+    },
+  ],
 };
 
 export default meta;
@@ -97,7 +107,10 @@ export const WithPinnedPodcasts: Story = {
   },
   loaders: [
     async () => {
-      localStorage.setItem("sidebar:pinned-expanded", "1");
+      localStorage.setItem(
+        PINNED_EXPANDED_STORAGE_KEY,
+        PINNED_EXPANDED_STORAGE_VALUE,
+      );
       return {};
     },
   ],
@@ -116,7 +129,10 @@ export const WithPinnedPodcastsInSheet: Story = {
   },
   loaders: [
     async () => {
-      localStorage.setItem("sidebar:pinned-expanded", "1");
+      localStorage.setItem(
+        PINNED_EXPANDED_STORAGE_KEY,
+        PINNED_EXPANDED_STORAGE_VALUE,
+      );
       return {};
     },
   ],

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -23,6 +23,9 @@ function PinnedRssFallback() {
 
 function PinnedArtwork({ imageUrl }: { imageUrl: string | null }) {
   const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    setFailed(false);
+  }, [imageUrl]);
   if (!imageUrl || failed) return <PinnedRssFallback />;
   return (
     <Image

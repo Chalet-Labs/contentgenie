@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { OrganizationSwitcher } from "@clerk/nextjs";
@@ -43,8 +43,7 @@ function readPinnedExpanded(): boolean {
       localStorage.getItem(PINNED_EXPANDED_STORAGE_KEY) ===
       PINNED_EXPANDED_STORAGE_VALUE
     );
-  } catch (err) {
-    console.warn("[Sidebar] localStorage read failed:", err);
+  } catch {
     return false;
   }
 }
@@ -59,8 +58,8 @@ function writePinnedExpanded(next: boolean): void {
     } else {
       localStorage.removeItem(PINNED_EXPANDED_STORAGE_KEY);
     }
-  } catch (err) {
-    console.warn("[Sidebar] localStorage write failed:", err);
+  } catch {
+    // localStorage may be unavailable (e.g. private browsing quota exceeded)
   }
 }
 
@@ -75,7 +74,11 @@ function SidebarNav({
   const counts = useSidebarCountsOptional();
   const { pinned } = usePinnedSubscriptionsOptional();
 
-  const [pinnedExpanded, setPinnedExpanded] = useState(readPinnedExpanded);
+  const [pinnedExpanded, setPinnedExpanded] = useState(false);
+
+  useEffect(() => {
+    setPinnedExpanded(readPinnedExpanded());
+  }, []);
 
   const togglePinned = () => {
     const next = !pinnedExpanded;

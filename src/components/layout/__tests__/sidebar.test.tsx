@@ -1,6 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, within, fireEvent, act } from "@testing-library/react";
-import { Sidebar } from "@/components/layout/sidebar";
+import {
+  PINNED_EXPANDED_STORAGE_KEY,
+  PINNED_EXPANDED_STORAGE_VALUE,
+  Sidebar,
+} from "@/components/layout/sidebar";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { installLocalStorageMock } from "@/test/mocks/local-storage";
 
@@ -303,12 +307,14 @@ describe("Sidebar — pinned podcasts chevron", () => {
     });
 
     expect(screen.getByTestId("pinned-section")).toBeInTheDocument();
-    expect(localStorage.getItem("sidebar:pinned-expanded")).toBe("1");
+    expect(localStorage.getItem(PINNED_EXPANDED_STORAGE_KEY)).toBe(
+      PINNED_EXPANDED_STORAGE_VALUE,
+    );
     expect(chevron).toHaveAttribute("aria-expanded", "true");
   });
 
   it("does not expand on mount when localStorage value is anything other than '1'", () => {
-    localStorage.setItem("sidebar:pinned-expanded", "true");
+    localStorage.setItem(PINNED_EXPANDED_STORAGE_KEY, "true");
     mockUsePinnedSubscriptionsOptional.mockReturnValue({
       pinned: [
         {
@@ -356,11 +362,14 @@ describe("Sidebar — pinned podcasts chevron", () => {
     });
 
     expect(screen.queryByTestId("pinned-section")).toBeNull();
-    expect(localStorage.getItem("sidebar:pinned-expanded")).toBeNull();
+    expect(localStorage.getItem(PINNED_EXPANDED_STORAGE_KEY)).toBeNull();
   });
 
   it("reads localStorage on mount and expands section when pre-seeded to '1'", async () => {
-    localStorage.setItem("sidebar:pinned-expanded", "1");
+    localStorage.setItem(
+      PINNED_EXPANDED_STORAGE_KEY,
+      PINNED_EXPANDED_STORAGE_VALUE,
+    );
     mockUsePinnedSubscriptionsOptional.mockReturnValue({
       pinned: [
         {
@@ -403,7 +412,7 @@ describe("Sidebar — pinned podcasts chevron", () => {
     fireEvent.click(screen.getByRole("link", { name: /subscriptions/i }));
 
     expect(screen.queryByTestId("pinned-section")).toBeNull();
-    expect(localStorage.getItem("sidebar:pinned-expanded")).toBeNull();
+    expect(localStorage.getItem(PINNED_EXPANDED_STORAGE_KEY)).toBeNull();
 
     // Chevron is a separate button target
     const chevron = screen.getByLabelText("Toggle pinned podcasts");
