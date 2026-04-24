@@ -8,6 +8,7 @@ describe("useChapters", () => {
   });
 
   afterEach(() => {
+    vi.useRealTimers();
     vi.unstubAllGlobals();
     vi.restoreAllMocks();
   });
@@ -180,7 +181,6 @@ describe("useChapters", () => {
       status: "error",
       message: "Request timed out",
     });
-    vi.useRealTimers();
   });
 
   it("validates the response shape via parseChapters and drops malformed entries", async () => {
