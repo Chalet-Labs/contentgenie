@@ -995,7 +995,10 @@ describe("getPinnedSubscriptions", () => {
       title: "Solo",
       imageUrl: "https://img/1.png",
     });
-    expect(result.data[0]).not.toHaveProperty("description");
+    const projection = mockSelect.mock.calls[0][0] as Record<string, unknown>;
+    expect(Object.keys(projection).sort()).toEqual(
+      ["id", "imageUrl", "podcastId", "podcastIndexId", "title"],
+    );
   });
 
   it("orders by podcasts.title ASC — passes DB-sorted rows through unchanged", async () => {
@@ -1013,7 +1016,10 @@ describe("getPinnedSubscriptions", () => {
     const result = await getPinnedSubscriptions();
 
     expect(mocks.mockOrderBy).toHaveBeenCalledTimes(1);
-    expect(mocks.mockOrderBy).toHaveBeenCalledWith({ __op: "asc", col: "title" });
+    expect(mocks.mockOrderBy).toHaveBeenCalledWith(
+      { __op: "asc", col: "title" },
+      { __op: "asc", col: "id" },
+    );
     expect(result.success).toBe(true);
     if (!result.success) return;
     expect(result.data.map((r) => r.title)).toEqual(["Apple Pod", "Mango Pod", "Zebra Pod"]);
@@ -1053,6 +1059,7 @@ describe("getPinnedSubscriptions", () => {
       args: Array<{ __op: string; a: unknown; b: unknown }>;
     };
     expect(whereArg.__op).toBe("and");
+    expect(whereArg.args).toHaveLength(2);
     const userIdPredicate = whereArg.args.find((p) => p.a === "user_id");
     const isPinnedPredicate = whereArg.args.find((p) => p.a === "is_pinned");
     expect(userIdPredicate?.b).toBe("user_123");

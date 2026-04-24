@@ -610,10 +610,10 @@ export async function getPinnedSubscriptions(): Promise<
           eq(userSubscriptions.isPinned, true),
         ),
       )
-      .orderBy(asc(podcasts.title));
+      .orderBy(asc(podcasts.title), asc(userSubscriptions.id));
     return { success: true, data: rows };
   } catch (error) {
-    console.error("[getPinnedSubscriptions] failed", { userId, error });
+    console.error("[getPinnedSubscriptions] failed", error, { userId });
     return { success: false, error: "Failed to load pinned subscriptions" };
   }
 }
