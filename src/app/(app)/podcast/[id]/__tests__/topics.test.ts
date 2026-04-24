@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-const mockWhere = vi.fn();
+const mockOrderBy = vi.fn();
+const mockWhere = vi.fn(() => ({ orderBy: mockOrderBy }));
 const mockFrom = vi.fn(() => ({ where: mockWhere }));
 const mockSelect = vi.fn(() => ({ from: mockFrom }));
 
@@ -18,6 +19,10 @@ vi.mock("@/db/schema", () => ({
 
 vi.mock("drizzle-orm", () => ({
   inArray: vi.fn((col: unknown, vals: unknown) => ({ col, vals })),
+  sql: (strings: TemplateStringsArray, ...values: unknown[]) => ({
+    sql: strings.join("?"),
+    values,
+  }),
 }));
 
 import {
@@ -37,20 +42,22 @@ describe("getTopicsByPodcastIndexId", () => {
   });
 
   it("returns {} when no topic rows exist for the requested episodes", async () => {
-    mockWhere.mockResolvedValue([]);
+    mockOrderBy.mockResolvedValue([]);
     const result = await getTopicsByPodcastIndexId([
       { id: 1, podcastIndexId: "PI-1" },
     ]);
     expect(result).toEqual({});
   });
 
-  it("groups topics by episode, sorts by rank ascending, caps at TOPICS_PER_EPISODE_LIMIT", async () => {
-    mockWhere.mockResolvedValue([
-      { episodeId: 1, topic: "C", topicRank: 3 },
-      { episodeId: 1, topic: "A", topicRank: 1 },
-      { episodeId: 1, topic: "B", topicRank: 2 },
-      { episodeId: 1, topic: "D", topicRank: 4 },
-      { episodeId: 1, topic: "E", topicRank: 5 },
+  // The DB returns rows already ordered by topicRank ASC NULLS LAST, so the
+  // helper just needs to preserve insertion order and cap per-episode.
+  it("preserves DB order and caps at TOPICS_PER_EPISODE_LIMIT", async () => {
+    mockOrderBy.mockResolvedValue([
+      { episodeId: 1, topic: "A" },
+      { episodeId: 1, topic: "B" },
+      { episodeId: 1, topic: "C" },
+      { episodeId: 1, topic: "D" },
+      { episodeId: 1, topic: "E" },
     ]);
     const result = await getTopicsByPodcastIndexId([
       { id: 1, podcastIndexId: "PI-1" },
@@ -59,23 +66,17 @@ describe("getTopicsByPodcastIndexId", () => {
     expect(result["PI-1"]).toEqual(["A", "B", "C", "D"]);
   });
 
-  it("drops NULL ranks to the end of each episode's list", async () => {
-    mockWhere.mockResolvedValue([
-      { episodeId: 1, topic: "ranked", topicRank: 1 },
-      { episodeId: 1, topic: "null-a", topicRank: null },
-      { episodeId: 1, topic: "null-b", topicRank: null },
-    ]);
-    const result = await getTopicsByPodcastIndexId([
-      { id: 1, podcastIndexId: "PI-1" },
-    ]);
-    expect(result["PI-1"][0]).toBe("ranked");
-    expect(result["PI-1"].slice(1).sort()).toEqual(["null-a", "null-b"]);
+  it("orders topics by topicRank ASC NULLS LAST in the SQL query", async () => {
+    mockOrderBy.mockResolvedValue([]);
+    await getTopicsByPodcastIndexId([{ id: 1, podcastIndexId: "PI-1" }]);
+    const orderByArg = mockOrderBy.mock.calls[0][0];
+    expect(orderByArg.sql).toContain("ASC NULLS LAST");
   });
 
   it("remaps DB ids to PodcastIndex ids in the output keys", async () => {
-    mockWhere.mockResolvedValue([
-      { episodeId: 10, topic: "X", topicRank: 1 },
-      { episodeId: 20, topic: "Y", topicRank: 1 },
+    mockOrderBy.mockResolvedValue([
+      { episodeId: 10, topic: "X" },
+      { episodeId: 20, topic: "Y" },
     ]);
     const result = await getTopicsByPodcastIndexId([
       { id: 10, podcastIndexId: "PI-A" },
@@ -86,7 +87,7 @@ describe("getTopicsByPodcastIndexId", () => {
 
   it("returns {} and logs on DB failure instead of throwing", async () => {
     const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-    mockWhere.mockRejectedValue(new Error("neon unreachable"));
+    mockOrderBy.mockRejectedValue(new Error("neon unreachable"));
     const result = await getTopicsByPodcastIndexId([
       { id: 1, podcastIndexId: "PI-1" },
     ]);

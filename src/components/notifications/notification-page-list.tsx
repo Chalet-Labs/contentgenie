@@ -77,17 +77,19 @@ export function NotificationPageList({
 
   // Refresh listened state when any ListenedButton fires a mark. Without this,
   // remounted rows or duplicate-episode notifications would revert to the
-  // "Mark as listened" affordance after a successful toggle elsewhere. Mirrors
-  // the library page pattern in `src/app/(app)/library/page.tsx`.
+  // "Mark as listened" affordance after a successful toggle elsewhere.
+  const itemsRef = useRef(items);
+  itemsRef.current = items;
   useEffect(() => {
     const refresh = async () => {
-      const dbIds = items
+      const current = itemsRef.current;
+      const dbIds = current
         .map((n) => n.episodeDbId)
         .filter((id): id is number => id !== null);
       if (dbIds.length === 0) return;
       try {
         const listenedDbIds = new Set(await getListenedEpisodeIds(dbIds));
-        const piIds = items
+        const piIds = current
           .filter(
             (n) =>
               n.episodeDbId !== null &&
@@ -95,7 +97,11 @@ export function NotificationPageList({
               n.episodePodcastIndexId,
           )
           .map((n) => n.episodePodcastIndexId as string);
-        setListenedIds(piIds);
+        setListenedIds((prev) =>
+          prev.length === piIds.length && prev.every((id, i) => id === piIds[i])
+            ? prev
+            : piIds,
+        );
       } catch (err) {
         console.error("[notifications] listen-state refresh failed", err);
       }
@@ -103,7 +109,7 @@ export function NotificationPageList({
     window.addEventListener(LISTEN_STATE_CHANGED_EVENT, refresh);
     return () =>
       window.removeEventListener(LISTEN_STATE_CHANGED_EVENT, refresh);
-  }, [items]);
+  }, []);
 
   const handleDismiss = useCallback(
     (id: number) => {
