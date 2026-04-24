@@ -4,7 +4,11 @@ import { eq } from "drizzle-orm";
 import { tasks, auth } from "@trigger.dev/sdk";
 import { db } from "@/db";
 import { episodes, IN_PROGRESS_STATUSES } from "@/db/schema";
-import { checkRateLimit, checkDailyLimit, DAILY_SUMMARIZE_LIMIT } from "@/lib/rate-limit";
+import {
+  checkRateLimit,
+  checkDailyLimit,
+  DAILY_SUMMARIZE_LIMIT,
+} from "@/lib/rate-limit";
 import { ADMIN_ROLE } from "@/lib/auth-roles";
 import type { summarizeEpisode } from "@/trigger/summarize-episode";
 
@@ -22,10 +26,14 @@ export async function POST(request: NextRequest) {
     const isAdmin = has({ role: ADMIN_ROLE });
 
     const numericEpisodeId = Number(episodeId);
-    if (!episodeId || !Number.isFinite(numericEpisodeId) || numericEpisodeId <= 0) {
+    if (
+      !episodeId ||
+      !Number.isFinite(numericEpisodeId) ||
+      numericEpisodeId <= 0
+    ) {
       return NextResponse.json(
         { error: "A valid positive episode ID is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -38,7 +46,7 @@ export async function POST(request: NextRequest) {
     if (force && !isAdmin) {
       return NextResponse.json(
         { error: "Only admins can force re-summarization" },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
@@ -78,7 +86,7 @@ export async function POST(request: NextRequest) {
           publicAccessToken,
           status: existingEpisode.summaryStatus,
         },
-        { status: 202 }
+        { status: 202 },
       );
     }
 
@@ -89,11 +97,12 @@ export async function POST(request: NextRequest) {
       if (!dailyLimit.allowed) {
         return NextResponse.json(
           {
-            error: "Daily summarization limit reached. Please try again tomorrow.",
+            error:
+              "Daily summarization limit reached. Please try again tomorrow.",
             retryAfterMs: dailyLimit.retryAfterMs,
             dailyLimit: DAILY_SUMMARIZE_LIMIT,
           },
-          { status: 429 }
+          { status: 429 },
         );
       }
 
@@ -105,7 +114,7 @@ export async function POST(request: NextRequest) {
             error: "Rate limit exceeded. Please try again later.",
             retryAfterMs: rateLimit.retryAfterMs,
           },
-          { status: 429 }
+          { status: 429 },
         );
       }
     }
@@ -117,7 +126,10 @@ export async function POST(request: NextRequest) {
       { episodeId: numericEpisodeId },
       force
         ? {}
-        : { idempotencyKey: `summarize-episode-${numericEpisodeId}`, idempotencyKeyTTL: "10m" }
+        : {
+            idempotencyKey: `summarize-episode-${numericEpisodeId}`,
+            idempotencyKeyTTL: "10m",
+          },
     );
 
     // Generate public access token for realtime frontend subscription
@@ -149,7 +161,7 @@ export async function POST(request: NextRequest) {
         publicAccessToken,
         status: "queued",
       },
-      { status: 202 }
+      { status: 202 },
     );
   } catch (error) {
     console.error("Error triggering summary:", error);
@@ -158,7 +170,7 @@ export async function POST(request: NextRequest) {
         error: "Failed to trigger summary generation",
         details: error instanceof Error ? error.message : "Unknown error",
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -177,7 +189,7 @@ export async function GET(request: NextRequest) {
     if (!episodeId) {
       return NextResponse.json(
         { error: "Episode ID is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -239,7 +251,7 @@ export async function GET(request: NextRequest) {
     console.error("Error checking summary:", error);
     return NextResponse.json(
       { error: "Failed to check summary" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

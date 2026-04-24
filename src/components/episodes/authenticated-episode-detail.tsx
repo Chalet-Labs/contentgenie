@@ -21,7 +21,10 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { cn, stripHtml } from "@/lib/utils";
-import { useAudioPlayerState, useAudioPlayerAPI } from "@/contexts/audio-player-context";
+import {
+  useAudioPlayerState,
+  useAudioPlayerAPI,
+} from "@/contexts/audio-player-context";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   SummaryDisplay,
@@ -87,9 +90,13 @@ export function AuthenticatedEpisodeDetail({
   const [runId, setRunId] = useState<string | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [transcriptSource, setTranscriptSource] = useState<string | null>(null);
-  const [transcriptStatus, setTranscriptStatus] = useState<TranscriptStatus | null>(null);
+  const [transcriptStatus, setTranscriptStatus] =
+    useState<TranscriptStatus | null>(null);
   const [episodeDbId, setEpisodeDbId] = useState<number | null>(null);
-  const [overlapResult, setOverlapResult] = useState<{ label: string | null; labelKind: OverlapLabelKind | null }>({ label: null, labelKind: null });
+  const [overlapResult, setOverlapResult] = useState<{
+    label: string | null;
+    labelKind: OverlapLabelKind | null;
+  }>({ label: null, labelKind: null });
   const canRunEpisodeProcessing = supportsEpisodeProcessing(episodeId);
 
   // Realtime subscription to the Trigger.dev run
@@ -127,7 +134,14 @@ export function AuthenticatedEpisodeDetail({
       toast.success("Summary generated!", {
         description: "AI insights are now available for this episode",
       });
-    } else if (run.status === "FAILED" || run.status === "CANCELED" || run.status === "TIMED_OUT" || run.status === "SYSTEM_FAILURE" || run.status === "CRASHED" || run.status === "EXPIRED") {
+    } else if (
+      run.status === "FAILED" ||
+      run.status === "CANCELED" ||
+      run.status === "TIMED_OUT" ||
+      run.status === "SYSTEM_FAILURE" ||
+      run.status === "CRASHED" ||
+      run.status === "EXPIRED"
+    ) {
       setSummaryError("Summary generation failed. Please try again.");
       setIsLoadingSummary(false);
       setRunId(null);
@@ -145,7 +159,7 @@ export function AuthenticatedEpisodeDetail({
     try {
       // Fetch episode from PodcastIndex via API
       const response = await fetch(
-        `/api/episodes/${encodeURIComponent(episodeId)}`
+        `/api/episodes/${encodeURIComponent(episodeId)}`,
       );
       const data = await response.json();
 
@@ -163,14 +177,16 @@ export function AuthenticatedEpisodeDetail({
       void cacheEpisode(userId, episodeId, {
         episode: data.episode,
         podcast: data.podcast,
-        summary: data.summary ? {
-          summary: data.summary.summary,
-          keyTakeaways: data.summary.keyTakeaways || [],
-          worthItScore: data.summary.worthItScore,
-          worthItReason: data.summary.worthItReason,
-          worthItDimensions: data.summary.worthItDimensions ?? null,
-          cached: true,
-        } : null,
+        summary: data.summary
+          ? {
+              summary: data.summary.summary,
+              keyTakeaways: data.summary.keyTakeaways || [],
+              worthItScore: data.summary.worthItScore,
+              worthItReason: data.summary.worthItReason,
+              worthItDimensions: data.summary.worthItDimensions ?? null,
+              cached: true,
+            }
+          : null,
       });
 
       // Check if summary exists
@@ -189,7 +205,7 @@ export function AuthenticatedEpisodeDetail({
         if (canRunEpisodeProcessing) {
           try {
             const statusResponse = await fetch(
-              `/api/episodes/summarize?episodeId=${encodeURIComponent(episodeId)}`
+              `/api/episodes/summarize?episodeId=${encodeURIComponent(episodeId)}`,
             );
             const statusData = await statusResponse.json();
             if (
@@ -203,7 +219,7 @@ export function AuthenticatedEpisodeDetail({
             } else if (statusData.status === "failed") {
               setSummaryError(
                 statusData.processingError ||
-                  "Summary generation failed. Please try again."
+                  "Summary generation failed. Please try again.",
               );
               setIsLoadingSummary(false);
             }
@@ -226,7 +242,7 @@ export function AuthenticatedEpisodeDetail({
         return;
       }
       setEpisodeError(
-        error instanceof Error ? error.message : "Failed to load episode"
+        error instanceof Error ? error.message : "Failed to load episode",
       );
     } finally {
       setIsLoadingEpisode(false);
@@ -245,7 +261,9 @@ export function AuthenticatedEpisodeDetail({
       setSummaryData(cached.summary ?? null);
     } else {
       setSummaryData(null);
-      setEpisodeError("This episode hasn't been cached for offline viewing. Visit it while online first.");
+      setEpisodeError(
+        "This episode hasn't been cached for offline viewing. Visit it while online first.",
+      );
     }
 
     setIsLoadingEpisode(false);
@@ -268,12 +286,18 @@ export function AuthenticatedEpisodeDetail({
     let ignore = false;
     getEpisodeTopicOverlap(episodeId)
       .then((result) => {
-        if (!ignore) setOverlapResult({ label: result.label, labelKind: result.labelKind });
+        if (!ignore)
+          setOverlapResult({
+            label: result.label,
+            labelKind: result.labelKind,
+          });
       })
       .catch(() => {
         // Non-critical: overlap label is a presentation-only enhancement
       });
-    return () => { ignore = true; };
+    return () => {
+      ignore = true;
+    };
   }, [isOnline, episodeLoaded, episodeId]);
 
   // Generate summary — triggers a background task and subscribes to realtime updates
@@ -412,9 +436,12 @@ export function AuthenticatedEpisodeDetail({
 
   const artworkUrl = getEpisodeArtworkUrl(episode, podcast);
   const safeEpisodeLink = getSafeEpisodeLink(episode.link);
-  const categories = podcast?.categories ? Object.values(podcast.categories) : [];
+  const categories = podcast?.categories
+    ? Object.values(podcast.categories)
+    : [];
 
-  const isCurrentEpisode = playerState.currentEpisode?.id === String(episode.id);
+  const isCurrentEpisode =
+    playerState.currentEpisode?.id === String(episode.id);
   const isPlayingThis = isCurrentEpisode && playerState.isPlaying;
   const isPausedThis = isCurrentEpisode && !playerState.isPlaying;
 
@@ -529,10 +556,15 @@ export function AuthenticatedEpisodeDetail({
                   <TooltipTrigger asChild>
                     <button
                       type="button"
-                      className={cn("flex items-center gap-1", !transcriptSource && "text-muted-foreground/50")}
+                      className={cn(
+                        "flex items-center gap-1",
+                        !transcriptSource && "text-muted-foreground/50",
+                      )}
                     >
                       <FileText className="h-4 w-4" />
-                      <span>{transcriptSource ? "Transcript" : "No Transcript"}</span>
+                      <span>
+                        {transcriptSource ? "Transcript" : "No Transcript"}
+                      </span>
                     </button>
                   </TooltipTrigger>
                   <TooltipContent>
@@ -559,8 +591,14 @@ export function AuthenticatedEpisodeDetail({
           {/* Community Rating */}
           {isOnline && (
             <div>
-              <span className="mr-2 text-sm text-muted-foreground">Community Rating:</span>
-              <CommunityRating episodePodcastIndexId={episodeId} size="md" showCount={true} />
+              <span className="mr-2 text-sm text-muted-foreground">
+                Community Rating:
+              </span>
+              <CommunityRating
+                episodePodcastIndexId={episodeId}
+                size="md"
+                showCount={true}
+              />
             </div>
           )}
 
@@ -611,7 +649,9 @@ export function AuthenticatedEpisodeDetail({
                   description: episode.description,
                   audioUrl: episode.enclosureUrl,
                   duration: episode.duration,
-                  publishDate: episode.datePublished ? new Date(episode.datePublished * 1000) : undefined,
+                  publishDate: episode.datePublished
+                    ? new Date(episode.datePublished * 1000)
+                    : undefined,
                   podcast: {
                     podcastIndexId: String(podcast?.id || episode.feedId),
                     title: podcast?.title || "",
@@ -666,16 +706,16 @@ export function AuthenticatedEpisodeDetail({
       <div>
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-xl font-semibold">AI-Powered Insights</h2>
-          {isAdmin && canRunEpisodeProcessing && summaryData?.summary && isOnline && !isLoadingSummary && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={resummarize}
-            >
-              <RefreshCw className="mr-2 h-4 w-4" />
-              Re-summarize
-            </Button>
-          )}
+          {isAdmin &&
+            canRunEpisodeProcessing &&
+            summaryData?.summary &&
+            isOnline &&
+            !isLoadingSummary && (
+              <Button variant="outline" size="sm" onClick={resummarize}>
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Re-summarize
+              </Button>
+            )}
         </div>
         <SummaryDisplay
           summary={summaryData?.summary || null}

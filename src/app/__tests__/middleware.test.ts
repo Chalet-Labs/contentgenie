@@ -4,12 +4,17 @@ import { NextRequest, NextResponse } from "next/server";
 
 type MiddlewareCallback = (auth: unknown, req: NextRequest) => Promise<unknown>;
 
-function createClerkMock(userId: string | null, mockProtect?: ReturnType<typeof vi.fn>) {
+function createClerkMock(
+  userId: string | null,
+  mockProtect?: ReturnType<typeof vi.fn>,
+) {
   return {
     clerkMiddleware: (cb: MiddlewareCallback) => {
       return async (req: NextRequest) => {
         const protect = mockProtect ?? vi.fn();
-        const authFn = Object.assign(vi.fn().mockResolvedValue({ userId }), { protect });
+        const authFn = Object.assign(vi.fn().mockResolvedValue({ userId }), {
+          protect,
+        });
         return cb(authFn, req);
       };
     },
@@ -48,7 +53,7 @@ describe("middleware", () => {
 
     expect(response).toBeInstanceOf(NextResponse);
     expect((response as NextResponse).headers.get("location")).toBe(
-      "http://localhost:3000/dashboard"
+      "http://localhost:3000/dashboard",
     );
   });
 
@@ -61,7 +66,7 @@ describe("middleware", () => {
 
     if (response instanceof NextResponse) {
       expect(response.headers.get("location")).not.toBe(
-        "http://localhost:3000/dashboard"
+        "http://localhost:3000/dashboard",
       );
     }
   });
@@ -75,7 +80,7 @@ describe("middleware", () => {
 
     if (response instanceof NextResponse) {
       expect(response.headers.get("location")).not.toBe(
-        "http://localhost:3000/dashboard"
+        "http://localhost:3000/dashboard",
       );
     }
   });
@@ -118,7 +123,9 @@ describe("middleware", () => {
     vi.doMock("@clerk/nextjs/server", () => createClerkMock(null, mockProtect));
 
     const { default: middleware } = await import("@/middleware");
-    const req = new NextRequest("http://localhost:3000/episode/not-a-public-id");
+    const req = new NextRequest(
+      "http://localhost:3000/episode/not-a-public-id",
+    );
     await middleware(req, stubEvent);
 
     expect(mockProtect).toHaveBeenCalled();
@@ -168,9 +175,12 @@ describe("middleware", () => {
     vi.doMock("@clerk/nextjs/server", () => createClerkMock(null, mockProtect));
 
     const { default: middleware } = await import("@/middleware");
-    const req = new NextRequest("http://localhost:3000/api/episodes/summarize", {
-      method: "GET",
-    });
+    const req = new NextRequest(
+      "http://localhost:3000/api/episodes/summarize",
+      {
+        method: "GET",
+      },
+    );
     await middleware(req, stubEvent);
 
     expect(mockProtect).toHaveBeenCalled();

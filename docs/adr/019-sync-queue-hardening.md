@@ -44,6 +44,7 @@ Change `refreshQueue` to fetch all non-dequeued items (pending + in-flight), not
 ### 5. Stale in-flight recovery
 
 Add `resetStaleInFlight()` to `sync-queue.ts`: scans all items, resets any with `status === "in-flight"` back to `"pending"`. Call it:
+
 - In the SW `activate` handler (safe — fires once per SW lifecycle).
 - In the `SyncQueueProvider` initial mount effect.
 

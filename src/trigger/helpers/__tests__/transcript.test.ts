@@ -17,25 +17,25 @@ import { safeFetch } from "@/lib/security";
 describe("extractTranscriptUrl", () => {
   it("extracts URL after 'Transcript:' with newline", () => {
     expect(extractTranscriptUrl("Transcript:\nhttps://example.com/t")).toBe(
-      "https://example.com/t"
+      "https://example.com/t",
     );
   });
 
   it("extracts URL after 'Full transcript:'", () => {
     expect(extractTranscriptUrl("Full transcript: https://example.com/t")).toBe(
-      "https://example.com/t"
+      "https://example.com/t",
     );
   });
 
   it("extracts URL after 'Transcript available:'", () => {
     expect(
-      extractTranscriptUrl("Transcript available: https://example.com/t")
+      extractTranscriptUrl("Transcript available: https://example.com/t"),
     ).toBe("https://example.com/t");
   });
 
   it("extracts URL with plural 'Transcripts:'", () => {
     expect(extractTranscriptUrl("Transcripts: https://example.com/t")).toBe(
-      "https://example.com/t"
+      "https://example.com/t",
     );
   });
 
@@ -75,13 +75,13 @@ describe("fetchTranscriptFromUrl", () => {
     expect(result).toBe("This is transcript text.");
     expect(safeFetch).toHaveBeenCalledWith(
       "https://example.com/t",
-      expect.objectContaining({ signal: expect.any(AbortSignal) })
+      expect.objectContaining({ signal: expect.any(AbortSignal) }),
     );
   });
 
   it("strips HTML tags from HTML response", async () => {
     vi.mocked(safeFetch).mockResolvedValue(
-      "<!DOCTYPE html><html><body><p>Hello world</p></body></html>"
+      "<!DOCTYPE html><html><body><p>Hello world</p></body></html>",
     );
 
     const result = await fetchTranscriptFromUrl("https://example.com/t");
@@ -104,9 +104,9 @@ describe("fetchTranscriptFromUrl", () => {
   it("throws on fetch error", async () => {
     vi.mocked(safeFetch).mockRejectedValue(new Error("Network error"));
 
-    await expect(fetchTranscriptFromUrl("https://example.com/t")).rejects.toThrow(
-      "Network error"
-    );
+    await expect(
+      fetchTranscriptFromUrl("https://example.com/t"),
+    ).rejects.toThrow("Network error");
   });
 
   it("returns undefined for empty response", async () => {
@@ -331,7 +331,8 @@ describe("stripHtmlTranscript", () => {
   });
 
   it("handles script/style end tags with whitespace before >", () => {
-    const html = "<script>malicious()</script ><style>h1{}</style ><p>Content</p>";
+    const html =
+      "<script>malicious()</script ><style>h1{}</style ><p>Content</p>";
     const result = stripHtmlTranscript(html);
     expect(result).not.toContain("malicious");
     expect(result).not.toContain("h1{}");
@@ -438,7 +439,9 @@ describe("fetchTranscript", () => {
 
   it("returns undefined when no supported transcript type", async () => {
     const result = await fetchTranscript({
-      transcripts: [{ type: "audio/mpeg", url: "https://example.com/audio.mp3" }],
+      transcripts: [
+        { type: "audio/mpeg", url: "https://example.com/audio.mp3" },
+      ],
     });
     expect(result).toBeUndefined();
     expect(safeFetch).not.toHaveBeenCalled();
@@ -455,7 +458,7 @@ describe("fetchTranscript", () => {
     });
     expect(safeFetch).toHaveBeenCalledWith(
       "https://example.com/t.txt",
-      expect.anything()
+      expect.anything(),
     );
     expect(result).toBe("Plain text content");
   });
@@ -473,7 +476,7 @@ VTT speech`);
     });
     expect(safeFetch).toHaveBeenCalledWith(
       "https://example.com/t.vtt",
-      expect.anything()
+      expect.anything(),
     );
     expect(result).toBe("VTT speech");
     expect(result).not.toContain("WEBVTT");
@@ -486,7 +489,7 @@ VTT speech`);
     });
     expect(safeFetch).toHaveBeenCalledWith(
       "https://example.com/t.html",
-      expect.anything()
+      expect.anything(),
     );
     expect(result).toContain("HTML transcript");
     expect(result).not.toContain("<p>");
@@ -506,7 +509,7 @@ VTT speech`);
 
   it("applies HTML normalization when fetching text/html", async () => {
     vi.mocked(safeFetch).mockResolvedValue(
-      "<html><body><script>bad()</script><p>Clean text &amp; more</p></body></html>"
+      "<html><body><script>bad()</script><p>Clean text &amp; more</p></body></html>",
     );
     const result = await fetchTranscript({
       transcripts: [{ type: "text/html", url: "https://example.com/t.html" }],
@@ -537,7 +540,9 @@ VTT speech`);
   });
 
   it("prefers application/srt over text/vtt", async () => {
-    vi.mocked(safeFetch).mockResolvedValue("1\n00:00:01,000 --> 00:00:04,000\nSRT content");
+    vi.mocked(safeFetch).mockResolvedValue(
+      "1\n00:00:01,000 --> 00:00:04,000\nSRT content",
+    );
     const result = await fetchTranscript({
       transcripts: [
         { type: "text/vtt", url: "https://example.com/t.vtt" },
@@ -546,20 +551,25 @@ VTT speech`);
     });
     expect(safeFetch).toHaveBeenCalledWith(
       "https://example.com/t.srt",
-      expect.anything()
+      expect.anything(),
     );
     expect(result).toContain("SRT content");
   });
 
   it("logs warning when normalization produces empty output from non-empty content", async () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    vi.mocked(safeFetch).mockResolvedValue("WEBVTT\n\n00:00:01.000 --> 00:00:04.000\n\n");
+    vi.mocked(safeFetch).mockResolvedValue(
+      "WEBVTT\n\n00:00:01.000 --> 00:00:04.000\n\n",
+    );
     await fetchTranscript({
       transcripts: [{ type: "text/vtt", url: "https://example.com/t.vtt" }],
     });
     expect(warnSpy).toHaveBeenCalledWith(
       "[fetchTranscript] Normalization produced empty output",
-      expect.objectContaining({ type: "text/vtt", url: "https://example.com/t.vtt" })
+      expect.objectContaining({
+        type: "text/vtt",
+        url: "https://example.com/t.vtt",
+      }),
     );
     warnSpy.mockRestore();
   });

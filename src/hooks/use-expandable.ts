@@ -10,7 +10,10 @@ export interface UseExpandableResult<T> {
   toggle: () => void;
 }
 
-export function useExpandable<T>(items: T[], initial: number): UseExpandableResult<T> {
+export function useExpandable<T>(
+  items: T[],
+  initial: number,
+): UseExpandableResult<T> {
   const [expanded, setExpanded] = useState(false);
   const visible = items.slice(0, expanded ? undefined : initial);
   const shouldShowToggle = items.length > initial;

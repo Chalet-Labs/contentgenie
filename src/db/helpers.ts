@@ -69,7 +69,7 @@ interface UpsertPodcastOptions {
  */
 export async function upsertPodcast(
   data: UpsertPodcastData,
-  options?: UpsertPodcastOptions
+  options?: UpsertPodcastOptions,
 ): Promise<number> {
   const podcastIndexId = data.podcastIndexId.trim();
   const title = data.title.trim();
@@ -129,7 +129,7 @@ export async function upsertPodcast(
 
   const set = {
     ...Object.fromEntries(
-      Object.entries(updateFields).filter(([, v]) => v != null)
+      Object.entries(updateFields).filter(([, v]) => v != null),
     ),
     updatedAt: new Date(),
   };

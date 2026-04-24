@@ -41,9 +41,7 @@ describe("ShareButton", () => {
 
   it("renders the Share trigger button", () => {
     render(<ShareButton {...defaultProps} />);
-    expect(
-      screen.getByRole("button", { name: /share/i })
-    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /share/i })).toBeInTheDocument();
   });
 
   it("shows Copy link option in dropdown", async () => {
@@ -75,7 +73,9 @@ describe("ShareButton", () => {
     await user.click(screen.getByRole("button", { name: /share/i }));
     // Scope to menuitems to avoid matching the trigger button which also says "Share"
     const menuItems = screen.getAllByRole("menuitem");
-    expect(menuItems.some((item) => item.textContent?.includes("Share"))).toBe(true);
+    expect(menuItems.some((item) => item.textContent?.includes("Share"))).toBe(
+      true,
+    );
     expect(screen.getByText("Copy link")).toBeInTheDocument();
   });
 
@@ -89,7 +89,7 @@ describe("ShareButton", () => {
   it("shows Copy with summary when summary prop is provided", async () => {
     const user = userEvent.setup();
     render(
-      <ShareButton {...defaultProps} summary="Great insights on AI trends" />
+      <ShareButton {...defaultProps} summary="Great insights on AI trends" />,
     );
     await user.click(screen.getByRole("button", { name: /share/i }));
     expect(screen.getByText("Copy with summary")).toBeInTheDocument();
@@ -98,7 +98,7 @@ describe("ShareButton", () => {
   it("copies only URL when Copy link is clicked", async () => {
     const writeTextMock = vi.fn().mockResolvedValue(undefined);
     vi.spyOn(navigator.clipboard, "writeText").mockImplementation(
-      writeTextMock
+      writeTextMock,
     );
 
     const { toast } = await import("sonner");
@@ -117,7 +117,7 @@ describe("ShareButton", () => {
     const summary = "Great insights on AI trends";
     const writeTextMock = vi.fn().mockResolvedValue(undefined);
     vi.spyOn(navigator.clipboard, "writeText").mockImplementation(
-      writeTextMock
+      writeTextMock,
     );
 
     const { toast } = await import("sonner");
@@ -128,7 +128,7 @@ describe("ShareButton", () => {
 
     await waitFor(() => {
       expect(writeTextMock).toHaveBeenCalledWith(
-        `${defaultProps.title}\n\n${summary}\n\n${defaultProps.url}`
+        `${defaultProps.title}\n\n${summary}\n\n${defaultProps.url}`,
       );
       expect(toast.success).toHaveBeenCalledWith("Copied to clipboard");
     });
@@ -156,7 +156,7 @@ describe("ShareButton", () => {
     // Click the "Share" menu item (the native share one)
     const menuItems = screen.getAllByRole("menuitem");
     const shareItem = menuItems.find((item) =>
-      item.textContent?.includes("Share")
+      item.textContent?.includes("Share"),
     );
     await user.click(shareItem!);
 
@@ -190,7 +190,7 @@ describe("ShareButton", () => {
 
     const menuItems = screen.getAllByRole("menuitem");
     const shareItem = menuItems.find((item) =>
-      item.textContent?.includes("Share")
+      item.textContent?.includes("Share"),
     );
     await user.click(shareItem!);
 
@@ -225,7 +225,7 @@ describe("ShareButton", () => {
 
     const menuItems = screen.getAllByRole("menuitem");
     const shareItem = menuItems.find((item) =>
-      item.textContent?.includes("Share")
+      item.textContent?.includes("Share"),
     );
     await user.click(shareItem!);
 
@@ -239,7 +239,7 @@ describe("ShareButton", () => {
 
   it("shows toast with URL when clipboard write fails on Copy link", async () => {
     vi.spyOn(navigator.clipboard, "writeText").mockRejectedValue(
-      new Error("Clipboard denied")
+      new Error("Clipboard denied"),
     );
 
     const { toast } = await import("sonner");

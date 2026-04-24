@@ -63,7 +63,7 @@ describe("NotificationBell", () => {
     mockGetUnreadCount.mockReturnValue(new Promise(() => {}));
     render(<NotificationBell />);
     expect(
-      screen.getByRole("button", { name: /notifications/i })
+      screen.getByRole("button", { name: /notifications/i }),
     ).toBeInTheDocument();
   });
 
@@ -132,7 +132,9 @@ describe("NotificationBell", () => {
   });
 
   it("(f) getNotificationSummary error shows Retry path, logs the error, and does NOT call markAllNotificationsRead", async () => {
-    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
     mockGetUnreadCount.mockResolvedValue(2);
     const fetchError = new Error("fetch failed");
     mockGetNotificationSummary.mockRejectedValue(fetchError);
@@ -145,13 +147,13 @@ describe("NotificationBell", () => {
     await flushMicrotasks();
 
     expect(
-      screen.getByText(/couldn't load notifications/i)
+      screen.getByText(/couldn't load notifications/i),
     ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /retry/i })).toBeInTheDocument();
     // Error must be logged, not swallowed — bare catch {} was a debugging blackhole.
     expect(consoleError).toHaveBeenCalledWith(
       "Failed to fetch notification summary:",
-      fetchError
+      fetchError,
     );
     // Don't advance the "since last visit" boundary over notifications the
     // user never saw when the summary fetch failed.
@@ -208,7 +210,9 @@ describe("NotificationBell", () => {
   });
 
   it("(g3) badge optimistically drops to 0 when popover opens, reverts and logs on mark-read failure", async () => {
-    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
     mockGetUnreadCount.mockResolvedValue(5);
     mockGetNotificationSummary.mockResolvedValue(defaultSummary);
     mockMarkAllNotificationsRead.mockResolvedValue({
@@ -229,7 +233,7 @@ describe("NotificationBell", () => {
     // Structured failures must surface — a silent revert hides session/DB issues.
     expect(consoleError).toHaveBeenCalledWith(
       "markAllNotificationsRead failed:",
-      "DB down"
+      "DB down",
     );
     consoleError.mockRestore();
   });
@@ -253,7 +257,9 @@ describe("NotificationBell", () => {
   });
 
   it("(g5) badge reverts when markAllNotificationsRead throws", async () => {
-    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
     mockGetUnreadCount.mockResolvedValue(4);
     mockGetNotificationSummary.mockResolvedValue(defaultSummary);
     mockMarkAllNotificationsRead.mockRejectedValue(new Error("boom"));
@@ -269,13 +275,15 @@ describe("NotificationBell", () => {
     expect(screen.getByText("4")).toBeInTheDocument();
     expect(consoleError).toHaveBeenCalledWith(
       "Failed to mark all notifications as read:",
-      expect.any(Error)
+      expect.any(Error),
     );
     consoleError.mockRestore();
   });
 
   it("(g6) stale mark-read rejection does not clobber a later successful mark", async () => {
-    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
     mockGetUnreadCount.mockResolvedValue(5);
     mockGetNotificationSummary.mockResolvedValue(defaultSummary);
 
@@ -297,7 +305,9 @@ describe("NotificationBell", () => {
       fireEvent.click(btn);
     });
     await act(async () => {
-      fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });
+      fireEvent.keyDown(document.activeElement ?? document.body, {
+        key: "Escape",
+      });
     });
     await act(async () => {
       fireEvent.click(btn);
@@ -334,7 +344,9 @@ describe("NotificationBell", () => {
       fireEvent.click(btn);
     });
     await act(async () => {
-      fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });
+      fireEvent.keyDown(document.activeElement ?? document.body, {
+        key: "Escape",
+      });
     });
 
     // Only now does the slow fetch resolve. The mark-read step must NOT fire.
@@ -349,7 +361,9 @@ describe("NotificationBell", () => {
   });
 
   it("(g8) Retry after an initial fetch failure also runs mark-read", async () => {
-    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
     mockGetUnreadCount.mockResolvedValue(3);
     // First fetch fails, retry succeeds.
     mockGetNotificationSummary
@@ -404,7 +418,9 @@ describe("NotificationBell", () => {
   });
 
   it("(i) badge stays at last-known count when getUnreadCount rejects on subsequent poll", async () => {
-    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
 
     mockGetUnreadCount.mockResolvedValueOnce(5);
     render(<NotificationBell />);
@@ -437,12 +453,14 @@ describe("NotificationBell", () => {
 
     const button = screen.getByRole("button", { name: /notifications/i });
     expect(button.getAttribute("title")).toMatch(
-      /^Notifications · Updated (just now|\d+[mhd] ago|\d+\/\d+\/\d+)$/
+      /^Notifications · Updated (just now|\d+[mhd] ago|\d+\/\d+\/\d+)$/,
     );
   });
 
   it("does not render a badge when the first fetch fails before any success", async () => {
-    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {});
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
 
     mockGetUnreadCount.mockRejectedValueOnce(new Error("DB down"));
     render(<NotificationBell />);
@@ -462,7 +480,12 @@ describe("NotificationBell", () => {
     const firstSummary: typeof defaultSummary = {
       totalUnread: 1,
       groups: [
-        { kind: "episodes_by_podcast", podcastId: 1, podcastTitle: "Stale Pod", count: 1 },
+        {
+          kind: "episodes_by_podcast",
+          podcastId: 1,
+          podcastTitle: "Stale Pod",
+          count: 1,
+        },
       ],
     };
     const firstFetch = new Promise<typeof defaultSummary>((resolve) => {
@@ -474,7 +497,12 @@ describe("NotificationBell", () => {
     const freshSummary: typeof defaultSummary = {
       totalUnread: 2,
       groups: [
-        { kind: "episodes_by_podcast", podcastId: 2, podcastTitle: "Fresh Pod", count: 2 },
+        {
+          kind: "episodes_by_podcast",
+          podcastId: 2,
+          podcastTitle: "Fresh Pod",
+          count: 2,
+        },
       ],
     };
     mockGetNotificationSummary.mockResolvedValueOnce(freshSummary);
@@ -489,7 +517,9 @@ describe("NotificationBell", () => {
       fireEvent.click(btn);
     });
     await act(async () => {
-      fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });
+      fireEvent.keyDown(document.activeElement ?? document.body, {
+        key: "Escape",
+      });
     });
     await act(async () => {
       fireEvent.click(btn);
@@ -498,7 +528,7 @@ describe("NotificationBell", () => {
 
     // The fresh fetch has resolved — popover now shows Fresh Pod.
     expect(
-      screen.getByRole("link", { name: /from fresh pod/i })
+      screen.getByRole("link", { name: /from fresh pod/i }),
     ).toBeInTheDocument();
 
     // NOW the slow first fetch finally resolves. It must not clobber the fresh state.
@@ -508,10 +538,10 @@ describe("NotificationBell", () => {
     await flushMicrotasks();
 
     expect(
-      screen.getByRole("link", { name: /from fresh pod/i })
+      screen.getByRole("link", { name: /from fresh pod/i }),
     ).toBeInTheDocument();
     expect(
-      screen.queryByRole("link", { name: /from stale pod/i })
+      screen.queryByRole("link", { name: /from stale pod/i }),
     ).not.toBeInTheDocument();
   });
 });

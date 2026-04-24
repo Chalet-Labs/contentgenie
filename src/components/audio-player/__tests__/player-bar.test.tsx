@@ -1,7 +1,10 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
-import { render, screen, fireEvent, act } from "@testing-library/react"
-import userEvent from "@testing-library/user-event"
-import { PlayerBar, SKIP_FLASH_DURATION_MS } from "@/components/audio-player/player-bar"
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { render, screen, fireEvent, act } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import {
+  PlayerBar,
+  SKIP_FLASH_DURATION_MS,
+} from "@/components/audio-player/player-bar";
 
 // Radix Slider uses ResizeObserver which jsdom doesn't provide
 class MockResizeObserver {
@@ -9,7 +12,8 @@ class MockResizeObserver {
   unobserve() {}
   disconnect() {}
 }
-globalThis.ResizeObserver = MockResizeObserver as unknown as typeof ResizeObserver
+globalThis.ResizeObserver =
+  MockResizeObserver as unknown as typeof ResizeObserver;
 
 // jsdom doesn't provide matchMedia — stub it for the useMediaQuery hook
 Object.defineProperty(window, "matchMedia", {
@@ -24,17 +28,17 @@ Object.defineProperty(window, "matchMedia", {
     removeEventListener: vi.fn(),
     dispatchEvent: vi.fn(),
   })),
-})
+});
 
 // --- Mock the context hooks ---
 const mockState = {
   currentEpisode: null as {
-    id: string
-    title: string
-    podcastTitle: string
-    audioUrl: string
-    artwork?: string
-    duration?: number
+    id: string;
+    title: string;
+    podcastTitle: string;
+    audioUrl: string;
+    artwork?: string;
+    duration?: number;
   } | null,
   isPlaying: false,
   isBuffering: false,
@@ -44,14 +48,23 @@ const mockState = {
   playbackSpeed: 1,
   hasError: false,
   errorMessage: null as string | null,
-  queue: [] as { id: string; title: string; podcastTitle: string; audioUrl: string; artwork?: string; duration?: number }[],
-  chapters: null as { startTime: number; title: string; img?: string; url?: string }[] | null,
+  queue: [] as {
+    id: string;
+    title: string;
+    podcastTitle: string;
+    audioUrl: string;
+    artwork?: string;
+    duration?: number;
+  }[],
+  chapters: null as
+    | { startTime: number; title: string; img?: string; url?: string }[]
+    | null,
   chaptersLoading: false,
   sleepTimer: null as {
-    endTime: number | null
-    type: "duration" | "end-of-episode"
+    endTime: number | null;
+    type: "duration" | "end-of-episode";
   } | null,
-}
+};
 
 const mockAPI = {
   playEpisode: vi.fn(),
@@ -70,35 +83,37 @@ const mockAPI = {
   playNext: vi.fn(),
   setSleepTimer: vi.fn(),
   cancelSleepTimer: vi.fn(),
-}
+};
 
 const mockProgress = {
   currentTime: 45,
   buffered: 120,
-}
+};
 
 vi.mock("@/contexts/audio-player-context", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/contexts/audio-player-context")>()
+  const actual =
+    await importOriginal<typeof import("@/contexts/audio-player-context")>();
   return {
     ...actual,
     useAudioPlayerState: () => mockState,
     useAudioPlayerAPI: () => mockAPI,
     useAudioPlayerProgress: () => mockProgress,
-  }
-})
+  };
+});
 
 const mockChapterResult: {
-  chapter: { startTime: number; title: string } | null
-  index: number
-} = { chapter: null, index: -1 }
+  chapter: { startTime: number; title: string } | null;
+  index: number;
+} = { chapter: null, index: -1 };
 
 vi.mock("@/hooks/use-current-chapter", async (importOriginal) => {
-  const actual = await importOriginal<typeof import("@/hooks/use-current-chapter")>()
+  const actual =
+    await importOriginal<typeof import("@/hooks/use-current-chapter")>();
   return {
     ...actual,
     useCurrentChapter: () => mockChapterResult,
-  }
-})
+  };
+});
 
 const testEpisode = {
   id: "ep-1",
@@ -107,11 +122,11 @@ const testEpisode = {
   audioUrl: "https://example.com/audio.mp3",
   artwork: "https://example.com/art.jpg",
   duration: 300,
-}
+};
 
 describe("PlayerBar", () => {
   beforeEach(() => {
-    vi.clearAllMocks()
+    vi.clearAllMocks();
     Object.assign(mockState, {
       currentEpisode: null,
       isPlaying: false,
@@ -126,261 +141,278 @@ describe("PlayerBar", () => {
       chapters: null,
       chaptersLoading: false,
       sleepTimer: null,
-    })
-    Object.assign(mockProgress, { currentTime: 45, buffered: 120 })
-    Object.assign(mockChapterResult, { chapter: null, index: -1 })
-  })
+    });
+    Object.assign(mockProgress, { currentTime: 45, buffered: 120 });
+    Object.assign(mockChapterResult, { chapter: null, index: -1 });
+  });
 
   afterEach(() => {
-    vi.restoreAllMocks()
-  })
+    vi.restoreAllMocks();
+  });
 
   it("renders nothing when not visible", () => {
-    const { container } = render(<PlayerBar />)
-    expect(container.innerHTML).toBe("")
-  })
+    const { container } = render(<PlayerBar />);
+    expect(container.innerHTML).toBe("");
+  });
 
   it("renders nothing when no episode loaded", () => {
-    mockState.isVisible = true
-    const { container } = render(<PlayerBar />)
-    expect(container.innerHTML).toBe("")
-  })
+    mockState.isVisible = true;
+    const { container } = render(<PlayerBar />);
+    expect(container.innerHTML).toBe("");
+  });
 
   it("renders player bar when visible with episode", () => {
-    mockState.isVisible = true
-    mockState.currentEpisode = testEpisode
-    render(<PlayerBar />)
+    mockState.isVisible = true;
+    mockState.currentEpisode = testEpisode;
+    render(<PlayerBar />);
 
-    expect(screen.getByRole("region", { name: "Audio player" })).toBeInTheDocument()
-    expect(screen.getAllByText(testEpisode.title).length).toBeGreaterThan(0)
-    expect(screen.getAllByText(testEpisode.podcastTitle).length).toBeGreaterThan(0)
-  })
+    expect(
+      screen.getByRole("region", { name: "Audio player" }),
+    ).toBeInTheDocument();
+    expect(screen.getAllByText(testEpisode.title).length).toBeGreaterThan(0);
+    expect(
+      screen.getAllByText(testEpisode.podcastTitle).length,
+    ).toBeGreaterThan(0);
+  });
 
   it("shows play button when paused", () => {
-    mockState.isVisible = true
-    mockState.currentEpisode = testEpisode
-    mockState.isPlaying = false
-    render(<PlayerBar />)
+    mockState.isVisible = true;
+    mockState.currentEpisode = testEpisode;
+    mockState.isPlaying = false;
+    render(<PlayerBar />);
 
-    const playButtons = screen.getAllByRole("button", { name: "Play" })
-    expect(playButtons.length).toBeGreaterThan(0)
-  })
+    const playButtons = screen.getAllByRole("button", { name: "Play" });
+    expect(playButtons.length).toBeGreaterThan(0);
+  });
 
   it("shows pause button when playing", () => {
-    mockState.isVisible = true
-    mockState.currentEpisode = testEpisode
-    mockState.isPlaying = true
-    render(<PlayerBar />)
+    mockState.isVisible = true;
+    mockState.currentEpisode = testEpisode;
+    mockState.isPlaying = true;
+    render(<PlayerBar />);
 
-    const pauseButtons = screen.getAllByRole("button", { name: "Pause" })
-    expect(pauseButtons.length).toBeGreaterThan(0)
-  })
+    const pauseButtons = screen.getAllByRole("button", { name: "Pause" });
+    expect(pauseButtons.length).toBeGreaterThan(0);
+  });
 
   it("calls togglePlay when play/pause is clicked", async () => {
-    const user = userEvent.setup()
-    mockState.isVisible = true
-    mockState.currentEpisode = testEpisode
-    render(<PlayerBar />)
+    const user = userEvent.setup();
+    mockState.isVisible = true;
+    mockState.currentEpisode = testEpisode;
+    render(<PlayerBar />);
 
-    const playButtons = screen.getAllByRole("button", { name: "Play" })
-    await user.click(playButtons[0])
-    expect(mockAPI.togglePlay).toHaveBeenCalled()
-  })
+    const playButtons = screen.getAllByRole("button", { name: "Play" });
+    await user.click(playButtons[0]);
+    expect(mockAPI.togglePlay).toHaveBeenCalled();
+  });
 
   it("calls skipBack when skip back is clicked", async () => {
-    const user = userEvent.setup()
-    mockState.isVisible = true
-    mockState.currentEpisode = testEpisode
-    render(<PlayerBar />)
+    const user = userEvent.setup();
+    mockState.isVisible = true;
+    mockState.currentEpisode = testEpisode;
+    render(<PlayerBar />);
 
-    const skipBackButtons = screen.getAllByRole("button", { name: "Skip back 10 seconds" })
-    await user.click(skipBackButtons[0])
-    expect(mockAPI.skipBack).toHaveBeenCalled()
-  })
+    const skipBackButtons = screen.getAllByRole("button", {
+      name: "Skip back 10 seconds",
+    });
+    await user.click(skipBackButtons[0]);
+    expect(mockAPI.skipBack).toHaveBeenCalled();
+  });
 
   it("calls skipForward when skip forward is clicked", async () => {
-    const user = userEvent.setup()
-    mockState.isVisible = true
-    mockState.currentEpisode = testEpisode
-    render(<PlayerBar />)
+    const user = userEvent.setup();
+    mockState.isVisible = true;
+    mockState.currentEpisode = testEpisode;
+    render(<PlayerBar />);
 
-    const skipForwardButtons = screen.getAllByRole("button", { name: "Skip forward 30 seconds" })
-    await user.click(skipForwardButtons[0])
-    expect(mockAPI.skipForward).toHaveBeenCalled()
-  })
+    const skipForwardButtons = screen.getAllByRole("button", {
+      name: "Skip forward 30 seconds",
+    });
+    await user.click(skipForwardButtons[0]);
+    expect(mockAPI.skipForward).toHaveBeenCalled();
+  });
 
   it("calls closePlayer when close is clicked", async () => {
-    const user = userEvent.setup()
-    mockState.isVisible = true
-    mockState.currentEpisode = testEpisode
-    render(<PlayerBar />)
+    const user = userEvent.setup();
+    mockState.isVisible = true;
+    mockState.currentEpisode = testEpisode;
+    render(<PlayerBar />);
 
-    const closeButtons = screen.getAllByRole("button", { name: "Close player" })
-    await user.click(closeButtons[0])
-    expect(mockAPI.closePlayer).toHaveBeenCalled()
-  })
+    const closeButtons = screen.getAllByRole("button", {
+      name: "Close player",
+    });
+    await user.click(closeButtons[0]);
+    expect(mockAPI.closePlayer).toHaveBeenCalled();
+  });
 
   it("has aria-label on the player region", () => {
-    mockState.isVisible = true
-    mockState.currentEpisode = testEpisode
-    render(<PlayerBar />)
+    mockState.isVisible = true;
+    mockState.currentEpisode = testEpisode;
+    render(<PlayerBar />);
 
-    expect(screen.getByRole("region")).toHaveAttribute("aria-label", "Audio player")
-  })
+    expect(screen.getByRole("region")).toHaveAttribute(
+      "aria-label",
+      "Audio player",
+    );
+  });
 
   it("renders episode links correctly in both desktop and mobile layouts", () => {
-    mockState.isVisible = true
-    mockState.currentEpisode = testEpisode
-    render(<PlayerBar />)
+    mockState.isVisible = true;
+    mockState.currentEpisode = testEpisode;
+    render(<PlayerBar />);
 
     const links = screen.getAllByRole("link", {
       name: `View episode: ${testEpisode.title} - ${testEpisode.podcastTitle}`,
-    })
+    });
 
-    expect(links).toHaveLength(2)
+    expect(links).toHaveLength(2);
     links.forEach((link) => {
-      expect(link).toHaveAttribute("href", `/episode/${testEpisode.id}`)
+      expect(link).toHaveAttribute("href", `/episode/${testEpisode.id}`);
       expect(link).toHaveAttribute(
         "aria-label",
-        `View episode: ${testEpisode.title} - ${testEpisode.podcastTitle}`
-      )
-    })
-  })
+        `View episode: ${testEpisode.title} - ${testEpisode.podcastTitle}`,
+      );
+    });
+  });
 
   it("shows title attribute for long episode titles", () => {
-    mockState.isVisible = true
+    mockState.isVisible = true;
     mockState.currentEpisode = {
       ...testEpisode,
       title: "A Very Long Episode Title That Should Be Truncated In The UI",
-    }
-    render(<PlayerBar />)
+    };
+    render(<PlayerBar />);
 
     const titleElements = screen.getAllByTitle(
-      "A Very Long Episode Title That Should Be Truncated In The UI"
-    )
-    expect(titleElements.length).toBeGreaterThan(0)
-  })
+      "A Very Long Episode Title That Should Be Truncated In The UI",
+    );
+    expect(titleElements.length).toBeGreaterThan(0);
+  });
 
   it("hides chapters button when no chapters", () => {
-    mockState.isVisible = true
-    mockState.currentEpisode = testEpisode
-    mockState.chapters = null
-    render(<PlayerBar />)
+    mockState.isVisible = true;
+    mockState.currentEpisode = testEpisode;
+    mockState.chapters = null;
+    render(<PlayerBar />);
 
-    expect(screen.queryByRole("button", { name: "Chapters" })).not.toBeInTheDocument()
-  })
+    expect(
+      screen.queryByRole("button", { name: "Chapters" }),
+    ).not.toBeInTheDocument();
+  });
 
   it("shows sleep timer button when player is visible", () => {
-    mockState.isVisible = true
-    mockState.currentEpisode = testEpisode
-    render(<PlayerBar />)
+    mockState.isVisible = true;
+    mockState.currentEpisode = testEpisode;
+    render(<PlayerBar />);
 
-    const sleepTimerButtons = screen.getAllByRole("button", { name: "Sleep timer" })
-    expect(sleepTimerButtons.length).toBeGreaterThan(0)
-  })
+    const sleepTimerButtons = screen.getAllByRole("button", {
+      name: "Sleep timer",
+    });
+    expect(sleepTimerButtons.length).toBeGreaterThan(0);
+  });
 
   it("shows chapters button when chapters are available", () => {
-    mockState.isVisible = true
-    mockState.currentEpisode = testEpisode
+    mockState.isVisible = true;
+    mockState.currentEpisode = testEpisode;
     mockState.chapters = [
       { startTime: 0, title: "Intro" },
       { startTime: 60, title: "Main" },
-    ]
-    render(<PlayerBar />)
+    ];
+    render(<PlayerBar />);
 
-    const chaptersButtons = screen.getAllByRole("button", { name: "Chapters" })
-    expect(chaptersButtons.length).toBeGreaterThan(0)
-  })
+    const chaptersButtons = screen.getAllByRole("button", { name: "Chapters" });
+    expect(chaptersButtons.length).toBeGreaterThan(0);
+  });
 
   describe("Previous chapter (iPod-style restart threshold)", () => {
     const chapters = [
       { startTime: 0, title: "Intro" },
       { startTime: 60, title: "Main" },
       { startTime: 180, title: "Outro" },
-    ]
+    ];
 
     it("jumps to the previous chapter when pressed < 3s into current chapter", async () => {
-      const user = userEvent.setup()
-      mockState.isVisible = true
-      mockState.currentEpisode = testEpisode
-      mockState.chapters = chapters
-      mockProgress.currentTime = 61
-      Object.assign(mockChapterResult, { chapter: chapters[1], index: 1 })
-      render(<PlayerBar />)
+      const user = userEvent.setup();
+      mockState.isVisible = true;
+      mockState.currentEpisode = testEpisode;
+      mockState.chapters = chapters;
+      mockProgress.currentTime = 61;
+      Object.assign(mockChapterResult, { chapter: chapters[1], index: 1 });
+      render(<PlayerBar />);
 
-      const prev = screen.getByRole("button", { name: "Previous chapter" })
-      await user.click(prev)
-      expect(mockAPI.seek).toHaveBeenCalledWith(0)
-    })
+      const prev = screen.getByRole("button", { name: "Previous chapter" });
+      await user.click(prev);
+      expect(mockAPI.seek).toHaveBeenCalledWith(0);
+    });
 
     it("restarts the current chapter when pressed ≥ 3s in", async () => {
-      const user = userEvent.setup()
-      mockState.isVisible = true
-      mockState.currentEpisode = testEpisode
-      mockState.chapters = chapters
-      mockProgress.currentTime = 75
-      Object.assign(mockChapterResult, { chapter: chapters[1], index: 1 })
-      render(<PlayerBar />)
+      const user = userEvent.setup();
+      mockState.isVisible = true;
+      mockState.currentEpisode = testEpisode;
+      mockState.chapters = chapters;
+      mockProgress.currentTime = 75;
+      Object.assign(mockChapterResult, { chapter: chapters[1], index: 1 });
+      render(<PlayerBar />);
 
-      const prev = screen.getByRole("button", { name: "Previous chapter" })
-      await user.click(prev)
-      expect(mockAPI.seek).toHaveBeenCalledWith(60)
-    })
+      const prev = screen.getByRole("button", { name: "Previous chapter" });
+      await user.click(prev);
+      expect(mockAPI.seek).toHaveBeenCalledWith(60);
+    });
 
     it("restarts the first chapter when ≥ 3s in with no earlier chapter", async () => {
-      const user = userEvent.setup()
-      mockState.isVisible = true
-      mockState.currentEpisode = testEpisode
-      mockState.chapters = chapters
-      mockProgress.currentTime = 30
-      Object.assign(mockChapterResult, { chapter: chapters[0], index: 0 })
-      render(<PlayerBar />)
+      const user = userEvent.setup();
+      mockState.isVisible = true;
+      mockState.currentEpisode = testEpisode;
+      mockState.chapters = chapters;
+      mockProgress.currentTime = 30;
+      Object.assign(mockChapterResult, { chapter: chapters[0], index: 0 });
+      render(<PlayerBar />);
 
-      const prev = screen.getByRole("button", { name: "Previous chapter" })
-      await user.click(prev)
-      expect(mockAPI.seek).toHaveBeenCalledWith(0)
-    })
-  })
+      const prev = screen.getByRole("button", { name: "Previous chapter" });
+      await user.click(prev);
+      expect(mockAPI.seek).toHaveBeenCalledWith(0);
+    });
+  });
 
   describe("Next chapter / next episode", () => {
     const chapters = [
       { startTime: 0, title: "Intro" },
       { startTime: 60, title: "Main" },
       { startTime: 180, title: "Outro" },
-    ]
+    ];
 
     it("advances to the next chapter when one exists", async () => {
-      const user = userEvent.setup()
-      mockState.isVisible = true
-      mockState.currentEpisode = testEpisode
-      mockState.chapters = chapters
-      mockProgress.currentTime = 61
-      Object.assign(mockChapterResult, { chapter: chapters[1], index: 1 })
-      render(<PlayerBar />)
+      const user = userEvent.setup();
+      mockState.isVisible = true;
+      mockState.currentEpisode = testEpisode;
+      mockState.chapters = chapters;
+      mockProgress.currentTime = 61;
+      Object.assign(mockChapterResult, { chapter: chapters[1], index: 1 });
+      render(<PlayerBar />);
 
-      const next = screen.getByRole("button", { name: "Next chapter" })
-      await user.click(next)
-      expect(mockAPI.seek).toHaveBeenCalledWith(180)
-      expect(mockAPI.playNext).not.toHaveBeenCalled()
-    })
+      const next = screen.getByRole("button", { name: "Next chapter" });
+      await user.click(next);
+      expect(mockAPI.seek).toHaveBeenCalledWith(180);
+      expect(mockAPI.playNext).not.toHaveBeenCalled();
+    });
 
     it("falls through to playNext() on the last chapter when the queue has items", async () => {
-      const user = userEvent.setup()
-      mockState.isVisible = true
-      mockState.currentEpisode = testEpisode
-      mockState.chapters = chapters
+      const user = userEvent.setup();
+      mockState.isVisible = true;
+      mockState.currentEpisode = testEpisode;
+      mockState.chapters = chapters;
       mockState.queue = [
         { id: "ep-2", title: "Next ep", podcastTitle: "P", audioUrl: "a" },
-      ]
-      mockProgress.currentTime = 200
-      Object.assign(mockChapterResult, { chapter: chapters[2], index: 2 })
-      render(<PlayerBar />)
+      ];
+      mockProgress.currentTime = 200;
+      Object.assign(mockChapterResult, { chapter: chapters[2], index: 2 });
+      render(<PlayerBar />);
 
-      const next = screen.getByRole("button", { name: "Next episode" })
-      await user.click(next)
-      expect(mockAPI.playNext).toHaveBeenCalled()
-      expect(mockAPI.seek).not.toHaveBeenCalled()
-    })
+      const next = screen.getByRole("button", { name: "Next episode" });
+      await user.click(next);
+      expect(mockAPI.playNext).toHaveBeenCalled();
+      expect(mockAPI.seek).not.toHaveBeenCalled();
+    });
 
     it("advances chapter-by-chapter on rapid Next presses using live audio time", async () => {
       const fourChapters = [
@@ -388,135 +420,152 @@ describe("PlayerBar", () => {
         { startTime: 60, title: "Main" },
         { startTime: 180, title: "Outro" },
         { startTime: 300, title: "Credits" },
-      ]
-      const user = userEvent.setup()
-      mockState.isVisible = true
-      mockState.currentEpisode = testEpisode
-      mockState.chapters = fourChapters
-      mockProgress.currentTime = 1
-      Object.assign(mockChapterResult, { chapter: fourChapters[0], index: 0 })
+      ];
+      const user = userEvent.setup();
+      mockState.isVisible = true;
+      mockState.currentEpisode = testEpisode;
+      mockState.chapters = fourChapters;
+      mockProgress.currentTime = 1;
+      Object.assign(mockChapterResult, { chapter: fourChapters[0], index: 0 });
       // Each seek() mutates the mock "live" currentTime so the next click's
       // getCurrentTime() returns the fresh position the audio just jumped to.
       mockAPI.seek.mockImplementation((t: number) => {
-        mockProgress.currentTime = t
-      })
+        mockProgress.currentTime = t;
+      });
       try {
-        render(<PlayerBar />)
+        render(<PlayerBar />);
 
-        const next = screen.getByRole("button", { name: "Next chapter" })
-        await user.click(next)
-        await user.click(next)
-        await user.click(next)
+        const next = screen.getByRole("button", { name: "Next chapter" });
+        await user.click(next);
+        await user.click(next);
+        await user.click(next);
 
-        expect(mockAPI.seek).toHaveBeenNthCalledWith(1, fourChapters[1].startTime)
-        expect(mockAPI.seek).toHaveBeenNthCalledWith(2, fourChapters[2].startTime)
-        expect(mockAPI.seek).toHaveBeenNthCalledWith(3, fourChapters[3].startTime)
+        expect(mockAPI.seek).toHaveBeenNthCalledWith(
+          1,
+          fourChapters[1].startTime,
+        );
+        expect(mockAPI.seek).toHaveBeenNthCalledWith(
+          2,
+          fourChapters[2].startTime,
+        );
+        expect(mockAPI.seek).toHaveBeenNthCalledWith(
+          3,
+          fourChapters[3].startTime,
+        );
       } finally {
-        mockAPI.seek.mockReset()
+        mockAPI.seek.mockReset();
       }
-    })
+    });
 
     it("does not advance the queue while chapters are still loading", async () => {
-      const user = userEvent.setup()
-      mockState.isVisible = true
-      mockState.currentEpisode = testEpisode
-      mockState.chapters = null
-      mockState.chaptersLoading = true
+      const user = userEvent.setup();
+      mockState.isVisible = true;
+      mockState.currentEpisode = testEpisode;
+      mockState.chapters = null;
+      mockState.chaptersLoading = true;
       mockState.queue = [
         { id: "ep-2", title: "Next ep", podcastTitle: "P", audioUrl: "a" },
-      ]
-      render(<PlayerBar />)
+      ];
+      render(<PlayerBar />);
 
-      const next = screen.getByRole("button", { name: "Next" })
-      expect(next).toBeDisabled()
-      await user.click(next)
-      expect(mockAPI.playNext).not.toHaveBeenCalled()
-    })
+      const next = screen.getByRole("button", { name: "Next" });
+      expect(next).toBeDisabled();
+      await user.click(next);
+      expect(mockAPI.playNext).not.toHaveBeenCalled();
+    });
 
     it("renders a disabled 'Next' button when no chapter advance and empty queue", () => {
-      mockState.isVisible = true
-      mockState.currentEpisode = testEpisode
-      mockState.chapters = chapters
-      mockState.queue = []
-      mockProgress.currentTime = 200
-      Object.assign(mockChapterResult, { chapter: chapters[2], index: 2 })
-      render(<PlayerBar />)
+      mockState.isVisible = true;
+      mockState.currentEpisode = testEpisode;
+      mockState.chapters = chapters;
+      mockState.queue = [];
+      mockProgress.currentTime = 200;
+      Object.assign(mockChapterResult, { chapter: chapters[2], index: 2 });
+      render(<PlayerBar />);
 
-      const nextBtn = screen.getByRole("button", { name: "Next" })
-      expect(nextBtn).toBeDisabled()
-    })
-  })
+      const nextBtn = screen.getByRole("button", { name: "Next" });
+      expect(nextBtn).toBeDisabled();
+    });
+  });
 
   describe("Skip flash lifecycle", () => {
     it("shows the flash on skip forward and clears it after the full window", () => {
-      vi.useFakeTimers()
+      vi.useFakeTimers();
       try {
-        mockState.isVisible = true
-        mockState.currentEpisode = testEpisode
-        render(<PlayerBar />)
+        mockState.isVisible = true;
+        mockState.currentEpisode = testEpisode;
+        render(<PlayerBar />);
 
-        fireEvent.click(screen.getAllByRole("button", { name: "Skip forward 30 seconds" })[0])
-        expect(screen.getByText(/\+30s/)).toBeInTheDocument()
+        fireEvent.click(
+          screen.getAllByRole("button", { name: "Skip forward 30 seconds" })[0],
+        );
+        expect(screen.getByText(/\+30s/)).toBeInTheDocument();
 
         act(() => {
-          vi.advanceTimersByTime(SKIP_FLASH_DURATION_MS)
-        })
-        expect(screen.queryByText(/\+30s/)).not.toBeInTheDocument()
+          vi.advanceTimersByTime(SKIP_FLASH_DURATION_MS);
+        });
+        expect(screen.queryByText(/\+30s/)).not.toBeInTheDocument();
       } finally {
-        vi.useRealTimers()
+        vi.useRealTimers();
       }
-    })
+    });
 
     it("resets the timer when skip fires again within the flash window", () => {
-      vi.useFakeTimers()
+      vi.useFakeTimers();
       try {
-        mockState.isVisible = true
-        mockState.currentEpisode = testEpisode
-        render(<PlayerBar />)
+        mockState.isVisible = true;
+        mockState.currentEpisode = testEpisode;
+        render(<PlayerBar />);
 
-        const firstHalf = Math.floor(SKIP_FLASH_DURATION_MS * 0.57)
-        const secondAdvance = Math.floor(SKIP_FLASH_DURATION_MS * 0.71)
-        const remainder = SKIP_FLASH_DURATION_MS - secondAdvance + 1
+        const firstHalf = Math.floor(SKIP_FLASH_DURATION_MS * 0.57);
+        const secondAdvance = Math.floor(SKIP_FLASH_DURATION_MS * 0.71);
+        const remainder = SKIP_FLASH_DURATION_MS - secondAdvance + 1;
 
-        fireEvent.click(screen.getAllByRole("button", { name: "Skip back 10 seconds" })[0])
-        expect(screen.getByText(/−10s/)).toBeInTheDocument()
-
-        act(() => {
-          vi.advanceTimersByTime(firstHalf)
-        })
-        fireEvent.click(screen.getAllByRole("button", { name: "Skip forward 30 seconds" })[0])
-        expect(screen.getByText(/\+30s/)).toBeInTheDocument()
+        fireEvent.click(
+          screen.getAllByRole("button", { name: "Skip back 10 seconds" })[0],
+        );
+        expect(screen.getByText(/−10s/)).toBeInTheDocument();
 
         act(() => {
-          vi.advanceTimersByTime(secondAdvance)
-        })
-        expect(screen.getByText(/\+30s/)).toBeInTheDocument()
+          vi.advanceTimersByTime(firstHalf);
+        });
+        fireEvent.click(
+          screen.getAllByRole("button", { name: "Skip forward 30 seconds" })[0],
+        );
+        expect(screen.getByText(/\+30s/)).toBeInTheDocument();
 
         act(() => {
-          vi.advanceTimersByTime(remainder)
-        })
-        expect(screen.queryByText(/\+30s/)).not.toBeInTheDocument()
+          vi.advanceTimersByTime(secondAdvance);
+        });
+        expect(screen.getByText(/\+30s/)).toBeInTheDocument();
+
+        act(() => {
+          vi.advanceTimersByTime(remainder);
+        });
+        expect(screen.queryByText(/\+30s/)).not.toBeInTheDocument();
       } finally {
-        vi.useRealTimers()
+        vi.useRealTimers();
       }
-    })
+    });
 
     it("clears pending flash when the player becomes invisible", () => {
-      vi.useFakeTimers()
+      vi.useFakeTimers();
       try {
-        mockState.isVisible = true
-        mockState.currentEpisode = testEpisode
-        const { rerender } = render(<PlayerBar />)
+        mockState.isVisible = true;
+        mockState.currentEpisode = testEpisode;
+        const { rerender } = render(<PlayerBar />);
 
-        fireEvent.click(screen.getAllByRole("button", { name: "Skip forward 30 seconds" })[0])
-        expect(screen.getByText(/\+30s/)).toBeInTheDocument()
+        fireEvent.click(
+          screen.getAllByRole("button", { name: "Skip forward 30 seconds" })[0],
+        );
+        expect(screen.getByText(/\+30s/)).toBeInTheDocument();
 
-        mockState.isVisible = false
-        rerender(<PlayerBar />)
-        expect(screen.queryByText(/\+30s/)).not.toBeInTheDocument()
+        mockState.isVisible = false;
+        rerender(<PlayerBar />);
+        expect(screen.queryByText(/\+30s/)).not.toBeInTheDocument();
       } finally {
-        vi.useRealTimers()
+        vi.useRealTimers();
       }
-    })
-  })
-})
+    });
+  });
+});

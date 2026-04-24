@@ -19,7 +19,10 @@ export async function createCollection(name: string, description?: string) {
   const { userId } = await auth();
 
   if (!userId) {
-    return { success: false, error: "You must be signed in to create collections" };
+    return {
+      success: false,
+      error: "You must be signed in to create collections",
+    };
   }
 
   if (!name || name.trim().length === 0) {
@@ -43,7 +46,10 @@ export async function createCollection(name: string, description?: string) {
     return { success: true, collection: newCollection };
   } catch (error) {
     console.error("Error creating collection:", error);
-    return { success: false, error: "Failed to create collection. Please try again." };
+    return {
+      success: false,
+      error: "Failed to create collection. Please try again.",
+    };
   }
 }
 
@@ -51,12 +57,15 @@ export async function createCollection(name: string, description?: string) {
 export async function updateCollection(
   collectionId: number,
   name: string,
-  description?: string
+  description?: string,
 ) {
   const { userId } = await auth();
 
   if (!userId) {
-    return { success: false, error: "You must be signed in to update collections" };
+    return {
+      success: false,
+      error: "You must be signed in to update collections",
+    };
   }
 
   if (!name || name.trim().length === 0) {
@@ -68,7 +77,7 @@ export async function updateCollection(
     const collection = await db.query.collections.findFirst({
       where: and(
         eq(collections.id, collectionId),
-        eq(collections.userId, userId)
+        eq(collections.userId, userId),
       ),
     });
 
@@ -92,7 +101,10 @@ export async function updateCollection(
     return { success: true, collection: updatedCollection };
   } catch (error) {
     console.error("Error updating collection:", error);
-    return { success: false, error: "Failed to update collection. Please try again." };
+    return {
+      success: false,
+      error: "Failed to update collection. Please try again.",
+    };
   }
 }
 
@@ -101,7 +113,10 @@ export async function deleteCollection(collectionId: number) {
   const { userId } = await auth();
 
   if (!userId) {
-    return { success: false, error: "You must be signed in to delete collections" };
+    return {
+      success: false,
+      error: "You must be signed in to delete collections",
+    };
   }
 
   try {
@@ -109,7 +124,7 @@ export async function deleteCollection(collectionId: number) {
     const collection = await db.query.collections.findFirst({
       where: and(
         eq(collections.id, collectionId),
-        eq(collections.userId, userId)
+        eq(collections.userId, userId),
       ),
     });
 
@@ -131,7 +146,10 @@ export async function deleteCollection(collectionId: number) {
     return { success: true, message: "Collection deleted" };
   } catch (error) {
     console.error("Error deleting collection:", error);
-    return { success: false, error: "Failed to delete collection. Please try again." };
+    return {
+      success: false,
+      error: "Failed to delete collection. Please try again.",
+    };
   }
 }
 
@@ -140,7 +158,10 @@ export async function getUserCollections() {
   const { userId } = await auth();
 
   if (!userId) {
-    return { collections: [], error: "You must be signed in to view collections" };
+    return {
+      collections: [],
+      error: "You must be signed in to view collections",
+    };
   }
 
   try {
@@ -156,8 +177,8 @@ export async function getUserCollections() {
         userLibrary,
         and(
           eq(collections.id, userLibrary.collectionId),
-          eq(userLibrary.userId, userId)
-        )
+          eq(userLibrary.userId, userId),
+        ),
       )
       .where(eq(collections.userId, userId))
       .groupBy(collections.id)
@@ -171,18 +192,26 @@ export async function getUserCollections() {
 }
 
 // Get a single collection with its episodes
-export async function getCollection(collectionId: number): Promise<{ collection: Collection | null; items: SavedItemDTO[]; error: string | null }> {
+export async function getCollection(collectionId: number): Promise<{
+  collection: Collection | null;
+  items: SavedItemDTO[];
+  error: string | null;
+}> {
   const { userId } = await auth();
 
   if (!userId) {
-    return { collection: null, items: [], error: "You must be signed in to view collections" };
+    return {
+      collection: null,
+      items: [],
+      error: "You must be signed in to view collections",
+    };
   }
 
   try {
     const collection = await db.query.collections.findFirst({
       where: and(
         eq(collections.id, collectionId),
-        eq(collections.userId, userId)
+        eq(collections.userId, userId),
       ),
     });
 
@@ -196,7 +225,7 @@ export async function getCollection(collectionId: number): Promise<{ collection:
     const items = await db.query.userLibrary.findMany({
       where: and(
         eq(userLibrary.userId, userId),
-        eq(userLibrary.collectionId, collectionId)
+        eq(userLibrary.collectionId, collectionId),
       ),
       columns: LIBRARY_ENTRY_COLUMNS,
       with: {
@@ -225,12 +254,15 @@ export async function getCollection(collectionId: number): Promise<{ collection:
 // Move an episode to a collection (or remove from collection if collectionId is null)
 export async function moveEpisodeToCollection(
   libraryEntryId: number,
-  collectionId: number | null
+  collectionId: number | null,
 ) {
   const { userId } = await auth();
 
   if (!userId) {
-    return { success: false, error: "You must be signed in to organize episodes" };
+    return {
+      success: false,
+      error: "You must be signed in to organize episodes",
+    };
   }
 
   try {
@@ -238,7 +270,7 @@ export async function moveEpisodeToCollection(
     const libraryEntry = await db.query.userLibrary.findFirst({
       where: and(
         eq(userLibrary.id, libraryEntryId),
-        eq(userLibrary.userId, userId)
+        eq(userLibrary.userId, userId),
       ),
     });
 
@@ -251,7 +283,7 @@ export async function moveEpisodeToCollection(
       const collection = await db.query.collections.findFirst({
         where: and(
           eq(collections.id, collectionId),
-          eq(collections.userId, userId)
+          eq(collections.userId, userId),
         ),
       });
 
@@ -271,9 +303,17 @@ export async function moveEpisodeToCollection(
       revalidatePath(`/library/collection/${collectionId}`);
     }
 
-    return { success: true, message: collectionId ? "Episode moved to collection" : "Episode removed from collection" };
+    return {
+      success: true,
+      message: collectionId
+        ? "Episode moved to collection"
+        : "Episode removed from collection",
+    };
   } catch (error) {
     console.error("Error moving episode to collection:", error);
-    return { success: false, error: "Failed to move episode. Please try again." };
+    return {
+      success: false,
+      error: "Failed to move episode. Please try again.",
+    };
   }
 }

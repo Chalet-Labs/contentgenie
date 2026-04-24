@@ -40,13 +40,25 @@ export const bulkResummarize = task({
     name: "bulk-resummarize-queue",
     concurrencyLimit: 1,
   },
-  run: async (payload: BulkResummarizePayload): Promise<BulkResummarizeResult> => {
+  run: async (
+    payload: BulkResummarizePayload,
+  ): Promise<BulkResummarizeResult> => {
     const { podcastId, minDate, maxDate, maxScore } = payload;
 
-    logger.info("Starting bulk re-summarization", { podcastId, minDate, maxDate, maxScore });
+    logger.info("Starting bulk re-summarization", {
+      podcastId,
+      minDate,
+      maxDate,
+      maxScore,
+    });
 
     // Build WHERE conditions: processedAt IS NOT NULL (has existing summary) + optional filters
-    const conditions = buildResummarizeConditions({ podcastId, minDate, maxDate, maxScore });
+    const conditions = buildResummarizeConditions({
+      podcastId,
+      minDate,
+      maxDate,
+      maxScore,
+    });
 
     // Query matching episodes
     const matchingEpisodes = await db
@@ -97,7 +109,8 @@ export const bulkResummarize = task({
         payload: { episodeId },
       }));
 
-      const batchResult = await summarizeEpisode.batchTriggerAndWait(batchItems);
+      const batchResult =
+        await summarizeEpisode.batchTriggerAndWait(batchItems);
 
       // Aggregate per-child results
       for (let i = 0; i < batchResult.runs.length; i++) {

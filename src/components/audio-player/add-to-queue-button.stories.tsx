@@ -1,5 +1,5 @@
-import type { Meta, StoryObj } from "@storybook/nextjs-vite"
-import type { ReactNode } from "react"
+import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import type { ReactNode } from "react";
 import {
   AudioPlayerAPIContext,
   AudioPlayerStateContext,
@@ -7,8 +7,8 @@ import {
   type AudioPlayerState,
   type AudioPlayerAPI,
   type AudioEpisode,
-} from "@/contexts/audio-player-context"
-import { AddToQueueButton } from "@/components/audio-player/add-to-queue-button"
+} from "@/contexts/audio-player-context";
+import { AddToQueueButton } from "@/components/audio-player/add-to-queue-button";
 
 const testEpisode: AudioEpisode = {
   id: "ep-1",
@@ -17,7 +17,7 @@ const testEpisode: AudioEpisode = {
   audioUrl: "https://example.com/audio.mp3",
   artwork: "https://picsum.photos/seed/podcast/300/300",
   duration: 2400,
-}
+};
 
 const playingEpisode: AudioEpisode = {
   id: "ep-playing",
@@ -25,7 +25,7 @@ const playingEpisode: AudioEpisode = {
   podcastTitle: "Some Podcast",
   audioUrl: "https://example.com/playing.mp3",
   duration: 1800,
-}
+};
 
 const noopAPI: AudioPlayerAPI = {
   playEpisode: () => {},
@@ -44,7 +44,7 @@ const noopAPI: AudioPlayerAPI = {
   setSleepTimer: () => {},
   cancelSleepTimer: () => {},
   getCurrentTime: () => 0,
-}
+};
 
 const baseState: AudioPlayerState = {
   currentEpisode: playingEpisode,
@@ -60,14 +60,14 @@ const baseState: AudioPlayerState = {
   chapters: null,
   chaptersLoading: false,
   sleepTimer: null,
-}
+};
 
 function MockProvider({
   state,
   children,
 }: {
-  state: AudioPlayerState
-  children: ReactNode
+  state: AudioPlayerState;
+  children: ReactNode;
 }) {
   return (
     <AudioPlayerAPIContext.Provider value={noopAPI}>
@@ -79,16 +79,16 @@ function MockProvider({
         </AudioPlayerProgressContext.Provider>
       </AudioPlayerStateContext.Provider>
     </AudioPlayerAPIContext.Provider>
-  )
+  );
 }
 
 const meta: Meta<typeof AddToQueueButton> = {
   title: "AudioPlayer/AddToQueueButton",
   component: AddToQueueButton,
-}
+};
 
-export default meta
-type Story = StoryObj<typeof AddToQueueButton>
+export default meta;
+type Story = StoryObj<typeof AddToQueueButton>;
 
 export const Default: Story = {
   args: {
@@ -102,7 +102,7 @@ export const Default: Story = {
       </MockProvider>
     ),
   ],
-}
+};
 
 export const IconVariant: Story = {
   args: {
@@ -116,7 +116,7 @@ export const IconVariant: Story = {
       </MockProvider>
     ),
   ],
-}
+};
 
 export const AlreadyInQueue: Story = {
   args: {
@@ -130,7 +130,7 @@ export const AlreadyInQueue: Story = {
       </MockProvider>
     ),
   ],
-}
+};
 
 export const NowPlaying: Story = {
   args: {
@@ -144,4 +144,4 @@ export const NowPlaying: Story = {
       </MockProvider>
     ),
   ],
-}
+};

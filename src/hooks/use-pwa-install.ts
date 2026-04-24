@@ -137,8 +137,7 @@ export function usePwaInstall(): UsePwaInstallReturn {
     setDismissed(true);
   }, []);
 
-  const canInstall =
-    promptAvailable && engaged && !dismissed && !isInstalled;
+  const canInstall = promptAvailable && engaged && !dismissed && !isInstalled;
 
   const isInstallable = promptAvailable && !isInstalled;
 

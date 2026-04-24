@@ -1,4 +1,4 @@
-import React from "react"
+import React from "react";
 
 // Factory for mocking @/components/ui/sheet in Vitest suites. Returns a stateful
 // drop-in replacement with a throw-guard so any primitive rendered outside a
@@ -16,94 +16,103 @@ import React from "react"
 // Pass { includeSheetTitle: true } for suites that render AppHeader's sheet,
 // which uses <SheetTitle className="sr-only"> for Radix a11y compliance.
 export function createSheetMock(options: { includeSheetTitle?: boolean } = {}) {
-  const { useState, createContext, useContext } = React
+  const { useState, createContext, useContext } = React;
 
   const SheetStateContext = createContext<{
-    open: boolean
-    setOpen: (v: boolean) => void
-  } | null>(null)
+    open: boolean;
+    setOpen: (v: boolean) => void;
+  } | null>(null);
 
   const useSheetContext = () => {
-    const ctx = useContext(SheetStateContext)
+    const ctx = useContext(SheetStateContext);
     if (ctx === null) {
-      throw new Error("Sheet primitive used outside <Sheet> provider")
+      throw new Error("Sheet primitive used outside <Sheet> provider");
     }
-    return ctx
-  }
+    return ctx;
+  };
 
   const Sheet = ({ children }: { children: React.ReactNode }) => {
-    const [open, setOpen] = useState(false)
+    const [open, setOpen] = useState(false);
     return (
       <SheetStateContext.Provider value={{ open, setOpen }}>
         {children}
       </SheetStateContext.Provider>
-    )
-  }
+    );
+  };
 
   const SheetTrigger = ({
     children,
     asChild,
   }: {
-    children: React.ReactNode
-    asChild?: boolean
+    children: React.ReactNode;
+    asChild?: boolean;
   }) => {
-    const { setOpen } = useSheetContext()
-    const open = () => setOpen(true)
+    const { setOpen } = useSheetContext();
+    const open = () => setOpen(true);
     if (asChild && React.isValidElement(children)) {
-      const child = children as React.ReactElement<{ onClick?: (e: unknown) => void }>
+      const child = children as React.ReactElement<{
+        onClick?: (e: unknown) => void;
+      }>;
       return React.cloneElement(child, {
         "data-testid": "sheet-trigger",
         onClick: (e: unknown) => {
-          child.props.onClick?.(e)
-          open()
+          child.props.onClick?.(e);
+          open();
         },
-      } as Record<string, unknown>)
+      } as Record<string, unknown>);
     }
     return (
       <div data-testid="sheet-trigger" onClick={open}>
         {children}
       </div>
-    )
-  }
+    );
+  };
 
   const SheetContent = ({ children }: { children: React.ReactNode }) => {
-    const { open } = useSheetContext()
-    return open ? <div data-testid="sheet-content">{children}</div> : null
-  }
+    const { open } = useSheetContext();
+    return open ? <div data-testid="sheet-content">{children}</div> : null;
+  };
 
   const SheetClose = ({
     children,
     asChild,
   }: {
-    children: React.ReactNode
-    asChild?: boolean
+    children: React.ReactNode;
+    asChild?: boolean;
   }) => {
-    const { setOpen } = useSheetContext()
-    const close = () => setOpen(false)
+    const { setOpen } = useSheetContext();
+    const close = () => setOpen(false);
     if (asChild && React.isValidElement(children)) {
-      const child = children as React.ReactElement<{ onClick?: (e: unknown) => void }>
+      const child = children as React.ReactElement<{
+        onClick?: (e: unknown) => void;
+      }>;
       return React.cloneElement(child, {
         onClick: (e: unknown) => {
-          child.props.onClick?.(e)
-          close()
+          child.props.onClick?.(e);
+          close();
         },
-      })
+      });
     }
     return (
       <div data-testid="sheet-close" onClick={close}>
         {children}
       </div>
-    )
-  }
+    );
+  };
 
-  const mocks: Record<string, unknown> = { Sheet, SheetTrigger, SheetContent, SheetClose }
+  const mocks: Record<string, unknown> = {
+    Sheet,
+    SheetTrigger,
+    SheetContent,
+    SheetClose,
+  };
 
   if (options.includeSheetTitle) {
     const SheetTitle = ({ children }: { children: React.ReactNode }) => (
       <div data-testid="sheet-title">{children}</div>
-    )
-    mocks.SheetTitle = SheetTitle
+    );
+    mocks.SheetTitle = SheetTitle;
   }
 
-  return mocks
+  return mocks;
 }

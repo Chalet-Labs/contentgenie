@@ -1,16 +1,16 @@
-import type { Meta, StoryObj } from "@storybook/nextjs-vite"
-import type { ReactNode } from "react"
-import { BookMarked } from "lucide-react"
+import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import type { ReactNode } from "react";
+import { BookMarked } from "lucide-react";
 import {
   AudioPlayerAPIContext,
   AudioPlayerStateContext,
   AudioPlayerProgressContext,
   type AudioPlayerState,
   type AudioPlayerAPI,
-} from "@/contexts/audio-player-context"
-import { Button } from "@/components/ui/button"
-import { ChapterPanel } from "@/components/audio-player/chapter-panel"
-import type { Chapter } from "@/lib/chapters"
+} from "@/contexts/audio-player-context";
+import { Button } from "@/components/ui/button";
+import { ChapterPanel } from "@/components/audio-player/chapter-panel";
+import type { Chapter } from "@/lib/chapters";
 
 const noopAPI: AudioPlayerAPI = {
   playEpisode: () => {},
@@ -29,7 +29,7 @@ const noopAPI: AudioPlayerAPI = {
   setSleepTimer: () => {},
   cancelSleepTimer: () => {},
   getCurrentTime: () => 0,
-}
+};
 
 const sampleChapters: Chapter[] = [
   { startTime: 0, title: "Introduction" },
@@ -38,7 +38,7 @@ const sampleChapters: Chapter[] = [
   { startTime: 600, title: "Interview Part 2" },
   { startTime: 1800, title: "Listener Questions" },
   { startTime: 2400, title: "Outro" },
-]
+];
 
 function makeState(chapters: Chapter[] | null): AudioPlayerState {
   return {
@@ -60,7 +60,7 @@ function makeState(chapters: Chapter[] | null): AudioPlayerState {
     chapters,
     chaptersLoading: false,
     sleepTimer: null,
-  }
+  };
 }
 
 function MockProvider({
@@ -68,9 +68,9 @@ function MockProvider({
   currentTime,
   children,
 }: {
-  state: AudioPlayerState
-  currentTime: number
-  children: ReactNode
+  state: AudioPlayerState;
+  currentTime: number;
+  children: ReactNode;
 }) {
   return (
     <AudioPlayerAPIContext.Provider value={noopAPI}>
@@ -82,22 +82,22 @@ function MockProvider({
         </AudioPlayerProgressContext.Provider>
       </AudioPlayerStateContext.Provider>
     </AudioPlayerAPIContext.Provider>
-  )
+  );
 }
 
 const chapterTrigger = (
   <Button variant="ghost" size="icon" aria-label="Chapters">
     <BookMarked className="h-4 w-4" />
   </Button>
-)
+);
 
 const meta: Meta<typeof ChapterPanel> = {
   title: "AudioPlayer/ChapterPanel",
   component: ChapterPanel,
-}
+};
 
-export default meta
-type Story = StoryObj<typeof ChapterPanel>
+export default meta;
+type Story = StoryObj<typeof ChapterPanel>;
 
 export const DesktopPopover: Story = {
   args: {
@@ -114,7 +114,7 @@ export const DesktopPopover: Story = {
       </MockProvider>
     ),
   ],
-}
+};
 
 export const MobileSheet: Story = {
   parameters: {
@@ -135,4 +135,4 @@ export const MobileSheet: Story = {
       </MockProvider>
     ),
   ],
-}
+};

@@ -1,10 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { makeClerkAuthMock } from "@/test/mocks/clerk-server";
 
 // Mock Clerk auth
 const mockAuth = vi.fn();
-vi.mock("@clerk/nextjs/server", () => ({
-  auth: () => mockAuth(),
-}));
+vi.mock("@clerk/nextjs/server", () => makeClerkAuthMock(() => mockAuth()));
 
 // Mock database
 const mockDbSelect = vi.fn();
@@ -14,7 +13,9 @@ vi.mock("@/db", () => ({
   db: {
     select: (...args: unknown[]) => mockDbSelect(...args),
     query: {
-      episodes: { findMany: (...args: unknown[]) => mockEpisodesFindMany(...args) },
+      episodes: {
+        findMany: (...args: unknown[]) => mockEpisodesFindMany(...args),
+      },
     },
   },
 }));
@@ -46,7 +47,11 @@ vi.mock("drizzle-orm", () => ({
   eq: vi.fn((col: unknown, val: unknown) => ({ type: "eq", col, val })),
   count: vi.fn(() => "count(*)"),
   desc: vi.fn((col: unknown) => ({ type: "desc", col })),
-  inArray: vi.fn((col: unknown, vals: unknown) => ({ type: "inArray", col, vals })),
+  inArray: vi.fn((col: unknown, vals: unknown) => ({
+    type: "inArray",
+    col,
+    vals,
+  })),
 }));
 
 // Episode row factory
@@ -74,7 +79,7 @@ function makePodcastRow(overrides: Record<string, unknown> = {}) {
 function mockSelectChain(
   countValue: number,
   episodeRows: ReturnType<typeof makeEpisodeRow>[],
-  podcastRows: ReturnType<typeof makePodcastRow>[]
+  podcastRows: ReturnType<typeof makePodcastRow>[],
 ) {
   let callIndex = 0;
   mockDbSelect.mockImplementation(() => {
@@ -125,11 +130,13 @@ describe("getEpisodeTranscriptStats", () => {
   });
 
   it("returns error when not authenticated", async () => {
-    mockAuth.mockResolvedValue({ userId: null, has: vi.fn().mockReturnValue(false) });
+    mockAuth.mockResolvedValue({
+      userId: null,
+      has: vi.fn().mockReturnValue(false),
+    });
 
-    const { getEpisodeTranscriptStats } = await import(
-      "@/app/actions/transcript-stats"
-    );
+    const { getEpisodeTranscriptStats } =
+      await import("@/app/actions/transcript-stats");
     const result = await getEpisodeTranscriptStats();
 
     expect(result.error).toBe("Unauthorized");
@@ -140,11 +147,13 @@ describe("getEpisodeTranscriptStats", () => {
   });
 
   it("returns error when authenticated but not admin", async () => {
-    mockAuth.mockResolvedValue({ userId: "user_1", has: vi.fn().mockReturnValue(false) });
+    mockAuth.mockResolvedValue({
+      userId: "user_1",
+      has: vi.fn().mockReturnValue(false),
+    });
 
-    const { getEpisodeTranscriptStats } = await import(
-      "@/app/actions/transcript-stats"
-    );
+    const { getEpisodeTranscriptStats } =
+      await import("@/app/actions/transcript-stats");
     const result = await getEpisodeTranscriptStats();
 
     expect(result.error).toBe("Unauthorized");
@@ -152,14 +161,16 @@ describe("getEpisodeTranscriptStats", () => {
   });
 
   it("returns count and paginated episodes for admin", async () => {
-    mockAuth.mockResolvedValue({ userId: "admin_1", has: vi.fn().mockReturnValue(true) });
+    mockAuth.mockResolvedValue({
+      userId: "admin_1",
+      has: vi.fn().mockReturnValue(true),
+    });
     const ep = makeEpisodeRow();
     const pod = makePodcastRow();
     mockSelectChain(1, [ep], [pod]);
 
-    const { getEpisodeTranscriptStats } = await import(
-      "@/app/actions/transcript-stats"
-    );
+    const { getEpisodeTranscriptStats } =
+      await import("@/app/actions/transcript-stats");
     const result = await getEpisodeTranscriptStats();
 
     expect(result.error).toBeUndefined();
@@ -170,12 +181,14 @@ describe("getEpisodeTranscriptStats", () => {
   });
 
   it("returns empty result when no episodes are missing", async () => {
-    mockAuth.mockResolvedValue({ userId: "admin_1", has: vi.fn().mockReturnValue(true) });
+    mockAuth.mockResolvedValue({
+      userId: "admin_1",
+      has: vi.fn().mockReturnValue(true),
+    });
     mockSelectChain(0, [], []);
 
-    const { getEpisodeTranscriptStats } = await import(
-      "@/app/actions/transcript-stats"
-    );
+    const { getEpisodeTranscriptStats } =
+      await import("@/app/actions/transcript-stats");
     const result = await getEpisodeTranscriptStats();
 
     expect(result.totalMissing).toBe(0);
@@ -184,12 +197,14 @@ describe("getEpisodeTranscriptStats", () => {
   });
 
   it("applies pagination offset for page 2", async () => {
-    mockAuth.mockResolvedValue({ userId: "admin_1", has: vi.fn().mockReturnValue(true) });
+    mockAuth.mockResolvedValue({
+      userId: "admin_1",
+      has: vi.fn().mockReturnValue(true),
+    });
     mockSelectChain(15, [], []);
 
-    const { getEpisodeTranscriptStats } = await import(
-      "@/app/actions/transcript-stats"
-    );
+    const { getEpisodeTranscriptStats } =
+      await import("@/app/actions/transcript-stats");
     await getEpisodeTranscriptStats({ page: 2, pageSize: 5 });
 
     // The third db.select call (index 1) builds the episode list query.
@@ -198,27 +213,31 @@ describe("getEpisodeTranscriptStats", () => {
   });
 
   it("applies podcastId filter when provided", async () => {
-    mockAuth.mockResolvedValue({ userId: "admin_1", has: vi.fn().mockReturnValue(true) });
+    mockAuth.mockResolvedValue({
+      userId: "admin_1",
+      has: vi.fn().mockReturnValue(true),
+    });
     mockSelectChain(3, [], []);
     const { eq } = await import("drizzle-orm");
 
-    const { getEpisodeTranscriptStats } = await import(
-      "@/app/actions/transcript-stats"
-    );
+    const { getEpisodeTranscriptStats } =
+      await import("@/app/actions/transcript-stats");
     await getEpisodeTranscriptStats({ podcastId: 42 });
 
     expect(eq).toHaveBeenCalledWith(expect.anything(), 42);
   });
 
   it("includes episodes with transcriptStatus = 'fetching' (stale recovery)", async () => {
-    mockAuth.mockResolvedValue({ userId: "admin_1", has: vi.fn().mockReturnValue(true) });
+    mockAuth.mockResolvedValue({
+      userId: "admin_1",
+      has: vi.fn().mockReturnValue(true),
+    });
     const staleEp = makeEpisodeRow({ transcriptStatus: "fetching" });
     mockSelectChain(1, [staleEp], []);
     const { eq } = await import("drizzle-orm");
 
-    const { getEpisodeTranscriptStats } = await import(
-      "@/app/actions/transcript-stats"
-    );
+    const { getEpisodeTranscriptStats } =
+      await import("@/app/actions/transcript-stats");
     const result = await getEpisodeTranscriptStats();
 
     // eq is called for each of the non-null transcript status checks (missing, failed, fetching)
@@ -227,13 +246,15 @@ describe("getEpisodeTranscriptStats", () => {
   });
 
   it("builds the or condition with explicit statuses and processedAt gap check", async () => {
-    mockAuth.mockResolvedValue({ userId: "admin_1", has: vi.fn().mockReturnValue(true) });
+    mockAuth.mockResolvedValue({
+      userId: "admin_1",
+      has: vi.fn().mockReturnValue(true),
+    });
     mockSelectChain(0, [], []);
     const { or, isNull, isNotNull, eq, and } = await import("drizzle-orm");
 
-    const { getEpisodeTranscriptStats } = await import(
-      "@/app/actions/transcript-stats"
-    );
+    const { getEpisodeTranscriptStats } =
+      await import("@/app/actions/transcript-stats");
     await getEpisodeTranscriptStats();
 
     // Explicit status checks
@@ -248,13 +269,18 @@ describe("getEpisodeTranscriptStats", () => {
   });
 
   it("returns podcasts array for dropdown filter", async () => {
-    mockAuth.mockResolvedValue({ userId: "admin_1", has: vi.fn().mockReturnValue(true) });
-    const pods = [makePodcastRow({ id: 1, title: "Pod A" }), makePodcastRow({ id: 2, title: "Pod B" })];
+    mockAuth.mockResolvedValue({
+      userId: "admin_1",
+      has: vi.fn().mockReturnValue(true),
+    });
+    const pods = [
+      makePodcastRow({ id: 1, title: "Pod A" }),
+      makePodcastRow({ id: 2, title: "Pod B" }),
+    ];
     mockSelectChain(0, [], pods);
 
-    const { getEpisodeTranscriptStats } = await import(
-      "@/app/actions/transcript-stats"
-    );
+    const { getEpisodeTranscriptStats } =
+      await import("@/app/actions/transcript-stats");
     const result = await getEpisodeTranscriptStats();
 
     expect(result.podcasts).toHaveLength(2);
@@ -262,20 +288,29 @@ describe("getEpisodeTranscriptStats", () => {
   });
 
   it("skips podcasts query when skipPodcasts is true", async () => {
-    mockAuth.mockResolvedValue({ userId: "admin_1", has: vi.fn().mockReturnValue(true) });
+    mockAuth.mockResolvedValue({
+      userId: "admin_1",
+      has: vi.fn().mockReturnValue(true),
+    });
     // Only 2 db.select calls needed (count + episodes) — no podcasts query
     let callIndex = 0;
     mockDbSelect.mockImplementation(() => {
       const call = callIndex++;
       if (call === 0) {
-        return { from: vi.fn().mockReturnValue({ where: vi.fn().mockResolvedValue([{ count: 0 }]) }) };
+        return {
+          from: vi.fn().mockReturnValue({
+            where: vi.fn().mockResolvedValue([{ count: 0 }]),
+          }),
+        };
       }
       return {
         from: vi.fn().mockReturnValue({
           innerJoin: vi.fn().mockReturnValue({
             where: vi.fn().mockReturnValue({
               orderBy: vi.fn().mockReturnValue({
-                limit: vi.fn().mockReturnValue({ offset: vi.fn().mockResolvedValue([]) }),
+                limit: vi
+                  .fn()
+                  .mockReturnValue({ offset: vi.fn().mockResolvedValue([]) }),
               }),
             }),
           }),
@@ -283,9 +318,8 @@ describe("getEpisodeTranscriptStats", () => {
       };
     });
 
-    const { getEpisodeTranscriptStats } = await import(
-      "@/app/actions/transcript-stats"
-    );
+    const { getEpisodeTranscriptStats } =
+      await import("@/app/actions/transcript-stats");
     const result = await getEpisodeTranscriptStats({ skipPodcasts: true });
 
     expect(result.podcasts).toEqual([]);
@@ -294,24 +328,30 @@ describe("getEpisodeTranscriptStats", () => {
   });
 
   it("clamps pageSize to max 50 and page to min 1", async () => {
-    mockAuth.mockResolvedValue({ userId: "admin_1", has: vi.fn().mockReturnValue(true) });
+    mockAuth.mockResolvedValue({
+      userId: "admin_1",
+      has: vi.fn().mockReturnValue(true),
+    });
     mockSelectChain(0, [], []);
 
-    const { getEpisodeTranscriptStats } = await import(
-      "@/app/actions/transcript-stats"
-    );
+    const { getEpisodeTranscriptStats } =
+      await import("@/app/actions/transcript-stats");
     // Should not throw even with extreme values
     await getEpisodeTranscriptStats({ page: -5, pageSize: 99999 });
     expect(mockDbSelect).toHaveBeenCalled();
   });
 
   it("returns error on DB failure instead of throwing", async () => {
-    mockAuth.mockResolvedValue({ userId: "admin_1", has: vi.fn().mockReturnValue(true) });
-    mockDbSelect.mockImplementation(() => { throw new Error("DB connection failed"); });
+    mockAuth.mockResolvedValue({
+      userId: "admin_1",
+      has: vi.fn().mockReturnValue(true),
+    });
+    mockDbSelect.mockImplementation(() => {
+      throw new Error("DB connection failed");
+    });
 
-    const { getEpisodeTranscriptStats } = await import(
-      "@/app/actions/transcript-stats"
-    );
+    const { getEpisodeTranscriptStats } =
+      await import("@/app/actions/transcript-stats");
     const result = await getEpisodeTranscriptStats();
 
     expect(result.error).toBe("Failed to load transcript stats");

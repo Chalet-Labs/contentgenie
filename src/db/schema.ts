@@ -75,7 +75,7 @@ export const podcasts = pgTable(
   (table) => [
     uniqueIndex("podcasts_podcast_index_id_idx").on(table.podcastIndexId),
     check("source_enum", sql`${table.source} IN ('podcastindex', 'rss')`),
-  ]
+  ],
 );
 
 // Episodes table
@@ -98,8 +98,18 @@ export const episodes = pgTable(
     worthItScore: decimal("worth_it_score", { precision: 4, scale: 2 }), // 0.00 - 10.00
     worthItReason: text("worth_it_reason"),
     worthItDimensions: json("worth_it_dimensions").$type<
-      | { kind: "signals"; signals: WorthItSignals; adjustment: -1 | 0 | 1; adjustmentReason: string }
-      | { kind: "dimensions"; uniqueness: number; actionability: number; timeValue: number }
+      | {
+          kind: "signals";
+          signals: WorthItSignals;
+          adjustment: -1 | 0 | 1;
+          adjustmentReason: string;
+        }
+      | {
+          kind: "dimensions";
+          uniqueness: number;
+          actionability: number;
+          timeValue: number;
+        }
     >(),
     processedAt: timestamp("processed_at"),
     summaryRunId: text("summary_run_id"),
@@ -126,21 +136,21 @@ export const episodes = pgTable(
     index("episodes_rss_guid_idx").on(table.rssGuid),
     check(
       "worth_it_score_range",
-      sql`${table.worthItScore} >= 0 AND ${table.worthItScore} <= 10`
+      sql`${table.worthItScore} >= 0 AND ${table.worthItScore} <= 10`,
     ),
     check(
       "summary_status_enum",
-      sql`${table.summaryStatus} IN ('queued', 'running', 'summarizing', 'completed', 'failed')`
+      sql`${table.summaryStatus} IN ('queued', 'running', 'summarizing', 'completed', 'failed')`,
     ),
     check(
       "transcript_source_enum",
-      sql`${table.transcriptSource} IN ('podcastindex', 'assemblyai', 'description-url')`
+      sql`${table.transcriptSource} IN ('podcastindex', 'assemblyai', 'description-url')`,
     ),
     check(
       "transcript_status_enum",
-      sql`${table.transcriptStatus} IN ('missing', 'fetching', 'available', 'failed')`
+      sql`${table.transcriptStatus} IN ('missing', 'fetching', 'available', 'failed')`,
     ),
-  ]
+  ],
 );
 
 // User Subscriptions table
@@ -161,14 +171,14 @@ export const userSubscriptions = pgTable(
   (table) => [
     uniqueIndex("user_subscriptions_user_podcast_idx").on(
       table.userId,
-      table.podcastId
+      table.podcastId,
     ),
     index("user_subscriptions_user_id_idx").on(table.userId),
     index("user_subscriptions_pinned_idx")
       .on(table.userId)
       .concurrently()
       .where(sql`${table.isPinned} = true`),
-  ]
+  ],
 );
 
 // Collections table
@@ -185,7 +195,7 @@ export const collections = pgTable(
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
-  (table) => [index("collections_user_id_idx").on(table.userId)]
+  (table) => [index("collections_user_id_idx").on(table.userId)],
 );
 
 // User Library table
@@ -209,12 +219,12 @@ export const userLibrary = pgTable(
   (table) => [
     uniqueIndex("user_library_user_episode_idx").on(
       table.userId,
-      table.episodeId
+      table.episodeId,
     ),
     index("user_library_user_id_idx").on(table.userId),
     index("user_library_episode_id_idx").on(table.episodeId),
     index("user_library_collection_id_idx").on(table.collectionId),
-  ]
+  ],
 );
 
 // AI Config table (admin-selectable provider and model)
@@ -232,7 +242,7 @@ export const aiConfig = pgTable(
   },
   (table) => [
     check("provider_enum", sql`${table.provider} IN ('openrouter', 'zai')`),
-  ]
+  ],
 );
 
 // Bookmarks table
@@ -247,7 +257,7 @@ export const bookmarks = pgTable(
     note: text("note"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
-  (table) => [index("bookmarks_user_library_id_idx").on(table.userLibraryId)]
+  (table) => [index("bookmarks_user_library_id_idx").on(table.userLibraryId)],
 );
 
 // Notifications table
@@ -272,20 +282,17 @@ export const notifications = pgTable(
     index("notifications_user_unread_idx").on(
       table.userId,
       table.isRead,
-      table.createdAt
+      table.createdAt,
     ),
-    index("notifications_user_created_idx").on(
-      table.userId,
-      table.createdAt
-    ),
+    index("notifications_user_created_idx").on(table.userId, table.createdAt),
     check(
       "notification_type_enum",
-      sql`${table.type} IN ('new_episode', 'summary_completed')`
+      sql`${table.type} IN ('new_episode', 'summary_completed')`,
     ),
     uniqueIndex("notifications_user_episode_unique_idx")
       .on(table.userId, table.episodeId)
       .where(sql`episode_id IS NOT NULL AND type = 'new_episode'`),
-  ]
+  ],
 );
 
 // Push Subscriptions table
@@ -302,7 +309,7 @@ export const pushSubscriptions = pgTable(
     userAgent: text("user_agent"),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
-  (table) => [index("push_subscriptions_user_id_idx").on(table.userId)]
+  (table) => [index("push_subscriptions_user_id_idx").on(table.userId)],
 );
 
 // Trending Topics table (daily LLM-generated snapshots)
@@ -317,7 +324,7 @@ export const trendingTopics = pgTable(
     episodeCount: integer("episode_count").notNull().default(0),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
-  (table) => [index("trending_topics_generated_at_idx").on(table.generatedAt)]
+  (table) => [index("trending_topics_generated_at_idx").on(table.generatedAt)],
 );
 
 export const episodeTopics = pgTable(
@@ -334,13 +341,22 @@ export const episodeTopics = pgTable(
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => [
-    uniqueIndex("episode_topics_episode_topic_idx").on(table.episodeId, table.topic),
+    uniqueIndex("episode_topics_episode_topic_idx").on(
+      table.episodeId,
+      table.topic,
+    ),
     index("episode_topics_topic_idx").on(table.topic),
     index("episode_topics_topic_rank_idx").on(table.topicRank),
-    check("relevance_range", sql`${table.relevance} >= 0 AND ${table.relevance} <= 1`),
+    check(
+      "relevance_range",
+      sql`${table.relevance} >= 0 AND ${table.relevance} <= 1`,
+    ),
     check("topic_not_blank", sql`length(btrim(${table.topic})) > 0`),
-    check("topic_rank_positive", sql`${table.topicRank} IS NULL OR ${table.topicRank} >= 1`),
-  ]
+    check(
+      "topic_rank_positive",
+      sql`${table.topicRank} IS NULL OR ${table.topicRank} >= 1`,
+    ),
+  ],
 );
 
 // Listen History table
@@ -364,13 +380,13 @@ export const listenHistory = pgTable(
   (table) => [
     uniqueIndex("listen_history_user_episode_idx").on(
       table.userId,
-      table.episodeId
+      table.episodeId,
     ),
     index("listen_history_user_id_idx").on(table.userId),
     index("listen_history_podcast_index_episode_id_idx").on(
-      table.podcastIndexEpisodeId
+      table.podcastIndexEpisodeId,
     ),
-  ]
+  ],
 );
 
 // User Queue Items table (denormalized episode fields for cross-device queue sync)
@@ -394,13 +410,13 @@ export const userQueueItems = pgTable(
   (table) => [
     uniqueIndex("user_queue_items_user_episode_idx").on(
       table.userId,
-      table.episodeId
+      table.episodeId,
     ),
     uniqueIndex("user_queue_items_user_position_idx").on(
       table.userId,
-      table.position
+      table.position,
     ),
-  ]
+  ],
 );
 
 // User Player Session table (per-user resume state, one row per user)
@@ -465,7 +481,7 @@ export const userSubscriptionsRelations = relations(
       fields: [userSubscriptions.podcastId],
       references: [podcasts.id],
     }),
-  })
+  }),
 );
 
 export const collectionsRelations = relations(collections, ({ one, many }) => ({
@@ -524,7 +540,7 @@ export const pushSubscriptionsRelations = relations(
       fields: [pushSubscriptions.userId],
       references: [users.id],
     }),
-  })
+  }),
 );
 
 export const listenHistoryRelations = relations(listenHistory, ({ one }) => ({
@@ -552,7 +568,7 @@ export const userPlayerSessionRelations = relations(
       fields: [userPlayerSession.userId],
       references: [users.id],
     }),
-  })
+  }),
 );
 
 // Type exports for use in the application

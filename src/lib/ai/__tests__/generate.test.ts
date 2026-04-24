@@ -2,7 +2,10 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 vi.mock("@/lib/ai/config", () => ({
   getActiveAiConfig: vi.fn(),
-  DEFAULT_AI_CONFIG: { provider: "openrouter", model: "google/gemini-2.0-flash-001" },
+  DEFAULT_AI_CONFIG: {
+    provider: "openrouter",
+    model: "google/gemini-2.0-flash-001",
+  },
 }));
 
 vi.mock("@/lib/ai/provider-factory", () => ({

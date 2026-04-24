@@ -17,8 +17,8 @@ describe("getAiProvider", () => {
   });
 
   it("throws on unknown provider name", () => {
-    expect(() =>
-      getAiProvider("unknown" as never)
-    ).toThrow("Unknown AI provider: unknown");
+    expect(() => getAiProvider("unknown" as never)).toThrow(
+      "Unknown AI provider: unknown",
+    );
   });
 });

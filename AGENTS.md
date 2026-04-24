@@ -22,21 +22,21 @@ Podcast discovery, AI-powered summarization, and library management for busy pro
 
 ## Architecture map
 
-| Path | Purpose |
-|------|---------|
-| `src/app/` | Next.js App Router pages, route groups `(app)` and `(auth)` |
-| `src/app/actions/` | Server actions — all mutations (`"use server"`) |
-| `src/app/api/` | Route handlers for external API proxying & Trigger.dev orchestration |
-| `src/components/` | Shared React components (feature + UI) |
-| `src/components/ui/` | shadcn/ui primitives (do not edit by hand) |
-| `src/lib/` | Shared domain logic |
-| `src/db/` | Drizzle schema and client — the database schema is defined in `@/db/schema.ts`. Reference it anytime you need to understand the structure of data stored in the database. |
-| `src/trigger/` | Trigger.dev task definitions (background jobs) |
-| `src/hooks/`, `src/contexts/` | Client-side React hooks and context providers |
-| `src/types/` | Shared TypeScript types and type helpers |
-| `src/test/` | Test setup (`src/test/setup.ts`) and global fixtures |
-| `src/middleware.ts` | Next.js middleware (request-time auth/session) |
-| `docs/adr/` | 30+ ADRs — grep by topic before modifying related code |
+| Path                          | Purpose                                                                                                                                                                   |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/app/`                    | Next.js App Router pages, route groups `(app)` and `(auth)`                                                                                                               |
+| `src/app/actions/`            | Server actions — all mutations (`"use server"`)                                                                                                                           |
+| `src/app/api/`                | Route handlers for external API proxying & Trigger.dev orchestration                                                                                                      |
+| `src/components/`             | Shared React components (feature + UI)                                                                                                                                    |
+| `src/components/ui/`          | shadcn/ui primitives (do not edit by hand)                                                                                                                                |
+| `src/lib/`                    | Shared domain logic                                                                                                                                                       |
+| `src/db/`                     | Drizzle schema and client — the database schema is defined in `@/db/schema.ts`. Reference it anytime you need to understand the structure of data stored in the database. |
+| `src/trigger/`                | Trigger.dev task definitions (background jobs)                                                                                                                            |
+| `src/hooks/`, `src/contexts/` | Client-side React hooks and context providers                                                                                                                             |
+| `src/types/`                  | Shared TypeScript types and type helpers                                                                                                                                  |
+| `src/test/`                   | Test setup (`src/test/setup.ts`) and global fixtures                                                                                                                      |
+| `src/middleware.ts`           | Next.js middleware (request-time auth/session)                                                                                                                            |
+| `docs/adr/`                   | 30+ ADRs — grep by topic before modifying related code                                                                                                                    |
 
 Coverage: Vitest enforces an 80% line-coverage threshold globally across `src/app/api/`, `src/app/actions/`, `src/components/` (excluding `ui/`), `src/lib/`, and `src/trigger/`. See `vitest.config.ts` for the exact include/exclude lists.
 
@@ -47,6 +47,8 @@ bun run dev            # Start dev server (port 3000, Turbopack)
 bun run build          # Production build
 bun run start          # Serve the production build locally (run `bun run build` first)
 bun run lint           # ESLint (next lint)
+bun run format         # Format all source files with Prettier
+bun run format:check   # Verify formatting without writing (used by pre-commit hook)
 bun run test           # Run Vitest unit tests
 bun run test:watch     # Run tests in watch mode
 bun run test:coverage  # Run tests with coverage (80% line threshold, see vitest.config.ts)
@@ -63,9 +65,9 @@ bun run trigger:deploy # Deploy tasks to Trigger.dev Cloud
 
 - **Test framework:** Vitest with React Testing Library. Config: `vitest.config.ts`, setup: `src/test/setup.ts`.
 - **Component stories:** Storybook 10 (`@storybook/nextjs-vite`). Config: `.storybook/main.ts`.
-- Always run `bun run lint`, `bun run test`, and `bun run build` before committing.
+- Always run `bun run format:check`, `bun run lint`, `bun run test`, and `bun run build` before committing.
 - Unit tests live in `__tests__/` directories co-located with source. Stories live alongside components as `*.stories.tsx` files.
-- The pre-commit hook (Husky) automatically runs lint and tests on commit.
+- The pre-commit hook (Husky) automatically runs format:check, lint, and tests on commit.
 - ADRs live in `docs/adr/` — read the relevant ADR before modifying areas it covers.
 - **UI verification (agents):** Vitest/RTL runs in jsdom and can't catch real rendering, layout, or interaction bugs. For any UI work, **invoke the `agent-browser` skill** to test the web app in a real browser:
   - **App flows / pages:** start `bun run dev` (port 3000), then use `agent-browser` to navigate to `http://localhost:3000`, click through the flow, fill forms, and take screenshots.
@@ -96,6 +98,7 @@ See [.impeccable.md](.impeccable.md) for design context: users, brand personalit
 Secrets are managed via **Doppler** (not `.env` files). Run `doppler setup` after cloning.
 
 See [docs/secrets-management.md](docs/secrets-management.md) for the full variable reference and per-environment setup. Key points:
+
 - `NEXT_PUBLIC_*` variables are inlined at build time — rebuild after changing them in Doppler.
 - Vercel environments sync from Doppler automatically; Trigger.dev Prod secrets are set manually.
 

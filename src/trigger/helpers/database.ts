@@ -3,7 +3,10 @@ import { db } from "@/db";
 import { episodes, episodeTopics, podcasts } from "@/db/schema";
 import { upsertPodcast } from "@/db/helpers";
 import type { SummaryResult } from "@/lib/openrouter";
-import type { PodcastIndexPodcast, PodcastIndexEpisode } from "@/lib/podcastindex";
+import type {
+  PodcastIndexPodcast,
+  PodcastIndexEpisode,
+} from "@/lib/podcastindex";
 
 /**
  * Ensures a podcast exists in the database, creating it if necessary.
@@ -11,7 +14,7 @@ import type { PodcastIndexPodcast, PodcastIndexEpisode } from "@/lib/podcastinde
  */
 async function ensurePodcast(
   feedId: number,
-  podcast?: PodcastIndexPodcast
+  podcast?: PodcastIndexPodcast,
 ): Promise<number | null> {
   if (podcast) {
     const categoryValues = podcast.categories
@@ -19,19 +22,22 @@ async function ensurePodcast(
       : [];
     const categories = categoryValues.length > 0 ? categoryValues : undefined;
 
-    return upsertPodcast({
-      podcastIndexId: feedId.toString(),
-      title: podcast.title,
-      description: podcast.description,
-      publisher: podcast.author || podcast.ownerName,
-      imageUrl: podcast.artwork || podcast.image,
-      rssFeedUrl: podcast.url,
-      categories,
-      totalEpisodes: podcast.episodeCount,
-      latestEpisodeDate: podcast.newestItemPubdate
-        ? new Date(podcast.newestItemPubdate * 1000)
-        : undefined,
-    }, { updateOnConflict: "full" });
+    return upsertPodcast(
+      {
+        podcastIndexId: feedId.toString(),
+        title: podcast.title,
+        description: podcast.description,
+        publisher: podcast.author || podcast.ownerName,
+        imageUrl: podcast.artwork || podcast.image,
+        rssFeedUrl: podcast.url,
+        categories,
+        totalEpisodes: podcast.episodeCount,
+        latestEpisodeDate: podcast.newestItemPubdate
+          ? new Date(podcast.newestItemPubdate * 1000)
+          : undefined,
+      },
+      { updateOnConflict: "full" },
+    );
   }
 
   const dbPodcast = await db.query.podcasts.findFirst({
@@ -47,7 +53,7 @@ async function ensurePodcast(
 export async function trackEpisodeRun(
   episode: PodcastIndexEpisode,
   podcast: PodcastIndexPodcast | undefined,
-  runId: string
+  runId: string,
 ): Promise<void> {
   const podcastId = await ensurePodcast(episode.feedId, podcast);
   if (!podcastId) return;
@@ -92,7 +98,7 @@ export async function trackEpisodeRun(
  */
 export async function updateEpisodeStatus(
   episodeId: number | string,
-  status: "summarizing"
+  status: "summarizing",
 ): Promise<void> {
   await db
     .update(episodes)
@@ -112,7 +118,7 @@ export async function updateEpisodeStatus(
 export async function persistTranscript(
   episodeId: number,
   transcript: string,
-  source: "podcastindex" | "assemblyai" | "description-url"
+  source: "podcastindex" | "assemblyai" | "description-url",
 ): Promise<void> {
   const now = new Date();
   const updated = await db
@@ -130,34 +136,34 @@ export async function persistTranscript(
     .returning({ id: episodes.id });
 
   if (updated.length === 0) {
-    throw new Error(`Episode ${episodeId} not found for transcript persistence`);
+    throw new Error(
+      `Episode ${episodeId} not found for transcript persistence`,
+    );
   }
 }
 
 async function persistTopics(
   episodeId: number,
-  topics: SummaryResult["topics"]
+  topics: SummaryResult["topics"],
 ): Promise<void> {
   if (!topics || topics.length === 0) return;
   // Delete-then-insert to reconcile stale topics on re-summarization.
   // No transaction — benign failure mode matches the existing pattern
   // (summary saved without topics; Trigger.dev retries self-heal).
   await db.delete(episodeTopics).where(eq(episodeTopics.episodeId, episodeId));
-  await db
-    .insert(episodeTopics)
-    .values(
-      topics.map((t) => ({
-        episodeId,
-        topic: t.name,
-        relevance: t.relevance.toFixed(2),
-      }))
-    );
+  await db.insert(episodeTopics).values(
+    topics.map((t) => ({
+      episodeId,
+      topic: t.name,
+      relevance: t.relevance.toFixed(2),
+    })),
+  );
 }
 
 export async function persistEpisodeSummary(
   episode: PodcastIndexEpisode,
   podcast: PodcastIndexPodcast | undefined,
-  summary: SummaryResult
+  summary: SummaryResult,
 ): Promise<void> {
   const podcastId = await ensurePodcast(episode.feedId, podcast);
   if (!podcastId) {

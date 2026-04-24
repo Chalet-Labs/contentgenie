@@ -6,7 +6,7 @@
 
 ## Context
 
-Each episode summarization consumes paid API resources: OpenRouter/Z.AI for AI inference and AssemblyAI for audio transcription. The existing rate limiter (ADR-001) enforces a per-user hourly quota of 10 summarizations per rolling hour. This prevents short-term abuse but does not cap total daily spend — a determined user can trigger 240 summarizations per day (10/hour * 24 hours).
+Each episode summarization consumes paid API resources: OpenRouter/Z.AI for AI inference and AssemblyAI for audio transcription. The existing rate limiter (ADR-001) enforces a per-user hourly quota of 10 summarizations per rolling hour. This prevents short-term abuse but does not cap total daily spend — a determined user can trigger 240 summarizations per day (10/hour \* 24 hours).
 
 Issue #64 requests a **per-user daily limit** (e.g., 5 per day) to provide tighter cost control. The limit should be configurable without redeployment, apply to both manual and batch summarization flows, and return clear feedback when exhausted.
 

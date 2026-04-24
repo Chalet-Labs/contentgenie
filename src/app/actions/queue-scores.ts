@@ -15,18 +15,20 @@ const MAX_IDS = 50;
  * Returns an empty object when unauthenticated or on error.
  */
 export async function getQueueEpisodeScores(
-  podcastIndexIds: string[]
+  podcastIndexIds: string[],
 ): Promise<Record<string, number | null>> {
   try {
     const { userId } = await auth();
     if (!userId) return {};
 
-    const ids = Array.from(new Set(
-      podcastIndexIds
-        .filter((id) => typeof id === "string")
-        .map((id) => id.trim())
-        .filter((id) => id.length > 0)
-    )).slice(0, MAX_IDS);
+    const ids = Array.from(
+      new Set(
+        podcastIndexIds
+          .filter((id) => typeof id === "string")
+          .map((id) => id.trim())
+          .filter((id) => id.length > 0),
+      ),
+    ).slice(0, MAX_IDS);
 
     if (ids.length === 0) return {};
 

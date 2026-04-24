@@ -143,7 +143,9 @@ export function RecentEpisodes({
               )}
             </div>
             <div className="min-w-0 flex-1">
-              <h4 className="line-clamp-1 text-sm font-medium">{episode.title}</h4>
+              <h4 className="line-clamp-1 text-sm font-medium">
+                {episode.title}
+              </h4>
               <p className="line-clamp-1 text-xs text-muted-foreground">
                 {episode.podcastTitle}
               </p>

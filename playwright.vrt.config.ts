@@ -1,4 +1,4 @@
-import { defineConfig, devices } from "@playwright/test"
+import { defineConfig, devices } from "@playwright/test";
 
 /**
  * Playwright configuration for visual regression testing (VRT).
@@ -44,4 +44,4 @@ export default defineConfig({
       use: { ...devices["Desktop Chrome"] },
     },
   ],
-})
+});

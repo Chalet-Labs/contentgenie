@@ -49,10 +49,10 @@ describe("NotificationPopover", () => {
         summary={populatedSummary}
         isError={false}
         onRetry={vi.fn()}
-      />
+      />,
     );
     expect(
-      screen.getByRole("dialog", { name: /notifications/i })
+      screen.getByRole("dialog", { name: /notifications/i }),
     ).toBeInTheDocument();
   });
 
@@ -67,13 +67,13 @@ describe("NotificationPopover", () => {
         summary={populatedSummary}
         isError={false}
         onRetry={vi.fn()}
-      />
+      />,
     );
     expect(
-      screen.getByRole("dialog", { name: /notifications/i })
+      screen.getByRole("dialog", { name: /notifications/i }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("heading", { name: /notifications/i })
+      screen.getByRole("heading", { name: /notifications/i }),
     ).toBeInTheDocument();
   });
 
@@ -86,7 +86,7 @@ describe("NotificationPopover", () => {
         summary={null}
         isError={false}
         onRetry={vi.fn()}
-      />
+      />,
     );
     // Skeleton rows are rendered as divs with animate-pulse; count them by test id
     const skeletons = document.querySelectorAll("[data-testid='skeleton-row']");
@@ -103,10 +103,10 @@ describe("NotificationPopover", () => {
         summary={null}
         isError={true}
         onRetry={onRetry}
-      />
+      />,
     );
     expect(
-      screen.getByText(/couldn't load notifications/i)
+      screen.getByText(/couldn't load notifications/i),
     ).toBeInTheDocument();
     const retryBtn = screen.getByRole("button", { name: /retry/i });
     fireEvent.click(retryBtn);
@@ -122,10 +122,10 @@ describe("NotificationPopover", () => {
         summary={populatedSummary}
         isError={false}
         onRetry={vi.fn()}
-      />
+      />,
     );
     expect(
-      screen.getByRole("link", { name: /3 new episodes from test podcast/i })
+      screen.getByRole("link", { name: /3 new episodes from test podcast/i }),
     ).toBeInTheDocument();
   });
 
@@ -138,11 +138,12 @@ describe("NotificationPopover", () => {
         summary={populatedSummary}
         isError={false}
         onRetry={vi.fn()}
-      />
+      />,
     );
-    expect(
-      screen.getByRole("link", { name: /see all/i })
-    ).toHaveAttribute("href", "/notifications");
+    expect(screen.getByRole("link", { name: /see all/i })).toHaveAttribute(
+      "href",
+      "/notifications",
+    );
   });
 
   it("(f) See all footer link renders in loading state", () => {
@@ -154,11 +155,12 @@ describe("NotificationPopover", () => {
         summary={null}
         isError={false}
         onRetry={vi.fn()}
-      />
+      />,
     );
-    expect(
-      screen.getByRole("link", { name: /see all/i })
-    ).toHaveAttribute("href", "/notifications");
+    expect(screen.getByRole("link", { name: /see all/i })).toHaveAttribute(
+      "href",
+      "/notifications",
+    );
   });
 
   it("(f) See all footer link renders in error state", () => {
@@ -170,11 +172,12 @@ describe("NotificationPopover", () => {
         summary={null}
         isError={true}
         onRetry={vi.fn()}
-      />
+      />,
     );
-    expect(
-      screen.getByRole("link", { name: /see all/i })
-    ).toHaveAttribute("href", "/notifications");
+    expect(screen.getByRole("link", { name: /see all/i })).toHaveAttribute(
+      "href",
+      "/notifications",
+    );
   });
 
   it("(f) See all footer link renders in empty state", () => {
@@ -186,11 +189,12 @@ describe("NotificationPopover", () => {
         summary={emptySummary}
         isError={false}
         onRetry={vi.fn()}
-      />
+      />,
     );
-    expect(
-      screen.getByRole("link", { name: /see all/i })
-    ).toHaveAttribute("href", "/notifications");
+    expect(screen.getByRole("link", { name: /see all/i })).toHaveAttribute(
+      "href",
+      "/notifications",
+    );
   });
 
   it("(g) Esc key triggers onOpenChange(false)", async () => {
@@ -204,7 +208,7 @@ describe("NotificationPopover", () => {
         summary={populatedSummary}
         isError={false}
         onRetry={vi.fn()}
-      />
+      />,
     );
     await user.keyboard("{Escape}");
     expect(onOpenChange).toHaveBeenCalledWith(false);
@@ -219,10 +223,10 @@ describe("NotificationPopover", () => {
         summary={emptySummary}
         isError={false}
         onRetry={vi.fn()}
-      />
+      />,
     );
     expect(
-      screen.queryByRole("button", { name: /clear all/i })
+      screen.queryByRole("button", { name: /clear all/i }),
     ).not.toBeInTheDocument();
   });
 
@@ -235,10 +239,10 @@ describe("NotificationPopover", () => {
         summary={null}
         isError={false}
         onRetry={vi.fn()}
-      />
+      />,
     );
     expect(
-      screen.queryByRole("button", { name: /clear all/i })
+      screen.queryByRole("button", { name: /clear all/i }),
     ).not.toBeInTheDocument();
   });
 
@@ -252,20 +256,20 @@ describe("NotificationPopover", () => {
         summary={populatedSummary}
         isError={false}
         onRetry={vi.fn()}
-      />
+      />,
     );
     expect(
-      screen.getByRole("link", { name: /3 new episodes from test podcast/i })
+      screen.getByRole("link", { name: /3 new episodes from test podcast/i }),
     ).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /clear all/i }));
 
     expect(
-      screen.queryByRole("link", { name: /from test podcast/i })
+      screen.queryByRole("link", { name: /from test podcast/i }),
     ).not.toBeInTheDocument();
     expect(screen.getByText(/you're all caught up/i)).toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: /clear all/i })
+      screen.queryByRole("button", { name: /clear all/i }),
     ).not.toBeInTheDocument();
   });
 
@@ -296,16 +300,16 @@ describe("NotificationPopover", () => {
         summary={twoGroupSummary}
         isError={false}
         onRetry={vi.fn()}
-      />
+      />,
     );
 
     await user.click(screen.getByRole("link", { name: /from pod a/i }));
 
     expect(
-      screen.queryByRole("link", { name: /from pod a/i })
+      screen.queryByRole("link", { name: /from pod a/i }),
     ).not.toBeInTheDocument();
     expect(
-      screen.getByRole("link", { name: /from pod b/i })
+      screen.getByRole("link", { name: /from pod b/i }),
     ).toBeInTheDocument();
   });
 
@@ -330,14 +334,14 @@ describe("NotificationPopover", () => {
         summary={singleGroupSummary}
         isError={false}
         onRetry={vi.fn()}
-      />
+      />,
     );
 
     await user.click(screen.getByRole("link", { name: /from pod solo/i }));
 
     expect(screen.getByText(/you're all caught up/i)).toBeInTheDocument();
     expect(
-      screen.queryByRole("link", { name: /unread notifications?$/i })
+      screen.queryByRole("link", { name: /unread notifications?$/i }),
     ).not.toBeInTheDocument();
   });
 
@@ -373,10 +377,10 @@ describe("NotificationPopover", () => {
         summary={initialSummary}
         isError={false}
         onRetry={vi.fn()}
-      />
+      />,
     );
     expect(
-      screen.getByRole("link", { name: /from pod one/i })
+      screen.getByRole("link", { name: /from pod one/i }),
     ).toBeInTheDocument();
 
     rerender(
@@ -387,13 +391,13 @@ describe("NotificationPopover", () => {
         summary={updatedSummary}
         isError={false}
         onRetry={vi.fn()}
-      />
+      />,
     );
     expect(
-      screen.getByRole("link", { name: /from pod two/i })
+      screen.getByRole("link", { name: /from pod two/i }),
     ).toBeInTheDocument();
     expect(
-      screen.queryByRole("link", { name: /from pod one/i })
+      screen.queryByRole("link", { name: /from pod one/i }),
     ).not.toBeInTheDocument();
   });
 
@@ -409,7 +413,7 @@ describe("NotificationPopover", () => {
         summary={populatedSummary}
         isError={false}
         onRetry={vi.fn()}
-      />
+      />,
     );
     expect(screen.getByRole("dialog")).toBeInTheDocument();
     rerender(
@@ -420,7 +424,7 @@ describe("NotificationPopover", () => {
         summary={populatedSummary}
         isError={false}
         onRetry={vi.fn()}
-      />
+      />,
     );
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });

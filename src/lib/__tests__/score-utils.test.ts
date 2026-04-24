@@ -15,40 +15,56 @@ import type { WorthItSignals } from "@/lib/openrouter";
 /** Helper: create a WorthItSignals object with all signals set to `value`. */
 function allSignals(value: boolean): WorthItSignals {
   return coerceSignals(
-    Object.fromEntries(WORTH_IT_SIGNAL_KEYS.map((k) => [k, value]))
+    Object.fromEntries(WORTH_IT_SIGNAL_KEYS.map((k) => [k, value])),
   );
 }
 
 /** Helper: create signals with the first `n` keys true, rest false. */
 function nTrueSignals(n: number): WorthItSignals {
   return coerceSignals(
-    Object.fromEntries(WORTH_IT_SIGNAL_KEYS.map((k, i) => [k, i < n]))
+    Object.fromEntries(WORTH_IT_SIGNAL_KEYS.map((k, i) => [k, i < n])),
   );
 }
 
 describe("getScoreColor", () => {
   it("returns exceptional colors for scores >= 8", () => {
-    expect(getScoreColor(8)).toBe("bg-score-exceptional text-score-exceptional-foreground");
-    expect(getScoreColor(9.5)).toBe("bg-score-exceptional text-score-exceptional-foreground");
-    expect(getScoreColor(10)).toBe("bg-score-exceptional text-score-exceptional-foreground");
+    expect(getScoreColor(8)).toBe(
+      "bg-score-exceptional text-score-exceptional-foreground",
+    );
+    expect(getScoreColor(9.5)).toBe(
+      "bg-score-exceptional text-score-exceptional-foreground",
+    );
+    expect(getScoreColor(10)).toBe(
+      "bg-score-exceptional text-score-exceptional-foreground",
+    );
   });
 
   it("returns above colors for scores >= 6 and < 8", () => {
     expect(getScoreColor(6)).toBe("bg-score-above text-score-above-foreground");
     expect(getScoreColor(7)).toBe("bg-score-above text-score-above-foreground");
-    expect(getScoreColor(7.9)).toBe("bg-score-above text-score-above-foreground");
+    expect(getScoreColor(7.9)).toBe(
+      "bg-score-above text-score-above-foreground",
+    );
   });
 
   it("returns average colors for scores >= 4 and < 6", () => {
-    expect(getScoreColor(4)).toBe("bg-score-average text-score-average-foreground");
-    expect(getScoreColor(5)).toBe("bg-score-average text-score-average-foreground");
-    expect(getScoreColor(5.9)).toBe("bg-score-average text-score-average-foreground");
+    expect(getScoreColor(4)).toBe(
+      "bg-score-average text-score-average-foreground",
+    );
+    expect(getScoreColor(5)).toBe(
+      "bg-score-average text-score-average-foreground",
+    );
+    expect(getScoreColor(5.9)).toBe(
+      "bg-score-average text-score-average-foreground",
+    );
   });
 
   it("returns below colors for scores >= 2 and < 4", () => {
     expect(getScoreColor(2)).toBe("bg-score-below text-score-below-foreground");
     expect(getScoreColor(3)).toBe("bg-score-below text-score-below-foreground");
-    expect(getScoreColor(3.9)).toBe("bg-score-below text-score-below-foreground");
+    expect(getScoreColor(3.9)).toBe(
+      "bg-score-below text-score-below-foreground",
+    );
   });
 
   it("returns skip colors for scores < 2", () => {
@@ -249,14 +265,14 @@ describe("coerceSignals", () => {
 
   it("coerces recognized non-boolean values correctly", () => {
     const result = coerceSignals({
-      hasActionableInsights: 1,            // number 1 → true
-      hasNearTermApplicability: "true",    // string "true" → true
-      staysFocused: "TRUE",               // case-insensitive → true
-      goesBeyondSurface: 0,               // number 0 → false
-      isWellStructured: "false",           // string "false" → false
-      timeJustified: "yes",               // unrecognized string → false
-      hasConcreteExamples: 42,            // number ≠ 1 → false
-      hasExpertPerspectives: null,        // null → false
+      hasActionableInsights: 1, // number 1 → true
+      hasNearTermApplicability: "true", // string "true" → true
+      staysFocused: "TRUE", // case-insensitive → true
+      goesBeyondSurface: 0, // number 0 → false
+      isWellStructured: "false", // string "false" → false
+      timeJustified: "yes", // unrecognized string → false
+      hasConcreteExamples: 42, // number ≠ 1 → false
+      hasExpertPerspectives: null, // null → false
     });
     expect(result.hasActionableInsights).toBe(true);
     expect(result.hasNearTermApplicability).toBe(true);

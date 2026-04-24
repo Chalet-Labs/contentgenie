@@ -1,26 +1,33 @@
-"use client"
+"use client";
 
-import { useEffect } from "react"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { useEffect } from "react";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 
 export default function AdminError({
   error,
   reset,
 }: {
-  error: Error & { digest?: string }
-  reset: () => void
+  error: Error & { digest?: string };
+  reset: () => void;
 }) {
   useEffect(() => {
-    console.error("Admin panel error:", error)
-  }, [error])
+    console.error("Admin panel error:", error);
+  }, [error]);
 
   return (
     <Card className="border-destructive/50">
       <CardHeader>
         <CardTitle className="text-destructive">Something went wrong</CardTitle>
         <CardDescription>
-          An error occurred while loading the admin panel. This may be a temporary issue.
+          An error occurred while loading the admin panel. This may be a
+          temporary issue.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -29,5 +36,5 @@ export default function AdminError({
         </Button>
       </CardContent>
     </Card>
-  )
+  );
 }

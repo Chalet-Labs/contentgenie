@@ -1,11 +1,11 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
-import { render, screen } from "@testing-library/react"
-import userEvent from "@testing-library/user-event"
-import { SleepTimerMenu } from "@/components/audio-player/sleep-timer-menu"
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { SleepTimerMenu } from "@/components/audio-player/sleep-timer-menu";
 import type {
   AudioPlayerState,
   AudioPlayerAPI,
-} from "@/contexts/audio-player-context"
+} from "@/contexts/audio-player-context";
 
 const mockState: AudioPlayerState = {
   sleepTimer: null,
@@ -21,7 +21,7 @@ const mockState: AudioPlayerState = {
   queue: [],
   chapters: null,
   chaptersLoading: false,
-}
+};
 
 const mockAPI: AudioPlayerAPI = {
   playEpisode: vi.fn(),
@@ -40,185 +40,183 @@ const mockAPI: AudioPlayerAPI = {
   setSleepTimer: vi.fn(),
   cancelSleepTimer: vi.fn(),
   getCurrentTime: vi.fn(() => 0),
-}
+};
 
 vi.mock("@/contexts/audio-player-context", () => ({
   useAudioPlayerState: () => mockState,
   useAudioPlayerAPI: () => mockAPI,
-}))
+}));
 
 describe("SleepTimerMenu", () => {
   beforeEach(() => {
-    vi.clearAllMocks()
-    mockState.sleepTimer = null
-  })
+    vi.clearAllMocks();
+    mockState.sleepTimer = null;
+  });
 
   afterEach(() => {
-    vi.restoreAllMocks()
-  })
+    vi.restoreAllMocks();
+  });
 
   it("renders the trigger button with Moon icon", () => {
-    render(<SleepTimerMenu />)
-    expect(screen.getByRole("button", { name: "Sleep timer" })).toBeInTheDocument()
-  })
+    render(<SleepTimerMenu />);
+    expect(
+      screen.getByRole("button", { name: "Sleep timer" }),
+    ).toBeInTheDocument();
+  });
 
   it("shows menu items on click", async () => {
-    const user = userEvent.setup()
-    render(<SleepTimerMenu />)
+    const user = userEvent.setup();
+    render(<SleepTimerMenu />);
 
-    await user.click(screen.getByRole("button", { name: "Sleep timer" }))
+    await user.click(screen.getByRole("button", { name: "Sleep timer" }));
 
-    expect(screen.getByText("15 minutes")).toBeInTheDocument()
-    expect(screen.getByText("30 minutes")).toBeInTheDocument()
-    expect(screen.getByText("45 minutes")).toBeInTheDocument()
-    expect(screen.getByText("60 minutes")).toBeInTheDocument()
-    expect(screen.getByText("End of episode")).toBeInTheDocument()
-  })
+    expect(screen.getByText("15 minutes")).toBeInTheDocument();
+    expect(screen.getByText("30 minutes")).toBeInTheDocument();
+    expect(screen.getByText("45 minutes")).toBeInTheDocument();
+    expect(screen.getByText("60 minutes")).toBeInTheDocument();
+    expect(screen.getByText("End of episode")).toBeInTheDocument();
+  });
 
   it("does not show cancel option when no timer is active", async () => {
-    const user = userEvent.setup()
-    render(<SleepTimerMenu />)
+    const user = userEvent.setup();
+    render(<SleepTimerMenu />);
 
-    await user.click(screen.getByRole("button", { name: "Sleep timer" }))
+    await user.click(screen.getByRole("button", { name: "Sleep timer" }));
 
-    expect(screen.queryByText("Cancel timer")).not.toBeInTheDocument()
-  })
+    expect(screen.queryByText("Cancel timer")).not.toBeInTheDocument();
+  });
 
   it.each([15, 30, 45, 60])(
     "calls setSleepTimer with %d when that preset is clicked",
     async (minutes) => {
-      const user = userEvent.setup()
-      render(<SleepTimerMenu />)
+      const user = userEvent.setup();
+      render(<SleepTimerMenu />);
 
-      await user.click(screen.getByRole("button", { name: "Sleep timer" }))
-      await user.click(screen.getByText(`${minutes} minutes`))
+      await user.click(screen.getByRole("button", { name: "Sleep timer" }));
+      await user.click(screen.getByText(`${minutes} minutes`));
 
-      expect(mockAPI.setSleepTimer).toHaveBeenCalledWith(minutes)
-    }
-  )
+      expect(mockAPI.setSleepTimer).toHaveBeenCalledWith(minutes);
+    },
+  );
 
   it("calls setSleepTimer with 'end-of-episode' for end of episode option", async () => {
-    const user = userEvent.setup()
-    render(<SleepTimerMenu />)
+    const user = userEvent.setup();
+    render(<SleepTimerMenu />);
 
-    await user.click(screen.getByRole("button", { name: "Sleep timer" }))
-    await user.click(screen.getByText("End of episode"))
+    await user.click(screen.getByRole("button", { name: "Sleep timer" }));
+    await user.click(screen.getByText("End of episode"));
 
-    expect(mockAPI.setSleepTimer).toHaveBeenCalledWith("end-of-episode")
-  })
+    expect(mockAPI.setSleepTimer).toHaveBeenCalledWith("end-of-episode");
+  });
 
   it("shows cancel option when timer is active", async () => {
     mockState.sleepTimer = {
       endTime: Date.now() + 1800_000,
       type: "duration",
-    }
-    const user = userEvent.setup()
-    render(<SleepTimerMenu />)
+    };
+    const user = userEvent.setup();
+    render(<SleepTimerMenu />);
 
-    await user.click(
-      screen.getByRole("button", { name: /Sleep timer/ })
-    )
+    await user.click(screen.getByRole("button", { name: /Sleep timer/ }));
 
-    expect(screen.getByText("Cancel timer")).toBeInTheDocument()
-  })
+    expect(screen.getByText("Cancel timer")).toBeInTheDocument();
+  });
 
   it("calls cancelSleepTimer when cancel is clicked", async () => {
     mockState.sleepTimer = {
       endTime: Date.now() + 900_000,
       type: "duration",
-    }
-    const user = userEvent.setup()
-    render(<SleepTimerMenu />)
+    };
+    const user = userEvent.setup();
+    render(<SleepTimerMenu />);
 
-    await user.click(
-      screen.getByRole("button", { name: /Sleep timer/ })
-    )
-    await user.click(screen.getByText("Cancel timer"))
+    await user.click(screen.getByRole("button", { name: /Sleep timer/ }));
+    await user.click(screen.getByText("Cancel timer"));
 
-    expect(mockAPI.cancelSleepTimer).toHaveBeenCalledOnce()
-  })
+    expect(mockAPI.cancelSleepTimer).toHaveBeenCalledOnce();
+  });
 
   it("shows countdown text on trigger when duration timer is active", () => {
     mockState.sleepTimer = {
       endTime: Date.now() + 1500_000,
       type: "duration",
-    }
-    render(<SleepTimerMenu />)
+    };
+    render(<SleepTimerMenu />);
 
     // formatTime(1500) = "25:00"
-    expect(screen.getByText("25:00")).toBeInTheDocument()
-  })
+    expect(screen.getByText("25:00")).toBeInTheDocument();
+  });
 
   it("shows 'End' text on trigger when end-of-episode timer is active", () => {
     mockState.sleepTimer = {
       endTime: null,
       type: "end-of-episode",
-    }
-    render(<SleepTimerMenu />)
+    };
+    render(<SleepTimerMenu />);
 
-    expect(screen.getByText("End")).toBeInTheDocument()
-  })
+    expect(screen.getByText("End")).toBeInTheDocument();
+  });
 
   it("has correct aria-label when duration timer is active", () => {
     mockState.sleepTimer = {
       endTime: Date.now() + 1800_000,
       type: "duration",
-    }
-    render(<SleepTimerMenu />)
+    };
+    render(<SleepTimerMenu />);
 
     expect(
       screen.getByRole("button", {
         name: "Sleep timer — 30 minutes remaining",
-      })
-    ).toBeInTheDocument()
-  })
+      }),
+    ).toBeInTheDocument();
+  });
 
   it("has correct aria-label when end-of-episode timer is active", () => {
     mockState.sleepTimer = {
       endTime: null,
       type: "end-of-episode",
-    }
-    render(<SleepTimerMenu />)
+    };
+    render(<SleepTimerMenu />);
 
     expect(
       screen.getByRole("button", {
         name: "Sleep timer — end of episode",
-      })
-    ).toBeInTheDocument()
-  })
+      }),
+    ).toBeInTheDocument();
+  });
 
   it("shows check icon next to End of episode when end-of-episode timer is active", async () => {
     mockState.sleepTimer = {
       endTime: null,
       type: "end-of-episode",
-    }
-    const user = userEvent.setup()
-    render(<SleepTimerMenu />)
+    };
+    const user = userEvent.setup();
+    render(<SleepTimerMenu />);
 
-    await user.click(
-      screen.getByRole("button", { name: /Sleep timer/ })
-    )
+    await user.click(screen.getByRole("button", { name: /Sleep timer/ }));
 
     // The check icon renders as an svg inside the end-of-episode menu item
-    const menuItem = screen.getByText("End of episode").closest("[role=menuitem]")
-    expect(menuItem).not.toBeNull()
-    expect(menuItem!.querySelector("svg")).toBeInTheDocument()
-  })
+    const menuItem = screen
+      .getByText("End of episode")
+      .closest("[role=menuitem]");
+    expect(menuItem).not.toBeNull();
+    expect(menuItem!.querySelector("svg")).toBeInTheDocument();
+  });
 
   it("does not show check icon next to duration presets when duration timer is active", async () => {
     mockState.sleepTimer = {
       endTime: Date.now() + 1800_000,
       type: "duration",
-    }
-    const user = userEvent.setup()
-    render(<SleepTimerMenu />)
+    };
+    const user = userEvent.setup();
+    render(<SleepTimerMenu />);
 
-    await user.click(
-      screen.getByRole("button", { name: /Sleep timer/ })
-    )
+    await user.click(screen.getByRole("button", { name: /Sleep timer/ }));
 
-    const thirtyMinItem = screen.getByText("30 minutes").closest("[role=menuitem]")
-    expect(thirtyMinItem).not.toBeNull()
-    expect(thirtyMinItem!.querySelector("svg")).not.toBeInTheDocument()
-  })
-})
+    const thirtyMinItem = screen
+      .getByText("30 minutes")
+      .closest("[role=menuitem]");
+    expect(thirtyMinItem).not.toBeNull();
+    expect(thirtyMinItem!.querySelector("svg")).not.toBeInTheDocument();
+  });
+});

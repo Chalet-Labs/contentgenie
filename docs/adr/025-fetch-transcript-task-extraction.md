@@ -14,6 +14,7 @@ The `summarize-episode` Trigger.dev task contained a ~150-line transcript acquis
 4. Submits audio to AssemblyAI for async transcription (via `wait.createToken` + webhook)
 
 This waterfall is inlined in `summarize-episode`, making it impossible to:
+
 - Test transcript acquisition independently from summarization
 - Reuse transcript fetching from other entry points (e.g., a future standalone transcript-refresh flow)
 - Retry only the transcript fetch step without retrying the entire episode + podcast fetch pipeline

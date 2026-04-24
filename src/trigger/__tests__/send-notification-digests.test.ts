@@ -1,16 +1,11 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { createTriggerSdkMock } from "@/test/mocks/trigger-sdk";
 
-// Mock Trigger.dev SDK
-vi.mock("@trigger.dev/sdk", () => ({
-  schedules: {
-    task: vi.fn((config) => config),
-  },
-  logger: {
-    info: vi.fn(),
-    warn: vi.fn(),
-    error: vi.fn(),
-  },
-}));
+vi.mock("@trigger.dev/sdk", () =>
+  createTriggerSdkMock({
+    schedules: { task: vi.fn((config: unknown) => config) },
+  }),
+);
 
 // Mock sendPushToUser from the shared push module
 const mockSendPushToUser = vi.fn();
@@ -73,10 +68,7 @@ describe("send-notification-digests", () => {
     vi.restoreAllMocks();
   });
 
-  function setupSelectChain(
-    digestUsers: unknown[],
-    unreadCountValue: number
-  ) {
+  function setupSelectChain(digestUsers: unknown[], unreadCountValue: number) {
     // First select: query digest users
     // Second select (per user): count unread notifications
     const unreadResult = [{ value: unreadCountValue }];
@@ -127,7 +119,7 @@ describe("send-notification-digests", () => {
         tag: "digest",
         data: { url: "/dashboard" },
       }),
-      expect.any(Object)
+      expect.any(Object),
     );
   });
 
@@ -149,7 +141,7 @@ describe("send-notification-digests", () => {
     expect(mockSendPushToUser).toHaveBeenCalledWith(
       "user-1",
       expect.objectContaining({ body: "You have 1 new update" }),
-      expect.any(Object)
+      expect.any(Object),
     );
   });
 
@@ -249,7 +241,7 @@ describe("send-notification-digests", () => {
           pushEnabled: true,
           lastDigestSentAt: expect.any(String),
         }),
-      })
+      }),
     );
   });
 

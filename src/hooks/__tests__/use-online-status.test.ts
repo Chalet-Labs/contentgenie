@@ -80,7 +80,7 @@ describe("useOnlineStatus", () => {
     unmount();
 
     const removedEvents = removeEventListenerSpy.mock.calls.map(
-      ([event]) => event
+      ([event]) => event,
     );
     expect(removedEvents).toContain("online");
     expect(removedEvents).toContain("offline");

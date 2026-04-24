@@ -8,11 +8,11 @@
  * mocked module), by which time ESM imports have resolved.
  * Episode fixtures live in `@/test/fixtures/audio-episode`.
  */
-import { expect, vi } from "vitest"
+import { expect, vi } from "vitest";
 
-type MockFn = ReturnType<typeof vi.fn>
+type MockFn = ReturnType<typeof vi.fn>;
 
-export { validEpisode, validEpisode2 } from "@/test/fixtures/audio-episode"
+export { validEpisode, validEpisode2 } from "@/test/fixtures/audio-episode";
 
 /**
  * Factory for the `drizzle-orm` mock. Pure (no closure over file-local vars),
@@ -22,7 +22,7 @@ export function createDrizzleOrmMock() {
   return {
     eq: vi.fn((col: unknown, val: unknown) => ({ col, val })),
     asc: vi.fn((col: unknown) => ({ col, direction: "asc" })),
-  }
+  };
 }
 
 /**
@@ -34,11 +34,11 @@ export function makeInsertChain(
   valuesSpy: (...args: unknown[]) => unknown,
 ) {
   return (...args: unknown[]) => {
-    insertSpy(...args)
+    insertSpy(...args);
     return {
       values: (...vArgs: unknown[]) => valuesSpy(...vArgs),
-    }
-  }
+    };
+  };
 }
 
 /**
@@ -52,16 +52,16 @@ export function makeInsertConflictChain(
   onConflictSpy: (opts: unknown) => unknown,
 ) {
   return (...args: unknown[]) => {
-    insertSpy(...args)
+    insertSpy(...args);
     return {
       values: (...vArgs: unknown[]) => {
-        valuesSpy(...vArgs)
+        valuesSpy(...vArgs);
         return {
           onConflictDoUpdate: (opts: unknown) => onConflictSpy(opts),
-        }
+        };
       },
-    }
-  }
+    };
+  };
 }
 
 /** Build a 2-level chain: `db.delete(table).where(predicate)`. */
@@ -70,23 +70,14 @@ export function makeDeleteChain(
   whereSpy: (...args: unknown[]) => unknown,
 ) {
   return (...args: unknown[]) => {
-    deleteSpy(...args)
+    deleteSpy(...args);
     return {
       where: (...wArgs: unknown[]) => whereSpy(...wArgs),
-    }
-  }
+    };
+  };
 }
 
-/**
- * Module shape for `@clerk/nextjs/server`. Intended for use inside
- * `vi.mock("@clerk/nextjs/server", () => makeClerkAuthMock(() => mockAuth()))`.
- * The global test setup already installs a happy-path Clerk mock; action tests
- * override it so they can drive `userId` per test (e.g. null for the
- * unauthenticated case).
- */
-export function makeClerkAuthMock(authSpy: () => unknown) {
-  return { auth: authSpy }
-}
+export { makeClerkAuthMock } from "@/test/mocks/clerk-server";
 
 /**
  * Module shape for `@/db/helpers`. Intended for use inside
@@ -95,7 +86,7 @@ export function makeClerkAuthMock(authSpy: () => unknown) {
 export function makeUserHelpersMock(
   ensureUserExistsSpy: (...args: unknown[]) => unknown,
 ) {
-  return { ensureUserExists: ensureUserExistsSpy }
+  return { ensureUserExists: ensureUserExistsSpy };
 }
 
 /**
@@ -106,10 +97,10 @@ export function makeUserHelpersMock(
  */
 export function happyPathSetup(authSpy: MockFn, ensureUserExistsSpy: MockFn) {
   return () => {
-    vi.clearAllMocks()
-    authSpy.mockResolvedValue({ userId: "user_123" })
-    ensureUserExistsSpy.mockResolvedValue(undefined)
-  }
+    vi.clearAllMocks();
+    authSpy.mockResolvedValue({ userId: "user_123" });
+    ensureUserExistsSpy.mockResolvedValue(undefined);
+  };
 }
 
 /**
@@ -131,11 +122,11 @@ export function testUnauthenticated(
   blockedSpy: MockFn,
 ) {
   return async () => {
-    authSpy.mockResolvedValue({ userId: null })
-    const result = await runAction()
-    expect(result.success).toBe(false)
-    expect(blockedSpy).not.toHaveBeenCalled()
-  }
+    authSpy.mockResolvedValue({ userId: null });
+    const result = await runAction();
+    expect(result.success).toBe(false);
+    expect(blockedSpy).not.toHaveBeenCalled();
+  };
 }
 
 /**
@@ -149,10 +140,10 @@ export function testDbError(
   runAction: () => Promise<{ success: boolean }>,
 ) {
   return async () => {
-    failingSpy.mockRejectedValue(new Error("DB failure"))
-    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {})
-    const result = await runAction()
-    expect(result.success).toBe(false)
-    expect(consoleSpy).toHaveBeenCalled()
-  }
+    failingSpy.mockRejectedValue(new Error("DB failure"));
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const result = await runAction();
+    expect(result.success).toBe(false);
+    expect(consoleSpy).toHaveBeenCalled();
+  };
 }

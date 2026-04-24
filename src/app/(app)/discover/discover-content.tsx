@@ -37,7 +37,7 @@ export function DiscoverContent() {
       try {
         const response = await fetch(
           `/api/podcasts/search?q=${encodeURIComponent(q)}&max=20`,
-          { signal: controller.signal }
+          { signal: controller.signal },
         );
 
         if (!response.ok) {
@@ -56,7 +56,7 @@ export function DiscoverContent() {
         }
         console.error("Search error:", err);
         setError(
-          err instanceof Error ? err.message : "Failed to search podcasts"
+          err instanceof Error ? err.message : "Failed to search podcasts",
         );
         setPodcasts([]);
       } finally {

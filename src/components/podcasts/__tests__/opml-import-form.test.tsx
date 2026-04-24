@@ -228,7 +228,7 @@ describe("OpmlImportForm", () => {
 
     await waitFor(() => {
       expect(
-        screen.getByRole("button", { name: "Import" })
+        screen.getByRole("button", { name: "Import" }),
       ).toBeInTheDocument();
     });
   });

@@ -9,12 +9,14 @@
 The `EpisodeActionButtons` component (admin episodes table) and the episode page (`/episode/[id]`) both use `useRealtimeRun` to subscribe to in-flight Trigger.dev runs. When the user navigates away and returns while a run is still in progress, the component has no `runId` or `accessToken` to reattach the realtime subscription.
 
 **Current mitigation:** A mount-time recovery effect calls `getEpisodeStatus()` to check whether the status is still in-progress. If it is, the UI shows a spinner but cannot subscribe to realtime updates — the user sees a stuck loading state until either:
+
 1. The staleness timeout fires (20 min transcript, 10 min summary), or
 2. The user manually refreshes after the run completes.
 
 **Root cause:** The `summaryRunId` column already exists on the `episodes` table and is used by the summary flow for exactly this reconnection pattern (see `summarize/route.ts` GET handler, lines 203-224). However, no equivalent `transcriptRunId` column exists, and neither the `fetch-transcript` API route nor the `getEpisodeStatus` server action return run IDs for reconnection.
 
 The summary flow already demonstrates the correct pattern:
+
 1. **On trigger:** Store `summaryRunId` in the DB (the `db.update().set({ summaryRunId: handle.id })` call in the `summarize/route.ts` POST handler)
 2. **On page load:** GET handler checks for in-progress run, reads `summaryRunId` from DB, generates a fresh `publicAccessToken`, and returns both (the in-progress run check in the `summarize/route.ts` GET handler)
 3. **On completion:** `persistEpisodeSummary` clears `summaryRunId` to null (in `database.ts`)
@@ -42,6 +44,7 @@ Expand `getEpisodeStatus` to also return `summaryRunId` and `transcriptRunId` fr
 ### 4. Server action: Add `getRunReconnectionData`
 
 Add a new server action that, given an episode ID and run type (`"transcript"` | `"summary"`), returns `{ runId, publicAccessToken }` by:
+
 1. Reading the appropriate `*RunId` column from the DB
 2. Generating a fresh `publicAccessToken` via `auth.createPublicToken`
 
@@ -54,6 +57,7 @@ In `EpisodeActionButtons`, the existing mount-time recovery effect already detec
 ### 6. Task completion: Clear `transcriptRunId`
 
 Clear `transcriptRunId` unconditionally at the end of the `fetch-transcript` task's `run` function, after the `persistTranscript` conditional. This covers all completion paths:
+
 - **Transcript found + persisted:** `persistTranscript` writes `transcriptStatus: "available"`, then the unconditional clear removes the run ID.
 - **No transcript found:** `persistTranscript` is skipped (task returns `{ transcript: undefined, source: null }`), but the run ID is still cleared.
 

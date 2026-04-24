@@ -9,6 +9,7 @@
 Users want to import their podcast subscriptions from other apps via OPML files. OPML (Outline Processor Markup Language) is the de facto standard for podcast subscription interchange. An OPML file can contain dozens to hundreds of feeds, each requiring PodcastIndex lookup (or RSS fallback), podcast upsert, and subscription creation. This is too slow for a synchronous server action or API route.
 
 The existing codebase already has two Trigger.dev patterns for long-running operations:
+
 1. **Fan-out with wait** (`batchSummarizeEpisodes`): Parent task triggers child tasks via `batchTriggerAndWait`, tracks progress via `metadata.set`.
 2. **Sequential iteration** (`pollNewEpisodes`): Iterates feeds sequentially with per-feed error isolation via try/catch.
 

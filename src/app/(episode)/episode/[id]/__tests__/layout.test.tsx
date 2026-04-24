@@ -27,7 +27,9 @@ describe("EpisodeLayout", () => {
   it("renders the public shell for anonymous viewers", async () => {
     mockAuth.mockResolvedValue({ userId: null });
 
-    const result = await EpisodeLayout({ children: <div>episode content</div> });
+    const result = await EpisodeLayout({
+      children: <div>episode content</div>,
+    });
     render(result as React.ReactElement);
 
     expect(screen.getByTestId("marketing-header")).toBeInTheDocument();
@@ -38,7 +40,9 @@ describe("EpisodeLayout", () => {
   it("renders AppShell for authenticated viewers", async () => {
     mockAuth.mockResolvedValue({ userId: "user-1" });
 
-    const result = await EpisodeLayout({ children: <div>episode content</div> });
+    const result = await EpisodeLayout({
+      children: <div>episode content</div>,
+    });
     render(result as React.ReactElement);
 
     expect(screen.getByTestId("app-shell")).toBeInTheDocument();

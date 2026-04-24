@@ -64,7 +64,11 @@ describe("enqueue", () => {
   });
 
   it("enqueues multiple distinct items", async () => {
-    await enqueue({ action: "save-episode", entityKey: "episode:1", payload: {} });
+    await enqueue({
+      action: "save-episode",
+      entityKey: "episode:1",
+      payload: {},
+    });
     await enqueue({ action: "subscribe", entityKey: "podcast:2", payload: {} });
     const count = await getQueueCount();
     expect(count).toBe(2);
@@ -73,43 +77,91 @@ describe("enqueue", () => {
 
 describe("dedup: opposite action cancels pending", () => {
   it("save then unsave for same entity cancels both — queue empty", async () => {
-    await enqueue({ action: "save-episode", entityKey: "episode:123", payload: {} });
-    await enqueue({ action: "unsave-episode", entityKey: "episode:123", payload: {} });
+    await enqueue({
+      action: "save-episode",
+      entityKey: "episode:123",
+      payload: {},
+    });
+    await enqueue({
+      action: "unsave-episode",
+      entityKey: "episode:123",
+      payload: {},
+    });
     const count = await getQueueCount();
     expect(count).toBe(0);
   });
 
   it("unsave then save for same entity cancels both", async () => {
-    await enqueue({ action: "unsave-episode", entityKey: "episode:99", payload: {} });
-    await enqueue({ action: "save-episode", entityKey: "episode:99", payload: {} });
+    await enqueue({
+      action: "unsave-episode",
+      entityKey: "episode:99",
+      payload: {},
+    });
+    await enqueue({
+      action: "save-episode",
+      entityKey: "episode:99",
+      payload: {},
+    });
     const count = await getQueueCount();
     expect(count).toBe(0);
   });
 
   it("subscribe then unsubscribe for same podcast cancels both", async () => {
-    await enqueue({ action: "subscribe", entityKey: "podcast:10", payload: {} });
-    await enqueue({ action: "unsubscribe", entityKey: "podcast:10", payload: {} });
+    await enqueue({
+      action: "subscribe",
+      entityKey: "podcast:10",
+      payload: {},
+    });
+    await enqueue({
+      action: "unsubscribe",
+      entityKey: "podcast:10",
+      payload: {},
+    });
     const count = await getQueueCount();
     expect(count).toBe(0);
   });
 
   it("unsubscribe then subscribe for same podcast cancels both", async () => {
-    await enqueue({ action: "unsubscribe", entityKey: "podcast:10", payload: {} });
-    await enqueue({ action: "subscribe", entityKey: "podcast:10", payload: {} });
+    await enqueue({
+      action: "unsubscribe",
+      entityKey: "podcast:10",
+      payload: {},
+    });
+    await enqueue({
+      action: "subscribe",
+      entityKey: "podcast:10",
+      payload: {},
+    });
     const count = await getQueueCount();
     expect(count).toBe(0);
   });
 
   it("same action for same entity is not deduplicated (keeps both)", async () => {
-    await enqueue({ action: "save-episode", entityKey: "episode:55", payload: {} });
-    await enqueue({ action: "save-episode", entityKey: "episode:55", payload: {} });
+    await enqueue({
+      action: "save-episode",
+      entityKey: "episode:55",
+      payload: {},
+    });
+    await enqueue({
+      action: "save-episode",
+      entityKey: "episode:55",
+      payload: {},
+    });
     const count = await getQueueCount();
     expect(count).toBe(2);
   });
 
   it("dedup is scoped to entityKey — different keys are independent", async () => {
-    await enqueue({ action: "save-episode", entityKey: "episode:A", payload: {} });
-    await enqueue({ action: "unsave-episode", entityKey: "episode:B", payload: {} });
+    await enqueue({
+      action: "save-episode",
+      entityKey: "episode:A",
+      payload: {},
+    });
+    await enqueue({
+      action: "unsave-episode",
+      entityKey: "episode:B",
+      payload: {},
+    });
     const count = await getQueueCount();
     expect(count).toBe(2);
   });
@@ -117,14 +169,22 @@ describe("dedup: opposite action cancels pending", () => {
 
 describe("dequeue", () => {
   it("removes item by id", async () => {
-    const id = await enqueue({ action: "save-episode", entityKey: "episode:1", payload: {} });
+    const id = await enqueue({
+      action: "save-episode",
+      entityKey: "episode:1",
+      payload: {},
+    });
     expect(id).not.toBeNull();
     await dequeue(id as string);
     expect(await getQueueCount()).toBe(0);
   });
 
   it("is a no-op for non-existent id", async () => {
-    await enqueue({ action: "save-episode", entityKey: "episode:1", payload: {} });
+    await enqueue({
+      action: "save-episode",
+      entityKey: "episode:1",
+      payload: {},
+    });
     await dequeue("non-existent-id");
     expect(await getQueueCount()).toBe(1);
   });
@@ -132,8 +192,16 @@ describe("dequeue", () => {
 
 describe("dequeueByEntityKey", () => {
   it("removes all pending items matching entityKey", async () => {
-    await enqueue({ action: "save-episode", entityKey: "episode:42", payload: {} });
-    await enqueue({ action: "save-episode", entityKey: "episode:99", payload: {} });
+    await enqueue({
+      action: "save-episode",
+      entityKey: "episode:42",
+      payload: {},
+    });
+    await enqueue({
+      action: "save-episode",
+      entityKey: "episode:99",
+      payload: {},
+    });
     await dequeueByEntityKey("episode:42");
     const items = await getPending();
     expect(items).toHaveLength(1);
@@ -141,7 +209,11 @@ describe("dequeueByEntityKey", () => {
   });
 
   it("is a no-op when no items match", async () => {
-    await enqueue({ action: "save-episode", entityKey: "episode:1", payload: {} });
+    await enqueue({
+      action: "save-episode",
+      entityKey: "episode:1",
+      payload: {},
+    });
     await dequeueByEntityKey("episode:nonexistent");
     expect(await getQueueCount()).toBe(1);
   });
@@ -149,7 +221,11 @@ describe("dequeueByEntityKey", () => {
 
 describe("status transitions", () => {
   it("markInFlight sets status to in-flight", async () => {
-    const id = await enqueue({ action: "save-episode", entityKey: "episode:1", payload: {} });
+    const id = await enqueue({
+      action: "save-episode",
+      entityKey: "episode:1",
+      payload: {},
+    });
     expect(id).not.toBeNull();
     await markInFlight(id as string);
     // in-flight items are not returned by getPending
@@ -159,7 +235,11 @@ describe("status transitions", () => {
   });
 
   it("markFailed sets status to failed", async () => {
-    const id = await enqueue({ action: "save-episode", entityKey: "episode:7", payload: {} });
+    const id = await enqueue({
+      action: "save-episode",
+      entityKey: "episode:7",
+      payload: {},
+    });
     expect(id).not.toBeNull();
     await markFailed(id as string);
     const pending = await getPending();
@@ -168,12 +248,24 @@ describe("status transitions", () => {
   });
 
   it("clearFailed removes all failed items", async () => {
-    const id1 = await enqueue({ action: "save-episode", entityKey: "episode:A", payload: {} });
-    const id2 = await enqueue({ action: "subscribe", entityKey: "podcast:B", payload: {} });
+    const id1 = await enqueue({
+      action: "save-episode",
+      entityKey: "episode:A",
+      payload: {},
+    });
+    const id2 = await enqueue({
+      action: "subscribe",
+      entityKey: "podcast:B",
+      payload: {},
+    });
     expect(id1).not.toBeNull();
     expect(id2).not.toBeNull();
     await markFailed(id1 as string);
-    await enqueue({ action: "save-episode", entityKey: "episode:C", payload: {} }); // pending
+    await enqueue({
+      action: "save-episode",
+      entityKey: "episode:C",
+      payload: {},
+    }); // pending
     await clearFailed();
     // id1 failed item should be gone; id2 (still pending) and episode:C should remain
     const count = await getQueueCount();
@@ -183,7 +275,11 @@ describe("status transitions", () => {
 
 describe("incrementAttempts", () => {
   it("increments attempt count on the item", async () => {
-    const id = await enqueue({ action: "save-episode", entityKey: "episode:1", payload: {} });
+    const id = await enqueue({
+      action: "save-episode",
+      entityKey: "episode:1",
+      payload: {},
+    });
     expect(id).not.toBeNull();
     await incrementAttempts(id as string);
     // After incrementing, item should still be pending with attempts=1
@@ -194,7 +290,11 @@ describe("incrementAttempts", () => {
   });
 
   it("accumulates across multiple increments", async () => {
-    const id = await enqueue({ action: "subscribe", entityKey: "podcast:X", payload: {} });
+    const id = await enqueue({
+      action: "subscribe",
+      entityKey: "podcast:X",
+      payload: {},
+    });
     expect(id).not.toBeNull();
     await incrementAttempts(id as string);
     await incrementAttempts(id as string);
@@ -210,7 +310,11 @@ describe("getQueueCount", () => {
   });
 
   it("counts all non-failed items", async () => {
-    await enqueue({ action: "save-episode", entityKey: "episode:1", payload: {} });
+    await enqueue({
+      action: "save-episode",
+      entityKey: "episode:1",
+      payload: {},
+    });
     await enqueue({ action: "subscribe", entityKey: "podcast:2", payload: {} });
     expect(await getQueueCount()).toBe(2);
   });
@@ -218,7 +322,11 @@ describe("getQueueCount", () => {
 
 describe("hasPendingAction", () => {
   it("returns true when a pending item exists for entityKey", async () => {
-    await enqueue({ action: "save-episode", entityKey: "episode:99", payload: {} });
+    await enqueue({
+      action: "save-episode",
+      entityKey: "episode:99",
+      payload: {},
+    });
     expect(await hasPendingAction("episode:99")).toBe(true);
   });
 
@@ -227,7 +335,11 @@ describe("hasPendingAction", () => {
   });
 
   it("returns false after the item is dequeued", async () => {
-    const id = await enqueue({ action: "save-episode", entityKey: "episode:55", payload: {} });
+    const id = await enqueue({
+      action: "save-episode",
+      entityKey: "episode:55",
+      payload: {},
+    });
     expect(id).not.toBeNull();
     await dequeue(id as string);
     expect(await hasPendingAction("episode:55")).toBe(false);
@@ -236,15 +348,29 @@ describe("hasPendingAction", () => {
 
 describe("getPending", () => {
   it("returns items in order (oldest first or by insertion)", async () => {
-    await enqueue({ action: "save-episode", entityKey: "episode:1", payload: { n: 1 } });
-    await enqueue({ action: "subscribe", entityKey: "podcast:2", payload: { n: 2 } });
+    await enqueue({
+      action: "save-episode",
+      entityKey: "episode:1",
+      payload: { n: 1 },
+    });
+    await enqueue({
+      action: "subscribe",
+      entityKey: "podcast:2",
+      payload: { n: 2 },
+    });
     const items = await getPending();
     expect(items).toHaveLength(2);
-    expect(items.every((i: SyncQueueItem) => i.status === "pending")).toBe(true);
+    expect(items.every((i: SyncQueueItem) => i.status === "pending")).toBe(
+      true,
+    );
   });
 
   it("does not include in-flight items", async () => {
-    const id = await enqueue({ action: "save-episode", entityKey: "episode:1", payload: {} });
+    const id = await enqueue({
+      action: "save-episode",
+      entityKey: "episode:1",
+      payload: {},
+    });
     expect(id).not.toBeNull();
     await markInFlight(id as string);
     const items = await getPending();
@@ -252,7 +378,11 @@ describe("getPending", () => {
   });
 
   it("does not include failed items", async () => {
-    const id = await enqueue({ action: "save-episode", entityKey: "episode:1", payload: {} });
+    const id = await enqueue({
+      action: "save-episode",
+      entityKey: "episode:1",
+      payload: {},
+    });
     expect(id).not.toBeNull();
     await markFailed(id as string);
     const items = await getPending();
@@ -262,9 +392,21 @@ describe("getPending", () => {
 
 describe("getActive", () => {
   it("returns items with status pending or in-flight", async () => {
-    const id1 = await enqueue({ action: "save-episode", entityKey: "episode:1", payload: {} });
-    const id2 = await enqueue({ action: "subscribe", entityKey: "podcast:2", payload: {} });
-    const id3 = await enqueue({ action: "save-episode", entityKey: "episode:3", payload: {} });
+    const id1 = await enqueue({
+      action: "save-episode",
+      entityKey: "episode:1",
+      payload: {},
+    });
+    const id2 = await enqueue({
+      action: "subscribe",
+      entityKey: "podcast:2",
+      payload: {},
+    });
+    const id3 = await enqueue({
+      action: "save-episode",
+      entityKey: "episode:3",
+      payload: {},
+    });
     expect(id1).not.toBeNull();
     expect(id2).not.toBeNull();
     expect(id3).not.toBeNull();
@@ -285,7 +427,11 @@ describe("getActive", () => {
   });
 
   it("returns items sorted by createdAt (oldest first)", async () => {
-    await enqueue({ action: "save-episode", entityKey: "episode:A", payload: {} });
+    await enqueue({
+      action: "save-episode",
+      entityKey: "episode:A",
+      payload: {},
+    });
     await enqueue({ action: "subscribe", entityKey: "podcast:B", payload: {} });
     const active = await getActive();
     expect(active).toHaveLength(2);
@@ -302,8 +448,16 @@ describe("getActive", () => {
 
 describe("resetStaleInFlight", () => {
   it("resets expired in-flight items to pending", async () => {
-    const id1 = await enqueue({ action: "save-episode", entityKey: "episode:1", payload: {} });
-    const id2 = await enqueue({ action: "subscribe", entityKey: "podcast:2", payload: {} });
+    const id1 = await enqueue({
+      action: "save-episode",
+      entityKey: "episode:1",
+      payload: {},
+    });
+    const id2 = await enqueue({
+      action: "subscribe",
+      entityKey: "podcast:2",
+      payload: {},
+    });
     expect(id1).not.toBeNull();
     expect(id2).not.toBeNull();
     await markInFlight(id1 as string);
@@ -317,12 +471,18 @@ describe("resetStaleInFlight", () => {
 
     const pending = await getPending();
     expect(pending).toHaveLength(2);
-    expect(pending.every((i: SyncQueueItem) => i.status === "pending")).toBe(true);
+    expect(pending.every((i: SyncQueueItem) => i.status === "pending")).toBe(
+      true,
+    );
     vi.restoreAllMocks();
   });
 
   it("does not reset fresh in-flight items", async () => {
-    const id = await enqueue({ action: "save-episode", entityKey: "episode:1", payload: {} });
+    const id = await enqueue({
+      action: "save-episode",
+      entityKey: "episode:1",
+      payload: {},
+    });
     expect(id).not.toBeNull();
     await markInFlight(id as string);
 
@@ -337,7 +497,11 @@ describe("resetStaleInFlight", () => {
   });
 
   it("does not touch pending items", async () => {
-    await enqueue({ action: "save-episode", entityKey: "episode:1", payload: {} });
+    await enqueue({
+      action: "save-episode",
+      entityKey: "episode:1",
+      payload: {},
+    });
     await resetStaleInFlight();
     const pending = await getPending();
     expect(pending).toHaveLength(1);
@@ -345,7 +509,11 @@ describe("resetStaleInFlight", () => {
   });
 
   it("does not touch failed items", async () => {
-    const id = await enqueue({ action: "save-episode", entityKey: "episode:1", payload: {} });
+    const id = await enqueue({
+      action: "save-episode",
+      entityKey: "episode:1",
+      payload: {},
+    });
     expect(id).not.toBeNull();
     await markFailed(id as string);
     await resetStaleInFlight();
@@ -363,7 +531,11 @@ describe("resetStaleInFlight", () => {
 describe("IDB graceful degradation", () => {
   it("enqueue does not throw when IDB is available", async () => {
     // fake-indexeddb is always available in tests — verifies no throw and valid return
-    const id = await enqueue({ action: "save-episode", entityKey: "episode:1", payload: {} });
+    const id = await enqueue({
+      action: "save-episode",
+      entityKey: "episode:1",
+      payload: {},
+    });
     expect(id).not.toBeNull();
   });
 

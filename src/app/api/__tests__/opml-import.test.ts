@@ -13,7 +13,10 @@ vi.mock("@clerk/nextjs/server", () => ({
 // Mock the rate limiter module — checker must survive clearAllMocks
 const mockCheckRateLimit = vi.fn().mockResolvedValue({ allowed: true });
 vi.mock("@/lib/rate-limit", () => ({
-  createRateLimitChecker: () => (...args: unknown[]) => mockCheckRateLimit(...args),
+  createRateLimitChecker:
+    () =>
+    (...args: unknown[]) =>
+      mockCheckRateLimit(...args),
 }));
 
 // Mock OPML parser
@@ -71,7 +74,11 @@ function makeFormRequest(file?: File) {
   });
 }
 
-function makeOpmlFile(content: string, name = "podcasts.opml", size?: number): File {
+function makeOpmlFile(
+  content: string,
+  name = "podcasts.opml",
+  size?: number,
+): File {
   if (size) {
     const oversizedContent = content.padEnd(size, " ");
     return new File([oversizedContent], name, { type: "text/xml" });
@@ -143,7 +150,10 @@ describe("POST /api/opml/import", () => {
 
   it("returns 429 when rate limit is exceeded", async () => {
     mockAuth.mockResolvedValue({ userId: "user-1" });
-    mockCheckRateLimit.mockResolvedValue({ allowed: false, retryAfterMs: 300000 });
+    mockCheckRateLimit.mockResolvedValue({
+      allowed: false,
+      retryAfterMs: 300000,
+    });
 
     const response = await POST(makeFormRequest(makeOpmlFile("<opml/>")));
     const data = await response.json();
@@ -158,7 +168,9 @@ describe("POST /api/opml/import", () => {
       throw new Error("Invalid OPML: missing <opml> root element");
     });
 
-    const response = await POST(makeFormRequest(makeOpmlFile("not valid opml")));
+    const response = await POST(
+      makeFormRequest(makeOpmlFile("not valid opml")),
+    );
     const data = await response.json();
 
     expect(response.status).toBe(400);
@@ -190,9 +202,7 @@ describe("POST /api/opml/import", () => {
     mockParseOpml.mockReturnValue([
       { feedUrl: "https://A.COM/FEED", title: "A" },
     ]);
-    mockWhere.mockResolvedValue([
-      { rssFeedUrl: "https://a.com/feed" },
-    ]);
+    mockWhere.mockResolvedValue([{ rssFeedUrl: "https://a.com/feed" }]);
 
     const response = await POST(makeFormRequest(makeOpmlFile("<opml/>")));
     const data = await response.json();
@@ -210,9 +220,7 @@ describe("POST /api/opml/import", () => {
       { feedUrl: "https://b.com/feed", title: "B" },
       { feedUrl: "https://c.com/feed", title: "C" },
     ]);
-    mockWhere.mockResolvedValue([
-      { rssFeedUrl: "https://b.com/feed" },
-    ]);
+    mockWhere.mockResolvedValue([{ rssFeedUrl: "https://b.com/feed" }]);
 
     const response = await POST(makeFormRequest(makeOpmlFile("<opml/>")));
     const data = await response.json();

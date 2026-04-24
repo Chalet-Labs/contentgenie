@@ -31,7 +31,7 @@ export default defineConfig({
 
         const res = await fetch(
           "https://api.doppler.com/v3/configs/config/secrets/download?format=json",
-          { headers: { Authorization: `Bearer ${token}` } }
+          { headers: { Authorization: `Bearer ${token}` } },
         );
         if (!res.ok) return [];
 

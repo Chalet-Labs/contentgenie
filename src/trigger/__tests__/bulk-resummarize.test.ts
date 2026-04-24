@@ -1,18 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { createTriggerSdkMock } from "@/test/mocks/trigger-sdk";
 
-// Mock Trigger.dev SDK before imports
 const mockMetadataSet = vi.fn();
-vi.mock("@trigger.dev/sdk", () => ({
-  task: vi.fn((config) => config),
-  metadata: {
-    set: (...args: unknown[]) => mockMetadataSet(...args),
-  },
-  logger: {
-    info: vi.fn(),
-    warn: vi.fn(),
-    error: vi.fn(),
-  },
-}));
+vi.mock("@trigger.dev/sdk", () =>
+  createTriggerSdkMock({
+    metadata: { set: (...args: unknown[]) => mockMetadataSet(...args) },
+  }),
+);
 
 const mockBatchTriggerAndWait = vi.fn();
 
@@ -53,7 +47,6 @@ vi.mock("drizzle-orm", () => ({
 
 import { bulkResummarize } from "@/trigger/bulk-resummarize";
 import type { BulkResummarizePayload } from "@/trigger/bulk-resummarize";
-import { metadata } from "@trigger.dev/sdk";
 
 // The task mock returns the raw config object, so `.run` is available at runtime
 const taskConfig = bulkResummarize as unknown as {
@@ -191,7 +184,12 @@ describe("bulk-resummarize task", () => {
     const chunk1Runs = Array.from({ length: 500 }, (_, i) => ({
       ok: i !== 10 && i !== 200,
       output: i !== 10 && i !== 200 ? {} : undefined,
-      error: i === 10 ? new Error("Episode 11 failed") : i === 200 ? "Episode 201 failed" : undefined,
+      error:
+        i === 10
+          ? new Error("Episode 11 failed")
+          : i === 200
+            ? "Episode 201 failed"
+            : undefined,
     }));
     // Chunk 2: 100 items, 1 fail
     const chunk2Runs = Array.from({ length: 100 }, (_, i) => ({
@@ -249,20 +247,29 @@ describe("bulk-resummarize task", () => {
     await taskConfig.run({});
 
     // Initial metadata set
-    expect(mockMetadataSet).toHaveBeenCalledWith("progress", expect.objectContaining({
-      currentChunk: 0,
-      totalChunks: 2,
-    }));
+    expect(mockMetadataSet).toHaveBeenCalledWith(
+      "progress",
+      expect.objectContaining({
+        currentChunk: 0,
+        totalChunks: 2,
+      }),
+    );
     // After chunk 1
-    expect(mockMetadataSet).toHaveBeenCalledWith("progress", expect.objectContaining({
-      currentChunk: 1,
-      totalChunks: 2,
-    }));
+    expect(mockMetadataSet).toHaveBeenCalledWith(
+      "progress",
+      expect.objectContaining({
+        currentChunk: 1,
+        totalChunks: 2,
+      }),
+    );
     // After chunk 2 (final)
-    expect(mockMetadataSet).toHaveBeenCalledWith("progress", expect.objectContaining({
-      currentChunk: 2,
-      totalChunks: 2,
-    }));
+    expect(mockMetadataSet).toHaveBeenCalledWith(
+      "progress",
+      expect.objectContaining({
+        currentChunk: 2,
+        totalChunks: 2,
+      }),
+    );
   });
 
   it("handles non-Error failure values from child tasks", async () => {
@@ -281,9 +288,18 @@ describe("bulk-resummarize task", () => {
 
     const result = await taskConfig.run({});
 
-    expect(result.failures).toContainEqual({ episodeId: 1, error: "Explicit error" });
-    expect(result.failures).toContainEqual({ episodeId: 2, error: "String error" });
-    expect(result.failures).toContainEqual({ episodeId: 3, error: "Unknown error" });
+    expect(result.failures).toContainEqual({
+      episodeId: 1,
+      error: "Explicit error",
+    });
+    expect(result.failures).toContainEqual({
+      episodeId: 2,
+      error: "String error",
+    });
+    expect(result.failures).toContainEqual({
+      episodeId: 3,
+      error: "Unknown error",
+    });
   });
 
   it("casts podcastIndexId string to number for child payloads", async () => {
@@ -305,10 +321,7 @@ describe("bulk-resummarize task", () => {
   });
 
   it("returns correct final result when all child tasks fail", async () => {
-    mockDbSelectResult([
-      { podcastIndexId: "1" },
-      { podcastIndexId: "2" },
-    ]);
+    mockDbSelectResult([{ podcastIndexId: "1" }, { podcastIndexId: "2" }]);
     mockBatchTriggerAndWait.mockResolvedValue({
       runs: [
         { ok: false, error: new Error("Failed 1") },

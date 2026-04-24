@@ -31,7 +31,7 @@ export const sendNotificationDigests = schedules.task({
       .from(users)
       .where(
         sql`${users.preferences}->>'digestFrequency' IN ('daily', 'weekly')
-            AND COALESCE(${users.preferences}->>'pushEnabled', 'false') = 'true'`
+            AND COALESCE(${users.preferences}->>'pushEnabled', 'false') = 'true'`,
       );
 
     logger.info("Found users with digest preferences", {
@@ -71,8 +71,8 @@ export const sendNotificationDigests = schedules.task({
             and(
               eq(notifications.userId, user.id),
               eq(notifications.isRead, false),
-              gt(notifications.createdAt, sinceDate)
-            )
+              gt(notifications.createdAt, sinceDate),
+            ),
           );
 
         const unreadCount = result?.value ?? 0;
@@ -87,7 +87,7 @@ export const sendNotificationDigests = schedules.task({
             tag: "digest",
             data: { url: "/dashboard" },
           },
-          logger
+          logger,
         );
 
         // Skip advancement only when push was attempted but none succeeded

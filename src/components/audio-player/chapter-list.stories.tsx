@@ -1,14 +1,14 @@
-import type { Meta, StoryObj } from "@storybook/nextjs-vite"
-import type { ReactNode } from "react"
+import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import type { ReactNode } from "react";
 import {
   AudioPlayerAPIContext,
   AudioPlayerStateContext,
   AudioPlayerProgressContext,
   type AudioPlayerState,
   type AudioPlayerAPI,
-} from "@/contexts/audio-player-context"
-import { ChapterList } from "@/components/audio-player/chapter-list"
-import type { Chapter } from "@/lib/chapters"
+} from "@/contexts/audio-player-context";
+import { ChapterList } from "@/components/audio-player/chapter-list";
+import type { Chapter } from "@/lib/chapters";
 
 const noopAPI: AudioPlayerAPI = {
   playEpisode: () => {},
@@ -27,7 +27,7 @@ const noopAPI: AudioPlayerAPI = {
   setSleepTimer: () => {},
   cancelSleepTimer: () => {},
   getCurrentTime: () => 0,
-}
+};
 
 function makeState(chapters: Chapter[] | null): AudioPlayerState {
   return {
@@ -49,7 +49,7 @@ function makeState(chapters: Chapter[] | null): AudioPlayerState {
     chapters,
     chaptersLoading: false,
     sleepTimer: null,
-  }
+  };
 }
 
 function MockProvider({
@@ -57,9 +57,9 @@ function MockProvider({
   currentTime,
   children,
 }: {
-  state: AudioPlayerState
-  currentTime: number
-  children: ReactNode
+  state: AudioPlayerState;
+  currentTime: number;
+  children: ReactNode;
 }) {
   return (
     <AudioPlayerAPIContext.Provider value={noopAPI}>
@@ -71,7 +71,7 @@ function MockProvider({
         </AudioPlayerProgressContext.Provider>
       </AudioPlayerStateContext.Provider>
     </AudioPlayerAPIContext.Provider>
-  )
+  );
 }
 
 const sampleChapters: Chapter[] = [
@@ -81,26 +81,38 @@ const sampleChapters: Chapter[] = [
   { startTime: 600, title: "Interview Part 2" },
   { startTime: 1800, title: "Listener Questions" },
   { startTime: 2400, title: "Outro" },
-]
+];
 
 const longChapters: Chapter[] = Array.from({ length: 25 }, (_, i) => ({
   startTime: i * 120,
   title: `Chapter ${i + 1}: ${["Deep Dive", "Analysis", "Discussion", "Review", "Summary"][i % 5]}`,
-}))
+}));
 
 const chaptersWithImages: Chapter[] = [
-  { startTime: 0, title: "Cold Open", img: "https://picsum.photos/seed/ch1/64/64" },
-  { startTime: 60, title: "Main Topic", img: "https://picsum.photos/seed/ch2/64/64" },
-  { startTime: 300, title: "Guest Segment", img: "https://picsum.photos/seed/ch3/64/64" },
-]
+  {
+    startTime: 0,
+    title: "Cold Open",
+    img: "https://picsum.photos/seed/ch1/64/64",
+  },
+  {
+    startTime: 60,
+    title: "Main Topic",
+    img: "https://picsum.photos/seed/ch2/64/64",
+  },
+  {
+    startTime: 300,
+    title: "Guest Segment",
+    img: "https://picsum.photos/seed/ch3/64/64",
+  },
+];
 
 const meta: Meta<typeof ChapterList> = {
   title: "AudioPlayer/ChapterList",
   component: ChapterList,
-}
+};
 
-export default meta
-type Story = StoryObj<typeof ChapterList>
+export default meta;
+type Story = StoryObj<typeof ChapterList>;
 
 export const Default: Story = {
   decorators: [
@@ -112,7 +124,7 @@ export const Default: Story = {
       </MockProvider>
     ),
   ],
-}
+};
 
 export const LongList: Story = {
   decorators: [
@@ -124,7 +136,7 @@ export const LongList: Story = {
       </MockProvider>
     ),
   ],
-}
+};
 
 export const WithThumbnails: Story = {
   decorators: [
@@ -136,7 +148,7 @@ export const WithThumbnails: Story = {
       </MockProvider>
     ),
   ],
-}
+};
 
 export const EmptyState: Story = {
   decorators: [
@@ -148,7 +160,7 @@ export const EmptyState: Story = {
       </MockProvider>
     ),
   ],
-}
+};
 
 export const SingleChapter: Story = {
   decorators: [
@@ -163,4 +175,4 @@ export const SingleChapter: Story = {
       </MockProvider>
     ),
   ],
-}
+};

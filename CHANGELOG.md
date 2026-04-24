@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [Unreleased]
 
 ### Added
+
 - Sort dropdown and pin toggle on `/subscriptions` (epic #336, sub-issue #339). The list portion is now a `"use client"` component (`SubscriptionsList`) that renders a shadcn `<Select>` with "Recently added", "Title (A–Z)", "Latest episode", "Recently listened"; changing it calls `setSubscriptionSort` and `router.refresh()` so the server re-fetches in the new order. Each `SubscriptionCard` gains a `Pin`/`PinOff` toggle with `aria-pressed` + descriptive `aria-label`, wired to `togglePinSubscription` with optimistic state, `router.refresh()` on success, and rollback-on-failure toast (covers both `{success:false}` envelopes and action rejections). Optimistic overrides reconcile against the refreshed server props via `useEffect`, so the displayed pin state converges on the authoritative DB value and the list reorders without a hard reload. (Implementation note: React 18.3.1 stable does not expose `useOptimistic` at runtime, so the optimistic state uses the established `useState + useTransition` pattern from `listened-button.tsx` — identical UX to what the issue spec described with `useOptimistic`.) A new `getUserSubscriptionSort()` helper wraps the private `resolveSort` so the page reads the same preference value the action would otherwise fall back to internally; `resolveSort` logs preference-read DB failures under a distinct `[resolveSort]` tag so ops can distinguish "no preference stored" from "DB unreachable".
 - Subscription sort + pin server actions (epic #336, sub-issue #338). `getUserSubscriptions(sort?)` now accepts an optional `SubscriptionSort` and falls back to `users.preferences.subscriptionSort` (default `"recently-added"`); the query emits a single SQL statement that orders by `is_pinned DESC` first, then the selected sort (including a `LEFT JOIN` on `listen_history` + `episodes` with `MAX(started_at)` for `"recently-listened"`, with a `subscribedAt DESC` tiebreaker for never-played podcasts). New `togglePinSubscription(subscriptionId)` flips pin state atomically via SQL `NOT is_pinned` with composite user+id ownership enforcement, and new `setSubscriptionSort(sort)` merges the choice into existing `users.preferences` without clobbering other keys. Both new actions use `ActionResult<T>` envelopes and Zod validation. UI wiring follows in the next sub-issue.
 - "Mark as listened" button on episode cards (podcast detail, trending, and library surfaces). Tapping the check-icon button optimistically flips the UI to a non-interactive "Already listened" indicator, calls `recordListenEvent`, and reverts with a toast on failure. A new `getListenedEpisodeIds` server action batch-fetches listened state per page. Marking an episode listened causes it to stop appearing in the dashboard "For You" feed on the next render (#330).
@@ -15,20 +16,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Dashboard Trending Topics and Recommended Episodes cards now collapse to a 3-item preview with a ghost full-width "Show N more" / "Show less" toggle when there are more items to reveal. The Recommended Episodes server fetch limit was raised from 6 to 12 so the toggle has headroom to expand (#308).
 
 ### Changed
+
 - EpisodeCard now shows a brand-colored left accent bar on unlistened episodes instead of summarized ones; Worth-It score badge continues to indicate summary state (see ADR-038).
+- Adopted Prettier + `prettier-plugin-tailwindcss` for automated Tailwind class ordering. New `bun run format` / `bun run format:check` scripts. Pre-commit hook now runs `format:check` before lint and tests, failing fast on formatting drift. Initial repo-wide format pass landed as a separate commit to keep blame clean (#321).
 - Episode card affordances unified across notifications and the podcast detail episode list (post-#344 follow-up). A new shared `PlayEpisodeButton` (icon variant, at `src/components/audio-player/play-episode-button.tsx`) replaces the bespoke text "Listen" button on notifications and is added to the podcasts wrapper — both surfaces now expose Play, Add-to-queue, and "Mark as listened" as an icon row, in that order. The podcast detail list also renders topic chips per episode when the row has been summarized (new `TOPICS_PER_EPISODE_LIMIT=4` batch-fetch at `src/app/(app)/podcast/[id]/page.tsx`, keyed by PodcastIndex id). `AddToQueueButton` is no longer hover-revealed on podcasts detail — visible by default, matching notifications. Notifications fetches listened state via `getListenedEpisodeIds` on the server and threads `initialListenedIds` through `NotificationPageList` so the ListenedButton shows the correct state on first paint. Notifications page container drops `max-w-2xl`; cards now fill the `max-w-6xl` shell like library and podcasts detail.
 - Unified episode card rendering across notifications, podcast detail, and library behind a shared `EpisodeCard` primitive at `src/components/episodes/episode-card.tsx`. The primitive owns layout, artwork tile, score pill (`WorthItBadge`), processing status icon, topic chips, meta row, and action slots (`primaryAction`, `secondaryActions`). The bespoke `ScoreIndicator` helper in `podcasts/episode-card.tsx` is deleted; `"Summarized"`/`"Failed"` text pills are replaced by compact icon-only status indicators. `SavedEpisodeCard` keeps its `Collapsible` expansion body; `NotificationPageList` rows now expose a dedicated `Listen` button via the primary-action slot. The `Listen` button plays in place without navigating away. Unrated notifications still render a "Not rated" pill; the legacy completed-summary left-border accent is preserved. Saved library rows keep the `/podcast/{id}?from=library` link on the podcast title via a new `podcastHref` prop. Notifications without an `episodePodcastIndexId` hide the primary action entirely instead of silently routing to the dashboard (#344).
 - Audio player redesigned to the "Centered Focus" layout: full-width seek bar on top; transport cluster centered via CSS grid (`grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]`) with chapter-prev / rewind pill / 56px play / forward pill / chapter-next; right-side ancillary controls (speed, sleep, bookmark, chapters, queue, volume, close). Skip defaults split asymmetric — back 10s, forward 30s — and the Media Session `seekbackward`/`seekforward` handlers pick them up automatically. Skip presses flash a 700ms `−10s` / `+30s` pill anchored above the player (monotonic-nonce keyed so rapid re-presses always re-animate; `aria-hidden` to avoid per-press screen-reader noise; state and pending timer cleared when the player becomes invisible). Chapter prev uses iPod-style restart-vs-previous (3s threshold); next falls through to `playNext()` when on the last chapter with a non-empty queue, and the aria-label flips between "Next chapter" and "Next episode" to match the actual action. Prev is hidden entirely for queue-only episodes (no dead "Previous episode" button). Mobile keeps the 2-row layout with chevron icons matching the new defaults.
-- Notification bell popover now clears the unread badge on open and offers a "Clear all" button. Opening the popover fetches the current unread summary, then calls the existing `markAllNotificationsRead()` server action so the badge drops to 0 immediately (reverts optimistically if the mutation fails). Items in the popover stay visible for the duration of the open session — clicking a row navigates to the filtered `/notifications` page *and* removes that group from the popover's displayed list (relevant when staying on the same pathname); "Clear all" empties the displayed list in one action. Because the `MAX(createdAt) WHERE isRead=true` expression that powers the "since last visit" group now advances to "just now" on every open, that label becomes semantically accurate. Rows remain visible on the full `/notifications` page (which filters only by `isDismissed`), just re-styled as read. No schema change.
+- Notification bell popover now clears the unread badge on open and offers a "Clear all" button. Opening the popover fetches the current unread summary, then calls the existing `markAllNotificationsRead()` server action so the badge drops to 0 immediately (reverts optimistically if the mutation fails). Items in the popover stay visible for the duration of the open session — clicking a row navigates to the filtered `/notifications` page _and_ removes that group from the popover's displayed list (relevant when staying on the same pathname); "Clear all" empties the displayed list in one action. Because the `MAX(createdAt) WHERE isRead=true` expression that powers the "since last visit" group now advances to "just now" on every open, that label becomes semantically accurate. Rows remain visible on the full `/notifications` page (which filters only by `isDismissed`), just re-styled as read. No schema change.
 - Notification summary popover correctness pass (PR #328 review follow-up): `getNotificationSummary()` `totalUnread` now counts all unread notification types (matches `getUnreadCount`), preventing the badge and popover from disagreeing for users with legacy `summary_completed` rows. `NotificationSummary` discriminated-union now embeds `sinceIso` into the `episodes_since_last_seen` variant (was top-level `lastSeenAt`), removing a non-null assertion. New fallback "N unread notifications" link when unread rows exist but none group into an episode bucket. `NotificationPageList` now accepts an optional `filter` prop that is threaded through "Load more" so paginated filtered views stay scoped. Invalid `?podcast=` / `?since=` values are now logged via `console.warn` (stricter `/^\d+$/` id parsing), and the notifications page forwards the active filter to the list component. Bell client additions: stale-fetch generation counter (open → close → open races), `console.error` logging on summary fetch failure, and removed the close-branch state reset that caused a skeleton flicker during the Radix exit animation.
 - Design system refresh: new "Paper, fern, amber" palette replaces the blue + zinc chrome — emerald primary (`hsl(160 70% 29%)` — darkened from the initial `hsl(160 70% 35%)` proposal so the primary-button label reaches WCAG 2.1 AA 4.5:1; dedicated `--primary-hover` (`hsl(160 70% 24%)` / `hsl(156 60% 42%)` dark) replaces the prior `hover:bg-primary/90` alpha composite to keep the hover state AA-compliant), amber `--brand` accent for logo/marketing/star ratings, vermilion destructive, and green-tinted neutrals (H 150). Score palette shifts to a warmer green → chartreuse → amber → vermilion ramp. Status colors rebalanced. New brand logo (amber speech-bubble + soundwave glyph) replaces the Lucide `Headphones` brand mark in the app header, install banner, welcome card, and regenerated PWA icons (192/512/maskable/apple-touch/favicon). `src/components/brand/logo.tsx` is the canonical Logo component; `scripts/generate-pwa-icons.mjs` makes bitmap regeneration reproducible. Inline score indicators gain a `data-score-band` attribute for stable test assertions.
 - Server-action envelope return types normalized: new `ActionResult<T = void>` alias at `src/types/action-result.ts` replaces the inline `{ success: true; data?: T } | { success: false; error: string }` unions in `player-session.ts`, `listening-queue.ts`, `listen-history.ts`, and the `updateAiConfig` / `updateSummarizationPrompt` exports of `ai-config.ts`. `recordListenEvent` is tightened from `{ success: boolean }` to `ActionResult<void>`; failure payloads now carry an `error: string` (previously absent) but no call site read that field. Raw-return actions and `getAiConfig` are unchanged (#306).
 - Public marketing landing page (`/`) redesigned: editorial-clean hero with a live-feeling inbox surface + floating AI summary, four-feature bento grid (Worth-It Score, Key Takeaways, Library, Discover), four-step how-it-works flow, worked example summary, and a free-during-beta pricing card (50% off forever for grandfathered accounts). Adds JetBrains Mono alongside Inter via `next/font`. The previous minimal `LandingHeader` is replaced by `MarketingHeader` (brand mark, full nav, contrast CTA), which now also powers the signed-out public episode share page — share-link visitors can discover the product instead of hitting a nav-less dead end. Adds a `ContrastButton` wrapper (at `src/components/landing/contrast-button.tsx`) that composes the shadcn `Button` primitive with inverted-color styling for marketing CTAs — keeps `src/components/ui/button.tsx` pristine and shadcn-sync-safe.
 
 ### Fixed
+
 - Android lock-screen / notification media controls now show `play + rewind + forward` instead of `play + skip-to-next`, and the lock-screen / CarPlay progress bar is draggable. The app stops registering Media Session `nexttrack` (Chrome on Android's compact slot ranked it above `seekforward`, hiding the `−10s / +30s` buttons added in PR #348) and wires `seekto` through the existing `api.seek()` clamp, guarded with `Number.isFinite`. Trade-off: advancing the queue from the lock screen now requires opening the app (#355).
 - `getNotificationSummary()` no longer crashes with `TypeError: e.toISOString is not a function` in production. The raw `` sql<Date | null>`MAX(...)` `` aggregate bypasses Drizzle's `PgTimestamp.mapFromDriverValue`, so Neon's HTTP driver returns `lastSeen` as a string; the action now rehydrates to a real `Date` before the `gte(notifications.createdAt, lastSeenAt)` comparison and the `sinceIso` serialization. Regression test added.
-- Worth-It Score no longer penalizes episodes for ads, sponsor reads, or promotional segments. `getSummarizationPrompt` now inlines ad-exclusion guards on the `staysFocused` and `timeJustified` signal descriptions, in the `-1` adjustment rules, and in the Bottom Line / `worthItReason` guidance. `SIGNAL_LABELS.staysFocused` and `SIGNAL_LABELS.timeJustified` were re-worded to reference *editorial* content so the UI matches the prompt's intent. Score math and the `WorthItSignals` shape are unchanged (#317).
+- Worth-It Score no longer penalizes episodes for ads, sponsor reads, or promotional segments. `getSummarizationPrompt` now inlines ad-exclusion guards on the `staysFocused` and `timeJustified` signal descriptions, in the `-1` adjustment rules, and in the Bottom Line / `worthItReason` guidance. `SIGNAL_LABELS.staysFocused` and `SIGNAL_LABELS.timeJustified` were re-worded to reference _editorial_ content so the UI matches the prompt's intent. Score math and the `WorthItSignals` shape are unchanged (#317).
 - Sidebar Storybook stories (`WithAdmin`, `InSheetWithAdmin`) now correctly render the admin link by passing `isAdmin: true` through story `args`. Post-#292, `Sidebar.isAdmin` became a required prop fed from `AppShellInner`, so the old `setStorybookIsAdmin` mutation was silently dead — `WithAdmin` stories rendered identically to their non-admin counterparts. Also removed the now-dead `setStorybookIsAdmin` / `isAdminMock` plumbing from `.storybook/mocks/clerk.ts` and dropped the unused `@storybook-mocks/*` path alias from `tsconfig.json` and `.storybook/main.ts` (#294).
 - `setQueue` server action now uses `db.batch([delete, insert])` instead of `db.transaction`, which is unsupported on the `drizzle-orm/neon-http` driver. Every queue mutation (add/reorder/remove) in production was failing with "Couldn't sync queue — Rolling back" and reverting the optimistic UI (#309).
 - `BatchSummarizeButton` on the podcast detail page now slices the passed-in episode list to the API's 20-episode batch limit before calling `/api/episodes/batch-summarize`, preventing 400 "Maximum 20 episodes per batch" errors when the page loads up to 200 episodes (#291).
@@ -37,11 +41,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `ZaiProvider` now includes `finish_reason`, `completion_tokens`, `reasoning_tokens`, and a `reasoning_content` snippet in the "Invalid response format" error. Reasoning-capable Z.AI models (GLM-4.6 / GLM-5.x) burn tokens on chain-of-thought before emitting `content`; without these diagnostics, max-token exhaustion looked identical to an API-shape regression.
 
 ### Changed
+
 - Trending topics trigger task: `MAX_EPISODES` lowered from 500 to 200, input field switched from `keyTakeaways` to `summary` for richer clustering context, and the LLM call now passes `maxTokens: 16000` so reasoning models (e.g. GLM-5.1) have headroom after chain-of-thought.
 - Podcast detail page now loads up to 200 episodes (raised from 20 for PodcastIndex-sourced and 50 for RSS-sourced) and supports client-side title search within the loaded window (#291)
 - Dashboard Trending Topics card redesigned as a vertical list with topic name, AI description (2-line clamp), episode count, and per-row link to `/trending/<slug>` (#281)
 
 ### Added
+
 - Dedicated `/notifications` page with worth-it score badges, topic chips (up to 3 per row), inline Add-to-queue button, and optimistic dismiss with automatic rollback on server error and a Retry toast. Bell icon now links to the page and retains a poll-based unread badge. Schema: `notifications.isDismissed` boolean column (DEFAULT false NOT NULL) — **production requires `doppler run --config prd -- bunx drizzle-kit push` before or with code deploy** (#303)
 - Cross-device sync for the listening queue and currently-playing episode. Queue and resume-position now round-trip through the server and reconcile on app mount or window focus. Concurrent mutations use last-commit-wins; active playback is never rewound by a server refetch. (#282)
 - Public episode share pages for anonymous viewers at `/episode/[id]`, with a signed-out shell, read-only episode details, share/external links, existing summaries, and sign-up redirects for save/queue/library actions (#293)
@@ -69,6 +75,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Admin link in sidebar (visible to `org:admin` users only)
 
 ### Changed
+
 - Notifications: one row per episode per subscriber. The poller creates the notification on discovery ("New episode: …"); the summarizer updates it in place when the summary lands ("Summary ready: …", unread resets). Push uses a shared `tag=episode-${episodeId}` so devices replace rather than stack. Admin-triggered re-summarization no longer produces duplicate notification rows. (#289)
 - Unified in-app navigation — `Sidebar` is now the single source of truth for authenticated nav (desktop aside + mobile sheet); `Header` split into `AppHeader` (utility bar: logo, theme toggle, notifications, user menu, mobile hamburger) and `LandingHeader` (marketing: logo, theme, auth CTAs). Admin link is now reachable from mobile. Desktop aside breakpoint widened from `lg:` to `md:`. (#286)
 - Trending topic snapshots now include a stable `slug` per topic, used as the URL identifier for topic detail pages.
@@ -88,6 +95,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - `summarize-episode` Trigger.dev task reads `summarizationPrompt` from `getActiveAiConfig()` and passes it to `generateEpisodeSummary` at execution time
 
 ### Removed
+
 - `BulkResummarizeCard` component deleted (superseded by admin panel batch re-summarization)
 - `MissingTranscriptsCard` component deleted (superseded by admin panel episodes table with transcript status filter)
 - `summarize-episode` is now a pure consumer of existing transcripts: it reads the `transcription` column from the database and aborts with `AbortTaskRunError` if no transcript is present, instead of orchestrating `fetch-transcript` inline or generating a description-only fallback (ADR-027, #215)
@@ -98,6 +106,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Summarization step progress UI removes `"fetching-transcript"` and `"transcribing-audio"` steps — summarization no longer fetches transcripts
 
 ### Fixed
+
 - Upgrade Storybook 8.6.15 → 10.3.5 and swap framework from `@storybook/react-vite` to `@storybook/nextjs-vite` so stories that import `next/link`, `next/image`, or `next/navigation` render without `process is not defined` / `React is not defined` runtime errors (#298)
 - Close mobile library sidebar sheet when tapping a collection or "All Saved" link, matching the site header fix from #283 (#284)
 - Restore episode topic persistence on production by adding the missing `topic_rank`/`ranked_at` migration; PR #266 added the columns to the schema but never generated a migration, so production INSERTs into `episode_topics` failed (#275)
@@ -113,6 +122,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Add required `speech_models` parameter to AssemblyAI API calls to resolve 400 errors from the updated API
 
 ### Added
+
 - Admin missing-transcripts panel on the settings page: shows count of episodes with null/missing/failed/fetching `transcriptStatus`, podcast dropdown filter, paginated episode list with status badges and error display, per-episode "Fetch" button, and "Fetch All" batch button (max 20). Backed by `getEpisodeTranscriptStats` server action and two new API routes (`POST /api/episodes/fetch-transcript`, `POST /api/episodes/batch-fetch-transcripts`). Stale `fetching` rows from crashed runs remain visible and are retryable (#216)
 - Independent transcript tracking: `transcript_status`, `transcript_fetched_at`, and `transcript_error` columns on the episodes table with CHECK constraint, `TranscriptStatus` type export, updated persist helpers, and backfill migration (ADR-026, #214)
 - Visual regression testing (VRT) with Playwright: all 33 Storybook stories are screenshot-tested on every PR against committed Linux/Chromium baselines; diff artifacts are uploaded on failure; Chromium cache keeps CI overhead to ~65–125s; baseline update workflow documented in ADR-024 (#203)
@@ -149,6 +159,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Episode artwork and title in the audio player bar now link to the episode detail page (`/episode/[id]`), with hover feedback, aria-label for accessibility, and touch feedback on mobile (#115)
 
 ### Changed
+
 - Extract transcript waterfall (cached → PodcastIndex → description URL → AssemblyAI) from `summarize-episode` into a standalone `fetch-transcript` Trigger.dev task; `summarize-episode` now delegates via `triggerAndWait` (#213)
 - Reworked dashboard layout to vertical stack: Trending, Recommendations, Queue, New Episodes (#194)
 - Replaced podcast-level recommendations on dashboard with episode-level recommendations ranked by Worth It score, excluding subscribed/saved/listened episodes (#189)
@@ -158,9 +169,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Optimized `saveEpisodeToLibrary` and `subscribeToPodcast` to use atomic upserts (`onConflictDoUpdate`/`onConflictDoNothing`), reducing DB round-trips from 7→4 and 5→3. `getUserSubscriptions` now excludes `description` column (~25% payload reduction).
 
 ### Removed
+
 - Removed Recently Saved section from dashboard (#194)
 
 ### Fixed
+
 - Fixed non-deterministic Storybook stories (trending-topics, sleep-timer-menu, notification-list, notification-bell) by replacing `Date.now()` / `new Date()` module-level calls with fixed ISO timestamps, making stories VRT-safe (#203)
 - Cached summaries no longer consume hourly rate limit points in single summarize route (#64)
 - Fixed Clerk hosted sign-in/sign-up not redirecting back to the app by replacing `CLERK_SIGN_IN_FORCE_REDIRECT_URL` / `CLERK_SIGN_UP_FORCE_REDIRECT_URL` with `NEXT_PUBLIC_CLERK_SIGN_IN_FALLBACK_REDIRECT_URL` / `NEXT_PUBLIC_CLERK_SIGN_UP_FALLBACK_REDIRECT_URL` (public-prefixed, fallback semantics so `auth.protect()` redirect takes precedence) and adding `NEXT_PUBLIC_CLERK_SIGN_IN_URL` / `NEXT_PUBLIC_CLERK_SIGN_UP_URL` for correct routing to embedded auth pages
@@ -175,17 +188,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Preview deployments no longer get 500 errors from schema drift — `drizzle-kit push` now runs in the Vercel build targeting the correct Neon branch
 
 ### Security
+
 - Push notification topic header: `webpush.sendNotification()` now includes RFC 8030 `Topic` header derived from the notification tag, enabling push service message coalescing for offline devices (#159)
 - CSRF custom header check on push subscribe/unsubscribe API route: requires `X-Requested-With: fetch` header, returning 403 Forbidden when missing (#159)
 - ADR-018: Push Notification Hardening architecture decision record (#159)
 
 ### Refactored
+
 - Replaced unsafe `as PodcastIndexPodcast` type assertions in search route with `PodcastSearchResult` DTO (#72)
 
 ### Removed
+
 - GitHub Actions Neon branch workflow (`.github/workflows/neon-branch.yml`) — replaced by `vercel-build` script to eliminate dual Neon branch problem
 
 ### Changed
+
 - Increased `summarize-episode` task `maxDuration` to 7200s (2 hours) for async transcription
 - AI summarization prompt rewritten with anti-inflation anchoring and structured summary sections (TL;DR, What You'll Learn, Notable Quotes, Action Items, Bottom Line) (#133)
 - Worth-it score labels recalibrated: "Exceptional" (8+), "Above Average" (6-7.9), "Average" (4-5.9), "Below Average" (2-3.9), "Skip" (<2) (#133)
@@ -200,6 +217,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - CI workflow simplified to quality checks only (lint, test, Storybook); Vercel handles builds and deploys
 
 ### Added
+
 - Persistent in-app audio player with play/pause, seek, skip ±15s, playback speed, volume, and OS media controls via Media Session API (#93)
 - Post-merge schema drift detection CI job — alerts when Drizzle schema diverges from production database (#67)
 - GitHub Actions workflow to delete Neon preview branches on PR close, preventing branch accumulation on the free plan
@@ -227,28 +245,33 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [2026-02-08]
 
 ### Added
+
 - AssemblyAI transcription integration for episode audio-to-text conversion
 - RSS feed parser for direct podcast ingestion by URL
 - "Add by RSS URL" UI and server action on the Discover page
 - Durable episode summarization pipeline via Trigger.dev (replaces inline API summarization)
 
 ### Changed
+
 - Migrated package manager from npm to Bun; lockfile is now `bun.lock`
 - Enabled Turbopack for `next dev` (faster local development)
 
 ## [2026-02-07]
 
 ### Added
+
 - Doppler integration for centralized secrets management (replaces `.env` files)
 - Vitest unit test suite with React Testing Library
 - Storybook component testing and visual development environment
 
 ### Fixed
+
 - Resolved `next` binary path issue in CI build step
 
 ## [2026-02-02]
 
 ### Added
+
 - Podcast search powered by PodcastIndex API
 - Podcast detail page with episode listing
 - Podcast subscription management
@@ -266,6 +289,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ## [2026-01-20]
 
 ### Added
+
 - Initial project setup
 
 [Unreleased]: https://github.com/Chalet-Labs/contentgenie/compare/4974644...HEAD

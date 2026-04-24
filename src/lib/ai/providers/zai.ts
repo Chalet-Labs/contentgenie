@@ -1,4 +1,8 @@
-import type { AiProvider, AiMessage, AiCompletionOptions } from "@/lib/ai/types";
+import type {
+  AiProvider,
+  AiMessage,
+  AiCompletionOptions,
+} from "@/lib/ai/types";
 
 const ZAI_API_URL = "https://api.z.ai/api/coding/paas/v4/chat/completions";
 // Env-var name for opting into structured logs of reasoning_content snippets
@@ -15,7 +19,7 @@ export class ZaiProvider implements AiProvider {
 
   async generateCompletion(
     messages: AiMessage[],
-    options: AiCompletionOptions
+    options: AiCompletionOptions,
   ): Promise<string> {
     const apiKey = process.env.ZAI_API_KEY || "";
     if (!apiKey) {
@@ -52,7 +56,7 @@ export class ZaiProvider implements AiProvider {
     const finishReason = choice.finish_reason;
     if (finishReason === "sensitive") {
       throw new Error(
-        "Z.AI content filter: the request or response was flagged as sensitive"
+        "Z.AI content filter: the request or response was flagged as sensitive",
       );
     }
     if (finishReason === "network_error") {
@@ -87,7 +91,7 @@ export class ZaiProvider implements AiProvider {
         });
       }
       throw new Error(
-        `Invalid response format from Z.AI: empty content (finish_reason=${finishReason ?? "unknown"}, completion_tokens=${completionTokens ?? "unknown"}, reasoning_tokens=${reasoningTokens ?? "unknown"}).`
+        `Invalid response format from Z.AI: empty content (finish_reason=${finishReason ?? "unknown"}, completion_tokens=${completionTokens ?? "unknown"}, reasoning_tokens=${reasoningTokens ?? "unknown"}).`,
       );
     }
 

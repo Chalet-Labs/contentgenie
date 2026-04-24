@@ -1,6 +1,6 @@
-import Link from "next/link"
-import Image from "next/image"
-import { ROUTES } from "@/lib/routes"
+import Link from "next/link";
+import Image from "next/image";
+import { ROUTES } from "@/lib/routes";
 import {
   Table,
   TableBody,
@@ -8,45 +8,50 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table"
-import { Button } from "@/components/ui/button"
-import { StatusBadge } from "@/components/admin/episodes/status-badge"
-import { RowCheckbox } from "@/components/admin/episodes/row-checkbox"
-import { EpisodeActionButtons } from "@/components/admin/episodes/episode-action-buttons"
-import { PAGE_SIZE } from "@/lib/admin/episode-filters"
-import { relativeTime } from "@/lib/admin/format-utils"
-import type { EpisodeRow } from "@/lib/admin/episode-queries"
+} from "@/components/ui/table";
+import { Button } from "@/components/ui/button";
+import { StatusBadge } from "@/components/admin/episodes/status-badge";
+import { RowCheckbox } from "@/components/admin/episodes/row-checkbox";
+import { EpisodeActionButtons } from "@/components/admin/episodes/episode-action-buttons";
+import { PAGE_SIZE } from "@/lib/admin/episode-filters";
+import { relativeTime } from "@/lib/admin/format-utils";
+import type { EpisodeRow } from "@/lib/admin/episode-queries";
 
 interface EpisodesTableProps {
-  episodes: EpisodeRow[]
-  totalCount: number
-  currentPage: number
-  searchParams?: Record<string, string | string[] | undefined>
+  episodes: EpisodeRow[];
+  totalCount: number;
+  currentPage: number;
+  searchParams?: Record<string, string | string[] | undefined>;
 }
 
 function relativeDate(date: Date | null): string {
-  if (!date) return "—"
-  return relativeTime(date)
+  if (!date) return "—";
+  return relativeTime(date);
 }
 
-export function EpisodesTable({ episodes: rows, totalCount, currentPage, searchParams = {} }: EpisodesTableProps) {
-  const totalPages = Math.ceil(totalCount / PAGE_SIZE)
-  const hasPrev = currentPage > 1
-  const hasNext = currentPage < totalPages
+export function EpisodesTable({
+  episodes: rows,
+  totalCount,
+  currentPage,
+  searchParams = {},
+}: EpisodesTableProps) {
+  const totalPages = Math.ceil(totalCount / PAGE_SIZE);
+  const hasPrev = currentPage > 1;
+  const hasNext = currentPage < totalPages;
 
   function buildPageLink(page: number) {
-    const params = new URLSearchParams()
+    const params = new URLSearchParams();
     for (const [key, value] of Object.entries(searchParams)) {
       if (key !== "page" && value !== undefined) {
         if (Array.isArray(value)) {
-          params.set(key, value.join(","))
+          params.set(key, value.join(","));
         } else {
-          params.set(key, value)
+          params.set(key, value);
         }
       }
     }
-    params.set("page", String(page))
-    return `?${params.toString()}`
+    params.set("page", String(page));
+    return `?${params.toString()}`;
   }
 
   if (rows.length === 0) {
@@ -54,12 +59,12 @@ export function EpisodesTable({ episodes: rows, totalCount, currentPage, searchP
       <div className="rounded-md border p-8 text-center text-sm text-muted-foreground">
         No episodes found.
       </div>
-    )
+    );
   }
 
   return (
     <div className="space-y-2">
-      <div className="rounded-md border overflow-x-auto">
+      <div className="overflow-x-auto rounded-md border">
         <Table>
           <TableHeader>
             <TableRow>
@@ -88,7 +93,7 @@ export function EpisodesTable({ episodes: rows, totalCount, currentPage, searchP
                         alt=""
                         width={24}
                         height={24}
-                        className="rounded object-cover flex-shrink-0"
+                        className="flex-shrink-0 rounded object-cover"
                       />
                     )}
                     <span className="truncate text-sm">{ep.podcastTitle}</span>
@@ -97,12 +102,12 @@ export function EpisodesTable({ episodes: rows, totalCount, currentPage, searchP
                 <TableCell className="max-w-[200px]">
                   <Link
                     href={ROUTES.episode(ep.podcastIndexId)}
-                    className="text-sm hover:underline truncate block"
+                    className="block truncate text-sm hover:underline"
                   >
                     {ep.title}
                   </Link>
                 </TableCell>
-                <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
                   {relativeDate(ep.publishDate)}
                 </TableCell>
                 <TableCell>
@@ -153,5 +158,5 @@ export function EpisodesTable({ episodes: rows, totalCount, currentPage, searchP
         </div>
       )}
     </div>
-  )
+  );
 }

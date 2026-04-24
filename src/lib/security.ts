@@ -56,13 +56,21 @@ export function isPrivateIP(ip: string): boolean {
     const normalizedIp = ip.toLowerCase();
 
     // Loopback ::1
-    if (normalizedIp === "::1" || normalizedIp === "0:0:0:0:0:0:0:1") return true;
+    if (normalizedIp === "::1" || normalizedIp === "0:0:0:0:0:0:0:1")
+      return true;
 
     // Unique Local Address fc00::/7
-    if (normalizedIp.startsWith("fc") || normalizedIp.startsWith("fd")) return true;
+    if (normalizedIp.startsWith("fc") || normalizedIp.startsWith("fd"))
+      return true;
 
     // Link-local Address fe80::/10
-    if (normalizedIp.startsWith("fe8") || normalizedIp.startsWith("fe9") || normalizedIp.startsWith("fea") || normalizedIp.startsWith("feb")) return true;
+    if (
+      normalizedIp.startsWith("fe8") ||
+      normalizedIp.startsWith("fe9") ||
+      normalizedIp.startsWith("fea") ||
+      normalizedIp.startsWith("feb")
+    )
+      return true;
 
     // IPv4-mapped IPv6 ::ffff:0:0/96
     if (normalizedIp.startsWith("::ffff:")) {
@@ -84,10 +92,12 @@ export function isPrivateIP(ip: string): boolean {
     }
 
     // Unspecified address ::
-    if (normalizedIp === "::" || normalizedIp === "0:0:0:0:0:0:0:0") return true;
+    if (normalizedIp === "::" || normalizedIp === "0:0:0:0:0:0:0:0")
+      return true;
 
     // Discard prefix 100::/64
-    if (normalizedIp.startsWith("100:") || normalizedIp.startsWith("0100:")) return true;
+    if (normalizedIp.startsWith("100:") || normalizedIp.startsWith("0100:"))
+      return true;
 
     // Documentation prefix 2001:db8::/32
     if (normalizedIp.startsWith("2001:db8")) return true;
@@ -97,7 +107,8 @@ export function isPrivateIP(ip: string): boolean {
       normalizedIp.startsWith("2001:0:") ||
       normalizedIp.startsWith("2001::") ||
       normalizedIp.startsWith("2001:0000")
-    ) return true;
+    )
+      return true;
   }
 
   return false;
@@ -126,9 +137,10 @@ export async function isSafeUrl(urlString: string): Promise<boolean> {
     const hostname = url.hostname;
 
     // Remove brackets for IPv6 hostnames (e.g., [::1])
-    const cleanHostname = hostname.startsWith("[") && hostname.endsWith("]")
-      ? hostname.slice(1, -1)
-      : hostname;
+    const cleanHostname =
+      hostname.startsWith("[") && hostname.endsWith("]")
+        ? hostname.slice(1, -1)
+        : hostname;
 
     // If hostname is an IP, check if it's private
     if (net.isIP(cleanHostname)) {
@@ -174,7 +186,7 @@ export async function isSafeUrl(urlString: string): Promise<boolean> {
  */
 export async function safeFetch(
   url: string,
-  options: RequestInit = {}
+  options: RequestInit = {},
 ): Promise<string> {
   const MAX_REDIRECTS = 5;
   const SENSITIVE_HEADERS = ["authorization", "cookie", "proxy-authorization"];
@@ -183,7 +195,11 @@ export async function safeFetch(
   const initialOrigin = new URL(url).origin;
 
   // Build persistent request options outside the loop so header mutations survive across iterations
-  const { redirect: _ignoredRedirect, headers: originalHeaders, ...baseOptions } = options ?? {};
+  const {
+    redirect: _ignoredRedirect,
+    headers: originalHeaders,
+    ...baseOptions
+  } = options ?? {};
   let currentHeaders: Headers | undefined = originalHeaders
     ? new Headers(originalHeaders as HeadersInit)
     : undefined;
@@ -246,7 +262,7 @@ export async function safeFetch(
     }
 
     throw new Error(
-      `Failed to fetch URL: ${response.status} ${response.statusText}`
+      `Failed to fetch URL: ${response.status} ${response.statusText}`,
     );
   }
 

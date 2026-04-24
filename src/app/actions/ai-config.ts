@@ -38,7 +38,7 @@ export async function getAiConfig(): Promise<{
 }
 
 export async function updateSummarizationPrompt(
-  prompt: string | null
+  prompt: string | null,
 ): Promise<ActionResult> {
   const { userId, has } = await auth();
 
@@ -55,7 +55,10 @@ export async function updateSummarizationPrompt(
       return { success: false, error: "Prompt cannot be empty" };
     }
     if (prompt.length > 10000) {
-      return { success: false, error: "Prompt must be 10,000 characters or fewer" };
+      return {
+        success: false,
+        error: "Prompt must be 10,000 characters or fewer",
+      };
     }
     if (!prompt.includes("{{transcript}}")) {
       return { success: false, error: "Prompt must contain {{transcript}}" };
@@ -91,7 +94,7 @@ export async function updateSummarizationPrompt(
 
 export async function updateAiConfig(
   provider: AiProviderName,
-  model: string
+  model: string,
 ): Promise<ActionResult> {
   const { userId, has } = await auth();
 

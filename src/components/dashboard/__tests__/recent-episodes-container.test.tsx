@@ -63,9 +63,8 @@ async function renderContainer(overrides?: {
   sinceLastLogin?: number | null;
   initialEpisodes?: RecentEpisode[];
 }) {
-  const { RecentEpisodesContainer } = await import(
-    "@/components/dashboard/recent-episodes-container"
-  );
+  const { RecentEpisodesContainer } =
+    await import("@/components/dashboard/recent-episodes-container");
   return render(
     <RecentEpisodesContainer
       initialEpisodes={overrides?.initialEpisodes ?? [makeEpisode(1)]}
@@ -75,7 +74,7 @@ async function renderContainer(overrides?: {
           : SINCE_LAST_LOGIN
       }
       hasSubscriptions={true}
-    />
+    />,
   );
 }
 
@@ -86,7 +85,11 @@ async function renderContainer(overrides?: {
 describe("RecentEpisodesContainer", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockGetRecentEpisodes.mockResolvedValue({ episodes: [], hasSubscriptions: true, error: null });
+    mockGetRecentEpisodes.mockResolvedValue({
+      episodes: [],
+      hasSubscriptions: true,
+      error: null,
+    });
   });
 
   afterEach(() => {
@@ -97,8 +100,12 @@ describe("RecentEpisodesContainer", () => {
   it("renders both toggle buttons when sinceLastLogin is provided", async () => {
     await renderContainer();
 
-    expect(screen.getByRole("button", { name: /last week/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /since last login/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /last week/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /since last login/i }),
+    ).toBeInTheDocument();
   });
 
   it("hides the entire toggle group (including 'Last week') when sinceLastLogin is null", async () => {
@@ -110,7 +117,10 @@ describe("RecentEpisodesContainer", () => {
   });
 
   it("renders initial episodes without calling the server action", async () => {
-    const initial = [makeEpisode(10, "Initial Ep"), makeEpisode(11, "Another Ep")];
+    const initial = [
+      makeEpisode(10, "Initial Ep"),
+      makeEpisode(11, "Another Ep"),
+    ];
     await renderContainer({ initialEpisodes: initial });
 
     expect(screen.getByTestId("episode-10")).toBeInTheDocument();
@@ -181,13 +191,23 @@ describe("RecentEpisodesContainer", () => {
   it("calls server action with fresh sinceLastWeek when 'Last week' is clicked after switching away", async () => {
     const mockNow = 1_710_000_000_000;
     vi.spyOn(Date, "now").mockReturnValue(mockNow);
-    const expectedSinceWeek = Math.floor((mockNow - 7 * 24 * 60 * 60 * 1000) / 1000);
+    const expectedSinceWeek = Math.floor(
+      (mockNow - 7 * 24 * 60 * 60 * 1000) / 1000,
+    );
 
     const weekEpisodes = [makeEpisode(55, "Week Ep")];
     // First call: login toggle, second call: back to week
     mockGetRecentEpisodes
-      .mockResolvedValueOnce({ episodes: [], hasSubscriptions: true, error: null })
-      .mockResolvedValueOnce({ episodes: weekEpisodes, hasSubscriptions: true, error: null });
+      .mockResolvedValueOnce({
+        episodes: [],
+        hasSubscriptions: true,
+        error: null,
+      })
+      .mockResolvedValueOnce({
+        episodes: weekEpisodes,
+        hasSubscriptions: true,
+        error: null,
+      });
 
     await renderContainer();
 

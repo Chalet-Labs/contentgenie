@@ -1,10 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { makeClerkAuthMock } from "@/test/mocks/clerk-server";
 
 // Mock Clerk auth
 const mockAuth = vi.fn();
-vi.mock("@clerk/nextjs/server", () => ({
-  auth: () => mockAuth(),
-}));
+vi.mock("@clerk/nextjs/server", () => makeClerkAuthMock(() => mockAuth()));
 
 // Mock next/cache
 vi.mock("next/cache", () => ({
@@ -22,7 +21,9 @@ const mockUpdateWhere = vi.fn();
 vi.mock("@/db", () => ({
   db: {
     query: {
-      podcasts: { findFirst: (...args: unknown[]) => mockFindFirstPodcast(...args) },
+      podcasts: {
+        findFirst: (...args: unknown[]) => mockFindFirstPodcast(...args),
+      },
       userSubscriptions: {
         findFirst: (...args: unknown[]) => mockFindFirstSubscription(...args),
         findMany: vi.fn().mockResolvedValue([]),
@@ -105,9 +106,7 @@ describe("refreshPodcastFeed", () => {
   it("requires authentication", async () => {
     mockAuth.mockResolvedValue({ userId: null });
 
-    const { refreshPodcastFeed } = await import(
-      "@/app/actions/subscriptions"
-    );
+    const { refreshPodcastFeed } = await import("@/app/actions/subscriptions");
     const result = await refreshPodcastFeed(1);
 
     expect(result.success).toBe(false);
@@ -125,9 +124,7 @@ describe("refreshPodcastFeed", () => {
     // No subscription found
     mockFindFirstSubscription.mockResolvedValue(null);
 
-    const { refreshPodcastFeed } = await import(
-      "@/app/actions/subscriptions"
-    );
+    const { refreshPodcastFeed } = await import("@/app/actions/subscriptions");
     const result = await refreshPodcastFeed(1);
 
     expect(result.success).toBe(false);
@@ -159,21 +156,22 @@ describe("refreshPodcastFeed", () => {
     // Episode 5002 already exists in DB
     mockSelectWhere.mockResolvedValue([{ podcastIndexId: "5002" }]);
 
-    const { refreshPodcastFeed } = await import(
-      "@/app/actions/subscriptions"
-    );
+    const { refreshPodcastFeed } = await import("@/app/actions/subscriptions");
     const result = await refreshPodcastFeed(1);
 
     expect(result.success).toBe(true);
     expect(result.newEpisodes).toBe(2);
 
     // Verify batchTrigger was called with the 2 new episode IDs + idempotency keys
-    expect(mockBatchTrigger).toHaveBeenCalledWith(
-      "summarize-episode",
-      [
-        { payload: { episodeId: 5001 }, options: { idempotencyKey: "refresh-summarize-5001" } },
-        { payload: { episodeId: 5003 }, options: { idempotencyKey: "refresh-summarize-5003" } },
-      ]
-    );
+    expect(mockBatchTrigger).toHaveBeenCalledWith("summarize-episode", [
+      {
+        payload: { episodeId: 5001 },
+        options: { idempotencyKey: "refresh-summarize-5001" },
+      },
+      {
+        payload: { episodeId: 5003 },
+        options: { idempotencyKey: "refresh-summarize-5003" },
+      },
+    ]);
   });
 });

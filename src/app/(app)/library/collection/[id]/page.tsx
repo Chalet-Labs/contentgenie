@@ -4,7 +4,14 @@ import { useState, useEffect, useCallback } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
-import { ArrowLeft, Bookmark, Pencil, Trash2, Loader2, Folder } from "lucide-react";
+import {
+  ArrowLeft,
+  Bookmark,
+  Pencil,
+  Trash2,
+  Loader2,
+  Folder,
+} from "lucide-react";
 import { ShareButton } from "@/components/ui/share-button";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -56,8 +63,10 @@ export default function CollectionDetailPage() {
     } else {
       setCollection(result.collection);
       setItems(result.items);
-      const ids = await getListenedEpisodeIds(result.items.map((i) => i.episode.id))
-      setListenedSet(new Set(ids))
+      const ids = await getListenedEpisodeIds(
+        result.items.map((i) => i.episode.id),
+      );
+      setListenedSet(new Set(ids));
     }
 
     setIsLoading(false);
@@ -77,7 +86,8 @@ export default function CollectionDetailPage() {
       setListenedSet(new Set(listenedIds));
     };
     window.addEventListener(LISTEN_STATE_CHANGED_EVENT, refresh);
-    return () => window.removeEventListener(LISTEN_STATE_CHANGED_EVENT, refresh);
+    return () =>
+      window.removeEventListener(LISTEN_STATE_CHANGED_EVENT, refresh);
   }, [items]);
 
   const handleRemoved = () => {
@@ -130,10 +140,13 @@ export default function CollectionDetailPage() {
             <div>
               <div className="flex items-center gap-2">
                 <Folder className="h-6 w-6 text-muted-foreground" />
-                <h1 className="text-3xl font-bold tracking-tight">{collection.name}</h1>
+                <h1 className="text-3xl font-bold tracking-tight">
+                  {collection.name}
+                </h1>
               </div>
               <p className="text-muted-foreground">
-                {collection.description || `${items.length} episode${items.length === 1 ? "" : "s"}`}
+                {collection.description ||
+                  `${items.length} episode${items.length === 1 ? "" : "s"}`}
               </p>
             </div>
           ) : null}
@@ -158,7 +171,11 @@ export default function CollectionDetailPage() {
             </Button>
             <AlertDialog>
               <AlertDialogTrigger asChild>
-                <Button variant="outline" size="sm" className="text-destructive hover:text-destructive">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-destructive hover:text-destructive"
+                >
                   <Trash2 className="mr-2 h-4 w-4" />
                   Delete
                 </Button>
@@ -167,8 +184,9 @@ export default function CollectionDetailPage() {
                 <AlertDialogHeader>
                   <AlertDialogTitle>Delete Collection</AlertDialogTitle>
                   <AlertDialogDescription>
-                    Are you sure you want to delete &quot;{collection.name}&quot;? Episodes in this
-                    collection will not be deleted from your library.
+                    Are you sure you want to delete &quot;{collection.name}
+                    &quot;? Episodes in this collection will not be deleted from
+                    your library.
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
@@ -178,7 +196,9 @@ export default function CollectionDetailPage() {
                     disabled={isDeleting}
                     className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
                   >
-                    {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    {isDeleting && (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    )}
                     Delete
                   </AlertDialogAction>
                 </AlertDialogFooter>
@@ -226,9 +246,12 @@ export default function CollectionDetailPage() {
           <div className="mb-4 rounded-full bg-muted p-4">
             <Bookmark className="h-8 w-8 text-muted-foreground" />
           </div>
-          <h2 className="text-lg font-semibold">No episodes in this collection</h2>
+          <h2 className="text-lg font-semibold">
+            No episodes in this collection
+          </h2>
           <p className="mt-2 max-w-sm text-sm text-muted-foreground">
-            Add episodes to this collection from your library or by saving new episodes.
+            Add episodes to this collection from your library or by saving new
+            episodes.
           </p>
           <Button asChild className="mt-6">
             <Link href="/library">

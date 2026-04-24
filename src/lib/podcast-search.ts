@@ -19,8 +19,22 @@ export interface LocalSearchResult {
 }
 
 const STOP_WORDS = new Set([
-  "the", "a", "an", "and", "or", "of", "in", "to", "for", "with",
-  "on", "at", "by", "is", "it", "be",
+  "the",
+  "a",
+  "an",
+  "and",
+  "or",
+  "of",
+  "in",
+  "to",
+  "for",
+  "with",
+  "on",
+  "at",
+  "by",
+  "is",
+  "it",
+  "be",
 ]);
 
 const GLOBAL_KEY = "__podcastSearchIndex" as const;
@@ -95,7 +109,7 @@ export async function getOrBuildIndex(): Promise<MiniSearch<IndexedPodcast>> {
 }
 
 export async function searchLocalPodcasts(
-  query: string
+  query: string,
 ): Promise<LocalSearchResult[]> {
   if (!query.trim()) {
     return [];

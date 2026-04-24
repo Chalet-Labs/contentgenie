@@ -155,9 +155,7 @@ function getAuthHeaders(): Record<string, string> {
   // PodcastIndex allows a 5-minute drift, so 30 seconds is safe.
   const apiHeaderTime = Math.floor(Date.now() / 1000 / 30) * 30;
   const dataToHash = apiKey + apiSecret + apiHeaderTime;
-  const hash = createHash("sha1")
-    .update(dataToHash)
-    .digest("hex");
+  const hash = createHash("sha1").update(dataToHash).digest("hex");
 
   return {
     "X-Auth-Date": apiHeaderTime.toString(),
@@ -170,7 +168,7 @@ function getAuthHeaders(): Record<string, string> {
 // Generic fetch function with error handling
 async function fetchFromPodcastIndex<T>(
   endpoint: string,
-  params: Record<string, string> = {}
+  params: Record<string, string> = {},
 ): Promise<T> {
   const url = new URL(`${API_BASE_URL}${endpoint}`);
   Object.entries(params).forEach(([key, value]) => {
@@ -183,7 +181,9 @@ async function fetchFromPodcastIndex<T>(
   });
 
   if (!response.ok) {
-    throw new Error(`PodcastIndex API error: ${response.status} ${response.statusText}`);
+    throw new Error(
+      `PodcastIndex API error: ${response.status} ${response.statusText}`,
+    );
   }
 
   const data = await response.json();
@@ -194,7 +194,7 @@ async function fetchFromPodcastIndex<T>(
 export async function searchPodcasts(
   query: string,
   max: number = 20,
-  options: { similar?: boolean } = {}
+  options: { similar?: boolean } = {},
 ): Promise<SearchPodcastsResponse> {
   const params: Record<string, string> = {
     q: query,
@@ -205,7 +205,7 @@ export async function searchPodcasts(
   }
   return fetchFromPodcastIndex<SearchPodcastsResponse>(
     "/search/byterm",
-    params
+    params,
   );
 }
 
@@ -219,20 +219,17 @@ export interface SearchByPersonResponse {
 
 export async function searchByPerson(
   query: string,
-  max: number = 20
+  max: number = 20,
 ): Promise<SearchByPersonResponse> {
-  return fetchFromPodcastIndex<SearchByPersonResponse>(
-    "/search/byperson",
-    {
-      q: query,
-      max: max.toString(),
-    }
-  );
+  return fetchFromPodcastIndex<SearchByPersonResponse>("/search/byperson", {
+    q: query,
+    max: max.toString(),
+  });
 }
 
 // Get podcast by feed URL
 export async function getPodcastByFeedUrl(
-  feedUrl: string
+  feedUrl: string,
 ): Promise<GetPodcastResponse> {
   return fetchFromPodcastIndex<GetPodcastResponse>("/podcasts/byfeedurl", {
     url: feedUrl,
@@ -241,7 +238,7 @@ export async function getPodcastByFeedUrl(
 
 // Get podcast by feed ID
 export async function getPodcastById(
-  feedId: number
+  feedId: number,
 ): Promise<GetPodcastResponse> {
   return fetchFromPodcastIndex<GetPodcastResponse>("/podcasts/byfeedid", {
     id: feedId.toString(),
@@ -250,7 +247,7 @@ export async function getPodcastById(
 
 // Get podcast by iTunes ID
 export async function getPodcastByItunesId(
-  itunesId: number
+  itunesId: number,
 ): Promise<GetPodcastResponse> {
   return fetchFromPodcastIndex<GetPodcastResponse>("/podcasts/byitunesid", {
     id: itunesId.toString(),
@@ -261,19 +258,22 @@ export async function getPodcastByItunesId(
 export async function getEpisodesByFeedId(
   feedId: number | string,
   max: number = 20,
-  since?: number
+  since?: number,
 ): Promise<GetEpisodesResponse> {
   const params: Record<string, string> = {
     id: feedId.toString(),
     max: max.toString(),
   };
   if (since !== undefined) params.since = since.toString();
-  return fetchFromPodcastIndex<GetEpisodesResponse>("/episodes/byfeedid", params);
+  return fetchFromPodcastIndex<GetEpisodesResponse>(
+    "/episodes/byfeedid",
+    params,
+  );
 }
 
 // Get episode by ID
 export async function getEpisodeById(
-  episodeId: number
+  episodeId: number,
 ): Promise<GetEpisodeResponse> {
   return fetchFromPodcastIndex<GetEpisodeResponse>("/episodes/byid", {
     id: episodeId.toString(),
@@ -284,7 +284,7 @@ export async function getEpisodeById(
 export async function getTrendingPodcasts(
   max: number = 20,
   lang: string = "en",
-  categories?: string
+  categories?: string,
 ): Promise<TrendingPodcastsResponse> {
   const params: Record<string, string> = {
     max: max.toString(),
@@ -293,13 +293,16 @@ export async function getTrendingPodcasts(
   if (categories) {
     params.cat = categories;
   }
-  return fetchFromPodcastIndex<TrendingPodcastsResponse>("/podcasts/trending", params);
+  return fetchFromPodcastIndex<TrendingPodcastsResponse>(
+    "/podcasts/trending",
+    params,
+  );
 }
 
 // Search episodes by term
 export async function searchEpisodes(
   query: string,
-  max: number = 20
+  max: number = 20,
 ): Promise<GetEpisodesResponse> {
   return fetchFromPodcastIndex<GetEpisodesResponse>("/search/byterm", {
     q: query,

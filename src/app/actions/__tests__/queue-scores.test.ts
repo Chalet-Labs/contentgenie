@@ -1,127 +1,133 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { makeClerkAuthMock } from "@/test/mocks/clerk-server";
 
 // Mock Clerk auth
-const mockAuth = vi.fn()
-vi.mock("@clerk/nextjs/server", () => ({
-  auth: () => mockAuth(),
-}))
+const mockAuth = vi.fn();
+vi.mock("@clerk/nextjs/server", () => makeClerkAuthMock(() => mockAuth()));
 
 // Mock DB select chain
-const mockSelect = vi.fn()
-const mockFrom = vi.fn()
-const mockWhere = vi.fn().mockResolvedValue([])
+const mockSelect = vi.fn();
+const mockFrom = vi.fn();
+const mockWhere = vi.fn().mockResolvedValue([]);
 
 vi.mock("@/db", () => ({
   db: {
     select: (...args: unknown[]) => {
-      mockSelect(...args)
+      mockSelect(...args);
       return {
         from: (...fArgs: unknown[]) => {
-          mockFrom(...fArgs)
+          mockFrom(...fArgs);
           return {
             where: (...wArgs: unknown[]) => mockWhere(...wArgs),
-          }
+          };
         },
-      }
+      };
     },
   },
-}))
+}));
 
 vi.mock("@/db/schema", () => ({
   episodes: {
     podcastIndexId: "podcastIndexId",
     worthItScore: "worthItScore",
   },
-}))
+}));
 
 vi.mock("drizzle-orm", () => ({
   inArray: vi.fn((col: unknown, vals: unknown) => ({ col, vals })),
-}))
+}));
 
 describe("getQueueEpisodeScores", () => {
   beforeEach(() => {
-    vi.clearAllMocks()
-    mockAuth.mockResolvedValue({ userId: "user_123" })
-    mockWhere.mockResolvedValue([])
-  })
+    vi.clearAllMocks();
+    mockAuth.mockResolvedValue({ userId: "user_123" });
+    mockWhere.mockResolvedValue([]);
+  });
 
   afterEach(() => {
-    vi.restoreAllMocks()
-  })
+    vi.restoreAllMocks();
+  });
 
   it("returns empty object when unauthenticated", async () => {
-    mockAuth.mockResolvedValue({ userId: null })
-    const { getQueueEpisodeScores } = await import("@/app/actions/queue-scores")
-    const result = await getQueueEpisodeScores(["123", "456"])
-    expect(result).toEqual({})
-    expect(mockSelect).not.toHaveBeenCalled()
-  })
+    mockAuth.mockResolvedValue({ userId: null });
+    const { getQueueEpisodeScores } =
+      await import("@/app/actions/queue-scores");
+    const result = await getQueueEpisodeScores(["123", "456"]);
+    expect(result).toEqual({});
+    expect(mockSelect).not.toHaveBeenCalled();
+  });
 
   it("returns empty object for empty input", async () => {
-    const { getQueueEpisodeScores } = await import("@/app/actions/queue-scores")
-    const result = await getQueueEpisodeScores([])
-    expect(result).toEqual({})
-    expect(mockSelect).not.toHaveBeenCalled()
-  })
+    const { getQueueEpisodeScores } =
+      await import("@/app/actions/queue-scores");
+    const result = await getQueueEpisodeScores([]);
+    expect(result).toEqual({});
+    expect(mockSelect).not.toHaveBeenCalled();
+  });
 
   it("returns empty object when all IDs are empty strings", async () => {
-    const { getQueueEpisodeScores } = await import("@/app/actions/queue-scores")
-    const result = await getQueueEpisodeScores(["", "  ", ""])
-    expect(result).toEqual({})
-    expect(mockSelect).not.toHaveBeenCalled()
-  })
+    const { getQueueEpisodeScores } =
+      await import("@/app/actions/queue-scores");
+    const result = await getQueueEpisodeScores(["", "  ", ""]);
+    expect(result).toEqual({});
+    expect(mockSelect).not.toHaveBeenCalled();
+  });
 
   it("returns scores for matching episode IDs", async () => {
     const dbRows = [
       { podcastIndexId: "111", worthItScore: "8.50" },
       { podcastIndexId: "222", worthItScore: "5.00" },
-    ]
-    mockWhere.mockReturnValue(Promise.resolve(dbRows))
-    const { getQueueEpisodeScores } = await import("@/app/actions/queue-scores")
-    const result = await getQueueEpisodeScores(["111", "222"])
+    ];
+    mockWhere.mockReturnValue(Promise.resolve(dbRows));
+    const { getQueueEpisodeScores } =
+      await import("@/app/actions/queue-scores");
+    const result = await getQueueEpisodeScores(["111", "222"]);
     expect(result).toEqual({
       "111": parseFloat(dbRows[0].worthItScore),
       "222": parseFloat(dbRows[1].worthItScore),
-    })
-  })
+    });
+  });
 
   it("returns null for IDs with no score (worthItScore is null)", async () => {
     mockWhere.mockReturnValue(
-      Promise.resolve([
-        { podcastIndexId: "333", worthItScore: null },
-      ])
-    )
-    const { getQueueEpisodeScores } = await import("@/app/actions/queue-scores")
-    const result = await getQueueEpisodeScores(["333"])
-    expect(result).toEqual({ "333": null })
-  })
+      Promise.resolve([{ podcastIndexId: "333", worthItScore: null }]),
+    );
+    const { getQueueEpisodeScores } =
+      await import("@/app/actions/queue-scores");
+    const result = await getQueueEpisodeScores(["333"]);
+    expect(result).toEqual({ "333": null });
+  });
 
   it("does not include IDs with no matching DB row in result", async () => {
     mockWhere.mockReturnValue(
       Promise.resolve([
         { podcastIndexId: "111", worthItScore: "7.00" },
         // "999" is not in the result — no DB row
-      ])
-    )
-    const { getQueueEpisodeScores } = await import("@/app/actions/queue-scores")
-    const result = await getQueueEpisodeScores(["111", "999"])
-    expect(result).toEqual({ "111": 7.0 })
-    expect(Object.hasOwn(result, "999")).toBe(false)
-  })
+      ]),
+    );
+    const { getQueueEpisodeScores } =
+      await import("@/app/actions/queue-scores");
+    const result = await getQueueEpisodeScores(["111", "999"]);
+    expect(result).toEqual({ "111": 7.0 });
+    expect(Object.hasOwn(result, "999")).toBe(false);
+  });
 
   it("caps input at 50 IDs", async () => {
-    const { inArray } = await import("drizzle-orm")
-    const ids = Array.from({ length: 60 }, (_, i) => String(i + 1))
-    const { getQueueEpisodeScores } = await import("@/app/actions/queue-scores")
-    await getQueueEpisodeScores(ids)
-    const passedIds = (inArray as ReturnType<typeof vi.fn>).mock.calls[0][1] as string[]
-    expect(passedIds).toHaveLength(50)
-  })
+    const { inArray } = await import("drizzle-orm");
+    const ids = Array.from({ length: 60 }, (_, i) => String(i + 1));
+    const { getQueueEpisodeScores } =
+      await import("@/app/actions/queue-scores");
+    await getQueueEpisodeScores(ids);
+    const passedIds = (inArray as ReturnType<typeof vi.fn>).mock
+      .calls[0][1] as string[];
+    expect(passedIds).toHaveLength(50);
+  });
 
   it("returns empty object on DB error", async () => {
-    mockWhere.mockReturnValue(Promise.reject(new Error("db failure")))
-    const { getQueueEpisodeScores } = await import("@/app/actions/queue-scores")
-    const result = await getQueueEpisodeScores(["111"])
-    expect(result).toEqual({})
-  })
-})
+    mockWhere.mockReturnValue(Promise.reject(new Error("db failure")));
+    const { getQueueEpisodeScores } =
+      await import("@/app/actions/queue-scores");
+    const result = await getQueueEpisodeScores(["111"]);
+    expect(result).toEqual({});
+  });
+});

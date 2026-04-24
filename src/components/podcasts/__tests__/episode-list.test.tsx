@@ -139,7 +139,11 @@ describe("EpisodeList", () => {
     const statusMap = { "3": "completed" as const };
     const scoreMap = { "3": "0.85" };
     render(
-      <EpisodeList episodes={fixtures} statusMap={statusMap} scoreMap={scoreMap} />,
+      <EpisodeList
+        episodes={fixtures}
+        statusMap={statusMap}
+        scoreMap={scoreMap}
+      />,
     );
     const input = screen.getByLabelText(/search episodes by title/i);
     fireEvent.change(input, { target: { value: "rust" } });

@@ -52,15 +52,15 @@ async function RecentEpisodesSection() {
 
   // Treat as null if within 5 minutes (current session is first session)
   const sinceLastLogin =
-    lastSignInAt === null ||
-    Date.now() - lastSignInAt.getTime() < 5 * 60 * 1000
+    lastSignInAt === null || Date.now() - lastSignInAt.getTime() < 5 * 60 * 1000
       ? null
       : Math.floor(lastSignInAt.getTime() / 1000);
 
-  const { episodes, hasSubscriptions, error } = await getRecentEpisodesFromSubscriptions({
-    limit: RECENT_EPISODES_LIMIT,
-    since: Math.floor((Date.now() - 7 * 24 * 60 * 60 * 1000) / 1000),
-  });
+  const { episodes, hasSubscriptions, error } =
+    await getRecentEpisodesFromSubscriptions({
+      limit: RECENT_EPISODES_LIMIT,
+      since: Math.floor((Date.now() - 7 * 24 * 60 * 60 * 1000) / 1000),
+    });
 
   if (error) console.error("[RecentEpisodesSection]", error);
 
@@ -75,7 +75,9 @@ async function RecentEpisodesSection() {
 
 // Server component for episode recommendations
 async function RecommendationsSection() {
-  const { episodes, error } = await getRecommendedEpisodes(RECOMMENDATIONS_FETCH_SIZE);
+  const { episodes, error } = await getRecommendedEpisodes(
+    RECOMMENDATIONS_FETCH_SIZE,
+  );
   if (error) console.error("[RecommendationsSection]", error);
   return <EpisodeRecommendations episodes={episodes} />;
 }

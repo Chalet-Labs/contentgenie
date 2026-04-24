@@ -24,7 +24,8 @@ vi.mock("@/components/notifications/notification-page-list", () => ({
     mockPageListProps(props);
     return (
       <div data-testid="notification-page-list">
-        items:{props.initialItems.length}:hasMore:{String(props.initialHasMore)}:topics:
+        items:{props.initialItems.length}:hasMore:{String(props.initialHasMore)}
+        :topics:
         {Object.keys(props.initialTopicsByEpisode).length}
       </div>
     );
@@ -39,7 +40,9 @@ describe("NotificationsPage", () => {
     mockAuth.mockResolvedValue({ userId: "user-1" });
   });
 
-  function mockSuccess(items: Array<{ id: number; episodeDbId?: number | null }> = []) {
+  function mockSuccess(
+    items: Array<{ id: number; episodeDbId?: number | null }> = [],
+  ) {
     mockGetNotifications.mockResolvedValue({
       notifications: items,
       hasMore: false,
@@ -60,11 +63,11 @@ describe("NotificationsPage", () => {
     mockGetEpisodeTopics.mockResolvedValue({ 10: ["AI", "Tech"] });
 
     render(
-      (await NotificationsPage({ searchParams: {} })) as React.ReactElement
+      (await NotificationsPage({ searchParams: {} })) as React.ReactElement,
     );
 
     expect(screen.getByTestId("notification-page-list")).toHaveTextContent(
-      "items:2:hasMore:true:topics:1"
+      "items:2:hasMore:true:topics:1",
     );
     expect(mockGetEpisodeTopics).toHaveBeenCalledWith([10]);
   });
@@ -77,12 +80,12 @@ describe("NotificationsPage", () => {
     });
 
     render(
-      (await NotificationsPage({ searchParams: {} })) as React.ReactElement
+      (await NotificationsPage({ searchParams: {} })) as React.ReactElement,
     );
 
     expect(mockGetEpisodeTopics).not.toHaveBeenCalled();
     expect(screen.getByTestId("notification-page-list")).toHaveTextContent(
-      "items:1:hasMore:false:topics:0"
+      "items:1:hasMore:false:topics:0",
     );
   });
 
@@ -94,12 +97,16 @@ describe("NotificationsPage", () => {
     });
 
     render(
-      (await NotificationsPage({ searchParams: {} })) as React.ReactElement
+      (await NotificationsPage({ searchParams: {} })) as React.ReactElement,
     );
 
     expect(screen.getByRole("alert")).toBeInTheDocument();
-    expect(screen.getByText(/couldn't load notifications/i)).toBeInTheDocument();
-    expect(screen.queryByTestId("notification-page-list")).not.toBeInTheDocument();
+    expect(
+      screen.getByText(/couldn't load notifications/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByTestId("notification-page-list"),
+    ).not.toBeInTheDocument();
     expect(screen.queryByText(/all caught up/i)).not.toBeInTheDocument();
     expect(mockGetEpisodeTopics).not.toHaveBeenCalled();
   });
@@ -112,11 +119,11 @@ describe("NotificationsPage", () => {
     });
 
     render(
-      (await NotificationsPage({ searchParams: {} })) as React.ReactElement
+      (await NotificationsPage({ searchParams: {} })) as React.ReactElement,
     );
 
     expect(screen.getByTestId("notification-page-list")).toHaveTextContent(
-      "items:0:hasMore:false:topics:0"
+      "items:0:hasMore:false:topics:0",
     );
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
@@ -177,7 +184,7 @@ describe("NotificationsPage", () => {
     await NotificationsPage({ searchParams: { podcast: "42abc" } });
     expect(mockGetNotifications).toHaveBeenCalledWith(50, 0, undefined);
     expect(warn).toHaveBeenCalledWith(
-      expect.stringContaining("Invalid 'podcast' searchParam")
+      expect.stringContaining("Invalid 'podcast' searchParam"),
     );
     warn.mockRestore();
   });
@@ -211,7 +218,7 @@ describe("NotificationsPage", () => {
     mockSuccess();
     await NotificationsPage({ searchParams: { since: "not-a-date" } });
     expect(warn).toHaveBeenCalledWith(
-      expect.stringContaining("Invalid 'since' searchParam")
+      expect.stringContaining("Invalid 'since' searchParam"),
     );
     warn.mockRestore();
   });
@@ -227,7 +234,7 @@ describe("NotificationsPage", () => {
           podcast: "42",
           since: "2026-04-20T00:00:00.000Z",
         },
-      })) as React.ReactElement
+      })) as React.ReactElement,
     );
     expect(mockPageListProps).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -235,7 +242,7 @@ describe("NotificationsPage", () => {
           podcastId: 42,
           since: new Date("2026-04-20T00:00:00.000Z"),
         },
-      })
+      }),
     );
   });
 
@@ -245,7 +252,7 @@ describe("NotificationsPage", () => {
     render(
       (await NotificationsPage({
         searchParams: {},
-      })) as React.ReactElement
+      })) as React.ReactElement,
     );
     const call = mockPageListProps.mock.calls[0][0];
     expect(call.filter).toBeUndefined();

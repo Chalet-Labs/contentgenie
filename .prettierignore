@@ -1,0 +1,13 @@
+dist
+bun.lock
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+drizzle/meta
+
+# AI-agent instruction files — inline code snippets are illustrative, not real TS/JS.
+# Prettier's embedded formatter can mangle them (e.g. object literal → labeled-statement block).
+.agents
+.claude/skills
+.github/instructions
+.jules

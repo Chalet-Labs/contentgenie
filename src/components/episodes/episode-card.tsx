@@ -148,7 +148,7 @@ export function EpisodeCard({
       className={cn(
         "group transition-colors hover:bg-accent/50",
         accent === "unread" && "bg-accent/10",
-        isListened !== true && "border-l-2 border-l-primary"
+        isListened !== true && "border-l-2 border-l-primary",
       )}
     >
       <CardContent className="p-4">

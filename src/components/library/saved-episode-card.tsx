@@ -20,7 +20,10 @@ import {
   StickyNote,
   Star,
 } from "lucide-react";
-import { removeEpisodeFromLibrary, updateLibraryRating } from "@/app/actions/library";
+import {
+  removeEpisodeFromLibrary,
+  updateLibraryRating,
+} from "@/app/actions/library";
 import { useSidebarCountsOptional } from "@/contexts/sidebar-counts-context";
 import { ListenedButton } from "@/components/episodes/listened-button";
 import { EpisodeCard } from "@/components/episodes/episode-card";
@@ -194,7 +197,7 @@ export function SavedEpisodeCard({
                   onRatingChange={async (rating) => {
                     return await updateLibraryRating(
                       episode.podcastIndexId,
-                      rating
+                      rating,
                     );
                   }}
                   size="md"

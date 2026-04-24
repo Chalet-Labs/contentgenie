@@ -19,11 +19,13 @@ The remaining surfaces do not follow submit-cycle semantics.
 ### Pattern 1: react-hook-form + Zod + shadcn `<Form>`
 
 Use when the surface has **all** of:
+
 - A submit event (user explicitly triggers save/create/update)
 - Field validation that should display inline errors
 - Two or more fields (single validated fields are borderline — use judgment)
 
 Current surfaces using this pattern:
+
 - `src/components/podcasts/rss-feed-form.tsx` — RSS feed URL input
 - `src/components/library/collection-dialog.tsx` — Create/edit collection
 - `src/components/library/bookmarks-list.tsx` — Add bookmark dialog
@@ -32,19 +34,20 @@ Current surfaces using this pattern:
 ### Pattern 2: Manual `useState`
 
 Use when the surface has **any** of:
+
 - No submit event (autosave, URL navigation, immediate-apply controls)
 - Complex non-form state that dominates the component (upload state machines, streaming, abort controllers)
 - A single ephemeral input (auto-dismissing popovers, search boxes)
 
 Current surfaces using this pattern and why:
 
-| Surface | File | Why manual state is appropriate |
-|---|---|---|
-| Discover search | `src/app/(app)/discover/discover-content.tsx` | URL navigation (`router.replace`), not a data mutation. No validation needed. |
-| OPML import | `src/components/podcasts/opml-import-form.tsx` | 5-state machine (idle→uploading→processing→done→error) + Trigger.dev realtime progress. The core complexity is the upload lifecycle, not field management. |
-| Bookmark note popover | `src/components/audio-player/bookmark-button.tsx` | Ephemeral popover with 5s auto-dismiss. Single optional text input after bookmark is already created. |
-| Notes editor | `src/components/library/notes-editor.tsx` | Autosave on debounce — no submit cycle at all. |
-| Prompt template editor | `src/components/admin/settings/prompt-template-card.tsx` | Admin tool with streaming test output, abort controller, debounced combobox search. Core complexity is in streaming/search, not form fields. |
+| Surface                | File                                                     | Why manual state is appropriate                                                                                                                            |
+| ---------------------- | -------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Discover search        | `src/app/(app)/discover/discover-content.tsx`            | URL navigation (`router.replace`), not a data mutation. No validation needed.                                                                              |
+| OPML import            | `src/components/podcasts/opml-import-form.tsx`           | 5-state machine (idle→uploading→processing→done→error) + Trigger.dev realtime progress. The core complexity is the upload lifecycle, not field management. |
+| Bookmark note popover  | `src/components/audio-player/bookmark-button.tsx`        | Ephemeral popover with 5s auto-dismiss. Single optional text input after bookmark is already created.                                                      |
+| Notes editor           | `src/components/library/notes-editor.tsx`                | Autosave on debounce — no submit cycle at all.                                                                                                             |
+| Prompt template editor | `src/components/admin/settings/prompt-template-card.tsx` | Admin tool with streaming test output, abort controller, debounced combobox search. Core complexity is in streaming/search, not form fields.               |
 
 ### Shared validation constants
 
@@ -54,12 +57,12 @@ To prevent client/server validation drift, the `MAX_SHORT_TEXT` constant (500 ch
 
 Error feedback follows the interaction context, not the form pattern:
 
-| Context | Pattern | Rationale |
-|---|---|---|
-| Field validation in RHF forms | `<FormMessage>` below the field | Inline, persistent, tied to specific field |
-| Action/mutation failures | `toast.error()` | Transient, non-blocking, not tied to a field |
-| Data loading failures | Inline `<p className="text-destructive">` | Persistent until resolved, replaces content area |
-| Warnings (non-blocking) | Inline `<p className="text-yellow-600">` | Visible but non-obstructive |
+| Context                       | Pattern                                   | Rationale                                        |
+| ----------------------------- | ----------------------------------------- | ------------------------------------------------ |
+| Field validation in RHF forms | `<FormMessage>` below the field           | Inline, persistent, tied to specific field       |
+| Action/mutation failures      | `toast.error()`                           | Transient, non-blocking, not tied to a field     |
+| Data loading failures         | Inline `<p className="text-destructive">` | Persistent until resolved, replaces content area |
+| Warnings (non-blocking)       | Inline `<p className="text-yellow-600">`  | Visible but non-obstructive                      |
 
 ## Consequences
 

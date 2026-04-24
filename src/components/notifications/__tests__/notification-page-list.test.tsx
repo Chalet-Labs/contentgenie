@@ -21,15 +21,18 @@ const mockGetNotifications = vi.fn();
 const mockGetEpisodeTopics = vi.fn();
 vi.mock("@/app/actions/notifications", () => ({
   dismissNotification: (...args: unknown[]) => mockDismissNotification(...args),
-  markNotificationRead: (...args: unknown[]) => mockMarkNotificationRead(...args),
-  markAllNotificationsRead: (...args: unknown[]) => mockMarkAllNotificationsRead(...args),
+  markNotificationRead: (...args: unknown[]) =>
+    mockMarkNotificationRead(...args),
+  markAllNotificationsRead: (...args: unknown[]) =>
+    mockMarkAllNotificationsRead(...args),
   getNotifications: (...args: unknown[]) => mockGetNotifications(...args),
   getEpisodeTopics: (...args: unknown[]) => mockGetEpisodeTopics(...args),
 }));
 
 const mockGetListenedEpisodeIds = vi.fn();
 vi.mock("@/app/actions/listen-history", () => ({
-  getListenedEpisodeIds: (...args: unknown[]) => mockGetListenedEpisodeIds(...args),
+  getListenedEpisodeIds: (...args: unknown[]) =>
+    mockGetListenedEpisodeIds(...args),
   recordListenEvent: vi.fn().mockResolvedValue({ success: true }),
 }));
 
@@ -43,7 +46,10 @@ let mockPlayerState: {
   currentEpisode: unknown;
 } = { queue: [], currentEpisode: null };
 vi.mock("@/contexts/audio-player-context", () => ({
-  useAudioPlayerAPI: () => ({ addToQueue: mockAddToQueue, playEpisode: mockPlayEpisode }),
+  useAudioPlayerAPI: () => ({
+    addToQueue: mockAddToQueue,
+    playEpisode: mockPlayEpisode,
+  }),
   useAudioPlayerState: () => mockPlayerState,
 }));
 
@@ -52,7 +58,9 @@ import { NotificationPageList } from "@/components/notifications/notification-pa
 
 // --- Test helpers ---
 
-type NotificationItem = React.ComponentProps<typeof NotificationPageList>["initialItems"][0];
+type NotificationItem = React.ComponentProps<
+  typeof NotificationPageList
+>["initialItems"][0];
 
 function makeItem(overrides: Partial<NotificationItem> = {}): NotificationItem {
   return {
@@ -75,7 +83,10 @@ function makeItem(overrides: Partial<NotificationItem> = {}): NotificationItem {
 }
 
 const defaultProps = {
-  initialItems: [makeItem({ id: 1, isRead: false }), makeItem({ id: 2, isRead: true })],
+  initialItems: [
+    makeItem({ id: 1, isRead: false }),
+    makeItem({ id: 2, isRead: true }),
+  ],
   initialHasMore: false,
   initialTopicsByEpisode: { 10: ["AI", "Tech", "Future"] },
 };
@@ -88,7 +99,11 @@ describe("NotificationPageList", () => {
     mockDismissNotification.mockResolvedValue({ success: true });
     mockMarkNotificationRead.mockResolvedValue({ success: true });
     mockMarkAllNotificationsRead.mockResolvedValue({ success: true });
-    mockGetNotifications.mockResolvedValue({ notifications: [], hasMore: false, error: null });
+    mockGetNotifications.mockResolvedValue({
+      notifications: [],
+      hasMore: false,
+      error: null,
+    });
     mockGetEpisodeTopics.mockResolvedValue({});
     mockGetListenedEpisodeIds.mockResolvedValue([]);
   });
@@ -100,7 +115,7 @@ describe("NotificationPageList", () => {
         initialItems={[]}
         initialHasMore={false}
         initialTopicsByEpisode={{}}
-      />
+      />,
     );
     expect(screen.getByText(/you're all caught up/i)).toBeInTheDocument();
   });
@@ -144,7 +159,7 @@ describe("NotificationPageList", () => {
         initialItems={[makeItem({ id: 1, isRead: true })]}
         initialHasMore={false}
         initialTopicsByEpisode={{}}
-      />
+      />,
     );
     await user.click(screen.getByRole("tab", { name: /unread/i }));
     expect(screen.getByText(/no unread notifications/i)).toBeInTheDocument();
@@ -157,7 +172,7 @@ describe("NotificationPageList", () => {
         initialItems={[makeItem({ id: 1, episodeDbId: 10 })]}
         initialHasMore={false}
         initialTopicsByEpisode={{ 10: ["AI", "Tech", "Future", "Extra"] }}
-      />
+      />,
     );
     expect(screen.getByText("AI")).toBeInTheDocument();
     expect(screen.getByText("Tech")).toBeInTheDocument();
@@ -172,7 +187,7 @@ describe("NotificationPageList", () => {
         initialItems={[makeItem({ id: 1, episodeDbId: 10 })]}
         initialHasMore={false}
         initialTopicsByEpisode={{ 10: ["AI"] }}
-      />
+      />,
     );
     const chip = screen.getByText("AI");
     expect(chip.closest("button")).toBeNull();
@@ -204,7 +219,10 @@ describe("NotificationPageList", () => {
 
   // AC-8: dismiss failure — row reappears AND toast fires with Retry action
   it("row reappears and shows toast with Retry action on dismiss failure", async () => {
-    mockDismissNotification.mockResolvedValue({ success: false, error: "Server error" });
+    mockDismissNotification.mockResolvedValue({
+      success: false,
+      error: "Server error",
+    });
     const user = userEvent.setup();
     render(<NotificationPageList {...defaultProps} />);
     expect(screen.getAllByRole("article")).toHaveLength(2);
@@ -217,7 +235,7 @@ describe("NotificationPageList", () => {
         expect.any(String),
         expect.objectContaining({
           action: expect.objectContaining({ label: "Retry" }),
-        })
+        }),
       );
     });
   });
@@ -244,7 +262,9 @@ describe("NotificationPageList", () => {
   it("Listen click calls markNotificationRead if unread then plays episode", async () => {
     const user = userEvent.setup();
     render(<NotificationPageList {...defaultProps} />);
-    const listenBtns = screen.getAllByRole("button", { name: /^play episode$/i });
+    const listenBtns = screen.getAllByRole("button", {
+      name: /^play episode$/i,
+    });
     await user.click(listenBtns[0]);
     await waitFor(() => {
       expect(mockMarkNotificationRead).toHaveBeenCalledWith(1);
@@ -259,7 +279,9 @@ describe("NotificationPageList", () => {
   it("Listen click does NOT call router.push", async () => {
     const user = userEvent.setup();
     render(<NotificationPageList {...defaultProps} />);
-    const listenBtns = screen.getAllByRole("button", { name: /^play episode$/i });
+    const listenBtns = screen.getAllByRole("button", {
+      name: /^play episode$/i,
+    });
     await user.click(listenBtns[0]);
     await waitFor(() => {
       expect(mockPlayEpisode).toHaveBeenCalled();
@@ -275,9 +297,11 @@ describe("NotificationPageList", () => {
         initialItems={[makeItem({ id: 2, isRead: true })]}
         initialHasMore={false}
         initialTopicsByEpisode={{}}
-      />
+      />,
     );
-    const listenBtns = screen.getAllByRole("button", { name: /^play episode$/i });
+    const listenBtns = screen.getAllByRole("button", {
+      name: /^play episode$/i,
+    });
     await user.click(listenBtns[0]);
     await waitFor(() => {
       expect(mockMarkNotificationRead).not.toHaveBeenCalled();
@@ -293,12 +317,10 @@ describe("NotificationPageList", () => {
     const user = userEvent.setup();
     render(
       <NotificationPageList
-        initialItems={[
-          makeItem({ id: 1, isRead: false, audioUrl: null }),
-        ]}
+        initialItems={[makeItem({ id: 1, isRead: false, audioUrl: null })]}
         initialHasMore={false}
         initialTopicsByEpisode={{}}
-      />
+      />,
     );
     const viewBtn = screen.getByRole("button", { name: /view episode/i });
     await user.click(viewBtn);
@@ -321,16 +343,16 @@ describe("NotificationPageList", () => {
         ]}
         initialHasMore={false}
         initialTopicsByEpisode={{}}
-      />
+      />,
     );
     expect(
-      screen.queryByRole("button", { name: /^play episode$/i })
+      screen.queryByRole("button", { name: /^play episode$/i }),
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: /view episode/i })
+      screen.queryByRole("button", { name: /view episode/i }),
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: /mark as listened/i })
+      screen.queryByRole("button", { name: /mark as listened/i }),
     ).not.toBeInTheDocument();
   });
 
@@ -349,11 +371,11 @@ describe("NotificationPageList", () => {
         initialHasMore={false}
         initialTopicsByEpisode={{}}
         initialListenedIds={["PI-read"]}
-      />
+      />,
     );
     // Row 1: unlistened → clickable Mark-as-listened button exists.
     expect(
-      screen.getByRole("button", { name: /mark as listened/i })
+      screen.getByRole("button", { name: /mark as listened/i }),
     ).toBeInTheDocument();
     // Row 2: listened → Already-listened indicator (a span with aria-label).
     expect(screen.getByLabelText(/already listened/i)).toBeInTheDocument();
@@ -371,14 +393,14 @@ describe("NotificationPageList", () => {
     // A full first page (50 items) mirrors the real server-component hydration
     // and sets offsetRef to 50, matching the expected next-offset assertion.
     const fullPage = Array.from({ length: 50 }, (_, i) =>
-      makeItem({ id: i + 1 })
+      makeItem({ id: i + 1 }),
     );
     render(
       <NotificationPageList
         initialItems={fullPage}
         initialHasMore={true}
         initialTopicsByEpisode={{}}
-      />
+      />,
     );
     const loadMoreBtn = screen.getByRole("button", { name: /load more/i });
     await user.click(loadMoreBtn);
@@ -396,7 +418,7 @@ describe("NotificationPageList", () => {
     mockGetEpisodeTopics.mockResolvedValue({});
     const user = userEvent.setup();
     const fullPage = Array.from({ length: 50 }, (_, i) =>
-      makeItem({ id: i + 1 })
+      makeItem({ id: i + 1 }),
     );
     const since = new Date("2026-04-20T00:00:00.000Z");
     render(
@@ -405,7 +427,7 @@ describe("NotificationPageList", () => {
         initialHasMore={true}
         initialTopicsByEpisode={{}}
         filter={{ podcastId: 42, since }}
-      />
+      />,
     );
     const loadMoreBtn = screen.getByRole("button", { name: /load more/i });
     await user.click(loadMoreBtn);
@@ -426,14 +448,14 @@ describe("NotificationPageList", () => {
     });
     const user = userEvent.setup();
     const fullPage = Array.from({ length: 50 }, (_, i) =>
-      makeItem({ id: i + 1 })
+      makeItem({ id: i + 1 }),
     );
     render(
       <NotificationPageList
         initialItems={fullPage}
         initialHasMore={true}
         initialTopicsByEpisode={{}}
-      />
+      />,
     );
 
     // Dismiss the first row — offset should go from 50 to 49
@@ -461,14 +483,19 @@ describe("NotificationPageList", () => {
     const unreadRow = screen.getAllByRole("article")[0];
     expect(unreadRow).toHaveAttribute("data-read", "false");
 
-    const listenBtns = screen.getAllByRole("button", { name: /^play episode$/i });
+    const listenBtns = screen.getAllByRole("button", {
+      name: /^play episode$/i,
+    });
     await user.click(listenBtns[0]);
 
     await waitFor(() => {
       expect(mockMarkNotificationRead).toHaveBeenCalledWith(1);
     });
     // Row should still render as unread because server rejected
-    expect(screen.getAllByRole("article")[0]).toHaveAttribute("data-read", "false");
+    expect(screen.getAllByRole("article")[0]).toHaveAttribute(
+      "data-read",
+      "false",
+    );
     expect(mockPush).not.toHaveBeenCalled();
   });
 
@@ -485,7 +512,7 @@ describe("NotificationPageList", () => {
         initialItems={defaultProps.initialItems}
         initialHasMore={true}
         initialTopicsByEpisode={{}}
-      />
+      />,
     );
 
     await user.click(screen.getByRole("button", { name: /load more/i }));
@@ -494,11 +521,13 @@ describe("NotificationPageList", () => {
         expect.stringMatching(/failed to load/i),
         expect.objectContaining({
           action: expect.objectContaining({ label: "Retry" }),
-        })
+        }),
       );
     });
     // Button is still present for manual retry
-    expect(screen.getByRole("button", { name: /load more/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /load more/i }),
+    ).toBeInTheDocument();
   });
 
   // Regression: mark-all-read failure surfaces a toast with Retry (previously silent)
@@ -516,11 +545,14 @@ describe("NotificationPageList", () => {
         expect.stringMatching(/mark all as read|db error/i),
         expect.objectContaining({
           action: expect.objectContaining({ label: "Retry" }),
-        })
+        }),
       );
     });
     // Rows must NOT be flipped to read on failure
-    expect(screen.getAllByRole("article")[0]).toHaveAttribute("data-read", "false");
+    expect(screen.getAllByRole("article")[0]).toHaveAttribute(
+      "data-read",
+      "false",
+    );
   });
 
   // Regression: Listen click that throws still plays and toasts (not silent)
@@ -529,12 +561,14 @@ describe("NotificationPageList", () => {
     const user = userEvent.setup();
     render(<NotificationPageList {...defaultProps} />);
 
-    const listenBtns = screen.getAllByRole("button", { name: /^play episode$/i });
+    const listenBtns = screen.getAllByRole("button", {
+      name: /^play episode$/i,
+    });
     await user.click(listenBtns[0]);
 
     await waitFor(() => {
       expect(mockToastError).toHaveBeenCalledWith(
-        expect.stringMatching(/couldn.t mark as read/i)
+        expect.stringMatching(/couldn.t mark as read/i),
       );
       expect(mockPlayEpisode).toHaveBeenCalled();
     });
@@ -628,9 +662,10 @@ describe("NotificationPageList", () => {
         initialHasMore={false}
         initialTopicsByEpisode={{}}
         initialListenedIds={["PI-42"]}
-      />
+      />,
     );
-    const card = screen.getByRole("article").firstElementChild as HTMLElement | null;
+    const card = screen.getByRole("article")
+      .firstElementChild as HTMLElement | null;
     expect(card).not.toBeNull();
     expect(card!).toHaveAttribute("data-listened", "true");
   });
@@ -642,9 +677,10 @@ describe("NotificationPageList", () => {
         initialHasMore={false}
         initialTopicsByEpisode={{}}
         initialListenedIds={[]}
-      />
+      />,
     );
-    const card = screen.getByRole("article").firstElementChild as HTMLElement | null;
+    const card = screen.getByRole("article")
+      .firstElementChild as HTMLElement | null;
     expect(card).not.toBeNull();
     expect(card!).toHaveAttribute("data-listened", "false");
   });
@@ -663,7 +699,7 @@ describe("NotificationPageList", () => {
         initialItems={defaultProps.initialItems}
         initialHasMore={true}
         initialTopicsByEpisode={{}}
-      />
+      />,
     );
 
     await user.click(screen.getByRole("button", { name: /load more/i }));

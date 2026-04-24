@@ -132,7 +132,7 @@ describe("AuthenticatedEpisodeDetail", () => {
         }
 
         return Promise.reject(new Error(`Unexpected fetch call: ${input}`));
-      })
+      }),
     );
   });
 
@@ -142,27 +142,27 @@ describe("AuthenticatedEpisodeDetail", () => {
         episodeId="rss-abc"
         userId="user-1"
         isAdmin={true}
-      />
+      />,
     );
 
     await screen.findByRole("heading", { name: "RSS Episode" });
 
     expect(fetch).toHaveBeenCalledWith("/api/episodes/rss-abc");
     expect(fetch).not.toHaveBeenCalledWith(
-      expect.stringContaining("/api/episodes/summarize")
+      expect.stringContaining("/api/episodes/summarize"),
     );
 
     await waitFor(() => {
       expect(screen.getByTestId("summary-display")).toHaveTextContent(
-        "can-generate:false"
+        "can-generate:false",
       );
     });
 
     expect(
-      screen.queryByTestId("transcript-fetch-button")
+      screen.queryByTestId("transcript-fetch-button"),
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: /re-summarize/i })
+      screen.queryByRole("button", { name: /re-summarize/i }),
     ).not.toBeInTheDocument();
   });
 });

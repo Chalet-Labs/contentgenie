@@ -149,9 +149,7 @@ export function SyncQueueProvider({ children }: { children: ReactNode }) {
   // Per-entity failed check
   const hasFailed = useCallback(
     (entityKey: string): boolean => {
-      return failedItems.some(
-        (item) => item.entityKey === entityKey,
-      );
+      return failedItems.some((item) => item.entityKey === entityKey);
     },
     [failedItems],
   );

@@ -215,7 +215,9 @@ describe("unsaveEpisodeSchema", () => {
   });
 
   it("trims podcastIndexId", () => {
-    const result = unsaveEpisodeSchema.safeParse({ podcastIndexId: "  ep-123  " });
+    const result = unsaveEpisodeSchema.safeParse({
+      podcastIndexId: "  ep-123  ",
+    });
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data.podcastIndexId).toBe("ep-123");
@@ -290,12 +292,18 @@ describe("subscribeSchema", () => {
   });
 
   it("rejects empty podcastIndexId", () => {
-    const result = subscribeSchema.safeParse({ podcastIndexId: "", title: "T" });
+    const result = subscribeSchema.safeParse({
+      podcastIndexId: "",
+      title: "T",
+    });
     expect(result.success).toBe(false);
   });
 
   it("rejects empty title", () => {
-    const result = subscribeSchema.safeParse({ podcastIndexId: "pod-1", title: "" });
+    const result = subscribeSchema.safeParse({
+      podcastIndexId: "pod-1",
+      title: "",
+    });
     expect(result.success).toBe(false);
   });
 
@@ -318,7 +326,9 @@ describe("unsubscribeSchema", () => {
   });
 
   it("trims podcastIndexId", () => {
-    const result = unsubscribeSchema.safeParse({ podcastIndexId: "  pod-123  " });
+    const result = unsubscribeSchema.safeParse({
+      podcastIndexId: "  pod-123  ",
+    });
     expect(result.success).toBe(true);
     if (result.success) {
       expect(result.data.podcastIndexId).toBe("pod-123");

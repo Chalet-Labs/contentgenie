@@ -117,9 +117,8 @@ export function NotificationPopover({
   // the `summary` prop when the user clicks items or "Clear all", so items can
   // visually disappear without waiting for a server refetch. It resyncs
   // whenever the parent provides a new summary (e.g., a fresh fetch on open).
-  const [displayedSummary, setDisplayedSummary] = useState<
-    NotificationSummary | null
-  >(summary);
+  const [displayedSummary, setDisplayedSummary] =
+    useState<NotificationSummary | null>(summary);
 
   useEffect(() => {
     setDisplayedSummary(summary);
@@ -174,14 +173,14 @@ export function NotificationPopover({
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetTrigger asChild>{trigger}</SheetTrigger>
-      <SheetContent side="bottom" className="h-[85vh] flex flex-col p-0">
+      <SheetContent side="bottom" className="flex h-[85vh] flex-col p-0">
         <SheetHeader className="border-b px-4 py-3">
           <SheetTitle>Notifications</SheetTitle>
           <SheetDescription className="sr-only">
             Grouped notification summary
           </SheetDescription>
         </SheetHeader>
-        <div className="flex flex-col flex-1 overflow-hidden">
+        <div className="flex flex-1 flex-col overflow-hidden">
           <PopoverBody
             summary={displayedSummary}
             isError={isError}

@@ -19,12 +19,12 @@ The alternative to adopting VRT is to fix only the 4 non-deterministic stories a
 
 ### Tool options evaluated
 
-| Tool | Cost | Setup effort | CI integration | Storybook 8 compat |
-|---|---|---|---|---|
-| **Chromatic** | Free tier (5000 snapshots/mo), then $149+/mo | Low — 1 package + CI step | Official GH Action, blocks PRs with UI review | First-class |
-| **Loki** | Free | Medium — Docker/local Chrome in CI | Manual baseline commit + diff artifact upload | Community-maintained |
-| **Playwright `toHaveScreenshot()`** | Free | Low-medium — config + one test file | `playwright already installed`; no external service | No Storybook awareness; build + serve first |
-| **Storycap + reg-suit** | Free | High — two tools, cloud storage needed | Complex; publishes HTML reports | Works but less active |
+| Tool                                | Cost                                         | Setup effort                           | CI integration                                      | Storybook 8 compat                          |
+| ----------------------------------- | -------------------------------------------- | -------------------------------------- | --------------------------------------------------- | ------------------------------------------- |
+| **Chromatic**                       | Free tier (5000 snapshots/mo), then $149+/mo | Low — 1 package + CI step              | Official GH Action, blocks PRs with UI review       | First-class                                 |
+| **Loki**                            | Free                                         | Medium — Docker/local Chrome in CI     | Manual baseline commit + diff artifact upload       | Community-maintained                        |
+| **Playwright `toHaveScreenshot()`** | Free                                         | Low-medium — config + one test file    | `playwright already installed`; no external service | No Storybook awareness; build + serve first |
+| **Storycap + reg-suit**             | Free                                         | High — two tools, cloud storage needed | Complex; publishes HTML reports                     | Works but less active                       |
 
 ## Decision
 

@@ -1,8 +1,11 @@
-import type { Meta, StoryObj } from "@storybook/nextjs-vite"
-import { DndContext } from "@dnd-kit/core"
-import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable"
-import type { AudioEpisode } from "@/contexts/audio-player-context"
-import { QueueItem } from "@/components/audio-player/queue-item"
+import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { DndContext } from "@dnd-kit/core";
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import type { AudioEpisode } from "@/contexts/audio-player-context";
+import { QueueItem } from "@/components/audio-player/queue-item";
 
 const testEpisode: AudioEpisode = {
   id: "ep-1",
@@ -11,7 +14,7 @@ const testEpisode: AudioEpisode = {
   audioUrl: "https://example.com/audio.mp3",
   artwork: "https://picsum.photos/seed/podcast/300/300",
   duration: 2400,
-}
+};
 
 const longTitleEpisode: AudioEpisode = {
   id: "ep-2",
@@ -21,7 +24,7 @@ const longTitleEpisode: AudioEpisode = {
     "My Very Long Podcast Name That Also Needs Truncation In The Queue Item",
   audioUrl: "https://example.com/audio.mp3",
   duration: 5400,
-}
+};
 
 function DndWrapper({ children }: { children: React.ReactNode }) {
   return (
@@ -33,7 +36,7 @@ function DndWrapper({ children }: { children: React.ReactNode }) {
         <div className="w-80">{children}</div>
       </SortableContext>
     </DndContext>
-  )
+  );
 }
 
 const meta: Meta<typeof QueueItem> = {
@@ -46,10 +49,10 @@ const meta: Meta<typeof QueueItem> = {
       </DndWrapper>
     ),
   ],
-}
+};
 
-export default meta
-type Story = StoryObj<typeof QueueItem>
+export default meta;
+type Story = StoryObj<typeof QueueItem>;
 
 export const Default: Story = {
   args: {
@@ -57,7 +60,7 @@ export const Default: Story = {
     onRemove: () => {},
     onPlay: () => {},
   },
-}
+};
 
 export const LongTitle: Story = {
   args: {
@@ -65,7 +68,7 @@ export const LongTitle: Story = {
     onRemove: () => {},
     onPlay: () => {},
   },
-}
+};
 
 export const Dragging: Story = {
   args: {
@@ -77,4 +80,4 @@ export const Dragging: Story = {
   // easily forced via args. This story renders the item in its default (non-dragging)
   // state inside a DnD context so that the component mounts without errors.
   // Visual drag state can be confirmed via manual interaction in the Storybook canvas.
-}
+};

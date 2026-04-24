@@ -12,7 +12,10 @@ const mockHasPending = vi.fn(() => false);
 const mockHasFailed = vi.fn(() => false);
 
 vi.mock("@/hooks/use-sync-queue", () => ({
-  useSyncQueue: () => ({ hasPending: mockHasPending, hasFailed: mockHasFailed }),
+  useSyncQueue: () => ({
+    hasPending: mockHasPending,
+    hasFailed: mockHasFailed,
+  }),
 }));
 
 vi.mock("@/hooks/use-online-status", () => ({

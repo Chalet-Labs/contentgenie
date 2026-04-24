@@ -22,20 +22,21 @@ score = clamp(1 + count_of_true_signals + adjustment, 1, 10)
 
 ### The 8 signals
 
-| Signal | Question |
-|--------|----------|
-| `hasActionableInsights` | Does the episode contain 3+ actionable insights? |
-| `hasNearTermApplicability` | Could a listener apply something within a week? |
-| `staysFocused` | Does the episode stay focused with low filler-to-content ratio? |
-| `goesBeyondSurface` | Does it go beyond surface-level discussion? |
-| `isWellStructured` | Is it well-structured and easy to follow? |
-| `timeJustified` | Is the time investment justified by content density? |
-| `hasConcreteExamples` | Does it include concrete examples, data, or evidence? |
-| `hasExpertPerspectives` | Does it feature expert or practitioner perspectives? |
+| Signal                     | Question                                                        |
+| -------------------------- | --------------------------------------------------------------- |
+| `hasActionableInsights`    | Does the episode contain 3+ actionable insights?                |
+| `hasNearTermApplicability` | Could a listener apply something within a week?                 |
+| `staysFocused`             | Does the episode stay focused with low filler-to-content ratio? |
+| `goesBeyondSurface`        | Does it go beyond surface-level discussion?                     |
+| `isWellStructured`         | Is it well-structured and easy to follow?                       |
+| `timeJustified`            | Is the time investment justified by content density?            |
+| `hasConcreteExamples`      | Does it include concrete examples, data, or evidence?           |
+| `hasExpertPerspectives`    | Does it feature expert or practitioner perspectives?            |
 
 ### Adjustment
 
 After answering the signals, the LLM may apply a small adjustment:
+
 - **-1**: Signals slightly overstate quality (e.g., technically structured but painfully boring)
 - **0**: Signals accurately capture quality (default, used in most cases)
 - **+1**: Signals slightly understate quality (e.g., a masterclass that transcends the checklist)
@@ -58,6 +59,7 @@ The LLM returns the 8 boolean signals and the adjustment; the score is computed 
 ### Discrete vs. continuous scores
 
 Scores become discrete integers (1–10) instead of continuous decimals. This is acceptable because:
+
 - The signal checklist provides the real qualitative detail — the number is a summary
 - Integer scores are easier for users to reason about
 - The old continuous scores were illusory precision — an averaged 7.33 vs. 7.00 carried no meaningful distinction
@@ -69,6 +71,7 @@ Old episodes retain their decimal scores (e.g., "7.3"). New episodes produce int
 ### Custom prompts may not return signals
 
 Custom prompts (per ADR-028) bypass `getSummarizationPrompt()` entirely. The server-side score computation implements a 3-tier fallback:
+
 1. If `worthItSignals` is present → compute score from signals (new path)
 2. If `worthItDimensions` is present with old format → average dimensions (legacy path)
 3. If neither → use raw `worthItScore` from LLM response (fallback)

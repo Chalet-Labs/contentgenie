@@ -12,23 +12,13 @@ describe("RatingInput", () => {
   });
 
   it("renders 5 star buttons", () => {
-    render(
-      <RatingInput
-        initialRating={null}
-        onRatingChange={vi.fn()}
-      />
-    );
+    render(<RatingInput initialRating={null} onRatingChange={vi.fn()} />);
     const buttons = screen.getAllByRole("button");
     expect(buttons).toHaveLength(5);
   });
 
   it("shows 'Click to rate' label initially", () => {
-    render(
-      <RatingInput
-        initialRating={null}
-        onRatingChange={vi.fn()}
-      />
-    );
+    render(<RatingInput initialRating={null} onRatingChange={vi.fn()} />);
     expect(screen.getByText("Click to rate")).toBeInTheDocument();
   });
 
@@ -37,10 +27,7 @@ describe("RatingInput", () => {
     const user = userEvent.setup();
 
     render(
-      <RatingInput
-        initialRating={null}
-        onRatingChange={onRatingChange}
-      />
+      <RatingInput initialRating={null} onRatingChange={onRatingChange} />,
     );
 
     await user.click(screen.getByLabelText("Rate 3 stars"));
@@ -48,16 +35,9 @@ describe("RatingInput", () => {
   });
 
   it("has aria labels on each star", () => {
-    render(
-      <RatingInput
-        initialRating={null}
-        onRatingChange={vi.fn()}
-      />
-    );
+    render(<RatingInput initialRating={null} onRatingChange={vi.fn()} />);
     for (let i = 1; i <= 5; i++) {
-      expect(
-        screen.getByLabelText(`Rate ${i} stars`)
-      ).toBeInTheDocument();
+      expect(screen.getByLabelText(`Rate ${i} stars`)).toBeInTheDocument();
     }
   });
 
@@ -67,7 +47,7 @@ describe("RatingInput", () => {
         initialRating={null}
         onRatingChange={vi.fn()}
         disabled={true}
-      />
+      />,
     );
     const buttons = screen.getAllByRole("button");
     buttons.forEach((btn) => {
@@ -76,12 +56,7 @@ describe("RatingInput", () => {
   });
 
   it("shows rating label for existing rating", () => {
-    render(
-      <RatingInput
-        initialRating={4}
-        onRatingChange={vi.fn()}
-      />
-    );
+    render(<RatingInput initialRating={4} onRatingChange={vi.fn()} />);
     expect(screen.getByText("Your rating: Great")).toBeInTheDocument();
   });
 
@@ -91,7 +66,7 @@ describe("RatingInput", () => {
         initialRating={null}
         onRatingChange={vi.fn()}
         showLabel={false}
-      />
+      />,
     );
     expect(screen.queryByText("Click to rate")).not.toBeInTheDocument();
   });

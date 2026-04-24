@@ -13,7 +13,8 @@ const baseEpisode: PodcastIndexEpisode = {
   id: 789,
   title: "How AI is Transforming Podcast Discovery",
   link: "https://example.com/episode",
-  description: "In this episode, we explore how artificial intelligence is changing the way people find and consume podcasts.",
+  description:
+    "In this episode, we explore how artificial intelligence is changing the way people find and consume podcasts.",
   guid: "ep-guid-789",
   datePublished: 1705276800,
   datePublishedPretty: "January 15, 2024",

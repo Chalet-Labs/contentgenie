@@ -40,7 +40,9 @@ describe("GET /api/podcasts/search", () => {
   });
 
   it("returns 400 when query is missing", async () => {
-    const request = new NextRequest("http://localhost:3000/api/podcasts/search");
+    const request = new NextRequest(
+      "http://localhost:3000/api/podcasts/search",
+    );
     const response = await GET(request);
     const data = await response.json();
 
@@ -53,7 +55,7 @@ describe("GET /api/podcasts/search", () => {
     vi.stubEnv("PODCASTINDEX_API_SECRET", "");
 
     const request = new NextRequest(
-      "http://localhost:3000/api/podcasts/search?q=test"
+      "http://localhost:3000/api/podcasts/search?q=test",
     );
     const response = await GET(request);
     const data = await response.json();
@@ -79,7 +81,12 @@ describe("GET /api/podcasts/search", () => {
     vi.mocked(searchByPerson).mockResolvedValue({
       status: "true",
       items: [
-        { feedId: 3, title: "Person Episode", feedTitle: "Person Pod", feedImage: "img.jpg" } as never,
+        {
+          feedId: 3,
+          title: "Person Episode",
+          feedTitle: "Person Pod",
+          feedImage: "img.jpg",
+        } as never,
       ],
       count: 1,
       query: "test",
@@ -95,7 +102,7 @@ describe("GET /api/podcasts/search", () => {
     ]);
 
     const request = new NextRequest(
-      "http://localhost:3000/api/podcasts/search?q=test&max=10"
+      "http://localhost:3000/api/podcasts/search?q=test&max=10",
     );
     const response = await GET(request);
     const data = await response.json();
@@ -119,7 +126,7 @@ describe("GET /api/podcasts/search", () => {
     mockAllLayersEmpty();
 
     const request = new NextRequest(
-      "http://localhost:3000/api/podcasts/search?q=test&max=10"
+      "http://localhost:3000/api/podcasts/search?q=test&max=10",
     );
     await GET(request);
 
@@ -151,7 +158,7 @@ describe("GET /api/podcasts/search", () => {
     ]);
 
     const request = new NextRequest(
-      "http://localhost:3000/api/podcasts/search?q=test"
+      "http://localhost:3000/api/podcasts/search?q=test",
     );
     const response = await GET(request);
     const data = await response.json();
@@ -182,7 +189,7 @@ describe("GET /api/podcasts/search", () => {
     ]);
 
     const request = new NextRequest(
-      "http://localhost:3000/api/podcasts/search?q=test"
+      "http://localhost:3000/api/podcasts/search?q=test",
     );
     const response = await GET(request);
     const data = await response.json();
@@ -213,7 +220,7 @@ describe("GET /api/podcasts/search", () => {
     vi.mocked(searchLocalPodcasts).mockRejectedValue(new Error("DB error"));
 
     const request = new NextRequest(
-      "http://localhost:3000/api/podcasts/search?q=test"
+      "http://localhost:3000/api/podcasts/search?q=test",
     );
     const response = await GET(request);
     const data = await response.json();
@@ -229,7 +236,7 @@ describe("GET /api/podcasts/search", () => {
     mockAllLayersEmpty();
 
     const request = new NextRequest(
-      "http://localhost:3000/api/podcasts/search?q=zzzznothing"
+      "http://localhost:3000/api/podcasts/search?q=zzzznothing",
     );
     const response = await GET(request);
     const data = await response.json();

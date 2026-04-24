@@ -1,10 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { makeClerkAuthMock } from "@/test/mocks/clerk-server";
 
 // Mock Clerk auth
 const mockAuth = vi.fn();
-vi.mock("@clerk/nextjs/server", () => ({
-  auth: () => mockAuth(),
-}));
+vi.mock("@clerk/nextjs/server", () => makeClerkAuthMock(() => mockAuth()));
 
 // Mock the database
 vi.mock("@/db", () => ({
@@ -21,11 +20,18 @@ vi.mock("@/db", () => ({
 
 // Mock the AI config module
 vi.mock("@/lib/ai", () => ({
-  DEFAULT_AI_CONFIG: { provider: "openrouter", model: "google/gemini-2.0-flash-001" },
+  DEFAULT_AI_CONFIG: {
+    provider: "openrouter",
+    model: "google/gemini-2.0-flash-001",
+  },
 }));
 
 import { db } from "@/db";
-import { getAiConfig, updateAiConfig, updateSummarizationPrompt } from "@/app/actions/ai-config";
+import {
+  getAiConfig,
+  updateAiConfig,
+  updateSummarizationPrompt,
+} from "@/app/actions/ai-config";
 
 describe("getAiConfig", () => {
   beforeEach(() => {
@@ -43,7 +49,11 @@ describe("getAiConfig", () => {
     });
 
     const result = await getAiConfig();
-    expect(result.config).toEqual({ provider: "zai", model: "glm-4.7-flash", summarizationPrompt: null });
+    expect(result.config).toEqual({
+      provider: "zai",
+      model: "glm-4.7-flash",
+      summarizationPrompt: null,
+    });
     expect(result.error).toBeUndefined();
   });
 
@@ -59,7 +69,7 @@ describe("getAiConfig", () => {
 
   it("returns default config with error on DB failure", async () => {
     vi.mocked(db.query.aiConfig.findFirst).mockRejectedValue(
-      new Error("DB error")
+      new Error("DB error"),
     );
 
     const result = await getAiConfig();
@@ -73,7 +83,9 @@ describe("getAiConfig", () => {
 
 describe("updateAiConfig", () => {
   const mockOnConflictDoUpdate = vi.fn().mockResolvedValue(undefined);
-  const mockValues = vi.fn().mockReturnValue({ onConflictDoUpdate: mockOnConflictDoUpdate });
+  const mockValues = vi
+    .fn()
+    .mockReturnValue({ onConflictDoUpdate: mockOnConflictDoUpdate });
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -93,7 +105,7 @@ describe("updateAiConfig", () => {
         id: 1,
         provider: "zai",
         model: "glm-4.7-flash",
-      })
+      }),
     );
     expect(mockOnConflictDoUpdate).toHaveBeenCalled();
   });
@@ -148,14 +160,16 @@ describe("updateAiConfig", () => {
     expect(mockValues).toHaveBeenCalledWith(
       expect.objectContaining({
         model: "google/gemini-2.0-flash-001",
-      })
+      }),
     );
   });
 });
 
 describe("updateSummarizationPrompt", () => {
   const mockOnConflictDoUpdate = vi.fn().mockResolvedValue(undefined);
-  const mockValues = vi.fn().mockReturnValue({ onConflictDoUpdate: mockOnConflictDoUpdate });
+  const mockValues = vi
+    .fn()
+    .mockReturnValue({ onConflictDoUpdate: mockOnConflictDoUpdate });
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -179,15 +193,23 @@ describe("updateSummarizationPrompt", () => {
   });
 
   it("rejects prompt without {{transcript}}", async () => {
-    const result = await updateSummarizationPrompt("Analyze this episode please");
-    expect(result).toEqual({ success: false, error: "Prompt must contain {{transcript}}" });
+    const result = await updateSummarizationPrompt(
+      "Analyze this episode please",
+    );
+    expect(result).toEqual({
+      success: false,
+      error: "Prompt must contain {{transcript}}",
+    });
   });
 
   it("rejects prompt exceeding 10,000 characters", async () => {
     const longPrompt = "{{transcript}}" + "a".repeat(9987);
     expect(longPrompt.length).toBeGreaterThan(10000);
     const result = await updateSummarizationPrompt(longPrompt);
-    expect(result).toEqual({ success: false, error: "Prompt must be 10,000 characters or fewer" });
+    expect(result).toEqual({
+      success: false,
+      error: "Prompt must be 10,000 characters or fewer",
+    });
   });
 
   it("rejects empty string prompt", async () => {
@@ -207,7 +229,7 @@ describe("updateSummarizationPrompt", () => {
     const result = await updateSummarizationPrompt(null);
     expect(result).toEqual({ success: true });
     expect(mockValues).toHaveBeenCalledWith(
-      expect.objectContaining({ summarizationPrompt: null })
+      expect.objectContaining({ summarizationPrompt: null }),
     );
   });
 });

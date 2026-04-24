@@ -50,7 +50,9 @@ vi.mock("drizzle-orm", () => ({
   count: vi.fn(() => "count(*)"),
 }));
 
-const mockRunsRetrieve = vi.fn().mockResolvedValue({ id: "run_abc123", tags: ["user:user-1"] });
+const mockRunsRetrieve = vi
+  .fn()
+  .mockResolvedValue({ id: "run_abc123", tags: ["user:user-1"] });
 vi.mock("@trigger.dev/sdk", () => ({
   tasks: {
     trigger: vi.fn().mockResolvedValue({ id: "run_bulk123" }),
@@ -73,7 +75,7 @@ function makeRequest(method: string, body: unknown) {
       method,
       body: JSON.stringify(body),
       headers: { "Content-Type": "application/json" },
-    }
+    },
   );
 }
 
@@ -83,7 +85,10 @@ describe("POST /api/episodes/bulk-resummarize", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockHas.mockReturnValue(false);
-    vi.mocked(clerkAuth).mockResolvedValue({ userId: "user-1", has: mockHas } as never);
+    vi.mocked(clerkAuth).mockResolvedValue({
+      userId: "user-1",
+      has: mockHas,
+    } as never);
     mockRateLimitFn.mockResolvedValue({ allowed: true });
     mockDbSelectWhere.mockResolvedValue([{ count: 10 }]);
     mockSubscriptionFindFirst.mockResolvedValue({ id: 1 });
@@ -186,7 +191,10 @@ describe("POST /api/episodes/bulk-resummarize", () => {
   });
 
   it("returns 429 when rate limit exceeded", async () => {
-    mockRateLimitFn.mockResolvedValue({ allowed: false, retryAfterMs: 3600000 });
+    mockRateLimitFn.mockResolvedValue({
+      allowed: false,
+      retryAfterMs: 3600000,
+    });
 
     const { POST } = await import("@/app/api/episodes/bulk-resummarize/route");
     const response = await POST(makeRequest("POST", { all: true }));
@@ -198,7 +206,10 @@ describe("POST /api/episodes/bulk-resummarize", () => {
 
   it("skips rate limit for admins", async () => {
     mockHas.mockReturnValue(true);
-    mockRateLimitFn.mockResolvedValue({ allowed: false, retryAfterMs: 3600000 });
+    mockRateLimitFn.mockResolvedValue({
+      allowed: false,
+      retryAfterMs: 3600000,
+    });
 
     const { POST } = await import("@/app/api/episodes/bulk-resummarize/route");
     const response = await POST(makeRequest("POST", { all: true }));
@@ -235,10 +246,12 @@ describe("POST /api/episodes/bulk-resummarize", () => {
 
   it("accepts request with date range filters", async () => {
     const { POST } = await import("@/app/api/episodes/bulk-resummarize/route");
-    const response = await POST(makeRequest("POST", {
-      minDate: "2024-01-01",
-      maxDate: "2024-12-31",
-    }));
+    const response = await POST(
+      makeRequest("POST", {
+        minDate: "2024-01-01",
+        maxDate: "2024-12-31",
+      }),
+    );
 
     expect(response.status).toBe(202);
   });
@@ -273,7 +286,7 @@ describe("POST /api/episodes/bulk-resummarize", () => {
     expect(tasks.trigger).toHaveBeenCalledWith(
       "bulk-resummarize",
       expect.objectContaining({ podcastId: 7, maxScore: 5 }),
-      expect.objectContaining({ tags: ["user:user-1"] })
+      expect.objectContaining({ tags: ["user:user-1"] }),
     );
   });
 
@@ -282,11 +295,12 @@ describe("POST /api/episodes/bulk-resummarize", () => {
       mockDbSelectWhere.mockResolvedValue([{ count: 0 }]);
 
       const { auth } = await import("@trigger.dev/sdk");
-      const { POST } = await import("@/app/api/episodes/bulk-resummarize/route");
+      const { POST } =
+        await import("@/app/api/episodes/bulk-resummarize/route");
       await POST(makeRequest("POST", { all: true }));
 
       expect(auth.createPublicToken).toHaveBeenCalledWith(
-        expect.objectContaining({ expirationTime: "15m" })
+        expect.objectContaining({ expirationTime: "15m" }),
       );
     });
 
@@ -294,11 +308,12 @@ describe("POST /api/episodes/bulk-resummarize", () => {
       mockDbSelectWhere.mockResolvedValue([{ count: 10000 }]);
 
       const { auth } = await import("@trigger.dev/sdk");
-      const { POST } = await import("@/app/api/episodes/bulk-resummarize/route");
+      const { POST } =
+        await import("@/app/api/episodes/bulk-resummarize/route");
       await POST(makeRequest("POST", { all: true }));
 
       expect(auth.createPublicToken).toHaveBeenCalledWith(
-        expect.objectContaining({ expirationTime: "60m" })
+        expect.objectContaining({ expirationTime: "60m" }),
       );
     });
 
@@ -308,11 +323,12 @@ describe("POST /api/episodes/bulk-resummarize", () => {
       mockDbSelectWhere.mockResolvedValue([{ count: 45 }]);
 
       const { auth } = await import("@trigger.dev/sdk");
-      const { POST } = await import("@/app/api/episodes/bulk-resummarize/route");
+      const { POST } =
+        await import("@/app/api/episodes/bulk-resummarize/route");
       await POST(makeRequest("POST", { all: true }));
 
       expect(auth.createPublicToken).toHaveBeenCalledWith(
-        expect.objectContaining({ expirationTime: "30m" })
+        expect.objectContaining({ expirationTime: "30m" }),
       );
     });
   });
@@ -333,7 +349,10 @@ describe("DELETE /api/episodes/bulk-resummarize", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(clerkAuth).mockResolvedValue({ userId: "user-1" } as never);
-    mockRunsRetrieve.mockResolvedValue({ id: "run_abc123", tags: ["user:user-1"] });
+    mockRunsRetrieve.mockResolvedValue({
+      id: "run_abc123",
+      tags: ["user:user-1"],
+    });
   });
 
   afterEach(() => {
@@ -346,7 +365,8 @@ describe("DELETE /api/episodes/bulk-resummarize", () => {
   it("returns 401 when unauthenticated", async () => {
     vi.mocked(clerkAuth).mockResolvedValue({ userId: null } as never);
 
-    const { DELETE } = await import("@/app/api/episodes/bulk-resummarize/route");
+    const { DELETE } =
+      await import("@/app/api/episodes/bulk-resummarize/route");
     const response = await DELETE(makeRequest("DELETE", { runId: "run_abc" }));
     const data = await response.json();
 
@@ -355,7 +375,8 @@ describe("DELETE /api/episodes/bulk-resummarize", () => {
   });
 
   it("returns 400 when runId is missing", async () => {
-    const { DELETE } = await import("@/app/api/episodes/bulk-resummarize/route");
+    const { DELETE } =
+      await import("@/app/api/episodes/bulk-resummarize/route");
     const response = await DELETE(makeRequest("DELETE", {}));
     const data = await response.json();
 
@@ -364,7 +385,8 @@ describe("DELETE /api/episodes/bulk-resummarize", () => {
   });
 
   it("returns 400 when runId is not a string", async () => {
-    const { DELETE } = await import("@/app/api/episodes/bulk-resummarize/route");
+    const { DELETE } =
+      await import("@/app/api/episodes/bulk-resummarize/route");
     const response = await DELETE(makeRequest("DELETE", { runId: 12345 }));
     const data = await response.json();
 
@@ -373,10 +395,16 @@ describe("DELETE /api/episodes/bulk-resummarize", () => {
   });
 
   it("returns 403 when user does not own the run", async () => {
-    mockRunsRetrieve.mockResolvedValue({ id: "run_abc123", tags: ["user:other-user"] });
+    mockRunsRetrieve.mockResolvedValue({
+      id: "run_abc123",
+      tags: ["user:other-user"],
+    });
 
-    const { DELETE } = await import("@/app/api/episodes/bulk-resummarize/route");
-    const response = await DELETE(makeRequest("DELETE", { runId: "run_abc123" }));
+    const { DELETE } =
+      await import("@/app/api/episodes/bulk-resummarize/route");
+    const response = await DELETE(
+      makeRequest("DELETE", { runId: "run_abc123" }),
+    );
     const data = await response.json();
 
     expect(response.status).toBe(403);
@@ -386,8 +414,11 @@ describe("DELETE /api/episodes/bulk-resummarize", () => {
   it("cancels the run and returns { canceled: true }", async () => {
     const { runs } = await import("@trigger.dev/sdk");
 
-    const { DELETE } = await import("@/app/api/episodes/bulk-resummarize/route");
-    const response = await DELETE(makeRequest("DELETE", { runId: "run_abc123" }));
+    const { DELETE } =
+      await import("@/app/api/episodes/bulk-resummarize/route");
+    const response = await DELETE(
+      makeRequest("DELETE", { runId: "run_abc123" }),
+    );
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -397,9 +428,12 @@ describe("DELETE /api/episodes/bulk-resummarize", () => {
 
   it("returns 500 when runs.cancel throws", async () => {
     const sdkModule = await import("@trigger.dev/sdk");
-    vi.mocked(sdkModule.runs.cancel).mockRejectedValueOnce(new Error("Run not found"));
+    vi.mocked(sdkModule.runs.cancel).mockRejectedValueOnce(
+      new Error("Run not found"),
+    );
 
-    const { DELETE } = await import("@/app/api/episodes/bulk-resummarize/route");
+    const { DELETE } =
+      await import("@/app/api/episodes/bulk-resummarize/route");
     const response = await DELETE(makeRequest("DELETE", { runId: "run_bad" }));
     const data = await response.json();
 

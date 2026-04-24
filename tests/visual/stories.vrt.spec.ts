@@ -29,14 +29,14 @@
  * ──────────────────────────────────────────────────────────────────────────
  */
 
-import { test, expect } from "@playwright/test"
-import fs from "node:fs"
-import path from "node:path"
+import { test, expect } from "@playwright/test";
+import fs from "node:fs";
+import path from "node:path";
 
 // Fixed timestamp matching the reference "now" used across all story files.
 // Mocked via page.addInitScript so Date.now() returns a stable value for
 // time-dependent components (formatRelativeTime, SleepTimerMenu countdown, etc.).
-const FIXED_NOW = new Date("2026-01-15T10:00:00Z").getTime()
+const FIXED_NOW = new Date("2026-01-15T10:00:00Z").getTime();
 
 // Story IDs are populated by globalSetup (global-setup.ts), which fetches
 // the Storybook index and writes them to .story-ids.json. We read them
@@ -45,9 +45,9 @@ const FIXED_NOW = new Date("2026-01-15T10:00:00Z").getTime()
 const storyIds: string[] = JSON.parse(
   fs.readFileSync(
     path.join(process.cwd(), "tests/visual/.story-ids.json"),
-    "utf-8"
-  )
-)
+    "utf-8",
+  ),
+);
 
 test.describe("Visual Regression", () => {
   for (const id of storyIds) {
@@ -55,13 +55,13 @@ test.describe("Visual Regression", () => {
       // Mock Date.now() so time-dependent components (formatRelativeTime,
       // SleepTimerMenu countdown, etc.) render deterministically.
       await page.addInitScript((fixedNow: number) => {
-        Date.now = () => fixedNow
-      }, FIXED_NOW)
+        Date.now = () => fixedNow;
+      }, FIXED_NOW);
 
       await page.goto(
         `/iframe.html?id=${encodeURIComponent(id)}&viewMode=story`,
-        { waitUntil: "networkidle" }
-      )
+        { waitUntil: "networkidle" },
+      );
 
       // Disable all CSS animations and transitions to prevent flaky
       // screenshots. More reliable than a fixed waitForTimeout because it
@@ -75,7 +75,7 @@ test.describe("Visual Regression", () => {
             transition-delay: 0s !important;
           }
         `,
-      })
+      });
 
       // Screenshot name is the story ID (e.g. dashboard-trendingtopics--default).
       // Renaming the story title or export name changes the ID and orphans the
@@ -84,7 +84,7 @@ test.describe("Visual Regression", () => {
         maxDiffPixelRatio: 0.005,
         // Viewport-only: consistent dimensions regardless of content height.
         fullPage: false,
-      })
-    })
+      });
+    });
   }
-})
+});

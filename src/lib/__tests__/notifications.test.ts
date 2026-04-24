@@ -60,8 +60,12 @@ describe("notifications library", () => {
 
   describe("createNotification", () => {
     it("inserts notification and dispatches push for realtime users", async () => {
-      mockInsert.mockReturnValue({ values: vi.fn().mockResolvedValue(undefined) });
-      mockFindFirst.mockResolvedValue({ preferences: { digestFrequency: "realtime", pushEnabled: true } });
+      mockInsert.mockReturnValue({
+        values: vi.fn().mockResolvedValue(undefined),
+      });
+      mockFindFirst.mockResolvedValue({
+        preferences: { digestFrequency: "realtime", pushEnabled: true },
+      });
 
       const { createNotification } = await import("@/lib/notifications");
       await createNotification({
@@ -76,14 +80,21 @@ describe("notifications library", () => {
       expect(mockSendPushToUser).toHaveBeenCalledTimes(1);
       expect(mockSendPushToUser).toHaveBeenCalledWith(
         "user-1",
-        expect.objectContaining({ title: "Test Podcast", body: "New episode: Test" }),
-        expect.any(Object)
+        expect.objectContaining({
+          title: "Test Podcast",
+          body: "New episode: Test",
+        }),
+        expect.any(Object),
       );
     });
 
     it("push URL contains PodcastIndex episode ID", async () => {
-      mockInsert.mockReturnValue({ values: vi.fn().mockResolvedValue(undefined) });
-      mockFindFirst.mockResolvedValue({ preferences: { digestFrequency: "realtime", pushEnabled: true } });
+      mockInsert.mockReturnValue({
+        values: vi.fn().mockResolvedValue(undefined),
+      });
+      mockFindFirst.mockResolvedValue({
+        preferences: { digestFrequency: "realtime", pushEnabled: true },
+      });
       mockEpisodesFindFirst.mockResolvedValue({ podcastIndexId: "PI-42" });
 
       const { createNotification } = await import("@/lib/notifications");
@@ -100,13 +111,17 @@ describe("notifications library", () => {
         expect.objectContaining({
           data: expect.objectContaining({ url: "/episode/PI-42" }),
         }),
-        expect.any(Object)
+        expect.any(Object),
       );
     });
 
     it("push URL falls back to /dashboard when episode lookup fails", async () => {
-      mockInsert.mockReturnValue({ values: vi.fn().mockResolvedValue(undefined) });
-      mockFindFirst.mockResolvedValue({ preferences: { digestFrequency: "realtime", pushEnabled: true } });
+      mockInsert.mockReturnValue({
+        values: vi.fn().mockResolvedValue(undefined),
+      });
+      mockFindFirst.mockResolvedValue({
+        preferences: { digestFrequency: "realtime", pushEnabled: true },
+      });
       mockEpisodesFindFirst.mockResolvedValue(null);
 
       const { createNotification } = await import("@/lib/notifications");
@@ -123,13 +138,17 @@ describe("notifications library", () => {
         expect.objectContaining({
           data: expect.objectContaining({ url: "/dashboard" }),
         }),
-        expect.any(Object)
+        expect.any(Object),
       );
     });
 
     it("skips push for users with daily digest preference", async () => {
-      mockInsert.mockReturnValue({ values: vi.fn().mockResolvedValue(undefined) });
-      mockFindFirst.mockResolvedValue({ preferences: { digestFrequency: "daily" } });
+      mockInsert.mockReturnValue({
+        values: vi.fn().mockResolvedValue(undefined),
+      });
+      mockFindFirst.mockResolvedValue({
+        preferences: { digestFrequency: "daily" },
+      });
 
       const { createNotification } = await import("@/lib/notifications");
       await createNotification({
@@ -150,21 +169,39 @@ describe("notifications library", () => {
       const mockValues = vi.fn().mockResolvedValue(undefined);
       mockInsert.mockReturnValue({ values: mockValues });
       mockUsersFindMany.mockResolvedValue([
-        { id: "user-1", preferences: { pushEnabled: true, digestFrequency: "realtime" } },
-        { id: "user-2", preferences: { pushEnabled: true, digestFrequency: "realtime" } },
+        {
+          id: "user-1",
+          preferences: { pushEnabled: true, digestFrequency: "realtime" },
+        },
+        {
+          id: "user-2",
+          preferences: { pushEnabled: true, digestFrequency: "realtime" },
+        },
       ]);
 
       const { createBulkNotifications } = await import("@/lib/notifications");
       await createBulkNotifications([
-        { type: "new_episode", userId: "user-1", episodeId: 1, title: "P1", body: "New" },
-        { type: "new_episode", userId: "user-2", episodeId: 1, title: "P1", body: "New" },
+        {
+          type: "new_episode",
+          userId: "user-1",
+          episodeId: 1,
+          title: "P1",
+          body: "New",
+        },
+        {
+          type: "new_episode",
+          userId: "user-2",
+          episodeId: 1,
+          title: "P1",
+          body: "New",
+        },
       ]);
 
       expect(mockValues).toHaveBeenCalledWith(
         expect.arrayContaining([
           expect.objectContaining({ userId: "user-1" }),
           expect.objectContaining({ userId: "user-2" }),
-        ])
+        ]),
       );
     });
 
@@ -172,21 +209,39 @@ describe("notifications library", () => {
       const mockValues = vi.fn().mockResolvedValue(undefined);
       mockInsert.mockReturnValue({ values: mockValues });
       mockUsersFindMany.mockResolvedValue([
-        { id: "user-1", preferences: { pushEnabled: true, digestFrequency: "realtime" } },
-        { id: "user-2", preferences: { pushEnabled: true, digestFrequency: "daily" } },
+        {
+          id: "user-1",
+          preferences: { pushEnabled: true, digestFrequency: "realtime" },
+        },
+        {
+          id: "user-2",
+          preferences: { pushEnabled: true, digestFrequency: "daily" },
+        },
       ]);
 
       const { createBulkNotifications } = await import("@/lib/notifications");
       await createBulkNotifications([
-        { type: "new_episode", userId: "user-1", episodeId: 1, title: "P1", body: "New" },
-        { type: "new_episode", userId: "user-2", episodeId: 1, title: "P1", body: "New" },
+        {
+          type: "new_episode",
+          userId: "user-1",
+          episodeId: 1,
+          title: "P1",
+          body: "New",
+        },
+        {
+          type: "new_episode",
+          userId: "user-2",
+          episodeId: 1,
+          title: "P1",
+          body: "New",
+        },
       ]);
 
       expect(mockSendPushToUser).toHaveBeenCalledTimes(1);
       expect(mockSendPushToUser).toHaveBeenCalledWith(
         "user-1",
         expect.any(Object),
-        expect.any(Object)
+        expect.any(Object),
       );
     });
 
@@ -194,13 +249,24 @@ describe("notifications library", () => {
       const mockValues = vi.fn().mockResolvedValue(undefined);
       mockInsert.mockReturnValue({ values: mockValues });
       mockUsersFindMany.mockResolvedValue([
-        { id: "user-1", preferences: { pushEnabled: true, digestFrequency: "realtime" } },
+        {
+          id: "user-1",
+          preferences: { pushEnabled: true, digestFrequency: "realtime" },
+        },
       ]);
-      mockEpisodesFindMany.mockResolvedValue([{ id: 42, podcastIndexId: "PI-42" }]);
+      mockEpisodesFindMany.mockResolvedValue([
+        { id: 42, podcastIndexId: "PI-42" },
+      ]);
 
       const { createBulkNotifications } = await import("@/lib/notifications");
       await createBulkNotifications([
-        { type: "new_episode", userId: "user-1", episodeId: 42, title: "P1", body: "New" },
+        {
+          type: "new_episode",
+          userId: "user-1",
+          episodeId: 42,
+          title: "P1",
+          body: "New",
+        },
       ]);
 
       expect(mockSendPushToUser).toHaveBeenCalledWith(
@@ -208,7 +274,7 @@ describe("notifications library", () => {
         expect.objectContaining({
           data: expect.objectContaining({ url: "/episode/PI-42" }),
         }),
-        expect.any(Object)
+        expect.any(Object),
       );
     });
 
@@ -216,13 +282,22 @@ describe("notifications library", () => {
       const mockValues = vi.fn().mockResolvedValue(undefined);
       mockInsert.mockReturnValue({ values: mockValues });
       mockUsersFindMany.mockResolvedValue([
-        { id: "user-1", preferences: { pushEnabled: true, digestFrequency: "realtime" } },
+        {
+          id: "user-1",
+          preferences: { pushEnabled: true, digestFrequency: "realtime" },
+        },
       ]);
       mockEpisodesFindMany.mockResolvedValue([]);
 
       const { createBulkNotifications } = await import("@/lib/notifications");
       await createBulkNotifications([
-        { type: "new_episode", userId: "user-1", episodeId: 42, title: "P1", body: "New" },
+        {
+          type: "new_episode",
+          userId: "user-1",
+          episodeId: 42,
+          title: "P1",
+          body: "New",
+        },
       ]);
 
       expect(mockSendPushToUser).toHaveBeenCalledWith(
@@ -230,7 +305,7 @@ describe("notifications library", () => {
         expect.objectContaining({
           data: expect.objectContaining({ url: "/dashboard" }),
         }),
-        expect.any(Object)
+        expect.any(Object),
       );
     });
 

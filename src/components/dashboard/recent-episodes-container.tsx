@@ -20,7 +20,9 @@ export function RecentEpisodesContainer({
 }: RecentEpisodesContainerProps) {
   const [activeRange, setActiveRange] = useState<TimeRange>("week");
   const [episodes, setEpisodes] = useState<RecentEpisode[]>(initialEpisodes);
-  const [hasSubscriptions, setHasSubscriptions] = useState(initialHasSubscriptions);
+  const [hasSubscriptions, setHasSubscriptions] = useState(
+    initialHasSubscriptions,
+  );
   const [isPending, startTransition] = useTransition();
   const latestRangeRef = useRef<TimeRange>("week");
 
@@ -38,7 +40,10 @@ export function RecentEpisodesContainer({
           range === "login"
             ? sinceLastLogin!
             : Math.floor((Date.now() - 7 * 24 * 60 * 60 * 1000) / 1000);
-        const result = await getRecentEpisodesFromSubscriptions({ limit: 5, since });
+        const result = await getRecentEpisodesFromSubscriptions({
+          limit: 5,
+          since,
+        });
 
         // Ignore stale results if the user toggled again while this fetch was in-flight
         if (latestRangeRef.current !== range) return;
@@ -63,15 +68,15 @@ export function RecentEpisodesContainer({
   return (
     <div className="space-y-3">
       {sinceLastLogin !== null && hasSubscriptions && (
-        <div className="flex gap-1 rounded-lg border bg-muted/40 p-1 w-fit">
+        <div className="flex w-fit gap-1 rounded-lg border bg-muted/40 p-1">
           <button
             onClick={() => handleRangeChange("week")}
             disabled={isPending}
             aria-pressed={activeRange === "week"}
             className={
               activeRange === "week"
-                ? "rounded-md px-3 py-1 text-sm font-medium bg-background shadow-sm disabled:opacity-50"
-                : "rounded-md px-3 py-1 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+                ? "rounded-md bg-background px-3 py-1 text-sm font-medium shadow-sm disabled:opacity-50"
+                : "rounded-md px-3 py-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
             }
           >
             Last week
@@ -82,8 +87,8 @@ export function RecentEpisodesContainer({
             aria-pressed={activeRange === "login"}
             className={
               activeRange === "login"
-                ? "rounded-md px-3 py-1 text-sm font-medium bg-background shadow-sm disabled:opacity-50"
-                : "rounded-md px-3 py-1 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+                ? "rounded-md bg-background px-3 py-1 text-sm font-medium shadow-sm disabled:opacity-50"
+                : "rounded-md px-3 py-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
             }
           >
             Since last login

@@ -15,4 +15,6 @@ export const adminEpisodeSearchParams = {
   page: parseAsInteger.withDefault(1),
 };
 
-export const loadAdminEpisodeSearchParams = createLoader(adminEpisodeSearchParams);
+export const loadAdminEpisodeSearchParams = createLoader(
+  adminEpisodeSearchParams,
+);

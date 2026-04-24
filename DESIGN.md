@@ -569,10 +569,11 @@ to Linear, Readwise Reader, and Superhuman than to Spotify or Apple Podcasts.
 clinical blues. Neutrals carry a whisper of green (paper with a fern-tinted
 tooth); the primary interactive color is a deep emerald; the brand accent is
 a confident amber; destructive actions land in a warm vermilion rather than a
-cool red. The result reads as *inviting and collaborative* rather than
+cool red. The result reads as _inviting and collaborative_ rather than
 corporate or sterile — a reading room, not a dashboard.
 
 **Two chromatic roles, never mixed.**
+
 - **Primary (emerald)** is the interactive chrome: buttons, links, focus
   rings, selection highlights, filled icons at rest. It is the "touch this"
   color.
@@ -609,6 +610,7 @@ out-of-system.
 ### Primary — emerald (#167E5B)
 
 The single color for interactive chrome. Used for:
+
 - Primary buttons, submit actions, default toggle-on states.
 - Links inside body copy (underline + emerald, not blue).
 - The focus ring on all inputs and buttons.
@@ -621,6 +623,7 @@ chrome stays legible against the forest-ink background.
 ### Brand — amber (#F59E0B)
 
 The identity accent. Used for:
+
 - The logo tile (amber square + ink glyph). The tile is the product's face;
   keep it at its specified amber, never tinted.
 - Rating stars and user-supplied rating UI (fill + outline both at brand).
@@ -642,15 +645,16 @@ score. The tone says "this is a strong action," not "error, error."
 A product-specific semantic ramp that walks the palette from emerald to
 vermilion:
 
-| Tier        | Score  | Bg hex    | Meaning          |
-|-------------|--------|-----------|------------------|
-| Exceptional | ≥ 8    | #148F66   | Listen now       |
-| Above avg.  | 6–7.99 | #2EB877   | Worth the time   |
-| Average     | 4–5.99 | #99CB4D   | Maybe, if time   |
-| Below avg.  | 2–3.99 | #F59E0B   | Skim the summary |
-| Skip        | < 2    | #E24D28   | Move on          |
+| Tier        | Score  | Bg hex  | Meaning          |
+| ----------- | ------ | ------- | ---------------- |
+| Exceptional | ≥ 8    | #148F66 | Listen now       |
+| Above avg.  | 6–7.99 | #2EB877 | Worth the time   |
+| Average     | 4–5.99 | #99CB4D | Maybe, if time   |
+| Below avg.  | 2–3.99 | #F59E0B | Skim the summary |
+| Skip        | < 2    | #E24D28 | Move on          |
 
 Each tier has three paired tokens:
+
 - `-bg` — the fill behind short badges / pills.
 - `-foreground` — the text on that fill.
 - `-text` — a darker accessible variant for inline score numbers that sit
@@ -672,7 +676,7 @@ bg / text / border triplet:
 - **Danger** — `#FBE5E0` / `#A23216` / `#F0B7A8`
 - **Neutral** — `#EBEFED` / `#5B6761` / `#C7D1CC`
 
-Status colors *never* replace primary or destructive for interactive
+Status colors _never_ replace primary or destructive for interactive
 elements — they're read-only semantic framing for content, not chrome.
 
 ### Contrast targets
@@ -789,7 +793,7 @@ safety net for environments where the `next/font` pipeline is bypassed.
 - **Grid: 12-column, 24px gutter, collapses to a single column below
   768px.** No asymmetric designer grids; lists stay rectangular so scan
   speed wins.
-- **Touch targets: minimum 44×44px *hit area* on mobile.** The visual
+- **Touch targets: minimum 44×44px _hit area_ on mobile.** The visual
   button height stays at 36px (`h-9`) so the chrome does not dominate
   dense desktop layouts; on touch devices the hit area is extended to
   44×44 via wrapper padding (this is what the icon-only button note
@@ -799,7 +803,7 @@ safety net for environments where the `next/font` pipeline is bypassed.
 
 ## Elevation & Depth
 
-Shadows are *structural, not decorative*. Four shadow tiers cover the
+Shadows are _structural, not decorative_. Four shadow tiers cover the
 full surface hierarchy:
 
 - **sm** — subtle bottom hint for hovered rows and the lightest
@@ -811,6 +815,7 @@ full surface hierarchy:
 - **lg** — only for overlay dialogs that eclipse the page chrome.
 
 Rules:
+
 - Cards combine a 1px border with the `DEFAULT` shadow — the border
   draws the edge, the shadow anchors the card against paper. This is
   the one place border + shadow coexist by design.
@@ -818,14 +823,14 @@ Rules:
   shadows push the palette toward "branded gradient kitsch."
 - Past the card tier, don't combine border + heavy shadow. Pick one
   per surface tier.
-- Dark mode shadow intent: the tier values *should* halve opacity in
+- Dark mode shadow intent: the tier values _should_ halve opacity in
   dark mode — forest ink already absorbs depth cues, and
   over-shadowing reads as muddy. **Known gap:** neither the
   frontmatter (`elevation:`) nor the shipped `.dark` block in
   `src/app/globals.css` carries `-dark` shadow overrides today, so
   production currently re-uses the light-mode shadow triplet values
   under dark mode. Remediation when the system is revisited: add
-  `-dark` twins to the `elevation` section *and* matching
+  `-dark` twins to the `elevation` section _and_ matching
   `--shadow-*` overrides inside `.dark { … }`, then update this
   rule to describe the shipped behavior.
 
@@ -860,6 +865,7 @@ Tailwind's built-in 4px. Always reach for `rounded-md`,
 `rounded-lg`, or `rounded-xl` explicitly; never `rounded` alone.
 
 Rules:
+
 - **Rounded but not bubbly.** Never use `full` rounding on non-pill
   rectangles larger than 32px tall. Large `full`-rounded cards read as
   kids' apps.
@@ -911,7 +917,7 @@ easing flourish is 400ms of delay between the user and the information.
   surface — unlike ghost, which deliberately lets the surround show
   through.
 - **Ghost** — transparent, foreground label, hover reveals both
-  `accent` fill *and* `accent-foreground` label color. Use inside
+  `accent` fill _and_ `accent-foreground` label color. Use inside
   dense toolbars.
 - **Destructive** — vermilion fill. Pair with an explicit confirm step
   for irreversible actions.
@@ -935,7 +941,7 @@ one row — if both feel equal, one of them is mis-labeled.
 - **Accent** — same, plus a 2px left border in `primary`
   (`borderLeftWidth: 2px`, `borderLeftColor: primary`) to flag
   "this one has a completed summary." Reserved for that one
-  semantic. The left accent stripe sits *on top of* the card's
+  semantic. The left accent stripe sits _on top of_ the card's
   structural border and shadow, not instead of them.
 
 Cards have at most one hero element (title, score, image) and metadata
@@ -960,7 +966,7 @@ the card edge without competing with content.
 - Error state: border shifts to `destructive`; inline message below
   the field uses `destructive` text (i.e. `text-destructive`) at
   `small` size. Never use `destructive-foreground` here — that token
-  is the near-white color meant to sit *on* a destructive-filled
+  is the near-white color meant to sit _on_ a destructive-filled
   surface, not free-floating on paper.
 - Never replace the label with a placeholder. Placeholders disappear on
   focus; labels don't.
@@ -1010,6 +1016,7 @@ the card edge without competing with content.
 ## Do's and Don'ts
 
 **Do**
+
 - Use `primary` (emerald) for every interactive affordance. One color
   for "touch this" makes the product scannable.
 - Use `brand` (amber) exactly where it means "this is the product":
@@ -1026,6 +1033,7 @@ the card edge without competing with content.
   surface must have a defined dark equivalent.
 
 **Don't**
+
 - Don't use Tailwind's palette literals (`blue-600`, `yellow-400`,
   `zinc-*`, `slate-*`, `emerald-500`, …). They sit outside the token
   system and drift.

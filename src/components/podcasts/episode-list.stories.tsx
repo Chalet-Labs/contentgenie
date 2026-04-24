@@ -2,7 +2,11 @@ import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { EpisodeList } from "./episode-list";
 import type { PodcastIndexEpisode } from "@/lib/podcastindex";
 
-function makeEpisode(id: number, title: string, description: string): PodcastIndexEpisode {
+function makeEpisode(
+  id: number,
+  title: string,
+  description: string,
+): PodcastIndexEpisode {
   return {
     id,
     title,
@@ -36,11 +40,31 @@ function makeEpisode(id: number, title: string, description: string): PodcastInd
 }
 
 const sampleEpisodes: PodcastIndexEpisode[] = [
-  makeEpisode(1, "Intro to TypeScript", "Type systems for JavaScript developers."),
-  makeEpisode(2, "Advanced React Patterns", "Compound components, hooks, and context."),
-  makeEpisode(3, "Rust for JS devs", "Memory safety without garbage collection."),
-  makeEpisode(4, "Building with Next.js App Router", "Server components and streaming."),
-  makeEpisode(5, "Postgres at Scale", "Indexes, partitioning, and query plans."),
+  makeEpisode(
+    1,
+    "Intro to TypeScript",
+    "Type systems for JavaScript developers.",
+  ),
+  makeEpisode(
+    2,
+    "Advanced React Patterns",
+    "Compound components, hooks, and context.",
+  ),
+  makeEpisode(
+    3,
+    "Rust for JS devs",
+    "Memory safety without garbage collection.",
+  ),
+  makeEpisode(
+    4,
+    "Building with Next.js App Router",
+    "Server components and streaming.",
+  ),
+  makeEpisode(
+    5,
+    "Postgres at Scale",
+    "Indexes, partitioning, and query plans.",
+  ),
 ];
 
 const meta: Meta<typeof EpisodeList> = {

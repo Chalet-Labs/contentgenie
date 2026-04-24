@@ -1,6 +1,12 @@
 import { enqueue, SYNC_TAG } from "@/lib/sync-queue";
-import { saveEpisodeToLibrary, removeEpisodeFromLibrary } from "@/app/actions/library";
-import { subscribeToPodcast, unsubscribeFromPodcast } from "@/app/actions/subscriptions";
+import {
+  saveEpisodeToLibrary,
+  removeEpisodeFromLibrary,
+} from "@/app/actions/library";
+import {
+  subscribeToPodcast,
+  unsubscribeFromPodcast,
+} from "@/app/actions/subscriptions";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -49,7 +55,11 @@ async function tryRegisterSync(): Promise<void> {
     if (navigator?.serviceWorker) {
       const reg = await navigator.serviceWorker.ready;
       if ("sync" in reg) {
-        await (reg as unknown as { sync: { register: (tag: string) => Promise<void> } }).sync.register(SYNC_TAG);
+        await (
+          reg as unknown as {
+            sync: { register: (tag: string) => Promise<void> };
+          }
+        ).sync.register(SYNC_TAG);
       }
     }
   } catch {
@@ -81,7 +91,11 @@ export async function offlineSaveEpisode(
   // Fire-and-forget sync registration
   void tryRegisterSync();
 
-  return { success: true, queued: true, message: "Saved (will sync when online)" };
+  return {
+    success: true,
+    queued: true,
+    message: "Saved (will sync when online)",
+  };
 }
 
 export async function offlineUnsaveEpisode(
@@ -105,7 +119,11 @@ export async function offlineUnsaveEpisode(
 
   void tryRegisterSync();
 
-  return { success: true, queued: true, message: "Removed (will sync when online)" };
+  return {
+    success: true,
+    queued: true,
+    message: "Removed (will sync when online)",
+  };
 }
 
 export async function offlineSubscribe(
@@ -129,7 +147,11 @@ export async function offlineSubscribe(
 
   void tryRegisterSync();
 
-  return { success: true, queued: true, message: "Subscribed (will sync when online)" };
+  return {
+    success: true,
+    queued: true,
+    message: "Subscribed (will sync when online)",
+  };
 }
 
 export async function offlineUnsubscribe(
@@ -153,5 +175,9 @@ export async function offlineUnsubscribe(
 
   void tryRegisterSync();
 
-  return { success: true, queued: true, message: "Unsubscribed (will sync when online)" };
+  return {
+    success: true,
+    queued: true,
+    message: "Unsubscribed (will sync when online)",
+  };
 }

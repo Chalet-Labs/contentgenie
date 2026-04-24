@@ -22,7 +22,11 @@ export function EpisodeRecommendationsLoading() {
       <CardContent>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {Array.from({ length: EPISODES_INITIAL }).map((_, i) => (
-            <div key={i} data-testid="episode-loading-row" className="flex gap-3 p-2">
+            <div
+              key={i}
+              data-testid="episode-loading-row"
+              className="flex gap-3 p-2"
+            >
               <Skeleton className="h-14 w-14 shrink-0 rounded-md" />
               <div className="min-w-0 flex-1 space-y-2">
                 <Skeleton className="h-4 w-3/4" />
@@ -40,24 +44,28 @@ interface EpisodeRecommendationsProps {
   episodes: RecommendedEpisodeDTO[];
 }
 
-export function EpisodeRecommendations({ episodes }: EpisodeRecommendationsProps) {
-  const { visible, expanded, hiddenCount, shouldShowToggle, toggle } = useExpandable(
-    episodes,
-    EPISODES_INITIAL,
-  );
+export function EpisodeRecommendations({
+  episodes,
+}: EpisodeRecommendationsProps) {
+  const { visible, expanded, hiddenCount, shouldShowToggle, toggle } =
+    useExpandable(episodes, EPISODES_INITIAL);
 
   if (episodes.length === 0) {
     return (
       <Card>
         <CardHeader className="flex flex-row items-center justify-between pb-2">
-          <CardTitle className="text-lg font-semibold">Recommended Episodes</CardTitle>
+          <CardTitle className="text-lg font-semibold">
+            Recommended Episodes
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex flex-col items-center justify-center py-8 text-center">
             <div className="mb-2 rounded-full bg-muted p-3">
               <Sparkles className="h-5 w-5 text-muted-foreground" />
             </div>
-            <p className="mt-2 text-sm text-muted-foreground">No recommendations yet</p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              No recommendations yet
+            </p>
             <p className="text-xs text-muted-foreground">
               Check back as more episodes are rated by the community
             </p>
@@ -76,7 +84,9 @@ export function EpisodeRecommendations({ episodes }: EpisodeRecommendationsProps
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between pb-2">
-        <CardTitle className="text-lg font-semibold">Recommended Episodes</CardTitle>
+        <CardTitle className="text-lg font-semibold">
+          Recommended Episodes
+        </CardTitle>
         <Link
           href="/discover"
           className="flex items-center text-sm text-muted-foreground hover:text-primary"
@@ -109,7 +119,9 @@ export function EpisodeRecommendations({ episodes }: EpisodeRecommendationsProps
                 )}
               </div>
               <div className="min-w-0 flex-1">
-                <h4 className="line-clamp-1 text-sm font-medium">{episode.title}</h4>
+                <h4 className="line-clamp-1 text-sm font-medium">
+                  {episode.title}
+                </h4>
                 <p className="line-clamp-1 text-xs text-muted-foreground">
                   {episode.podcastTitle}
                 </p>
@@ -119,7 +131,13 @@ export function EpisodeRecommendations({ episodes }: EpisodeRecommendationsProps
                   </p>
                 )}
                 <div className="mt-1 flex flex-wrap items-center gap-2">
-                  <WorthItBadge score={episode.worthItScore != null ? Number(episode.worthItScore) : null} />
+                  <WorthItBadge
+                    score={
+                      episode.worthItScore != null
+                        ? Number(episode.worthItScore)
+                        : null
+                    }
+                  />
                   <span className="text-xs text-muted-foreground">
                     {formatDuration(episode.duration)}
                     {episode.publishDate && (

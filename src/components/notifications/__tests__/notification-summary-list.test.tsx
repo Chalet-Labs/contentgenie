@@ -94,7 +94,7 @@ describe("NotificationSummaryList", () => {
     expect(link).toBeInTheDocument();
     expect(link).toHaveAttribute(
       "href",
-      `/notifications?since=${encodeURIComponent(lastSeenAt.toISOString())}`
+      `/notifications?since=${encodeURIComponent(lastSeenAt.toISOString())}`,
     );
   });
 
@@ -110,17 +110,17 @@ describe("NotificationSummaryList", () => {
   it("(d) singular label when count === 1", () => {
     render(<NotificationSummaryList summary={singularSummary} />);
     expect(
-      screen.getByRole("link", { name: /1 new episode from solo pod/i })
+      screen.getByRole("link", { name: /1 new episode from solo pod/i }),
     ).toBeInTheDocument();
   });
 
   it("(e) multiple podcast groups each render one link", () => {
     render(<NotificationSummaryList summary={multiGroupSummary} />);
     expect(
-      screen.getByRole("link", { name: /new episodes from pod alpha/i })
+      screen.getByRole("link", { name: /new episodes from pod alpha/i }),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("link", { name: /new episodes from pod beta/i })
+      screen.getByRole("link", { name: /new episodes from pod beta/i }),
     ).toBeInTheDocument();
   });
 
@@ -128,10 +128,10 @@ describe("NotificationSummaryList", () => {
     render(<NotificationSummaryList summary={multiGroupSummary} />);
     const links = screen.getAllByRole("link");
     const sinceIndex = links.findIndex((l) =>
-      l.textContent?.includes("since last visit")
+      l.textContent?.includes("since last visit"),
     );
     const podcastIndex = links.findIndex((l) =>
-      l.textContent?.includes("from Pod Alpha")
+      l.textContent?.includes("from Pod Alpha"),
     );
     expect(sinceIndex).toBeLessThan(podcastIndex);
   });
@@ -139,10 +139,10 @@ describe("NotificationSummaryList", () => {
   it("(g) no since-last-seen row when group absent from groups array", () => {
     render(<NotificationSummaryList summary={podcastOnlySummary} />);
     expect(
-      screen.queryByRole("link", { name: /since last visit/i })
+      screen.queryByRole("link", { name: /since last visit/i }),
     ).not.toBeInTheDocument();
     expect(
-      screen.getByRole("link", { name: /no since pod/i })
+      screen.getByRole("link", { name: /no since pod/i }),
     ).toBeInTheDocument();
   });
 
@@ -163,7 +163,7 @@ describe("NotificationSummaryList", () => {
       <NotificationSummaryList
         summary={podcastSummary}
         onItemClick={onItemClick}
-      />
+      />,
     );
     const link = screen.getByRole("link", { name: /from the daily/i });
     fireEvent.click(link, { button: 0 });
@@ -176,7 +176,7 @@ describe("NotificationSummaryList", () => {
       <NotificationSummaryList
         summary={sinceOnlySummary}
         onItemClick={onItemClick}
-      />
+      />,
     );
     const link = screen.getByRole("link", { name: /since last visit/i });
     fireEvent.click(link, { button: 0 });
@@ -189,7 +189,7 @@ describe("NotificationSummaryList", () => {
       <NotificationSummaryList
         summary={podcastSummary}
         onItemClick={onItemClick}
-      />
+      />,
     );
     const link = screen.getByRole("link", { name: /from the daily/i });
 

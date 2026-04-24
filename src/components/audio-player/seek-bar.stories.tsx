@@ -1,5 +1,5 @@
-import type { Meta, StoryObj } from "@storybook/nextjs-vite"
-import type { ReactNode } from "react"
+import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import type { ReactNode } from "react";
 import {
   AudioPlayerAPIContext,
   AudioPlayerStateContext,
@@ -7,8 +7,8 @@ import {
   type AudioPlayerState,
   type AudioPlayerProgress,
   type AudioPlayerAPI,
-} from "@/contexts/audio-player-context"
-import { SeekBar } from "./seek-bar"
+} from "@/contexts/audio-player-context";
+import { SeekBar } from "./seek-bar";
 
 const noopAPI: AudioPlayerAPI = {
   playEpisode: () => {},
@@ -27,7 +27,7 @@ const noopAPI: AudioPlayerAPI = {
   setSleepTimer: () => {},
   cancelSleepTimer: () => {},
   getCurrentTime: () => 0,
-}
+};
 
 const baseState: AudioPlayerState = {
   currentEpisode: null,
@@ -43,16 +43,16 @@ const baseState: AudioPlayerState = {
   chapters: null,
   chaptersLoading: false,
   sleepTimer: null,
-}
+};
 
 function MockProvider({
   state,
   progress,
   children,
 }: {
-  state: AudioPlayerState
-  progress: AudioPlayerProgress
-  children: ReactNode
+  state: AudioPlayerState;
+  progress: AudioPlayerProgress;
+  children: ReactNode;
 }) {
   return (
     <AudioPlayerAPIContext.Provider value={noopAPI}>
@@ -62,16 +62,16 @@ function MockProvider({
         </AudioPlayerProgressContext.Provider>
       </AudioPlayerStateContext.Provider>
     </AudioPlayerAPIContext.Provider>
-  )
+  );
 }
 
 const meta: Meta<typeof SeekBar> = {
   title: "AudioPlayer/SeekBar",
   component: SeekBar,
-}
+};
 
-export default meta
-type Story = StoryObj<typeof SeekBar>
+export default meta;
+type Story = StoryObj<typeof SeekBar>;
 
 export const Default: Story = {
   decorators: [
@@ -86,7 +86,7 @@ export const Default: Story = {
       </MockProvider>
     ),
   ],
-}
+};
 
 export const NearEnd: Story = {
   decorators: [
@@ -101,7 +101,7 @@ export const NearEnd: Story = {
       </MockProvider>
     ),
   ],
-}
+};
 
 export const LongEpisode: Story = {
   decorators: [
@@ -116,7 +116,7 @@ export const LongEpisode: Story = {
       </MockProvider>
     ),
   ],
-}
+};
 
 export const BufferedRange: Story = {
   decorators: [
@@ -131,7 +131,7 @@ export const BufferedRange: Story = {
       </MockProvider>
     ),
   ],
-}
+};
 
 export const ZeroDuration: Story = {
   decorators: [
@@ -146,7 +146,7 @@ export const ZeroDuration: Story = {
       </MockProvider>
     ),
   ],
-}
+};
 
 export const WithChapterMarkers: Story = {
   decorators: [
@@ -171,7 +171,7 @@ export const WithChapterMarkers: Story = {
       </MockProvider>
     ),
   ],
-}
+};
 
 export const NoChapterMarkers: Story = {
   decorators: [
@@ -186,4 +186,4 @@ export const NoChapterMarkers: Story = {
       </MockProvider>
     ),
   ],
-}
+};

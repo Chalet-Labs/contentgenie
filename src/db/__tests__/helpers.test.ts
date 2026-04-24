@@ -60,7 +60,7 @@ describe("upsertPodcast — safe mode", () => {
         rssFeedUrl: "https://example.com/feed.rss",
         source: "podcastindex",
       },
-      { updateOnConflict: "safe" }
+      { updateOnConflict: "safe" },
     );
 
     const [{ set }] = mockOnConflictDoUpdate.mock.calls[0];
@@ -75,10 +75,11 @@ describe("upsertPodcast — safe mode", () => {
         rssFeedUrl: "https://example.com/feed.rss",
         source: "rss",
       },
-      { updateOnConflict: "safe" }
+      { updateOnConflict: "safe" },
     );
 
-    const insertValues = mockInsert.mock.results[0].value.values.mock.calls[0][0];
+    const insertValues =
+      mockInsert.mock.results[0].value.values.mock.calls[0][0];
     expect(Object.hasOwn(insertValues, "rssFeedUrl")).toBe(false);
     expect(Object.hasOwn(insertValues, "source")).toBe(false);
     expect(insertValues.title).toBe("Test Podcast");
@@ -89,7 +90,7 @@ describe("upsertPodcast — safe mode", () => {
 
     const id = await upsertPodcast(
       { podcastIndexId: "pod-1", title: "Test" },
-      { updateOnConflict: "safe" }
+      { updateOnConflict: "safe" },
     );
 
     expect(id).toBe(99);
@@ -116,7 +117,7 @@ describe("upsertPodcast — full mode", () => {
         totalEpisodes: 50,
         latestEpisodeDate,
       },
-      { updateOnConflict: "full" }
+      { updateOnConflict: "full" },
     );
 
     const [{ set }] = mockOnConflictDoUpdate.mock.calls[0];
@@ -138,7 +139,7 @@ describe("upsertPodcast — full mode", () => {
 
     const id = await upsertPodcast(
       { podcastIndexId: "pod-2", title: "Test" },
-      { updateOnConflict: "full" }
+      { updateOnConflict: "full" },
     );
 
     expect(id).toBe(77);

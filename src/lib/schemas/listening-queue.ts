@@ -27,7 +27,13 @@ export const audioEpisodeSchema = z
     artwork: optionalHttpOrHttpsUrl,
     // Mirror the integer("duration") DB column — fractional seconds would be
     // silently truncated on insert (or fail, depending on the driver).
-    duration: z.number().int().nonnegative().finite().max(MAX_TIME_SECONDS).optional(),
+    duration: z
+      .number()
+      .int()
+      .nonnegative()
+      .finite()
+      .max(MAX_TIME_SECONDS)
+      .optional(),
     chaptersUrl: optionalHttpOrHttpsUrl,
   })
   .strip();
@@ -35,10 +41,9 @@ export const audioEpisodeSchema = z
 export const queueSchema = z
   .array(audioEpisodeSchema)
   .max(MAX_QUEUE_ITEMS)
-  .refine(
-    (queue) => new Set(queue.map((ep) => ep.id)).size === queue.length,
-    { message: "Queue cannot contain duplicate episodes" },
-  );
+  .refine((queue) => new Set(queue.map((ep) => ep.id)).size === queue.length, {
+    message: "Queue cannot contain duplicate episodes",
+  });
 
 export const savePlayerSessionSchema = z
   .object({

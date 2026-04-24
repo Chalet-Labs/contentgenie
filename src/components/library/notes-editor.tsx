@@ -32,7 +32,10 @@ export function NotesEditor({
       setIsSaving(true);
       setError(null);
 
-      const result = await updateLibraryNotes(episodePodcastIndexId, notesValue);
+      const result = await updateLibraryNotes(
+        episodePodcastIndexId,
+        notesValue,
+      );
 
       if (result.success) {
         lastSavedRef.current = notesValue;
@@ -44,7 +47,7 @@ export function NotesEditor({
 
       setIsSaving(false);
     },
-    [episodePodcastIndexId]
+    [episodePodcastIndexId],
   );
 
   useEffect(() => {

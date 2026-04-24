@@ -65,7 +65,7 @@ describe("push module", () => {
     it("strips non-URL-safe-base64 characters", async () => {
       const { sanitizeTopic } = await import("@/lib/push");
       expect(sanitizeTopic("tag:with/invalid chars!")).toBe(
-        "tagwithinvalidchars"
+        "tagwithinvalidchars",
       );
     });
 
@@ -78,13 +78,24 @@ describe("push module", () => {
   describe("sendPushToUser", () => {
     it("sends push to all user subscriptions and returns sent count", async () => {
       mockFindMany.mockResolvedValue([
-        { endpoint: "https://push.example.com/1", p256dh: "key1", auth: "auth1" },
-        { endpoint: "https://push.example.com/2", p256dh: "key2", auth: "auth2" },
+        {
+          endpoint: "https://push.example.com/1",
+          p256dh: "key1",
+          auth: "auth1",
+        },
+        {
+          endpoint: "https://push.example.com/2",
+          p256dh: "key2",
+          auth: "auth2",
+        },
       ]);
       mockSendNotification.mockResolvedValue({});
 
       const { sendPushToUser } = await import("@/lib/push");
-      const result = await sendPushToUser("user-1", { title: "Test", body: "Body" });
+      const result = await sendPushToUser("user-1", {
+        title: "Test",
+        body: "Body",
+      });
 
       expect(mockSendNotification).toHaveBeenCalledTimes(2);
       expect(result).toEqual({ sent: 2, failed: 0 });
@@ -92,23 +103,35 @@ describe("push module", () => {
 
     it("passes topic to sendNotification when tag is provided", async () => {
       mockFindMany.mockResolvedValue([
-        { endpoint: "https://push.example.com/1", p256dh: "key1", auth: "auth1" },
+        {
+          endpoint: "https://push.example.com/1",
+          p256dh: "key1",
+          auth: "auth1",
+        },
       ]);
       mockSendNotification.mockResolvedValue({});
 
       const { sendPushToUser } = await import("@/lib/push");
-      await sendPushToUser("user-1", { title: "Test", body: "Body", tag: "new_episode-42" });
+      await sendPushToUser("user-1", {
+        title: "Test",
+        body: "Body",
+        tag: "new_episode-42",
+      });
 
       expect(mockSendNotification).toHaveBeenCalledWith(
         expect.any(Object),
         expect.any(String),
-        expect.objectContaining({ topic: "new_episode-42" })
+        expect.objectContaining({ topic: "new_episode-42" }),
       );
     });
 
     it("omits topic from sendNotification when no tag is provided", async () => {
       mockFindMany.mockResolvedValue([
-        { endpoint: "https://push.example.com/1", p256dh: "key1", auth: "auth1" },
+        {
+          endpoint: "https://push.example.com/1",
+          p256dh: "key1",
+          auth: "auth1",
+        },
       ]);
       mockSendNotification.mockResolvedValue({});
 
@@ -121,46 +144,69 @@ describe("push module", () => {
 
     it("truncates topic to TOPIC_MAX_LENGTH characters per RFC 8030", async () => {
       mockFindMany.mockResolvedValue([
-        { endpoint: "https://push.example.com/1", p256dh: "key1", auth: "auth1" },
+        {
+          endpoint: "https://push.example.com/1",
+          p256dh: "key1",
+          auth: "auth1",
+        },
       ]);
       mockSendNotification.mockResolvedValue({});
 
       const { sendPushToUser, TOPIC_MAX_LENGTH } = await import("@/lib/push");
       const longTag = "a".repeat(TOPIC_MAX_LENGTH + 18);
-      await sendPushToUser("user-1", { title: "Test", body: "Body", tag: longTag });
+      await sendPushToUser("user-1", {
+        title: "Test",
+        body: "Body",
+        tag: longTag,
+      });
 
       expect(mockSendNotification).toHaveBeenCalledWith(
         expect.any(Object),
         expect.any(String),
-        expect.objectContaining({ topic: "a".repeat(TOPIC_MAX_LENGTH) })
+        expect.objectContaining({ topic: "a".repeat(TOPIC_MAX_LENGTH) }),
       );
     });
 
     it("strips non-URL-safe-base64 characters from topic per RFC 8030", async () => {
       mockFindMany.mockResolvedValue([
-        { endpoint: "https://push.example.com/1", p256dh: "key1", auth: "auth1" },
+        {
+          endpoint: "https://push.example.com/1",
+          p256dh: "key1",
+          auth: "auth1",
+        },
       ]);
       mockSendNotification.mockResolvedValue({});
 
       const { sendPushToUser } = await import("@/lib/push");
-      await sendPushToUser("user-1", { title: "Test", body: "Body", tag: "tag:with/invalid chars!" });
+      await sendPushToUser("user-1", {
+        title: "Test",
+        body: "Body",
+        tag: "tag:with/invalid chars!",
+      });
 
       expect(mockSendNotification).toHaveBeenCalledWith(
         expect.any(Object),
         expect.any(String),
-        expect.objectContaining({ topic: "tagwithinvalidchars" })
+        expect.objectContaining({ topic: "tagwithinvalidchars" }),
       );
     });
 
     it("deletes stale subscriptions on 404 response", async () => {
       mockFindMany.mockResolvedValue([
-        { endpoint: "https://push.example.com/stale", p256dh: "key", auth: "auth" },
+        {
+          endpoint: "https://push.example.com/stale",
+          p256dh: "key",
+          auth: "auth",
+        },
       ]);
       mockSendNotification.mockRejectedValue({ statusCode: 404 });
       mockDelete.mockReturnValue({ where: vi.fn() });
 
       const { sendPushToUser } = await import("@/lib/push");
-      const result = await sendPushToUser("user-1", { title: "Test", body: "Body" });
+      const result = await sendPushToUser("user-1", {
+        title: "Test",
+        body: "Body",
+      });
 
       expect(mockDelete).toHaveBeenCalled();
       expect(result).toEqual({ sent: 0, failed: 1 });
@@ -168,13 +214,20 @@ describe("push module", () => {
 
     it("deletes stale subscriptions on 410 response", async () => {
       mockFindMany.mockResolvedValue([
-        { endpoint: "https://push.example.com/gone", p256dh: "key", auth: "auth" },
+        {
+          endpoint: "https://push.example.com/gone",
+          p256dh: "key",
+          auth: "auth",
+        },
       ]);
       mockSendNotification.mockRejectedValue({ statusCode: 410 });
       mockDelete.mockReturnValue({ where: vi.fn() });
 
       const { sendPushToUser } = await import("@/lib/push");
-      const result = await sendPushToUser("user-1", { title: "Test", body: "Body" });
+      const result = await sendPushToUser("user-1", {
+        title: "Test",
+        body: "Body",
+      });
 
       expect(mockDelete).toHaveBeenCalled();
       expect(result).toEqual({ sent: 0, failed: 1 });
@@ -182,12 +235,19 @@ describe("push module", () => {
 
     it("returns failed count when push fails with non-stale error", async () => {
       mockFindMany.mockResolvedValue([
-        { endpoint: "https://push.example.com/fail", p256dh: "key", auth: "auth" },
+        {
+          endpoint: "https://push.example.com/fail",
+          p256dh: "key",
+          auth: "auth",
+        },
       ]);
       mockSendNotification.mockRejectedValue(new Error("Network error"));
 
       const { sendPushToUser } = await import("@/lib/push");
-      const result = await sendPushToUser("user-1", { title: "Test", body: "Body" });
+      const result = await sendPushToUser("user-1", {
+        title: "Test",
+        body: "Body",
+      });
 
       expect(result).toEqual({ sent: 0, failed: 1 });
     });
@@ -196,7 +256,10 @@ describe("push module", () => {
       mockFindMany.mockResolvedValue([]);
 
       const { sendPushToUser } = await import("@/lib/push");
-      const result = await sendPushToUser("user-no-subs", { title: "Test", body: "Body" });
+      const result = await sendPushToUser("user-no-subs", {
+        title: "Test",
+        body: "Body",
+      });
 
       expect(result).toEqual({ sent: 0, failed: 0 });
       expect(mockSendNotification).not.toHaveBeenCalled();
@@ -209,7 +272,10 @@ describe("push module", () => {
       vi.resetModules();
 
       const { sendPushToUser } = await import("@/lib/push");
-      const result = await sendPushToUser("user-1", { title: "Test", body: "Body" });
+      const result = await sendPushToUser("user-1", {
+        title: "Test",
+        body: "Body",
+      });
 
       expect(result).toEqual({ sent: 0, failed: 0 });
       expect(mockFindMany).not.toHaveBeenCalled();
@@ -218,19 +284,23 @@ describe("push module", () => {
 
     it("uses default consolePushLogger when no logger arg is passed", async () => {
       mockFindMany.mockResolvedValue([
-        { endpoint: "https://push.example.com/fail", p256dh: "key", auth: "auth" },
+        {
+          endpoint: "https://push.example.com/fail",
+          p256dh: "key",
+          auth: "auth",
+        },
       ]);
       mockSendNotification.mockRejectedValue(new Error("Network error"));
       const consoleSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
       const { sendPushToUser } = await import("@/lib/push");
       await expect(
-        sendPushToUser("user-1", { title: "Test", body: "Body" })
+        sendPushToUser("user-1", { title: "Test", body: "Body" }),
       ).resolves.toBeDefined();
 
       expect(consoleSpy).toHaveBeenCalledWith(
         expect.stringContaining("[push]"),
-        expect.any(Object)
+        expect.any(Object),
       );
       consoleSpy.mockRestore();
     });
@@ -244,16 +314,21 @@ describe("push module", () => {
       const mockLogger = { warn: vi.fn(), error: vi.fn() };
 
       const { sendPushToUser } = await import("@/lib/push");
-      await sendPushToUser("user-1", { title: "Test", body: "Body" }, mockLogger);
+      await sendPushToUser(
+        "user-1",
+        { title: "Test", body: "Body" },
+        mockLogger,
+      );
 
       expect(mockLogger.warn).toHaveBeenCalledWith(
         expect.stringContaining("VAPID"),
-        expect.any(Object)
+        expect.any(Object),
       );
     });
 
     it("calls custom logger.warn on push notification failure with redacted endpoint", async () => {
-      const endpoint = "https://push.example.com/abcdefghijklmnopqrstuvwxyz123456";
+      const endpoint =
+        "https://push.example.com/abcdefghijklmnopqrstuvwxyz123456";
       mockFindMany.mockResolvedValue([
         { endpoint, p256dh: "key", auth: "auth" },
       ]);
@@ -262,15 +337,21 @@ describe("push module", () => {
       const mockLogger = { warn: vi.fn(), error: vi.fn() };
 
       const { sendPushToUser } = await import("@/lib/push");
-      await sendPushToUser("user-1", { title: "Test", body: "Body" }, mockLogger);
+      await sendPushToUser(
+        "user-1",
+        { title: "Test", body: "Body" },
+        mockLogger,
+      );
 
       expect(mockLogger.warn).toHaveBeenCalledWith(
         "Push notification failed",
         expect.objectContaining({
           endpoint: expect.stringContaining("…"),
-        })
+        }),
       );
-      const loggedMeta = mockLogger.warn.mock.calls[0]?.[1] as { endpoint?: string };
+      const loggedMeta = mockLogger.warn.mock.calls[0]?.[1] as {
+        endpoint?: string;
+      };
       expect(loggedMeta.endpoint).not.toBe(endpoint);
     });
 
@@ -280,23 +361,42 @@ describe("push module", () => {
       const mockLogger = { warn: vi.fn(), error: vi.fn() };
 
       const { sendPushToUser } = await import("@/lib/push");
-      const result = await sendPushToUser("user-1", { title: "Test", body: "Body" }, mockLogger);
+      const result = await sendPushToUser(
+        "user-1",
+        { title: "Test", body: "Body" },
+        mockLogger,
+      );
 
       expect(result).toEqual({ sent: 0, failed: 0 });
       expect(mockLogger.error).toHaveBeenCalledWith(
         "Failed to fetch push subscriptions",
-        expect.objectContaining({ userIdHash: expect.any(String) })
+        expect.objectContaining({ userIdHash: expect.any(String) }),
       );
-      const loggedMeta = mockLogger.error.mock.calls[0]?.[1] as Record<string, unknown>;
+      const loggedMeta = mockLogger.error.mock.calls[0]?.[1] as Record<
+        string,
+        unknown
+      >;
       expect(loggedMeta).not.toHaveProperty("userId");
       expect(loggedMeta.userIdHash).not.toBe("user-1");
     });
 
     it("mixes sent and failed correctly across multiple subscriptions", async () => {
       mockFindMany.mockResolvedValue([
-        { endpoint: "https://push.example.com/1", p256dh: "key1", auth: "auth1" },
-        { endpoint: "https://push.example.com/2", p256dh: "key2", auth: "auth2" },
-        { endpoint: "https://push.example.com/3", p256dh: "key3", auth: "auth3" },
+        {
+          endpoint: "https://push.example.com/1",
+          p256dh: "key1",
+          auth: "auth1",
+        },
+        {
+          endpoint: "https://push.example.com/2",
+          p256dh: "key2",
+          auth: "auth2",
+        },
+        {
+          endpoint: "https://push.example.com/3",
+          p256dh: "key3",
+          auth: "auth3",
+        },
       ]);
       mockSendNotification
         .mockResolvedValueOnce({})
@@ -304,7 +404,10 @@ describe("push module", () => {
         .mockResolvedValueOnce({});
 
       const { sendPushToUser } = await import("@/lib/push");
-      const result = await sendPushToUser("user-1", { title: "Test", body: "Body" });
+      const result = await sendPushToUser("user-1", {
+        title: "Test",
+        body: "Body",
+      });
 
       expect(result).toEqual({ sent: 2, failed: 1 });
     });

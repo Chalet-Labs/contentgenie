@@ -24,7 +24,7 @@ export async function getResummarizeEpisodeCount(filters: {
       const subscription = await db.query.userSubscriptions.findFirst({
         where: and(
           eq(userSubscriptions.userId, userId),
-          eq(userSubscriptions.podcastId, filters.podcastId)
+          eq(userSubscriptions.podcastId, filters.podcastId),
         ),
       });
       if (!subscription) {

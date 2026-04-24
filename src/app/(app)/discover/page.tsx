@@ -9,7 +9,7 @@ function DiscoverPageSkeleton() {
         <Skeleton className="h-10 flex-1" />
         <Skeleton className="h-10 w-24" />
       </div>
-      <Skeleton className="h-4 w-48 mx-auto" />
+      <Skeleton className="mx-auto h-4 w-48" />
       <Skeleton className="h-10 w-full" />
     </div>
   );

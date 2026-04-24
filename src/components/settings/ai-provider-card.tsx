@@ -36,7 +36,10 @@ import type { AiProviderName } from "@/lib/ai";
 import { ADMIN_ROLE } from "@/lib/auth-roles";
 
 const aiProviderSchema = z.object({
-  provider: z.enum(["openrouter", "zai"] as [AiProviderName, ...AiProviderName[]]),
+  provider: z.enum(["openrouter", "zai"] as [
+    AiProviderName,
+    ...AiProviderName[],
+  ]),
   model: z.string().trim().min(1, "Model is required"),
 });
 type AiProviderValues = z.infer<typeof aiProviderSchema>;
@@ -117,7 +120,10 @@ export function AiProviderCard() {
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Provider</FormLabel>
-                      <Select value={field.value} onValueChange={field.onChange}>
+                      <Select
+                        value={field.value}
+                        onValueChange={field.onChange}
+                      >
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Select provider" />

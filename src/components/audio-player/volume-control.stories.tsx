@@ -1,13 +1,13 @@
-import type { Meta, StoryObj } from "@storybook/nextjs-vite"
-import type { ReactNode } from "react"
+import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import type { ReactNode } from "react";
 import {
   AudioPlayerAPIContext,
   AudioPlayerStateContext,
   AudioPlayerProgressContext,
   type AudioPlayerState,
   type AudioPlayerAPI,
-} from "@/contexts/audio-player-context"
-import { VolumeControl } from "@/components/audio-player/volume-control"
+} from "@/contexts/audio-player-context";
+import { VolumeControl } from "@/components/audio-player/volume-control";
 
 const noopAPI: AudioPlayerAPI = {
   playEpisode: () => {},
@@ -26,7 +26,7 @@ const noopAPI: AudioPlayerAPI = {
   setSleepTimer: () => {},
   cancelSleepTimer: () => {},
   getCurrentTime: () => 0,
-}
+};
 
 const baseState: AudioPlayerState = {
   currentEpisode: null,
@@ -42,14 +42,14 @@ const baseState: AudioPlayerState = {
   chapters: null,
   chaptersLoading: false,
   sleepTimer: null,
-}
+};
 
 function MockProvider({
   state,
   children,
 }: {
-  state: AudioPlayerState
-  children: ReactNode
+  state: AudioPlayerState;
+  children: ReactNode;
 }) {
   return (
     <AudioPlayerAPIContext.Provider value={noopAPI}>
@@ -61,16 +61,16 @@ function MockProvider({
         </AudioPlayerProgressContext.Provider>
       </AudioPlayerStateContext.Provider>
     </AudioPlayerAPIContext.Provider>
-  )
+  );
 }
 
 const meta: Meta<typeof VolumeControl> = {
   title: "AudioPlayer/VolumeControl",
   component: VolumeControl,
-}
+};
 
-export default meta
-type Story = StoryObj<typeof VolumeControl>
+export default meta;
+type Story = StoryObj<typeof VolumeControl>;
 
 export const Default: Story = {
   decorators: [
@@ -82,7 +82,7 @@ export const Default: Story = {
       </MockProvider>
     ),
   ],
-}
+};
 
 export const Muted: Story = {
   decorators: [
@@ -94,7 +94,7 @@ export const Muted: Story = {
       </MockProvider>
     ),
   ],
-}
+};
 
 export const HalfVolume: Story = {
   decorators: [
@@ -106,7 +106,7 @@ export const HalfVolume: Story = {
       </MockProvider>
     ),
   ],
-}
+};
 
 export const MaxVolume: Story = {
   decorators: [
@@ -118,4 +118,4 @@ export const MaxVolume: Story = {
       </MockProvider>
     ),
   ],
-}
+};

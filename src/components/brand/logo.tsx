@@ -44,15 +44,43 @@ export function Logo({
         fill="none"
         {...a11y}
       >
-        <rect x="0" y="6" width="32" height="32" rx="7" fill="hsl(var(--brand))" />
+        <rect
+          x="0"
+          y="6"
+          width="32"
+          height="32"
+          rx="7"
+          fill="hsl(var(--brand))"
+        />
         <g transform="translate(0 6)">
           <path
             d="M7 8 h18 a3 3 0 0 1 3 3 v8 a3 3 0 0 1 -3 3 h-10 l-5 4 v-4 h-3 a3 3 0 0 1 -3 -3 v-8 a3 3 0 0 1 3 -3 z"
             fill="hsl(var(--brand-foreground))"
           />
-          <rect x="11.5" y="14" width="2" height="3" rx="1" fill="hsl(var(--brand))" />
-          <rect x="15.5" y="11.5" width="2" height="8" rx="1" fill="hsl(var(--brand))" />
-          <rect x="19.5" y="13" width="2" height="5" rx="1" fill="hsl(var(--brand))" />
+          <rect
+            x="11.5"
+            y="14"
+            width="2"
+            height="3"
+            rx="1"
+            fill="hsl(var(--brand))"
+          />
+          <rect
+            x="15.5"
+            y="11.5"
+            width="2"
+            height="8"
+            rx="1"
+            fill="hsl(var(--brand))"
+          />
+          <rect
+            x="19.5"
+            y="13"
+            width="2"
+            height="5"
+            rx="1"
+            fill="hsl(var(--brand))"
+          />
         </g>
         <text
           x="44"
@@ -82,7 +110,14 @@ export function Logo({
         {...a11y}
       >
         <defs>
-          <mask id={maskId} maskUnits="userSpaceOnUse" x="0" y="0" width="32" height="32">
+          <mask
+            id={maskId}
+            maskUnits="userSpaceOnUse"
+            x="0"
+            y="0"
+            width="32"
+            height="32"
+          >
             <path
               d="M7 8 h18 a3 3 0 0 1 3 3 v8 a3 3 0 0 1 -3 3 h-10 l-5 4 v-4 h-3 a3 3 0 0 1 -3 -3 v-8 a3 3 0 0 1 3 -3 z"
               fill="white"
@@ -92,7 +127,12 @@ export function Logo({
             <rect x="19.5" y="13" width="2" height="5" rx="1" fill="black" />
           </mask>
         </defs>
-        <rect width="32" height="32" fill="currentColor" mask={`url(#${maskId})`} />
+        <rect
+          width="32"
+          height="32"
+          fill="currentColor"
+          mask={`url(#${maskId})`}
+        />
       </svg>
     );
   }
@@ -111,9 +151,30 @@ export function Logo({
         d="M7 8 h18 a3 3 0 0 1 3 3 v8 a3 3 0 0 1 -3 3 h-10 l-5 4 v-4 h-3 a3 3 0 0 1 -3 -3 v-8 a3 3 0 0 1 3 -3 z"
         fill="hsl(var(--brand-foreground))"
       />
-      <rect x="11.5" y="14" width="2" height="3" rx="1" fill="hsl(var(--brand))" />
-      <rect x="15.5" y="11.5" width="2" height="8" rx="1" fill="hsl(var(--brand))" />
-      <rect x="19.5" y="13" width="2" height="5" rx="1" fill="hsl(var(--brand))" />
+      <rect
+        x="11.5"
+        y="14"
+        width="2"
+        height="3"
+        rx="1"
+        fill="hsl(var(--brand))"
+      />
+      <rect
+        x="15.5"
+        y="11.5"
+        width="2"
+        height="8"
+        rx="1"
+        fill="hsl(var(--brand))"
+      />
+      <rect
+        x="19.5"
+        y="13"
+        width="2"
+        height="5"
+        rx="1"
+        fill="hsl(var(--brand))"
+      />
     </svg>
   );
 }

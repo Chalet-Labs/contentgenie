@@ -18,7 +18,7 @@ describe("SummaryDisplay", () => {
         keyTakeaways={null}
         worthItScore={null}
         isLoading={true}
-      />
+      />,
     );
     expect(screen.getByText("Generating Summary...")).toBeInTheDocument();
   });
@@ -31,7 +31,7 @@ describe("SummaryDisplay", () => {
         worthItScore={null}
         isLoading={true}
         currentStep="generating-summary"
-      />
+      />,
     );
     expect(screen.getByText("Generating Summary...")).toBeInTheDocument();
     expect(screen.getByText("Generating AI summary")).toBeInTheDocument();
@@ -47,11 +47,9 @@ describe("SummaryDisplay", () => {
         worthItScore={null}
         error="Something went wrong"
         onGenerateSummary={onRetry}
-      />
+      />,
     );
-    expect(
-      screen.getByText("Failed to generate summary")
-    ).toBeInTheDocument();
+    expect(screen.getByText("Failed to generate summary")).toBeInTheDocument();
     expect(screen.getByText("Something went wrong")).toBeInTheDocument();
     expect(screen.getByText("Try Again")).toBeInTheDocument();
   });
@@ -64,7 +62,7 @@ describe("SummaryDisplay", () => {
         keyTakeaways={null}
         worthItScore={null}
         onGenerateSummary={onGenerate}
-      />
+      />,
     );
     expect(screen.getByText("No Summary Available")).toBeInTheDocument();
     expect(screen.getByText("Generate Summary")).toBeInTheDocument();
@@ -77,10 +75,10 @@ describe("SummaryDisplay", () => {
         keyTakeaways={["Takeaway 1", "Takeaway 2", "Takeaway 3"]}
         worthItScore={8.5}
         worthItReason="Excellent content"
-      />
+      />,
     );
     expect(
-      screen.getByText("This is a great episode summary.")
+      screen.getByText("This is a great episode summary."),
     ).toBeInTheDocument();
     expect(screen.getByText("8.5")).toBeInTheDocument();
     expect(screen.getByText("Exceptional")).toBeInTheDocument();
@@ -99,7 +97,7 @@ describe("SummaryDisplay", () => {
         summary={longSummary}
         keyTakeaways={[]}
         worthItScore={5}
-      />
+      />,
     );
 
     expect(screen.getByText("Read More")).toBeInTheDocument();
@@ -112,47 +110,27 @@ describe("SummaryDisplay", () => {
 
   it("shows correct score labels", () => {
     const { rerender } = render(
-      <SummaryDisplay
-        summary="Summary"
-        keyTakeaways={[]}
-        worthItScore={9}
-      />
+      <SummaryDisplay summary="Summary" keyTakeaways={[]} worthItScore={9} />,
     );
     expect(screen.getByText("Exceptional")).toBeInTheDocument();
 
     rerender(
-      <SummaryDisplay
-        summary="Summary"
-        keyTakeaways={[]}
-        worthItScore={6}
-      />
+      <SummaryDisplay summary="Summary" keyTakeaways={[]} worthItScore={6} />,
     );
     expect(screen.getByText("Above Average")).toBeInTheDocument();
 
     rerender(
-      <SummaryDisplay
-        summary="Summary"
-        keyTakeaways={[]}
-        worthItScore={4}
-      />
+      <SummaryDisplay summary="Summary" keyTakeaways={[]} worthItScore={4} />,
     );
     expect(screen.getByText("Average")).toBeInTheDocument();
 
     rerender(
-      <SummaryDisplay
-        summary="Summary"
-        keyTakeaways={[]}
-        worthItScore={2}
-      />
+      <SummaryDisplay summary="Summary" keyTakeaways={[]} worthItScore={2} />,
     );
     expect(screen.getByText("Below Average")).toBeInTheDocument();
 
     rerender(
-      <SummaryDisplay
-        summary="Summary"
-        keyTakeaways={[]}
-        worthItScore={1}
-      />
+      <SummaryDisplay summary="Summary" keyTakeaways={[]} worthItScore={1} />,
     );
     expect(screen.getByText("Skip")).toBeInTheDocument();
   });
@@ -163,7 +141,7 @@ describe("SummaryDisplay", () => {
         summary="Summary text"
         keyTakeaways={[]}
         worthItScore={null}
-      />
+      />,
     );
     expect(screen.queryByText("Worth-It Score")).not.toBeInTheDocument();
   });
@@ -176,7 +154,7 @@ describe("SummaryDisplay", () => {
         summary={structuredSummary}
         keyTakeaways={[]}
         worthItScore={7}
-      />
+      />,
     );
     expect(screen.getByText("TL;DR")).toBeInTheDocument();
     expect(screen.getByText("A quick overview.")).toBeInTheDocument();
@@ -194,7 +172,7 @@ describe("SummaryDisplay", () => {
         summary={structuredSummary}
         keyTakeaways={[]}
         worthItScore={7}
-      />
+      />,
     );
     await user.click(screen.getByText("Read More"));
     expect(screen.getByText("What You'll Learn")).toBeInTheDocument();
@@ -207,8 +185,13 @@ describe("SummaryDisplay", () => {
         summary="Short summary."
         keyTakeaways={[]}
         worthItScore={7}
-        worthItDimensions={{ kind: "dimensions", uniqueness: 3, actionability: 4, timeValue: 9 }}
-      />
+        worthItDimensions={{
+          kind: "dimensions",
+          uniqueness: 3,
+          actionability: 4,
+          timeValue: 9,
+        }}
+      />,
     );
     expect(screen.getByText("Score Breakdown")).toBeInTheDocument();
     expect(screen.getByText("Uniqueness")).toBeInTheDocument();
@@ -228,7 +211,7 @@ describe("SummaryDisplay", () => {
           actionability: NaN as unknown as number,
           timeValue: 6,
         }}
-      />
+      />,
     );
     expect(screen.getByText("Score Breakdown")).toBeInTheDocument();
     expect(screen.getByText("Uniqueness")).toBeInTheDocument();

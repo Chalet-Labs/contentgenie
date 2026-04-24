@@ -43,8 +43,18 @@ export const SIGNAL_LABELS: Record<keyof WorthItSignals, string> = {
 
 /** Discriminated union for backward compatibility with legacy dimension format. */
 export type WorthItDimensionsData =
-  | { kind: "signals"; signals: WorthItSignals; adjustment: -1 | 0 | 1; adjustmentReason: string }
-  | { kind: "dimensions"; uniqueness: number; actionability: number; timeValue: number };
+  | {
+      kind: "signals";
+      signals: WorthItSignals;
+      adjustment: -1 | 0 | 1;
+      adjustmentReason: string;
+    }
+  | {
+      kind: "dimensions";
+      uniqueness: number;
+      actionability: number;
+      timeValue: number;
+    };
 
 export interface SummaryResult {
   summary: string;

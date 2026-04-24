@@ -38,9 +38,7 @@ export function WelcomeCard() {
               <div className="mx-auto mb-2 flex h-9 w-9 items-center justify-center rounded-full bg-muted">
                 <Headphones className="h-4 w-4 text-muted-foreground" />
               </div>
-              <p className="text-xs text-muted-foreground">
-                Get AI summaries
-              </p>
+              <p className="text-xs text-muted-foreground">Get AI summaries</p>
             </div>
             <div>
               <div className="mx-auto mb-2 flex h-9 w-9 items-center justify-center rounded-full bg-muted">

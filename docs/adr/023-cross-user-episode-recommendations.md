@@ -28,6 +28,7 @@ Use the Drizzle SQL builder (`db.select().from()`) with `notInArray` subqueries 
 - Raw SQL via `sql\`\`` would work but loses type safety.
 
 The query:
+
 1. Selects the same 8 fields as `EPISODE_LIST_COLUMNS` (id, podcastIndexId, title, description, audioUrl, duration, publishDate, worthItScore) + podcast title/image from joined `podcasts` table. Note: `EPISODE_LIST_COLUMNS` is a relational query allowlist (boolean flags) that cannot be spread into the SQL builder's `db.select({})` which requires column references. The manual column list achieves the same performance goal — excluding heavy columns like transcription, summary, keyTakeaways, worthItDimensions, worthItReason.
 2. Filters: `worthItScore IS NOT NULL` and `worthItScore >= threshold` (default 6.0)
 3. Excludes: episodes whose `podcastId` is in the user's subscriptions (via `notInArray` subquery on `userSubscriptions`). When the subquery returns zero rows (new user), SQL evaluates `NOT IN (empty set)` as `TRUE` — no exclusions, which is correct.
@@ -39,6 +40,7 @@ The query:
 ### Component strategy
 
 Replace the existing `Recommendations` component (which renders podcast cards) with a new `EpisodeRecommendations` component that renders episode cards with:
+
 - Podcast artwork (from joined podcast data)
 - Episode title, podcast name, description snippet
 - Color-coded `WorthItBadge` using existing `score-utils.ts`
@@ -54,6 +56,7 @@ Define a `RecommendedEpisodeDTO` type that extends `EpisodeListDTO` with podcast
 ## Consequences
 
 ### Positive
+
 - Users see actionable episode-level recommendations ranked by quality
 - No external API dependency — queries local database only
 - Excludes already-consumed content (subscribed podcasts, saved episodes, listened episodes)
@@ -61,10 +64,12 @@ Define a `RecommendedEpisodeDTO` type that extends `EpisodeListDTO` with podcast
 - Single SQL query with subqueries — efficient, no N+1
 
 ### Negative
+
 - Recommendations are limited to episodes that have been summarized (have `worthItScore`). New podcasts without summarized episodes won't appear. This is acceptable because the Worth It score IS the quality signal.
 - Cold start: users with no subscriptions, library, or listen history get generic "top-scored" episodes. This is fine as a starting point.
 - The `getRecommendedPodcasts()` function and `Recommendations` component become dead code and should be removed.
 
 ### Risks
+
 - If the `episodes` table has very few scored episodes, recommendations may be sparse. Mitigation: the empty state already handles this gracefully.
 - No index on `worthItScore` — the query scans with filters. For the current data volume this is fine; add an index if the table exceeds ~100k rows.

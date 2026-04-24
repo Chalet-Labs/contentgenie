@@ -17,7 +17,9 @@ const jetbrainsMono = JetBrains_Mono({
 
 export default function Home() {
   return (
-    <div className={`lp ${jetbrainsMono.variable} min-h-screen bg-background text-foreground`}>
+    <div
+      className={`lp ${jetbrainsMono.variable} min-h-screen bg-background text-foreground`}
+    >
       <MarketingHeader />
       <main>
         <Hero />

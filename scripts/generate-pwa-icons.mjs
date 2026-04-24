@@ -12,7 +12,10 @@ import path from "node:path";
 import url from "node:url";
 import sharp from "sharp";
 
-const root = path.resolve(path.dirname(url.fileURLToPath(import.meta.url)), "..");
+const root = path.resolve(
+  path.dirname(url.fileURLToPath(import.meta.url)),
+  "..",
+);
 const sourcePath = path.join(root, "public/brand/logo-mark.svg");
 const outDir = path.join(root, "public");
 
@@ -48,14 +51,20 @@ const writes = [];
 async function stagePng(svgBuffer, size, outPath) {
   const tmp = `${outPath}.tmp`;
   await rasterize(svgBuffer, size).toFile(tmp);
-  writes.push({ tmp, final: outPath, label: `${path.relative(root, outPath)} (${size}×${size})` });
+  writes.push({
+    tmp,
+    final: outPath,
+    label: `${path.relative(root, outPath)} (${size}×${size})`,
+  });
 }
 
 async function stageIco(svgBuffer, sizes, outPath) {
   // Minimal multi-size ICO: each entry is a PNG payload inside the ICO
   // container — the spec allows this and modern browsers render it fine.
   if (!sizes.every((s) => Number.isInteger(s) && s > 0 && s <= 256)) {
-    throw new RangeError(`ICO sizes must be integers in (0, 256], got ${JSON.stringify(sizes)}`);
+    throw new RangeError(
+      `ICO sizes must be integers in (0, 256], got ${JSON.stringify(sizes)}`,
+    );
   }
 
   const pngs = await Promise.all(
@@ -87,7 +96,11 @@ async function stageIco(svgBuffer, sizes, outPath) {
 
   const tmp = `${outPath}.tmp`;
   await fs.writeFile(tmp, Buffer.concat([header, ...dirEntries, ...pngs]));
-  writes.push({ tmp, final: outPath, label: `${path.relative(root, outPath)} (${sizes.join(", ")})` });
+  writes.push({
+    tmp,
+    final: outPath,
+    label: `${path.relative(root, outPath)} (${sizes.join(", ")})`,
+  });
 }
 
 async function commitAll() {
@@ -112,7 +125,11 @@ try {
   console.log("Regenerating PWA icons from public/brand/logo-mark.svg …");
   await stagePng(logoSvg, 192, path.join(outDir, "icon-192x192.png"));
   await stagePng(logoSvg, 512, path.join(outDir, "icon-512x512.png"));
-  await stagePng(maskableSvg, 512, path.join(outDir, "icon-maskable-512x512.png"));
+  await stagePng(
+    maskableSvg,
+    512,
+    path.join(outDir, "icon-maskable-512x512.png"),
+  );
   await stagePng(logoSvg, 180, path.join(outDir, "apple-touch-icon.png"));
   await stageIco(logoSvg, [16, 32, 48], path.join(outDir, "favicon.ico"));
   await commitAll();

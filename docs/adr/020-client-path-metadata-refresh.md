@@ -7,6 +7,7 @@
 ## Context
 
 `upsertPodcast()` previously had a binary `updateOnConflict?: boolean`:
+
 - `true` (default): full metadata update, used by Trigger.dev background tasks
 - `false`: no-op touch (self-assigns `podcastIndexId` for RETURNING), used by client-facing paths
 
@@ -17,6 +18,7 @@ An initial revision introduced a `"safe"` mode that updated whitelisted display 
 ## Decision
 
 Replace the boolean with a `"full" | "safe"` string union:
+
 - `"full"`: updates all provided fields (trusted background tasks)
 - `"safe"`: **no metadata updates on conflict** — only bumps `updatedAt` so RETURNING yields the row ID. Protected fields (`rssFeedUrl`, `source`) are also stripped from INSERT values so client paths cannot seed them for new records. Use for all client-facing server actions and API routes.
 

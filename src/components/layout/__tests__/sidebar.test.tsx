@@ -1,52 +1,67 @@
-import { describe, it, expect, vi, beforeEach } from "vitest"
-import { render, screen, within, fireEvent } from "@testing-library/react"
-import { Sidebar } from "@/components/layout/sidebar"
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { render, screen, within, fireEvent } from "@testing-library/react";
+import { Sidebar } from "@/components/layout/sidebar";
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 
-const mockUseSidebarCounts = vi.fn()
-const mockUsePathname = vi.fn(() => "/")
+const mockUseSidebarCounts = vi.fn();
+const mockUsePathname = vi.fn(() => "/");
 
 vi.mock("next/navigation", () => ({
   usePathname: () => mockUsePathname(),
-  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), back: vi.fn(), forward: vi.fn(), refresh: vi.fn(), prefetch: vi.fn() }),
+  useRouter: () => ({
+    push: vi.fn(),
+    replace: vi.fn(),
+    back: vi.fn(),
+    forward: vi.fn(),
+    refresh: vi.fn(),
+    prefetch: vi.fn(),
+  }),
   useSearchParams: () => new URLSearchParams(),
   useParams: () => ({}),
-}))
+}));
 
 vi.mock("@/contexts/sidebar-counts-context", () => ({
   useSidebarCounts: () => mockUseSidebarCounts(),
   useSidebarCountsOptional: () => mockUseSidebarCounts(),
   getBadgeCount: (
     href: string,
-    counts: { subscriptionCount: number; savedCount: number; isLoading: boolean }
+    counts: {
+      subscriptionCount: number;
+      savedCount: number;
+      isLoading: boolean;
+    },
   ): number | null => {
-    if (counts.isLoading) return null
-    if (href === "/subscriptions" && counts.subscriptionCount > 0) return counts.subscriptionCount
-    if (href === "/library" && counts.savedCount > 0) return counts.savedCount
-    return null
+    if (counts.isLoading) return null;
+    if (href === "/subscriptions" && counts.subscriptionCount > 0)
+      return counts.subscriptionCount;
+    if (href === "/library" && counts.savedCount > 0) return counts.savedCount;
+    return null;
   },
-  NavBadge: ({ count }: { count: number }) => <span>{count > 99 ? "99+" : count}</span>,
-}))
+  NavBadge: ({ count }: { count: number }) => (
+    <span>{count > 99 ? "99+" : count}</span>
+  ),
+}));
 
 vi.mock("@clerk/nextjs", () => ({
   OrganizationSwitcher: () => <div data-testid="org-switcher" />,
-}))
+}));
 
 vi.mock("@/components/ui/sheet", async () => {
-  const { createSheetMock } = await vi.importActual<typeof import("@/test/mocks/sheet")>(
-    "@/test/mocks/sheet"
-  )
-  return createSheetMock()
-})
+  const { createSheetMock } =
+    await vi.importActual<typeof import("@/test/mocks/sheet")>(
+      "@/test/mocks/sheet",
+    );
+  return createSheetMock();
+});
 
 beforeEach(() => {
   mockUseSidebarCounts.mockReturnValue({
     subscriptionCount: 0,
     savedCount: 0,
     isLoading: false,
-  })
-  mockUsePathname.mockReturnValue("/")
-})
+  });
+  mockUsePathname.mockReturnValue("/");
+});
 
 describe("Sidebar — inline aside mode", () => {
   it("shows badge on Subscriptions link when subscriptionCount > 0", () => {
@@ -54,81 +69,91 @@ describe("Sidebar — inline aside mode", () => {
       subscriptionCount: 5,
       savedCount: 0,
       isLoading: false,
-    })
+    });
 
-    render(<Sidebar isAdmin={false} />)
+    render(<Sidebar isAdmin={false} />);
 
-    const subscriptionsLink = screen.getByRole("link", { name: /subscriptions/i })
-    expect(subscriptionsLink).toHaveTextContent("5")
-  })
+    const subscriptionsLink = screen.getByRole("link", {
+      name: /subscriptions/i,
+    });
+    expect(subscriptionsLink).toHaveTextContent("5");
+  });
 
   it("shows badge on Library link when savedCount > 0", () => {
     mockUseSidebarCounts.mockReturnValue({
       subscriptionCount: 0,
       savedCount: 12,
       isLoading: false,
-    })
+    });
 
-    render(<Sidebar isAdmin={false} />)
+    render(<Sidebar isAdmin={false} />);
 
-    const libraryLink = screen.getByRole("link", { name: /library/i })
-    expect(libraryLink).toHaveTextContent("12")
-  })
+    const libraryLink = screen.getByRole("link", { name: /library/i });
+    expect(libraryLink).toHaveTextContent("12");
+  });
 
   it("does not show badge when counts are 0", () => {
-    render(<Sidebar isAdmin={false} />)
+    render(<Sidebar isAdmin={false} />);
 
-    const subscriptionsLink = screen.getByRole("link", { name: /subscriptions/i })
-    const libraryLink = screen.getByRole("link", { name: /library/i })
+    const subscriptionsLink = screen.getByRole("link", {
+      name: /subscriptions/i,
+    });
+    const libraryLink = screen.getByRole("link", { name: /library/i });
 
-    expect(subscriptionsLink.querySelector("span")).toBeNull()
-    expect(libraryLink.querySelector("span")).toBeNull()
-  })
+    expect(subscriptionsLink.querySelector("span")).toBeNull();
+    expect(libraryLink.querySelector("span")).toBeNull();
+  });
 
   it("does not show badge while loading", () => {
     mockUseSidebarCounts.mockReturnValue({
       subscriptionCount: 10,
       savedCount: 20,
       isLoading: true,
-    })
+    });
 
-    render(<Sidebar isAdmin={false} />)
+    render(<Sidebar isAdmin={false} />);
 
-    const subscriptionsLink = screen.getByRole("link", { name: /subscriptions/i })
-    const libraryLink = screen.getByRole("link", { name: /library/i })
+    const subscriptionsLink = screen.getByRole("link", {
+      name: /subscriptions/i,
+    });
+    const libraryLink = screen.getByRole("link", { name: /library/i });
 
-    expect(subscriptionsLink.querySelector("span")).toBeNull()
-    expect(libraryLink.querySelector("span")).toBeNull()
-  })
+    expect(subscriptionsLink.querySelector("span")).toBeNull();
+    expect(libraryLink.querySelector("span")).toBeNull();
+  });
 
   it("shows Admin link when isAdmin is true", () => {
-    render(<Sidebar isAdmin={true} />)
-    expect(screen.getByRole("link", { name: /admin/i })).toBeInTheDocument()
-  })
+    render(<Sidebar isAdmin={true} />);
+    expect(screen.getByRole("link", { name: /admin/i })).toBeInTheDocument();
+  });
 
   it("does not show Admin link when isAdmin is false", () => {
-    render(<Sidebar isAdmin={false} />)
-    expect(screen.queryByRole("link", { name: /admin/i })).not.toBeInTheDocument()
-  })
+    render(<Sidebar isAdmin={false} />);
+    expect(
+      screen.queryByRole("link", { name: /admin/i }),
+    ).not.toBeInTheDocument();
+  });
 
   it("renders OrganizationSwitcher in inline mode", () => {
-    render(<Sidebar isAdmin={false} />)
-    expect(screen.getByTestId("org-switcher")).toBeInTheDocument()
-  })
-})
+    render(<Sidebar isAdmin={false} />);
+    expect(screen.getByTestId("org-switcher")).toBeInTheDocument();
+  });
+});
 
-const renderSidebarInOpenSheet = ({ isAdmin = false }: { isAdmin?: boolean } = {}) => {
+const renderSidebarInOpenSheet = ({
+  isAdmin = false,
+}: { isAdmin?: boolean } = {}) => {
   const result = render(
     <Sheet>
       <SheetTrigger>open</SheetTrigger>
       <SheetContent>
         <Sidebar inSheet isAdmin={isAdmin} />
       </SheetContent>
-    </Sheet>
-  )
-  fireEvent.click(screen.getByTestId("sheet-trigger"))
-  return result
-}
+    </Sheet>,
+  );
+  fireEvent.click(screen.getByTestId("sheet-trigger"));
+  return result;
+};
 
 describe("Sidebar — inSheet mode", () => {
   it.each([
@@ -136,56 +161,67 @@ describe("Sidebar — inSheet mode", () => {
     { name: "Settings", matcher: /settings/i, admin: false },
     { name: "Admin", matcher: /admin/i, admin: true },
   ])("tapping $name closes the sheet via SheetClose", ({ matcher, admin }) => {
-    renderSidebarInOpenSheet({ isAdmin: admin })
+    renderSidebarInOpenSheet({ isAdmin: admin });
 
-    const link = within(screen.getByTestId("sheet-content")).getByRole("link", { name: matcher })
-    fireEvent.click(link)
+    const link = within(screen.getByTestId("sheet-content")).getByRole("link", {
+      name: matcher,
+    });
+    fireEvent.click(link);
 
-    expect(screen.queryByTestId("sheet-content")).not.toBeInTheDocument()
-  })
+    expect(screen.queryByTestId("sheet-content")).not.toBeInTheDocument();
+  });
 
   it("admin link is visible when isAdmin is true", () => {
-    renderSidebarInOpenSheet({ isAdmin: true })
+    renderSidebarInOpenSheet({ isAdmin: true });
     expect(
-      within(screen.getByTestId("sheet-content")).getByRole("link", { name: /admin/i })
-    ).toBeInTheDocument()
-  })
+      within(screen.getByTestId("sheet-content")).getByRole("link", {
+        name: /admin/i,
+      }),
+    ).toBeInTheDocument();
+  });
 
   it("does not render admin link when isAdmin is false", () => {
-    renderSidebarInOpenSheet({ isAdmin: false })
+    renderSidebarInOpenSheet({ isAdmin: false });
     expect(
-      within(screen.getByTestId("sheet-content")).queryByRole("link", { name: /admin/i })
-    ).not.toBeInTheDocument()
-  })
+      within(screen.getByTestId("sheet-content")).queryByRole("link", {
+        name: /admin/i,
+      }),
+    ).not.toBeInTheDocument();
+  });
 
   it("renders OrganizationSwitcher in inSheet mode", () => {
-    renderSidebarInOpenSheet()
+    renderSidebarInOpenSheet();
     expect(
-      within(screen.getByTestId("sheet-content")).getByTestId("org-switcher")
-    ).toBeInTheDocument()
-  })
+      within(screen.getByTestId("sheet-content")).getByTestId("org-switcher"),
+    ).toBeInTheDocument();
+  });
 
   it("active link has active styling (bg-accent) when pathname matches", () => {
-    mockUsePathname.mockReturnValue("/library")
-    renderSidebarInOpenSheet()
-    const libraryLink = within(screen.getByTestId("sheet-content")).getByRole("link", {
-      name: /library/i,
-    })
-    expect(libraryLink.className).toContain("bg-accent")
-    expect(libraryLink.className).toContain("text-accent-foreground")
-  })
+    mockUsePathname.mockReturnValue("/library");
+    renderSidebarInOpenSheet();
+    const libraryLink = within(screen.getByTestId("sheet-content")).getByRole(
+      "link",
+      {
+        name: /library/i,
+      },
+    );
+    expect(libraryLink.className).toContain("bg-accent");
+    expect(libraryLink.className).toContain("text-accent-foreground");
+  });
 
   it("renders badges on Subscriptions/Library when counts are provided in inSheet mode", () => {
     mockUseSidebarCounts.mockReturnValue({
       subscriptionCount: 7,
       savedCount: 42,
       isLoading: false,
-    })
-    renderSidebarInOpenSheet()
-    const sheetContent = screen.getByTestId("sheet-content")
-    expect(within(sheetContent).getByRole("link", { name: /subscriptions/i })).toHaveTextContent(
-      "7"
-    )
-    expect(within(sheetContent).getByRole("link", { name: /library/i })).toHaveTextContent("42")
-  })
-})
+    });
+    renderSidebarInOpenSheet();
+    const sheetContent = screen.getByTestId("sheet-content");
+    expect(
+      within(sheetContent).getByRole("link", { name: /subscriptions/i }),
+    ).toHaveTextContent("7");
+    expect(
+      within(sheetContent).getByRole("link", { name: /library/i }),
+    ).toHaveTextContent("42");
+  });
+});

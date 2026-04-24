@@ -32,7 +32,7 @@ describe("getSummarizationPrompt", () => {
       "Episode 1",
       "A great episode",
       3600,
-      "Transcript content here"
+      "Transcript content here",
     );
     expect(prompt).toContain("My Podcast");
     expect(prompt).toContain("Episode 1");
@@ -44,7 +44,7 @@ describe("getSummarizationPrompt", () => {
       "Episode",
       "Description",
       5400, // 90 minutes
-      "Transcript content here"
+      "Transcript content here",
     );
     expect(prompt).toContain("90 minutes");
   });
@@ -56,7 +56,7 @@ describe("getSummarizationPrompt", () => {
       "Episode",
       "Description",
       3600,
-      transcript
+      transcript,
     );
     expect(prompt).toContain("Transcript");
     expect(prompt).toContain(transcript);
@@ -69,7 +69,7 @@ describe("getSummarizationPrompt", () => {
       "Episode",
       "Description",
       3600,
-      "Transcript content here"
+      "Transcript content here",
     );
     expect(prompt).toContain('"summary"');
     expect(prompt).toContain('"keyTakeaways"');
@@ -82,7 +82,7 @@ describe("getSummarizationPrompt", () => {
       "Episode",
       "Description",
       3600,
-      "Transcript content here"
+      "Transcript content here",
     );
     expect(prompt).toContain('"worthItSignals"');
     expect(prompt).toContain('"hasActionableInsights"');
@@ -96,7 +96,7 @@ describe("getSummarizationPrompt", () => {
       "Episode",
       "Description",
       3600,
-      "Transcript content here"
+      "Transcript content here",
     );
     expect(prompt).toContain("TL;DR");
     expect(prompt).toContain("What You'll Learn");
@@ -111,7 +111,7 @@ describe("getSummarizationPrompt", () => {
       "Episode",
       "Description",
       3600,
-      "Transcript content here"
+      "Transcript content here",
     );
     expect(prompt).toContain("Boolean Quality Signals");
     expect(prompt).toContain("Adjustment (-1, 0, or +1)");
@@ -124,7 +124,7 @@ describe("getSummarizationPrompt ad-exclusion guards", () => {
     "Episode",
     "Description",
     3600,
-    "Transcript content here"
+    "Transcript content here",
   );
 
   it("instructs staysFocused to ignore ads and sponsor reads", () => {
@@ -139,13 +139,13 @@ describe("getSummarizationPrompt ad-exclusion guards", () => {
 
   it("forbids applying -1 for ads, sponsor reads, or promotional segments", () => {
     expect(prompt).toMatch(
-      /never apply -1 for ads, sponsor reads, or promotional segments/i
+      /never apply -1 for ads, sponsor reads, or promotional segments/i,
     );
   });
 
   it("forbids citing ads as negatives in the Bottom Line or worthItReason", () => {
     expect(prompt).toMatch(
-      /do not cite ads, sponsor reads, or promo length as negatives/i
+      /do not cite ads, sponsor reads, or promo length as negatives/i,
     );
   });
 
@@ -154,7 +154,7 @@ describe("getSummarizationPrompt ad-exclusion guards", () => {
     // like "diminish" or "downgrade" can slip through; the positive assertions
     // above are the primary guard.
     expect(prompt).not.toMatch(
-      /\b(ads?|sponsor(ship)? reads?)\b.*\b(reduce|dilute|hurt|lower|degrade|diminish|downgrade|detract)\b/i
+      /\b(ads?|sponsor(ship)? reads?)\b.*\b(reduce|dilute|hurt|lower|degrade|diminish|downgrade|detract)\b/i,
     );
     expect(prompt).not.toMatch(/penaliz\w* .*\b(ads?|sponsor|promo)/i);
   });
@@ -163,7 +163,11 @@ describe("getSummarizationPrompt ad-exclusion guards", () => {
 describe("getTrendingTopicsPrompt", () => {
   it("serializes the summary field (not keyTakeaways) in the payload", () => {
     const prompt = getTrendingTopicsPrompt([
-      { id: 1, title: "AI in Healthcare", summary: "A deep dive into medical LLMs." },
+      {
+        id: 1,
+        title: "AI in Healthcare",
+        summary: "A deep dive into medical LLMs.",
+      },
     ]);
     expect(prompt).toContain('"summary": "A deep dive into medical LLMs."');
     expect(prompt).not.toContain("keyTakeaways");
@@ -182,9 +186,7 @@ describe("getTrendingTopicsPrompt", () => {
 
   it("JSON-escapes markdown summaries with quotes, newlines, and backticks", () => {
     const summary = `## TL;DR\nUses \`fetch()\` with "retry" logic.\n\n- bullet`;
-    const prompt = getTrendingTopicsPrompt([
-      { id: 1, title: "Ep", summary },
-    ]);
+    const prompt = getTrendingTopicsPrompt([{ id: 1, title: "Ep", summary }]);
     // JSON serialization must escape the embedded quotes + preserve content
     expect(prompt).toContain('\\"retry\\"');
     expect(prompt).toContain("\\n");
@@ -213,7 +215,9 @@ describe("getTrendingTopicsPrompt", () => {
       summary: `Summary ${i + 1}`,
     }));
     const prompt = getTrendingTopicsPrompt(episodes);
-    expect(prompt).toContain("Analyze these 7 recently summarized podcast episodes");
+    expect(prompt).toContain(
+      "Analyze these 7 recently summarized podcast episodes",
+    );
   });
 });
 

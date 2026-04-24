@@ -32,7 +32,12 @@ const mockPodcast: PodcastIndexPodcast = {
   episodeCount: 42,
   crawlErrors: 0,
   parseErrors: 0,
-  categories: { "1": "Technology", "2": "Science", "3": "Education", "4": "Health" },
+  categories: {
+    "1": "Technology",
+    "2": "Science",
+    "3": "Education",
+    "4": "Health",
+  },
   locked: 0,
   imageUrlHash: 0,
   newestItemPubdate: 1700000000,
@@ -53,7 +58,7 @@ describe("PodcastCard", () => {
     render(
       <PodcastCard
         podcast={{ ...mockPodcast, description: "<p>Cool <b>podcast</b></p>" }}
-      />
+      />,
     );
     expect(screen.getByText("Cool podcast")).toBeInTheDocument();
   });
@@ -79,9 +84,7 @@ describe("PodcastCard", () => {
 
   it("handles missing author gracefully", () => {
     render(
-      <PodcastCard
-        podcast={{ ...mockPodcast, author: "", ownerName: "" }}
-      />
+      <PodcastCard podcast={{ ...mockPodcast, author: "", ownerName: "" }} />,
     );
     expect(screen.getByText("Unknown author")).toBeInTheDocument();
   });

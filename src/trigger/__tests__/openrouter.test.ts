@@ -17,7 +17,10 @@ import { generateEpisodeSummary } from "@/trigger/helpers/ai-summary";
 import { generateCompletion } from "@/lib/ai";
 import { parseJsonResponse } from "@/lib/openrouter";
 import { SYSTEM_PROMPT, getSummarizationPrompt } from "@/lib/prompts";
-import type { PodcastIndexPodcast, PodcastIndexEpisode } from "@/lib/podcastindex";
+import type {
+  PodcastIndexPodcast,
+  PodcastIndexEpisode,
+} from "@/lib/podcastindex";
 
 describe("generateEpisodeSummary", () => {
   const mockPodcast = {
@@ -42,7 +45,8 @@ describe("generateEpisodeSummary", () => {
   });
 
   it("successfully generates and parses a summary", async () => {
-    const mockRawResponse = '{"summary":"Parsed summary","keyTakeaways":["T1"],"worthItScore":9,"worthItReason":"Great"}';
+    const mockRawResponse =
+      '{"summary":"Parsed summary","keyTakeaways":["T1"],"worthItScore":9,"worthItReason":"Great"}';
     const mockParsedResult = {
       summary: "Parsed summary",
       keyTakeaways: ["T1"],
@@ -53,7 +57,11 @@ describe("generateEpisodeSummary", () => {
     vi.mocked(generateCompletion).mockResolvedValue(mockRawResponse);
     vi.mocked(parseJsonResponse).mockReturnValue(mockParsedResult);
 
-    const result = await generateEpisodeSummary(mockPodcast, mockEpisode, mockTranscript);
+    const result = await generateEpisodeSummary(
+      mockPodcast,
+      mockEpisode,
+      mockTranscript,
+    );
 
     expect(result).toEqual(mockParsedResult);
     expect(getSummarizationPrompt).toHaveBeenCalledWith(
@@ -61,7 +69,7 @@ describe("generateEpisodeSummary", () => {
       "Test Episode",
       "Test Description",
       3600,
-      mockTranscript
+      mockTranscript,
     );
     expect(generateCompletion).toHaveBeenCalledWith([
       { role: "system", content: SYSTEM_PROMPT },
@@ -78,7 +86,11 @@ describe("generateEpisodeSummary", () => {
       throw new Error("JSON parse error");
     });
 
-    const result = await generateEpisodeSummary(mockPodcast, mockEpisode, mockTranscript);
+    const result = await generateEpisodeSummary(
+      mockPodcast,
+      mockEpisode,
+      mockTranscript,
+    );
 
     expect(result).toEqual({
       summary: malformedResponse,
@@ -95,7 +107,8 @@ describe("generateEpisodeSummary", () => {
       title: "Minimal Episode",
     } as unknown as PodcastIndexEpisode;
 
-    const mockRawResponse = '{"summary":"Min summary","keyTakeaways":[],"worthItScore":5,"worthItReason":"OK"}';
+    const mockRawResponse =
+      '{"summary":"Min summary","keyTakeaways":[],"worthItScore":5,"worthItReason":"OK"}';
     vi.mocked(generateCompletion).mockResolvedValue(mockRawResponse);
     vi.mocked(parseJsonResponse).mockReturnValue({
       summary: "Min summary",
@@ -111,7 +124,7 @@ describe("generateEpisodeSummary", () => {
       "Minimal Episode",
       "",
       0,
-      "test transcript"
+      "test transcript",
     );
   });
 });

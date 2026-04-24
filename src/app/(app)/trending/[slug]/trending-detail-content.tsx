@@ -8,11 +8,24 @@ import { TopicSwitcher } from "@/components/trending/topic-switcher";
 import { WorthItBadge } from "@/components/episodes/worth-it-badge";
 import { ListenedButton } from "@/components/episodes/listened-button";
 import { Card, CardContent } from "@/components/ui/card";
-import { formatDate, formatDuration, formatRelativeTime, stripHtml } from "@/lib/utils";
+import {
+  formatDate,
+  formatDuration,
+  formatRelativeTime,
+  stripHtml,
+} from "@/lib/utils";
 import { isTrendingSnapshotStale } from "@/lib/trending";
 import type { RecommendedEpisodeDTO } from "@/db/library-columns";
 
-function FallbackCard({ heading, body, children }: { heading: string; body: string; children?: ReactNode }) {
+function FallbackCard({
+  heading,
+  body,
+  children,
+}: {
+  heading: string;
+  body: string;
+  children?: ReactNode;
+}) {
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-bold tracking-tight">{heading}</h1>
@@ -20,7 +33,10 @@ function FallbackCard({ heading, body, children }: { heading: string; body: stri
         <CardContent className="space-y-4 pt-6">
           <p className="text-sm text-muted-foreground">{body}</p>
           {children}
-          <Link href="/dashboard" className="text-sm text-primary underline-offset-4 hover:underline">
+          <Link
+            href="/dashboard"
+            className="text-sm text-primary underline-offset-4 hover:underline"
+          >
             Back to dashboard
           </Link>
         </CardContent>
@@ -29,7 +45,13 @@ function FallbackCard({ heading, body, children }: { heading: string; body: stri
   );
 }
 
-function EpisodeCard({ episode, isListened = false }: { episode: RecommendedEpisodeDTO; isListened?: boolean }) {
+function EpisodeCard({
+  episode,
+  isListened = false,
+}: {
+  episode: RecommendedEpisodeDTO;
+  isListened?: boolean;
+}) {
   return (
     <div className="flex items-start gap-3 rounded-lg p-2 transition-colors hover:bg-accent">
       <Link
@@ -54,14 +76,22 @@ function EpisodeCard({ episode, isListened = false }: { episode: RecommendedEpis
         </div>
         <div className="min-w-0 flex-1">
           <h4 className="line-clamp-1 text-sm font-medium">{episode.title}</h4>
-          <p className="line-clamp-1 text-xs text-muted-foreground">{episode.podcastTitle}</p>
+          <p className="line-clamp-1 text-xs text-muted-foreground">
+            {episode.podcastTitle}
+          </p>
           {episode.description && (
             <p className="line-clamp-2 text-xs text-muted-foreground">
               {stripHtml(episode.description)}
             </p>
           )}
           <div className="mt-1 flex flex-wrap items-center gap-2">
-            <WorthItBadge score={episode.worthItScore != null ? Number(episode.worthItScore) : null} />
+            <WorthItBadge
+              score={
+                episode.worthItScore != null
+                  ? Number(episode.worthItScore)
+                  : null
+              }
+            />
             <span className="text-xs text-muted-foreground">
               {[
                 formatDuration(episode.duration),
@@ -118,10 +148,11 @@ export async function TrendingDetailContent({ slug }: { slug: string }) {
 
     case "found": {
       const { topic, allTopics, episodes, generatedAt } = result;
-      const listenedIds = episodes.length > 0
-        ? await getListenedEpisodeIds(episodes.map((e) => e.id))
-        : []
-      const listenedSet = new Set<number>(listenedIds)
+      const listenedIds =
+        episodes.length > 0
+          ? await getListenedEpisodeIds(episodes.map((e) => e.id))
+          : [];
+      const listenedSet = new Set<number>(listenedIds);
       return (
         <div className="space-y-6">
           <h1 className="text-3xl font-bold tracking-tight">{topic.name}</h1>
@@ -129,7 +160,9 @@ export async function TrendingDetailContent({ slug }: { slug: string }) {
           <TopicSwitcher topics={allTopics} activeSlug={slug} />
 
           <div>
-            <p className="mb-1 text-sm text-muted-foreground">{topic.description}</p>
+            <p className="mb-1 text-sm text-muted-foreground">
+              {topic.description}
+            </p>
             <p className="text-sm text-muted-foreground">
               Past 7 days &middot; Updated {formatRelativeTime(generatedAt)}
             </p>
@@ -141,11 +174,17 @@ export async function TrendingDetailContent({ slug }: { slug: string }) {
           </div>
 
           {episodes.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No episodes available for this topic yet.</p>
+            <p className="text-sm text-muted-foreground">
+              No episodes available for this topic yet.
+            </p>
           ) : (
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {episodes.map((episode) => (
-                <EpisodeCard key={episode.id} episode={episode} isListened={listenedSet.has(episode.id)} />
+                <EpisodeCard
+                  key={episode.id}
+                  episode={episode}
+                  isListened={listenedSet.has(episode.id)}
+                />
               ))}
             </div>
           )}
@@ -159,7 +198,9 @@ export async function TrendingDetailContent({ slug }: { slug: string }) {
       // Throw rather than return so any bypass of type-checking fails loudly
       // at runtime instead of rendering nothing.
       const _exhaustive: never = result;
-      throw new Error(`Unhandled TrendingTopicDetailResult kind: ${JSON.stringify(_exhaustive)}`);
+      throw new Error(
+        `Unhandled TrendingTopicDetailResult kind: ${JSON.stringify(_exhaustive)}`,
+      );
     }
   }
 }

@@ -12,7 +12,9 @@ describe("Logo", () => {
 
   it("uses a custom label when provided", () => {
     const { container } = render(<Logo label="Home" />);
-    expect(container.querySelector("svg")?.getAttribute("aria-label")).toBe("Home");
+    expect(container.querySelector("svg")?.getAttribute("aria-label")).toBe(
+      "Home",
+    );
   });
 
   it("renders aria-hidden and no role when decorative", () => {

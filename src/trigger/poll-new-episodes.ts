@@ -20,18 +20,19 @@ export async function getSubscribedPodcasts() {
   const result = await db
     .select()
     .from(podcasts)
-    .where(
-      inArray(podcasts.id, subscribedPodcastIds)
-    );
+    .where(inArray(podcasts.id, subscribedPodcastIds));
 
   // Separate PodcastIndex-sourced from RSS-sourced
   const podcastIndexFeeds = result.filter((p) => p.source === "podcastindex");
   const rssFeeds = result.filter((p) => p.source === "rss");
 
   if (rssFeeds.length > 0) {
-    logger.info("Skipped RSS-sourced podcasts (not compatible with PodcastIndex API)", {
-      count: rssFeeds.length,
-    });
+    logger.info(
+      "Skipped RSS-sourced podcasts (not compatible with PodcastIndex API)",
+      {
+        count: rssFeeds.length,
+      },
+    );
   }
 
   return podcastIndexFeeds;
@@ -51,7 +52,7 @@ export async function pollSingleFeed(podcast: typeof podcasts.$inferSelect) {
   // Fetch latest episodes from PodcastIndex (with inline retry)
   const response = await retry.onThrow(
     async () => getEpisodesByFeedId(feedId, 20),
-    { maxAttempts: 3 }
+    { maxAttempts: 3 },
   );
 
   const fetchedEpisodes = response?.items ?? [];
@@ -75,7 +76,7 @@ export async function pollSingleFeed(podcast: typeof podcasts.$inferSelect) {
 
     const existingIds = new Set(existingEpisodes.map((e) => e.podcastIndexId));
     newEpisodes = fetchedEpisodes.filter(
-      (ep) => !existingIds.has(String(ep.id))
+      (ep) => !existingIds.has(String(ep.id)),
     );
 
     logger.info("Deduplication complete", {
@@ -107,7 +108,7 @@ export async function pollSingleFeed(podcast: typeof podcasts.$inferSelect) {
             ? new Date(ep.datePublished * 1000)
             : null,
           transcriptStatus: "fetching" as const,
-        }))
+        })),
       )
       .onConflictDoUpdate({
         target: episodes.podcastIndexId,
@@ -119,7 +120,9 @@ export async function pollSingleFeed(podcast: typeof podcasts.$inferSelect) {
     // subscriber lookup + one prefs lookup + one INSERT across the whole poll,
     // instead of N queries per-episode. Idempotent — only genuinely-new
     // (user, episode) pairs produce a row + push.
-    const episodeByPiid = new Map(fetchedEpisodes.map((e) => [String(e.id), e]));
+    const episodeByPiid = new Map(
+      fetchedEpisodes.map((e) => [String(e.id), e]),
+    );
     const notificationBatch = upserted.map((row) => {
       const ep = episodeByPiid.get(row.podcastIndexId);
       return {

@@ -1,35 +1,35 @@
-"use client"
+"use client";
 
-import { ListPlus } from "lucide-react"
-import { toast } from "sonner"
-import { Button } from "@/components/ui/button"
+import { ListPlus } from "lucide-react";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
 import {
   useAudioPlayerAPI,
   useAudioPlayerState,
   type AudioEpisode,
-} from "@/contexts/audio-player-context"
+} from "@/contexts/audio-player-context";
 
 interface AddToQueueButtonProps {
-  episode: AudioEpisode
-  variant?: "icon" | "full"
+  episode: AudioEpisode;
+  variant?: "icon" | "full";
 }
 
 export function AddToQueueButton({
   episode,
   variant = "full",
 }: AddToQueueButtonProps) {
-  const { addToQueue } = useAudioPlayerAPI()
-  const { queue, currentEpisode } = useAudioPlayerState()
+  const { addToQueue } = useAudioPlayerAPI();
+  const { queue, currentEpisode } = useAudioPlayerState();
 
-  const isNowPlaying = currentEpisode?.id === episode.id
-  const isInQueue = queue.some((ep) => ep.id === episode.id)
-  const isDisabled = isNowPlaying || isInQueue
+  const isNowPlaying = currentEpisode?.id === episode.id;
+  const isInQueue = queue.some((ep) => ep.id === episode.id);
+  const isDisabled = isNowPlaying || isInQueue;
 
   function handleClick() {
-    if (isDisabled) return
-    addToQueue(episode)
+    if (isDisabled) return;
+    addToQueue(episode);
     if (currentEpisode) {
-      toast.success(`Added to queue: ${episode.title}`)
+      toast.success(`Added to queue: ${episode.title}`);
     }
   }
 
@@ -37,7 +37,7 @@ export function AddToQueueButton({
     ? "Now playing"
     : isInQueue
       ? "Already in queue"
-      : "Add to Queue"
+      : "Add to Queue";
 
   if (variant === "icon") {
     return (
@@ -52,7 +52,7 @@ export function AddToQueueButton({
       >
         <ListPlus className="h-4 w-4" />
       </Button>
-    )
+    );
   }
 
   return (
@@ -66,5 +66,5 @@ export function AddToQueueButton({
       <ListPlus className="mr-2 h-4 w-4" />
       {label}
     </Button>
-  )
+  );
 }

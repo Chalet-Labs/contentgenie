@@ -15,13 +15,16 @@ const mockSubscribeToPodcast = vi.fn();
 const mockUnsubscribeFromPodcast = vi.fn();
 
 vi.mock("@/app/actions/library", () => ({
-  saveEpisodeToLibrary: (...args: unknown[]) => mockSaveEpisodeToLibrary(...args),
-  removeEpisodeFromLibrary: (...args: unknown[]) => mockRemoveEpisodeFromLibrary(...args),
+  saveEpisodeToLibrary: (...args: unknown[]) =>
+    mockSaveEpisodeToLibrary(...args),
+  removeEpisodeFromLibrary: (...args: unknown[]) =>
+    mockRemoveEpisodeFromLibrary(...args),
 }));
 
 vi.mock("@/app/actions/subscriptions", () => ({
   subscribeToPodcast: (...args: unknown[]) => mockSubscribeToPodcast(...args),
-  unsubscribeFromPodcast: (...args: unknown[]) => mockUnsubscribeFromPodcast(...args),
+  unsubscribeFromPodcast: (...args: unknown[]) =>
+    mockUnsubscribeFromPodcast(...args),
 }));
 
 const sampleEpisodeData = {
@@ -63,7 +66,10 @@ afterEach(() => {
 describe("offlineSaveEpisode", () => {
   describe("online path", () => {
     it("calls saveEpisodeToLibrary directly when online", async () => {
-      mockSaveEpisodeToLibrary.mockResolvedValue({ success: true, message: "Episode saved" });
+      mockSaveEpisodeToLibrary.mockResolvedValue({
+        success: true,
+        message: "Episode saved",
+      });
 
       const { offlineSaveEpisode } = await import("@/lib/offline-actions");
       const result = await offlineSaveEpisode(sampleEpisodeData, true);
@@ -74,7 +80,10 @@ describe("offlineSaveEpisode", () => {
     });
 
     it("returns server action result on online path", async () => {
-      mockSaveEpisodeToLibrary.mockResolvedValue({ success: false, error: "DB error" });
+      mockSaveEpisodeToLibrary.mockResolvedValue({
+        success: false,
+        error: "DB error",
+      });
 
       const { offlineSaveEpisode } = await import("@/lib/offline-actions");
       const result = await offlineSaveEpisode(sampleEpisodeData, true);
@@ -102,7 +111,7 @@ describe("offlineSaveEpisode", () => {
         expect.objectContaining({
           action: "save-episode",
           entityKey: "episode:ep-123",
-        })
+        }),
       );
     });
 
@@ -143,7 +152,9 @@ describe("offlineSaveEpisode", () => {
 
     it("does not throw when serviceWorker is not available", async () => {
       const { offlineSaveEpisode } = await import("@/lib/offline-actions");
-      await expect(offlineSaveEpisode(sampleEpisodeData, false)).resolves.not.toThrow();
+      await expect(
+        offlineSaveEpisode(sampleEpisodeData, false),
+      ).resolves.not.toThrow();
     });
   });
 
@@ -177,7 +188,7 @@ describe("offlineUnsaveEpisode", () => {
       expect.objectContaining({
         action: "unsave-episode",
         entityKey: "episode:ep-123",
-      })
+      }),
     );
   });
 
@@ -188,12 +199,14 @@ describe("offlineUnsaveEpisode", () => {
     expect(result.success).toBe(true);
     expect(result.queued).toBe(true);
   });
-
 });
 
 describe("offlineSubscribe", () => {
   it("calls subscribeToPodcast directly when online", async () => {
-    mockSubscribeToPodcast.mockResolvedValue({ success: true, message: "Subscribed" });
+    mockSubscribeToPodcast.mockResolvedValue({
+      success: true,
+      message: "Subscribed",
+    });
 
     const { offlineSubscribe } = await import("@/lib/offline-actions");
     const result = await offlineSubscribe(samplePodcastData, true);
@@ -210,7 +223,7 @@ describe("offlineSubscribe", () => {
       expect.objectContaining({
         action: "subscribe",
         entityKey: "podcast:pod-456",
-      })
+      }),
     );
   });
 
@@ -249,7 +262,7 @@ describe("offlineUnsubscribe", () => {
       expect.objectContaining({
         action: "unsubscribe",
         entityKey: "podcast:pod-456",
-      })
+      }),
     );
   });
 

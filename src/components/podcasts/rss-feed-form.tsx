@@ -27,8 +27,8 @@ const rssFeedSchema = z.object({
         .url("Please enter a valid URL")
         .refine(
           (val) => /^https?:\/\//i.test(val),
-          "Please enter a valid URL starting with http:// or https://"
-        )
+          "Please enter a valid URL starting with http:// or https://",
+        ),
     ),
 });
 type RssFeedValues = z.infer<typeof rssFeedSchema>;

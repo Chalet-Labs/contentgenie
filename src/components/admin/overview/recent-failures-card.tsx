@@ -1,11 +1,18 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { StatusBadge } from "@/components/admin/episodes/status-badge"
-import { relativeTime } from "@/lib/admin/format-utils"
-import type { RecentFailure } from "@/lib/admin/overview-queries"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { StatusBadge } from "@/components/admin/episodes/status-badge";
+import { relativeTime } from "@/lib/admin/format-utils";
+import type { RecentFailure } from "@/lib/admin/overview-queries";
 
 interface RecentFailuresCardProps {
-  failures: RecentFailure[]
+  failures: RecentFailure[];
 }
 
 export function RecentFailuresCard({ failures }: RecentFailuresCardProps) {
@@ -30,29 +37,31 @@ export function RecentFailuresCard({ failures }: RecentFailuresCardProps) {
             </TableHeader>
             <TableBody>
               {failures.map((f) => {
-                const error = f.transcriptError ?? f.processingError ?? null
+                const error = f.transcriptError ?? f.processingError ?? null;
                 return (
                   <TableRow key={f.id}>
-                    <TableCell className="max-w-[200px] truncate text-sm">{f.title}</TableCell>
+                    <TableCell className="max-w-[200px] truncate text-sm">
+                      {f.title}
+                    </TableCell>
                     <TableCell>
                       <StatusBadge status={f.transcriptStatus} />
                     </TableCell>
                     <TableCell>
                       <StatusBadge status={f.summaryStatus} />
                     </TableCell>
-                    <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                    <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
                       {relativeTime(f.updatedAt)}
                     </TableCell>
-                    <TableCell className="text-xs text-muted-foreground max-w-[200px] truncate">
+                    <TableCell className="max-w-[200px] truncate text-xs text-muted-foreground">
                       {error ? error.slice(0, 80) : "—"}
                     </TableCell>
                   </TableRow>
-                )
+                );
               })}
             </TableBody>
           </Table>
         )}
       </CardContent>
     </Card>
-  )
+  );
 }

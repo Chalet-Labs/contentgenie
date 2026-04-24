@@ -39,14 +39,19 @@ describe("useExpandable", () => {
   });
 
   it("hiddenCount equals items.length - initial when over threshold", () => {
-    const { result } = renderHook(() => useExpandable(Array.from({ length: 10 }), 3));
+    const { result } = renderHook(() =>
+      useExpandable(Array.from({ length: 10 }), 3),
+    );
     expect(result.current.hiddenCount).toBe(7);
   });
 
   it("toggle identity is stable across renders (safe for memoized children)", () => {
-    const { result, rerender } = renderHook(({ items }) => useExpandable(items, 3), {
-      initialProps: { items: [1, 2, 3, 4] },
-    });
+    const { result, rerender } = renderHook(
+      ({ items }) => useExpandable(items, 3),
+      {
+        initialProps: { items: [1, 2, 3, 4] },
+      },
+    );
     const first = result.current.toggle;
     rerender({ items: [1, 2, 3, 4, 5] });
     expect(result.current.toggle).toBe(first);

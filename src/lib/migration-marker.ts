@@ -10,62 +10,62 @@
  * queue would leak into User B's account on B's first sync).
  */
 
-const QUEUE_MIGRATED_PREFIX = "contentgenie-queue-migrated-"
-const SESSION_MIGRATED_PREFIX = "contentgenie-session-migrated-"
-const LAST_USER_ID_KEY = "contentgenie-last-user-id"
+const QUEUE_MIGRATED_PREFIX = "contentgenie-queue-migrated-";
+const SESSION_MIGRATED_PREFIX = "contentgenie-session-migrated-";
+const LAST_USER_ID_KEY = "contentgenie-last-user-id";
 
-const QUEUE_STORAGE_KEY = "contentgenie-player-queue"
-const SESSION_STORAGE_KEY = "contentgenie-player-session"
+const QUEUE_STORAGE_KEY = "contentgenie-player-queue";
+const SESSION_STORAGE_KEY = "contentgenie-player-session";
 
 function safeGet(key: string): string | null {
-  if (typeof window === "undefined") return null
+  if (typeof window === "undefined") return null;
   try {
-    return localStorage.getItem(key)
+    return localStorage.getItem(key);
   } catch {
-    return null
+    return null;
   }
 }
 
 function safeSet(key: string, val: string): void {
-  if (typeof window === "undefined") return
+  if (typeof window === "undefined") return;
   try {
-    localStorage.setItem(key, val)
+    localStorage.setItem(key, val);
   } catch {
     // localStorage unavailable (private mode / quota exceeded) — ignore.
   }
 }
 
 function safeRemove(key: string): void {
-  if (typeof window === "undefined") return
+  if (typeof window === "undefined") return;
   try {
-    localStorage.removeItem(key)
+    localStorage.removeItem(key);
   } catch {
     // ignore
   }
 }
 
 export function hasQueueMigrated(userId: string): boolean {
-  return safeGet(QUEUE_MIGRATED_PREFIX + userId) === "1"
+  return safeGet(QUEUE_MIGRATED_PREFIX + userId) === "1";
 }
 
 export function markQueueMigrated(userId: string): void {
-  safeSet(QUEUE_MIGRATED_PREFIX + userId, "1")
+  safeSet(QUEUE_MIGRATED_PREFIX + userId, "1");
 }
 
 export function hasSessionMigrated(userId: string): boolean {
-  return safeGet(SESSION_MIGRATED_PREFIX + userId) === "1"
+  return safeGet(SESSION_MIGRATED_PREFIX + userId) === "1";
 }
 
 export function markSessionMigrated(userId: string): void {
-  safeSet(SESSION_MIGRATED_PREFIX + userId, "1")
+  safeSet(SESSION_MIGRATED_PREFIX + userId, "1");
 }
 
 export function getLastUserId(): string | null {
-  return safeGet(LAST_USER_ID_KEY)
+  return safeGet(LAST_USER_ID_KEY);
 }
 
 export function setLastUserId(userId: string): void {
-  safeSet(LAST_USER_ID_KEY, userId)
+  safeSet(LAST_USER_ID_KEY, userId);
 }
 
 /**
@@ -74,21 +74,21 @@ export function setLastUserId(userId: string): void {
  * so we don't carry the previous user's data into the new account.
  */
 export function clearAllUserLocalData(): void {
-  if (typeof window === "undefined") return
+  if (typeof window === "undefined") return;
   try {
-    safeRemove(QUEUE_STORAGE_KEY)
-    safeRemove(SESSION_STORAGE_KEY)
-    safeRemove(LAST_USER_ID_KEY)
+    safeRemove(QUEUE_STORAGE_KEY);
+    safeRemove(SESSION_STORAGE_KEY);
+    safeRemove(LAST_USER_ID_KEY);
     // Remove all per-user migration markers — iterate in reverse since
     // removeItem mutates localStorage.length.
     for (let i = localStorage.length - 1; i >= 0; i--) {
-      const key = localStorage.key(i)
-      if (!key) continue
+      const key = localStorage.key(i);
+      if (!key) continue;
       if (
         key.startsWith(QUEUE_MIGRATED_PREFIX) ||
         key.startsWith(SESSION_MIGRATED_PREFIX)
       ) {
-        safeRemove(key)
+        safeRemove(key);
       }
     }
   } catch {

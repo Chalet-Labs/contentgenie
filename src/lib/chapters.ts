@@ -67,11 +67,19 @@ export function parseChapters(json: unknown): Chapter[] {
           : `Chapter ${chapters.length + 1}`,
     };
 
-    if (typeof record.img === "string" && record.img.trim() !== "" && isHttpUrl(record.img)) {
+    if (
+      typeof record.img === "string" &&
+      record.img.trim() !== "" &&
+      isHttpUrl(record.img)
+    ) {
       chapter.img = record.img;
     }
 
-    if (typeof record.url === "string" && record.url.trim() !== "" && isHttpUrl(record.url)) {
+    if (
+      typeof record.url === "string" &&
+      record.url.trim() !== "" &&
+      isHttpUrl(record.url)
+    ) {
       chapter.url = record.url;
     }
 

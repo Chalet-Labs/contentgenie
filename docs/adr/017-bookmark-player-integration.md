@@ -7,6 +7,7 @@
 ## Context
 
 Issue #95 integrates the existing bookmark system (database-backed, per-library-entry timestamps) with the in-app audio player. Users need to:
+
 1. Bookmark the current playback position from the player bar.
 2. Click bookmarks on the episode page to seek the player.
 3. See bookmark indicators on the seek bar.

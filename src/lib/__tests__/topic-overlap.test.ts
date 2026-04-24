@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { buildUserTopicProfile, computeTopicOverlap } from "@/lib/topic-overlap";
+import {
+  buildUserTopicProfile,
+  computeTopicOverlap,
+} from "@/lib/topic-overlap";
 
 describe("buildUserTopicProfile", () => {
   it("returns an empty map for no rows", () => {

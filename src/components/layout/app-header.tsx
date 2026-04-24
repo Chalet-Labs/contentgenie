@@ -1,19 +1,19 @@
-"use client"
+"use client";
 
-import Link from "next/link"
-import { SignedIn, UserButton } from "@clerk/nextjs"
-import { Button } from "@/components/ui/button"
+import Link from "next/link";
+import { SignedIn, UserButton } from "@clerk/nextjs";
+import { Button } from "@/components/ui/button";
 import {
   Sheet,
   SheetContent,
   SheetTitle,
   SheetTrigger,
-} from "@/components/ui/sheet"
-import { Menu } from "lucide-react"
-import { NotificationBell } from "@/components/notifications/notification-bell"
-import { Sidebar } from "@/components/layout/sidebar"
-import { ThemeToggle } from "@/components/layout/theme-toggle"
-import { Logo } from "@/components/brand/logo"
+} from "@/components/ui/sheet";
+import { Menu } from "lucide-react";
+import { NotificationBell } from "@/components/notifications/notification-bell";
+import { Sidebar } from "@/components/layout/sidebar";
+import { ThemeToggle } from "@/components/layout/theme-toggle";
+import { Logo } from "@/components/brand/logo";
 
 export function AppHeader({ isAdmin }: { isAdmin: boolean }) {
   return (
@@ -25,26 +25,33 @@ export function AppHeader({ isAdmin }: { isAdmin: boolean }) {
             <Button
               variant="ghost"
               size="icon"
-              className="md:hidden mr-2"
+              className="mr-2 md:hidden"
               aria-label="Open navigation menu"
             >
               <Menu className="h-5 w-5" />
             </Button>
           </SheetTrigger>
-          <SheetContent side="left" className="w-[280px] sm:w-[320px] p-0 flex flex-col">
+          <SheetContent
+            side="left"
+            className="flex w-[280px] flex-col p-0 sm:w-[320px]"
+          >
             <SheetTitle className="sr-only">Navigation</SheetTitle>
             <Sidebar inSheet isAdmin={isAdmin} />
           </SheetContent>
         </Sheet>
 
         {/* Logo */}
-        <Link href="/" className="flex items-center gap-2 mr-6" aria-label="ContentGenie home">
+        <Link
+          href="/"
+          className="mr-6 flex items-center gap-2"
+          aria-label="ContentGenie home"
+        >
           <Logo variant="mark" size={24} decorative />
-          <span className="font-bold hidden sm:inline-block">ContentGenie</span>
+          <span className="hidden font-bold sm:inline-block">ContentGenie</span>
         </Link>
 
         {/* Right side: theme, notifications, user */}
-        <div className="flex items-center gap-2 ml-auto">
+        <div className="ml-auto flex items-center gap-2">
           <ThemeToggle />
           <SignedIn>
             <NotificationBell />
@@ -53,5 +60,5 @@ export function AppHeader({ isAdmin }: { isAdmin: boolean }) {
         </div>
       </div>
     </header>
-  )
+  );
 }

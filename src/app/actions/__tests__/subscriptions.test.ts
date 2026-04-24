@@ -1,11 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { DEFAULT_SUBSCRIPTION_SORT } from "@/db/subscription-sorts";
+import { makeClerkAuthMock } from "@/test/mocks/clerk-server";
 
 // Mock Clerk auth
 const mockAuth = vi.fn();
-vi.mock("@clerk/nextjs/server", () => ({
-  auth: () => mockAuth(),
-}));
+vi.mock("@clerk/nextjs/server", () => makeClerkAuthMock(() => mockAuth()));
 
 // Mock next/cache
 vi.mock("next/cache", () => ({
@@ -31,7 +30,9 @@ vi.mock("@/db", () => ({
   db: {
     query: {
       users: { findFirst: (...args: unknown[]) => mockFindFirstUser(...args) },
-      podcasts: { findFirst: (...args: unknown[]) => mockFindFirstPodcast(...args) },
+      podcasts: {
+        findFirst: (...args: unknown[]) => mockFindFirstPodcast(...args),
+      },
       userSubscriptions: {
         findFirst: (...args: unknown[]) => mockFindFirstSubscription(...args),
       },
@@ -139,7 +140,11 @@ vi.mock("@/db/schema", async () => {
 
 // Mock drizzle-orm — capture orderBy/join args to assert sort wiring
 const sqlTemplate = (strings: TemplateStringsArray, ...values: unknown[]) => {
-  const result: { strings: TemplateStringsArray; values: unknown[]; alias?: string } = {
+  const result: {
+    strings: TemplateStringsArray;
+    values: unknown[];
+    alias?: string;
+  } = {
     strings,
     values,
   };
@@ -193,9 +198,7 @@ describe("addPodcastByRssUrl", () => {
   it("returns error when not authenticated", async () => {
     mockAuth.mockResolvedValue({ userId: null });
 
-    const { addPodcastByRssUrl } = await import(
-      "@/app/actions/subscriptions"
-    );
+    const { addPodcastByRssUrl } = await import("@/app/actions/subscriptions");
     const result = await addPodcastByRssUrl("https://example.com/feed.xml");
 
     expect(result.success).toBe(false);
@@ -204,9 +207,7 @@ describe("addPodcastByRssUrl", () => {
 
   it("returns error for invalid URL", async () => {
     mockIsSafeUrl.mockResolvedValueOnce(false);
-    const { addPodcastByRssUrl } = await import(
-      "@/app/actions/subscriptions"
-    );
+    const { addPodcastByRssUrl } = await import("@/app/actions/subscriptions");
     const result = await addPodcastByRssUrl("not-a-url");
 
     expect(result.success).toBe(false);
@@ -215,9 +216,7 @@ describe("addPodcastByRssUrl", () => {
 
   it("returns error for empty URL", async () => {
     mockIsSafeUrl.mockResolvedValueOnce(false);
-    const { addPodcastByRssUrl } = await import(
-      "@/app/actions/subscriptions"
-    );
+    const { addPodcastByRssUrl } = await import("@/app/actions/subscriptions");
     const result = await addPodcastByRssUrl("");
 
     expect(result.success).toBe(false);
@@ -226,9 +225,7 @@ describe("addPodcastByRssUrl", () => {
 
   it("returns error for non-http URL", async () => {
     mockIsSafeUrl.mockResolvedValueOnce(false);
-    const { addPodcastByRssUrl } = await import(
-      "@/app/actions/subscriptions"
-    );
+    const { addPodcastByRssUrl } = await import("@/app/actions/subscriptions");
     const result = await addPodcastByRssUrl("ftp://example.com/feed.xml");
 
     expect(result.success).toBe(false);
@@ -243,9 +240,7 @@ describe("addPodcastByRssUrl", () => {
     });
     mockFindFirstSubscription.mockResolvedValue({ id: 1 });
 
-    const { addPodcastByRssUrl } = await import(
-      "@/app/actions/subscriptions"
-    );
+    const { addPodcastByRssUrl } = await import("@/app/actions/subscriptions");
     const result = await addPodcastByRssUrl("https://example.com/feed.xml");
 
     expect(result.success).toBe(true);
@@ -257,9 +252,7 @@ describe("addPodcastByRssUrl", () => {
   it("returns error when feed parsing fails", async () => {
     mockParsePodcastFeed.mockRejectedValue(new Error("Invalid XML"));
 
-    const { addPodcastByRssUrl } = await import(
-      "@/app/actions/subscriptions"
-    );
+    const { addPodcastByRssUrl } = await import("@/app/actions/subscriptions");
     const result = await addPodcastByRssUrl("https://example.com/bad-feed.xml");
 
     expect(result.success).toBe(false);
@@ -298,9 +291,7 @@ describe("addPodcastByRssUrl", () => {
       ],
     });
 
-    const { addPodcastByRssUrl } = await import(
-      "@/app/actions/subscriptions"
-    );
+    const { addPodcastByRssUrl } = await import("@/app/actions/subscriptions");
     const result = await addPodcastByRssUrl("https://example.com/feed.xml");
 
     expect(result.success).toBe(true);
@@ -331,9 +322,7 @@ describe("subscribeToPodcast", () => {
       .mockReturnValueOnce([{ id: 1 }])
       .mockReturnValueOnce([{ id: 2 }]);
 
-    const { subscribeToPodcast } = await import(
-      "@/app/actions/subscriptions"
-    );
+    const { subscribeToPodcast } = await import("@/app/actions/subscriptions");
     const result = await subscribeToPodcast({
       podcastIndexId: "12345",
       title: "Test Podcast",
@@ -346,13 +335,9 @@ describe("subscribeToPodcast", () => {
   });
 
   it("handles already subscribed case correctly", async () => {
-    mockReturning
-      .mockReturnValueOnce([{ id: 1 }])
-      .mockReturnValueOnce([]);
+    mockReturning.mockReturnValueOnce([{ id: 1 }]).mockReturnValueOnce([]);
 
-    const { subscribeToPodcast } = await import(
-      "@/app/actions/subscriptions"
-    );
+    const { subscribeToPodcast } = await import("@/app/actions/subscriptions");
     const result = await subscribeToPodcast({
       podcastIndexId: "12345",
       title: "Test Podcast",
@@ -372,9 +357,8 @@ describe("isSubscribedToPodcast", () => {
   it("returns false when not authenticated", async () => {
     mockAuth.mockResolvedValue({ userId: null });
 
-    const { isSubscribedToPodcast } = await import(
-      "@/app/actions/subscriptions"
-    );
+    const { isSubscribedToPodcast } =
+      await import("@/app/actions/subscriptions");
     const result = await isSubscribedToPodcast("12345");
 
     expect(result).toBe(false);
@@ -384,9 +368,8 @@ describe("isSubscribedToPodcast", () => {
   it("returns true when user is subscribed", async () => {
     mockSelectChain([{ exists: 1 }]);
 
-    const { isSubscribedToPodcast } = await import(
-      "@/app/actions/subscriptions"
-    );
+    const { isSubscribedToPodcast } =
+      await import("@/app/actions/subscriptions");
     const result = await isSubscribedToPodcast("12345");
 
     expect(result).toBe(true);
@@ -396,9 +379,8 @@ describe("isSubscribedToPodcast", () => {
   it("returns false when user is not subscribed", async () => {
     mockSelectChain([]);
 
-    const { isSubscribedToPodcast } = await import(
-      "@/app/actions/subscriptions"
-    );
+    const { isSubscribedToPodcast } =
+      await import("@/app/actions/subscriptions");
     const result = await isSubscribedToPodcast("12345");
 
     expect(result).toBe(false);
@@ -410,9 +392,8 @@ describe("isSubscribedToPodcast", () => {
       throw new Error("DB connection failed");
     });
 
-    const { isSubscribedToPodcast } = await import(
-      "@/app/actions/subscriptions"
-    );
+    const { isSubscribedToPodcast } =
+      await import("@/app/actions/subscriptions");
     const result = await isSubscribedToPodcast("12345");
 
     expect(result).toBe(false);
@@ -427,9 +408,11 @@ function makeSubsListChain(
   const mockOrderBy = vi.fn().mockResolvedValue(rows);
   const mockWhere = vi.fn().mockReturnValue({ orderBy: mockOrderBy });
   const mockLeftJoin = vi.fn().mockReturnValue({ where: mockWhere });
-  const mockInnerJoin = vi.fn().mockReturnValue(
-    recentlyListened ? { leftJoin: mockLeftJoin } : { where: mockWhere },
-  );
+  const mockInnerJoin = vi
+    .fn()
+    .mockReturnValue(
+      recentlyListened ? { leftJoin: mockLeftJoin } : { where: mockWhere },
+    );
   const mockFrom = vi.fn().mockReturnValue({ innerJoin: mockInnerJoin });
   return {
     chain: { from: mockFrom },
@@ -479,9 +462,8 @@ describe("getUserSubscriptions", () => {
   it("returns error when not authenticated", async () => {
     mockAuth.mockResolvedValue({ userId: null });
 
-    const { getUserSubscriptions } = await import(
-      "@/app/actions/subscriptions"
-    );
+    const { getUserSubscriptions } =
+      await import("@/app/actions/subscriptions");
     const result = await getUserSubscriptions();
 
     expect(result.subscriptions).toEqual([]);
@@ -493,9 +475,8 @@ describe("getUserSubscriptions", () => {
     const { chain, mocks } = makeSubsListChain([]);
     mockSelect.mockReturnValue(chain);
 
-    const { getUserSubscriptions } = await import(
-      "@/app/actions/subscriptions"
-    );
+    const { getUserSubscriptions } =
+      await import("@/app/actions/subscriptions");
     await getUserSubscriptions();
 
     expect(mocks.mockOrderBy).toHaveBeenCalledWith(...DEFAULT_ORDER_BY);
@@ -509,9 +490,8 @@ describe("getUserSubscriptions", () => {
     const { chain, mocks } = makeSubsListChain([]);
     mockSelect.mockReturnValue(chain);
 
-    const { getUserSubscriptions } = await import(
-      "@/app/actions/subscriptions"
-    );
+    const { getUserSubscriptions } =
+      await import("@/app/actions/subscriptions");
     await getUserSubscriptions();
 
     expect(mocks.mockOrderBy).toHaveBeenCalledWith(
@@ -527,9 +507,8 @@ describe("getUserSubscriptions", () => {
     const { chain, mocks } = makeSubsListChain([]);
     mockSelect.mockReturnValue(chain);
 
-    const { getUserSubscriptions } = await import(
-      "@/app/actions/subscriptions"
-    );
+    const { getUserSubscriptions } =
+      await import("@/app/actions/subscriptions");
     await getUserSubscriptions("latest-episode");
 
     // stored pref lookup skipped when arg is passed
@@ -550,9 +529,8 @@ describe("getUserSubscriptions", () => {
     const { chain, mocks } = makeSubsListChain([]);
     mockSelect.mockReturnValue(chain);
 
-    const { getUserSubscriptions } = await import(
-      "@/app/actions/subscriptions"
-    );
+    const { getUserSubscriptions } =
+      await import("@/app/actions/subscriptions");
     await getUserSubscriptions();
 
     expect(mocks.mockOrderBy).toHaveBeenCalledWith(...DEFAULT_ORDER_BY);
@@ -565,9 +543,8 @@ describe("getUserSubscriptions", () => {
       .mockReturnValueOnce(subqueryChain)
       .mockReturnValueOnce(main.chain);
 
-    const { getUserSubscriptions } = await import(
-      "@/app/actions/subscriptions"
-    );
+    const { getUserSubscriptions } =
+      await import("@/app/actions/subscriptions");
     await getUserSubscriptions("recently-listened");
 
     expect(main.mocks.mockLeftJoin).toHaveBeenCalledTimes(1);
@@ -605,9 +582,8 @@ describe("getUserSubscriptions", () => {
     const { chain } = makeSubsListChain(rows);
     mockSelect.mockReturnValue(chain);
 
-    const { getUserSubscriptions } = await import(
-      "@/app/actions/subscriptions"
-    );
+    const { getUserSubscriptions } =
+      await import("@/app/actions/subscriptions");
     const result = await getUserSubscriptions();
 
     expect(result.error).toBeNull();
@@ -624,9 +600,8 @@ describe("getUserSubscriptions", () => {
       throw new Error("db exploded");
     });
 
-    const { getUserSubscriptions } = await import(
-      "@/app/actions/subscriptions"
-    );
+    const { getUserSubscriptions } =
+      await import("@/app/actions/subscriptions");
     const result = await getUserSubscriptions();
 
     expect(result.subscriptions).toEqual([]);
@@ -639,9 +614,8 @@ describe("getUserSubscriptions", () => {
     const { chain, mocks } = makeSubsListChain([]);
     mockSelect.mockReturnValue(chain);
 
-    const { getUserSubscriptions } = await import(
-      "@/app/actions/subscriptions"
-    );
+    const { getUserSubscriptions } =
+      await import("@/app/actions/subscriptions");
     const result = await getUserSubscriptions();
 
     expect(result.error).toBeNull();
@@ -662,9 +636,8 @@ describe("togglePinSubscription", () => {
   it("returns error when not authenticated", async () => {
     mockAuth.mockResolvedValue({ userId: null });
 
-    const { togglePinSubscription } = await import(
-      "@/app/actions/subscriptions"
-    );
+    const { togglePinSubscription } =
+      await import("@/app/actions/subscriptions");
     const result = await togglePinSubscription(1);
 
     expect(result).toEqual({
@@ -677,9 +650,8 @@ describe("togglePinSubscription", () => {
   it.each([0, -1, 1.5, Number.NaN])(
     "rejects invalid subscription id: %s",
     async (badId) => {
-      const { togglePinSubscription } = await import(
-        "@/app/actions/subscriptions"
-      );
+      const { togglePinSubscription } =
+        await import("@/app/actions/subscriptions");
       const result = await togglePinSubscription(badId);
 
       expect(result).toEqual({
@@ -693,9 +665,8 @@ describe("togglePinSubscription", () => {
   it("returns not-found when the UPDATE RETURNING is empty (ownership or bad id)", async () => {
     mockUpdateReturning.mockResolvedValue([]);
 
-    const { togglePinSubscription } = await import(
-      "@/app/actions/subscriptions"
-    );
+    const { togglePinSubscription } =
+      await import("@/app/actions/subscriptions");
     const result = await togglePinSubscription(999);
 
     expect(result).toEqual({
@@ -708,9 +679,8 @@ describe("togglePinSubscription", () => {
     const { revalidatePath } = await import("next/cache");
     mockUpdateReturning.mockResolvedValue([{ isPinned: true }]);
 
-    const { togglePinSubscription } = await import(
-      "@/app/actions/subscriptions"
-    );
+    const { togglePinSubscription } =
+      await import("@/app/actions/subscriptions");
     const result = await togglePinSubscription(42);
 
     expect(result).toEqual({ success: true, data: { isPinned: true } });
@@ -725,9 +695,8 @@ describe("togglePinSubscription", () => {
   it("scopes the UPDATE to the current user (ownership regression guard)", async () => {
     mockUpdateReturning.mockResolvedValue([{ isPinned: true }]);
 
-    const { togglePinSubscription } = await import(
-      "@/app/actions/subscriptions"
-    );
+    const { togglePinSubscription } =
+      await import("@/app/actions/subscriptions");
     await togglePinSubscription(42);
 
     // WHERE must be an and(eq(id, 42), eq(user_id, userId)) — dropping the
@@ -748,9 +717,8 @@ describe("togglePinSubscription", () => {
   it("returns error envelope on database failure", async () => {
     mockUpdateReturning.mockRejectedValue(new Error("db exploded"));
 
-    const { togglePinSubscription } = await import(
-      "@/app/actions/subscriptions"
-    );
+    const { togglePinSubscription } =
+      await import("@/app/actions/subscriptions");
     const result = await togglePinSubscription(1);
 
     expect(result).toEqual({
@@ -775,9 +743,7 @@ describe("setSubscriptionSort", () => {
   it("returns error when not authenticated", async () => {
     mockAuth.mockResolvedValue({ userId: null });
 
-    const { setSubscriptionSort } = await import(
-      "@/app/actions/subscriptions"
-    );
+    const { setSubscriptionSort } = await import("@/app/actions/subscriptions");
     const result = await setSubscriptionSort("title-asc");
 
     expect(result).toEqual({
@@ -788,9 +754,7 @@ describe("setSubscriptionSort", () => {
   });
 
   it("rejects invalid sort values at the zod boundary", async () => {
-    const { setSubscriptionSort } = await import(
-      "@/app/actions/subscriptions"
-    );
+    const { setSubscriptionSort } = await import("@/app/actions/subscriptions");
     const result = await setSubscriptionSort(
       "not-a-real-sort" as unknown as "title-asc",
     );
@@ -805,9 +769,7 @@ describe("setSubscriptionSort", () => {
   it("emits an atomic jsonb_set UPDATE with the new sort and touches updatedAt", async () => {
     const { revalidatePath } = await import("next/cache");
 
-    const { setSubscriptionSort } = await import(
-      "@/app/actions/subscriptions"
-    );
+    const { setSubscriptionSort } = await import("@/app/actions/subscriptions");
     const result = await setSubscriptionSort("title-asc");
 
     expect(result).toEqual({ success: true });
@@ -835,9 +797,7 @@ describe("setSubscriptionSort", () => {
     // insert; either way, it must run before the preferences UPDATE.
     mockFindFirstUser.mockResolvedValueOnce({ email: "already@exists.com" });
 
-    const { setSubscriptionSort } = await import(
-      "@/app/actions/subscriptions"
-    );
+    const { setSubscriptionSort } = await import("@/app/actions/subscriptions");
     await setSubscriptionSort("title-asc");
 
     expect(mockFindFirstUser).toHaveBeenCalled();
@@ -848,9 +808,7 @@ describe("setSubscriptionSort", () => {
   it("returns error envelope when ensureUserExists throws", async () => {
     mockFindFirstUser.mockRejectedValue(new Error("db exploded"));
 
-    const { setSubscriptionSort } = await import(
-      "@/app/actions/subscriptions"
-    );
+    const { setSubscriptionSort } = await import("@/app/actions/subscriptions");
     const result = await setSubscriptionSort("title-asc");
 
     expect(result).toEqual({
@@ -874,9 +832,8 @@ describe("getUserSubscriptionSort", () => {
   it("returns default sort when not authenticated (no DB read)", async () => {
     mockAuth.mockResolvedValue({ userId: null });
 
-    const { getUserSubscriptionSort } = await import(
-      "@/app/actions/subscriptions"
-    );
+    const { getUserSubscriptionSort } =
+      await import("@/app/actions/subscriptions");
     const result = await getUserSubscriptionSort();
 
     expect(result).toBe(DEFAULT_SUBSCRIPTION_SORT);
@@ -886,9 +843,8 @@ describe("getUserSubscriptionSort", () => {
   it("returns default sort when preferences row is null", async () => {
     mockFindFirstUser.mockResolvedValue({ preferences: null });
 
-    const { getUserSubscriptionSort } = await import(
-      "@/app/actions/subscriptions"
-    );
+    const { getUserSubscriptionSort } =
+      await import("@/app/actions/subscriptions");
     const result = await getUserSubscriptionSort();
 
     expect(result).toBe(DEFAULT_SUBSCRIPTION_SORT);
@@ -900,9 +856,8 @@ describe("getUserSubscriptionSort", () => {
       preferences: { subscriptionSort: "latest-episode" },
     });
 
-    const { getUserSubscriptionSort } = await import(
-      "@/app/actions/subscriptions"
-    );
+    const { getUserSubscriptionSort } =
+      await import("@/app/actions/subscriptions");
     const result = await getUserSubscriptionSort();
 
     expect(result).toBe("latest-episode");
@@ -911,9 +866,8 @@ describe("getUserSubscriptionSort", () => {
   it("falls back to default when the preference read throws", async () => {
     mockFindFirstUser.mockRejectedValue(new Error("prefs read hiccup"));
 
-    const { getUserSubscriptionSort } = await import(
-      "@/app/actions/subscriptions"
-    );
+    const { getUserSubscriptionSort } =
+      await import("@/app/actions/subscriptions");
     const result = await getUserSubscriptionSort();
 
     expect(result).toBe(DEFAULT_SUBSCRIPTION_SORT);
@@ -945,9 +899,8 @@ describe("getPinnedSubscriptions", () => {
   it("returns error when not authenticated", async () => {
     mockAuth.mockResolvedValue({ userId: null });
 
-    const { getPinnedSubscriptions } = await import(
-      "@/app/actions/subscriptions"
-    );
+    const { getPinnedSubscriptions } =
+      await import("@/app/actions/subscriptions");
     const result = await getPinnedSubscriptions();
 
     expect(result).toEqual({
@@ -961,9 +914,8 @@ describe("getPinnedSubscriptions", () => {
     const { chain } = makePinnedListChain([]);
     mockSelect.mockReturnValue(chain);
 
-    const { getPinnedSubscriptions } = await import(
-      "@/app/actions/subscriptions"
-    );
+    const { getPinnedSubscriptions } =
+      await import("@/app/actions/subscriptions");
     const result = await getPinnedSubscriptions();
 
     expect(result).toEqual({ success: true, data: [] });
@@ -980,9 +932,8 @@ describe("getPinnedSubscriptions", () => {
     const { chain } = makePinnedListChain([row]);
     mockSelect.mockReturnValue(chain);
 
-    const { getPinnedSubscriptions } = await import(
-      "@/app/actions/subscriptions"
-    );
+    const { getPinnedSubscriptions } =
+      await import("@/app/actions/subscriptions");
     const result = await getPinnedSubscriptions();
 
     expect(result.success).toBe(true);
@@ -996,23 +947,44 @@ describe("getPinnedSubscriptions", () => {
       imageUrl: "https://img/1.png",
     });
     const projection = mockSelect.mock.calls[0][0] as Record<string, unknown>;
-    expect(Object.keys(projection).sort()).toEqual(
-      ["id", "imageUrl", "podcastId", "podcastIndexId", "title"],
-    );
+    expect(Object.keys(projection).sort()).toEqual([
+      "id",
+      "imageUrl",
+      "podcastId",
+      "podcastIndexId",
+      "title",
+    ]);
   });
 
   it("orders by podcasts.title ASC — passes DB-sorted rows through unchanged", async () => {
     const rows = [
-      { id: 1, podcastId: 10, podcastIndexId: "pi-10", title: "Apple Pod", imageUrl: "https://img/10.png" },
-      { id: 2, podcastId: 20, podcastIndexId: "pi-20", title: "Mango Pod", imageUrl: null },
-      { id: 3, podcastId: 30, podcastIndexId: "pi-30", title: "Zebra Pod", imageUrl: "https://img/30.png" },
+      {
+        id: 1,
+        podcastId: 10,
+        podcastIndexId: "pi-10",
+        title: "Apple Pod",
+        imageUrl: "https://img/10.png",
+      },
+      {
+        id: 2,
+        podcastId: 20,
+        podcastIndexId: "pi-20",
+        title: "Mango Pod",
+        imageUrl: null,
+      },
+      {
+        id: 3,
+        podcastId: 30,
+        podcastIndexId: "pi-30",
+        title: "Zebra Pod",
+        imageUrl: "https://img/30.png",
+      },
     ];
     const { chain, mocks } = makePinnedListChain(rows);
     mockSelect.mockReturnValue(chain);
 
-    const { getPinnedSubscriptions } = await import(
-      "@/app/actions/subscriptions"
-    );
+    const { getPinnedSubscriptions } =
+      await import("@/app/actions/subscriptions");
     const result = await getPinnedSubscriptions();
 
     expect(mocks.mockOrderBy).toHaveBeenCalledTimes(1);
@@ -1022,35 +994,59 @@ describe("getPinnedSubscriptions", () => {
     );
     expect(result.success).toBe(true);
     if (!result.success) return;
-    expect(result.data.map((r) => r.title)).toEqual(["Apple Pod", "Mango Pod", "Zebra Pod"]);
+    expect(result.data.map((r) => r.title)).toEqual([
+      "Apple Pod",
+      "Mango Pod",
+      "Zebra Pod",
+    ]);
   });
 
   it("does not re-sort DB results client-side (non-alphabetical seed)", async () => {
     const unsortedRows = [
-      { id: 3, podcastId: 30, podcastIndexId: "pi-30", title: "Zebra Pod", imageUrl: null },
-      { id: 1, podcastId: 10, podcastIndexId: "pi-10", title: "Apple Pod", imageUrl: null },
-      { id: 2, podcastId: 20, podcastIndexId: "pi-20", title: "Mango Pod", imageUrl: null },
+      {
+        id: 3,
+        podcastId: 30,
+        podcastIndexId: "pi-30",
+        title: "Zebra Pod",
+        imageUrl: null,
+      },
+      {
+        id: 1,
+        podcastId: 10,
+        podcastIndexId: "pi-10",
+        title: "Apple Pod",
+        imageUrl: null,
+      },
+      {
+        id: 2,
+        podcastId: 20,
+        podcastIndexId: "pi-20",
+        title: "Mango Pod",
+        imageUrl: null,
+      },
     ];
     const { chain } = makePinnedListChain(unsortedRows);
     mockSelect.mockReturnValue(chain);
 
-    const { getPinnedSubscriptions } = await import(
-      "@/app/actions/subscriptions"
-    );
+    const { getPinnedSubscriptions } =
+      await import("@/app/actions/subscriptions");
     const result = await getPinnedSubscriptions();
 
     expect(result.success).toBe(true);
     if (!result.success) return;
-    expect(result.data.map((r) => r.title)).toEqual(["Zebra Pod", "Apple Pod", "Mango Pod"]);
+    expect(result.data.map((r) => r.title)).toEqual([
+      "Zebra Pod",
+      "Apple Pod",
+      "Mango Pod",
+    ]);
   });
 
   it("WHERE includes isPinned=true and userId predicates", async () => {
     const { chain, mocks } = makePinnedListChain([]);
     mockSelect.mockReturnValue(chain);
 
-    const { getPinnedSubscriptions } = await import(
-      "@/app/actions/subscriptions"
-    );
+    const { getPinnedSubscriptions } =
+      await import("@/app/actions/subscriptions");
     await getPinnedSubscriptions();
 
     expect(mocks.mockWhere).toHaveBeenCalledTimes(1);
@@ -1071,9 +1067,8 @@ describe("getPinnedSubscriptions", () => {
       throw new Error("db exploded");
     });
 
-    const { getPinnedSubscriptions } = await import(
-      "@/app/actions/subscriptions"
-    );
+    const { getPinnedSubscriptions } =
+      await import("@/app/actions/subscriptions");
     const result = await getPinnedSubscriptions();
 
     expect(result).toEqual({

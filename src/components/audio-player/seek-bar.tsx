@@ -1,90 +1,106 @@
-"use client"
+"use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react"
-import { Slider } from "@/components/ui/slider"
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Slider } from "@/components/ui/slider";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from "@/components/ui/tooltip"
-import { useAudioPlayerProgress, useAudioPlayerAPI, useAudioPlayerState } from "@/contexts/audio-player-context"
-import { formatTime } from "@/lib/format-time"
-import { getLibraryEntryByEpisodeId, getBookmarks } from "@/app/actions/library"
-import type { Bookmark } from "@/db/schema"
-import { BOOKMARK_CHANGED_EVENT } from "@/lib/events"
+} from "@/components/ui/tooltip";
+import {
+  useAudioPlayerProgress,
+  useAudioPlayerAPI,
+  useAudioPlayerState,
+} from "@/contexts/audio-player-context";
+import { formatTime } from "@/lib/format-time";
+import {
+  getLibraryEntryByEpisodeId,
+  getBookmarks,
+} from "@/app/actions/library";
+import type { Bookmark } from "@/db/schema";
+import { BOOKMARK_CHANGED_EVENT } from "@/lib/events";
 
 export function SeekBar() {
-  const { currentTime, buffered } = useAudioPlayerProgress()
-  const { duration, chapters, currentEpisode } = useAudioPlayerState()
-  const { seek } = useAudioPlayerAPI()
-  const [bookmarks, setBookmarks] = useState<Bookmark[]>([])
+  const { currentTime, buffered } = useAudioPlayerProgress();
+  const { duration, chapters, currentEpisode } = useAudioPlayerState();
+  const { seek } = useAudioPlayerAPI();
+  const [bookmarks, setBookmarks] = useState<Bookmark[]>([]);
 
   const handleSeek = useCallback(
     (value: number[]) => {
-      seek(value[0])
+      seek(value[0]);
     },
-    [seek]
-  )
+    [seek],
+  );
 
-  const bufferedPercent = duration > 0 ? (buffered / duration) * 100 : 0
+  const bufferedPercent = duration > 0 ? (buffered / duration) * 100 : 0;
 
   const chapterTicks = useMemo(() => {
-    if (!chapters || duration <= 0) return null
+    if (!chapters || duration <= 0) return null;
     return chapters
       .filter((ch) => ch.startTime > 0 && ch.startTime < duration)
-      .map((ch) => ({ startTime: ch.startTime, title: ch.title, left: (ch.startTime / duration) * 100 }))
-  }, [chapters, duration])
+      .map((ch) => ({
+        startTime: ch.startTime,
+        title: ch.title,
+        left: (ch.startTime / duration) * 100,
+      }));
+  }, [chapters, duration]);
 
   // Fetch bookmarks for the current episode and refetch on changes
-  const episodeId = currentEpisode?.id
+  const episodeId = currentEpisode?.id;
   useEffect(() => {
     if (!episodeId) {
-      setBookmarks([])
-      return
+      setBookmarks([]);
+      return;
     }
 
-    let cancelled = false
-    let requestSeq = 0
+    let cancelled = false;
+    let requestSeq = 0;
 
     const fetchAndSetBookmarks = async () => {
-      const seq = ++requestSeq
+      const seq = ++requestSeq;
       try {
-        const entry = await getLibraryEntryByEpisodeId(episodeId)
+        const entry = await getLibraryEntryByEpisodeId(episodeId);
         if (cancelled || !entry) {
-          if (!cancelled && seq === requestSeq) setBookmarks([])
-          return
+          if (!cancelled && seq === requestSeq) setBookmarks([]);
+          return;
         }
-        const result = await getBookmarks(entry.libraryEntryId)
+        const result = await getBookmarks(entry.libraryEntryId);
         if (!cancelled && seq === requestSeq) {
-          setBookmarks(result.bookmarks ?? [])
+          setBookmarks(result.bookmarks ?? []);
         }
       } catch {
-        if (!cancelled && seq === requestSeq) setBookmarks([])
+        if (!cancelled && seq === requestSeq) setBookmarks([]);
       }
-    }
+    };
 
-    fetchAndSetBookmarks()
+    fetchAndSetBookmarks();
 
-    window.addEventListener(BOOKMARK_CHANGED_EVENT, fetchAndSetBookmarks)
+    window.addEventListener(BOOKMARK_CHANGED_EVENT, fetchAndSetBookmarks);
 
     return () => {
-      cancelled = true
-      window.removeEventListener(BOOKMARK_CHANGED_EVENT, fetchAndSetBookmarks)
-    }
-  }, [episodeId])
+      cancelled = true;
+      window.removeEventListener(BOOKMARK_CHANGED_EVENT, fetchAndSetBookmarks);
+    };
+  }, [episodeId]);
 
   const bookmarkDots = useMemo(() => {
-    if (bookmarks.length === 0 || duration <= 0) return null
+    if (bookmarks.length === 0 || duration <= 0) return null;
     return bookmarks
-      .filter((bm) => Number.isFinite(bm.timestamp) && bm.timestamp >= 0 && bm.timestamp <= duration)
+      .filter(
+        (bm) =>
+          Number.isFinite(bm.timestamp) &&
+          bm.timestamp >= 0 &&
+          bm.timestamp <= duration,
+      )
       .map((bm) => ({
         id: bm.id,
         timestamp: bm.timestamp,
         note: bm.note,
         left: Math.min(100, Math.max(0, (bm.timestamp / duration) * 100)),
-      }))
-  }, [bookmarks, duration])
+      }));
+  }, [bookmarks, duration]);
 
   return (
     <div className="flex w-full items-center gap-2">
@@ -127,8 +143,8 @@ export function SeekBar() {
                       className="pointer-events-auto absolute h-2 w-2 -translate-x-1/2 rounded-full bg-primary/60 transition-transform hover:scale-150"
                       style={{ left: `${dot.left}%` }}
                       onClick={(e) => {
-                        e.stopPropagation()
-                        seek(dot.timestamp)
+                        e.stopPropagation();
+                        seek(dot.timestamp);
                       }}
                       aria-label={`Bookmark at ${formatTime(dot.timestamp)}`}
                       data-testid="bookmark-dot"
@@ -155,5 +171,5 @@ export function SeekBar() {
         {formatTime(duration)}
       </span>
     </div>
-  )
+  );
 }

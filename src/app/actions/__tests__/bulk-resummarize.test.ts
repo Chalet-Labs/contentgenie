@@ -1,10 +1,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { makeClerkAuthMock } from "@/test/mocks/clerk-server";
 
 // Mock Clerk auth
 const mockAuth = vi.fn();
-vi.mock("@clerk/nextjs/server", () => ({
-  auth: () => mockAuth(),
-}));
+vi.mock("@clerk/nextjs/server", () => makeClerkAuthMock(() => mockAuth()));
 
 // Mock next/cache (needed by some server actions indirectly)
 vi.mock("next/cache", () => ({
@@ -76,9 +75,8 @@ describe("getResummarizeEpisodeCount", () => {
   it("returns error when user is not authenticated", async () => {
     mockAuth.mockResolvedValue({ userId: null });
 
-    const { getResummarizeEpisodeCount } = await import(
-      "@/app/actions/bulk-resummarize"
-    );
+    const { getResummarizeEpisodeCount } =
+      await import("@/app/actions/bulk-resummarize");
     const result = await getResummarizeEpisodeCount({});
 
     expect(result.count).toBe(0);
@@ -89,9 +87,8 @@ describe("getResummarizeEpisodeCount", () => {
   it("returns count with no filters applied", async () => {
     mockCountResult(42);
 
-    const { getResummarizeEpisodeCount } = await import(
-      "@/app/actions/bulk-resummarize"
-    );
+    const { getResummarizeEpisodeCount } =
+      await import("@/app/actions/bulk-resummarize");
     const result = await getResummarizeEpisodeCount({});
 
     expect(result.count).toBe(42);
@@ -101,9 +98,8 @@ describe("getResummarizeEpisodeCount", () => {
   it("returns error when user is not subscribed to the podcast", async () => {
     mockSubscriptionFindFirst.mockResolvedValue(null);
 
-    const { getResummarizeEpisodeCount } = await import(
-      "@/app/actions/bulk-resummarize"
-    );
+    const { getResummarizeEpisodeCount } =
+      await import("@/app/actions/bulk-resummarize");
     const result = await getResummarizeEpisodeCount({ podcastId: 7 });
 
     expect(result.count).toBe(0);
@@ -115,14 +111,13 @@ describe("getResummarizeEpisodeCount", () => {
     mockCountResult(5);
     const { eq } = await import("drizzle-orm");
 
-    const { getResummarizeEpisodeCount } = await import(
-      "@/app/actions/bulk-resummarize"
-    );
+    const { getResummarizeEpisodeCount } =
+      await import("@/app/actions/bulk-resummarize");
     await getResummarizeEpisodeCount({ podcastId: 7 });
 
     expect(eq).toHaveBeenCalledWith(
       expect.anything(), // episodes.podcastId
-      7
+      7,
     );
   });
 
@@ -130,14 +125,13 @@ describe("getResummarizeEpisodeCount", () => {
     mockCountResult(10);
     const { gte } = await import("drizzle-orm");
 
-    const { getResummarizeEpisodeCount } = await import(
-      "@/app/actions/bulk-resummarize"
-    );
+    const { getResummarizeEpisodeCount } =
+      await import("@/app/actions/bulk-resummarize");
     await getResummarizeEpisodeCount({ minDate: "2024-01-01" });
 
     expect(gte).toHaveBeenCalledWith(
       expect.anything(), // episodes.publishDate
-      new Date("2024-01-01")
+      new Date("2024-01-01"),
     );
   });
 
@@ -145,14 +139,13 @@ describe("getResummarizeEpisodeCount", () => {
     mockCountResult(8);
     const { lte } = await import("drizzle-orm");
 
-    const { getResummarizeEpisodeCount } = await import(
-      "@/app/actions/bulk-resummarize"
-    );
+    const { getResummarizeEpisodeCount } =
+      await import("@/app/actions/bulk-resummarize");
     await getResummarizeEpisodeCount({ maxDate: "2024-12-31" });
 
     expect(lte).toHaveBeenCalledWith(
       expect.anything(), // episodes.publishDate
-      new Date("2024-12-31")
+      new Date("2024-12-31"),
     );
   });
 
@@ -160,14 +153,13 @@ describe("getResummarizeEpisodeCount", () => {
     mockCountResult(3);
     const { lte } = await import("drizzle-orm");
 
-    const { getResummarizeEpisodeCount } = await import(
-      "@/app/actions/bulk-resummarize"
-    );
+    const { getResummarizeEpisodeCount } =
+      await import("@/app/actions/bulk-resummarize");
     await getResummarizeEpisodeCount({ maxScore: 5 });
 
     expect(lte).toHaveBeenCalledWith(
       expect.anything(), // episodes.worthItScore
-      String(5)
+      String(5),
     );
   });
 
@@ -175,9 +167,8 @@ describe("getResummarizeEpisodeCount", () => {
     mockCountResult(2);
     const { eq, gte, lte } = await import("drizzle-orm");
 
-    const { getResummarizeEpisodeCount } = await import(
-      "@/app/actions/bulk-resummarize"
-    );
+    const { getResummarizeEpisodeCount } =
+      await import("@/app/actions/bulk-resummarize");
     await getResummarizeEpisodeCount({
       podcastId: 3,
       minDate: "2024-01-01",
@@ -194,9 +185,8 @@ describe("getResummarizeEpisodeCount", () => {
     mockCountResult(10);
     const { isNotNull } = await import("drizzle-orm");
 
-    const { getResummarizeEpisodeCount } = await import(
-      "@/app/actions/bulk-resummarize"
-    );
+    const { getResummarizeEpisodeCount } =
+      await import("@/app/actions/bulk-resummarize");
     await getResummarizeEpisodeCount({});
 
     expect(isNotNull).toHaveBeenCalled();
@@ -209,9 +199,8 @@ describe("getResummarizeEpisodeCount", () => {
       }),
     });
 
-    const { getResummarizeEpisodeCount } = await import(
-      "@/app/actions/bulk-resummarize"
-    );
+    const { getResummarizeEpisodeCount } =
+      await import("@/app/actions/bulk-resummarize");
     const result = await getResummarizeEpisodeCount({});
 
     expect(result.count).toBe(0);

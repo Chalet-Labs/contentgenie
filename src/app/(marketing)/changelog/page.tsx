@@ -8,8 +8,8 @@ export const metadata: Metadata = {
 export default function ChangelogPage() {
   return (
     <article className="space-y-6">
-      <h1 className="text-3xl font-bold tracking-tight mb-4">Changelog</h1>
-      <p className="text-sm text-muted-foreground mb-8">
+      <h1 className="mb-4 text-3xl font-bold tracking-tight">Changelog</h1>
+      <p className="mb-8 text-sm text-muted-foreground">
         Highlights from the ContentGenie public beta.
       </p>
       <p className="text-[15px] leading-relaxed text-muted-foreground">
@@ -25,7 +25,7 @@ export default function ChangelogPage() {
         </a>
         .
       </p>
-      <p className="text-[15px] leading-relaxed text-muted-foreground mt-6">
+      <p className="mt-6 text-[15px] leading-relaxed text-muted-foreground">
         A curated, human-readable changelog with screenshots will land here
         before we exit beta.
       </p>

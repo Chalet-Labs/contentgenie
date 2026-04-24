@@ -23,7 +23,7 @@ describe("DiscoverContent", () => {
     });
 
     expect(
-      screen.getByPlaceholderText("Search podcasts...")
+      screen.getByPlaceholderText("Search podcasts..."),
     ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Search" })).toBeInTheDocument();
   });
@@ -55,7 +55,7 @@ describe("DiscoverContent", () => {
     await waitFor(() => {
       expect(mockFetch).toHaveBeenCalledWith(
         "/api/podcasts/search?q=lex&max=20",
-        expect.objectContaining({ signal: expect.any(AbortSignal) })
+        expect.objectContaining({ signal: expect.any(AbortSignal) }),
       );
     });
   });
@@ -69,7 +69,7 @@ describe("DiscoverContent", () => {
 
     await user.type(
       screen.getByPlaceholderText("Search podcasts..."),
-      "technology"
+      "technology",
     );
     await user.click(screen.getByRole("button", { name: "Search" }));
 
@@ -77,7 +77,7 @@ describe("DiscoverContent", () => {
       expect(onUrlUpdate).toHaveBeenCalledWith(
         expect.objectContaining({
           queryString: expect.stringContaining("q=technology"),
-        })
+        }),
       );
     });
   });
@@ -97,7 +97,7 @@ describe("DiscoverContent", () => {
 
     await waitFor(() => {
       expect(onUrlUpdate).toHaveBeenCalledWith(
-        expect.objectContaining({ queryString: "" })
+        expect.objectContaining({ queryString: "" }),
       );
     });
   });
@@ -126,7 +126,7 @@ describe("DiscoverContent", () => {
 
     await user.type(
       screen.getByPlaceholderText("Search podcasts..."),
-      "  lex fridman  "
+      "  lex fridman  ",
     );
     await user.click(screen.getByRole("button", { name: "Search" }));
 
@@ -134,7 +134,7 @@ describe("DiscoverContent", () => {
       expect(onUrlUpdate).toHaveBeenCalledWith(
         expect.objectContaining({
           queryString: expect.stringContaining("q=lex+fridman"),
-        })
+        }),
       );
     });
   });
@@ -170,7 +170,7 @@ describe("DiscoverContent", () => {
               }),
             });
           }
-        })
+        }),
     );
 
     render(<DiscoverContent />, {
@@ -181,7 +181,7 @@ describe("DiscoverContent", () => {
     await waitFor(() => {
       expect(mockFetch).toHaveBeenCalledWith(
         expect.stringContaining("q=first"),
-        expect.anything()
+        expect.anything(),
       );
     });
 
@@ -205,7 +205,7 @@ describe("DiscoverContent", () => {
           options?.signal?.addEventListener("abort", () => {
             reject(new DOMException("Aborted", "AbortError"));
           });
-        })
+        }),
     );
 
     const { unmount } = render(<DiscoverContent />, {

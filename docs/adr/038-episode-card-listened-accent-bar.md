@@ -14,7 +14,7 @@
 Today the card applies a brand-colored 2px left border when `status === "completed"` (i.e. the AI summary has finished):
 
 ```tsx
-status === "completed" && "border-l-2 border-l-primary"
+status === "completed" && "border-l-2 border-l-primary";
 ```
 
 That signal duplicates information the `WorthItBadge` already communicates more precisely — a completed summary is already visible as a numeric score (or "Not rated") in the top-right of the card. The only episodes that render without a badge are ones whose caller omits the `score` prop entirely; in those views the completion accent bar carries no user value anyway because there is no paired score to contextualize it.
@@ -41,7 +41,7 @@ The `accent` prop union (`"unread" | "none"`) is **not** extended. Notifications
 The issue's original "notification cards: unchanged" framing is imprecise. `NotificationRow` in `src/components/notifications/notification-page-list.tsx` now threads `isListened` to `EpisodeCard` (previously it was only passed to `ListenedButton`), so the new logic **does** apply to notification cards. We accept this outcome rather than introduce a suppression prop. Rationale:
 
 - A notification card for an unlistened episode is itself an unlistened-episode surface — the bar is semantically accurate and consistent with every other list of episode cards in the app.
-- `accent="unread"` (notification read/unread) and `isListened` (episode listened/not) are independent axes. A *read* notification for an *unlistened* episode should still show the bar; an *unread* notification for a *listened* episode should still show the bg-tint without a bar. Suppressing the bar in the notification context would collapse these axes incorrectly.
+- `accent="unread"` (notification read/unread) and `isListened` (episode listened/not) are independent axes. A _read_ notification for an _unlistened_ episode should still show the bar; an _unread_ notification for a _listened_ episode should still show the bg-tint without a bar. Suppressing the bar in the notification context would collapse these axes incorrectly.
 - Introducing a `showListenedBar={false}` (or equivalent) escape hatch would add prop surface purely to preserve an incidental current-state artifact, violating "don't design for hypothetical future requirements".
 
 ### `isListened = false` default is load-bearing
@@ -59,7 +59,7 @@ The `isListened` prop defaults to `false`. After this change, that default means
 
 ### Negative
 
-- Default unlistened cards now render with a left accent bar even on views that previously showed a plain card (e.g. a podcast detail list of fresh episodes). This is intentional — fresh content *is* unlistened content — but it is a visual density increase for users on those views.
+- Default unlistened cards now render with a left accent bar even on views that previously showed a plain card (e.g. a podcast detail list of fresh episodes). This is intentional — fresh content _is_ unlistened content — but it is a visual density increase for users on those views.
 - Any code or test that relied on the old `border-l-primary` class appearing for `status === "completed"` will need to update. A repo-wide check found no tests asserting on that class; only the `data-status` attribute is asserted, which is preserved.
 - VRT baselines for `EpisodeCard` stories (both `src/components/episodes/episode-card.stories.tsx` and `src/components/podcasts/episode-card.stories.tsx`) will need regeneration on the CI Linux runner because most of those stories render unlistened (no `isListened=true`), so they will now gain a left bar. This is routine baseline maintenance per ADR-024.
 

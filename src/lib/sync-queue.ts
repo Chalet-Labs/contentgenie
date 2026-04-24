@@ -65,7 +65,9 @@ async function getEntries(): Promise<[string, SyncQueueItem][]> {
 /** Read-modify-write a single item. No-op if item not found or IDB unavailable. */
 async function updateItem(
   id: string,
-  patch: Partial<SyncQueueItem> | ((item: SyncQueueItem) => Partial<SyncQueueItem>),
+  patch:
+    | Partial<SyncQueueItem>
+    | ((item: SyncQueueItem) => Partial<SyncQueueItem>),
 ): Promise<void> {
   if (!(await isIdbAvailable())) return;
   const item = await get<SyncQueueItem>(id, store);
@@ -75,7 +77,9 @@ async function updateItem(
 }
 
 /** Delete all entries matching predicate. */
-async function deleteWhere(predicate: (item: SyncQueueItem) => boolean): Promise<void> {
+async function deleteWhere(
+  predicate: (item: SyncQueueItem) => boolean,
+): Promise<void> {
   const allEntries = await getEntries();
   await Promise.all(
     allEntries
@@ -166,18 +170,25 @@ export async function markFailed(id: string): Promise<void> {
 }
 
 export async function incrementAttempts(id: string): Promise<void> {
-  await updateItem(id, (item) => ({ attempts: item.attempts + 1, status: "pending" }));
+  await updateItem(id, (item) => ({
+    attempts: item.attempts + 1,
+    status: "pending",
+  }));
 }
 
 export async function getQueueCount(): Promise<number> {
   const allEntries = await getEntries();
-  return allEntries.filter(([, v]) => v.status === "pending" || v.status === "in-flight").length;
+  return allEntries.filter(
+    ([, v]) => v.status === "pending" || v.status === "in-flight",
+  ).length;
 }
 
 export async function hasPendingAction(entityKey: string): Promise<boolean> {
   const allEntries = await getEntries();
   return allEntries.some(
-    ([, v]) => v.entityKey === entityKey && (v.status === "pending" || v.status === "in-flight"),
+    ([, v]) =>
+      v.entityKey === entityKey &&
+      (v.status === "pending" || v.status === "in-flight"),
   );
 }
 
@@ -217,7 +228,9 @@ export async function resetStaleInFlight(): Promise<void> {
       .filter(([, value]) => {
         if (value.status !== "in-flight") return false;
         // Missing inFlightAt means legacy entry — treat as expired
-        return !value.inFlightAt || now - value.inFlightAt >= IN_FLIGHT_LEASE_MS;
+        return (
+          !value.inFlightAt || now - value.inFlightAt >= IN_FLIGHT_LEASE_MS
+        );
       })
       .map(([key, value]) => set(key, { ...value, status: "pending" }, store)),
   );

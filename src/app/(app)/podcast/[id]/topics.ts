@@ -25,10 +25,7 @@ export async function getTopicsByPodcastIndexId(
       })
       .from(episodeTopics)
       .where(
-        inArray(
-          episodeTopics.episodeId,
-          Array.from(idToPodcastIndexId.keys()),
-        ),
+        inArray(episodeTopics.episodeId, Array.from(idToPodcastIndexId.keys())),
       )
       .orderBy(sql`${episodeTopics.topicRank} ASC NULLS LAST`);
     const out: Record<string, string[]> = {};

@@ -24,7 +24,9 @@ export const batchSummarizeEpisodes = task({
   // through the summarize-queue (concurrencyLimit: 3). A batch of N needs
   // ~ceil(N/3) serial rounds, so the parent can run far longer than any child.
   maxDuration: 3600,
-  run: async (payload: BatchSummarizePayload): Promise<BatchSummarizeResult> => {
+  run: async (
+    payload: BatchSummarizePayload,
+  ): Promise<BatchSummarizeResult> => {
     const { episodeIds, skippedCount, totalRequested } = payload;
 
     logger.info("Starting batch summarization", {

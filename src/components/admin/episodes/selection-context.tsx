@@ -1,12 +1,12 @@
-"use client"
+"use client";
 
-import { createContext, useContext } from "react"
+import { createContext, useContext } from "react";
 
 export interface SelectionContextValue {
-  selectedIds: Set<number>
-  toggle: (id: number) => void
-  selectAll: (ids: number[]) => void
-  clearAll: () => void
+  selectedIds: Set<number>;
+  toggle: (id: number) => void;
+  selectAll: (ids: number[]) => void;
+  clearAll: () => void;
 }
 
 export const SelectionContext = createContext<SelectionContextValue>({
@@ -14,8 +14,8 @@ export const SelectionContext = createContext<SelectionContextValue>({
   toggle: () => {},
   selectAll: () => {},
   clearAll: () => {},
-})
+});
 
 export function useSelection() {
-  return useContext(SelectionContext)
+  return useContext(SelectionContext);
 }

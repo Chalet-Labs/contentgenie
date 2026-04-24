@@ -9,6 +9,7 @@
 When ContentGenie is installed as a PWA and the user loses connectivity, "Save" and "Subscribe" toggle actions fail silently because they invoke server actions that require a network connection. Users expect instant feedback and eventual consistency: the UI should respond immediately and the mutation should replay automatically when connectivity returns.
 
 The codebase already has:
+
 - `idb-keyval` for IndexedDB access (ADR-011, `src/lib/offline-cache.ts`)
 - `useOnlineStatus` hook for connectivity detection (`src/hooks/use-online-status.ts`)
 - A service worker (`public/sw.js`) handling push notifications and static asset caching (ADR-009)

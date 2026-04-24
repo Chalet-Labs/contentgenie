@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
     ) {
       return NextResponse.json(
         { error: "Invalid push subscription data" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
     console.error("Error saving push subscription:", error);
     return NextResponse.json(
       { error: "Failed to save push subscription" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -95,7 +95,7 @@ export async function DELETE(request: NextRequest) {
     if (!endpoint || typeof endpoint !== "string") {
       return NextResponse.json(
         { error: "Endpoint is required" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -104,8 +104,8 @@ export async function DELETE(request: NextRequest) {
       .where(
         and(
           eq(pushSubscriptions.userId, userId),
-          eq(pushSubscriptions.endpoint, endpoint)
-        )
+          eq(pushSubscriptions.endpoint, endpoint),
+        ),
       );
 
     return NextResponse.json({ success: true });
@@ -113,7 +113,7 @@ export async function DELETE(request: NextRequest) {
     console.error("Error removing push subscription:", error);
     return NextResponse.json(
       { error: "Failed to remove push subscription" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

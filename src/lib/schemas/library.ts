@@ -64,7 +64,9 @@ export const toggleSubscriptionSchema = z
   .strip();
 
 /** Parse an ISO datetime string into a Date, returning undefined on invalid input. */
-export function safeParseDate(value: string | null | undefined): Date | undefined {
+export function safeParseDate(
+  value: string | null | undefined,
+): Date | undefined {
   if (value == null) return undefined;
   const d = new Date(value);
   return isNaN(d.getTime()) ? undefined : d;

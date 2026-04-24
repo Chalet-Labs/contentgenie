@@ -67,7 +67,8 @@ export const LowScore: Story = {
     summary: "A short, unimpressive episode with recycled content.",
     keyTakeaways: ["One minor point"],
     worthItScore: 2.5,
-    worthItReason: "Limited value — mostly rehashed material from other episodes.",
+    worthItReason:
+      "Limited value — mostly rehashed material from other episodes.",
   },
 };
 

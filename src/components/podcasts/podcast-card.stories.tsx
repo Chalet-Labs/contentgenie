@@ -9,7 +9,8 @@ const basePodcast: PodcastIndexPodcast = {
   url: "https://example.com/feed",
   originalUrl: "https://example.com/feed",
   link: "https://example.com",
-  description: "A daily podcast covering the latest in technology, startups, and innovation.",
+  description:
+    "A daily podcast covering the latest in technology, startups, and innovation.",
   author: "Jane Smith",
   ownerName: "Jane Smith",
   image: "",
@@ -60,7 +61,9 @@ export const LongDescription: Story = {
     podcast: {
       ...basePodcast,
       description:
-        "This is a very long description that goes on and on to test how the card handles text overflow. ".repeat(5),
+        "This is a very long description that goes on and on to test how the card handles text overflow. ".repeat(
+          5,
+        ),
     },
   },
 };

@@ -16,7 +16,7 @@ export function getSummarizationPrompt(
   episodeTitle: string,
   description: string,
   duration: number,
-  transcript: string
+  transcript: string,
 ): string {
   const durationMinutes = duration > 0 ? Math.round(duration / 60) : null;
 
@@ -104,7 +104,7 @@ Always respond in valid JSON format.`;
 export const TRENDING_SUMMARY_SNIPPET_CHARS = 1500;
 
 export function getTrendingTopicsPrompt(
-  episodes: Array<{ id: number; title: string; summary: string }>
+  episodes: Array<{ id: number; title: string; summary: string }>,
 ): string {
   const episodePayload = JSON.stringify(
     episodes.map((ep) => ({
@@ -113,7 +113,7 @@ export function getTrendingTopicsPrompt(
       summary: ep.summary.slice(0, TRENDING_SUMMARY_SNIPPET_CHARS),
     })),
     null,
-    2
+    2,
   );
 
   return `Analyze these ${episodes.length} recently summarized podcast episodes and identify 5-8 trending topic clusters:
@@ -162,7 +162,7 @@ export function getTopicComparisonPrompt(
   titleA: string,
   summaryA: string,
   titleB: string,
-  summaryB: string
+  summaryB: string,
 ): string {
   return `Compare these two episode summaries on the topic "${escapeXml(topic)}".
 Which episode provides better coverage of this topic?
@@ -194,7 +194,7 @@ Rules:
 
 export function getQuickSummaryPrompt(
   title: string,
-  description: string
+  description: string,
 ): string {
   return `Provide a very brief (2-3 sentence) summary of this podcast episode based on its title and description:
 

@@ -116,10 +116,7 @@ describe("usePwaInstall", () => {
   });
 
   it("returns canInstall: false when dismissed within 7 days", () => {
-    window.localStorage.setItem(
-      "pwa-install-dismissed",
-      String(Date.now()),
-    );
+    window.localStorage.setItem("pwa-install-dismissed", String(Date.now()));
 
     const { result } = renderHook(() => usePwaInstall());
 

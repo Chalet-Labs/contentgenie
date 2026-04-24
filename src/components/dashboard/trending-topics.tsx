@@ -27,13 +27,15 @@ interface TrendingTopicsProps {
   isStale?: boolean;
 }
 
-export function TrendingTopics({ topics, generatedAt, isStale = false }: TrendingTopicsProps) {
+export function TrendingTopics({
+  topics,
+  generatedAt,
+  isStale = false,
+}: TrendingTopicsProps) {
   const updatedAgo = formatRelativeTime(generatedAt);
   const deduped = dedupeTopics(topics);
-  const { visible, expanded, hiddenCount, shouldShowToggle, toggle } = useExpandable(
-    deduped,
-    TOPICS_INITIAL,
-  );
+  const { visible, expanded, hiddenCount, shouldShowToggle, toggle } =
+    useExpandable(deduped, TOPICS_INITIAL);
 
   return (
     <Card>
@@ -42,9 +44,7 @@ export function TrendingTopics({ topics, generatedAt, isStale = false }: Trendin
           <TrendingUp className="h-4 w-4" />
           Trending Topics
         </CardTitle>
-        <CardDescription
-          className={cn(isStale && "text-status-warning-text")}
-        >
+        <CardDescription className={cn(isStale && "text-status-warning-text")}>
           Past 7 days · Updated {updatedAgo}
           {isStale && " · Out of date"}
         </CardDescription>
@@ -73,7 +73,9 @@ export function TrendingTopics({ topics, generatedAt, isStale = false }: Trendin
                     )}
                   </div>
                   <div className="flex shrink-0 items-center gap-1 text-sm text-muted-foreground">
-                    <span>{count} {count === 1 ? "episode" : "episodes"}</span>
+                    <span>
+                      {count} {count === 1 ? "episode" : "episodes"}
+                    </span>
                     <ChevronRight className="h-4 w-4" />
                   </div>
                 </Link>

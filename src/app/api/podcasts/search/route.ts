@@ -14,14 +14,17 @@ export async function GET(request: NextRequest) {
   if (!query) {
     return NextResponse.json(
       { error: "Search query is required" },
-      { status: 400 }
+      { status: 400 },
     );
   }
 
-  if (!process.env.PODCASTINDEX_API_KEY || !process.env.PODCASTINDEX_API_SECRET) {
+  if (
+    !process.env.PODCASTINDEX_API_KEY ||
+    !process.env.PODCASTINDEX_API_SECRET
+  ) {
     return NextResponse.json(
       { error: "PodcastIndex API credentials not configured" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 
@@ -103,7 +106,7 @@ export async function GET(request: NextRequest) {
     console.error("Podcast search error:", error);
     return NextResponse.json(
       { error: "Failed to search podcasts" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

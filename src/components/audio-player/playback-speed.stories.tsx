@@ -1,13 +1,13 @@
-import type { Meta, StoryObj } from "@storybook/nextjs-vite"
-import type { ReactNode } from "react"
+import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import type { ReactNode } from "react";
 import {
   AudioPlayerAPIContext,
   AudioPlayerStateContext,
   AudioPlayerProgressContext,
   type AudioPlayerState,
   type AudioPlayerAPI,
-} from "@/contexts/audio-player-context"
-import { PlaybackSpeed } from "./playback-speed"
+} from "@/contexts/audio-player-context";
+import { PlaybackSpeed } from "./playback-speed";
 
 const noopAPI: AudioPlayerAPI = {
   playEpisode: () => {},
@@ -26,7 +26,7 @@ const noopAPI: AudioPlayerAPI = {
   setSleepTimer: () => {},
   cancelSleepTimer: () => {},
   getCurrentTime: () => 0,
-}
+};
 
 const baseState: AudioPlayerState = {
   currentEpisode: null,
@@ -42,14 +42,14 @@ const baseState: AudioPlayerState = {
   chapters: null,
   chaptersLoading: false,
   sleepTimer: null,
-}
+};
 
 function MockProvider({
   state,
   children,
 }: {
-  state: AudioPlayerState
-  children: ReactNode
+  state: AudioPlayerState;
+  children: ReactNode;
 }) {
   return (
     <AudioPlayerAPIContext.Provider value={noopAPI}>
@@ -61,16 +61,16 @@ function MockProvider({
         </AudioPlayerProgressContext.Provider>
       </AudioPlayerStateContext.Provider>
     </AudioPlayerAPIContext.Provider>
-  )
+  );
 }
 
 const meta: Meta<typeof PlaybackSpeed> = {
   title: "AudioPlayer/PlaybackSpeed",
   component: PlaybackSpeed,
-}
+};
 
-export default meta
-type Story = StoryObj<typeof PlaybackSpeed>
+export default meta;
+type Story = StoryObj<typeof PlaybackSpeed>;
 
 export const Speed1x: Story = {
   decorators: [
@@ -82,7 +82,7 @@ export const Speed1x: Story = {
       </MockProvider>
     ),
   ],
-}
+};
 
 export const Speed125x: Story = {
   name: "Speed 1.25x",
@@ -95,7 +95,7 @@ export const Speed125x: Story = {
       </MockProvider>
     ),
   ],
-}
+};
 
 export const Speed15x: Story = {
   name: "Speed 1.5x",
@@ -108,7 +108,7 @@ export const Speed15x: Story = {
       </MockProvider>
     ),
   ],
-}
+};
 
 export const Speed2x: Story = {
   decorators: [
@@ -120,4 +120,4 @@ export const Speed2x: Story = {
       </MockProvider>
     ),
   ],
-}
+};

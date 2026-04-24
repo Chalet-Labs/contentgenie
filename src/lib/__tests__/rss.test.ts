@@ -266,9 +266,7 @@ describe("parsePodcastFeed", () => {
   it("handles episodes with invalid publish date", async () => {
     mockParseString.mockResolvedValueOnce({
       title: "Podcast",
-      items: [
-        { title: "Bad Date", guid: "bd-001", pubDate: "not-a-date" },
-      ],
+      items: [{ title: "Bad Date", guid: "bd-001", pubDate: "not-a-date" }],
     });
 
     const { parsePodcastFeed } = await import("@/lib/rss");
@@ -300,7 +298,9 @@ describe("parsePodcastFeed", () => {
 
   it("throws descriptive error on network failure", async () => {
     // Mock safeFetch failure
-    vi.mocked(security.safeFetch).mockRejectedValueOnce(new Error("ECONNREFUSED"));
+    vi.mocked(security.safeFetch).mockRejectedValueOnce(
+      new Error("ECONNREFUSED"),
+    );
 
     const { parsePodcastFeed } = await import("@/lib/rss");
 
@@ -399,21 +399,39 @@ describe("generatePodcastSyntheticId", () => {
 
 describe("generateEpisodeSyntheticId", () => {
   it("returns a deterministic rss- prefixed ID", () => {
-    const id1 = generateEpisodeSyntheticId("https://example.com/feed.xml", "ep-001");
-    const id2 = generateEpisodeSyntheticId("https://example.com/feed.xml", "ep-001");
+    const id1 = generateEpisodeSyntheticId(
+      "https://example.com/feed.xml",
+      "ep-001",
+    );
+    const id2 = generateEpisodeSyntheticId(
+      "https://example.com/feed.xml",
+      "ep-001",
+    );
     expect(id1).toBe(id2);
     expect(id1).toMatch(/^rss-[a-f0-9]{16}$/);
   });
 
   it("produces different IDs for different GUIDs", () => {
-    const a = generateEpisodeSyntheticId("https://example.com/feed.xml", "ep-001");
-    const b = generateEpisodeSyntheticId("https://example.com/feed.xml", "ep-002");
+    const a = generateEpisodeSyntheticId(
+      "https://example.com/feed.xml",
+      "ep-001",
+    );
+    const b = generateEpisodeSyntheticId(
+      "https://example.com/feed.xml",
+      "ep-002",
+    );
     expect(a).not.toBe(b);
   });
 
   it("produces different IDs for same GUID on different feeds", () => {
-    const a = generateEpisodeSyntheticId("https://example.com/feed1.xml", "ep-001");
-    const b = generateEpisodeSyntheticId("https://example.com/feed2.xml", "ep-001");
+    const a = generateEpisodeSyntheticId(
+      "https://example.com/feed1.xml",
+      "ep-001",
+    );
+    const b = generateEpisodeSyntheticId(
+      "https://example.com/feed2.xml",
+      "ep-001",
+    );
     expect(a).not.toBe(b);
   });
 

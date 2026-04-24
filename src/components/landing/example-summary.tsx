@@ -28,7 +28,8 @@ export function ExampleSummary() {
               dropped that intro so you don&apos;t have to.
             </p>
             <div className="lp-quote">
-              “I&apos;ve replaced three podcast apps with ContentGenie. My commute is mine again.”
+              “I&apos;ve replaced three podcast apps with ContentGenie. My
+              commute is mine again.”
               <cite>— Mira Okonjo, PM at a logistics startup</cite>
             </div>
           </aside>
@@ -52,15 +53,18 @@ export function ExampleSummary() {
               <h5>Verdict</h5>
               <p>
                 Worth listening in full if you run growth or monetize retention.
-                The cohort-math segment alone (min 14–28) is the best explanation
-                of survivorship bias in consumer SaaS we&apos;ve heard this year.
+                The cohort-math segment alone (min 14–28) is the best
+                explanation of survivorship bias in consumer SaaS we&apos;ve
+                heard this year.
               </p>
 
               <h5>Key takeaways</h5>
               <ul className="lp-ex-take">
                 {takeaways.map((t, i) => (
                   <li key={t}>
-                    <span className="lp-n">{String(i + 1).padStart(2, "0")}</span>
+                    <span className="lp-n">
+                      {String(i + 1).padStart(2, "0")}
+                    </span>
                     <span>{t}</span>
                   </li>
                 ))}
@@ -68,8 +72,8 @@ export function ExampleSummary() {
 
               <h5>Worth it for</h5>
               <p>
-                Growth PMs, early-stage founders deciding on a pricing move, anyone
-                writing a board deck about retention this quarter.
+                Growth PMs, early-stage founders deciding on a pricing move,
+                anyone writing a board deck about retention this quarter.
               </p>
             </div>
             <div className="lp-ex-footer">

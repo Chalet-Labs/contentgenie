@@ -28,7 +28,7 @@ describe("GET /api/chapters", () => {
     vi.mocked(auth).mockResolvedValue({ userId: null } as never);
 
     const request = new NextRequest(
-      "http://localhost:3000/api/chapters?url=https://example.com/chapters.json"
+      "http://localhost:3000/api/chapters?url=https://example.com/chapters.json",
     );
     const response = await GET(request);
 
@@ -51,7 +51,7 @@ describe("GET /api/chapters", () => {
     vi.mocked(isSafeUrl).mockResolvedValue(false);
 
     const request = new NextRequest(
-      "http://localhost:3000/api/chapters?url=not-a-url"
+      "http://localhost:3000/api/chapters?url=not-a-url",
     );
     const response = await GET(request);
 
@@ -64,7 +64,7 @@ describe("GET /api/chapters", () => {
     vi.mocked(isSafeUrl).mockResolvedValue(false);
 
     const request = new NextRequest(
-      "http://localhost:3000/api/chapters?url=ftp://example.com/chapters.json"
+      "http://localhost:3000/api/chapters?url=ftp://example.com/chapters.json",
     );
     const response = await GET(request);
 
@@ -77,7 +77,7 @@ describe("GET /api/chapters", () => {
     vi.mocked(isSafeUrl).mockResolvedValue(false);
 
     const request = new NextRequest(
-      "http://localhost:3000/api/chapters?url=https://10.0.0.1/chapters.json"
+      "http://localhost:3000/api/chapters?url=https://10.0.0.1/chapters.json",
     );
     const response = await GET(request);
 
@@ -91,7 +91,7 @@ describe("GET /api/chapters", () => {
     vi.mocked(safeFetch).mockRejectedValue(new Error("Network error"));
 
     const request = new NextRequest(
-      "http://localhost:3000/api/chapters?url=https://example.com/chapters.json"
+      "http://localhost:3000/api/chapters?url=https://example.com/chapters.json",
     );
     const response = await GET(request);
 
@@ -107,7 +107,7 @@ describe("GET /api/chapters", () => {
     vi.mocked(safeFetch).mockResolvedValue("not json {{{");
 
     const request = new NextRequest(
-      "http://localhost:3000/api/chapters?url=https://example.com/chapters.json"
+      "http://localhost:3000/api/chapters?url=https://example.com/chapters.json",
     );
     const response = await GET(request);
 
@@ -127,7 +127,7 @@ describe("GET /api/chapters", () => {
           { startTime: 0, title: "Intro" },
           { startTime: 60, title: "Main" },
         ],
-      })
+      }),
     );
     vi.mocked(parseChapters).mockReturnValue([
       { startTime: 0, title: "Intro" },
@@ -135,7 +135,7 @@ describe("GET /api/chapters", () => {
     ]);
 
     const request = new NextRequest(
-      "http://localhost:3000/api/chapters?url=https://example.com/chapters.json"
+      "http://localhost:3000/api/chapters?url=https://example.com/chapters.json",
     );
     const response = await GET(request);
 

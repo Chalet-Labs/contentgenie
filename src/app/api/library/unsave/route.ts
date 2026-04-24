@@ -10,10 +10,14 @@ export async function POST(request: NextRequest) {
   try {
     const { userId } = await auth();
     if (!userId) {
-      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json(
+        { success: false, error: "Unauthorized" },
+        { status: 401 },
+      );
     }
 
-    const contentType = request.headers.get("content-type")?.toLowerCase() ?? "";
+    const contentType =
+      request.headers.get("content-type")?.toLowerCase() ?? "";
     if (!contentType.includes("application/json")) {
       return NextResponse.json(
         { success: false, error: "Unsupported Media Type" },
@@ -42,7 +46,10 @@ export async function POST(request: NextRequest) {
     const result = unsaveEpisodeSchema.safeParse(body);
     if (!result.success) {
       return NextResponse.json(
-        { success: false, error: "Invalid episode data: podcastIndexId is required" },
+        {
+          success: false,
+          error: "Invalid episode data: podcastIndexId is required",
+        },
         { status: 400 },
       );
     }
@@ -73,7 +80,10 @@ export async function POST(request: NextRequest) {
     revalidatePath("/library");
     revalidatePath(`/episode/${podcastIndexId}`);
 
-    return NextResponse.json({ success: true, message: "Episode removed from library" });
+    return NextResponse.json({
+      success: true,
+      message: "Episode removed from library",
+    });
   } catch (error) {
     console.error("Error removing episode from library:", error);
     return NextResponse.json(

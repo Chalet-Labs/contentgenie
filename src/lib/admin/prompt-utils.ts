@@ -11,7 +11,8 @@ export interface PromptVars {
  * Unrecognized {{x}} tokens pass through unchanged.
  */
 export function interpolatePrompt(template: string, vars: PromptVars): string {
-  const durationMinutes = vars.duration > 0 ? Math.round(vars.duration / 60) : 0;
+  const durationMinutes =
+    vars.duration > 0 ? Math.round(vars.duration / 60) : 0;
 
   return template
     .replace(/\{\{title\}\}/g, () => vars.title)

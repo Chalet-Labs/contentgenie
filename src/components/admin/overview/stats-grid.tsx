@@ -1,10 +1,10 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import type { OverviewStats } from "@/lib/admin/overview-queries"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import type { OverviewStats } from "@/lib/admin/overview-queries";
 
-const TRIGGER_DASHBOARD_URL = "https://cloud.trigger.dev"
+const TRIGGER_DASHBOARD_URL = "https://cloud.trigger.dev";
 
 interface StatsGridProps {
-  stats: OverviewStats
+  stats: OverviewStats;
 }
 
 function StatCard({
@@ -13,15 +13,17 @@ function StatCard({
   description,
   approximate,
 }: {
-  title: string
-  value: string | number
-  description?: string
-  approximate?: boolean
+  title: string;
+  value: string | number;
+  description?: string;
+  approximate?: boolean;
 }) {
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-medium text-muted-foreground">{title}</CardTitle>
+        <CardTitle className="text-sm font-medium text-muted-foreground">
+          {title}
+        </CardTitle>
       </CardHeader>
       <CardContent>
         <div className="text-2xl font-bold">
@@ -29,10 +31,10 @@ function StatCard({
           {value}
         </div>
         {description && (
-          <p className="text-xs text-muted-foreground mt-1">{description}</p>
+          <p className="mt-1 text-xs text-muted-foreground">{description}</p>
         )}
         {approximate && (
-          <p className="text-xs text-muted-foreground mt-1">
+          <p className="mt-1 text-xs text-muted-foreground">
             Approximate — based on episode status in DB.{" "}
             <a
               href={TRIGGER_DASHBOARD_URL}
@@ -47,7 +49,7 @@ function StatCard({
         )}
       </CardContent>
     </Card>
-  )
+  );
 }
 
 export function StatsGrid({ stats }: StatsGridProps) {
@@ -81,5 +83,5 @@ export function StatsGrid({ stats }: StatsGridProps) {
         approximate
       />
     </div>
-  )
+  );
 }

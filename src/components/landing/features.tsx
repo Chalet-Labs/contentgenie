@@ -47,7 +47,8 @@ export function Features() {
         <div className="lp-sec-head">
           <div className="lp-sec-label">01 — Product</div>
           <h2 className="lp-sec-title">
-            Four tools, one job: <em>decide what deserves the next 40 minutes.</em>
+            Four tools, one job:{" "}
+            <em>decide what deserves the next 40 minutes.</em>
           </h2>
         </div>
 
@@ -69,11 +70,17 @@ export function Features() {
                       <div>
                         <div className="lp-row-title">{r.title}</div>
                         <div className="lp-bar">
-                          <i style={{ width: `${r.score * 10}%`, background: `hsl(var(${BAND_TOKEN[band]}))` }} />
+                          <i
+                            style={{
+                              width: `${r.score * 10}%`,
+                              background: `hsl(var(${BAND_TOKEN[band]}))`,
+                            }}
+                          />
                         </div>
                       </div>
                       <span className={`lp-score lp-s-${band}`}>
-                        <span className="lp-num">{r.score.toFixed(1)}</span> {getScoreLabel(r.score)}
+                        <span className="lp-num">{r.score.toFixed(1)}</span>{" "}
+                        {getScoreLabel(r.score)}
                       </span>
                     </div>
                   );
@@ -92,7 +99,9 @@ export function Features() {
             <div className="lp-feat-demo">
               {takeaways.map((t, i) => (
                 <span key={t} className="lp-chip">
-                  <span className="lp-chip-n">{String(i + 1).padStart(2, "0")}</span>
+                  <span className="lp-chip-n">
+                    {String(i + 1).padStart(2, "0")}
+                  </span>
                   {t}
                 </span>
               ))}
@@ -102,11 +111,18 @@ export function Features() {
           <div className="lp-feat lp-f-md">
             <div className="lp-feat-num">F.03</div>
             <h3>A library that remembers</h3>
-            <p>Collections, tags, and notes. Search your own listening history by phrase.</p>
+            <p>
+              Collections, tags, and notes. Search your own listening history by
+              phrase.
+            </p>
             <div className="lp-feat-demo">
               <div className="lp-lib-grid">
                 {libraryColors.map((c) => (
-                  <div key={c} className="lp-lib-cell" style={{ background: c }} />
+                  <div
+                    key={c}
+                    className="lp-lib-cell"
+                    style={{ background: c }}
+                  />
                 ))}
               </div>
             </div>
@@ -120,7 +136,10 @@ export function Features() {
               Find the two episodes on a topic actually worth hearing, not the
               twenty-two that exist.
             </p>
-            <div className="lp-feat-demo" style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+            <div
+              className="lp-feat-demo"
+              style={{ display: "flex", gap: 8, flexWrap: "wrap" }}
+            >
               {discoverChips.map((c) => (
                 <span key={c.n} className="lp-chip lp-chip-ghost">
                   <span className="lp-chip-n">{c.n}</span>

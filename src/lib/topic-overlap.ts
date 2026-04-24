@@ -67,7 +67,9 @@ export interface TopicCountRow {
  * Aggregate raw topic-count query rows into a profile map.
  * Maps topic → number of distinct consumed episodes tagged with that topic.
  */
-export function buildUserTopicProfile(rows: TopicCountRow[]): Map<string, number> {
+export function buildUserTopicProfile(
+  rows: TopicCountRow[],
+): Map<string, number> {
   const profile = new Map<string, number>();
   for (const row of rows) {
     profile.set(row.topic, row.count);
@@ -95,7 +97,7 @@ export function computeTopicOverlap(
   userProfile: Map<string, number>,
   episodeTopics: EpisodeTopicRow[],
   totalConsumed: number,
-  topicRank?: number | null
+  topicRank?: number | null,
 ): TopicOverlapResult {
   // Global gate: fewer than MIN_CONSUMED_FOR_INDICATORS consumed episodes → no indicators at all
   if (totalConsumed < MIN_CONSUMED_FOR_INDICATORS) {
@@ -154,5 +156,11 @@ export function computeTopicOverlap(
   }
 
   // Rule 5: no label
-  return { overlapCount, topOverlapTopic, isNewTopic: false, label: null, labelKind: null };
+  return {
+    overlapCount,
+    topOverlapTopic,
+    isNewTopic: false,
+    label: null,
+    labelKind: null,
+  };
 }

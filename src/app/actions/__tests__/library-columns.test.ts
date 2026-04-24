@@ -55,10 +55,7 @@ describe("Library column selection constants", () => {
   });
 
   it("COLLECTION_LIST_COLUMNS includes exactly the expected fields", () => {
-    expect(Object.keys(COLLECTION_LIST_COLUMNS).sort()).toEqual([
-      "id",
-      "name",
-    ]);
+    expect(Object.keys(COLLECTION_LIST_COLUMNS).sort()).toEqual(["id", "name"]);
   });
 
   it("all column values are true (allowlist pattern)", () => {

@@ -46,20 +46,21 @@ export async function submitTranscription(audioUrl: string): Promise<string> {
   const response = await fetch(`${API_BASE_URL}/transcript`, {
     method: "POST",
     headers: getAuthHeaders(),
-    body: JSON.stringify({ audio_url: audioUrl, speech_models: DEFAULT_SPEECH_MODELS }),
+    body: JSON.stringify({
+      audio_url: audioUrl,
+      speech_models: DEFAULT_SPEECH_MODELS,
+    }),
   });
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(
-      `AssemblyAI API error: ${response.status} - ${errorText}`
-    );
+    throw new Error(`AssemblyAI API error: ${response.status} - ${errorText}`);
   }
 
   const data = await response.json();
   if (typeof data?.id !== "string" || !data.id) {
     throw new Error(
-      "AssemblyAI API error: submit response did not include a transcript ID"
+      "AssemblyAI API error: submit response did not include a transcript ID",
     );
   }
   return data.id;
@@ -68,25 +69,27 @@ export async function submitTranscription(audioUrl: string): Promise<string> {
 // Submit an audio URL for transcription with a webhook callback, returns the transcript ID
 export async function submitTranscriptionAsync(
   audioUrl: string,
-  webhookUrl: string
+  webhookUrl: string,
 ): Promise<string> {
   const response = await fetch(`${API_BASE_URL}/transcript`, {
     method: "POST",
     headers: getAuthHeaders(),
-    body: JSON.stringify({ audio_url: audioUrl, webhook_url: webhookUrl, speech_models: DEFAULT_SPEECH_MODELS }),
+    body: JSON.stringify({
+      audio_url: audioUrl,
+      webhook_url: webhookUrl,
+      speech_models: DEFAULT_SPEECH_MODELS,
+    }),
   });
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(
-      `AssemblyAI API error: ${response.status} - ${errorText}`
-    );
+    throw new Error(`AssemblyAI API error: ${response.status} - ${errorText}`);
   }
 
   const data = await response.json();
   if (typeof data?.id !== "string" || !data.id) {
     throw new Error(
-      "AssemblyAI API error: submit response did not include a transcript ID"
+      "AssemblyAI API error: submit response did not include a transcript ID",
     );
   }
   return data.id;
@@ -94,7 +97,7 @@ export async function submitTranscriptionAsync(
 
 // Get the current status of a transcription
 export async function getTranscriptionStatus(
-  transcriptId: string
+  transcriptId: string,
 ): Promise<TranscriptionResult> {
   const response = await fetch(`${API_BASE_URL}/transcript/${transcriptId}`, {
     method: "GET",
@@ -103,16 +106,12 @@ export async function getTranscriptionStatus(
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(
-      `AssemblyAI API error: ${response.status} - ${errorText}`
-    );
+    throw new Error(`AssemblyAI API error: ${response.status} - ${errorText}`);
   }
 
   const data = await response.json();
   if (typeof data?.id !== "string" || typeof data?.status !== "string") {
-    throw new Error(
-      "AssemblyAI API error: invalid response from status check"
-    );
+    throw new Error("AssemblyAI API error: invalid response from status check");
   }
   return {
     id: data.id,
@@ -129,7 +128,7 @@ function sleep(ms: number): Promise<void> {
 // High-level function: submit audio and poll until completion or error
 export async function transcribeAudio(
   audioUrl: string,
-  options: TranscribeOptions = {}
+  options: TranscribeOptions = {},
 ): Promise<TranscriptionResult> {
   const pollInterval = options.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS;
   const maxWait = options.maxWaitMs ?? MAX_WAIT_MS;
@@ -152,7 +151,7 @@ export async function transcribeAudio(
     // Exponential backoff
     currentInterval = Math.min(
       currentInterval * BACKOFF_FACTOR,
-      MAX_POLL_INTERVAL_MS
+      MAX_POLL_INTERVAL_MS,
     );
   }
 
