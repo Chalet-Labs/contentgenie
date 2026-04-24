@@ -185,5 +185,5 @@ Run `doppler setup` in the project root to link your local environment.
 **"Unable to fetch secrets"**
 Run `doppler login` to re-authenticate, then `doppler setup` to re-link.
 
-**"NEXT*PUBLIC*\* variables not available in browser"**
+**"`NEXT_PUBLIC_*` variables not available in browser"**
 `NEXT_PUBLIC_*` variables are inlined at build time. If you change them in Doppler, you must rebuild the app (`bun run build`).

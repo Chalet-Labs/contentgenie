@@ -120,10 +120,9 @@ Present findings as a prioritized list with estimated impact:
 
 1. **Right-size `process-images` machine** — Currently `large-2x`, average run 2s.
    Switching to `small-2x` could reduce this task's cost by ~16x.
+   <!-- prettier-ignore -->
    ```ts
-   machine: {
-     preset: "small-2x";
-   } // was "large-2x"
+   machine: { preset: "small-2x" }  // was "large-2x"
    ```
 ````
 
