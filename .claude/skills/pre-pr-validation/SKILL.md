@@ -106,9 +106,9 @@ Must exit 0. If it fails, fix the root cause (not a suppression, not a workaroun
 
 Launch three reviews in parallel (one message, three independent tool calls):
 
-1. `/codex:review --base main --background` — external perspective. Detaches; poll `/codex:status` until it reports complete before reading output. If status is stuck for more than 15 minutes, run `/codex:cancel` and surface to the user.
-2. `/pr-review-toolkit:review-pr all` — specialized agents: code-reviewer, pr-test-analyzer, silent-failure-hunter, type-design-analyzer, comment-analyzer, code-simplifier.
-3. `/simplify` — reuse/quality/efficiency pass.
+1. **Codex review** — external perspective. The `/codex:review` slash command is marked `disable-model-invocation`, so the agent can't call it via the Skill tool. Invoke the underlying CLI via Bash instead: `codex review --base main` (synchronous; no `--background` flag at the CLI layer — that's a slash-command wrapper). If the agent is running inline and the synchronous wait is a problem, launch it with `run_in_background: true` on the Bash tool and poll the output later.
+2. `/pr-review-toolkit:review-pr all` — specialized agents: code-reviewer, pr-test-analyzer, silent-failure-hunter, type-design-analyzer, comment-analyzer, code-simplifier. Invokable via Skill.
+3. `/simplify` — reuse/quality/efficiency pass. Invokable via Skill.
 
 Wait for all three to complete before proceeding. Collect their full output. Don't run `codex:setup` — it's one-time init, not part of the pipeline.
 
