@@ -29,7 +29,7 @@ export function setupMediaSessionHandlers(handlers: {
   onSeekBackward: () => void
   onSeekForward: () => void
   onStop: () => void
-  onNextTrack?: (() => void) | null
+  onSeekTo: (time: number) => void
 }): void {
   if (typeof navigator === "undefined" || !("mediaSession" in navigator)) return
 
@@ -38,10 +38,20 @@ export function setupMediaSessionHandlers(handlers: {
   navigator.mediaSession.setActionHandler("seekbackward", handlers.onSeekBackward)
   navigator.mediaSession.setActionHandler("seekforward", handlers.onSeekForward)
   navigator.mediaSession.setActionHandler("stop", handlers.onStop)
+  // Never register "nexttrack": Chrome on Android's compact notification slot ranks
+  // nexttrack above seekforward, which hides rewind/forward from the lock screen.
+  // Actively null it so re-runs of this effect clear any stale handler.
   try {
-    navigator.mediaSession.setActionHandler("nexttrack", handlers.onNextTrack ?? null)
+    navigator.mediaSession.setActionHandler("nexttrack", null)
   } catch {
     // "nexttrack" may not be supported on all platforms
+  }
+  try {
+    navigator.mediaSession.setActionHandler("seekto", (details) => {
+      if (typeof details.seekTime === "number") handlers.onSeekTo(details.seekTime)
+    })
+  } catch {
+    // "seekto" may not be supported on all platforms
   }
 }
 
@@ -76,5 +86,10 @@ export function clearMediaSession(): void {
     navigator.mediaSession.setActionHandler("nexttrack", null)
   } catch {
     // "nexttrack" may not be supported on all platforms
+  }
+  try {
+    navigator.mediaSession.setActionHandler("seekto", null)
+  } catch {
+    // "seekto" may not be supported on all platforms
   }
 }

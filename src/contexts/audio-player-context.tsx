@@ -1091,9 +1091,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       onSeekBackward: () => api.skipBack(),
       onSeekForward: () => api.skipForward(),
       onStop: api.closePlayer,
-      onNextTrack: () => {
-        if (stateRef.current.queue.length > 0) api.playNext()
-      },
+      onSeekTo: api.seek,
     })
     return () => clearMediaSession()
   }, [api])
