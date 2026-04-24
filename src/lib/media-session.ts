@@ -53,8 +53,9 @@ export function setupMediaSessionHandlers(handlers: {
   // above seekforward, displacing rewind/forward. Null overwrites any stale handler (#355).
   setActionHandlerSafe("nexttrack", null)
   setActionHandlerSafe("seekto", (details) => {
-    if (Number.isFinite(details.seekTime) && (details.seekTime as number) >= 0) {
-      handlers.onSeekTo(details.seekTime as number)
+    const seekTime = details.seekTime
+    if (typeof seekTime === "number" && Number.isFinite(seekTime) && seekTime >= 0) {
+      handlers.onSeekTo(seekTime)
     }
   })
 }
