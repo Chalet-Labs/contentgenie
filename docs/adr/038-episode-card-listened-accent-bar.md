@@ -9,7 +9,7 @@
 
 ## Context
 
-`EpisodeCard` (`src/components/episodes/episode-card.tsx`) is the shared primitive used to render episodes across the app: podcast detail (`src/components/podcasts/episode-list.tsx`), library (`src/components/library/saved-episode-card.tsx`), trending detail (`src/app/(app)/trending/[slug]/trending-detail-content.tsx`), and notifications (`src/components/notifications/notification-page-list.tsx`).
+`EpisodeCard` (`src/components/episodes/episode-card.tsx`) is the shared primitive used to render episodes in podcast detail (via `src/components/podcasts/episode-card.tsx`, which wraps the primitive and is consumed by `episode-list.tsx`), library (`src/components/library/saved-episode-card.tsx`), and notifications (`src/components/notifications/notification-page-list.tsx`). The trending detail page (`src/app/(app)/trending/[slug]/trending-detail-content.tsx`) renders episodes via its own local `EpisodeCard` function (defined inline at the top of the file) and does **not** use the shared primitive.
 
 Today the card applies a brand-colored 2px left border when `status === "completed"` (i.e. the AI summary has finished):
 
@@ -30,7 +30,9 @@ Repurpose the EpisodeCard left-accent bar to indicate listen state instead of su
 - `isListened === true` (i.e. the user has heard this episode) renders with no accent bar.
 - Worth-It score continues to communicate summary state on its own.
 
-Scope of the bar change is limited to the `EpisodeCard` primitive's class logic plus a single caller patch: three of the four consumers (`podcasts/episode-card.tsx`, `library/saved-episode-card.tsx`, `trending-detail-content.tsx`) already thread `isListened` through to the primitive. `NotificationRow` in `src/components/notifications/notification-page-list.tsx` previously threaded `isListened` only to `ListenedButton` and not to `EpisodeCard`; this change adds the missing `isListened={isListened}` prop so listened notifications correctly hide the bar.
+Scope of the bar change is limited to the `EpisodeCard` primitive's class logic plus a single caller patch. The primitive has three consumers: `podcasts/episode-card.tsx` (the podcast-detail wrapper), `library/saved-episode-card.tsx`, and `notifications/notification-page-list.tsx`. The first two already thread `isListened` through to the primitive. `NotificationRow` in `notification-page-list.tsx` previously threaded `isListened` only to `ListenedButton` and not to `EpisodeCard`; this change adds the missing `isListened={isListened}` prop so listened notifications correctly hide the bar.
+
+Trending detail (`src/app/(app)/trending/[slug]/trending-detail-content.tsx`) is **out of scope** for this ADR: it renders episodes via a local `EpisodeCard` function that never consumed the shared primitive, so the listen-state bar will not appear on trending detail until that local component is either unified with the primitive or gains equivalent bar logic. Tracked as follow-up.
 
 The `accent` prop union (`"unread" | "none"`) is **not** extended. Notifications continue to use `accent="unread"` to apply the bg-tint treatment, which is an orthogonal axis to the listen-state bar. The two treatments can coexist on the same card without visual conflict: the `accent="unread"` bg-tint fills the card body, while the listen-state bar sits on the left edge.
 
@@ -44,7 +46,7 @@ The issue's original "notification cards: unchanged" framing is imprecise. `Noti
 
 ### `isListened = false` default is load-bearing
 
-The `isListened` prop defaults to `false`. After this change, that default means **every** card rendered without an explicit `isListened` prop will show the bar. This is the correct failure mode — a caller that does not know listen state should assume "unlistened" and surface the activity marker (false-positive bar is a smaller UX error than false-negative silent listened state). All four current consumer surfaces explicitly pass `isListened`, so the default acts as a safety net rather than the common path.
+The `isListened` prop defaults to `false`. After this change, that default means **every** card rendered without an explicit `isListened` prop will show the bar. This is the correct failure mode — a caller that does not know listen state should assume "unlistened" and surface the activity marker (false-positive bar is a smaller UX error than false-negative silent listened state). All three current primitive consumers explicitly pass `isListened`, so the default acts as a safety net rather than the common path.
 
 ## Consequences
 
