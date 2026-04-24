@@ -17,11 +17,20 @@ import type { UseChaptersState } from "@/hooks/use-chapters";
 interface EpisodeChaptersListProps {
   state: UseChaptersState;
   audioEpisode: AudioEpisode;
+  /**
+   * Whether this episode can be started/seeked from here. When false
+   * (e.g. offline, missing enclosure URL), clicks on non-current-episode
+   * rows are disabled so we never replace the player with an unplayable
+   * source. Current-episode seek/resume is always allowed — that audio is
+   * already loaded.
+   */
+  canPlay?: boolean;
 }
 
 export function EpisodeChaptersList({
   state,
   audioEpisode,
+  canPlay = true,
 }: EpisodeChaptersListProps) {
   const playerState = useAudioPlayerState();
   const progress = useAudioPlayerProgress();
@@ -67,10 +76,12 @@ export function EpisodeChaptersList({
           if (!playerState.isPlaying) {
             playerAPI.togglePlay();
           }
-        } else {
+        } else if (canPlay) {
           playerAPI.playEpisode(audioEpisode, { startAt: chapter.startTime });
         }
       };
+
+      const rowDisabled = !isCurrentEpisode && !canPlay;
 
       return (
         <div>
@@ -86,9 +97,12 @@ export function EpisodeChaptersList({
                   <button
                     type="button"
                     onClick={() => handleSelect(chapter)}
+                    disabled={rowDisabled}
                     aria-current={active ? "true" : undefined}
                     className={cn(
                       "flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors",
+                      "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
+                      "disabled:cursor-not-allowed disabled:opacity-60",
                       active
                         ? "bg-primary/[0.08] text-primary"
                         : "hover:bg-muted/60",
@@ -96,7 +110,7 @@ export function EpisodeChaptersList({
                   >
                     <span
                       className={cn(
-                        "w-12 shrink-0 text-xs font-medium tabular-nums",
+                        "w-14 shrink-0 text-xs font-medium tabular-nums",
                         active ? "text-primary" : "text-muted-foreground",
                       )}
                     >

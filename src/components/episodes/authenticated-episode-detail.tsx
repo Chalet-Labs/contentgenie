@@ -451,7 +451,9 @@ export function AuthenticatedEpisodeDetail({
     : [];
 
   const hasChapters = normalizedChaptersUrl !== null;
-  const hasDescription = Boolean(episode.description?.trim());
+  const descriptionPlainText = stripHtml(episode.description ?? "");
+  const hasDescription = Boolean(descriptionPlainText.trim());
+  const canPlayEpisode = isOnline && Boolean(episode.enclosureUrl);
   const chaptersCount =
     chaptersState.status === "ready"
       ? chaptersState.chapters.length
@@ -473,7 +475,7 @@ export function AuthenticatedEpisodeDetail({
         audioUrl: episode.enclosureUrl,
         artwork: artworkUrl,
         duration: episode.duration,
-        chaptersUrl: episode.chaptersUrl ?? undefined,
+        chaptersUrl: normalizedChaptersUrl ?? undefined,
       });
     }
   };
@@ -653,7 +655,7 @@ export function AuthenticatedEpisodeDetail({
                   // Known v1 limitation: queue items persisted before this feature
                   // won't carry chaptersUrl. Chapters silently won't load for
                   // queue-initiated playback of older queue entries.
-                  chaptersUrl: episode.chaptersUrl ?? undefined,
+                  chaptersUrl: normalizedChaptersUrl ?? undefined,
                 }}
                 variant="full"
               />
@@ -759,6 +761,7 @@ export function AuthenticatedEpisodeDetail({
               <CardContent className="p-4">
                 <EpisodeChaptersList
                   state={chaptersState}
+                  canPlay={canPlayEpisode}
                   audioEpisode={{
                     id: String(episode.id),
                     title: episode.title,
@@ -782,7 +785,7 @@ export function AuthenticatedEpisodeDetail({
                   About This Episode
                 </h2>
                 <p className="whitespace-pre-wrap text-muted-foreground">
-                  {stripHtml(episode.description)}
+                  {descriptionPlainText}
                 </p>
               </CardContent>
             </Card>

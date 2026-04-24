@@ -1,7 +1,7 @@
 /**
  * Format seconds as `M:SS` or `H:MM:SS` when hours are non-zero
- * (e.g. 65 → "1:05", 3725 → "1:02:05"). Returns "0:00" for non-finite
- * or negative input.
+ * (e.g. 65 → "1:05", 3725 → "1:02:05"). Returns "0:00" for non-finite,
+ * non-positive, or sub-second input.
  */
 export function formatTime(seconds: number): string {
   if (!isFinite(seconds) || seconds <= 0) return "0:00";

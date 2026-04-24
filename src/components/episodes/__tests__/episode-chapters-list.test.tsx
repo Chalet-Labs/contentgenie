@@ -132,6 +132,58 @@ describe("EpisodeChaptersList", () => {
     expect(playEpisode).toHaveBeenCalledWith(sampleEpisode, { startAt: 300 });
   });
 
+  it("disables non-current chapter rows and skips playEpisode when canPlay=false", async () => {
+    const playEpisode = vi.fn();
+    mocks.useAudioPlayerAPI.mockReturnValue({
+      playEpisode,
+      seek: vi.fn(),
+      togglePlay: vi.fn(),
+    });
+
+    render(
+      <EpisodeChaptersList
+        state={readyState(2)}
+        audioEpisode={sampleEpisode}
+        canPlay={false}
+      />,
+    );
+
+    const row = screen.getByText("Chapter 2").closest("button");
+    expect(row).toBeDisabled();
+
+    const user = userEvent.setup();
+    await user.click(screen.getByText("Chapter 2"));
+    expect(playEpisode).not.toHaveBeenCalled();
+  });
+
+  it("keeps current-episode seek+resume working even when canPlay=false", async () => {
+    const seek = vi.fn();
+    const togglePlay = vi.fn();
+    const playEpisode = vi.fn();
+    mocks.useAudioPlayerState.mockReturnValue({
+      currentEpisode: { id: sampleEpisode.id },
+      isPlaying: false,
+    });
+    mocks.useAudioPlayerAPI.mockReturnValue({ seek, playEpisode, togglePlay });
+
+    render(
+      <EpisodeChaptersList
+        state={readyState(2)}
+        audioEpisode={sampleEpisode}
+        canPlay={false}
+      />,
+    );
+
+    const row = screen.getByText("Chapter 2").closest("button");
+    expect(row).not.toBeDisabled();
+
+    const user = userEvent.setup();
+    await user.click(screen.getByText("Chapter 2"));
+    expect(seek).toHaveBeenCalledWith(300);
+    expect(togglePlay).toHaveBeenCalledTimes(1);
+    expect(playEpisode).not.toHaveBeenCalled();
+  });
+
   it("seeks and resumes playback when the current episode matches and is paused", async () => {
     const seek = vi.fn();
     const playEpisode = vi.fn();
