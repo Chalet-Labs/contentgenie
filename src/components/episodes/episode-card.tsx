@@ -9,6 +9,8 @@ import { WorthItBadge } from "@/components/episodes/worth-it-badge";
 import { parseScoreOrNull } from "@/lib/score-utils";
 import type { SummaryStatus } from "@/db/schema";
 
+export const MAX_DISPLAYED_TOPICS = 3;
+
 export interface EpisodeCardProps {
   /** Podcast artwork URL. When omitted, no artwork tile is rendered. */
   artwork?: string | null;
@@ -201,7 +203,7 @@ export function EpisodeCard({
 
             {topics && topics.length > 0 && (
               <div className="mt-2 flex flex-wrap gap-1">
-                {topics.slice(0, 3).map((t) => (
+                {topics.slice(0, MAX_DISPLAYED_TOPICS).map((t) => (
                   <Badge key={t} variant="secondary" className="text-xs">
                     {t}
                   </Badge>

@@ -1,8 +1,9 @@
-import { inArray, sql } from "drizzle-orm";
+import { inArray, lte, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { episodeTopics } from "@/db/schema";
+import { MAX_DISPLAYED_TOPICS } from "@/components/episodes/episode-card";
 
-export const TOPICS_PER_EPISODE_LIMIT = 4;
+export const TOPICS_PER_EPISODE_LIMIT = MAX_DISPLAYED_TOPICS + 1;
 
 /**
  * Batch-fetch top topics per episode, keyed by PodcastIndex id.
@@ -18,25 +19,39 @@ export async function getTopicsByPodcastIndexId(
     const idToPodcastIndexId = new Map(
       dbEpisodes.map((e) => [e.id, e.podcastIndexId]),
     );
-    const rows = await db
+    const episodeIds = Array.from(idToPodcastIndexId.keys());
+    const sub = db
       .select({
         episodeId: episodeTopics.episodeId,
         topic: episodeTopics.topic,
+        topicRank: episodeTopics.topicRank,
+        rn: sql<number>`
+          row_number() over (
+            partition by ${episodeTopics.episodeId}
+            order by ${episodeTopics.topicRank} nulls last, ${episodeTopics.topic}
+          )
+        `.as("rn"),
       })
       .from(episodeTopics)
-      .where(
-        inArray(episodeTopics.episodeId, Array.from(idToPodcastIndexId.keys())),
-      )
-      .orderBy(sql`${episodeTopics.topicRank} ASC NULLS LAST`);
+      .where(inArray(episodeTopics.episodeId, episodeIds))
+      .as("sub");
+
+    const rows = await db
+      .select({
+        episodeId: sub.episodeId,
+        topic: sub.topic,
+        topicRank: sub.topicRank,
+      })
+      .from(sub)
+      .where(lte(sub.rn, TOPICS_PER_EPISODE_LIMIT));
+
     const out: Record<string, string[]> = {};
     for (const row of rows) {
       const pi = idToPodcastIndexId.get(row.episodeId);
       if (!pi) continue;
-      const existing = out[pi] ?? [];
-      if (existing.length < TOPICS_PER_EPISODE_LIMIT) {
-        existing.push(row.topic);
-        out[pi] = existing;
-      }
+      const bucket = out[pi] ?? [];
+      bucket.push(row.topic);
+      out[pi] = bucket;
     }
     return out;
   } catch (err) {

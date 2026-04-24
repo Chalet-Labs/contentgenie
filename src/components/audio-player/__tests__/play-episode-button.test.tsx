@@ -61,7 +61,7 @@ describe("PlayEpisodeButton", () => {
     const user = userEvent.setup();
     render(<PlayEpisodeButton episode={episode} />);
     const btn = screen.getByRole("button", { name: /now playing/i });
-    expect(btn).toBeDisabled();
+    expect(btn).toHaveAttribute("aria-disabled", "true");
     await user.click(btn);
     expect(mockPlayEpisode).not.toHaveBeenCalled();
     expect(mockTogglePlay).not.toHaveBeenCalled();
@@ -76,7 +76,7 @@ describe("PlayEpisodeButton", () => {
     const user = userEvent.setup();
     render(<PlayEpisodeButton episode={episode} />);
     const btn = screen.getByRole("button", { name: /resume episode/i });
-    expect(btn).not.toBeDisabled();
+    expect(btn).not.toHaveAttribute("aria-disabled", "true");
     await user.click(btn);
     expect(mockTogglePlay).toHaveBeenCalledTimes(1);
     expect(mockPlayEpisode).not.toHaveBeenCalled();
@@ -101,5 +101,24 @@ describe("PlayEpisodeButton", () => {
     expect(
       screen.getByRole("button", { name: "Play Test Episode" }),
     ).toBeInTheDocument();
+  });
+
+  it("is keyboard-focusable and click no-ops when isActivelyPlaying", async () => {
+    mockCurrentEpisode = episode;
+    mockIsPlaying = true;
+    const user = userEvent.setup();
+    render(
+      <div>
+        <button>preceding</button>
+        <PlayEpisodeButton episode={episode} />
+      </div>,
+    );
+    const btn = screen.getByRole("button", { name: /now playing/i });
+    await user.tab();
+    await user.tab();
+    expect(btn).toHaveFocus();
+    await user.click(btn);
+    expect(mockPlayEpisode).not.toHaveBeenCalled();
+    expect(mockTogglePlay).not.toHaveBeenCalled();
   });
 });

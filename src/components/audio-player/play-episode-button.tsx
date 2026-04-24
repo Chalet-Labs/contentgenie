@@ -52,10 +52,10 @@ export function PlayEpisodeButton({
       variant="ghost"
       size="icon"
       onClick={handleClick}
-      disabled={isActivelyPlaying}
+      aria-disabled={isActivelyPlaying}
       aria-label={label}
       title={label}
-      className="h-8 w-8 shrink-0"
+      className="h-8 w-8 shrink-0 aria-disabled:cursor-not-allowed aria-disabled:opacity-50"
     >
       <Play className="h-4 w-4" />
     </Button>
