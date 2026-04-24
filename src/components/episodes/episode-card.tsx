@@ -37,7 +37,7 @@ export interface EpisodeCardProps {
   score?: string | null;
   /**
    * Summary processing state. Non-terminal states render a small StatusIcon;
-   * `"completed"` applies a left-border accent; `"failed"` renders an alert icon.
+   * `"failed"` renders an alert icon.
    */
   status?: SummaryStatus | null;
   /** Meta row cells rendered between description and action row. */
@@ -48,7 +48,7 @@ export interface EpisodeCardProps {
   primaryAction?: ReactNode;
   /** Icon-sized action slots (AddToQueueButton, ListenedButton, dismiss, remove, etc.). */
   secondaryActions?: ReactNode;
-  /** When true, marks the card as listened — used for data attrs and future styling. */
+  /** When true, marks the card as listened. Drives the left-accent bar: `isListened !== true` renders the bar; `true` hides it. */
   isListened?: boolean;
   /**
    * Invoked when the user clicks the title or artwork link. Runs alongside the
@@ -148,7 +148,7 @@ export function EpisodeCard({
       className={cn(
         "group transition-colors hover:bg-accent/50",
         accent === "unread" && "bg-accent/10",
-        status === "completed" && "border-l-2 border-l-primary"
+        isListened !== true && "border-l-2 border-l-primary"
       )}
     >
       <CardContent className="p-4">

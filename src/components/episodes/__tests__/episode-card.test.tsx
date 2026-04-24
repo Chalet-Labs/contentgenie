@@ -264,6 +264,42 @@ describe("EpisodeCard", () => {
     expect(screen.getByText("2 hours ago")).toBeInTheDocument();
   });
 
+  describe("listen-state accent bar", () => {
+    it("applies listen-state accent bar when isListened is false (default)", () => {
+      const { container } = render(<EpisodeCard {...baseProps} />);
+      expect(
+        (container.firstChild as HTMLElement).classList.contains("border-l-primary")
+      ).toBe(true);
+    });
+
+    it("omits listen-state accent bar when isListened is true", () => {
+      const { container } = render(
+        <EpisodeCard {...baseProps} isListened={true} />
+      );
+      expect(
+        (container.firstChild as HTMLElement).classList.contains("border-l-primary")
+      ).toBe(false);
+    });
+
+    it("does not apply accent bar for completed status when episode is listened", () => {
+      const { container } = render(
+        <EpisodeCard {...baseProps} status="completed" isListened={true} />
+      );
+      expect(
+        (container.firstChild as HTMLElement).classList.contains("border-l-primary")
+      ).toBe(false);
+    });
+
+    it("applies accent bar for completed status when unlistened (driven by listen state, not status)", () => {
+      const { container } = render(
+        <EpisodeCard {...baseProps} status="completed" />
+      );
+      expect(
+        (container.firstChild as HTMLElement).classList.contains("border-l-primary")
+      ).toBe(true);
+    });
+  });
+
   it("fires onTitleClick when the title link is clicked", async () => {
     const onTitleClick = vi.fn();
     const user = userEvent.setup();
