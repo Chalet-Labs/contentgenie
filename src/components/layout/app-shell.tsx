@@ -7,6 +7,7 @@ import {
 } from "@/contexts/audio-player-context";
 import { SyncQueueProvider } from "@/contexts/sync-queue-context";
 import { SidebarCountsProvider } from "@/contexts/sidebar-counts-context";
+import { PinnedSubscriptionsProvider } from "@/contexts/pinned-subscriptions-context";
 import { AppHeader } from "@/components/layout/app-header";
 import { Sidebar } from "@/components/layout/sidebar";
 import { PlayerBar } from "@/components/audio-player/player-bar";
@@ -43,7 +44,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     <SyncQueueProvider>
       <AudioPlayerProvider>
         <SidebarCountsProvider>
-          <AppShellInner>{children}</AppShellInner>
+          <PinnedSubscriptionsProvider>
+            <AppShellInner>{children}</AppShellInner>
+          </PinnedSubscriptionsProvider>
         </SidebarCountsProvider>
       </AudioPlayerProvider>
     </SyncQueueProvider>

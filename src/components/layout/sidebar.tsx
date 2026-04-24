@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { OrganizationSwitcher } from "@clerk/nextjs";
@@ -12,6 +12,8 @@ import {
   Library,
   Settings,
   Shield,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react";
 import { SheetClose } from "@/components/ui/sheet";
 import {
@@ -19,6 +21,8 @@ import {
   getBadgeCount,
   NavBadge,
 } from "@/contexts/sidebar-counts-context";
+import { usePinnedSubscriptionsOptional } from "@/contexts/pinned-subscriptions-context";
+import { PinnedSubscriptionsSection } from "@/components/layout/pinned-subscriptions-section";
 
 const sidebarLinks = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -29,7 +33,7 @@ const sidebarLinks = [
 
 const bottomLinks = [{ href: "/settings", label: "Settings", icon: Settings }];
 
-function MaybeSheetClose({
+export function MaybeSheetClose({
   inSheet,
   children,
 }: {
@@ -48,6 +52,25 @@ function SidebarNav({
 }) {
   const pathname = usePathname();
   const counts = useSidebarCountsOptional();
+  const { pinned } = usePinnedSubscriptionsOptional();
+
+  const [pinnedExpanded, setPinnedExpanded] = useState(false);
+
+  useEffect(() => {
+    if (localStorage.getItem("sidebar:pinned-expanded") === "1") {
+      setPinnedExpanded(true);
+    }
+  }, []);
+
+  const togglePinned = () => {
+    const next = !pinnedExpanded;
+    setPinnedExpanded(next);
+    if (next) {
+      localStorage.setItem("sidebar:pinned-expanded", "1");
+    } else {
+      localStorage.removeItem("sidebar:pinned-expanded");
+    }
+  };
 
   return (
     <div className="flex h-full flex-col">
@@ -58,6 +81,49 @@ function SidebarNav({
             const isActive =
               pathname === link.href || pathname?.startsWith(`${link.href}/`);
             const badge = getBadgeCount(link.href, counts);
+
+            if (link.href === "/subscriptions") {
+              return (
+                <div key={link.href}>
+                  <div className="flex items-center gap-1">
+                    <MaybeSheetClose inSheet={inSheet}>
+                      <Link
+                        href={link.href}
+                        className={cn(
+                          "flex flex-1 items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                          isActive
+                            ? "bg-accent text-accent-foreground"
+                            : "text-muted-foreground hover:bg-accent hover:text-accent-foreground",
+                        )}
+                      >
+                        <Icon className="h-4 w-4" />
+                        {link.label}
+                        {badge !== null && <NavBadge count={badge} />}
+                      </Link>
+                    </MaybeSheetClose>
+                    {pinned.length > 0 && (
+                      <button
+                        type="button"
+                        aria-label="Toggle pinned podcasts"
+                        aria-expanded={pinnedExpanded}
+                        onClick={togglePinned}
+                        className="rounded-md p-2 text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                      >
+                        {pinnedExpanded ? (
+                          <ChevronDown className="h-4 w-4" />
+                        ) : (
+                          <ChevronRight className="h-4 w-4" />
+                        )}
+                      </button>
+                    )}
+                  </div>
+                  {pinnedExpanded && pinned.length > 0 && (
+                    <PinnedSubscriptionsSection inSheet={inSheet} />
+                  )}
+                </div>
+              );
+            }
+
             return (
               <MaybeSheetClose key={link.href} inSheet={inSheet}>
                 <Link
