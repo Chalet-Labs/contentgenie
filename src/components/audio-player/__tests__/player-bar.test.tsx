@@ -77,13 +77,15 @@ const mockProgress = {
   buffered: 120,
 }
 
-vi.mock("@/contexts/audio-player-context", () => ({
-  useAudioPlayerState: () => mockState,
-  useAudioPlayerAPI: () => mockAPI,
-  useAudioPlayerProgress: () => mockProgress,
-  SKIP_BACK_SECONDS: 10,
-  SKIP_FORWARD_SECONDS: 30,
-}))
+vi.mock("@/contexts/audio-player-context", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/contexts/audio-player-context")>()
+  return {
+    ...actual,
+    useAudioPlayerState: () => mockState,
+    useAudioPlayerAPI: () => mockAPI,
+    useAudioPlayerProgress: () => mockProgress,
+  }
+})
 
 const mockChapterResult: {
   chapter: { startTime: number; title: string } | null
