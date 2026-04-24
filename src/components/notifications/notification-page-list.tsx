@@ -80,8 +80,10 @@ export function NotificationPageList({
   // "Mark as listened" affordance after a successful toggle elsewhere.
   const itemsRef = useRef(items);
   itemsRef.current = items;
+  const refreshSeqRef = useRef(0);
   useEffect(() => {
     const refresh = async () => {
+      const seq = ++refreshSeqRef.current;
       const current = itemsRef.current;
       const dbIds = current
         .map((n) => n.episodeDbId)
@@ -89,6 +91,8 @@ export function NotificationPageList({
       if (dbIds.length === 0) return;
       try {
         const listenedDbIds = new Set(await getListenedEpisodeIds(dbIds));
+        // Drop stale responses when a newer refresh is already in flight.
+        if (seq !== refreshSeqRef.current) return;
         const piIds = current
           .filter(
             (n) =>
@@ -97,11 +101,16 @@ export function NotificationPageList({
               n.episodePodcastIndexId,
           )
           .map((n) => n.episodePodcastIndexId as string);
-        setListenedIds((prev) =>
-          prev.length === piIds.length && prev.every((id, i) => id === piIds[i])
-            ? prev
-            : piIds,
-        );
+        setListenedIds((prev) => {
+          // getListenedEpisodeIds returns [] on failure and on "no listens"
+          // alike. Treat empty-while-prev-non-empty as a likely failure and
+          // preserve prev so a transient server glitch doesn't wipe every row.
+          if (piIds.length === 0 && prev.length > 0) return prev;
+          if (prev.length === piIds.length && prev.every((id, i) => id === piIds[i])) {
+            return prev;
+          }
+          return piIds;
+        });
       } catch (err) {
         console.error("[notifications] listen-state refresh failed", err);
       }
