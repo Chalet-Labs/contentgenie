@@ -26,6 +26,7 @@ const noopAPI: AudioPlayerAPI = {
   playNext: () => {},
   setSleepTimer: () => {},
   cancelSleepTimer: () => {},
+  getCurrentTime: () => 0,
 }
 
 function makeState(chapters: Chapter[] | null): AudioPlayerState {

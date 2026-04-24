@@ -239,7 +239,7 @@ describe("AudioPlayerProvider", () => {
     expect(audio.currentTime).toBe(120)
   })
 
-  it("skips forward by 15 seconds", async () => {
+  it("skips forward by 30 seconds", async () => {
     const user = userEvent.setup()
     render(
       <AudioPlayerProvider>
@@ -252,10 +252,10 @@ describe("AudioPlayerProvider", () => {
     audio.currentTime = 100
     Object.defineProperty(audio, "duration", { value: 600, configurable: true })
     await user.click(screen.getByText("Skip Forward"))
-    expect(audio.currentTime).toBe(115)
+    expect(audio.currentTime).toBe(130)
   })
 
-  it("skips back by 15 seconds", async () => {
+  it("skips back by 10 seconds", async () => {
     const user = userEvent.setup()
     render(
       <AudioPlayerProvider>
@@ -267,7 +267,7 @@ describe("AudioPlayerProvider", () => {
     const audio = getAudioElement()!
     audio.currentTime = 100
     await user.click(screen.getByText("Skip Back"))
-    expect(audio.currentTime).toBe(85)
+    expect(audio.currentTime).toBe(90)
   })
 
   it("does not skip back below zero", async () => {

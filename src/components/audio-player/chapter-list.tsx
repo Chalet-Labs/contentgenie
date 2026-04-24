@@ -12,7 +12,7 @@ import { Button } from "@/components/ui/button"
 export function ChapterList() {
   const { chapters } = useAudioPlayerState()
   const { seek } = useAudioPlayerAPI()
-  const currentChapter = useCurrentChapter()
+  const { chapter: currentChapter } = useCurrentChapter()
   const activeRef = useRef<HTMLButtonElement>(null)
 
   // Auto-scroll to active chapter

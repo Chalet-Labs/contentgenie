@@ -39,6 +39,7 @@ const mockAPI: AudioPlayerAPI = {
   playNext: vi.fn(),
   setSleepTimer: vi.fn(),
   cancelSleepTimer: vi.fn(),
+  getCurrentTime: vi.fn(() => 0),
 }
 
 vi.mock("@/contexts/audio-player-context", () => ({
