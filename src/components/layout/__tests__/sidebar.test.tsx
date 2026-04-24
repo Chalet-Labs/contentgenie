@@ -295,12 +295,41 @@ describe("Sidebar — pinned podcasts chevron", () => {
     });
     render(<Sidebar isAdmin={false} />);
 
+    const chevron = screen.getByLabelText("Toggle pinned podcasts");
+    expect(chevron).toHaveAttribute("aria-expanded", "false");
+
     await act(async () => {
-      fireEvent.click(screen.getByLabelText("Toggle pinned podcasts"));
+      fireEvent.click(chevron);
     });
 
     expect(screen.getByTestId("pinned-section")).toBeInTheDocument();
     expect(localStorage.getItem("sidebar:pinned-expanded")).toBe("1");
+    expect(chevron).toHaveAttribute("aria-expanded", "true");
+  });
+
+  it("does not expand on mount when localStorage value is anything other than '1'", () => {
+    localStorage.setItem("sidebar:pinned-expanded", "true");
+    mockUsePinnedSubscriptionsOptional.mockReturnValue({
+      pinned: [
+        {
+          id: 1,
+          podcastId: 10,
+          podcastIndexId: "10",
+          title: "A",
+          imageUrl: null,
+        },
+      ],
+      isLoading: false,
+      refreshPins: vi.fn(),
+    });
+
+    render(<Sidebar isAdmin={false} />);
+
+    expect(screen.queryByTestId("pinned-section")).toBeNull();
+    expect(screen.getByLabelText("Toggle pinned podcasts")).toHaveAttribute(
+      "aria-expanded",
+      "false",
+    );
   });
 
   it("clicking chevron twice collapses section and removes localStorage key", async () => {

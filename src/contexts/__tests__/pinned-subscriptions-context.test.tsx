@@ -255,6 +255,29 @@ describe("PinnedSubscriptionsProvider", () => {
     consoleWarn.mockRestore();
   });
 
+  it("removes pins-changed listener on unmount", async () => {
+    const { unmount } = render(
+      <PinnedSubscriptionsProvider>
+        <TestConsumer />
+      </PinnedSubscriptionsProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("loading").textContent).toBe("done");
+    });
+
+    const callsBeforeUnmount = mockGetPinnedSubscriptions.mock.calls.length;
+    unmount();
+
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent("pins-changed"));
+    });
+
+    expect(mockGetPinnedSubscriptions.mock.calls.length).toBe(
+      callsBeforeUnmount,
+    );
+  });
+
   it("logs error and sets isLoading=false when getPinnedSubscriptions throws", async () => {
     const consoleError = vi
       .spyOn(console, "error")

@@ -1,7 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { PinnedSubscriptionsSection } from "@/components/layout/pinned-subscriptions-section";
-import { Sheet as SheetWrapper } from "@/components/ui/sheet";
+import {
+  Sheet as SheetWrapper,
+  SheetContent,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 
 const mockUsePinnedSubscriptionsOptional = vi.fn();
 const mockUsePathname = vi.fn(() => "/");
@@ -76,6 +80,34 @@ describe("PinnedSubscriptionsSection — populated state", () => {
     expect(links[1]).toHaveAttribute("href", "/podcast/pod-2");
   });
 
+  it("preserves server-provided order without client-side re-sort", () => {
+    mockUsePinnedSubscriptionsOptional.mockReturnValue({
+      pinned: [
+        {
+          id: 3,
+          podcastId: 30,
+          podcastIndexId: "pod-z",
+          title: "Zebra Podcast",
+          imageUrl: null,
+        },
+        {
+          id: 4,
+          podcastId: 40,
+          podcastIndexId: "pod-a",
+          title: "Alpha Podcast",
+          imageUrl: null,
+        },
+      ],
+      isLoading: false,
+      refreshPins: vi.fn(),
+    });
+    render(<PinnedSubscriptionsSection inSheet={false} />);
+
+    const links = screen.getAllByRole("link");
+    expect(links[0]).toHaveAttribute("href", "/podcast/pod-z");
+    expect(links[1]).toHaveAttribute("href", "/podcast/pod-a");
+  });
+
   it("renders img when imageUrl is a string", () => {
     render(<PinnedSubscriptionsSection inSheet={false} />);
 
@@ -119,16 +151,20 @@ describe("PinnedSubscriptionsSection — populated state", () => {
     }
   });
 
-  it("wraps each link in SheetClose when inSheet=true", () => {
+  it("closes the sheet when a pinned link is tapped (inSheet=true)", () => {
     render(
       <SheetWrapper>
-        <PinnedSubscriptionsSection inSheet={true} />
+        <SheetTrigger>Open</SheetTrigger>
+        <SheetContent>
+          <PinnedSubscriptionsSection inSheet={true} />
+        </SheetContent>
       </SheetWrapper>,
     );
 
-    // MaybeSheetClose uses SheetClose asChild, which clones the Link element.
-    // Verify links still render correctly inside the Sheet context.
-    const links = screen.getAllByRole("link");
-    expect(links).toHaveLength(2);
+    fireEvent.click(screen.getByTestId("sheet-trigger"));
+    expect(screen.getByTestId("sheet-content")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("link", { name: /alpha podcast/i }));
+    expect(screen.queryByTestId("sheet-content")).toBeNull();
   });
 });

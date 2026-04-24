@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { OrganizationSwitcher } from "@clerk/nextjs";
@@ -15,7 +15,6 @@ import {
   ChevronDown,
   ChevronRight,
 } from "lucide-react";
-import { SheetClose } from "@/components/ui/sheet";
 import {
   useSidebarCountsOptional,
   getBadgeCount,
@@ -23,6 +22,7 @@ import {
 } from "@/contexts/sidebar-counts-context";
 import { usePinnedSubscriptionsOptional } from "@/contexts/pinned-subscriptions-context";
 import { PinnedSubscriptionsSection } from "@/components/layout/pinned-subscriptions-section";
+import { MaybeSheetClose } from "@/components/layout/maybe-sheet-close";
 
 const sidebarLinks = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -33,14 +33,35 @@ const sidebarLinks = [
 
 const bottomLinks = [{ href: "/settings", label: "Settings", icon: Settings }];
 
-export function MaybeSheetClose({
-  inSheet,
-  children,
-}: {
-  inSheet: boolean;
-  children: React.ReactElement;
-}) {
-  return inSheet ? <SheetClose asChild>{children}</SheetClose> : children;
+export const PINNED_EXPANDED_STORAGE_KEY = "sidebar:pinned-expanded";
+export const PINNED_EXPANDED_STORAGE_VALUE = "1";
+
+function readPinnedExpanded(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return (
+      localStorage.getItem(PINNED_EXPANDED_STORAGE_KEY) ===
+      PINNED_EXPANDED_STORAGE_VALUE
+    );
+  } catch (err) {
+    console.warn("[Sidebar] localStorage read failed:", err);
+    return false;
+  }
+}
+
+function writePinnedExpanded(next: boolean): void {
+  try {
+    if (next) {
+      localStorage.setItem(
+        PINNED_EXPANDED_STORAGE_KEY,
+        PINNED_EXPANDED_STORAGE_VALUE,
+      );
+    } else {
+      localStorage.removeItem(PINNED_EXPANDED_STORAGE_KEY);
+    }
+  } catch (err) {
+    console.warn("[Sidebar] localStorage write failed:", err);
+  }
 }
 
 function SidebarNav({
@@ -54,22 +75,12 @@ function SidebarNav({
   const counts = useSidebarCountsOptional();
   const { pinned } = usePinnedSubscriptionsOptional();
 
-  const [pinnedExpanded, setPinnedExpanded] = useState(false);
-
-  useEffect(() => {
-    if (localStorage.getItem("sidebar:pinned-expanded") === "1") {
-      setPinnedExpanded(true);
-    }
-  }, []);
+  const [pinnedExpanded, setPinnedExpanded] = useState(readPinnedExpanded);
 
   const togglePinned = () => {
     const next = !pinnedExpanded;
     setPinnedExpanded(next);
-    if (next) {
-      localStorage.setItem("sidebar:pinned-expanded", "1");
-    } else {
-      localStorage.removeItem("sidebar:pinned-expanded");
-    }
+    writePinnedExpanded(next);
   };
 
   return (

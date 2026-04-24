@@ -14,18 +14,20 @@ import {
   getPinnedSubscriptions,
   type PinnedSubscription,
 } from "@/app/actions/subscriptions";
+import { PINS_CHANGED_EVENT } from "@/lib/events";
 
 interface PinnedSubscriptionsContextValue {
-  pinned: PinnedSubscription[];
-  isLoading: boolean;
-  refreshPins: () => void;
+  readonly pinned: readonly PinnedSubscription[];
+  readonly isLoading: boolean;
+  readonly refreshPins: () => void;
 }
 
-const DEFAULT_PINNED_CONTEXT_VALUE: PinnedSubscriptionsContextValue = {
-  pinned: [],
-  isLoading: false,
-  refreshPins: () => {},
-};
+const DEFAULT_PINNED_CONTEXT_VALUE: PinnedSubscriptionsContextValue =
+  Object.freeze({
+    pinned: Object.freeze([]) as readonly PinnedSubscription[],
+    isLoading: false,
+    refreshPins: () => {},
+  });
 
 const PinnedSubscriptionsContext =
   createContext<PinnedSubscriptionsContextValue | null>(null);
@@ -36,7 +38,7 @@ export function PinnedSubscriptionsProvider({
   children: ReactNode;
 }) {
   const [state, setState] = useState<{
-    pinned: PinnedSubscription[];
+    pinned: readonly PinnedSubscription[];
     isLoading: boolean;
   }>({
     pinned: [],
@@ -46,7 +48,7 @@ export function PinnedSubscriptionsProvider({
   const refreshSerial = useRef(0);
 
   const refreshPins = useCallback(() => {
-    setState((prev) => ({ ...prev, isLoading: true }));
+    setState((prev) => (prev.isLoading ? prev : { ...prev, isLoading: true }));
     const serial = ++refreshSerial.current;
 
     getPinnedSubscriptions()
@@ -77,16 +79,19 @@ export function PinnedSubscriptionsProvider({
   }, [refreshPins]);
 
   /**
-   * "pins-changed" CustomEvent contract
-   * Dispatched by: clients mutating the user's pinned set (e.g. /subscriptions
-   *   pin-toggle handler — to be wired in follow-up).
+   * PINS_CHANGED_EVENT contract
+   * Dispatched by: clients mutating the user's pinned set (e.g. the
+   *   /subscriptions pin-toggle handler). No production dispatcher ships in
+   *   this PR — the listener is speculative and will go dead if the follow-up
+   *   uses a different event name.
    * Consumed by: PinnedSubscriptionsProvider — refetches via refreshPins().
-   * Payload: none. Precedent: "sync-queue-drained" (sync-queue-context.tsx:118).
+   * Payload: none. Precedent: the queue-drain dispatch in sync-queue-context.tsx.
    */
   useEffect(() => {
     const handlePinsChanged = () => refreshPins();
-    window.addEventListener("pins-changed", handlePinsChanged);
-    return () => window.removeEventListener("pins-changed", handlePinsChanged);
+    window.addEventListener(PINS_CHANGED_EVENT, handlePinsChanged);
+    return () =>
+      window.removeEventListener(PINS_CHANGED_EVENT, handlePinsChanged);
   }, [refreshPins]);
 
   const value = useMemo<PinnedSubscriptionsContextValue>(
