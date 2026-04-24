@@ -115,20 +115,14 @@ npm add @trigger.dev/react-hooks
 
 ```tsx
 "use client";
-import {
-  useTaskTrigger,
-  useRealtimeTaskTrigger,
-} from "@trigger.dev/react-hooks";
+import { useTaskTrigger, useRealtimeTaskTrigger } from "@trigger.dev/react-hooks";
 import type { myTask } from "../trigger/tasks";
 
 function TriggerComponent({ accessToken }: { accessToken: string }) {
   // Basic trigger
-  const { submit, handle, isLoading } = useTaskTrigger<typeof myTask>(
-    "my-task",
-    {
-      accessToken,
-    },
-  );
+  const { submit, handle, isLoading } = useTaskTrigger<typeof myTask>("my-task", {
+    accessToken,
+  });
 
   // Trigger with realtime updates
   const {
@@ -143,10 +137,7 @@ function TriggerComponent({ accessToken }: { accessToken: string }) {
         Trigger Task
       </button>
 
-      <button
-        onClick={() => realtimeSubmit({ data: "realtime" })}
-        disabled={isRealtimeLoading}
-      >
+      <button onClick={() => realtimeSubmit({ data: "realtime" })} disabled={isRealtimeLoading}>
         Trigger with Realtime
       </button>
 
@@ -160,19 +151,10 @@ function TriggerComponent({ accessToken }: { accessToken: string }) {
 
 ```tsx
 "use client";
-import {
-  useRealtimeRun,
-  useRealtimeRunsWithTag,
-} from "@trigger.dev/react-hooks";
+import { useRealtimeRun, useRealtimeRunsWithTag } from "@trigger.dev/react-hooks";
 import type { myTask } from "../trigger/tasks";
 
-function SubscribeComponent({
-  runId,
-  accessToken,
-}: {
-  runId: string;
-  accessToken: string;
-}) {
+function SubscribeComponent({ runId, accessToken }: { runId: string; accessToken: string }) {
   // Subscribe to specific run
   const { run, error } = useRealtimeRun<typeof myTask>(runId, {
     accessToken,
@@ -211,13 +193,7 @@ function SubscribeComponent({
 import { useRealtimeStream } from "@trigger.dev/react-hooks";
 import { aiStream } from "../trigger/streams";
 
-function StreamComponent({
-  runId,
-  accessToken,
-}: {
-  runId: string;
-  accessToken: string;
-}) {
+function StreamComponent({ runId, accessToken }: { runId: string; accessToken: string }) {
   // Pass defined stream directly for type safety
   const { parts, error } = useRealtimeStream(aiStream, runId, {
     accessToken,
@@ -240,18 +216,10 @@ function StreamComponent({
 "use client";
 import { useWaitToken } from "@trigger.dev/react-hooks";
 
-function WaitTokenComponent({
-  tokenId,
-  accessToken,
-}: {
-  tokenId: string;
-  accessToken: string;
-}) {
+function WaitTokenComponent({ tokenId, accessToken }: { tokenId: string; accessToken: string }) {
   const { complete } = useWaitToken(tokenId, { accessToken });
 
-  return (
-    <button onClick={() => complete({ approved: true })}>Approve Task</button>
-  );
+  return <button onClick={() => complete({ approved: true })}>Approve Task</button>;
 }
 ```
 

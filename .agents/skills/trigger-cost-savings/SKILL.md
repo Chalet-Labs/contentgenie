@@ -14,7 +14,6 @@ This skill requires the **Trigger.dev MCP server** to analyze live run data.
 ### Check MCP availability
 
 Before analysis, verify these MCP tools are available:
-
 - `list_runs` — list runs with filters (status, task, time period, machine size)
 - `get_run_details` — get run logs, duration, and status
 - `get_current_worker` — get registered tasks and their configurations
@@ -73,7 +72,6 @@ list_runs with filters:
 ```
 
 Look for:
-
 - Tasks with high total compute time (duration x run count)
 - Tasks with high failure rates (wasted retries)
 - Tasks running on large machines with short durations (over-provisioned)
@@ -85,7 +83,6 @@ list_runs with status: "FAILED" or "CRASHED"
 ```
 
 For high-failure tasks:
-
 - Check if failures are retryable (transient) vs permanent
 - Suggest `AbortTaskRunError` for known non-retryable errors
 - Calculate wasted compute from failed retries
@@ -97,7 +94,6 @@ get_run_details for sample runs of each task
 ```
 
 Compare actual resource usage against machine preset:
-
 - If a task on `large-2x` consistently runs in < 1 second, it's over-provisioned
 - If tasks are I/O-bound (API calls, DB queries), they likely don't need large machines
 
@@ -113,33 +109,27 @@ Flag schedules that may be too frequent for their purpose.
 
 Present findings as a prioritized list with estimated impact:
 
-````markdown
+```markdown
 ## Cost Optimization Report
 
 ### High Impact
-
 1. **Right-size `process-images` machine** — Currently `large-2x`, average run 2s.
    Switching to `small-2x` could reduce this task's cost by ~16x.
-   <!-- prettier-ignore -->
    ```ts
    machine: { preset: "small-2x" }  // was "large-2x"
    ```
-````
 
 ### Medium Impact
-
 2. **Add debounce to `sync-user-data`** — 847 runs/day, often triggered in bursts.
    ```ts
    debounce: { key: `user-${userId}`, delay: "5s" }
    ```
 
 ### Low Impact / Best Practices
-
 3. **Add `maxDuration` to `generate-report`** — No timeout configured.
    ```ts
-   maxDuration: 300; // 5 minutes
+   maxDuration: 300  // 5 minutes
    ```
-
 ```
 
 ## Machine Preset Costs (relative)
@@ -166,4 +156,3 @@ Larger machines cost proportionally more per second of compute:
 - **`AbortTaskRunError` stops wasteful retries** — don't retry permanent failures
 
 See `references/cost-reduction.md` for detailed strategies with code examples.
-```

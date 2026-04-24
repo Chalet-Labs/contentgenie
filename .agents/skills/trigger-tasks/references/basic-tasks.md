@@ -18,9 +18,7 @@ export const processData = task({
   },
   run: async (payload: { userId: string; data: any[] }) => {
     // Task logic - runs for long time, no timeouts
-    console.log(
-      `Processing ${payload.data.length} items for user ${payload.userId}`,
-    );
+    console.log(`Processing ${payload.data.length} items for user ${payload.userId}`);
     return { processed: payload.data.length };
   },
 });
@@ -61,13 +59,10 @@ const handle = await tasks.trigger<typeof processData>("process-data", {
 });
 
 // Batch trigger (up to 1,000 items, 3MB per payload)
-const batchHandle = await tasks.batchTrigger<typeof processData>(
-  "process-data",
-  [
-    { payload: { userId: "123", data: [{ id: 1 }] } },
-    { payload: { userId: "456", data: [{ id: 2 }] } },
-  ],
-);
+const batchHandle = await tasks.batchTrigger<typeof processData>("process-data", [
+  { payload: { userId: "123", data: [{ id: 1 }] } },
+  { payload: { userId: "456", data: [{ id: 2 }] } },
+]);
 ```
 
 ### Debounced Triggering
@@ -80,10 +75,10 @@ await myTask.trigger(
   { userId: "123" },
   {
     debounce: {
-      key: "user-123-update", // Unique key for debounce group
-      delay: "5s", // Wait before executing
+      key: "user-123-update",  // Unique key for debounce group
+      delay: "5s",              // Wait before executing
     },
-  },
+  }
 );
 
 // Trailing mode: use payload from LAST trigger
@@ -93,14 +88,13 @@ await myTask.trigger(
     debounce: {
       key: "trailing-example",
       delay: "10s",
-      mode: "trailing", // Default is "leading" (first payload)
+      mode: "trailing",  // Default is "leading" (first payload)
     },
-  },
+  }
 );
 ```
 
 **Debounce modes:**
-
 - `leading` (default): Uses payload from first trigger, subsequent triggers only reschedule
 - `trailing`: Uses payload from most recent trigger
 

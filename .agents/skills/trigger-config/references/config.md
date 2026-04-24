@@ -212,10 +212,7 @@ extensions: [
     // ctx contains: environment, projectRef, env
     return [
       { name: "SECRET_KEY", value: await getSecret(ctx.environment) },
-      {
-        name: "API_URL",
-        value: ctx.environment === "prod" ? "api.prod.com" : "api.dev.com",
-      },
+      { name: "API_URL", value: ctx.environment === "prod" ? "api.prod.com" : "api.dev.com" },
     ];
   }),
 ];
@@ -234,7 +231,7 @@ extensions: [
       project: process.env.SENTRY_PROJECT,
       authToken: process.env.SENTRY_AUTH_TOKEN,
     }),
-    { placement: "last", target: "deploy" }, // Optional config
+    { placement: "last", target: "deploy" } // Optional config
   ),
 ];
 ```
@@ -286,10 +283,7 @@ import { OpenAIInstrumentation } from "@langfuse/openai";
 export default defineConfig({
   // ... other config
   telemetry: {
-    instrumentations: [
-      new PrismaInstrumentation(),
-      new OpenAIInstrumentation(),
-    ],
+    instrumentations: [new PrismaInstrumentation(), new OpenAIInstrumentation()],
     exporters: [customExporter], // Optional custom exporters
   },
 });

@@ -1,5 +1,5 @@
 ---
-applyTo: "**/*.c,**/*.ddl,**/*.dml,**/*.h,**/*.js,**/*.jsx,**/*.mjs,**/*.sql,**/*.yaml,**/*.yml"
+applyTo: '**/*.c,**/*.ddl,**/*.dml,**/*.h,**/*.js,**/*.jsx,**/*.mjs,**/*.sql,**/*.yaml,**/*.yml'
 description: Data & storage security (DB isolation, TLS, least privilege, RLS/CLS, backups, auditing)
 version: 1.3.0
 ---

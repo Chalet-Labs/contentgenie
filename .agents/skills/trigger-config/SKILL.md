@@ -75,7 +75,7 @@ extensions: [
   playwright({
     browsers: ["chromium"], // or ["chromium", "firefox", "webkit"]
   }),
-];
+]
 ```
 
 ### Puppeteer
@@ -83,7 +83,7 @@ extensions: [
 ```ts
 import { puppeteer } from "@trigger.dev/build/extensions/puppeteer";
 
-extensions: [puppeteer()];
+extensions: [puppeteer()]
 
 // Set env var: PUPPETEER_EXECUTABLE_PATH="/usr/bin/google-chrome-stable"
 ```
@@ -93,7 +93,9 @@ extensions: [puppeteer()];
 ```ts
 import { ffmpeg } from "@trigger.dev/build/extensions/core";
 
-extensions: [ffmpeg({ version: "7" })];
+extensions: [
+  ffmpeg({ version: "7" }),
+]
 // Automatically sets FFMPEG_PATH and FFPROBE_PATH
 ```
 
@@ -108,7 +110,7 @@ extensions: [
     requirementsFile: "./requirements.txt",
     devPythonBinaryPath: ".venv/bin/python",
   }),
-];
+]
 
 // Usage in tasks:
 const result = await python.runScript("./python/process.py", ["arg1"]);
@@ -123,7 +125,7 @@ extensions: [
   aptGet({
     packages: ["imagemagick", "curl"],
   }),
-];
+]
 ```
 
 ### Additional Files
@@ -135,7 +137,7 @@ extensions: [
   additionalFiles({
     files: ["./assets/**", "./templates/**"],
   }),
-];
+]
 ```
 
 ### Environment Variable Sync
@@ -150,7 +152,7 @@ extensions: [
       { name: "ENV", value: ctx.environment },
     ];
   }),
-];
+]
 ```
 
 ## Common Extension Combinations
@@ -162,7 +164,7 @@ extensions: [
   prismaExtension({ schema: "prisma/schema.prisma", migrate: true }),
   additionalFiles({ files: ["./assets/**"] }),
   syncEnvVars(async (ctx) => [...envVars]),
-];
+]
 ```
 
 ### AI/ML Processing
@@ -174,7 +176,7 @@ extensions: [
     requirementsFile: "./requirements.txt",
   }),
   ffmpeg({ version: "7" }),
-];
+]
 ```
 
 ### Web Scraping
@@ -183,7 +185,7 @@ extensions: [
 extensions: [
   playwright({ browsers: ["chromium"] }),
   additionalFiles({ files: ["./selectors.json"] }),
-];
+]
 ```
 
 ## Global Lifecycle Hooks

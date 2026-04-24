@@ -34,7 +34,6 @@ npx trigger init
 ```
 
 This creates:
-
 - `trigger.config.ts` - project configuration
 - `trigger/` directory - where your tasks live
 - `trigger/example.ts` - a sample task
@@ -109,17 +108,14 @@ TRIGGER_SECRET_KEY=tr_dev_xxxxx  # From dashboard > API Keys
 ## Common Issues
 
 ### "No tasks found"
-
 - Ensure tasks are **exported** from files in `dirs` folders
 - Check `trigger.config.ts` points to correct directories
 
 ### "Project not found"
-
 - Verify `project` in config matches dashboard
 - Check `TRIGGER_SECRET_KEY` is set
 
 ### "Task not registered"
-
 - Restart `npx trigger dev` after adding new tasks
 - Tasks must use `task()` or `schemaTask()` from `@trigger.dev/sdk`
 

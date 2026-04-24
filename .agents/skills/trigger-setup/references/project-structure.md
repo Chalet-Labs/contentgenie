@@ -37,9 +37,9 @@ import { defineConfig } from "@trigger.dev/sdk";
 export default defineConfig({
   project: "proj_xxxxx",
   dirs: [
-    "./trigger", // Default
-    "./src/jobs", // Additional
-    "./src/scheduled", // Another
+    "./trigger",           // Default
+    "./src/jobs",          // Additional
+    "./src/scheduled",     // Another
   ],
 });
 ```
@@ -64,7 +64,7 @@ src/
 // trigger.config.ts
 export default defineConfig({
   project: "proj_xxxxx",
-  dirs: ["./src/**/tasks"], // Glob pattern
+  dirs: ["./src/**/tasks"],  // Glob pattern
 });
 ```
 

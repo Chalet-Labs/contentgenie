@@ -68,7 +68,6 @@ const myTask = task({
 ```
 
 **Supported schema libraries:**
-
 - Zod
 - ArkType
 - Any schema with `.toJsonSchema()` method
@@ -86,7 +85,7 @@ const searchTool = ai.tool(searchDatabase, {
     return [
       {
         type: "text",
-        text: `Found ${result.count} results:\n${result.items.map((i) => i.title).join("\n")}`,
+        text: `Found ${result.count} results:\n${result.items.map(i => i.title).join("\n")}`,
       },
     ];
   },
@@ -136,7 +135,7 @@ export const agentTask = schemaTask({
         calculate: calculateTool,
         summarize: summarizeTool,
       },
-      maxSteps: 10, // Allow multiple tool calls
+      maxSteps: 10,  // Allow multiple tool calls
     });
 
     return { result: result.text };
@@ -156,7 +155,7 @@ const result = await generateText({
     weather: weatherTool,
     news: newsTool,
   },
-  toolChoice: "required", // Force tool use
+  toolChoice: "required",  // Force tool use
   // or: toolChoice: { type: "tool", toolName: "weather" }
 });
 ```

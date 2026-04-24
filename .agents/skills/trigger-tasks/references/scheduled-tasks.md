@@ -37,11 +37,7 @@ schedules.task({
 
 schedules.task({
   id: "tokyo-5am",
-  cron: {
-    pattern: "0 5 * * *",
-    timezone: "Asia/Tokyo",
-    environments: ["PRODUCTION", "STAGING"],
-  },
+  cron: { pattern: "0 5 * * *", timezone: "Asia/Tokyo", environments: ["PRODUCTION", "STAGING"] },
   run: async () => {},
 });
 ```
@@ -83,7 +79,7 @@ export async function POST(req: Request) {
       timezone: data.timezone,
       externalId: data.userId,
       deduplicationKey: `${data.userId}-reminder`,
-    }),
+    })
   );
 }
 ```
@@ -109,11 +105,7 @@ export async function POST(req: Request) {
 ```ts
 await schedules.retrieve(id);
 await schedules.list();
-await schedules.update(id, {
-  cron: "0 0 1 * *",
-  externalId: "ext",
-  deduplicationKey: "key",
-});
+await schedules.update(id, { cron: "0 0 1 * *", externalId: "ext", deduplicationKey: "key" });
 await schedules.deactivate(id);
 await schedules.activate(id);
 await schedules.del(id);

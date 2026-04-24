@@ -55,7 +55,7 @@ const handle = await tasks.trigger("my-task", { data: "value" });
 for await (const run of runs.subscribeToRun(handle.id)) {
   console.log(`Status: ${run.status}`);
   console.log(`Progress: ${run.metadata?.progress}`);
-
+  
   if (run.status === "COMPLETED") {
     console.log("Output:", run.output);
     break;
@@ -91,15 +91,18 @@ import type { myTask } from "../trigger/tasks";
 function TaskTrigger({ accessToken }: { accessToken: string }) {
   const { submit, run, isLoading } = useRealtimeTaskTrigger<typeof myTask>(
     "my-task",
-    { accessToken },
+    { accessToken }
   );
 
   return (
     <div>
-      <button onClick={() => submit({ data: "value" })} disabled={isLoading}>
+      <button 
+        onClick={() => submit({ data: "value" })} 
+        disabled={isLoading}
+      >
         Start Task
       </button>
-
+      
       {run && (
         <div>
           <p>Status: {run.status}</p>
@@ -119,13 +122,7 @@ function TaskTrigger({ accessToken }: { accessToken: string }) {
 import { useRealtimeRun } from "@trigger.dev/react-hooks";
 import type { myTask } from "../trigger/tasks";
 
-function RunStatus({
-  runId,
-  accessToken,
-}: {
-  runId: string;
-  accessToken: string;
-}) {
+function RunStatus({ runId, accessToken }: { runId: string; accessToken: string }) {
   const { run, error } = useRealtimeRun<typeof myTask>(runId, {
     accessToken,
     onComplete: (run) => {
@@ -151,21 +148,13 @@ function RunStatus({
 "use client";
 import { useRealtimeRunsWithTag } from "@trigger.dev/react-hooks";
 
-function UserTasks({
-  userId,
-  accessToken,
-}: {
-  userId: string;
-  accessToken: string;
-}) {
+function UserTasks({ userId, accessToken }: { userId: string; accessToken: string }) {
   const { runs } = useRealtimeRunsWithTag(`user-${userId}`, { accessToken });
 
   return (
     <ul>
       {runs.map((run) => (
-        <li key={run.id}>
-          {run.id}: {run.status}
-        </li>
+        <li key={run.id}>{run.id}: {run.status}</li>
       ))}
     </ul>
   );
@@ -213,13 +202,7 @@ export const streamingTask = task({
 import { useRealtimeStream } from "@trigger.dev/react-hooks";
 import { aiStream } from "../trigger/streams";
 
-function AIResponse({
-  runId,
-  accessToken,
-}: {
-  runId: string;
-  accessToken: string;
-}) {
+function AIResponse({ runId, accessToken }: { runId: string; accessToken: string }) {
   const { parts, error } = useRealtimeStream(aiStream, runId, {
     accessToken,
     throttleInMs: 50,
@@ -254,7 +237,7 @@ export const approvalTask = task({
     if (approval.approved) {
       return await finalizeData(processed);
     }
-
+    
     throw new Error("Not approved");
   },
 });
@@ -266,19 +249,17 @@ export const approvalTask = task({
 "use client";
 import { useWaitToken } from "@trigger.dev/react-hooks";
 
-function ApprovalButton({
-  tokenId,
-  accessToken,
-}: {
-  tokenId: string;
-  accessToken: string;
-}) {
+function ApprovalButton({ tokenId, accessToken }: { tokenId: string; accessToken: string }) {
   const { complete } = useWaitToken(tokenId, { accessToken });
 
   return (
     <div>
-      <button onClick={() => complete({ approved: true })}>Approve</button>
-      <button onClick={() => complete({ approved: false })}>Reject</button>
+      <button onClick={() => complete({ approved: true })}>
+        Approve
+      </button>
+      <button onClick={() => complete({ approved: false })}>
+        Reject
+      </button>
     </div>
   );
 }
@@ -286,15 +267,15 @@ function ApprovalButton({
 
 ## Run Object Properties
 
-| Property      | Description                                              |
-| ------------- | -------------------------------------------------------- |
-| `id`          | Unique run identifier                                    |
-| `status`      | `QUEUED`, `EXECUTING`, `COMPLETED`, `FAILED`, `CANCELED` |
-| `payload`     | Task input (typed)                                       |
-| `output`      | Task result (typed, when completed)                      |
-| `metadata`    | Real-time updatable data                                 |
-| `createdAt`   | Start timestamp                                          |
-| `costInCents` | Execution cost                                           |
+| Property | Description |
+|----------|-------------|
+| `id` | Unique run identifier |
+| `status` | `QUEUED`, `EXECUTING`, `COMPLETED`, `FAILED`, `CANCELED` |
+| `payload` | Task input (typed) |
+| `output` | Task result (typed, when completed) |
+| `metadata` | Real-time updatable data |
+| `createdAt` | Start timestamp |
+| `costInCents` | Execution cost |
 
 ## Best Practices
 

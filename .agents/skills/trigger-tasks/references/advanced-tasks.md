@@ -21,7 +21,7 @@ export const processUser = task({
 // Trigger with tags
 await processUser.trigger(
   { userId: "123", orgId: "abc" },
-  { tags: ["priority", "user_123", "org_abc"] }, // Max 10 tags per run
+  { tags: ["priority", "user_123", "org_abc"] } // Max 10 tags per run
 );
 
 // Subscribe to tagged runs
@@ -48,19 +48,19 @@ Enhanced batch triggering with larger payloads and streaming ingestion.
 
 ### Rate Limiting (per environment)
 
-| Tier  | Bucket Size | Refill Rate     |
-| ----- | ----------- | --------------- |
-| Free  | 1,200 runs  | 100 runs/10 sec |
-| Hobby | 5,000 runs  | 500 runs/5 sec  |
-| Pro   | 5,000 runs  | 500 runs/5 sec  |
+| Tier | Bucket Size | Refill Rate |
+|------|-------------|-------------|
+| Free | 1,200 runs | 100 runs/10 sec |
+| Hobby | 5,000 runs | 500 runs/5 sec |
+| Pro | 5,000 runs | 500 runs/5 sec |
 
 ### Concurrent Batch Processing
 
-| Tier  | Concurrent Batches |
-| ----- | ------------------ |
-| Free  | 1                  |
-| Hobby | 10                 |
-| Pro   | 10                 |
+| Tier | Concurrent Batches |
+|------|-------------------|
+| Free | 1 |
+| Hobby | 10 |
+| Pro | 10 |
 
 ### Usage
 
@@ -122,10 +122,10 @@ await myTask.trigger(
   { userId: "123" },
   {
     debounce: {
-      key: "user-123-update", // Unique identifier for debounce group
-      delay: "5s", // Wait duration ("5s", "1m", or milliseconds)
+      key: "user-123-update",  // Unique identifier for debounce group
+      delay: "5s",              // Wait duration ("5s", "1m", or milliseconds)
     },
-  },
+  }
 );
 ```
 
@@ -135,20 +135,14 @@ await myTask.trigger(
 
 ```ts
 // First trigger sets the payload
-await myTask.trigger(
-  { action: "first" },
-  {
-    debounce: { key: "my-key", delay: "10s" },
-  },
-);
+await myTask.trigger({ action: "first" }, {
+  debounce: { key: "my-key", delay: "10s" }
+});
 
 // Second trigger only reschedules - payload remains "first"
-await myTask.trigger(
-  { action: "second" },
-  {
-    debounce: { key: "my-key", delay: "10s" },
-  },
-);
+await myTask.trigger({ action: "second" }, {
+  debounce: { key: "my-key", delay: "10s" }
+});
 // Task executes with { action: "first" }
 ```
 
@@ -163,12 +157,11 @@ await myTask.trigger(
       delay: "10s",
       mode: "trailing",
     },
-  },
+  }
 );
 ```
 
 In trailing mode, these options update with each trigger:
-
 - `payload` — task input data
 - `metadata` — run metadata
 - `tags` — run tags (replaces existing)
@@ -257,7 +250,7 @@ export const resilientTask = task({
       async () => {
         return await unstableApiCall(payload);
       },
-      { maxAttempts: 3 },
+      { maxAttempts: 3 }
     );
 
     // Conditional HTTP retries
@@ -321,9 +314,7 @@ export const paymentTask = task({
   },
   run: async (payload: { orderId: string; amount: number }) => {
     // Automatically scoped to this task run, so if the task is retried, the idempotency key will be the same
-    const idempotencyKey = await idempotencyKeys.create(
-      `payment-${payload.orderId}`,
-    );
+    const idempotencyKey = await idempotencyKeys.create(`payment-${payload.orderId}`);
 
     // Ensure payment is processed only once
     await chargeCustomer.trigger(payload, {
@@ -430,7 +421,7 @@ export const tracedTask = task({
 
         return userData;
       },
-      { userId: payload.userId },
+      { userId: payload.userId }
     );
 
     logger.debug("User fetched", { user: user.id });

@@ -6,7 +6,6 @@ https://trigger.dev/docs/how-to-reduce-your-spend
 ## 1. Monitor Usage
 
 Review your usage dashboard regularly to identify:
-
 - Most expensive tasks (by total compute time)
 - Run counts and daily spikes
 - Failure rates and wasted retries
@@ -14,7 +13,6 @@ Review your usage dashboard regularly to identify:
 ## 2. Configure Billing Alerts
 
 Set up alerts in the Trigger.dev dashboard:
-
 - **Standard alerts**: Notifications at 75%, 90%, 100%, 200%, 500% of budget
 - **Spike alerts**: Protection at 10x, 20x, 50x, 100x of monthly budget
 
@@ -188,7 +186,7 @@ await syncTask.trigger(
       delay: "5s",
       mode: "trailing", // Use latest payload
     },
-  },
+  }
 );
 ```
 

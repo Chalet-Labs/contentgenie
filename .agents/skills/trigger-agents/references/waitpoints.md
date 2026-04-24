@@ -9,14 +9,14 @@ import { wait } from "@trigger.dev/sdk";
 
 // Create a token (pauses execution point)
 const token = await wait.createToken({
-  timeout: "10m", // "1h", "1d", etc.
+  timeout: "10m",  // "1h", "1d", etc.
 });
 
 // Wait for completion (blocks until resolved)
 const result = await wait.forToken<ApprovalPayload>(token.id);
 
 if (result.ok) {
-  console.log(result.output); // Typed as ApprovalPayload
+  console.log(result.output);  // Typed as ApprovalPayload
 } else {
   console.log("Timed out:", result.error);
 }
@@ -37,7 +37,7 @@ type ApprovalToken = {
 
 export const generateWithApproval = task({
   id: "generate-with-approval",
-  maxDuration: 600, // 10 min to account for human delay
+  maxDuration: 600,  // 10 min to account for human delay
   run: async ({ prompt }) => {
     // 1. Generate options
     const options = await generateOptions(prompt);
@@ -103,7 +103,7 @@ const token = await wait.createToken({ timeout: "10m" });
 // token.url is a webhook URL that completes the token
 // POST to token.url with JSON body → becomes the output
 await externalService.startJob({
-  callbackUrl: token.url, // Service POSTs result here
+  callbackUrl: token.url,  // Service POSTs result here
 });
 
 const result = await wait.forToken<ExternalResult>(token.id);
@@ -196,7 +196,7 @@ const token = await wait.createToken({ timeout: "10m" });
 // Pass to frontend
 return {
   tokenId: token.id,
-  publicToken: token.publicAccessToken, // Auto-generated, expires in 1h
+  publicToken: token.publicAccessToken,  // Auto-generated, expires in 1h
 };
 ```
 

@@ -54,24 +54,24 @@ doppler setup --project my-app --config dev --no-interactive
 
 ## Common Tasks by Intent
 
-| Developer wants to...     | Action                                                        |
-| ------------------------- | ------------------------------------------------------------- |
-| List all secrets          | `doppler secrets -p <project> -c <config>`                    |
-| Get a single secret       | `doppler secrets get SECRET_NAME -p <project> -c <config>`    |
-| Set a secret              | `doppler secrets set KEY=value -p <project> -c <config>`      |
-| Set multiple secrets      | `doppler secrets set KEY1=val1 KEY2=val2`                     |
-| Delete a secret           | `doppler secrets delete SECRET_NAME`                          |
-| Run command with secrets  | `doppler run -- your-command --flags`                         |
-| Run with specific config  | `doppler run -p backend -c dev -- npm start`                  |
-| Download secrets as file  | `doppler secrets download --format env --no-file`             |
-| List projects             | `doppler projects`                                            |
-| List configs              | `doppler configs -p <project>`                                |
-| List environments         | `doppler environments -p <project>`                           |
-| Clone a config            | `doppler configs clone -p <project> -c <source> --name <new>` |
-| View activity logs        | `doppler activity`                                            |
-| Check current setup       | `doppler configure debug`                                     |
-| Open dashboard            | `doppler open`                                                |
-| View who is authenticated | `doppler me`                                                  |
+| Developer wants to... | Action |
+|-----------------------|--------|
+| List all secrets | `doppler secrets -p <project> -c <config>` |
+| Get a single secret | `doppler secrets get SECRET_NAME -p <project> -c <config>` |
+| Set a secret | `doppler secrets set KEY=value -p <project> -c <config>` |
+| Set multiple secrets | `doppler secrets set KEY1=val1 KEY2=val2` |
+| Delete a secret | `doppler secrets delete SECRET_NAME` |
+| Run command with secrets | `doppler run -- your-command --flags` |
+| Run with specific config | `doppler run -p backend -c dev -- npm start` |
+| Download secrets as file | `doppler secrets download --format env --no-file` |
+| List projects | `doppler projects` |
+| List configs | `doppler configs -p <project>` |
+| List environments | `doppler environments -p <project>` |
+| Clone a config | `doppler configs clone -p <project> -c <source> --name <new>` |
+| View activity logs | `doppler activity` |
+| Check current setup | `doppler configure debug` |
+| Open dashboard | `doppler open` |
+| View who is authenticated | `doppler me` |
 
 ## Secrets Injection Patterns
 
@@ -146,21 +146,21 @@ Workplace
 
 Doppler can automatically sync secrets to external platforms:
 
-| Platform                     | Use Case                              |
-| ---------------------------- | ------------------------------------- |
-| AWS Secrets Manager / SSM    | ECS, Lambda, EC2 deployments          |
-| GCP Secret Manager           | GKE, Cloud Run, Cloud Functions       |
-| Azure Key Vault              | AKS, App Service, Functions           |
-| Cloudflare Pages / Workers   | Edge & Jamstack deployments           |
-| Vercel                       | Frontend/fullstack deployments        |
+| Platform | Use Case |
+|----------|----------|
+| AWS Secrets Manager / SSM | ECS, Lambda, EC2 deployments |
+| GCP Secret Manager | GKE, Cloud Run, Cloud Functions |
+| Azure Key Vault | AKS, App Service, Functions |
+| Cloudflare Pages / Workers | Edge & Jamstack deployments |
+| Vercel | Frontend/fullstack deployments |
 | Firebase Functions / Hosting | Functions config & build-time secrets |
-| Serverless Framework         | Lambda/serverless function secrets    |
-| GitHub Actions               | CI/CD secrets                         |
-| Docker / Docker Compose      | Container environment injection       |
-| Kubernetes                   | Secret objects via Doppler Operator   |
-| Terraform                    | Infrastructure as Code                |
-| Webapp.io                    | CI/CD Layerfile secrets               |
-| Heroku                       | PaaS deployments                      |
+| Serverless Framework | Lambda/serverless function secrets |
+| GitHub Actions | CI/CD secrets |
+| Docker / Docker Compose | Container environment injection |
+| Kubernetes | Secret objects via Doppler Operator |
+| Terraform | Infrastructure as Code |
+| Webapp.io | CI/CD Layerfile secrets |
+| Heroku | PaaS deployments |
 
 ## Service Tokens
 
@@ -192,9 +192,9 @@ doppler secrets
 
 For deep dives, consult these references:
 
-| Reference                                     | Content                                                        |
-| --------------------------------------------- | -------------------------------------------------------------- |
-| [CLI.md](references/CLI.md)                   | Complete CLI command reference with all subcommands and flags  |
+| Reference | Content |
+|-----------|---------|
+| [CLI.md](references/CLI.md) | Complete CLI command reference with all subcommands and flags |
 | [INTEGRATIONS.md](references/INTEGRATIONS.md) | CI/CD, Docker, Kubernetes, cloud platform integration patterns |
 
 ## Troubleshooting
