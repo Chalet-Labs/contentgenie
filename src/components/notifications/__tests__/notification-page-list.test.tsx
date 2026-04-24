@@ -630,10 +630,9 @@ describe("NotificationPageList", () => {
         initialListenedIds={["PI-42"]}
       />
     );
-    const article = screen.getByRole("article");
-    const card = article.firstElementChild as HTMLElement | null;
+    const card = screen.getByRole("article").firstElementChild as HTMLElement | null;
     expect(card).not.toBeNull();
-    expect(card!.classList.contains("border-l-primary")).toBe(false);
+    expect(card!).toHaveAttribute("data-listened", "true");
   });
 
   it("shows the listen-state accent bar on unlistened notifications", () => {
@@ -645,10 +644,9 @@ describe("NotificationPageList", () => {
         initialListenedIds={[]}
       />
     );
-    const article = screen.getByRole("article");
-    const card = article.firstElementChild as HTMLElement | null;
+    const card = screen.getByRole("article").firstElementChild as HTMLElement | null;
     expect(card).not.toBeNull();
-    expect(card!.classList.contains("border-l-primary")).toBe(true);
+    expect(card!).toHaveAttribute("data-listened", "false");
   });
 
   // Regression: Load more degrades gracefully when getEpisodeTopics throws
