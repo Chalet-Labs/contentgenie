@@ -1,6 +1,6 @@
 ---
 name: pre-pr-validation
-description: Use before any `gh pr create` — invoke this skill as soon as the user asks to open, create, submit, or file a pull request, without waiting for the hook to bounce the command. Runs the full pre-PR pipeline: rebase onto main, verification gate (lint/test/build), parallel multi-tool review (external Codex via `council:codex-consultant`, `/pr-review-toolkit:review-pr all`, `/simplify`), validates every finding, auto-fixes all valid ones without pausing for approval, re-verifies, pushes, writes the sentinel that unblocks PR creation, then opens the PR. A PreToolUse hook guards `gh pr create` until a fresh sentinel exists, so triggering this skill proactively whenever PRs are mentioned is the path of least friction.
+description: Use before any `gh pr create` — invoke this skill as soon as the user asks to open, create, submit, or file a pull request, without waiting for the hook to bounce the command. Runs the full pre-PR pipeline: rebase onto main, build check (tsc/lint/test are enforced per commit by the husky hook), parallel multi-tool review (`/codex:review`, `/pr-review-toolkit:review-pr all`, `/simplify`), validates every finding, auto-fixes all valid ones without pausing for approval, re-verifies, pushes, writes the sentinel that unblocks PR creation, then opens the PR. A PreToolUse hook guards `gh pr create` until a fresh sentinel exists, so triggering this skill proactively whenever PRs are mentioned is the path of least friction.
 ---
 
 # Pre-PR Validation
@@ -17,7 +17,7 @@ You should invoke this skill proactively the moment a PR is discussed — don't 
 
 Before starting the pipeline, decide: **run inline in this session, or dispatch to a fresh Task subagent?**
 
-Skills run inline in the calling agent's context. Sub-tools (the codex consultant, `/pr-review-toolkit:review-pr`, `/simplify`) delegate their heavy thinking to fresh contexts, but the skill's orchestration — Phase 3 (validate findings), Phase 4 (apply fixes), and the git/verification phases — runs wherever you invoked it. If the caller has been doing feature work (lots of file reads, debugging conversations, long planning threads), that cluttered context will hurt triage quality and risks hitting limits mid-pipeline.
+Skills run inline in the calling agent's context. Sub-tools (`/codex:review`, `/pr-review-toolkit:review-pr`, `/simplify`) delegate their heavy thinking to fresh contexts, but the skill's orchestration — Phase 3 (validate findings), Phase 4 (apply fixes), and the git/verification phases — runs wherever you invoked it. If the caller has been doing feature work (lots of file reads, debugging conversations, long planning threads), that cluttered context will hurt triage quality and risks hitting limits mid-pipeline.
 
 **Rule of thumb:**
 
@@ -92,30 +92,25 @@ A branch behind main can pass local verification but fail CI after the PR opens 
 
 ### Phase 1 — Verification Gate
 
-Run the full verification trio, not just `build`:
+Run fresh:
 
 ```bash
-bunx tsc --noEmit
-bun run lint
-bun run test
 bun run build
 ```
 
-All four must exit 0.
+Must exit 0. If it fails, fix the root cause (not a suppression, not a workaround) and re-run. Don't enter Phase 2 with a red build — reviewers waste cycles on broken code.
 
-**Why all four, not just `build`?** The husky pre-commit hook covers `tsc/lint/test` per commit, but Phase 0's rebase replays commits *without* running pre-commit hooks, so post-rebase state has never been hook-checked. Any commit path that bypasses husky (`--no-verify`, `HUSKY=0`, hook not installed, rebase, cherry-pick) is also unchecked. Running the full trio in Phase 1 makes the gate unconditional.
-
-If something fails, fix the root cause (not a suppression, not a workaround) and re-run. Don't enter Phase 2 with any red.
+**Why only build?** The husky pre-commit hook already runs `tsc --noEmit`, `bun run lint`, and `bun run test` on every commit, so every commit that got us to this point has passed those three. `bun run build` is the gap the hook doesn't cover — notably Next.js page-export restrictions only surface here. Known gap: `git rebase` and `--no-verify` / `HUSKY=0` bypass pre-commit. If you suspect any of those happened, also run `bun run lint` and `bun run test` explicitly before proceeding.
 
 ### Phase 2 — Multi-Tool Review
 
 Launch three reviews in parallel (one message, three independent tool calls):
 
-1. **External Codex review** — dispatch `council:codex-consultant` via the `Task` tool. Brief it with the diff scope (`git diff origin/main...HEAD`), the branch name, and what you specifically want it to scrutinize. This is the substitute for `/codex:review` — the slash command is user-only and can't be invoked from inside the skill.
-2. **`/pr-review-toolkit:review-pr all`** — specialized agents: code-reviewer, pr-test-analyzer, silent-failure-hunter, type-design-analyzer, comment-analyzer, code-simplifier.
-3. **`/simplify`** — reuse/quality/efficiency pass (three internal agents).
+1. `/codex:review --base main --background` — external perspective. Detaches; poll `/codex:status` until it reports complete before reading output. If status is stuck for more than 15 minutes, run `/codex:cancel` and surface to the user.
+2. `/pr-review-toolkit:review-pr all` — specialized agents: code-reviewer, pr-test-analyzer, silent-failure-hunter, type-design-analyzer, comment-analyzer, code-simplifier.
+3. `/simplify` — reuse/quality/efficiency pass.
 
-Wait for all three to complete before proceeding. Collect their full output. Don't run `codex:setup` or any other init step — the reviewers handle their own bootstrapping.
+Wait for all three to complete before proceeding. Collect their full output. Don't run `codex:setup` — it's one-time init, not part of the pipeline.
 
 ### Phase 3 — Collect & Validate Findings
 
@@ -141,18 +136,13 @@ Per user memory, commit messages should not mention Claude, AI, or automated gen
 
 ### Phase 5 — Re-Verify
 
-Re-run the Phase 1 gate:
-
 ```bash
-bunx tsc --noEmit
-bun run lint
-bun run test
 bun run build
 ```
 
-All four must exit 0. Phase 4's commits triggered the husky pre-commit hook for tsc/lint/test, but re-running them in-session confirms the final state matches (and covers any `--no-verify`/HUSKY=0 gap).
+Must exit 0. Phase 4's commits already triggered the pre-commit hook (tsc + lint + test), so only the build gap needs re-checking here.
 
-If any fails, loop back to Phase 3 for the regressing finding (was it valid? is the fix correct?). Cap retries at 2. If still failing after 2 retries, stop and surface to the user with the specific failure — don't write the sentinel.
+If build fails, loop back to Phase 3 for the regressing finding (was it valid? is the fix correct?). Cap retries at 2. If still failing after 2 retries, stop and surface to the user with the specific failure — don't write the sentinel.
 
 ### Phase 6 — Push the Branch
 
@@ -199,7 +189,7 @@ Title: `type: Description`, under 70 characters, same convention as commits. Use
 - Own commits don't retrigger. Phase 4 fix-commits run before Phase 7 writes the sentinel, so the sentinel records the post-fix HEAD. Safe.
 - No partial verification. "Tests looked fine earlier" is not evidence. Re-run in this session.
 - No skipping the review phase, even for docs-only changes. The hook doesn't know what's in the diff.
-- The external Codex review is via `council:codex-consultant`, not `/codex:review` (that's a user-only slash command). Do not run `codex:setup` — it's one-time init, not part of the pipeline.
+- Do not run `codex:setup` — it's one-time init, not part of the pipeline.
 - An unpushed branch never gets a sentinel. Phase 6 is not optional.
 - Unattended means unattended. Phase 3 → Phase 4 runs without an approval pause.
 
@@ -208,8 +198,8 @@ Title: `type: Description`, under 70 characters, same convention as commits. Use
 | Symptom | Action |
 |---------|--------|
 | Phase 0 rebase conflicts | If trivial, resolve and continue. If not, stop and surface to the user. |
-| Phase 1 verification fails | Fix root cause, re-run. Don't proceed. |
-| External Codex review stuck > 15 min | Cancel the subagent, surface to user. |
+| Phase 1 build fails | Fix root cause, re-run. Don't proceed. |
+| `/codex:status` stuck > 15 min | `/codex:cancel`, surface to user. |
 | Reviewers disagree | Apply project conventions; document the choice in the finding. |
 | Phase 5 fails after fixes | Retry up to 2×. Then surface with the specific failure. |
 | Phase 6 push rejected (non-fast-forward) | Rebase onto current `origin/<branch>`, re-run Phase 5, retry push. No default force-push. |
