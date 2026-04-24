@@ -70,7 +70,7 @@ describe("getTopicsByPodcastIndexId", () => {
     expect(result).toEqual({});
   });
 
-  it("preserves DB order and returns rows up to TOPICS_PER_EPISODE_LIMIT", async () => {
+  it("preserves DB order end-to-end", async () => {
     mockOuterOrderBy.mockResolvedValue([
       { episodeId: 1, topic: "A" },
       { episodeId: 1, topic: "B" },
@@ -80,7 +80,6 @@ describe("getTopicsByPodcastIndexId", () => {
     const result = await getTopicsByPodcastIndexId([
       { id: 1, podcastIndexId: "PI-1" },
     ]);
-    expect(result["PI-1"]).toHaveLength(TOPICS_PER_EPISODE_LIMIT);
     expect(result["PI-1"]).toEqual(["A", "B", "C", "D"]);
   });
 

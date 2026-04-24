@@ -123,11 +123,11 @@ describe("PlayEpisodeButton", () => {
   // keyboard-activation events. The handleClick early-return is what keeps
   // these no-ops; these tests guard against someone removing that guard.
   it.each([
-    ["{Enter}", "Enter"],
-    [" ", "Space"],
+    { key: "{Enter}", label: "Enter" },
+    { key: " ", label: "Space" },
   ])(
-    "keyboard activation with %s no-ops when isActivelyPlaying",
-    async (key) => {
+    "keyboard activation with $label no-ops when isActivelyPlaying",
+    async ({ key }) => {
       mockCurrentEpisode = episode;
       mockIsPlaying = true;
       const user = userEvent.setup();
