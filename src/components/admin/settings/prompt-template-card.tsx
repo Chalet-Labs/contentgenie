@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef, useEffect, useId } from "react";
 import {
   Card,
   CardContent,
@@ -63,6 +63,7 @@ export function PromptTemplateCard({ initialPrompt }: PromptTemplateCardProps) {
   const [isSaving, setIsSaving] = useState(false);
   const [searchResults, setSearchResults] = useState<EpisodeSearchResult[]>([]);
   const [pickerOpen, setPickerOpen] = useState(false);
+  const pickerId = useId();
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const latestSearchIdRef = useRef(0);
   const testAbortRef = useRef<AbortController | null>(null);
@@ -238,7 +239,7 @@ export function PromptTemplateCard({ initialPrompt }: PromptTemplateCardProps) {
                 variant="outline"
                 role="combobox"
                 aria-expanded={pickerOpen}
-                aria-controls="prompt-episode-picker"
+                aria-controls={pickerId}
                 className="w-full justify-between"
               >
                 {selectedEpisode
@@ -250,10 +251,7 @@ export function PromptTemplateCard({ initialPrompt }: PromptTemplateCardProps) {
                 />
               </Button>
             </PopoverTrigger>
-            <PopoverContent
-              id="prompt-episode-picker"
-              className="w-[500px] p-0"
-            >
+            <PopoverContent id={pickerId} className="w-[500px] p-0">
               <Command shouldFilter={false}>
                 <CommandInput
                   placeholder="Search episodes with transcripts…"
