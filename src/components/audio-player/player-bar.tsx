@@ -104,6 +104,9 @@ export function PlayerBar() {
     }
   }, [hasChapters, chapters, getCurrentTime, seek])
 
+  const willAdvanceChapter =
+    hasChapters && currentChapterIdx + 1 < chapters.length
+
   const handleNextNav = useCallback(() => {
     if (hasChapters) {
       // Read live audio time so rapid Next presses see the real seeked
@@ -115,6 +118,11 @@ export function PlayerBar() {
         seek(chapters[nextIdx].startTime)
         return
       }
+      // Live audio has moved past the last chapter but the rendered affordance
+      // may still show "Next chapter" during the ~250ms timeupdate lag after a
+      // natural chapter crossing. Don't ambush the user with an episode skip
+      // they didn't ask for — no-op until the label updates on the next tick.
+      if (willAdvanceChapter) return
     }
     // Defer queue advance while chapters are still resolving — otherwise a
     // press during the fetch ejects the user to the next episode instead of
@@ -123,10 +131,7 @@ export function PlayerBar() {
     if (canNavigateQueue) {
       playNext()
     }
-  }, [hasChapters, chapters, chaptersLoading, canNavigateQueue, getCurrentTime, seek, playNext])
-
-  const willAdvanceChapter =
-    hasChapters && currentChapterIdx + 1 < chapters.length
+  }, [hasChapters, chapters, willAdvanceChapter, chaptersLoading, canNavigateQueue, getCurrentTime, seek, playNext])
   const queueAdvanceReady = !chaptersLoading && canNavigateQueue
   const prevLabel = "Previous chapter"
   const nextLabel = willAdvanceChapter
