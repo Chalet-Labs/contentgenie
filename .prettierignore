@@ -1,12 +1,4 @@
-node_modules
-.next
-out
-build
 dist
-coverage
-storybook-static
-.trigger
-.vercel
 bun.lock
 package-lock.json
 yarn.lock

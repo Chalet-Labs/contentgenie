@@ -48,7 +48,7 @@ bun run build          # Production build
 bun run start          # Serve the production build locally (run `bun run build` first)
 bun run lint           # ESLint (next lint)
 bun run format         # Format all source files with Prettier
-bun run format:check   # Verify formatting (CI-safe, no writes)
+bun run format:check   # Verify formatting without writing (used by pre-commit hook)
 bun run test           # Run Vitest unit tests
 bun run test:watch     # Run tests in watch mode
 bun run test:coverage  # Run tests with coverage (80% line threshold, see vitest.config.ts)
@@ -65,9 +65,9 @@ bun run trigger:deploy # Deploy tasks to Trigger.dev Cloud
 
 - **Test framework:** Vitest with React Testing Library. Config: `vitest.config.ts`, setup: `src/test/setup.ts`.
 - **Component stories:** Storybook 10 (`@storybook/nextjs-vite`). Config: `.storybook/main.ts`.
-- Always run `bun run lint`, `bun run test`, and `bun run build` before committing.
+- Always run `bun run format:check`, `bun run lint`, `bun run test`, and `bun run build` before committing.
 - Unit tests live in `__tests__/` directories co-located with source. Stories live alongside components as `*.stories.tsx` files.
-- The pre-commit hook (Husky) automatically runs lint and tests on commit.
+- The pre-commit hook (Husky) automatically runs format:check, lint, and tests on commit.
 - ADRs live in `docs/adr/` — read the relevant ADR before modifying areas it covers.
 - **UI verification (agents):** Vitest/RTL runs in jsdom and can't catch real rendering, layout, or interaction bugs. For any UI work, **invoke the `agent-browser` skill** to test the web app in a real browser:
   - **App flows / pages:** start `bun run dev` (port 3000), then use `agent-browser` to navigate to `http://localhost:3000`, click through the flow, fill forms, and take screenshots.
