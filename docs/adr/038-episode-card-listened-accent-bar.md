@@ -30,13 +30,13 @@ Repurpose the EpisodeCard left-accent bar to indicate listen state instead of su
 - `isListened === true` (i.e. the user has heard this episode) renders with no accent bar.
 - Worth-It score continues to communicate summary state on its own.
 
-Scope of the bar change is limited to the `EpisodeCard` primitive's class logic. Every consumer already threads an `isListened` boolean through to the primitive (verified — see Consequences below), so no call-site changes are required.
+Scope of the bar change is limited to the `EpisodeCard` primitive's class logic plus a single caller patch: three of the four consumers (`podcasts/episode-card.tsx`, `library/saved-episode-card.tsx`, `trending-detail-content.tsx`) already thread `isListened` through to the primitive. `NotificationRow` in `src/components/notifications/notification-page-list.tsx` previously threaded `isListened` only to `ListenedButton` and not to `EpisodeCard`; this change adds the missing `isListened={isListened}` prop so listened notifications correctly hide the bar.
 
 The `accent` prop union (`"unread" | "none"`) is **not** extended. Notifications continue to use `accent="unread"` to apply the bg-tint treatment, which is an orthogonal axis to the listen-state bar. The two treatments can coexist on the same card without visual conflict: the `accent="unread"` bg-tint fills the card body, while the listen-state bar sits on the left edge.
 
 ### Notification cards gain the listen-state bar (scope clarification)
 
-The issue's original "notification cards: unchanged" framing is imprecise. `NotificationRow` in `src/components/notifications/notification-page-list.tsx` already passes `isListened` through to `EpisodeCard` (lines 291–295 and 448), so the new logic **does** apply to notification cards. We accept this outcome rather than introduce a suppression prop. Rationale:
+The issue's original "notification cards: unchanged" framing is imprecise. `NotificationRow` in `src/components/notifications/notification-page-list.tsx` now threads `isListened` to `EpisodeCard` (previously it was only passed to `ListenedButton`), so the new logic **does** apply to notification cards. We accept this outcome rather than introduce a suppression prop. Rationale:
 
 - A notification card for an unlistened episode is itself an unlistened-episode surface — the bar is semantically accurate and consistent with every other list of episode cards in the app.
 - `accent="unread"` (notification read/unread) and `isListened` (episode listened/not) are independent axes. A *read* notification for an *unlistened* episode should still show the bar; an *unread* notification for a *listened* episode should still show the bg-tint without a bar. Suppressing the bar in the notification context would collapse these axes incorrectly.
