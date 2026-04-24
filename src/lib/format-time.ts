@@ -1,7 +1,16 @@
-/** Format seconds as M:SS (e.g. 65 → "1:05"). Returns "0:00" for non-finite input. */
+/**
+ * Format seconds as `M:SS` or `H:MM:SS` when hours are non-zero
+ * (e.g. 65 → "1:05", 3725 → "1:02:05"). Returns "0:00" for non-finite
+ * or negative input.
+ */
 export function formatTime(seconds: number): string {
-  if (!seconds || !isFinite(seconds)) return "0:00";
-  const mins = Math.floor(seconds / 60);
+  if (!isFinite(seconds) || seconds <= 0) return "0:00";
+  const hours = Math.floor(seconds / 3600);
+  const mins = Math.floor((seconds % 3600) / 60);
   const secs = Math.floor(seconds % 60);
-  return `${mins}:${secs.toString().padStart(2, "0")}`;
+  const secsPad = secs.toString().padStart(2, "0");
+  if (hours > 0) {
+    return `${hours}:${mins.toString().padStart(2, "0")}:${secsPad}`;
+  }
+  return `${mins}:${secsPad}`;
 }

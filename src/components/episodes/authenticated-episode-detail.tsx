@@ -88,7 +88,8 @@ export function AuthenticatedEpisodeDetail({
   const playerAPI = useAudioPlayerAPI();
 
   const [episode, setEpisode] = useState<EpisodeData | null>(null);
-  const chaptersState = useChapters(episode?.chaptersUrl);
+  const normalizedChaptersUrl = episode?.chaptersUrl?.trim() || null;
+  const chaptersState = useChapters(normalizedChaptersUrl);
   const [podcast, setPodcast] = useState<PodcastData | null>(null);
   const [summaryData, setSummaryData] = useState<SummaryData | null>(null);
   const [isLoadingEpisode, setIsLoadingEpisode] = useState(true);
@@ -449,9 +450,12 @@ export function AuthenticatedEpisodeDetail({
     ? Object.values(podcast.categories)
     : [];
 
-  const hasChapters = Boolean(episode.chaptersUrl?.trim());
+  const hasChapters = normalizedChaptersUrl !== null;
+  const hasDescription = Boolean(episode.description?.trim());
   const chaptersCount =
-    chaptersState.status === "ready" ? chaptersState.chapters.length : null;
+    chaptersState.status === "ready"
+      ? chaptersState.chapters.length
+      : undefined;
 
   const isCurrentEpisode =
     playerState.currentEpisode?.id === String(episode.id);
@@ -707,14 +711,13 @@ export function AuthenticatedEpisodeDetail({
         <EpisodeTabsList aria-label="Episode sections">
           <EpisodeTabsTrigger value="insights">Insights</EpisodeTabsTrigger>
           {hasChapters && (
-            <EpisodeTabsTrigger
-              value="chapters"
-              badge={chaptersCount ?? undefined}
-            >
+            <EpisodeTabsTrigger value="chapters" badge={chaptersCount}>
               Chapters
             </EpisodeTabsTrigger>
           )}
-          <EpisodeTabsTrigger value="about">About</EpisodeTabsTrigger>
+          {hasDescription && (
+            <EpisodeTabsTrigger value="about">About</EpisodeTabsTrigger>
+          )}
         </EpisodeTabsList>
 
         <EpisodeTabsContent value="insights">
@@ -771,7 +774,7 @@ export function AuthenticatedEpisodeDetail({
           </EpisodeTabsContent>
         )}
 
-        {episode.description && (
+        {hasDescription && (
           <EpisodeTabsContent value="about">
             <Card>
               <CardContent className="p-6">

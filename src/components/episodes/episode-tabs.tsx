@@ -19,11 +19,16 @@ const EpisodeTabsList = React.forwardRef<
 ));
 EpisodeTabsList.displayName = "EpisodeTabsList";
 
+type EpisodeTabsTriggerProps = Omit<
+  React.ComponentPropsWithoutRef<typeof TabsPrimitive.Trigger>,
+  "asChild"
+> & {
+  badge?: number | string;
+};
+
 const EpisodeTabsTrigger = React.forwardRef<
   React.ElementRef<typeof TabsPrimitive.Trigger>,
-  React.ComponentPropsWithoutRef<typeof TabsPrimitive.Trigger> & {
-    badge?: React.ReactNode;
-  }
+  EpisodeTabsTriggerProps
 >(({ className, children, badge, ...props }, ref) => (
   <TabsPrimitive.Trigger
     ref={ref}
@@ -34,7 +39,7 @@ const EpisodeTabsTrigger = React.forwardRef<
     {...props}
   >
     {children}
-    {badge != null && (
+    {badge !== undefined && (
       <span
         className={cn(
           "rounded-full bg-muted px-1.5 py-0.5 text-[11px] font-semibold leading-none text-muted-foreground",

@@ -130,7 +130,7 @@ describe("EpisodeChaptersList", () => {
     const seek = vi.fn();
     const playEpisode = vi.fn();
     mocks.useAudioPlayerState.mockReturnValue({
-      currentEpisode: { id: sampleEpisode.id } as AudioEpisode,
+      currentEpisode: { id: sampleEpisode.id },
     });
     mocks.useAudioPlayerAPI.mockReturnValue({ seek, playEpisode });
 
@@ -148,9 +148,9 @@ describe("EpisodeChaptersList", () => {
     expect(playEpisode).not.toHaveBeenCalled();
   });
 
-  it("highlights the active chapter when the current episode is playing past its start time", () => {
+  it("highlights the active chapter with aria-current when the current episode is playing past its start time", () => {
     mocks.useAudioPlayerState.mockReturnValue({
-      currentEpisode: { id: sampleEpisode.id } as AudioEpisode,
+      currentEpisode: { id: sampleEpisode.id },
     });
     mocks.useAudioPlayerProgress.mockReturnValue({
       currentTime: 310, // inside chapter 2
@@ -165,6 +165,42 @@ describe("EpisodeChaptersList", () => {
     );
 
     const activeRow = screen.getByText("Chapter 2").closest("button");
-    expect(activeRow).toHaveClass("bg-primary/[0.08]");
+    expect(activeRow).toHaveAttribute("aria-current", "true");
+    expect(screen.getByText("Chapter 1").closest("button")).not.toHaveAttribute(
+      "aria-current",
+    );
+  });
+
+  it("formats timestamps past one hour as H:MM:SS", () => {
+    const state: UseChaptersState = {
+      status: "ready",
+      chapters: [
+        { startTime: 0, title: "Start" },
+        { startTime: 3725, title: "Late" }, // 1:02:05
+      ],
+    };
+    render(<EpisodeChaptersList state={state} audioEpisode={sampleEpisode} />);
+    expect(screen.getByText("1:02:05")).toBeInTheDocument();
+  });
+
+  it("does not flag any chapter as active when the episode isn't currently playing", () => {
+    mocks.useAudioPlayerProgress.mockReturnValue({
+      currentTime: 600,
+      buffered: 0,
+    });
+
+    render(
+      <EpisodeChaptersList
+        state={readyState(3)}
+        audioEpisode={sampleEpisode}
+      />,
+    );
+
+    expect(
+      screen.queryByText("Chapter 1")?.closest("button"),
+    ).not.toHaveAttribute("aria-current");
+    expect(
+      screen.queryByText("Chapter 3")?.closest("button"),
+    ).not.toHaveAttribute("aria-current");
   });
 });

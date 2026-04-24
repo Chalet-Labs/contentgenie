@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AuthenticatedEpisodeDetail } from "@/components/episodes/authenticated-episode-detail";
 
 const mocks = vi.hoisted(() => ({
@@ -140,11 +140,10 @@ function stubEpisodeFetch(overrides: EpisodeOverrides = {}) {
         });
       }
 
-      if (input === CHAPTERS_URL) {
+      if (input === `/api/chapters?url=${encodeURIComponent(CHAPTERS_URL)}`) {
         return Promise.resolve({
           ok: true,
           json: async () => ({
-            version: "1.2.0",
             chapters: [
               { startTime: 0, title: "Cold open" },
               { startTime: 180, title: "Main segment" },
@@ -169,6 +168,10 @@ describe("AuthenticatedEpisodeDetail", () => {
     });
     mocks.getCachedEpisode.mockResolvedValue(undefined);
     stubEpisodeFetch();
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
   });
 
   it("hides numeric-only processing actions for rss episodes", async () => {
@@ -225,7 +228,7 @@ describe("AuthenticatedEpisodeDetail", () => {
     expect(screen.getByTestId("summary-display")).toBeInTheDocument();
   });
 
-  it("shows the Chapters tab with its count after fetch when chaptersUrl is present", async () => {
+  it("shows the Chapters tab with its count and renders the list when clicked", async () => {
     stubEpisodeFetch({ chaptersUrl: CHAPTERS_URL });
 
     render(
@@ -242,6 +245,32 @@ describe("AuthenticatedEpisodeDetail", () => {
     await waitFor(() => {
       expect(chaptersTab).toHaveTextContent("3");
     });
+
+    const user = userEvent.setup();
+    await user.click(chaptersTab);
+
+    expect(chaptersTab).toHaveAttribute("data-state", "active");
+    expect(await screen.findByText("Cold open")).toBeInTheDocument();
+    expect(screen.getByText("Main segment")).toBeInTheDocument();
+    expect(screen.getByText("Q&A")).toBeInTheDocument();
+  });
+
+  it("hides the About tab when the episode description is empty", async () => {
+    stubEpisodeFetch({ description: "" });
+
+    render(
+      <AuthenticatedEpisodeDetail
+        episodeId="rss-abc"
+        userId="user-1"
+        isAdmin={false}
+      />,
+    );
+
+    await screen.findByRole("heading", { name: "RSS Episode" });
+
+    expect(
+      screen.queryByRole("tab", { name: "About" }),
+    ).not.toBeInTheDocument();
   });
 
   it("switches to the About tab and renders the episode description", async () => {

@@ -69,7 +69,7 @@ The Chapters trigger is conditionally rendered based on `Boolean(episode.chapter
 
 - Users who previously scanned the description before summaries now need one extra click to reach the description. This is an intentional hierarchy call; the value-prop case outweighs it.
 - Tab state is ephemeral (local `useState`). Deep-linking to `?tab=chapters` would require `nuqs` (ADR-030) and is a small follow-up. First-cut acceptable for shipping.
-- The Chapters tab fetches `chaptersUrl` client-side when active. JSON Chapters payloads can be cross-origin and slow; a small skeleton covers the latency. If this becomes hot, consider hoisting the fetch into the existing `/api/episodes/[id]` response.
+- The Chapters tab fetches `chaptersUrl` client-side (via the existing `/api/chapters` proxy, which applies the SSRF/timeout/cache guard — same code path the audio player uses). The fetch starts as soon as the episode loads, not on tab click, so the count badge is available before the user opens the tab. If this becomes hot, consider hoisting the fetch into the existing `/api/episodes/[id]` response so it lands in one round-trip.
 
 ### Risks / Watch-outs
 
