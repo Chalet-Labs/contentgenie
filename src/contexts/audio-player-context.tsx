@@ -119,6 +119,7 @@ export interface AudioPlayerAPI {
   seek: (time: number) => void
   skipForward: (seconds?: number) => void
   skipBack: (seconds?: number) => void
+  getCurrentTime: () => number
   setVolume: (volume: number) => void
   setPlaybackSpeed: (speed: number) => void
   closePlayer: () => void
@@ -970,6 +971,8 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
         if (!audio) return
         audio.currentTime = Math.max(0, Math.min(time, audio.duration || 0))
       },
+
+      getCurrentTime: () => audioRef.current?.currentTime ?? 0,
 
       skipForward: (seconds = SKIP_FORWARD_SECONDS) => {
         const audio = audioRef.current

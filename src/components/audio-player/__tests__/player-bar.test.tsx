@@ -59,6 +59,7 @@ const mockAPI = {
   seek: vi.fn(),
   skipForward: vi.fn(),
   skipBack: vi.fn(),
+  getCurrentTime: vi.fn(() => mockProgress.currentTime),
   setVolume: vi.fn(),
   setPlaybackSpeed: vi.fn(),
   closePlayer: vi.fn(),
@@ -89,9 +90,13 @@ const mockChapterResult: {
   index: number
 } = { chapter: null, index: -1 }
 
-vi.mock("@/hooks/use-current-chapter", () => ({
-  useCurrentChapter: () => mockChapterResult,
-}))
+vi.mock("@/hooks/use-current-chapter", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/hooks/use-current-chapter")>()
+  return {
+    ...actual,
+    useCurrentChapter: () => mockChapterResult,
+  }
+})
 
 const testEpisode = {
   id: "ep-1",
@@ -375,7 +380,7 @@ describe("PlayerBar", () => {
       expect(mockAPI.seek).not.toHaveBeenCalled()
     })
 
-    it("advances chapter-by-chapter on rapid Next presses even before currentTime refreshes", async () => {
+    it("advances chapter-by-chapter on rapid Next presses using live audio time", async () => {
       const fourChapters = [
         { startTime: 0, title: "Intro" },
         { startTime: 60, title: "Main" },
@@ -388,6 +393,11 @@ describe("PlayerBar", () => {
       mockState.chapters = fourChapters
       mockProgress.currentTime = 1
       Object.assign(mockChapterResult, { chapter: fourChapters[0], index: 0 })
+      // Each seek() mutates the mock "live" currentTime so the next click's
+      // getCurrentTime() returns the fresh position the audio just jumped to.
+      mockAPI.seek.mockImplementation((t: number) => {
+        mockProgress.currentTime = t
+      })
       render(<PlayerBar />)
 
       const next = screen.getByRole("button", { name: "Next chapter" })
@@ -398,66 +408,7 @@ describe("PlayerBar", () => {
       expect(mockAPI.seek).toHaveBeenNthCalledWith(1, fourChapters[1].startTime)
       expect(mockAPI.seek).toHaveBeenNthCalledWith(2, fourChapters[2].startTime)
       expect(mockAPI.seek).toHaveBeenNthCalledWith(3, fourChapters[3].startTime)
-    })
-
-    it("clears the optimistic target when the live chapter index jumps to an intermediate chapter", async () => {
-      const fourChapters = [
-        { startTime: 0, title: "Intro" },
-        { startTime: 60, title: "Main" },
-        { startTime: 180, title: "Outro" },
-        { startTime: 300, title: "Credits" },
-      ]
-      const user = userEvent.setup()
-      mockState.isVisible = true
-      mockState.currentEpisode = testEpisode
-      mockState.chapters = fourChapters
-      mockProgress.currentTime = 1
-      Object.assign(mockChapterResult, { chapter: fourChapters[0], index: 0 })
-      const { rerender } = render(<PlayerBar />)
-
-      const next = screen.getByRole("button", { name: "Next chapter" })
-      await user.click(next)
-      await user.click(next)
-      expect(mockAPI.seek).toHaveBeenNthCalledWith(2, 180)
-
-      // Simulate a chapter-panel pick to chapter 1 mid-sequence: live index
-      // jumps from stale 0 to 1 without reaching the optimistic target (2).
-      mockProgress.currentTime = 60
-      Object.assign(mockChapterResult, { chapter: fourChapters[1], index: 1 })
-      rerender(<PlayerBar />)
-
-      await user.click(next)
-      // The optimistic target should have been cleared, so baseIdx uses live
-      // index 1 → next seeks to chapter[2] (180) again, not chapter[3] (300).
-      expect(mockAPI.seek).toHaveBeenLastCalledWith(180)
-    })
-
-    it("clears the optimistic target when Prev is pressed between Next presses", async () => {
-      const fourChapters = [
-        { startTime: 0, title: "Intro" },
-        { startTime: 60, title: "Main" },
-        { startTime: 180, title: "Outro" },
-        { startTime: 300, title: "Credits" },
-      ]
-      const user = userEvent.setup()
-      mockState.isVisible = true
-      mockState.currentEpisode = testEpisode
-      mockState.chapters = fourChapters
-      mockProgress.currentTime = 1
-      Object.assign(mockChapterResult, { chapter: fourChapters[0], index: 0 })
-      render(<PlayerBar />)
-
-      const next = screen.getByRole("button", { name: "Next chapter" })
-      const prev = screen.getByRole("button", { name: "Previous chapter" })
-
-      await user.click(next)
-      expect(mockAPI.seek).toHaveBeenLastCalledWith(60)
-      await user.click(prev)
-      // Prev with elapsed < 3 and idx == 0 restarts chapter 0 (idx can't go lower).
-      await user.click(next)
-      // Without the reset, the 3rd seek would target chapter 2 (startTime=180)
-      // because the optimistic ref was still at index 1.
-      expect(mockAPI.seek).toHaveBeenLastCalledWith(60)
+      mockAPI.seek.mockReset()
     })
 
     it("does not advance the queue while chapters are still loading", async () => {
@@ -500,12 +451,12 @@ describe("PlayerBar", () => {
         render(<PlayerBar />)
 
         fireEvent.click(screen.getAllByRole("button", { name: "Skip forward 30 seconds" })[0])
-        expect(screen.getByText(/\+ 30s/)).toBeInTheDocument()
+        expect(screen.getByText(/\+30s/)).toBeInTheDocument()
 
         act(() => {
           vi.advanceTimersByTime(SKIP_FLASH_DURATION_MS)
         })
-        expect(screen.queryByText(/\+ 30s/)).not.toBeInTheDocument()
+        expect(screen.queryByText(/\+30s/)).not.toBeInTheDocument()
       } finally {
         vi.useRealTimers()
       }
@@ -523,23 +474,23 @@ describe("PlayerBar", () => {
         const remainder = SKIP_FLASH_DURATION_MS - secondAdvance + 1
 
         fireEvent.click(screen.getAllByRole("button", { name: "Skip back 10 seconds" })[0])
-        expect(screen.getByText(/− 10s/)).toBeInTheDocument()
+        expect(screen.getByText(/−10s/)).toBeInTheDocument()
 
         act(() => {
           vi.advanceTimersByTime(firstHalf)
         })
         fireEvent.click(screen.getAllByRole("button", { name: "Skip forward 30 seconds" })[0])
-        expect(screen.getByText(/\+ 30s/)).toBeInTheDocument()
+        expect(screen.getByText(/\+30s/)).toBeInTheDocument()
 
         act(() => {
           vi.advanceTimersByTime(secondAdvance)
         })
-        expect(screen.getByText(/\+ 30s/)).toBeInTheDocument()
+        expect(screen.getByText(/\+30s/)).toBeInTheDocument()
 
         act(() => {
           vi.advanceTimersByTime(remainder)
         })
-        expect(screen.queryByText(/\+ 30s/)).not.toBeInTheDocument()
+        expect(screen.queryByText(/\+30s/)).not.toBeInTheDocument()
       } finally {
         vi.useRealTimers()
       }
@@ -553,11 +504,11 @@ describe("PlayerBar", () => {
         const { rerender } = render(<PlayerBar />)
 
         fireEvent.click(screen.getAllByRole("button", { name: "Skip forward 30 seconds" })[0])
-        expect(screen.getByText(/\+ 30s/)).toBeInTheDocument()
+        expect(screen.getByText(/\+30s/)).toBeInTheDocument()
 
         mockState.isVisible = false
         rerender(<PlayerBar />)
-        expect(screen.queryByText(/\+ 30s/)).not.toBeInTheDocument()
+        expect(screen.queryByText(/\+30s/)).not.toBeInTheDocument()
       } finally {
         vi.useRealTimers()
       }

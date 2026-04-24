@@ -20,7 +20,6 @@ import { Button } from "@/components/ui/button"
 import {
   useAudioPlayerState,
   useAudioPlayerAPI,
-  useAudioPlayerProgress,
   SKIP_BACK_SECONDS,
   SKIP_FORWARD_SECONDS,
 } from "@/contexts/audio-player-context"
@@ -31,7 +30,7 @@ import { QueuePanel } from "@/components/audio-player/queue-panel"
 import { ChapterPanel } from "@/components/audio-player/chapter-panel"
 import { SleepTimerMenu } from "@/components/audio-player/sleep-timer-menu"
 import { BookmarkButton } from "@/components/audio-player/bookmark-button"
-import { useCurrentChapter } from "@/hooks/use-current-chapter"
+import { useCurrentChapter, findChapterIndexAtTime } from "@/hooks/use-current-chapter"
 import { useMediaQuery } from "@/hooks/use-media-query"
 
 const PREV_CHAPTER_RESTART_THRESHOLD_SECONDS = 3
@@ -42,19 +41,13 @@ type SkipFlash = { direction: "back" | "forward"; seconds: number; nonce: number
 export function PlayerBar() {
   const { currentEpisode, isPlaying, isBuffering, isVisible, queue, chapters, chaptersLoading } =
     useAudioPlayerState()
-  const { togglePlay, skipBack, skipForward, seek, playNext, closePlayer } =
+  const { togglePlay, skipBack, skipForward, seek, playNext, closePlayer, getCurrentTime } =
     useAudioPlayerAPI()
-  const { currentTime } = useAudioPlayerProgress()
   const [queueOpen, setQueueOpen] = useState(false)
   const [chaptersOpen, setChaptersOpen] = useState(false)
   const [skipFlash, setSkipFlash] = useState<SkipFlash | null>(null)
   const flashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const nonceRef = useRef(0)
-  // Tracks the last chapter index we optimistically advanced to, so that rapid
-  // "Next" presses keep stepping forward even before `currentTime` (and thus
-  // `currentChapterIdx`) refreshes via `timeupdate`.
-  const nextTargetRef = useRef(-1)
-  const prevLiveIdxRef = useRef(-1)
   const { chapter: currentChapter, index: currentChapterIdx } = useCurrentChapter()
   const isDesktop = useMediaQuery("(min-width: 768px)")
 
@@ -85,29 +78,6 @@ export function PlayerBar() {
     }
   }, [isVisible])
 
-  useEffect(() => {
-    const prev = prevLiveIdxRef.current
-    prevLiveIdxRef.current = currentChapterIdx
-    if (nextTargetRef.current < 0) return
-    // Caught up to (or passed) the optimistic target → clear.
-    if (currentChapterIdx >= nextTargetRef.current) {
-      nextTargetRef.current = -1
-      return
-    }
-    // Live index changed but is still behind the optimistic target: either the
-    // user manually seeked backward or selected an intermediate chapter (via
-    // the chapter panel). Rapid Next/Prev clicks batch into a single
-    // timeupdate, so any real index change under the target means the target
-    // is stale — drop it.
-    if (prev >= 0 && currentChapterIdx !== prev) {
-      nextTargetRef.current = -1
-    }
-  }, [currentChapterIdx])
-
-  useEffect(() => {
-    nextTargetRef.current = -1
-  }, [chapters])
-
   const handleSkipBack = useCallback(() => {
     skipBack(SKIP_BACK_SECONDS)
     flashSkip("back", SKIP_BACK_SECONDS)
@@ -119,29 +89,30 @@ export function PlayerBar() {
   }, [skipForward, flashSkip])
 
   const handlePrevNav = useCallback(() => {
-    if (hasChapters && currentChapterIdx >= 0) {
-      const current = chapters[currentChapterIdx]
-      const elapsed = currentTime - current.startTime
-      if (elapsed < PREV_CHAPTER_RESTART_THRESHOLD_SECONDS && currentChapterIdx > 0) {
-        seek(chapters[currentChapterIdx - 1].startTime)
-      } else {
-        seek(current.startTime)
-      }
-      // Explicit backward intent — drop any pending forward target so the next
-      // Next press starts from the live position rather than an earlier
-      // optimistic advance that this Prev just undid.
-      nextTargetRef.current = -1
+    if (!hasChapters) return
+    // Read live audio time so rapid Prev double-press always sees the
+    // just-seeked position instead of a stale `currentTime` from React state.
+    const liveTime = getCurrentTime()
+    const liveIdx = findChapterIndexAtTime(chapters, liveTime)
+    if (liveIdx < 0) return
+    const current = chapters[liveIdx]
+    const elapsed = liveTime - current.startTime
+    if (elapsed < PREV_CHAPTER_RESTART_THRESHOLD_SECONDS && liveIdx > 0) {
+      seek(chapters[liveIdx - 1].startTime)
+    } else {
+      seek(current.startTime)
     }
-  }, [hasChapters, chapters, currentChapterIdx, currentTime, seek])
+  }, [hasChapters, chapters, getCurrentTime, seek])
 
   const handleNextNav = useCallback(() => {
     if (hasChapters) {
-      const baseIdx =
-        nextTargetRef.current >= 0 ? nextTargetRef.current : currentChapterIdx
-      const nextIdx = baseIdx + 1
+      // Read live audio time so rapid Next presses see the real seeked
+      // position — no need to track optimistic state alongside React.
+      const liveTime = getCurrentTime()
+      const liveIdx = findChapterIndexAtTime(chapters, liveTime)
+      const nextIdx = liveIdx + 1
       if (nextIdx < chapters.length) {
         seek(chapters[nextIdx].startTime)
-        nextTargetRef.current = nextIdx
         return
       }
     }
@@ -152,7 +123,7 @@ export function PlayerBar() {
     if (canNavigateQueue) {
       playNext()
     }
-  }, [hasChapters, chapters, currentChapterIdx, chaptersLoading, canNavigateQueue, seek, playNext])
+  }, [hasChapters, chapters, chaptersLoading, canNavigateQueue, getCurrentTime, seek, playNext])
 
   const willAdvanceChapter =
     hasChapters && currentChapterIdx + 1 < chapters.length
@@ -214,7 +185,7 @@ export function PlayerBar() {
           aria-hidden="true"
           className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-3 flex -translate-x-1/2 items-center gap-1 whitespace-nowrap rounded-full bg-foreground/90 px-3.5 py-2 text-[13px] font-semibold tracking-tight text-background shadow-lg animate-in fade-in slide-in-from-bottom-1 duration-200"
         >
-          {skipFlash.direction === "back" ? "−" : "+"} {skipFlash.seconds}s
+          {skipFlash.direction === "back" ? "−" : "+"}{skipFlash.seconds}s
         </div>
       )}
 
