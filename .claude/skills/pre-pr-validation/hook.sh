@@ -41,10 +41,13 @@ if ! printf '%s' "$naked" | grep -qE '(^|[;|&(])[[:space:]]*([A-Za-z_][A-Za-z0-9
   exit 0
 fi
 
-# Gate path. One git call reads everything we need; fail open if git is
-# unreadable (not in a repo, no commits, corrupt state).
-read -r repo_root branch head_sha < <(git rev-parse --show-toplevel --abbrev-ref HEAD HEAD 2>/dev/null) || exit 0
-[ -z "$repo_root" ] && exit 0
+# Gate path. Fail open if git is unreadable (not in a repo, no commits,
+# corrupt state). Two rev-parse calls because --abbrev-ref is sticky for
+# all refs in a single invocation — can't mix abbrev and SHA in one call.
+{ read -r repo_root; read -r head_sha; } < <(git rev-parse --show-toplevel HEAD 2>/dev/null)
+[ -z "${repo_root:-}" ] || [ -z "${head_sha:-}" ] && exit 0
+branch=$(git -C "$repo_root" rev-parse --abbrev-ref HEAD 2>/dev/null)
+[ -z "$branch" ] && exit 0
 
 # Detached HEAD cannot be a PR source — refuse instead of letting a
 # `HEAD <sha>` sentinel silently validate.
