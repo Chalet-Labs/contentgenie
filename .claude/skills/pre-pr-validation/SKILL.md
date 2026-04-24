@@ -17,7 +17,7 @@ You should invoke this skill proactively the moment a PR is discussed — don't 
 
 Run this pipeline inline in the calling session. Don't wrap it in a `Task` subagent.
 
-The sub-tools this skill invokes (`/codex:review`, `/pr-review-toolkit:review-pr`, `/simplify`) already isolate their heavy review work in their own freshly-spawned subagents — each reviewer (code-reviewer, pr-test-analyzer, silent-failure-hunter, type-design-analyzer, comment-analyzer, code-simplifier) gets a clean context. Context hygiene is handled there, not here. Wrapping the whole pipeline in an outer subagent adds a layer that can't dispatch further Task/Agent calls (subagents can't spawn subagents), which breaks the Codex-review path (Phase 2a requires `Task({run_in_background: true})`) and may also affect Skill availability for the other two reviewers. Net result: weaker review coverage, no context win.
+Phase 2 itself dispatches a background `Task({run_in_background: true})` for the Codex review, and `/pr-review-toolkit:review-pr all` dispatches further `Task` calls for each specialist reviewer. Subagents can't spawn further subagents — so wrapping this skill in an outer Task blocks the Codex step entirely, and may prevent `/pr-review-toolkit:review-pr` from launching its specialists. Net result: weaker review coverage, no context win (the heavy work was already going to happen in a fresh context; you'd just be stacking one more).
 
 If the caller's context is cluttered, the cost is mildly worse triage in Phase 3 — not broken reviews. That trade-off goes in favour of running inline.
 
