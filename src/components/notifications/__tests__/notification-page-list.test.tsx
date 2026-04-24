@@ -662,9 +662,10 @@ describe("NotificationPageList", () => {
         initialHasMore={false}
         initialTopicsByEpisode={{}}
         initialListenedIds={["PI-42"]}
-      />
+      />,
     );
-    const card = screen.getByRole("article").firstElementChild as HTMLElement | null;
+    const card = screen.getByRole("article")
+      .firstElementChild as HTMLElement | null;
     expect(card).not.toBeNull();
     expect(card!).toHaveAttribute("data-listened", "true");
   });
@@ -676,9 +677,10 @@ describe("NotificationPageList", () => {
         initialHasMore={false}
         initialTopicsByEpisode={{}}
         initialListenedIds={[]}
-      />
+      />,
     );
-    const card = screen.getByRole("article").firstElementChild as HTMLElement | null;
+    const card = screen.getByRole("article")
+      .firstElementChild as HTMLElement | null;
     expect(card).not.toBeNull();
     expect(card!).toHaveAttribute("data-listened", "false");
   });

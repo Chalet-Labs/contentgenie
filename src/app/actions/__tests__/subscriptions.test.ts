@@ -899,9 +899,8 @@ describe("getPinnedSubscriptions", () => {
   it("returns error when not authenticated", async () => {
     mockAuth.mockResolvedValue({ userId: null });
 
-    const { getPinnedSubscriptions } = await import(
-      "@/app/actions/subscriptions"
-    );
+    const { getPinnedSubscriptions } =
+      await import("@/app/actions/subscriptions");
     const result = await getPinnedSubscriptions();
 
     expect(result).toEqual({
@@ -915,9 +914,8 @@ describe("getPinnedSubscriptions", () => {
     const { chain } = makePinnedListChain([]);
     mockSelect.mockReturnValue(chain);
 
-    const { getPinnedSubscriptions } = await import(
-      "@/app/actions/subscriptions"
-    );
+    const { getPinnedSubscriptions } =
+      await import("@/app/actions/subscriptions");
     const result = await getPinnedSubscriptions();
 
     expect(result).toEqual({ success: true, data: [] });
@@ -934,9 +932,8 @@ describe("getPinnedSubscriptions", () => {
     const { chain } = makePinnedListChain([row]);
     mockSelect.mockReturnValue(chain);
 
-    const { getPinnedSubscriptions } = await import(
-      "@/app/actions/subscriptions"
-    );
+    const { getPinnedSubscriptions } =
+      await import("@/app/actions/subscriptions");
     const result = await getPinnedSubscriptions();
 
     expect(result.success).toBe(true);
@@ -950,23 +947,44 @@ describe("getPinnedSubscriptions", () => {
       imageUrl: "https://img/1.png",
     });
     const projection = mockSelect.mock.calls[0][0] as Record<string, unknown>;
-    expect(Object.keys(projection).sort()).toEqual(
-      ["id", "imageUrl", "podcastId", "podcastIndexId", "title"],
-    );
+    expect(Object.keys(projection).sort()).toEqual([
+      "id",
+      "imageUrl",
+      "podcastId",
+      "podcastIndexId",
+      "title",
+    ]);
   });
 
   it("orders by podcasts.title ASC — passes DB-sorted rows through unchanged", async () => {
     const rows = [
-      { id: 1, podcastId: 10, podcastIndexId: "pi-10", title: "Apple Pod", imageUrl: "https://img/10.png" },
-      { id: 2, podcastId: 20, podcastIndexId: "pi-20", title: "Mango Pod", imageUrl: null },
-      { id: 3, podcastId: 30, podcastIndexId: "pi-30", title: "Zebra Pod", imageUrl: "https://img/30.png" },
+      {
+        id: 1,
+        podcastId: 10,
+        podcastIndexId: "pi-10",
+        title: "Apple Pod",
+        imageUrl: "https://img/10.png",
+      },
+      {
+        id: 2,
+        podcastId: 20,
+        podcastIndexId: "pi-20",
+        title: "Mango Pod",
+        imageUrl: null,
+      },
+      {
+        id: 3,
+        podcastId: 30,
+        podcastIndexId: "pi-30",
+        title: "Zebra Pod",
+        imageUrl: "https://img/30.png",
+      },
     ];
     const { chain, mocks } = makePinnedListChain(rows);
     mockSelect.mockReturnValue(chain);
 
-    const { getPinnedSubscriptions } = await import(
-      "@/app/actions/subscriptions"
-    );
+    const { getPinnedSubscriptions } =
+      await import("@/app/actions/subscriptions");
     const result = await getPinnedSubscriptions();
 
     expect(mocks.mockOrderBy).toHaveBeenCalledTimes(1);
@@ -976,35 +994,59 @@ describe("getPinnedSubscriptions", () => {
     );
     expect(result.success).toBe(true);
     if (!result.success) return;
-    expect(result.data.map((r) => r.title)).toEqual(["Apple Pod", "Mango Pod", "Zebra Pod"]);
+    expect(result.data.map((r) => r.title)).toEqual([
+      "Apple Pod",
+      "Mango Pod",
+      "Zebra Pod",
+    ]);
   });
 
   it("does not re-sort DB results client-side (non-alphabetical seed)", async () => {
     const unsortedRows = [
-      { id: 3, podcastId: 30, podcastIndexId: "pi-30", title: "Zebra Pod", imageUrl: null },
-      { id: 1, podcastId: 10, podcastIndexId: "pi-10", title: "Apple Pod", imageUrl: null },
-      { id: 2, podcastId: 20, podcastIndexId: "pi-20", title: "Mango Pod", imageUrl: null },
+      {
+        id: 3,
+        podcastId: 30,
+        podcastIndexId: "pi-30",
+        title: "Zebra Pod",
+        imageUrl: null,
+      },
+      {
+        id: 1,
+        podcastId: 10,
+        podcastIndexId: "pi-10",
+        title: "Apple Pod",
+        imageUrl: null,
+      },
+      {
+        id: 2,
+        podcastId: 20,
+        podcastIndexId: "pi-20",
+        title: "Mango Pod",
+        imageUrl: null,
+      },
     ];
     const { chain } = makePinnedListChain(unsortedRows);
     mockSelect.mockReturnValue(chain);
 
-    const { getPinnedSubscriptions } = await import(
-      "@/app/actions/subscriptions"
-    );
+    const { getPinnedSubscriptions } =
+      await import("@/app/actions/subscriptions");
     const result = await getPinnedSubscriptions();
 
     expect(result.success).toBe(true);
     if (!result.success) return;
-    expect(result.data.map((r) => r.title)).toEqual(["Zebra Pod", "Apple Pod", "Mango Pod"]);
+    expect(result.data.map((r) => r.title)).toEqual([
+      "Zebra Pod",
+      "Apple Pod",
+      "Mango Pod",
+    ]);
   });
 
   it("WHERE includes isPinned=true and userId predicates", async () => {
     const { chain, mocks } = makePinnedListChain([]);
     mockSelect.mockReturnValue(chain);
 
-    const { getPinnedSubscriptions } = await import(
-      "@/app/actions/subscriptions"
-    );
+    const { getPinnedSubscriptions } =
+      await import("@/app/actions/subscriptions");
     await getPinnedSubscriptions();
 
     expect(mocks.mockWhere).toHaveBeenCalledTimes(1);
@@ -1025,9 +1067,8 @@ describe("getPinnedSubscriptions", () => {
       throw new Error("db exploded");
     });
 
-    const { getPinnedSubscriptions } = await import(
-      "@/app/actions/subscriptions"
-    );
+    const { getPinnedSubscriptions } =
+      await import("@/app/actions/subscriptions");
     const result = await getPinnedSubscriptions();
 
     expect(result).toEqual({
