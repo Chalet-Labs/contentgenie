@@ -47,6 +47,8 @@ bun run dev            # Start dev server (port 3000, Turbopack)
 bun run build          # Production build
 bun run start          # Serve the production build locally (run `bun run build` first)
 bun run lint           # ESLint (next lint)
+bun run format         # Format all source files with Prettier
+bun run format:check   # Verify formatting (CI-safe, no writes)
 bun run test           # Run Vitest unit tests
 bun run test:watch     # Run tests in watch mode
 bun run test:coverage  # Run tests with coverage (80% line threshold, see vitest.config.ts)
