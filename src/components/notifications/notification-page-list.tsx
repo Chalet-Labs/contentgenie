@@ -133,20 +133,37 @@ export function NotificationPageList({
 
   const handleDismiss = useCallback((id: number) => {
     startTransition(async () => {
+      // Decrement offset optimistically so a concurrent Load more uses the
+      // post-dismiss offset and doesn't skip a server row (#315).
       setItems((prev) =>
         prev.map((n) => (n.id === id ? { ...n, pendingDismiss: true } : n)),
       );
-      const result = await dismissNotification(id);
-      if (result.success) {
-        setItems((prev) => prev.filter((n) => n.id !== id));
-        offsetRef.current = Math.max(0, offsetRef.current - 1);
-      } else {
+      const offsetBefore = offsetRef.current;
+      offsetRef.current = Math.max(0, offsetBefore - 1);
+      const offsetDelta = offsetBefore - offsetRef.current;
+      const rollback = (errorMessage: string) => {
         setItems((prev) =>
           prev.map((n) => (n.id === id ? { ...n, pendingDismiss: false } : n)),
         );
-        toastErrorWithRetry("Failed to dismiss notification", () =>
-          handleDismiss(id),
-        );
+        offsetRef.current += offsetDelta;
+        toastErrorWithRetry(errorMessage, () => handleDismiss(id));
+      };
+      let result: Awaited<ReturnType<typeof dismissNotification>>;
+      try {
+        result = await dismissNotification(id);
+      } catch (err) {
+        console.error("[notifications] dismiss threw", { id, err });
+        rollback("Failed to dismiss notification");
+        return;
+      }
+      if (result.success) {
+        setItems((prev) => prev.filter((n) => n.id !== id));
+      } else {
+        console.error("[notifications] dismiss failed", {
+          id,
+          error: result.error,
+        });
+        rollback(result.error ?? "Failed to dismiss notification");
       }
     });
   }, []);
@@ -258,7 +275,15 @@ export function NotificationPageList({
             );
           }
         }
-        setItems((prev) => [...prev, ...newItems]);
+        // De-dupe by id: a Load more fired during an in-flight dismiss uses
+        // offset N-1; if that dismiss later fails (rollback restores the row),
+        // the appended page can overlap with already-rendered rows. Filtering
+        // here keeps React keys unique without coupling to dismiss state (#315).
+        setItems((prev) => {
+          const seen = new Set(prev.map((n) => n.id));
+          const additions = newItems.filter((n) => !seen.has(n.id));
+          return additions.length === 0 ? prev : [...prev, ...additions];
+        });
         setTopicsByEpisode((prev) => ({ ...prev, ...newTopics }));
         if (newListenedPiIds.length > 0) {
           setListenedIds((prev) =>

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { NOTIFICATIONS_PAGE_SIZE } from "@/lib/notifications-constants";
 
 // --- Mocks ---
 
@@ -683,6 +684,168 @@ describe("NotificationPageList", () => {
       .firstElementChild as HTMLElement | null;
     expect(card).not.toBeNull();
     expect(card!).toHaveAttribute("data-listened", "false");
+  });
+
+  // Regression (#315): dismiss+load-more race — offset must be decremented
+  // optimistically so a concurrent Load more uses the correct offset.
+  it("Load more uses decremented offset when a dismiss is still in-flight", async () => {
+    let resolveDismiss!: (v: { success: boolean }) => void;
+    mockDismissNotification.mockReturnValue(
+      new Promise<{ success: boolean }>((res) => {
+        resolveDismiss = res;
+      }),
+    );
+    mockGetNotifications.mockResolvedValue({
+      notifications: [makeItem({ id: 999 })],
+      hasMore: false,
+      error: null,
+    });
+
+    const user = userEvent.setup();
+    const N = 3;
+    const items = Array.from({ length: N }, (_, i) => makeItem({ id: i + 1 }));
+    render(
+      <NotificationPageList
+        initialItems={items}
+        initialHasMore={true}
+        initialTopicsByEpisode={{}}
+      />,
+    );
+
+    // Fire dismiss — server response is still pending.
+    await user.click(screen.getAllByRole("button", { name: /dismiss/i })[0]);
+    expect(mockDismissNotification).toHaveBeenCalledWith(1);
+
+    // Immediately fire Load more (dismiss not yet resolved).
+    await user.click(screen.getByRole("button", { name: /load more/i }));
+
+    // Load more must use offset N-1 (accounts for pending dismiss).
+    await waitFor(() => {
+      expect(mockGetNotifications).toHaveBeenCalledWith(
+        NOTIFICATIONS_PAGE_SIZE,
+        N - 1,
+        undefined,
+      );
+    });
+
+    // Resolve the dismiss inside act() so the success-path setItems runs
+    // before teardown (otherwise React logs an act(...) warning).
+    await act(async () => {
+      resolveDismiss({ success: true });
+    });
+  });
+
+  // Regression (#315): on dismiss failure the optimistic offset decrement is
+  // restored so the *next* Load more doesn't under-count.
+  it("restores offset when a dismiss fails so subsequent Load more uses correct offset", async () => {
+    let resolveDismiss!: (v: { success: boolean }) => void;
+    mockDismissNotification.mockReturnValue(
+      new Promise<{ success: boolean }>((res) => {
+        resolveDismiss = res;
+      }),
+    );
+    mockGetNotifications.mockResolvedValue({
+      notifications: [makeItem({ id: 999 })],
+      hasMore: false,
+      error: null,
+    });
+
+    const user = userEvent.setup();
+    const N = 3;
+    const items = Array.from({ length: N }, (_, i) => makeItem({ id: i + 1 }));
+    render(
+      <NotificationPageList
+        initialItems={items}
+        initialHasMore={true}
+        initialTopicsByEpisode={{}}
+      />,
+    );
+
+    // Fire dismiss.
+    await user.click(screen.getAllByRole("button", { name: /dismiss/i })[0]);
+    expect(mockDismissNotification).toHaveBeenCalledWith(1);
+
+    // Let the dismiss fail — offset should be restored to N. Wrap in act() so
+    // the rollback's setItems flush isn't observed mid-render by waitFor.
+    await act(async () => {
+      resolveDismiss({ success: false });
+    });
+    await waitFor(() => {
+      // Row reappears after rollback.
+      expect(screen.getAllByRole("article")).toHaveLength(N);
+    });
+    // Surface the failure to the user so they know the dismiss didn't stick.
+    expect(mockToastError).toHaveBeenCalledWith(
+      "Failed to dismiss notification",
+      expect.objectContaining({
+        action: expect.objectContaining({ label: "Retry" }),
+      }),
+    );
+
+    // Load more after the failed dismiss must use the original offset N.
+    await user.click(screen.getByRole("button", { name: /load more/i }));
+    await waitFor(() => {
+      expect(mockGetNotifications).toHaveBeenCalledWith(
+        NOTIFICATIONS_PAGE_SIZE,
+        N,
+        undefined,
+      );
+    });
+  });
+
+  // Regression (#315): Load more fired while dismiss is in-flight uses offset
+  // N-1, so the returned page can overlap with rows still in state. If the
+  // dismiss then fails (rollback restores its row), an unguarded append would
+  // produce duplicate ids and React key collisions. The component must dedupe.
+  it("does not duplicate ids when Load more overlaps with a failing dismiss", async () => {
+    let resolveDismiss!: (v: { success: boolean }) => void;
+    mockDismissNotification.mockReturnValue(
+      new Promise<{ success: boolean }>((res) => {
+        resolveDismiss = res;
+      }),
+    );
+    // Server response simulates the overlap: Load more with offset N-1 returns
+    // a row whose id collides with the still-pending dismiss target plus a new
+    // row that has not been seen.
+    mockGetNotifications.mockResolvedValue({
+      notifications: [makeItem({ id: 3 }), makeItem({ id: 4 })],
+      hasMore: false,
+      error: null,
+    });
+
+    const user = userEvent.setup();
+    const N = 3;
+    const items = Array.from({ length: N }, (_, i) => makeItem({ id: i + 1 }));
+    render(
+      <NotificationPageList
+        initialItems={items}
+        initialHasMore={true}
+        initialTopicsByEpisode={{}}
+      />,
+    );
+
+    // Dismiss row 1 — server still pending.
+    await user.click(screen.getAllByRole("button", { name: /dismiss/i })[0]);
+
+    // Load more uses offset N-1; mocked response includes overlapping id 3.
+    await user.click(screen.getByRole("button", { name: /load more/i }));
+    await waitFor(() => {
+      expect(mockGetNotifications).toHaveBeenCalledWith(
+        NOTIFICATIONS_PAGE_SIZE,
+        N - 1,
+        undefined,
+      );
+    });
+
+    // Now fail the dismiss so row 1 reappears via rollback.
+    await act(async () => {
+      resolveDismiss({ success: false });
+    });
+
+    // Final visible state: ids 1, 2, 3, 4 — no duplicates of id 3.
+    await waitFor(() => {
+      expect(screen.getAllByRole("article")).toHaveLength(4);
+    });
   });
 
   // Regression: Load more degrades gracefully when getEpisodeTopics throws
