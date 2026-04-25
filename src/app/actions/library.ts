@@ -254,7 +254,7 @@ export async function getUserLibrary(
           comparison = dateB - dateA; // Default newest first
           break;
         case "title":
-          comparison = a.episode.title.localeCompare(b.episode.title);
+          comparison = b.episode.title.localeCompare(a.episode.title); // Default Z to A
           break;
         case "savedAt":
         default:

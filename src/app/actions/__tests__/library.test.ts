@@ -565,13 +565,17 @@ describe("getUserLibrary", () => {
     expect(result.items[0].id).toBe(1);
   });
 
-  it("sorts titles A-Z when called with direction='desc' (production quirk: title branch is not pre-flipped)", async () => {
-    // Other sort keys compute (b - a) and rely on direction='asc' to flip.
-    // localeCompare already returns positive when a > b, so passing 'desc'
-    // here results in A→Z (Apple, Banana, Cherry → ids 2, 1, 3). This pins
-    // the production behavior; flipping the asymmetry is a separate concern.
+  it("sorts titles Z-A when called with direction='desc'", async () => {
     const { getUserLibrary } = await importLibrary();
     const result = await getUserLibrary("title", "desc");
+    // Cherry (id 3), Banana (id 1), Apple (id 2)
+    expect(result.items.map((i) => i.id)).toEqual([3, 1, 2]);
+  });
+
+  it("sorts titles A-Z when called with direction='asc'", async () => {
+    const { getUserLibrary } = await importLibrary();
+    const result = await getUserLibrary("title", "asc");
+    // Apple (id 2), Banana (id 1), Cherry (id 3)
     expect(result.items.map((i) => i.id)).toEqual([2, 1, 3]);
   });
 
