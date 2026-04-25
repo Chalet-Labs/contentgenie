@@ -18,6 +18,7 @@ import {
 } from "@/lib/podcastindex";
 import type { PodcastIndexEpisode } from "@/lib/podcastindex";
 import { isSubscribedToPodcast } from "@/app/actions/subscriptions";
+import { asPodcastIndexEpisodeId } from "@/types/ids";
 import { getListenedEpisodeIds } from "@/app/actions/listen-history";
 import { db } from "@/db";
 import { podcasts, episodes as episodesTable } from "@/db/schema";
@@ -316,7 +317,10 @@ export default async function PodcastPage({
     const episodes = episodesResponse.items || [];
 
     // Batch-query DB for summary data
-    const episodeStringIds = episodes.map((e) => String(e.id));
+    // PodcastIndex API id (number|string) → branded string.
+    const episodeStringIds = episodes.map((e) =>
+      asPodcastIndexEpisodeId(String(e.id)),
+    );
     const dbEpisodeData =
       episodeStringIds.length > 0
         ? await db.query.episodes.findMany({

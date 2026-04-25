@@ -11,6 +11,7 @@ import {
 } from "@/lib/rate-limit";
 import { BATCH_SUMMARIZE_LIMIT } from "@/lib/batch-summarize";
 import type { batchSummarizeEpisodes } from "@/trigger/batch-summarize-episodes";
+import { asPodcastIndexEpisodeId } from "@/types/ids";
 
 export async function POST(request: NextRequest) {
   try {
@@ -51,8 +52,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Query DB for already-processed episodes
+    // episodeIds are PI episode numeric ids from the request body.
     const existingEpisodes = await db.query.episodes.findMany({
-      where: inArray(episodes.podcastIndexId, episodeIds.map(String)),
+      where: inArray(
+        episodes.podcastIndexId,
+        episodeIds.map((id) => asPodcastIndexEpisodeId(String(id))),
+      ),
       columns: { podcastIndexId: true, processedAt: true },
     });
 

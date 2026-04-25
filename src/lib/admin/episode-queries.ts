@@ -1,6 +1,7 @@
 import { db } from "@/db";
 import { episodes, podcasts } from "@/db/schema";
 import { count, eq, sql } from "drizzle-orm";
+import type { PodcastIndexEpisodeId } from "@/types/ids";
 import {
   buildEpisodeWhereConditions,
   PAGE_SIZE,
@@ -13,7 +14,7 @@ export interface EpisodeRow {
   podcastId: number;
   podcastTitle: string;
   podcastImageUrl: string | null;
-  podcastIndexId: string;
+  podcastIndexId: PodcastIndexEpisodeId;
   publishDate: Date | null;
   transcriptStatus: string | null;
   transcriptSource: string | null;

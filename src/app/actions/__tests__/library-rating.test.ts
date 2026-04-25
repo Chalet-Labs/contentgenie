@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import type { PodcastIndexEpisodeId } from "@/types/ids";
 
 // Mock database
 const mockSelect = vi.fn();
@@ -40,7 +41,9 @@ describe("getEpisodeAverageRating", () => {
     mockQueryChain([{ averageRating: "4.0", ratingCount: 3 }]);
 
     const { getEpisodeAverageRating } = await import("@/app/actions/library");
-    const result = await getEpisodeAverageRating("ep123");
+    const result = await getEpisodeAverageRating(
+      "ep123" as PodcastIndexEpisodeId,
+    );
 
     expect(result.averageRating).toBe(4.0);
     expect(result.ratingCount).toBe(3);
@@ -51,7 +54,9 @@ describe("getEpisodeAverageRating", () => {
     mockQueryChain([]);
 
     const { getEpisodeAverageRating } = await import("@/app/actions/library");
-    const result = await getEpisodeAverageRating("ep123");
+    const result = await getEpisodeAverageRating(
+      "ep123" as PodcastIndexEpisodeId,
+    );
 
     expect(result.averageRating).toBeNull();
     expect(result.ratingCount).toBe(0);
@@ -62,7 +67,9 @@ describe("getEpisodeAverageRating", () => {
     mockQueryChain([]);
 
     const { getEpisodeAverageRating } = await import("@/app/actions/library");
-    const result = await getEpisodeAverageRating("nonexistent");
+    const result = await getEpisodeAverageRating(
+      "nonexistent" as PodcastIndexEpisodeId,
+    );
 
     expect(result.averageRating).toBeNull();
     expect(result.ratingCount).toBe(0);

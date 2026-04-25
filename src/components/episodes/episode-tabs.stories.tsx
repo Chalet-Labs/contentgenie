@@ -17,6 +17,7 @@ import {
   type AudioPlayerState,
 } from "@/contexts/audio-player-context";
 import type { Chapter } from "@/lib/chapters";
+import { asPodcastIndexEpisodeId } from "@/types/ids";
 
 const meta: Meta<typeof EpisodeTabs> = {
   title: "Episodes/EpisodeTabs",
@@ -77,7 +78,7 @@ function InsightsPanel() {
 }
 
 const sampleAudioEpisode: AudioEpisode = {
-  id: "story-ep",
+  id: asPodcastIndexEpisodeId("story-ep"),
   title: "Why Senior Designers Stop Using Frameworks",
   podcastTitle: "Design Decisions",
   audioUrl: "https://example.com/audio.mp3",

@@ -1,5 +1,10 @@
 import { z } from "zod";
 
+import {
+  asPodcastIndexEpisodeId,
+  type PodcastIndexEpisodeId,
+} from "@/types/ids";
+
 const trimmedNonEmpty = z.string().trim().min(1).max(500);
 
 // Restrict URL schemes to http/https so user-supplied payloads can't land
@@ -20,7 +25,7 @@ export const MAX_QUEUE_ITEMS = 200;
 
 export const audioEpisodeSchema = z
   .object({
-    id: trimmedNonEmpty,
+    id: trimmedNonEmpty.transform((v) => asPodcastIndexEpisodeId(v)),
     title: trimmedNonEmpty,
     podcastTitle: trimmedNonEmpty,
     audioUrl: httpOrHttpsUrl,
@@ -60,7 +65,7 @@ export type AudioEpisode = z.infer<typeof audioEpisodeSchema>;
  * assertions in `@/db/schema` guarantee these field sets stay aligned.
  */
 export interface EpisodeDenormRow {
-  episodeId: string;
+  episodeId: PodcastIndexEpisodeId;
   title: string;
   podcastTitle: string;
   audioUrl: string;

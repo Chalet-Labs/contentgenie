@@ -7,6 +7,7 @@ import {
   EPISODES_INITIAL,
 } from "@/components/dashboard/episode-recommendations";
 import type { RecommendedEpisodeDTO } from "@/db/library-columns";
+import { asPodcastIndexEpisodeId } from "@/types/ids";
 
 // ---------------------------------------------------------------------------
 // Factory
@@ -24,7 +25,7 @@ function makeEpisode(
   const id = _idCounter++;
   return {
     id,
-    podcastIndexId: String(id * 100),
+    podcastIndexId: asPodcastIndexEpisodeId(String(id * 100)),
     title: `Episode ${id}`,
     description: null,
     audioUrl: null,

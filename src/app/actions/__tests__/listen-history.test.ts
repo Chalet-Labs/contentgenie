@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { makeClerkAuthMock } from "@/test/mocks/clerk-server";
+import { asPodcastIndexEpisodeId } from "@/types/ids";
 
 // Mock Clerk auth
 const mockAuth = vi.fn();
@@ -93,7 +94,7 @@ describe("recordListenEvent", () => {
     mockAuth.mockResolvedValue({ userId: null });
     const { recordListenEvent } = await import("@/app/actions/listen-history");
     const result = await recordListenEvent({
-      podcastIndexEpisodeId: "12345",
+      podcastIndexEpisodeId: asPodcastIndexEpisodeId("12345"),
     });
     expect(result).toEqual({ success: false, error: "Unauthorized" });
     expect(mockInsert).not.toHaveBeenCalled();
@@ -103,7 +104,7 @@ describe("recordListenEvent", () => {
     mockFindFirst.mockResolvedValue(undefined);
     const { recordListenEvent } = await import("@/app/actions/listen-history");
     const result = await recordListenEvent({
-      podcastIndexEpisodeId: "99999",
+      podcastIndexEpisodeId: asPodcastIndexEpisodeId("99999"),
     });
     expect(result).toEqual({ success: false, error: "Episode not found" });
     expect(mockFindFirst).toHaveBeenCalledTimes(1);
@@ -114,7 +115,7 @@ describe("recordListenEvent", () => {
   it("calls db.insert with correct values for a started event", async () => {
     const { recordListenEvent } = await import("@/app/actions/listen-history");
     const result = await recordListenEvent({
-      podcastIndexEpisodeId: "99999",
+      podcastIndexEpisodeId: asPodcastIndexEpisodeId("99999"),
     });
     expect(result).toEqual({ success: true });
     expect(mockFindFirst).toHaveBeenCalledTimes(1);
@@ -124,7 +125,7 @@ describe("recordListenEvent", () => {
     expect(insertedValues).toMatchObject({
       userId: "user_123",
       episodeId: 42,
-      podcastIndexEpisodeId: "99999",
+      podcastIndexEpisodeId: asPodcastIndexEpisodeId("99999"),
     });
     expect(insertedValues.startedAt).toBeInstanceOf(Date);
   });
@@ -132,7 +133,7 @@ describe("recordListenEvent", () => {
   it("calls db.insert with correct values for a completed event", async () => {
     const { recordListenEvent } = await import("@/app/actions/listen-history");
     const result = await recordListenEvent({
-      podcastIndexEpisodeId: "777",
+      podcastIndexEpisodeId: asPodcastIndexEpisodeId("777"),
       completed: true,
       durationSeconds: 1800,
     });
@@ -142,7 +143,7 @@ describe("recordListenEvent", () => {
     expect(insertedValues).toMatchObject({
       userId: "user_123",
       episodeId: 42,
-      podcastIndexEpisodeId: "777",
+      podcastIndexEpisodeId: asPodcastIndexEpisodeId("777"),
       listenDurationSeconds: 1800,
     });
     expect(insertedValues.startedAt).toBeInstanceOf(Date);
@@ -152,7 +153,7 @@ describe("recordListenEvent", () => {
   it("uses onConflictDoUpdate with COALESCE for startedAt (preserves first listen)", async () => {
     const { recordListenEvent } = await import("@/app/actions/listen-history");
     await recordListenEvent({
-      podcastIndexEpisodeId: "111",
+      podcastIndexEpisodeId: asPodcastIndexEpisodeId("111"),
     });
     expect(mockOnConflictDoUpdate).toHaveBeenCalledTimes(1);
     const upsertOpts = mockOnConflictDoUpdate.mock.calls[0][0];
@@ -175,7 +176,7 @@ describe("recordListenEvent", () => {
   it("uses GREATEST for listenDurationSeconds on completed events", async () => {
     const { recordListenEvent } = await import("@/app/actions/listen-history");
     await recordListenEvent({
-      podcastIndexEpisodeId: "111",
+      podcastIndexEpisodeId: asPodcastIndexEpisodeId("111"),
       completed: true,
       durationSeconds: 1800,
     });
@@ -191,7 +192,7 @@ describe("recordListenEvent", () => {
   it("calls ensureUserExists before inserting", async () => {
     const { recordListenEvent } = await import("@/app/actions/listen-history");
     await recordListenEvent({
-      podcastIndexEpisodeId: "12345",
+      podcastIndexEpisodeId: asPodcastIndexEpisodeId("12345"),
     });
     expect(mockEnsureUserExists).toHaveBeenCalledWith("user_123");
     expect(mockEnsureUserExists).toHaveBeenCalledTimes(1);
@@ -204,7 +205,7 @@ describe("recordListenEvent", () => {
   it("returns { success: false } when durationSeconds is negative", async () => {
     const { recordListenEvent } = await import("@/app/actions/listen-history");
     const result = await recordListenEvent({
-      podcastIndexEpisodeId: "12345",
+      podcastIndexEpisodeId: asPodcastIndexEpisodeId("12345"),
       durationSeconds: -10,
     });
     expect(result).toEqual({
@@ -217,7 +218,7 @@ describe("recordListenEvent", () => {
   it("returns { success: false } when durationSeconds is not an integer", async () => {
     const { recordListenEvent } = await import("@/app/actions/listen-history");
     const result = await recordListenEvent({
-      podcastIndexEpisodeId: "12345",
+      podcastIndexEpisodeId: asPodcastIndexEpisodeId("12345"),
       durationSeconds: 3.14,
     });
     expect(result).toEqual({
@@ -230,7 +231,7 @@ describe("recordListenEvent", () => {
   it("returns { success: false } when podcastIndexEpisodeId is empty", async () => {
     const { recordListenEvent } = await import("@/app/actions/listen-history");
     const result = await recordListenEvent({
-      podcastIndexEpisodeId: "",
+      podcastIndexEpisodeId: asPodcastIndexEpisodeId(""),
     });
     expect(result).toEqual({ success: false, error: "Invalid input" });
     expect(mockFindFirst).not.toHaveBeenCalled();
@@ -244,7 +245,7 @@ describe("recordListenEvent", () => {
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const { recordListenEvent } = await import("@/app/actions/listen-history");
     const result = await recordListenEvent({
-      podcastIndexEpisodeId: "12345",
+      podcastIndexEpisodeId: asPodcastIndexEpisodeId("12345"),
     });
     expect(result).toEqual({
       success: false,

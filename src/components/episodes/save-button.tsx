@@ -17,9 +17,10 @@ import {
   offlineUnsaveEpisode,
 } from "@/lib/offline-actions";
 import { useSidebarCountsOptional } from "@/contexts/sidebar-counts-context";
+import type { PodcastIndexEpisodeId } from "@/types/ids";
 
 interface EpisodeData {
-  podcastIndexId: string;
+  podcastIndexId: PodcastIndexEpisodeId;
   title: string;
   description?: string;
   audioUrl?: string;

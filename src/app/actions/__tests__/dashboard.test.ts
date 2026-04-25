@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { makeClerkAuthMock } from "@/test/mocks/clerk-server";
+import { asPodcastIndexEpisodeId } from "@/types/ids";
 
 // Mock Clerk auth
 const mockAuth = vi.fn();
@@ -850,7 +851,9 @@ describe("getEpisodeTopicOverlap", () => {
     mockAuth.mockResolvedValue({ userId: null });
 
     const { getEpisodeTopicOverlap } = await import("@/app/actions/dashboard");
-    const result = await getEpisodeTopicOverlap("ep-123");
+    const result = await getEpisodeTopicOverlap(
+      asPodcastIndexEpisodeId("ep-123"),
+    );
 
     expect(result.label).toBeNull();
     expect(result.overlapCount).toBe(0);
@@ -861,7 +864,9 @@ describe("getEpisodeTopicOverlap", () => {
     mockLimit.mockResolvedValue([]);
 
     const { getEpisodeTopicOverlap } = await import("@/app/actions/dashboard");
-    const result = await getEpisodeTopicOverlap("ep-999");
+    const result = await getEpisodeTopicOverlap(
+      asPodcastIndexEpisodeId("ep-999"),
+    );
 
     expect(result.label).toBeNull();
   });
@@ -891,7 +896,9 @@ describe("getEpisodeTopicOverlap", () => {
     });
 
     const { getEpisodeTopicOverlap } = await import("@/app/actions/dashboard");
-    const result = await getEpisodeTopicOverlap("ep-42");
+    const result = await getEpisodeTopicOverlap(
+      asPodcastIndexEpisodeId("ep-42"),
+    );
 
     expect(result.label).toBe("You've heard 4 similar episodes");
     expect(result.overlapCount).toBe(4);
@@ -917,7 +924,9 @@ describe("getEpisodeTopicOverlap", () => {
     });
 
     const { getEpisodeTopicOverlap } = await import("@/app/actions/dashboard");
-    const result = await getEpisodeTopicOverlap("ep-42");
+    const result = await getEpisodeTopicOverlap(
+      asPodcastIndexEpisodeId("ep-42"),
+    );
 
     expect(result.label).toBeNull();
   });
@@ -926,7 +935,9 @@ describe("getEpisodeTopicOverlap", () => {
     mockLimit.mockRejectedValue(new Error("DB failure"));
 
     const { getEpisodeTopicOverlap } = await import("@/app/actions/dashboard");
-    const result = await getEpisodeTopicOverlap("ep-42");
+    const result = await getEpisodeTopicOverlap(
+      asPodcastIndexEpisodeId("ep-42"),
+    );
 
     expect(result.label).toBeNull();
     expect(result.overlapCount).toBe(0);

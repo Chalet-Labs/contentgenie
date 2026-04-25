@@ -15,6 +15,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { relations, sql } from "drizzle-orm";
 import type { WorthItSignals } from "@/lib/openrouter";
+import type { PodcastIndexEpisodeId } from "@/types/ids";
 import {
   DEFAULT_SUBSCRIPTION_SORT,
   SUBSCRIPTION_SORTS,
@@ -86,7 +87,10 @@ export const episodes = pgTable(
     podcastId: integer("podcast_id")
       .references(() => podcasts.id, { onDelete: "cascade" })
       .notNull(),
-    podcastIndexId: text("podcast_index_id").notNull().unique(),
+    podcastIndexId: text("podcast_index_id")
+      .$type<PodcastIndexEpisodeId>()
+      .notNull()
+      .unique(),
     title: text("title").notNull(),
     description: text("description"),
     audioUrl: text("audio_url"),
@@ -370,7 +374,9 @@ export const listenHistory = pgTable(
     episodeId: integer("episode_id")
       .references(() => episodes.id, { onDelete: "cascade" })
       .notNull(),
-    podcastIndexEpisodeId: text("podcast_index_episode_id").notNull(),
+    podcastIndexEpisodeId: text("podcast_index_episode_id")
+      .$type<PodcastIndexEpisodeId>()
+      .notNull(),
     startedAt: timestamp("started_at").notNull(),
     completedAt: timestamp("completed_at"),
     listenDurationSeconds: integer("listen_duration_seconds"),
@@ -398,7 +404,7 @@ export const userQueueItems = pgTable(
       .references(() => users.id, { onDelete: "cascade" })
       .notNull(),
     position: integer("position").notNull(),
-    episodeId: text("episode_id").notNull(),
+    episodeId: text("episode_id").$type<PodcastIndexEpisodeId>().notNull(),
     title: text("title").notNull(),
     podcastTitle: text("podcast_title").notNull(),
     audioUrl: text("audio_url").notNull(),
@@ -424,7 +430,7 @@ export const userPlayerSession = pgTable("user_player_session", {
   userId: text("user_id")
     .primaryKey()
     .references(() => users.id, { onDelete: "cascade" }),
-  episodeId: text("episode_id").notNull(),
+  episodeId: text("episode_id").$type<PodcastIndexEpisodeId>().notNull(),
   title: text("title").notNull(),
   podcastTitle: text("podcast_title").notNull(),
   audioUrl: text("audio_url").notNull(),

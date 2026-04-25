@@ -28,6 +28,7 @@ import {
   getEpisodeArtworkUrl,
   getSafeEpisodeLink,
 } from "@/components/episodes/episode-detail-shared";
+import { asPodcastIndexEpisodeId } from "@/types/ids";
 
 interface PublicEpisodeDetailProps {
   episodeId: string;
@@ -234,7 +235,9 @@ export function PublicEpisodeDetail({ episodeId }: PublicEpisodeDetailProps) {
               Community Rating:
             </span>
             <CommunityRating
-              episodePodcastIndexId={String(episode.id)}
+              episodePodcastIndexId={asPodcastIndexEpisodeId(
+                String(episode.id),
+              )}
               size="md"
               showCount={true}
             />

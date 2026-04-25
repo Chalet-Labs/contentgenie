@@ -3,6 +3,10 @@
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import {
+  asPodcastIndexEpisodeId,
+  type PodcastIndexEpisodeId,
+} from "@/types/ids";
+import {
   eq,
   desc,
   and,
@@ -193,7 +197,10 @@ export async function getRecentEpisodesFromSubscriptions({
     const allEpisodes = Array.from(episodesByFeed.values()).flat();
 
     // Batch-query DB for worth-it scores (keyed by podcastIndexId = String(ep.id))
-    const podcastIndexIds = allEpisodes.map((ep) => String(ep.id));
+    // PodcastIndex API id (number|string) → branded string.
+    const podcastIndexIds = allEpisodes.map((ep) =>
+      asPodcastIndexEpisodeId(String(ep.id)),
+    );
     const scoreRows =
       podcastIndexIds.length > 0
         ? await db
@@ -426,7 +433,9 @@ export async function getRecommendedEpisodes(
 }
 
 // Get topic overlap for a single episode — used by the episode detail page.
-export async function getEpisodeTopicOverlap(podcastIndexEpisodeId: string) {
+export async function getEpisodeTopicOverlap(
+  podcastIndexEpisodeId: PodcastIndexEpisodeId,
+) {
   if (!podcastIndexEpisodeId) return EMPTY_OVERLAP_RESULT;
 
   const { userId } = await auth();

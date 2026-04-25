@@ -6,6 +6,7 @@ import {
   AbortTaskRunError,
 } from "@trigger.dev/sdk";
 import { eq } from "drizzle-orm";
+import { asPodcastIndexEpisodeId } from "@/types/ids";
 import { getEpisodeById, getPodcastById } from "@/trigger/helpers/podcastindex";
 import {
   generateEpisodeSummary,
@@ -52,11 +53,13 @@ export const summarizeEpisode = task({
   maxDuration: 600, // 10 min — summarization itself is ~10-30s; generous buffer for retries
   onFailure: async (params: { payload: SummarizeEpisodePayload }) => {
     const { episodeId } = params.payload;
+    // Trigger payload uses numeric form; brand for DB lookup.
+    const piId = asPodcastIndexEpisodeId(String(episodeId));
     logger.error("Summarization task failed permanently", { episodeId });
     let existingProcessingError: string | null = null;
     try {
       const existing = await db.query.episodes.findFirst({
-        where: eq(episodes.podcastIndexId, String(episodeId)),
+        where: eq(episodes.podcastIndexId, piId),
         columns: { processingError: true },
       });
       existingProcessingError = existing?.processingError ?? null;
@@ -81,7 +84,7 @@ export const summarizeEpisode = task({
             "Summarization failed after maximum retry attempts",
           updatedAt: new Date(),
         })
-        .where(eq(episodes.podcastIndexId, String(episodeId)));
+        .where(eq(episodes.podcastIndexId, piId));
     } catch (error) {
       logger.error("Failed to update episode status to failed in database", {
         episodeId,
@@ -95,6 +98,8 @@ export const summarizeEpisode = task({
     { ctx },
   ): Promise<SummaryResult> => {
     const { episodeId } = payload;
+    // Trigger payload uses numeric form; brand for DB lookup.
+    const piId = asPodcastIndexEpisodeId(String(episodeId));
 
     // Step 1: Fetch episode from PodcastIndex
     setStep("fetching-episode");
@@ -116,7 +121,7 @@ export const summarizeEpisode = task({
             processingError: errorMsg,
             updatedAt: new Date(),
           })
-          .where(eq(episodes.podcastIndexId, String(episodeId)));
+          .where(eq(episodes.podcastIndexId, piId));
       } catch (dbErr) {
         logger.warn("Failed to write processingError before abort", {
           episodeId,
@@ -164,7 +169,7 @@ export const summarizeEpisode = task({
     const episodeRow = await retry.onThrow(
       async () =>
         db.query.episodes.findFirst({
-          where: eq(episodes.podcastIndexId, String(episodeId)),
+          where: eq(episodes.podcastIndexId, piId),
           columns: { transcription: true },
         }),
       { maxAttempts: 3 },
@@ -183,7 +188,7 @@ export const summarizeEpisode = task({
             processingError: errorMsg,
             updatedAt: new Date(),
           })
-          .where(eq(episodes.podcastIndexId, String(episodeId)));
+          .where(eq(episodes.podcastIndexId, piId));
       } catch (dbErr) {
         logger.warn("Failed to write processingError before abort", {
           episodeId,
@@ -242,7 +247,7 @@ export const summarizeEpisode = task({
       const podcastDbId = await resolvePodcastId(episode.feedId);
       if (podcastDbId) {
         const dbEpisode = await db.query.episodes.findFirst({
-          where: eq(episodes.podcastIndexId, String(episodeId)),
+          where: eq(episodes.podcastIndexId, piId),
           columns: { id: true },
         });
         const episodeDbId = dbEpisode?.id ?? null;
@@ -250,7 +255,7 @@ export const summarizeEpisode = task({
           await markSummaryReady(
             podcastDbId,
             episodeDbId,
-            String(episodeId),
+            piId,
             podcast?.title ?? episode.title,
             `Summary ready: ${episode.title}`,
           );

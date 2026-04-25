@@ -1,5 +1,6 @@
 /** Shared column selections and DTO types for library/episode/podcast queries. */
 
+import type { PodcastIndexEpisodeId } from "@/types/ids";
 import { type OverlapLabelKind } from "@/lib/topic-overlap";
 
 // -- Column selection constants (Drizzle `columns` allowlist) --
@@ -41,7 +42,7 @@ export const COLLECTION_LIST_COLUMNS = {
 
 export interface EpisodeListDTO {
   id: number;
-  podcastIndexId: string;
+  podcastIndexId: PodcastIndexEpisodeId;
   title: string;
   description: string | null;
   audioUrl: string | null;

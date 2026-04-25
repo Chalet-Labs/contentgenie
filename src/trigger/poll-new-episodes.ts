@@ -2,6 +2,7 @@ import { schedules, logger, retry } from "@trigger.dev/sdk";
 import { eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { podcasts, episodes, userSubscriptions } from "@/db/schema";
+import { asPodcastIndexEpisodeId } from "@/types/ids";
 import { getEpisodesByFeedId } from "@/trigger/helpers/podcastindex";
 import { fetchTranscriptTask } from "@/trigger/fetch-transcript";
 import { createEpisodeNotifications } from "@/trigger/helpers/notifications";
@@ -68,15 +69,19 @@ export async function pollSingleFeed(podcast: typeof podcasts.$inferSelect) {
     // Deduplicate for the transcript pipeline: only genuinely-new episodes
     // trigger fetch-transcript. Not used to gate the notification path — see
     // the `upserted` block below for the retry-safe notification flow.
-    const fetchedIds = fetchedEpisodes.map((ep) => String(ep.id));
+    // PodcastIndex API id (number|string) → branded string.
+    const fetchedIds = fetchedEpisodes.map((ep) =>
+      asPodcastIndexEpisodeId(String(ep.id)),
+    );
     const existingEpisodes = await db
       .select({ podcastIndexId: episodes.podcastIndexId })
       .from(episodes)
       .where(inArray(episodes.podcastIndexId, fetchedIds));
 
     const existingIds = new Set(existingEpisodes.map((e) => e.podcastIndexId));
+    // Reuse fetchedIds (already computed above) to avoid re-branding.
     newEpisodes = fetchedEpisodes.filter(
-      (ep) => !existingIds.has(String(ep.id)),
+      (_, i) => !existingIds.has(fetchedIds[i]),
     );
 
     logger.info("Deduplication complete", {
@@ -97,9 +102,9 @@ export async function pollSingleFeed(podcast: typeof podcasts.$inferSelect) {
     const upserted = await db
       .insert(episodes)
       .values(
-        fetchedEpisodes.map((ep) => ({
+        fetchedEpisodes.map((ep, i) => ({
           podcastId: podcast.id,
-          podcastIndexId: String(ep.id),
+          podcastIndexId: fetchedIds[i], // reuse pre-branded id
           title: ep.title,
           description: ep.description,
           audioUrl: ep.enclosureUrl,
@@ -121,7 +126,7 @@ export async function pollSingleFeed(podcast: typeof podcasts.$inferSelect) {
     // instead of N queries per-episode. Idempotent — only genuinely-new
     // (user, episode) pairs produce a row + push.
     const episodeByPiid = new Map(
-      fetchedEpisodes.map((e) => [String(e.id), e]),
+      fetchedEpisodes.map((e, i) => [fetchedIds[i], e]), // reuse pre-branded ids
     );
     const notificationBatch = upserted.map((row) => {
       const ep = episodeByPiid.get(row.podcastIndexId);

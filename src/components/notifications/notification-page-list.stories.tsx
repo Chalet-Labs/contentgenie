@@ -1,3 +1,4 @@
+import { asPodcastIndexEpisodeId } from "@/types/ids";
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { NotificationPageList } from "@/components/notifications/notification-page-list";
 import {
@@ -38,7 +39,7 @@ function makeItem(
     isRead: false,
     createdAt: STORY_NOW,
     episodeDbId: id * 10,
-    episodePodcastIndexId: `pi-${id}`,
+    episodePodcastIndexId: asPodcastIndexEpisodeId(`pi-${id}`),
     episodeTitle: `Episode ${id}`,
     podcastTitle: `Podcast ${id}`,
     worthItScore: null,

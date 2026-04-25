@@ -1,3 +1,4 @@
+import { asPodcastIndexEpisodeId } from "@/types/ids";
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { BookMarked } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -20,7 +21,7 @@ const sampleChapters: Chapter[] = [
 
 const playingState = {
   currentEpisode: {
-    id: "1",
+    id: asPodcastIndexEpisodeId("1"),
     title: "Test Episode",
     podcastTitle: "Test Podcast",
     audioUrl: "https://example.com/audio.mp3",

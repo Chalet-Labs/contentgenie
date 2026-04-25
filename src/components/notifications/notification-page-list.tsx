@@ -29,6 +29,7 @@ import { formatRelativeTime } from "@/lib/utils";
 import { ROUTES } from "@/lib/routes";
 import { LISTEN_STATE_CHANGED_EVENT } from "@/lib/events";
 import { NOTIFICATIONS_PAGE_SIZE } from "@/lib/notifications-constants";
+import type { PodcastIndexEpisodeId } from "@/types/ids";
 
 type NotificationItem = Awaited<
   ReturnType<typeof getNotifications>
@@ -53,7 +54,7 @@ interface NotificationPageListProps {
    * Passed as an array because RSC Flight can't serialize Sets; we build the
    * Set client-side. Matches the pattern in `src/components/podcasts/episode-list.tsx`.
    */
-  initialListenedIds?: string[];
+  initialListenedIds?: PodcastIndexEpisodeId[];
   filter?: { podcastId?: number; since?: Date };
 }
 
@@ -67,7 +68,7 @@ export function NotificationPageList({
   const router = useRouter();
   const [items, setItems] = useState<LocalNotification[]>(initialItems);
   const [hasMore, setHasMore] = useState(initialHasMore);
-  const [listenedIds, setListenedIds] = useState<string[]>(
+  const [listenedIds, setListenedIds] = useState<PodcastIndexEpisodeId[]>(
     initialListenedIds ?? [],
   );
   const listenedSet = useMemo(() => new Set(listenedIds), [listenedIds]);
@@ -101,14 +102,16 @@ export function NotificationPageList({
         const listenedDbIds = new Set(await getListenedEpisodeIds(dbIds));
         // Drop stale responses when a newer refresh is already in flight.
         if (seq !== refreshSeqRef.current) return;
-        const piIds = current
-          .filter(
-            (n) =>
-              n.episodeDbId !== null &&
-              listenedDbIds.has(n.episodeDbId) &&
-              n.episodePodcastIndexId,
-          )
-          .map((n) => n.episodePodcastIndexId as string);
+        const piIds = current.flatMap((n) => {
+          if (
+            n.episodeDbId !== null &&
+            listenedDbIds.has(n.episodeDbId) &&
+            n.episodePodcastIndexId !== null
+          ) {
+            return [n.episodePodcastIndexId]; // narrowed to PodcastIndexEpisodeId
+          }
+          return [];
+        });
         setListenedIds((prev) => {
           // getListenedEpisodeIds returns [] on failure and on "no listens"
           // alike. Treat empty-while-prev-non-empty as a likely failure and
@@ -241,7 +244,7 @@ export function NotificationPageList({
           .map((n) => n.episodeDbId)
           .filter((id): id is number => id !== null);
         let newTopics: Record<number, string[]> = {};
-        let newListenedPiIds: string[] = [];
+        let newListenedPiIds: PodcastIndexEpisodeId[] = [];
         if (newEpisodeIds.length > 0) {
           const [topicsResult, listenedResult] = await Promise.allSettled([
             getEpisodeTopics(newEpisodeIds),
@@ -258,14 +261,16 @@ export function NotificationPageList({
           }
           if (listenedResult.status === "fulfilled") {
             const listenedDbIds = new Set(listenedResult.value);
-            newListenedPiIds = newItems
-              .filter(
-                (n) =>
-                  n.episodeDbId !== null &&
-                  listenedDbIds.has(n.episodeDbId) &&
-                  n.episodePodcastIndexId,
-              )
-              .map((n) => n.episodePodcastIndexId as string);
+            newListenedPiIds = newItems.flatMap((n) => {
+              if (
+                n.episodeDbId !== null &&
+                listenedDbIds.has(n.episodeDbId) &&
+                n.episodePodcastIndexId !== null
+              ) {
+                return [n.episodePodcastIndexId]; // narrowed to PodcastIndexEpisodeId
+              }
+              return [];
+            });
           } else {
             // Degrade gracefully — rows stay "unlistened" on failure; the
             // user can re-mark if needed.

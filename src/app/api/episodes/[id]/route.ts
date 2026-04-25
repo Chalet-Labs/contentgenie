@@ -6,6 +6,7 @@ import { episodes } from "@/db/schema";
 import { getEpisodeById, getPodcastById } from "@/lib/podcastindex";
 import { createRateLimitChecker } from "@/lib/rate-limit";
 import { parseScoreOrNull } from "@/lib/score-utils";
+import { asPodcastIndexEpisodeId } from "@/types/ids";
 
 const PUBLIC_CACHE_CONTROL = "public, s-maxage=300, stale-while-revalidate=600";
 const checkPublicEpisodeRateLimit = createRateLimitChecker({
@@ -80,6 +81,12 @@ export async function GET(
     }
 
     const id = params.id;
+    // URL param: RSS ids carry "rss-" prefix; PI numeric ids are validated below.
+    // Note: piId uses the raw URL string directly rather than re-stringifying
+    // Number(id) — this is intentional. PI episode ids don't carry leading zeros
+    // in practice, and the DB stores exactly what PodcastIndex returns (e.g. "123",
+    // not "0123"), so skipping the Number round-trip is semantically equivalent.
+    const piId = asPodcastIndexEpisodeId(id);
 
     // RSS-sourced episode: load from database
     if (isRssSourced(id)) {
@@ -89,7 +96,7 @@ export async function GET(
       // Note: Uses column exclusion (vs. whitelist in the PodcastIndex path below)
       // because this query needs nearly all episode fields for response mapping.
       const dbEpisode = await db.query.episodes.findFirst({
-        where: eq(episodes.podcastIndexId, id),
+        where: eq(episodes.podcastIndexId, piId),
         columns: {
           transcription: false,
         },
@@ -220,7 +227,7 @@ export async function GET(
       // when only checking for cached summary data.
       // Expected impact: Significant reduction in DB I/O and memory usage per episode view.
       const cachedEpisode = await db.query.episodes.findFirst({
-        where: eq(episodes.podcastIndexId, episodeId.toString()),
+        where: eq(episodes.podcastIndexId, piId),
         columns: {
           id: true,
           summary: true,

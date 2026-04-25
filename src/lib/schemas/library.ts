@@ -1,5 +1,10 @@
 import { z } from "zod";
+
 import { SUBSCRIPTION_SORTS } from "@/db/subscription-sorts";
+import {
+  asPodcastIndexEpisodeId,
+  type PodcastIndexEpisodeId,
+} from "@/types/ids";
 
 /** Shared max-length for short user text (notes, descriptions, etc.). */
 export const MAX_SHORT_TEXT = 500;
@@ -27,7 +32,9 @@ const podcastSchema = z
 
 export const saveEpisodeSchema = z
   .object({
-    podcastIndexId: trimmedNonEmpty,
+    podcastIndexId: trimmedNonEmpty.transform((v) =>
+      asPodcastIndexEpisodeId(v),
+    ),
     title: trimmedNonEmpty,
     description: optionalText,
     audioUrl: optionalUrl,
@@ -39,7 +46,9 @@ export const saveEpisodeSchema = z
 
 export const unsaveEpisodeSchema = z
   .object({
-    podcastIndexId: trimmedNonEmpty,
+    podcastIndexId: trimmedNonEmpty.transform((v) =>
+      asPodcastIndexEpisodeId(v),
+    ),
   })
   .strip();
 

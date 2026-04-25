@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { EpisodeChaptersList } from "@/components/episodes/episode-chapters-list";
 import type { UseChaptersState } from "@/hooks/use-chapters";
 import type { AudioEpisode } from "@/contexts/audio-player-context";
+import { asPodcastIndexEpisodeId } from "@/types/ids";
 
 const mocks = vi.hoisted(() => ({
   useAudioPlayerState:
@@ -21,7 +22,7 @@ vi.mock("@/contexts/audio-player-context", () => ({
 }));
 
 const sampleEpisode: AudioEpisode = {
-  id: "ep-1",
+  id: asPodcastIndexEpisodeId("ep-1"),
   title: "Sample Episode",
   podcastTitle: "Sample Podcast",
   audioUrl: "https://example.com/audio.mp3",

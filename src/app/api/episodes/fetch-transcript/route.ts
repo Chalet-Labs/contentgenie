@@ -8,6 +8,7 @@ import { upsertPodcast } from "@/db/helpers";
 import { ADMIN_ROLE } from "@/lib/auth-roles";
 import { getEpisodeById, getPodcastById } from "@/lib/podcastindex";
 import type { fetchTranscriptTask } from "@/trigger/fetch-transcript";
+import { asPodcastIndexEpisodeId } from "@/types/ids";
 
 export async function POST(request: NextRequest) {
   try {
@@ -130,7 +131,10 @@ export async function POST(request: NextRequest) {
       }
 
       numericPodcastIndexId = parsedPodcastIndexId;
-      const podcastIndexIdStr = numericPodcastIndexId.toString();
+      // PI episode id numeric form → branded string for DB lookup.
+      const podcastIndexIdStr = asPodcastIndexEpisodeId(
+        numericPodcastIndexId.toString(),
+      );
 
       // Look for an existing DB row
       const existingEpisode = await db.query.episodes.findFirst({

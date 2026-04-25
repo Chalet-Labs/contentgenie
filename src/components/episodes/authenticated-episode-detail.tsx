@@ -70,6 +70,7 @@ import {
   getSafeEpisodeLink,
   supportsEpisodeProcessing,
 } from "@/components/episodes/episode-detail-shared";
+import { asPodcastIndexEpisodeId } from "@/types/ids";
 
 interface AuthenticatedEpisodeDetailProps {
   episodeId: string;
@@ -239,7 +240,10 @@ export function AuthenticatedEpisodeDetail({
       }
 
       // Check if episode is saved to library
-      const saved = await isEpisodeSaved(String(data.episode.id));
+      // PodcastIndex API id (number|string) → branded string.
+      const saved = await isEpisodeSaved(
+        asPodcastIndexEpisodeId(String(data.episode.id)),
+      );
       setIsSaved(saved);
     } catch (error) {
       console.error("Error fetching episode:", error);
@@ -293,7 +297,7 @@ export function AuthenticatedEpisodeDetail({
   useEffect(() => {
     if (!isOnline || !episodeLoaded) return;
     let ignore = false;
-    getEpisodeTopicOverlap(episodeId)
+    getEpisodeTopicOverlap(asPodcastIndexEpisodeId(episodeId))
       .then((result) => {
         if (!ignore)
           setOverlapResult({
@@ -462,8 +466,10 @@ export function AuthenticatedEpisodeDetail({
       ? chaptersState.chapters.length
       : undefined;
 
-  const isCurrentEpisode =
-    playerState.currentEpisode?.id === String(episode.id);
+  // PodcastIndex API id (number|string) → branded string.
+  const piId = asPodcastIndexEpisodeId(String(episode.id));
+
+  const isCurrentEpisode = playerState.currentEpisode?.id === piId;
   const isPlayingThis = isCurrentEpisode && playerState.isPlaying;
   const isPausedThis = isCurrentEpisode && !playerState.isPlaying;
 
@@ -472,7 +478,7 @@ export function AuthenticatedEpisodeDetail({
       playerAPI.togglePlay();
     } else {
       playerAPI.playEpisode({
-        id: String(episode.id),
+        id: piId,
         title: episode.title,
         podcastTitle: podcast?.title || "",
         audioUrl: episode.enclosureUrl,
@@ -617,7 +623,7 @@ export function AuthenticatedEpisodeDetail({
                 Community Rating:
               </span>
               <CommunityRating
-                episodePodcastIndexId={episodeId}
+                episodePodcastIndexId={asPodcastIndexEpisodeId(episodeId)}
                 size="md"
                 showCount={true}
               />
@@ -649,7 +655,7 @@ export function AuthenticatedEpisodeDetail({
             {isOnline && episode.enclosureUrl && (
               <AddToQueueButton
                 episode={{
-                  id: String(episode.id),
+                  id: piId,
                   title: episode.title,
                   podcastTitle: podcast?.title || "",
                   audioUrl: episode.enclosureUrl,
@@ -666,7 +672,7 @@ export function AuthenticatedEpisodeDetail({
             {isOnline && (
               <SaveButton
                 episodeData={{
-                  podcastIndexId: String(episode.id),
+                  podcastIndexId: piId,
                   title: episode.title,
                   description: episode.description,
                   audioUrl: episode.enclosureUrl,
@@ -753,7 +759,7 @@ export function AuthenticatedEpisodeDetail({
                   state={chaptersState}
                   canPlay={canPlayEpisode}
                   audioEpisode={{
-                    id: String(episode.id),
+                    id: piId,
                     title: episode.title,
                     podcastTitle: podcast?.title || "",
                     audioUrl: episode.enclosureUrl,

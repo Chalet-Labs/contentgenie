@@ -2,6 +2,9 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, act, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { LISTEN_STATE_CHANGED_EVENT } from "@/lib/events";
+import { asPodcastIndexEpisodeId } from "@/types/ids";
+
+const TEST_PI_EPISODE_ID = asPodcastIndexEpisodeId("ep-1");
 
 const mockRecordListenEvent = vi.fn();
 vi.mock("@/app/actions/listen-history", () => ({
@@ -22,7 +25,12 @@ describe("ListenedButton", () => {
   it("renders a button with aria-label 'Mark as listened' when isListened is false", async () => {
     const { ListenedButton } =
       await import("@/components/episodes/listened-button");
-    render(<ListenedButton podcastIndexEpisodeId="ep-1" isListened={false} />);
+    render(
+      <ListenedButton
+        podcastIndexEpisodeId={TEST_PI_EPISODE_ID}
+        isListened={false}
+      />,
+    );
     expect(
       screen.getByRole("button", { name: "Mark as listened" }),
     ).toBeInTheDocument();
@@ -31,7 +39,12 @@ describe("ListenedButton", () => {
   it("renders non-button indicator with aria-label 'Already listened' when isListened is true", async () => {
     const { ListenedButton } =
       await import("@/components/episodes/listened-button");
-    render(<ListenedButton podcastIndexEpisodeId="ep-1" isListened={true} />);
+    render(
+      <ListenedButton
+        podcastIndexEpisodeId={TEST_PI_EPISODE_ID}
+        isListened={true}
+      />,
+    );
     expect(
       screen.queryByRole("button", { name: "Mark as listened" }),
     ).toBeNull();
@@ -42,13 +55,21 @@ describe("ListenedButton", () => {
     const { ListenedButton } =
       await import("@/components/episodes/listened-button");
     const { rerender } = render(
-      <ListenedButton podcastIndexEpisodeId="ep-1" isListened={false} />,
+      <ListenedButton
+        podcastIndexEpisodeId={TEST_PI_EPISODE_ID}
+        isListened={false}
+      />,
     );
     expect(
       screen.getByRole("button", { name: "Mark as listened" }),
     ).toBeInTheDocument();
 
-    rerender(<ListenedButton podcastIndexEpisodeId="ep-1" isListened={true} />);
+    rerender(
+      <ListenedButton
+        podcastIndexEpisodeId={TEST_PI_EPISODE_ID}
+        isListened={true}
+      />,
+    );
     expect(
       screen.queryByRole("button", { name: "Mark as listened" }),
     ).toBeNull();
@@ -66,7 +87,12 @@ describe("ListenedButton", () => {
     const { ListenedButton } =
       await import("@/components/episodes/listened-button");
     const user = userEvent.setup();
-    render(<ListenedButton podcastIndexEpisodeId="ep-1" isListened={false} />);
+    render(
+      <ListenedButton
+        podcastIndexEpisodeId={TEST_PI_EPISODE_ID}
+        isListened={false}
+      />,
+    );
 
     const btn = screen.getByRole("button", { name: "Mark as listened" });
     await user.click(btn);
@@ -88,7 +114,12 @@ describe("ListenedButton", () => {
       await import("@/components/episodes/listened-button");
     const { toast } = await import("sonner");
     const user = userEvent.setup();
-    render(<ListenedButton podcastIndexEpisodeId="ep-1" isListened={false} />);
+    render(
+      <ListenedButton
+        podcastIndexEpisodeId={TEST_PI_EPISODE_ID}
+        isListened={false}
+      />,
+    );
 
     await user.click(screen.getByRole("button", { name: "Mark as listened" }));
 
@@ -107,7 +138,12 @@ describe("ListenedButton", () => {
       await import("@/components/episodes/listened-button");
     const { toast } = await import("sonner");
     const user = userEvent.setup();
-    render(<ListenedButton podcastIndexEpisodeId="ep-1" isListened={false} />);
+    render(
+      <ListenedButton
+        podcastIndexEpisodeId={TEST_PI_EPISODE_ID}
+        isListened={false}
+      />,
+    );
 
     await user.click(screen.getByRole("button", { name: "Mark as listened" }));
 
@@ -128,7 +164,12 @@ describe("ListenedButton", () => {
     const { toast } = await import("sonner");
     const user = userEvent.setup();
     const dispatchSpy = vi.spyOn(window, "dispatchEvent");
-    render(<ListenedButton podcastIndexEpisodeId="ep-1" isListened={false} />);
+    render(
+      <ListenedButton
+        podcastIndexEpisodeId={TEST_PI_EPISODE_ID}
+        isListened={false}
+      />,
+    );
 
     await user.click(screen.getByRole("button", { name: "Mark as listened" }));
 
@@ -158,7 +199,12 @@ describe("ListenedButton", () => {
     const { toast } = await import("sonner");
     const dispatchSpy = vi.spyOn(window, "dispatchEvent");
     const user = userEvent.setup();
-    render(<ListenedButton podcastIndexEpisodeId="ep-1" isListened={false} />);
+    render(
+      <ListenedButton
+        podcastIndexEpisodeId={TEST_PI_EPISODE_ID}
+        isListened={false}
+      />,
+    );
 
     await user.click(screen.getByRole("button", { name: "Mark as listened" }));
 

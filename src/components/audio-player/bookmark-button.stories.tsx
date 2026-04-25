@@ -1,10 +1,11 @@
+import { asPodcastIndexEpisodeId } from "@/types/ids";
 import type { Decorator, Meta, StoryObj } from "@storybook/nextjs-vite";
 import { BookmarkButton } from "@/components/audio-player/bookmark-button";
 import { audioPlayerContextDecorator } from "@/test/story-fixtures";
 
 const playingState = {
   currentEpisode: {
-    id: "ep-123",
+    id: asPodcastIndexEpisodeId("ep-123"),
     title: "Test Episode",
     podcastTitle: "Test Podcast",
     audioUrl: "http://example.com/audio.mp3",

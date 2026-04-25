@@ -4,9 +4,10 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { Loader2, Check, StickyNote } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { updateLibraryNotes } from "@/app/actions/library";
+import type { PodcastIndexEpisodeId } from "@/types/ids";
 
 interface NotesEditorProps {
-  episodePodcastIndexId: string;
+  episodePodcastIndexId: PodcastIndexEpisodeId;
   initialNotes: string;
   onNotesChange?: (notes: string) => void;
 }

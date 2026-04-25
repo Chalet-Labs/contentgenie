@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { asPodcastIndexEpisodeId } from "@/types/ids";
 import {
   EpisodeRecommendations,
   EpisodeRecommendationsLoading,
@@ -18,7 +19,7 @@ function makeEpisode(
 ): RecommendedEpisodeDTO {
   return {
     id,
-    podcastIndexId: String(id * 100),
+    podcastIndexId: asPodcastIndexEpisodeId(String(id * 100)),
     title,
     description: null,
     audioUrl: null,

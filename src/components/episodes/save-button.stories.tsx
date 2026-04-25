@@ -1,8 +1,9 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { SaveButton } from "./save-button";
+import { asPodcastIndexEpisodeId } from "@/types/ids";
 
 const mockEpisodeData = {
-  podcastIndexId: "123",
+  podcastIndexId: asPodcastIndexEpisodeId("123"),
   title: "Test Episode",
   description: "A test episode description",
   podcast: {

@@ -1,10 +1,11 @@
+import { asPodcastIndexEpisodeId } from "@/types/ids";
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { type AudioEpisode } from "@/contexts/audio-player-context";
 import { AddToQueueButton } from "@/components/audio-player/add-to-queue-button";
 import { audioPlayerContextDecorator } from "@/test/story-fixtures";
 
 const testEpisode: AudioEpisode = {
-  id: "ep-1",
+  id: asPodcastIndexEpisodeId("ep-1"),
   title: "How to Build Better Products",
   podcastTitle: "Design Matters",
   audioUrl: "https://example.com/audio.mp3",
@@ -13,7 +14,7 @@ const testEpisode: AudioEpisode = {
 };
 
 const playingEpisode: AudioEpisode = {
-  id: "ep-playing",
+  id: asPodcastIndexEpisodeId("ep-playing"),
   title: "Currently Playing Episode",
   podcastTitle: "Some Podcast",
   audioUrl: "https://example.com/playing.mp3",

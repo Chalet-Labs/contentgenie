@@ -5,6 +5,7 @@ import type {
   AudioEpisode,
   AudioPlayerState,
 } from "@/contexts/audio-player-context";
+import { asPodcastIndexEpisodeId } from "@/types/ids";
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -51,13 +52,16 @@ const mockFetch = vi.fn();
 // Helpers
 // ---------------------------------------------------------------------------
 
-function makeEpisode(overrides: Partial<AudioEpisode> = {}): AudioEpisode {
+type MakeEpisodeOverrides = Partial<Omit<AudioEpisode, "id">> & { id?: string };
+
+function makeEpisode(overrides: MakeEpisodeOverrides = {}): AudioEpisode {
+  const { id = "1001", ...rest } = overrides;
   return {
-    id: "1001",
+    id: asPodcastIndexEpisodeId(id),
     title: "Test Episode",
     podcastTitle: "Test Podcast",
     audioUrl: "https://example.com/audio.mp3",
-    ...overrides,
+    ...rest,
   };
 }
 
