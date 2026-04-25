@@ -183,6 +183,34 @@ describe("useChapters", () => {
     });
   });
 
+  it("skips fetch while offline and retries when isOnline flips back to true", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({ chapters: [{ startTime: 0, title: "Intro" }] }),
+        { status: 200 },
+      ),
+    );
+
+    const { result, rerender } = renderHook(
+      ({ online }: { online: boolean }) =>
+        useChapters("https://example.com/c.json", online),
+      { initialProps: { online: false } },
+    );
+
+    expect(result.current).toEqual({ status: "idle" });
+    expect(fetch).not.toHaveBeenCalled();
+
+    rerender({ online: true });
+
+    await waitFor(() =>
+      expect(result.current).toEqual({
+        status: "ready",
+        chapters: [{ startTime: 0, title: "Intro" }],
+      }),
+    );
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
   it("validates the response shape via parseChapters and drops malformed entries", async () => {
     vi.mocked(fetch).mockResolvedValueOnce(
       new Response(

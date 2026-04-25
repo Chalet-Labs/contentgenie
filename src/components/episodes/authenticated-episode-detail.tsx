@@ -89,7 +89,7 @@ export function AuthenticatedEpisodeDetail({
 
   const [episode, setEpisode] = useState<EpisodeData | null>(null);
   const normalizedChaptersUrl = episode?.chaptersUrl?.trim() || null;
-  const chaptersState = useChapters(normalizedChaptersUrl);
+  const chaptersState = useChapters(normalizedChaptersUrl, isOnline);
   const [podcast, setPodcast] = useState<PodcastData | null>(null);
   const [summaryData, setSummaryData] = useState<SummaryData | null>(null);
   const [isLoadingEpisode, setIsLoadingEpisode] = useState(true);
@@ -450,9 +450,11 @@ export function AuthenticatedEpisodeDetail({
     ? Object.values(podcast.categories)
     : [];
 
-  const hasChapters =
-    normalizedChaptersUrl !== null &&
-    (chaptersState.status !== "ready" || chaptersState.chapters.length > 0);
+  // Chapters tab visibility is gated by URL presence, not fetch state — Radix
+  // Tabs holds the active value across re-renders, so removing the trigger after
+  // a transient empty/error state would leave no panel rendered. The empty case
+  // is handled by EpisodeChaptersList's in-panel "No chapters available" copy.
+  const hasChapters = normalizedChaptersUrl !== null;
   const descriptionPlainText = stripHtml(episode.description ?? "");
   const hasDescription = Boolean(descriptionPlainText.trim());
   const canPlayEpisode = isOnline && Boolean(episode.enclosureUrl);

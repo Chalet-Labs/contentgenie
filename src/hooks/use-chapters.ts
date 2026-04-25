@@ -27,15 +27,27 @@ export type UseChaptersState =
  * error so the UI leaves the skeleton state. Tracking that with
  * `controller.signal.aborted` alone conflates the two — we use a
  * dedicated `didTimeout` flag instead.
+ *
+ * `isOnline` is an optional connectivity hint. When explicitly `false`,
+ * the hook skips the fetch and preserves the current state (so a stale
+ * `error` from before the network dropped stays visible). When the value
+ * flips back to `true`, the effect re-runs and a fresh fetch retries —
+ * recovers from a transient offline blip without forcing the user to
+ * remount the component.
  */
 export function useChapters(
   chaptersUrl: string | null | undefined,
+  isOnline?: boolean,
 ): UseChaptersState {
   const [state, setState] = useState<UseChaptersState>({ status: "idle" });
 
   useEffect(() => {
     if (!chaptersUrl) {
       setState({ status: "idle" });
+      return;
+    }
+    if (isOnline === false) {
+      // Preserve current state; don't issue a fetch the network will reject.
       return;
     }
 
@@ -81,7 +93,7 @@ export function useChapters(
       clearTimeout(timeoutId);
       controller.abort();
     };
-  }, [chaptersUrl]);
+  }, [chaptersUrl, isOnline]);
 
   return state;
 }
