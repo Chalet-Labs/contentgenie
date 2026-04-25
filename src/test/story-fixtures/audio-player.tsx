@@ -3,6 +3,9 @@ import {
   AudioPlayerAPIContext,
   AudioPlayerProgressContext,
   AudioPlayerStateContext,
+  IsPlayingContext,
+  NowPlayingEpisodeIdContext,
+  QueueEpisodeIdsContext,
   type AudioPlayerAPI,
   type AudioPlayerProgress,
   type AudioPlayerState,
@@ -60,13 +63,23 @@ export function audioPlayerContextDecorator(
   const api = { ...noopAudioPlayerAPI, ...overrides.api };
   const state = { ...idleAudioPlayerState, ...overrides.state };
   const progress = { ...idleAudioPlayerProgress, ...overrides.progress };
+  const queueEpisodeIds: ReadonlySet<string> = new Set(
+    state.queue.map((ep) => ep.id),
+  );
+  const nowPlayingEpisodeId = state.currentEpisode?.id ?? null;
 
   const AudioPlayerContextDecorator: Decorator = (Story) => (
     <AudioPlayerAPIContext.Provider value={api}>
       <AudioPlayerStateContext.Provider value={state}>
-        <AudioPlayerProgressContext.Provider value={progress}>
-          <Story />
-        </AudioPlayerProgressContext.Provider>
+        <NowPlayingEpisodeIdContext.Provider value={nowPlayingEpisodeId}>
+          <IsPlayingContext.Provider value={state.isPlaying}>
+            <QueueEpisodeIdsContext.Provider value={queueEpisodeIds}>
+              <AudioPlayerProgressContext.Provider value={progress}>
+                <Story />
+              </AudioPlayerProgressContext.Provider>
+            </QueueEpisodeIdsContext.Provider>
+          </IsPlayingContext.Provider>
+        </NowPlayingEpisodeIdContext.Provider>
       </AudioPlayerStateContext.Provider>
     </AudioPlayerAPIContext.Provider>
   );

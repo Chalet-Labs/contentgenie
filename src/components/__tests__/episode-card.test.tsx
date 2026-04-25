@@ -37,6 +37,9 @@ vi.mock("@/contexts/audio-player-context", () => ({
     addToQueue: vi.fn(),
   }),
   useAudioPlayerState: () => ({ queue: [], currentEpisode: null }),
+  useNowPlayingEpisodeId: () => null,
+  useIsEpisodePlaying: (_id: string) => false,
+  useIsEpisodeInQueue: (_id: string) => false,
 }));
 
 const mockEpisode: PodcastIndexEpisode = {

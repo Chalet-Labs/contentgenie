@@ -6,6 +6,9 @@ import {
   useAudioPlayerAPI,
   useAudioPlayerState,
   useAudioPlayerProgress,
+  useNowPlayingEpisodeId,
+  useIsEpisodePlaying,
+  useIsEpisodeInQueue,
   type AudioEpisode,
 } from "@/contexts/audio-player-context";
 
@@ -1027,6 +1030,36 @@ describe("hooks throw outside provider", () => {
       "useAudioPlayerProgress must be used within AudioPlayerProvider",
     );
   });
+
+  it("useNowPlayingEpisodeId throws without provider", () => {
+    function BadConsumer() {
+      useNowPlayingEpisodeId();
+      return null;
+    }
+    expect(() => render(<BadConsumer />)).toThrow(
+      "useNowPlayingEpisodeId must be used within AudioPlayerProvider",
+    );
+  });
+
+  it("useIsEpisodePlaying throws without provider", () => {
+    function BadConsumer() {
+      useIsEpisodePlaying("any");
+      return null;
+    }
+    expect(() => render(<BadConsumer />)).toThrow(
+      "useIsEpisodePlaying must be used within AudioPlayerProvider",
+    );
+  });
+
+  it("useIsEpisodeInQueue throws without provider", () => {
+    function BadConsumer() {
+      useIsEpisodeInQueue("any");
+      return null;
+    }
+    expect(() => render(<BadConsumer />)).toThrow(
+      "useIsEpisodeInQueue must be used within AudioPlayerProvider",
+    );
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -2007,5 +2040,103 @@ describe("Cross-device sync: hydration and reconcile", () => {
     });
 
     expect(toast.error).toHaveBeenCalled();
+  });
+
+  it("focus refetch with content-equal server queue does not re-fire the persist effect", async () => {
+    const queue: AudioEpisode[] = [queueEpisode1, queueEpisode2];
+    mockLoadQueue.mockReturnValue(queue);
+    // Each call returns a fresh array reference with identical content —
+    // mirrors production, where getQueue() deserializes a new payload every
+    // call. Using a single shared array reference would mask the regression:
+    // both state.queue (from mockLoadQueue) and action.queue (from getQueue)
+    // would alias the same object, so even an unconditional reducer
+    // `{ ...state, queue: action.queue }` would preserve identity.
+    mockGetQueue.mockImplementation(async () => ({
+      success: true,
+      data: queue.map((ep) => ({ ...ep })),
+    }));
+
+    render(
+      <AudioPlayerProvider>
+        <TestConsumer />
+      </AudioPlayerProvider>,
+    );
+
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 100));
+    });
+
+    // Mount hydration legitimately triggers one persist write; clear so we
+    // can isolate what the focus refetch produces.
+    mockSaveQueue.mockClear();
+
+    await act(async () => {
+      window.dispatchEvent(new Event("focus"));
+      await new Promise((r) => setTimeout(r, 300));
+    });
+
+    // Without the dispatch-site equality guard in the focus-refetch handler,
+    // INIT_QUEUE would have fired with a fresh array reference, the
+    // [state.queue] persist effect would have re-run, and saveQueue would
+    // have been called once more. The guard short-circuits the dispatch
+    // when content is unchanged.
+    expect(mockSaveQueue).not.toHaveBeenCalled();
+  });
+
+  it("focus refetch with mutated server metadata still applies the update", async () => {
+    const localQueue: AudioEpisode[] = [
+      {
+        id: "shared-id",
+        title: "Old Title",
+        podcastTitle: "Podcast",
+        audioUrl: "https://example.com/old.mp3",
+      },
+    ];
+    const serverQueue: AudioEpisode[] = [
+      {
+        id: "shared-id",
+        title: "New Title",
+        podcastTitle: "Podcast",
+        audioUrl: "https://example.com/new.mp3",
+      },
+    ];
+    mockLoadQueue.mockReturnValue(localQueue);
+    mockGetQueue.mockResolvedValueOnce({ success: true, data: localQueue });
+    mockGetQueue.mockResolvedValueOnce({ success: true, data: serverQueue });
+
+    render(
+      <AudioPlayerProvider>
+        <TestConsumer />
+      </AudioPlayerProvider>,
+    );
+
+    await act(async () => {
+      await new Promise((r) => setTimeout(r, 100));
+    });
+
+    mockSaveQueue.mockClear();
+
+    // Trigger the focus refetch — the second mocked call returns updated
+    // metadata for the same id.
+    await act(async () => {
+      window.dispatchEvent(new Event("focus"));
+      await new Promise((r) => setTimeout(r, 300));
+    });
+
+    // The dispatch must NOT short-circuit just because IDs match: server-side
+    // metadata refreshes (title, audioUrl, artwork, chaptersUrl) must
+    // propagate to the client. Persist firing alone proves only that some
+    // state.queue identity change reached the effect — assert the latest
+    // persisted snapshot also contains the refreshed metadata, otherwise a
+    // bug that re-dispatches a cloned local queue would still pass.
+    expect(mockSaveQueue).toHaveBeenCalled();
+    const latestPersistedQueue = mockSaveQueue.mock.calls.at(-1)?.[0];
+    expect(latestPersistedQueue).toMatchObject([
+      expect.objectContaining({
+        id: "shared-id",
+        title: "New Title",
+        audioUrl: "https://example.com/new.mp3",
+      }),
+    ]);
   });
 });

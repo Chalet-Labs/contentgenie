@@ -79,6 +79,36 @@ function clearSessionOnServer(): void {
     .catch((err) => console.warn("[player] clear threw:", err));
 }
 
+// Full-field equality on the persisted AudioEpisode shape. Used at the
+// focus-refetch dispatch site so a server reconcile returning content-
+// equal data can skip the dispatch entirely (preserving state.queue
+// reference identity and avoiding a spurious [state.queue] persist
+// effect re-fire). ID-only equality is insufficient: server-side metadata
+// refreshes (title corrections, artwork URLs, chaptersUrl backfill) must
+// still propagate to the client.
+function queuesEqualByContent(
+  a: readonly AudioEpisode[],
+  b: readonly AudioEpisode[],
+): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    const x = a[i];
+    const y = b[i];
+    if (
+      x.id !== y.id ||
+      x.title !== y.title ||
+      x.podcastTitle !== y.podcastTitle ||
+      x.audioUrl !== y.audioUrl ||
+      x.artwork !== y.artwork ||
+      x.duration !== y.duration ||
+      x.chaptersUrl !== y.chaptersUrl
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -284,6 +314,26 @@ export const AudioPlayerStateContext = createContext<AudioPlayerState | null>(
 );
 export const AudioPlayerProgressContext =
   createContext<AudioPlayerProgress | null>(null);
+
+// Narrow slice contexts — each holds a single primitive (or Set) derived from
+// AudioPlayerState. Subscribers re-render only when their specific slice changes,
+// not on every state dispatch. See ADR-039.
+//
+// Each context defaults to `undefined` so hooks can detect "rendered outside
+// AudioPlayerProvider" and throw — the runtime never produces undefined.
+//
+// @internal — these are exported only to support Storybook decorators and test
+// fixtures that need to compose the provider stack manually. Application code
+// must use the selector hooks (`useNowPlayingEpisodeId`, `useIsEpisodePlaying`,
+// `useIsEpisodeInQueue`) so call sites stay episode-scoped and avoid the raw
+// `isPlaying` footgun.
+export const NowPlayingEpisodeIdContext = createContext<
+  string | null | undefined
+>(undefined);
+export const IsPlayingContext = createContext<boolean | undefined>(undefined);
+export const QueueEpisodeIdsContext = createContext<
+  ReadonlySet<string> | undefined
+>(undefined);
 
 // ---------------------------------------------------------------------------
 // Provider
@@ -576,8 +626,18 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
 
         // Queue reconcile: skip if a local write is pending
         if (queueResult.success && !pendingQueueWriteRef.current) {
-          lastAckedQueueRef.current = queueResult.data;
-          dispatch({ type: "INIT_QUEUE", queue: queueResult.data });
+          const next = queueResult.data;
+          lastAckedQueueRef.current = next;
+          // Skip the dispatch when the server returned content-equal data.
+          // INIT_QUEUE always allocates a new state.queue array, which would
+          // re-fire the [state.queue] persist effect (one wasted localStorage
+          // write per focus event). The reducer must stay pure — its
+          // INIT_QUEUE invariant is "always produces new state" and the
+          // rollback path at the persist effect depends on that to consume
+          // suppressQueueWriteRef. Filter at the dispatch site instead.
+          if (!queuesEqualByContent(stateRef.current.queue, next)) {
+            dispatch({ type: "INIT_QUEUE", queue: next });
+          }
         } else if (!queueResult.success) {
           console.warn("Focus getQueue failed:", queueResult.error);
         }
@@ -1423,24 +1483,59 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
     };
   }, [clearSleepTimerInterval, cancelFade]);
 
+  // Derive a Set of queued episode IDs so AddToQueueButton can subscribe to
+  // queue membership without holding a reference to the full queue array.
+  // Preserve the previous Set reference when membership is unchanged (e.g.
+  // REORDER_QUEUE, or any action that produces a new queue array with the
+  // same ids) so context consumers bail out via Object.is.
+  const queueEpisodeIdsRef = useRef<ReadonlySet<string> | null>(null);
+  const queueEpisodeIds = useMemo(() => {
+    // Build the deduplicated id set first so the bailout is driven by Set
+    // sizes, not the (potentially duplicate-bearing) array length. If
+    // INIT_QUEUE ever hydrates duplicates, comparing against state.queue.length
+    // could falsely match prev.size and reuse a stale Set.
+    const next = new Set(state.queue.map((ep) => ep.id));
+    const prev = queueEpisodeIdsRef.current;
+    if (prev && prev.size === next.size) {
+      let same = true;
+      for (const ep of state.queue) {
+        if (!prev.has(ep.id)) {
+          same = false;
+          break;
+        }
+      }
+      if (same) return prev;
+    }
+    queueEpisodeIdsRef.current = next;
+    return next;
+  }, [state.queue]);
+
   return (
     <AudioPlayerAPIContext.Provider value={api}>
       <AudioPlayerStateContext.Provider value={state}>
-        <AudioPlayerProgressContext.Provider value={progress}>
-          {children}
-          {/* Hidden audio element */}
-          {/* eslint-disable-next-line jsx-a11y/media-has-caption -- podcast enclosures do not ship caption tracks; transcript is surfaced separately */}
-          <audio ref={audioRef} preload="metadata" />
-          {/* Screen reader time announcements */}
-          <div
-            role="status"
-            aria-live="polite"
-            aria-atomic="true"
-            className="sr-only"
-          >
-            {ariaAnnouncement}
-          </div>
-        </AudioPlayerProgressContext.Provider>
+        <NowPlayingEpisodeIdContext.Provider
+          value={state.currentEpisode?.id ?? null}
+        >
+          <IsPlayingContext.Provider value={state.isPlaying}>
+            <QueueEpisodeIdsContext.Provider value={queueEpisodeIds}>
+              <AudioPlayerProgressContext.Provider value={progress}>
+                {children}
+                {/* Hidden audio element */}
+                {/* eslint-disable-next-line jsx-a11y/media-has-caption -- podcast enclosures do not ship caption tracks; transcript is surfaced separately */}
+                <audio ref={audioRef} preload="metadata" />
+                {/* Screen reader time announcements */}
+                <div
+                  role="status"
+                  aria-live="polite"
+                  aria-atomic="true"
+                  className="sr-only"
+                >
+                  {ariaAnnouncement}
+                </div>
+              </AudioPlayerProgressContext.Provider>
+            </QueueEpisodeIdsContext.Provider>
+          </IsPlayingContext.Provider>
+        </NowPlayingEpisodeIdContext.Provider>
       </AudioPlayerStateContext.Provider>
     </AudioPlayerAPIContext.Provider>
   );
@@ -1486,4 +1581,75 @@ export function useAudioPlayer() {
     ...useAudioPlayerState(),
     ...useAudioPlayerAPI(),
   };
+}
+
+// ---------------------------------------------------------------------------
+// Narrow selector hooks (ADR-039)
+//
+// Each hook subscribes to exactly one primitive slice of AudioPlayerState.
+// Consumers only re-render when that specific value changes — not on every
+// dispatch (e.g. volume drag, buffering ticks, speed changes).
+//
+// IMPORTANT: keep slice values as primitives or a stable Set.
+// Wrapping values in an object forfeits the React context bailout and causes
+// every consumer to re-render on each slice update regardless of the value.
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns the ID of the currently loaded episode, or `null` when the player
+ * is empty. Re-renders only when the loaded episode changes.
+ */
+export function useNowPlayingEpisodeId(): string | null {
+  const ctx = useContext(NowPlayingEpisodeIdContext);
+  if (ctx === undefined) {
+    throw new Error(
+      "useNowPlayingEpisodeId must be used within AudioPlayerProvider",
+    );
+  }
+  return ctx;
+}
+
+/**
+ * Returns `true` when `episodeId` is the currently loaded episode AND the
+ * player is actively playing. Re-renders when either the loaded episode id
+ * or the play/pause state changes — both narrow contexts apply Object.is
+ * bailout, so unrelated dispatches (volume, scrub, buffering, queue) never
+ * re-render the consumer.
+ *
+ * Prefer this over composing `useNowPlayingEpisodeId()` and a raw isPlaying
+ * primitive at the call site: forgetting to compare the episode id silently
+ * causes every per-episode button to flash "playing" when any episode plays.
+ */
+export function useIsEpisodePlaying(episodeId: string): boolean {
+  const nowPlayingId = useContext(NowPlayingEpisodeIdContext);
+  if (nowPlayingId === undefined) {
+    throw new Error(
+      "useIsEpisodePlaying must be used within AudioPlayerProvider",
+    );
+  }
+  const isPlaying = useContext(IsPlayingContext);
+  if (isPlaying === undefined) {
+    throw new Error(
+      "useIsEpisodePlaying must be used within AudioPlayerProvider",
+    );
+  }
+  return nowPlayingId === episodeId && isPlaying;
+}
+
+/**
+ * Returns `true` when `episodeId` is present in the current playback queue.
+ * Re-renders only when membership (the set of ids) changes — adds, removes,
+ * clears, and inits with different ids. Reorders, focus-refetch reconciles,
+ * and metadata-only refreshes preserve the underlying Set reference (the
+ * provider memoizes by content equality) and bail out via Object.is.
+ * Volume, speed, buffering, and other unrelated dispatches never re-render.
+ */
+export function useIsEpisodeInQueue(episodeId: string): boolean {
+  const ctx = useContext(QueueEpisodeIdsContext);
+  if (ctx === undefined) {
+    throw new Error(
+      "useIsEpisodeInQueue must be used within AudioPlayerProvider",
+    );
+  }
+  return ctx.has(episodeId);
 }
