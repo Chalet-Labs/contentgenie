@@ -4,7 +4,8 @@ import { Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   useAudioPlayerAPI,
-  useAudioPlayerState,
+  useNowPlayingEpisodeId,
+  useIsPlaying,
   type AudioEpisode,
 } from "@/contexts/audio-player-context";
 
@@ -25,9 +26,10 @@ export function PlayEpisodeButton({
   "aria-label": ariaLabelProp,
 }: PlayEpisodeButtonProps) {
   const { playEpisode, togglePlay } = useAudioPlayerAPI();
-  const { currentEpisode, isPlaying } = useAudioPlayerState();
+  const nowPlayingId = useNowPlayingEpisodeId();
+  const isPlaying = useIsPlaying();
 
-  const isCurrent = currentEpisode?.id === episode.id;
+  const isCurrent = nowPlayingId === episode.id;
   const isActivelyPlaying = isCurrent && isPlaying;
   const label =
     ariaLabelProp ??

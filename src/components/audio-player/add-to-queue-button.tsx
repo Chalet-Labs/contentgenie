@@ -5,7 +5,8 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import {
   useAudioPlayerAPI,
-  useAudioPlayerState,
+  useNowPlayingEpisodeId,
+  useIsEpisodeInQueue,
   type AudioEpisode,
 } from "@/contexts/audio-player-context";
 
@@ -19,16 +20,16 @@ export function AddToQueueButton({
   variant = "full",
 }: AddToQueueButtonProps) {
   const { addToQueue } = useAudioPlayerAPI();
-  const { queue, currentEpisode } = useAudioPlayerState();
+  const nowPlayingId = useNowPlayingEpisodeId();
+  const isInQueue = useIsEpisodeInQueue(episode.id);
 
-  const isNowPlaying = currentEpisode?.id === episode.id;
-  const isInQueue = queue.some((ep) => ep.id === episode.id);
+  const isNowPlaying = nowPlayingId === episode.id;
   const isDisabled = isNowPlaying || isInQueue;
 
   function handleClick() {
     if (isDisabled) return;
     addToQueue(episode);
-    if (currentEpisode) {
+    if (nowPlayingId !== null) {
       toast.success(`Added to queue: ${episode.title}`);
     }
   }

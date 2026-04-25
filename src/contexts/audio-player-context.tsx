@@ -285,6 +285,23 @@ export const AudioPlayerStateContext = createContext<AudioPlayerState | null>(
 export const AudioPlayerProgressContext =
   createContext<AudioPlayerProgress | null>(null);
 
+// Narrow slice contexts — each holds a single primitive (or Set) derived from
+// AudioPlayerState. Subscribers re-render only when their specific slice changes,
+// not on every state dispatch. See ADR-039.
+//
+// Each context picks a sentinel that cannot occur as a real runtime value, so
+// hooks can detect "rendered outside AudioPlayerProvider" and throw. The two
+// primitive slices (`string | null`, `boolean`) use `undefined`; the Set slice
+// uses `null` (an empty queue produces `new Set()` which is truthy, so a `!ctx`
+// guard still distinguishes "no provider" from "empty queue").
+export const NowPlayingEpisodeIdContext = createContext<
+  string | null | undefined
+>(undefined);
+export const IsPlayingContext = createContext<boolean | undefined>(undefined);
+export const QueueEpisodeIdsContext = createContext<ReadonlySet<string> | null>(
+  null,
+);
+
 // ---------------------------------------------------------------------------
 // Provider
 // ---------------------------------------------------------------------------
@@ -1423,24 +1440,41 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
     };
   }, [clearSleepTimerInterval, cancelFade]);
 
+  // Derive a Set of queued episode IDs so AddToQueueButton can subscribe to
+  // queue membership without holding a reference to the full queue array.
+  // state.queue identity is stable across non-queue dispatches (see reducer),
+  // so this memo only invalidates on real ADD/REMOVE/REORDER/CLEAR/INIT actions.
+  const queueEpisodeIds = useMemo(
+    () => new Set(state.queue.map((ep) => ep.id)),
+    [state.queue],
+  );
+
   return (
     <AudioPlayerAPIContext.Provider value={api}>
       <AudioPlayerStateContext.Provider value={state}>
-        <AudioPlayerProgressContext.Provider value={progress}>
-          {children}
-          {/* Hidden audio element */}
-          {/* eslint-disable-next-line jsx-a11y/media-has-caption -- podcast enclosures do not ship caption tracks; transcript is surfaced separately */}
-          <audio ref={audioRef} preload="metadata" />
-          {/* Screen reader time announcements */}
-          <div
-            role="status"
-            aria-live="polite"
-            aria-atomic="true"
-            className="sr-only"
-          >
-            {ariaAnnouncement}
-          </div>
-        </AudioPlayerProgressContext.Provider>
+        <NowPlayingEpisodeIdContext.Provider
+          value={state.currentEpisode?.id ?? null}
+        >
+          <IsPlayingContext.Provider value={state.isPlaying}>
+            <QueueEpisodeIdsContext.Provider value={queueEpisodeIds}>
+              <AudioPlayerProgressContext.Provider value={progress}>
+                {children}
+                {/* Hidden audio element */}
+                {/* eslint-disable-next-line jsx-a11y/media-has-caption -- podcast enclosures do not ship caption tracks; transcript is surfaced separately */}
+                <audio ref={audioRef} preload="metadata" />
+                {/* Screen reader time announcements */}
+                <div
+                  role="status"
+                  aria-live="polite"
+                  aria-atomic="true"
+                  className="sr-only"
+                >
+                  {ariaAnnouncement}
+                </div>
+              </AudioPlayerProgressContext.Provider>
+            </QueueEpisodeIdsContext.Provider>
+          </IsPlayingContext.Provider>
+        </NowPlayingEpisodeIdContext.Provider>
       </AudioPlayerStateContext.Provider>
     </AudioPlayerAPIContext.Provider>
   );
@@ -1486,4 +1520,60 @@ export function useAudioPlayer() {
     ...useAudioPlayerState(),
     ...useAudioPlayerAPI(),
   };
+}
+
+// ---------------------------------------------------------------------------
+// Narrow selector hooks (ADR-039)
+//
+// Each hook subscribes to exactly one primitive slice of AudioPlayerState.
+// Consumers only re-render when that specific value changes — not on every
+// dispatch (e.g. volume drag, buffering ticks, speed changes).
+//
+// IMPORTANT: keep slice values as primitives or a stable Set.
+// Wrapping values in an object forfeits the React context bailout and causes
+// every consumer to re-render on each slice update regardless of the value.
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns the ID of the currently loaded episode, or `null` when the player
+ * is empty. Re-renders only when the loaded episode changes.
+ */
+export function useNowPlayingEpisodeId(): string | null {
+  const ctx = useContext(NowPlayingEpisodeIdContext);
+  if (ctx === undefined) {
+    throw new Error(
+      "useNowPlayingEpisodeId must be used within AudioPlayerProvider",
+    );
+  }
+  return ctx;
+}
+
+/**
+ * Returns `true` when the player is actively playing, `false` when paused or
+ * stopped. Re-renders only when the playing state toggles.
+ */
+export function useIsPlaying(): boolean {
+  const ctx = useContext(IsPlayingContext);
+  if (ctx === undefined) {
+    throw new Error("useIsPlaying must be used within AudioPlayerProvider");
+  }
+  return ctx;
+}
+
+/**
+ * Returns `true` when `episodeId` is present in the current playback queue.
+ * Re-renders when the queue array identity changes (any add/remove/reorder/
+ * clear/init), not on volume, speed, or buffering updates. A reorder still
+ * triggers a re-render even when `episodeId`'s membership did not flip,
+ * because the underlying `Set` is recomputed; React then bails out of DOM
+ * diffs when `has(episodeId)` returns the same boolean.
+ */
+export function useIsEpisodeInQueue(episodeId: string): boolean {
+  const ctx = useContext(QueueEpisodeIdsContext);
+  if (!ctx) {
+    throw new Error(
+      "useIsEpisodeInQueue must be used within AudioPlayerProvider",
+    );
+  }
+  return ctx.has(episodeId);
 }

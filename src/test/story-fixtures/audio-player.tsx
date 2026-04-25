@@ -3,6 +3,9 @@ import {
   AudioPlayerAPIContext,
   AudioPlayerProgressContext,
   AudioPlayerStateContext,
+  IsPlayingContext,
+  NowPlayingEpisodeIdContext,
+  QueueEpisodeIdsContext,
   type AudioPlayerAPI,
   type AudioPlayerProgress,
   type AudioPlayerState,
@@ -64,9 +67,19 @@ export function audioPlayerContextDecorator(
   const AudioPlayerContextDecorator: Decorator = (Story) => (
     <AudioPlayerAPIContext.Provider value={api}>
       <AudioPlayerStateContext.Provider value={state}>
-        <AudioPlayerProgressContext.Provider value={progress}>
-          <Story />
-        </AudioPlayerProgressContext.Provider>
+        <NowPlayingEpisodeIdContext.Provider
+          value={state.currentEpisode?.id ?? null}
+        >
+          <IsPlayingContext.Provider value={state.isPlaying}>
+            <QueueEpisodeIdsContext.Provider
+              value={new Set(state.queue.map((ep) => ep.id))}
+            >
+              <AudioPlayerProgressContext.Provider value={progress}>
+                <Story />
+              </AudioPlayerProgressContext.Provider>
+            </QueueEpisodeIdsContext.Provider>
+          </IsPlayingContext.Provider>
+        </NowPlayingEpisodeIdContext.Provider>
       </AudioPlayerStateContext.Provider>
     </AudioPlayerAPIContext.Provider>
   );

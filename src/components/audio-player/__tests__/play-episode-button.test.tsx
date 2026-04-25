@@ -17,6 +17,9 @@ vi.mock("@/contexts/audio-player-context", () => ({
     currentEpisode: mockCurrentEpisode,
     isPlaying: mockIsPlaying,
   }),
+  useNowPlayingEpisodeId: () => mockCurrentEpisode?.id ?? null,
+  useIsPlaying: () => mockIsPlaying,
+  useIsEpisodeInQueue: (_id: string) => false,
 }));
 
 // Import after mocks so the component sees the mocked context.
