@@ -45,7 +45,8 @@ const mockPlayEpisode = vi.fn();
 let mockPlayerState: {
   queue: Array<{ id: string }>;
   currentEpisode: unknown;
-} = { queue: [], currentEpisode: null };
+  isPlaying: boolean;
+} = { queue: [], currentEpisode: null, isPlaying: false };
 vi.mock("@/contexts/audio-player-context", () => ({
   useAudioPlayerAPI: () => ({
     addToQueue: mockAddToQueue,
@@ -54,9 +55,13 @@ vi.mock("@/contexts/audio-player-context", () => ({
   useAudioPlayerState: () => mockPlayerState,
   useNowPlayingEpisodeId: () =>
     (mockPlayerState.currentEpisode as { id: string } | null)?.id ?? null,
+  // Mirror the real hook: nowPlayingId === episodeId AND the player is actively
+  // playing. Tests that need an episode to read as "currently playing" must set
+  // both `currentEpisode` and `isPlaying: true` on `mockPlayerState`.
   useIsEpisodePlaying: (id: string) =>
     id ===
-    (mockPlayerState.currentEpisode as { id: string } | null | undefined)?.id,
+      (mockPlayerState.currentEpisode as { id: string } | null | undefined)
+        ?.id && mockPlayerState.isPlaying,
   useIsEpisodeInQueue: (id: string) =>
     mockPlayerState.queue.some((ep) => ep.id === id),
 }));
@@ -103,7 +108,7 @@ describe("NotificationPageList", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockPlayEpisode.mockImplementation(() => {});
-    mockPlayerState = { queue: [], currentEpisode: null };
+    mockPlayerState = { queue: [], currentEpisode: null, isPlaying: false };
     mockDismissNotification.mockResolvedValue({ success: true });
     mockMarkNotificationRead.mockResolvedValue({ success: true });
     mockMarkAllNotificationsRead.mockResolvedValue({ success: true });
@@ -203,7 +208,11 @@ describe("NotificationPageList", () => {
 
   // AC-6: Add-to-queue disabled when already in queue
   it("Add-to-queue button is disabled when episode is in queue", () => {
-    mockPlayerState = { queue: [{ id: "PI-42" }], currentEpisode: null };
+    mockPlayerState = {
+      queue: [{ id: "PI-42" }],
+      currentEpisode: null,
+      isPlaying: false,
+    };
     render(<NotificationPageList {...defaultProps} />);
     const btn = screen.getAllByRole("button", {
       name: /already in queue|add to queue/i,
