@@ -5,6 +5,9 @@ import {
   makeClerkAuthMock,
   testDbError,
 } from "@/app/actions/__tests__/__fixtures";
+import { asPodcastIndexEpisodeId } from "@/types/ids";
+
+const epId = asPodcastIndexEpisodeId("ep1");
 
 // ── Mocks ─────────────────────────────────────────────────────────────────
 
@@ -209,7 +212,7 @@ beforeEach(() => {
 });
 
 const validEpisodeData = {
-  podcastIndexId: "ep1",
+  podcastIndexId: epId,
   title: "Episode 1",
   description: "An episode",
   audioUrl: "https://example.com/a.mp3",
@@ -349,7 +352,7 @@ describe("removeEpisodeFromLibrary", () => {
   it("removes episode and revalidates paths", async () => {
     mockEpisodesFindFirst.mockResolvedValue({ id: 42 });
     const { removeEpisodeFromLibrary } = await importLibrary();
-    const result = await removeEpisodeFromLibrary("ep1");
+    const result = await removeEpisodeFromLibrary(epId);
     expect(result).toEqual({
       success: true,
       message: "Episode removed from library",
@@ -374,7 +377,7 @@ describe("removeEpisodeFromLibrary", () => {
   it("returns error when unauthenticated", async () => {
     mockAuth.mockResolvedValue({ userId: null });
     const { removeEpisodeFromLibrary } = await importLibrary();
-    const result = await removeEpisodeFromLibrary("ep1");
+    const result = await removeEpisodeFromLibrary(epId);
     expect(result.success).toBe(false);
     expect(mockEpisodesFindFirst).not.toHaveBeenCalled();
   });
@@ -382,7 +385,7 @@ describe("removeEpisodeFromLibrary", () => {
   it("returns 'Episode not found' when episode missing", async () => {
     mockEpisodesFindFirst.mockResolvedValue(undefined);
     const { removeEpisodeFromLibrary } = await importLibrary();
-    const result = await removeEpisodeFromLibrary("ep1");
+    const result = await removeEpisodeFromLibrary(epId);
     expect(result).toEqual({ success: false, error: "Episode not found" });
     expect(mockDelete).not.toHaveBeenCalled();
   });
@@ -391,7 +394,7 @@ describe("removeEpisodeFromLibrary", () => {
     "returns generic error when DB throws",
     testDbError(mockEpisodesFindFirst, async () => {
       const { removeEpisodeFromLibrary } = await importLibrary();
-      return removeEpisodeFromLibrary("ep1");
+      return removeEpisodeFromLibrary(epId);
     }),
   );
 });
@@ -404,19 +407,19 @@ describe("isEpisodeSaved", () => {
   it("returns true when query returns a row", async () => {
     mockLimit.mockResolvedValue([{ id: 1 }]);
     const { isEpisodeSaved } = await importLibrary();
-    expect(await isEpisodeSaved("ep1")).toBe(true);
+    expect(await isEpisodeSaved(epId)).toBe(true);
   });
 
   it("returns false when query returns empty", async () => {
     mockLimit.mockResolvedValue([]);
     const { isEpisodeSaved } = await importLibrary();
-    expect(await isEpisodeSaved("ep1")).toBe(false);
+    expect(await isEpisodeSaved(epId)).toBe(false);
   });
 
   it("returns false when unauthenticated", async () => {
     mockAuth.mockResolvedValue({ userId: null });
     const { isEpisodeSaved } = await importLibrary();
-    expect(await isEpisodeSaved("ep1")).toBe(false);
+    expect(await isEpisodeSaved(epId)).toBe(false);
     expect(mockSelect).not.toHaveBeenCalled();
   });
 
@@ -424,7 +427,7 @@ describe("isEpisodeSaved", () => {
     mockLimit.mockRejectedValue(new Error("DB failure"));
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const { isEpisodeSaved } = await importLibrary();
-    expect(await isEpisodeSaved("ep1")).toBe(false);
+    expect(await isEpisodeSaved(epId)).toBe(false);
     expect(consoleSpy).toHaveBeenCalled();
   });
 });
@@ -608,7 +611,7 @@ describe("updateLibraryNotes", () => {
     mockEpisodesFindFirst.mockResolvedValue({ id: 42 });
     mockUserLibraryFindFirst.mockResolvedValue({ id: 1 });
     const { updateLibraryNotes } = await importLibrary();
-    const result = await updateLibraryNotes("ep1", "my note");
+    const result = await updateLibraryNotes(epId, "my note");
     expect(result).toEqual({ success: true, message: "Notes updated" });
     expect(mockUpdateSet).toHaveBeenCalledWith({ notes: "my note" });
     expect(mockRevalidatePath).toHaveBeenCalledWith("/library");
@@ -617,7 +620,7 @@ describe("updateLibraryNotes", () => {
   it("returns error when unauthenticated", async () => {
     mockAuth.mockResolvedValue({ userId: null });
     const { updateLibraryNotes } = await importLibrary();
-    const result = await updateLibraryNotes("ep1", "x");
+    const result = await updateLibraryNotes(epId, "x");
     expect(result.success).toBe(false);
     expect(mockEpisodesFindFirst).not.toHaveBeenCalled();
   });
@@ -625,7 +628,7 @@ describe("updateLibraryNotes", () => {
   it("returns 'Episode not found' when episode missing", async () => {
     mockEpisodesFindFirst.mockResolvedValue(undefined);
     const { updateLibraryNotes } = await importLibrary();
-    const result = await updateLibraryNotes("ep1", "x");
+    const result = await updateLibraryNotes(epId, "x");
     expect(result).toEqual({ success: false, error: "Episode not found" });
   });
 
@@ -633,7 +636,7 @@ describe("updateLibraryNotes", () => {
     mockEpisodesFindFirst.mockResolvedValue({ id: 42 });
     mockUserLibraryFindFirst.mockResolvedValue(undefined);
     const { updateLibraryNotes } = await importLibrary();
-    const result = await updateLibraryNotes("ep1", "x");
+    const result = await updateLibraryNotes(epId, "x");
     expect(result).toEqual({ success: false, error: "Episode not in library" });
   });
 
@@ -641,7 +644,7 @@ describe("updateLibraryNotes", () => {
     "returns generic error when DB throws",
     testDbError(mockEpisodesFindFirst, async () => {
       const { updateLibraryNotes } = await importLibrary();
-      return updateLibraryNotes("ep1", "x");
+      return updateLibraryNotes(epId, "x");
     }),
   );
 });
@@ -831,7 +834,7 @@ describe("updateLibraryRating", () => {
     mockEpisodesFindFirst.mockResolvedValue({ id: 42 });
     mockUserLibraryFindFirst.mockResolvedValue({ id: 1 });
     const { updateLibraryRating } = await importLibrary();
-    const result = await updateLibraryRating("ep1", 4);
+    const result = await updateLibraryRating(epId, 4);
     expect(result).toEqual({ success: true, message: "Rating updated" });
     expect(mockUpdateSet).toHaveBeenCalledWith({ rating: 4 });
     expect(mockRevalidatePath).toHaveBeenCalledWith("/library");
@@ -840,13 +843,13 @@ describe("updateLibraryRating", () => {
   it("returns error when unauthenticated", async () => {
     mockAuth.mockResolvedValue({ userId: null });
     const { updateLibraryRating } = await importLibrary();
-    const result = await updateLibraryRating("ep1", 4);
+    const result = await updateLibraryRating(epId, 4);
     expect(result.success).toBe(false);
   });
 
   it.each([0, 6, -1, 10])("rejects out-of-range rating %i", async (rating) => {
     const { updateLibraryRating } = await importLibrary();
-    const result = await updateLibraryRating("ep1", rating);
+    const result = await updateLibraryRating(epId, rating);
     expect(result).toEqual({
       success: false,
       error: "Rating must be between 1 and 5",
@@ -857,7 +860,7 @@ describe("updateLibraryRating", () => {
   it("returns 'Episode not found' when missing", async () => {
     mockEpisodesFindFirst.mockResolvedValue(undefined);
     const { updateLibraryRating } = await importLibrary();
-    const result = await updateLibraryRating("ep1", 4);
+    const result = await updateLibraryRating(epId, 4);
     expect(result).toEqual({ success: false, error: "Episode not found" });
   });
 
@@ -865,7 +868,7 @@ describe("updateLibraryRating", () => {
     mockEpisodesFindFirst.mockResolvedValue({ id: 42 });
     mockUserLibraryFindFirst.mockResolvedValue(undefined);
     const { updateLibraryRating } = await importLibrary();
-    const result = await updateLibraryRating("ep1", 4);
+    const result = await updateLibraryRating(epId, 4);
     expect(result).toEqual({ success: false, error: "Episode not in library" });
   });
 
@@ -873,7 +876,7 @@ describe("updateLibraryRating", () => {
     "returns generic error when DB throws",
     testDbError(mockEpisodesFindFirst, async () => {
       const { updateLibraryRating } = await importLibrary();
-      return updateLibraryRating("ep1", 4);
+      return updateLibraryRating(epId, 4);
     }),
   );
 });
@@ -890,7 +893,7 @@ describe("getEpisodeAverageRating", () => {
       { averageRating: "4.27", ratingCount: 7 },
     ]);
     const { getEpisodeAverageRating } = await importLibrary();
-    const result = await getEpisodeAverageRating("ep1");
+    const result = await getEpisodeAverageRating(epId);
     expect(result).toEqual({
       averageRating: 4.3,
       ratingCount: 7,
@@ -901,7 +904,7 @@ describe("getEpisodeAverageRating", () => {
   it("returns null average when no ratings exist", async () => {
     mockSelectWhere.mockReturnValue([{ averageRating: null, ratingCount: 0 }]);
     const { getEpisodeAverageRating } = await importLibrary();
-    const result = await getEpisodeAverageRating("ep1");
+    const result = await getEpisodeAverageRating(epId);
     expect(result).toEqual({
       averageRating: null,
       ratingCount: 0,
@@ -915,7 +918,7 @@ describe("getEpisodeAverageRating", () => {
     });
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const { getEpisodeAverageRating } = await importLibrary();
-    const result = await getEpisodeAverageRating("ep1");
+    const result = await getEpisodeAverageRating(epId);
     expect(result).toEqual({
       averageRating: null,
       ratingCount: 0,
@@ -933,20 +936,20 @@ describe("getLibraryEntryByEpisodeId", () => {
   it("returns the first row when found", async () => {
     mockLimit.mockResolvedValue([{ libraryEntryId: 1, episodeId: 42 }]);
     const { getLibraryEntryByEpisodeId } = await importLibrary();
-    const result = await getLibraryEntryByEpisodeId("ep1");
+    const result = await getLibraryEntryByEpisodeId(epId);
     expect(result).toEqual({ libraryEntryId: 1, episodeId: 42 });
   });
 
   it("returns null when query is empty", async () => {
     mockLimit.mockResolvedValue([]);
     const { getLibraryEntryByEpisodeId } = await importLibrary();
-    expect(await getLibraryEntryByEpisodeId("ep1")).toBeNull();
+    expect(await getLibraryEntryByEpisodeId(epId)).toBeNull();
   });
 
   it("returns null when unauthenticated", async () => {
     mockAuth.mockResolvedValue({ userId: null });
     const { getLibraryEntryByEpisodeId } = await importLibrary();
-    expect(await getLibraryEntryByEpisodeId("ep1")).toBeNull();
+    expect(await getLibraryEntryByEpisodeId(epId)).toBeNull();
     expect(mockSelect).not.toHaveBeenCalled();
   });
 
@@ -954,7 +957,7 @@ describe("getLibraryEntryByEpisodeId", () => {
     mockLimit.mockRejectedValue(new Error("DB failure"));
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const { getLibraryEntryByEpisodeId } = await importLibrary();
-    expect(await getLibraryEntryByEpisodeId("ep1")).toBeNull();
+    expect(await getLibraryEntryByEpisodeId(epId)).toBeNull();
     expect(consoleSpy).toHaveBeenCalled();
   });
 });
