@@ -450,7 +450,9 @@ export function AuthenticatedEpisodeDetail({
     ? Object.values(podcast.categories)
     : [];
 
-  const hasChapters = normalizedChaptersUrl !== null;
+  const hasChapters =
+    normalizedChaptersUrl !== null &&
+    (chaptersState.status !== "ready" || chaptersState.chapters.length > 0);
   const descriptionPlainText = stripHtml(episode.description ?? "");
   const hasDescription = Boolean(descriptionPlainText.trim());
   const canPlayEpisode = isOnline && Boolean(episode.enclosureUrl);

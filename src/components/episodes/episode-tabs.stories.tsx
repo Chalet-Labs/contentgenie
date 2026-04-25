@@ -83,6 +83,7 @@ function ChaptersPanel() {
         ].map((c, i) => (
           <li key={i}>
             <button
+              type="button"
               className={`flex w-full items-center gap-3 px-3 py-2.5 text-left ${
                 c.active ? "bg-primary/[0.08] text-primary" : ""
               }`}

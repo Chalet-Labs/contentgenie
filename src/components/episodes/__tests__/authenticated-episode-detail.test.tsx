@@ -132,15 +132,26 @@ function stubEpisodeFetch(overrides: EpisodeOverrides = {}) {
   const id = overrides.id ?? "rss-abc";
   vi.stubGlobal(
     "fetch",
-    vi.fn().mockImplementation((input: string) => {
-      if (input === `/api/episodes/${id}`) {
+    vi.fn().mockImplementation((input: RequestInfo | URL) => {
+      const rawUrl =
+        typeof input === "string"
+          ? input
+          : input instanceof URL
+            ? input.toString()
+            : input.url;
+      const parsed = new URL(rawUrl, "http://localhost");
+
+      if (parsed.pathname === `/api/episodes/${id}`) {
         return Promise.resolve({
           ok: true,
           json: async () => makeEpisodeResponse(overrides),
         });
       }
 
-      if (input === `/api/chapters?url=${encodeURIComponent(CHAPTERS_URL)}`) {
+      if (
+        parsed.pathname === "/api/chapters" &&
+        parsed.searchParams.get("url") === CHAPTERS_URL
+      ) {
         return Promise.resolve({
           ok: true,
           json: async () => ({
@@ -153,7 +164,7 @@ function stubEpisodeFetch(overrides: EpisodeOverrides = {}) {
         });
       }
 
-      return Promise.reject(new Error(`Unexpected fetch call: ${input}`));
+      return Promise.reject(new Error(`Unexpected fetch call: ${rawUrl}`));
     }),
   );
 }

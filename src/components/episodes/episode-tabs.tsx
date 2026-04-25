@@ -39,7 +39,7 @@ const EpisodeTabsTrigger = React.forwardRef<
     {...props}
   >
     {children}
-    {badge !== undefined && (
+    {badge !== undefined && badge !== 0 && badge !== "" && (
       <span
         className={cn(
           "rounded-full bg-muted px-1.5 py-0.5 text-[11px] font-semibold leading-none text-muted-foreground",

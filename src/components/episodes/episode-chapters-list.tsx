@@ -138,5 +138,9 @@ export function EpisodeChaptersList({
         </div>
       );
     }
+    default: {
+      const _exhaustive: never = state;
+      return _exhaustive;
+    }
   }
 }

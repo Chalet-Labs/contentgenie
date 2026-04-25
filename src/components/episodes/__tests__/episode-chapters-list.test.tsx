@@ -54,6 +54,11 @@ describe("EpisodeChaptersList", () => {
       currentTime: 0,
       buffered: 0,
     });
+    mocks.useAudioPlayerAPI.mockReturnValue({
+      playEpisode: vi.fn(),
+      seek: vi.fn(),
+      togglePlay: vi.fn(),
+    });
   });
 
   it("renders a loading skeleton while chapters are fetching", () => {
