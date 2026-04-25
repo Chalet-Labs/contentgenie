@@ -32,6 +32,7 @@ const podcastSchema = z
 
 export const saveEpisodeSchema = z
   .object({
+    // Post-validation cast — JSON body string, trimmed and length-checked.
     podcastIndexId: trimmedNonEmpty.transform((v) =>
       asPodcastIndexEpisodeId(v),
     ),
@@ -46,6 +47,7 @@ export const saveEpisodeSchema = z
 
 export const unsaveEpisodeSchema = z
   .object({
+    // Post-validation cast — JSON body string, trimmed and length-checked.
     podcastIndexId: trimmedNonEmpty.transform((v) =>
       asPodcastIndexEpisodeId(v),
     ),

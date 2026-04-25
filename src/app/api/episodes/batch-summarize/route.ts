@@ -52,8 +52,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Query DB for already-processed episodes
-    // episodeIds are PI episode numeric ids from the request body.
     const existingEpisodes = await db.query.episodes.findMany({
+      // JSON body numeric episode ids → branded strings for DB lookup.
       where: inArray(
         episodes.podcastIndexId,
         episodeIds.map((id) => asPodcastIndexEpisodeId(String(id))),

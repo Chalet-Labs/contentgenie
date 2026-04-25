@@ -40,6 +40,7 @@ export async function POST(request: NextRequest) {
 
     // Check if we already have a cached summary in the database
     const existingEpisode = await db.query.episodes.findFirst({
+      // JSON body numeric episode id → branded string for DB lookup.
       where: eq(
         episodes.podcastIndexId,
         asPodcastIndexEpisodeId(episodeId.toString()),
@@ -199,10 +200,8 @@ export async function GET(request: NextRequest) {
 
     // Check if we have a cached summary
     const existingEpisode = await db.query.episodes.findFirst({
-      where: eq(
-        episodes.podcastIndexId,
-        asPodcastIndexEpisodeId(episodeId), // URL search param — PI episode id
-      ),
+      // URL search param (raw string) → branded string for DB lookup.
+      where: eq(episodes.podcastIndexId, asPodcastIndexEpisodeId(episodeId)),
     });
 
     if (existingEpisode?.summary && existingEpisode?.processedAt) {

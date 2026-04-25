@@ -81,15 +81,11 @@ export async function GET(
     }
 
     const id = params.id;
-    // URL param: RSS ids carry "rss-" prefix; PI numeric ids are validated below.
-    // Note: piId uses the raw URL string directly rather than re-stringifying
-    // Number(id) — this is intentional. PI episode ids don't carry leading zeros
-    // in practice, and the DB stores exactly what PodcastIndex returns (e.g. "123",
-    // not "0123"), so skipping the Number round-trip is semantically equivalent.
-    const piId = asPodcastIndexEpisodeId(id);
 
     // RSS-sourced episode: load from database
     if (isRssSourced(id)) {
+      // URL param (canonical "rss-..." form) → branded string for DB lookup.
+      const piId = asPodcastIndexEpisodeId(id);
       // BOLT OPTIMIZATION: Exclude the high-volume transcription field
       // which is not used in the response.
       // Expected impact: ~90% reduction in data transfer when transcripts are present.
@@ -185,6 +181,9 @@ export async function GET(
         { status: 400 },
       );
     }
+    // Round-trip through Number() so "00123" lookups normalise to "123" — DB
+    // stores the canonical PodcastIndex form. Then brand for DB lookup.
+    const piId = asPodcastIndexEpisodeId(episodeId.toString());
 
     // Fetch episode from PodcastIndex
     let episodeResponse;

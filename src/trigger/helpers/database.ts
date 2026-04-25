@@ -104,6 +104,8 @@ export async function updateEpisodeStatus(
   episodeId: number | string,
   status: "summarizing",
 ): Promise<void> {
+  // PodcastIndex API id (number|string from caller) → branded string for DB lookup.
+  const piId = asPodcastIndexEpisodeId(String(episodeId));
   await db
     .update(episodes)
     .set({
@@ -111,9 +113,7 @@ export async function updateEpisodeStatus(
       processingError: null,
       updatedAt: new Date(),
     })
-    .where(
-      eq(episodes.podcastIndexId, asPodcastIndexEpisodeId(String(episodeId))),
-    );
+    .where(eq(episodes.podcastIndexId, piId));
 }
 
 // persistTranscript is the sole writer of transcript columns — summarize-episode
@@ -127,6 +127,8 @@ export async function persistTranscript(
   source: "podcastindex" | "assemblyai" | "description-url",
 ): Promise<void> {
   const now = new Date();
+  // Trigger payload uses numeric form; brand for DB lookup.
+  const piId = asPodcastIndexEpisodeId(String(episodeId));
   const updated = await db
     .update(episodes)
     .set({
@@ -138,9 +140,7 @@ export async function persistTranscript(
       transcriptRunId: null,
       updatedAt: now,
     })
-    .where(
-      eq(episodes.podcastIndexId, asPodcastIndexEpisodeId(String(episodeId))),
-    )
+    .where(eq(episodes.podcastIndexId, piId))
     .returning({ id: episodes.id });
 
   if (updated.length === 0) {

@@ -108,6 +108,9 @@ export function AuthenticatedEpisodeDetail({
     labelKind: OverlapLabelKind | null;
   }>({ label: null, labelKind: null });
   const canRunEpisodeProcessing = supportsEpisodeProcessing(episodeId);
+  // Route param (URL segment) → branded string. Reused for downstream calls
+  // that key off the PodcastIndex episode-id namespace.
+  const episodeIdBranded = asPodcastIndexEpisodeId(episodeId);
 
   // Realtime subscription to the Trigger.dev run
   const { run } = useRealtimeRun<typeof summarizeEpisode>(runId ?? "", {
@@ -297,7 +300,7 @@ export function AuthenticatedEpisodeDetail({
   useEffect(() => {
     if (!isOnline || !episodeLoaded) return;
     let ignore = false;
-    getEpisodeTopicOverlap(asPodcastIndexEpisodeId(episodeId))
+    getEpisodeTopicOverlap(episodeIdBranded)
       .then((result) => {
         if (!ignore)
           setOverlapResult({
@@ -311,7 +314,7 @@ export function AuthenticatedEpisodeDetail({
     return () => {
       ignore = true;
     };
-  }, [isOnline, episodeLoaded, episodeId]);
+  }, [isOnline, episodeLoaded, episodeIdBranded]);
 
   // Generate summary — triggers a background task and subscribes to realtime updates
   const generateSummary = useCallback(async () => {
@@ -623,7 +626,7 @@ export function AuthenticatedEpisodeDetail({
                 Community Rating:
               </span>
               <CommunityRating
-                episodePodcastIndexId={asPodcastIndexEpisodeId(episodeId)}
+                episodePodcastIndexId={episodeIdBranded}
                 size="md"
                 showCount={true}
               />

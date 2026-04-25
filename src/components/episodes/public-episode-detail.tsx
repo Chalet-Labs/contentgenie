@@ -235,6 +235,7 @@ export function PublicEpisodeDetail({ episodeId }: PublicEpisodeDetailProps) {
               Community Rating:
             </span>
             <CommunityRating
+              // PodcastIndex API id (number|string) → branded string.
               episodePodcastIndexId={asPodcastIndexEpisodeId(
                 String(episode.id),
               )}

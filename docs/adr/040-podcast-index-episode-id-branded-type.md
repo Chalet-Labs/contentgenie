@@ -1,4 +1,4 @@
-# ADR-039: PodcastIndexEpisodeId Branded Type for Compile-Time ID Disambiguation
+# ADR-040: PodcastIndexEpisodeId Branded Type for Compile-Time ID Disambiguation
 
 **Status:** Accepted
 **Date:** 2026-04-25

@@ -686,3 +686,20 @@ export type _QueueDenormInvariant = _Assert<
 export type _SessionDenormInvariant = _Assert<
   _KeysMatch<_SessionDenormKeys, _AudioEpisodeNonIdKeys>
 >;
+
+// Pin the PodcastIndexEpisodeId brand on every column that stores a PI episode
+// id. If a future migration drops `$type<PodcastIndexEpisodeId>()` from any of
+// these columns, the matching assertion fails and the build breaks at the
+// source — see ADR-040 (Drizzle `$type` regression risk).
+export type _EpisodesPiIdBranded = _Assert<
+  _KeysMatch<Episode["podcastIndexId"], PodcastIndexEpisodeId>
+>;
+export type _ListenHistoryPiIdBranded = _Assert<
+  _KeysMatch<ListenHistoryEntry["podcastIndexEpisodeId"], PodcastIndexEpisodeId>
+>;
+export type _QueueItemsPiIdBranded = _Assert<
+  _KeysMatch<UserQueueItem["episodeId"], PodcastIndexEpisodeId>
+>;
+export type _PlayerSessionPiIdBranded = _Assert<
+  _KeysMatch<UserPlayerSession["episodeId"], PodcastIndexEpisodeId>
+>;

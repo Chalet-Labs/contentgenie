@@ -25,6 +25,7 @@ export const MAX_QUEUE_ITEMS = 200;
 
 export const audioEpisodeSchema = z
   .object({
+    // Post-validation cast — client/RSC payload string, trimmed and length-checked.
     id: trimmedNonEmpty.transform((v) => asPodcastIndexEpisodeId(v)),
     title: trimmedNonEmpty,
     podcastTitle: trimmedNonEmpty,

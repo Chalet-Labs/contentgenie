@@ -8,7 +8,6 @@ import {
 import { getListenedEpisodeIds } from "@/app/actions/listen-history";
 import { NotificationPageList } from "@/components/notifications/notification-page-list";
 import { NOTIFICATIONS_PAGE_SIZE } from "@/lib/notifications-constants";
-import type { PodcastIndexEpisodeId } from "@/types/ids";
 
 export const metadata: Metadata = {
   title: "Notifications",

@@ -22,7 +22,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Changed
 
 - Audio player: narrow context selectors for affordance buttons (PlayEpisodeButton, AddToQueueButton) — eliminates re-renders on volume/scrub/buffering ticks. The provider also memoizes `QueueEpisodeIdsContext` against content equality so reorders (and any non-membership-changing queue refresh) preserve the Set reference and don't re-render queue-aware consumers. See ADR-039.
-- Internal: introduced `PodcastIndexEpisodeId` branded type to disambiguate the PodcastIndex episode id namespace from DB-internal and Clerk user ids at compile time. No runtime behaviour change. See ADR-039.
+- Internal: introduced `PodcastIndexEpisodeId` branded type to disambiguate the PodcastIndex episode id namespace from DB-internal and Clerk user ids at compile time. No runtime behaviour change. See ADR-040.
 - Topics query (`getTopicsByPodcastIndexId`) now caps per-episode results with a Postgres `row_number() OVER (PARTITION BY episode_id)` window function instead of a JS loop, so only `TOPICS_PER_EPISODE_LIMIT` rows are sent across the wire per episode (3a).
 - `PlayEpisodeButton` now uses `aria-disabled` + `aria-disabled:opacity-50 aria-disabled:cursor-not-allowed` Tailwind utilities instead of native `disabled`, keeping the button keyboard-focusable and screen-reader–accessible when an episode is actively playing (3b).
 - `TOPICS_PER_EPISODE_LIMIT` is now derived as `MAX_DISPLAYED_TOPICS + 1` from the shared `src/lib/episodes/topic-display.ts` module (consumed by both `EpisodeCard` and the topics server helper), linking the DB cap to the primitive's chip count without forcing the server to import a component (3c).
