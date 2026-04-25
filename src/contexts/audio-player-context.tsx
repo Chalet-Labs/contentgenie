@@ -321,6 +321,12 @@ export const AudioPlayerProgressContext =
 //
 // Each context defaults to `undefined` so hooks can detect "rendered outside
 // AudioPlayerProvider" and throw — the runtime never produces undefined.
+//
+// @internal — these are exported only to support Storybook decorators and test
+// fixtures that need to compose the provider stack manually. Application code
+// must use the selector hooks (`useNowPlayingEpisodeId`, `useIsEpisodePlaying`,
+// `useIsEpisodeInQueue`) so call sites stay episode-scoped and avoid the raw
+// `isPlaying` footgun.
 export const NowPlayingEpisodeIdContext = createContext<
   string | null | undefined
 >(undefined);
@@ -1484,8 +1490,13 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
   // same ids) so context consumers bail out via Object.is.
   const queueEpisodeIdsRef = useRef<ReadonlySet<string> | null>(null);
   const queueEpisodeIds = useMemo(() => {
+    // Build the deduplicated id set first so the bailout is driven by Set
+    // sizes, not the (potentially duplicate-bearing) array length. If
+    // INIT_QUEUE ever hydrates duplicates, comparing against state.queue.length
+    // could falsely match prev.size and reuse a stale Set.
+    const next = new Set(state.queue.map((ep) => ep.id));
     const prev = queueEpisodeIdsRef.current;
-    if (prev && prev.size === state.queue.length) {
+    if (prev && prev.size === next.size) {
       let same = true;
       for (const ep of state.queue) {
         if (!prev.has(ep.id)) {
@@ -1495,7 +1506,6 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
       }
       if (same) return prev;
     }
-    const next = new Set(state.queue.map((ep) => ep.id));
     queueEpisodeIdsRef.current = next;
     return next;
   }, [state.queue]);

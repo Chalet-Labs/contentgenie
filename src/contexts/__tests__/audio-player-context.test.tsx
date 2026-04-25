@@ -2125,10 +2125,18 @@ describe("Cross-device sync: hydration and reconcile", () => {
 
     // The dispatch must NOT short-circuit just because IDs match: server-side
     // metadata refreshes (title, audioUrl, artwork, chaptersUrl) must
-    // propagate to the client. The TestConsumer only renders ids, so we use
-    // the persist effect re-firing (saveQueue called) as the proxy signal —
-    // it only fires when state.queue identity changes, which only happens
-    // when the dispatch isn't short-circuited.
+    // propagate to the client. Persist firing alone proves only that some
+    // state.queue identity change reached the effect — assert the latest
+    // persisted snapshot also contains the refreshed metadata, otherwise a
+    // bug that re-dispatches a cloned local queue would still pass.
     expect(mockSaveQueue).toHaveBeenCalled();
+    const latestPersistedQueue = mockSaveQueue.mock.calls.at(-1)?.[0];
+    expect(latestPersistedQueue).toMatchObject([
+      expect.objectContaining({
+        id: "shared-id",
+        title: "New Title",
+        audioUrl: "https://example.com/new.mp3",
+      }),
+    ]);
   });
 });

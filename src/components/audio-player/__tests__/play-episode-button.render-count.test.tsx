@@ -1,5 +1,5 @@
 import { Profiler } from "react";
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, act } from "@testing-library/react";
 import {
   AudioPlayerProvider,
@@ -9,6 +9,7 @@ import { PlayEpisodeButton } from "@/components/audio-player/play-episode-button
 import {
   createRenderCountHarness,
   stubHTMLMediaElement,
+  restoreHTMLMediaElement,
 } from "@/test/helpers/audio-player-render-count";
 
 // vi.mock() must live in each render-count test file because vi.mock() is
@@ -93,6 +94,10 @@ describe("PlayEpisodeButton render counts (real AudioPlayerProvider)", () => {
   beforeEach(() => {
     harness.reset();
     stubHTMLMediaElement();
+  });
+
+  afterEach(() => {
+    restoreHTMLMediaElement();
   });
 
   it("does not re-render when setVolume(0.5) is dispatched", () => {
