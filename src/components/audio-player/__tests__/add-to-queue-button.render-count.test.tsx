@@ -1,16 +1,18 @@
-import { Profiler, type ProfilerOnRenderCallback } from "react";
+import { Profiler } from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, act } from "@testing-library/react";
 import {
   AudioPlayerProvider,
-  useAudioPlayerAPI,
   type AudioEpisode,
-  type AudioPlayerAPI,
 } from "@/contexts/audio-player-context";
 import { AddToQueueButton } from "@/components/audio-player/add-to-queue-button";
+import {
+  createRenderCountHarness,
+  stubHTMLMediaElement,
+} from "@/test/helpers/audio-player-render-count";
 
-// ── Provider dependencies ────────────────────────────────────────────────────
-// These mocks must live here (not in a helper) because vi.mock() is hoisted.
+// vi.mock() must live in each render-count test file because vi.mock() is
+// hoisted per-file — a shared helper module can't host it.
 
 vi.mock("@/lib/media-session", () => ({
   updateMediaSessionMetadata: vi.fn(),
@@ -41,9 +43,6 @@ vi.mock("@/lib/player-session", () => ({
   clearPlayerSession: vi.fn(),
 }));
 
-// Server actions called by the provider's cross-device sync effects.
-// Without these, the effects throw when userId is non-null (test-user-id from
-// the global Clerk mock), which interferes with state updates.
 vi.mock("@/app/actions/listening-queue", () => ({
   getQueue: vi.fn().mockResolvedValue({ success: true, data: [] }),
   setQueue: vi.fn().mockResolvedValue({ success: true }),
@@ -55,8 +54,6 @@ vi.mock("@/app/actions/player-session", () => ({
   savePlayerSession: vi.fn().mockResolvedValue({ success: true }),
   clearPlayerSession: vi.fn().mockResolvedValue({ success: true }),
 }));
-
-// ── Fixtures ─────────────────────────────────────────────────────────────────
 
 const testEpisode: AudioEpisode = {
   id: "ep-queue-test",
@@ -82,84 +79,59 @@ const secondQueueEpisode: AudioEpisode = {
   duration: 450,
 };
 
-// ── Render-count infrastructure ───────────────────────────────────────────────
 // React.Profiler measures AddToQueueButton's actual renders regardless of how
 // it subscribes to contexts. A regression that re-adds useAudioPlayerState()
 // will cause setVolume/setPlaybackSpeed/buffering/isPlaying changes to
 // increment renders and fail the isolation tests. Mirror-subscription wrappers
 // cannot catch fat-context regressions — Profiler can.
-
-let renders = 0;
-let capturedAPI: AudioPlayerAPI | null = null;
-
-const onRender: ProfilerOnRenderCallback = () => {
-  renders += 1;
-};
-
-function APIBridge() {
-  capturedAPI = useAudioPlayerAPI();
-  return null;
-}
+const harness = createRenderCountHarness();
 
 function TestTree({ episode }: { episode: AudioEpisode }) {
   return (
     <AudioPlayerProvider>
-      <Profiler id="add-to-queue-button" onRender={onRender}>
+      <Profiler id="add-to-queue-button" onRender={harness.onRender}>
         <AddToQueueButton episode={episode} />
       </Profiler>
-      <APIBridge />
+      <harness.APIBridge />
     </AudioPlayerProvider>
   );
 }
 
 describe("AddToQueueButton render counts (real AudioPlayerProvider)", () => {
   beforeEach(() => {
-    renders = 0;
-    capturedAPI = null;
-
-    // jsdom doesn't implement HTMLMediaElement natively; stub what the provider needs.
-    HTMLMediaElement.prototype.play = vi.fn().mockResolvedValue(undefined);
-    HTMLMediaElement.prototype.pause = vi.fn();
-    HTMLMediaElement.prototype.load = vi.fn();
-    Object.defineProperty(HTMLMediaElement.prototype, "buffered", {
-      configurable: true,
-      get() {
-        return { length: 1, start: () => 0, end: () => 150 };
-      },
-    });
+    harness.reset();
+    stubHTMLMediaElement();
   });
-
-  // ── Isolation assertions (the core of the PR) ──────────────────────────────
 
   it("does not re-render when setVolume(0.5) is dispatched", () => {
     render(<TestTree episode={testEpisode} />);
-    const baseline = renders;
-    act(() => capturedAPI!.setVolume(0.5));
-    expect(renders).toBe(baseline);
+    const baseline = harness.renders;
+    act(() => harness.api!.setVolume(0.5));
+    expect(harness.renders).toBe(baseline);
   });
 
   it("does not re-render when setPlaybackSpeed(1.5) is dispatched", () => {
     render(<TestTree episode={testEpisode} />);
-    const baseline = renders;
-    act(() => capturedAPI!.setPlaybackSpeed(1.5));
-    expect(renders).toBe(baseline);
+    const baseline = harness.renders;
+    act(() => harness.api!.setPlaybackSpeed(1.5));
+    expect(harness.renders).toBe(baseline);
   });
 
   it("does not re-render when a 'waiting' audio event fires (buffering tick)", () => {
     render(<TestTree episode={testEpisode} />);
-    const baseline = renders;
+    const baseline = harness.renders;
     act(() => {
       const audio = document.querySelector("audio");
       audio?.dispatchEvent(new Event("waiting"));
     });
-    expect(renders).toBe(baseline);
+    expect(harness.renders).toBe(baseline);
   });
 
   it("does not re-render when setSleepTimer(10) is dispatched", () => {
     render(<TestTree episode={testEpisode} />);
-    const baseline = renders;
-    act(() => capturedAPI!.setSleepTimer(10));
-    expect(renders).toBe(baseline);
+    const baseline = harness.renders;
+    act(() => harness.api!.setSleepTimer(10));
+    expect(harness.renders).toBe(baseline);
   });
 
   // AddToQueueButton does not subscribe to IsPlayingContext. Fire the 'pause'
@@ -167,13 +139,13 @@ describe("AddToQueueButton render counts (real AudioPlayerProvider)", () => {
   // handler) and verify AddToQueueButton does not re-render.
   it("does not re-render when isPlaying toggles for an unrelated episode", async () => {
     render(<TestTree episode={testEpisode} />);
-    await act(async () => capturedAPI!.playEpisode(unrelatedEpisode));
-    const baseline = renders;
+    await act(async () => harness.api!.playEpisode(unrelatedEpisode));
+    const baseline = harness.renders;
     act(() => {
       const audio = document.querySelector("audio");
       audio?.dispatchEvent(new Event("pause"));
     });
-    expect(renders).toBe(baseline);
+    expect(harness.renders).toBe(baseline);
   });
 
   // REORDER_QUEUE produces a new queue array but identical membership.
@@ -181,12 +153,12 @@ describe("AddToQueueButton render counts (real AudioPlayerProvider)", () => {
   // stays stable across reorders and queue-aware consumers must not re-render.
   it("does not re-render when REORDER_QUEUE leaves membership unchanged", async () => {
     render(<TestTree episode={testEpisode} />);
-    await act(async () => capturedAPI!.playEpisode(unrelatedEpisode));
-    await act(async () => capturedAPI!.addToQueue(testEpisode));
-    await act(async () => capturedAPI!.addToQueue(secondQueueEpisode));
-    const baseline = renders;
-    act(() => capturedAPI!.reorderQueue(0, 1));
-    expect(renders).toBe(baseline);
+    await act(async () => harness.api!.playEpisode(unrelatedEpisode));
+    await act(async () => harness.api!.addToQueue(testEpisode));
+    await act(async () => harness.api!.addToQueue(secondQueueEpisode));
+    const baseline = harness.renders;
+    act(() => harness.api!.reorderQueue(0, 1));
+    expect(harness.renders).toBe(baseline);
   });
 
   // Same-size-different-membership: a remove + add pair lands at the original
@@ -196,26 +168,24 @@ describe("AddToQueueButton render counts (real AudioPlayerProvider)", () => {
   // size-only equality.
   it("re-renders when queue is replaced with same-size different-membership queue", async () => {
     render(<TestTree episode={testEpisode} />);
-    await act(async () => capturedAPI!.playEpisode(unrelatedEpisode));
-    await act(async () => capturedAPI!.addToQueue(secondQueueEpisode));
-    const baseline = renders;
+    await act(async () => harness.api!.playEpisode(unrelatedEpisode));
+    await act(async () => harness.api!.addToQueue(secondQueueEpisode));
+    const baseline = harness.renders;
     act(() => {
-      capturedAPI!.removeFromQueue(secondQueueEpisode.id);
-      capturedAPI!.addToQueue(testEpisode);
+      harness.api!.removeFromQueue(secondQueueEpisode.id);
+      harness.api!.addToQueue(testEpisode);
     });
-    expect(renders).toBeGreaterThan(baseline);
+    expect(harness.renders).toBeGreaterThan(baseline);
   });
-
-  // ── Sanity assertion (verify the button still reacts to queue changes) ──────
 
   it("re-renders when its episode is added to the queue", async () => {
     render(<TestTree episode={testEpisode} />);
     // Play something else first so addToQueue dispatches ADD_TO_QUEUE rather
     // than falling back to playEpisode (the provider skips queuing when nothing
     // is loaded). Also moves past the NowPlayingEpisodeId change before baseline.
-    await act(async () => capturedAPI!.playEpisode(unrelatedEpisode));
-    const baseline = renders;
-    act(() => capturedAPI!.addToQueue(testEpisode));
-    expect(renders).toBeGreaterThan(baseline);
+    await act(async () => harness.api!.playEpisode(unrelatedEpisode));
+    const baseline = harness.renders;
+    act(() => harness.api!.addToQueue(testEpisode));
+    expect(harness.renders).toBeGreaterThan(baseline);
   });
 });
