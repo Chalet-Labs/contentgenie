@@ -211,6 +211,46 @@ describe("useChapters", () => {
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 
+  it("resets to idle when chaptersUrl changes while offline", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({ chapters: [{ startTime: 0, title: "A" }] }),
+        { status: 200 },
+      ),
+    );
+
+    const { result, rerender } = renderHook(
+      ({ url, online }: { url: string; online: boolean }) =>
+        useChapters(url, online),
+      {
+        initialProps: {
+          url: "https://example.com/a.json",
+          online: true,
+        },
+      },
+    );
+
+    await waitFor(() =>
+      expect(result.current).toEqual({
+        status: "ready",
+        chapters: [{ startTime: 0, title: "A" }],
+      }),
+    );
+
+    // Connectivity drops with the same URL — ready state is preserved.
+    rerender({ url: "https://example.com/a.json", online: false });
+    expect(result.current).toEqual({
+      status: "ready",
+      chapters: [{ startTime: 0, title: "A" }],
+    });
+
+    // URL changes while still offline — chapters from the prior URL must not
+    // be shown against the new one. Reset to idle (skeleton).
+    rerender({ url: "https://example.com/b.json", online: false });
+    expect(result.current).toEqual({ status: "idle" });
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
   it("validates the response shape via parseChapters and drops malformed entries", async () => {
     vi.mocked(fetch).mockResolvedValueOnce(
       new Response(

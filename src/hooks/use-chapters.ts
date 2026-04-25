@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { parseChapters, type Chapter } from "@/lib/chapters";
 
 export type UseChaptersState =
@@ -40,14 +40,24 @@ export function useChapters(
   isOnline?: boolean,
 ): UseChaptersState {
   const [state, setState] = useState<UseChaptersState>({ status: "idle" });
+  const prevUrlRef = useRef<string | null | undefined>(undefined);
 
   useEffect(() => {
+    const prevUrl = prevUrlRef.current;
+    prevUrlRef.current = chaptersUrl;
+
     if (!chaptersUrl) {
       setState({ status: "idle" });
       return;
     }
     if (isOnline === false) {
-      // Preserve current state; don't issue a fetch the network will reject.
+      // Same URL during a connectivity blip: preserve current state so a
+      // ready/error from before the drop stays visible. Different URL while
+      // offline: reset to idle so we don't render the previous episode's
+      // chapters under the new URL once the consumer re-renders.
+      if (prevUrl !== chaptersUrl) {
+        setState({ status: "idle" });
+      }
       return;
     }
 
