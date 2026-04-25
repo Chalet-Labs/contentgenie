@@ -1,13 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { EpisodeCard } from "./episode-card";
 import type { PodcastIndexEpisode } from "@/lib/podcastindex";
-import {
-  AudioPlayerAPIContext,
-  AudioPlayerStateContext,
-  AudioPlayerProgressContext,
-  type AudioPlayerState,
-  type AudioPlayerAPI,
-} from "@/contexts/audio-player-context";
+import { withAudioPlayerContext } from "@/test/story-fixtures";
 
 const baseEpisode: PodcastIndexEpisode = {
   id: 789,
@@ -41,57 +35,10 @@ const baseEpisode: PodcastIndexEpisode = {
   transcripts: [],
 };
 
-const noopAPI: AudioPlayerAPI = {
-  playEpisode: () => {},
-  togglePlay: () => {},
-  seek: () => {},
-  skipForward: () => {},
-  skipBack: () => {},
-  setVolume: () => {},
-  setPlaybackSpeed: () => {},
-  closePlayer: () => {},
-  addToQueue: () => {},
-  removeFromQueue: () => {},
-  reorderQueue: () => {},
-  clearQueue: () => {},
-  playNext: () => {},
-  setSleepTimer: () => {},
-  cancelSleepTimer: () => {},
-  getCurrentTime: () => 0,
-};
-
-const mockPlayerState: AudioPlayerState = {
-  currentEpisode: null,
-  isPlaying: false,
-  isBuffering: false,
-  isVisible: false,
-  duration: 0,
-  volume: 1,
-  playbackSpeed: 1,
-  hasError: false,
-  errorMessage: null,
-  queue: [],
-  chapters: null,
-  chaptersLoading: false,
-  sleepTimer: null,
-};
-
 const meta: Meta<typeof EpisodeCard> = {
   title: "Podcasts/EpisodeCard",
   component: EpisodeCard,
-  decorators: [
-    (Story) => (
-      <AudioPlayerAPIContext.Provider value={noopAPI}>
-        <AudioPlayerStateContext.Provider value={mockPlayerState}>
-          <AudioPlayerProgressContext.Provider
-            value={{ currentTime: 0, buffered: 0 }}
-          >
-            <Story />
-          </AudioPlayerProgressContext.Provider>
-        </AudioPlayerStateContext.Provider>
-      </AudioPlayerAPIContext.Provider>
-    ),
-  ],
+  decorators: [withAudioPlayerContext],
 };
 
 export default meta;

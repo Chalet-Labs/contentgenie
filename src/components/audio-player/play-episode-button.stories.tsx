@@ -1,14 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
-import type { ReactNode } from "react";
-import {
-  AudioPlayerAPIContext,
-  AudioPlayerStateContext,
-  AudioPlayerProgressContext,
-  type AudioPlayerState,
-  type AudioPlayerAPI,
-  type AudioEpisode,
-} from "@/contexts/audio-player-context";
+import { type AudioEpisode } from "@/contexts/audio-player-context";
 import { PlayEpisodeButton } from "@/components/audio-player/play-episode-button";
+import { audioPlayerContextDecorator } from "@/test/story-fixtures";
 
 const testEpisode: AudioEpisode = {
   id: "ep-1",
@@ -27,61 +20,6 @@ const otherEpisode: AudioEpisode = {
   duration: 1800,
 };
 
-const noopAPI: AudioPlayerAPI = {
-  playEpisode: () => {},
-  togglePlay: () => {},
-  seek: () => {},
-  skipForward: () => {},
-  skipBack: () => {},
-  setVolume: () => {},
-  setPlaybackSpeed: () => {},
-  closePlayer: () => {},
-  addToQueue: () => {},
-  removeFromQueue: () => {},
-  reorderQueue: () => {},
-  clearQueue: () => {},
-  playNext: () => {},
-  setSleepTimer: () => {},
-  cancelSleepTimer: () => {},
-  getCurrentTime: () => 0,
-};
-
-const baseState: AudioPlayerState = {
-  currentEpisode: null,
-  isPlaying: false,
-  isBuffering: false,
-  isVisible: false,
-  duration: 0,
-  volume: 1,
-  playbackSpeed: 1,
-  hasError: false,
-  errorMessage: null,
-  queue: [],
-  chapters: null,
-  chaptersLoading: false,
-  sleepTimer: null,
-};
-
-function MockProvider({
-  state,
-  children,
-}: {
-  state: AudioPlayerState;
-  children: ReactNode;
-}) {
-  return (
-    <AudioPlayerAPIContext.Provider value={noopAPI}>
-      <AudioPlayerStateContext.Provider value={state}>
-        <AudioPlayerProgressContext.Provider
-          value={{ currentTime: 0, buffered: 0 }}
-        >
-          {children}
-        </AudioPlayerProgressContext.Provider>
-      </AudioPlayerStateContext.Provider>
-    </AudioPlayerAPIContext.Provider>
-  );
-}
-
 const meta: Meta<typeof PlayEpisodeButton> = {
   title: "AudioPlayer/PlayEpisodeButton",
   component: PlayEpisodeButton,
@@ -92,33 +30,19 @@ type Story = StoryObj<typeof PlayEpisodeButton>;
 
 export const Default: Story = {
   args: { episode: testEpisode },
-  decorators: [
-    (Story) => (
-      <MockProvider state={baseState}>
-        <Story />
-      </MockProvider>
-    ),
-  ],
+  decorators: [audioPlayerContextDecorator()],
 };
 
 export const NowPlaying: Story = {
   args: { episode: testEpisode },
   decorators: [
-    (Story) => (
-      <MockProvider state={{ ...baseState, currentEpisode: testEpisode }}>
-        <Story />
-      </MockProvider>
-    ),
+    audioPlayerContextDecorator({ state: { currentEpisode: testEpisode } }),
   ],
 };
 
 export const DifferentEpisodePlaying: Story = {
   args: { episode: testEpisode },
   decorators: [
-    (Story) => (
-      <MockProvider state={{ ...baseState, currentEpisode: otherEpisode }}>
-        <Story />
-      </MockProvider>
-    ),
+    audioPlayerContextDecorator({ state: { currentEpisode: otherEpisode } }),
   ],
 };

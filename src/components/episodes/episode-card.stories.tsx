@@ -6,63 +6,10 @@ import { EpisodeCard } from "./episode-card";
 import { ListenedButton } from "./listened-button";
 import { AddToQueueButton } from "@/components/audio-player/add-to-queue-button";
 import {
-  AudioPlayerAPIContext,
-  AudioPlayerStateContext,
-  AudioPlayerProgressContext,
-  type AudioPlayerState,
-  type AudioPlayerAPI,
-} from "@/contexts/audio-player-context";
-import { STORY_TWO_HOURS_AGO } from "@/test/story-fixtures";
+  STORY_TWO_HOURS_AGO,
+  withAudioPlayerContext,
+} from "@/test/story-fixtures";
 import { formatRelativeTime } from "@/lib/utils";
-
-const noopAPI: AudioPlayerAPI = {
-  playEpisode: () => {},
-  togglePlay: () => {},
-  seek: () => {},
-  skipForward: () => {},
-  skipBack: () => {},
-  setVolume: () => {},
-  setPlaybackSpeed: () => {},
-  closePlayer: () => {},
-  addToQueue: () => {},
-  removeFromQueue: () => {},
-  reorderQueue: () => {},
-  clearQueue: () => {},
-  playNext: () => {},
-  setSleepTimer: () => {},
-  cancelSleepTimer: () => {},
-  getCurrentTime: () => 0,
-};
-
-const mockPlayerState: AudioPlayerState = {
-  currentEpisode: null,
-  isPlaying: false,
-  isBuffering: false,
-  isVisible: false,
-  duration: 0,
-  volume: 1,
-  playbackSpeed: 1,
-  hasError: false,
-  errorMessage: null,
-  queue: [],
-  chapters: null,
-  chaptersLoading: false,
-  sleepTimer: null,
-};
-
-function withAudioPlayer(Story: React.ComponentType) {
-  return (
-    <AudioPlayerAPIContext.Provider value={noopAPI}>
-      <AudioPlayerStateContext.Provider value={mockPlayerState}>
-        <AudioPlayerProgressContext.Provider
-          value={{ currentTime: 0, buffered: 0 }}
-        >
-          <Story />
-        </AudioPlayerProgressContext.Provider>
-      </AudioPlayerStateContext.Provider>
-    </AudioPlayerAPIContext.Provider>
-  );
-}
 
 const baseAudioEpisode = {
   id: "PI-42",
@@ -127,7 +74,7 @@ export const WithPrimaryAction: Story = {
       </>
     ),
   },
-  decorators: [withAudioPlayer],
+  decorators: [withAudioPlayerContext],
 };
 
 export const ScoredExceptional: Story = {

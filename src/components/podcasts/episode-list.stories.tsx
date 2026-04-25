@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { EpisodeList } from "./episode-list";
 import type { PodcastIndexEpisode } from "@/lib/podcastindex";
+import { withAudioPlayerContext } from "@/test/story-fixtures";
 
 function makeEpisode(
   id: number,
@@ -70,6 +71,7 @@ const sampleEpisodes: PodcastIndexEpisode[] = [
 const meta: Meta<typeof EpisodeList> = {
   title: "Podcasts/EpisodeList",
   component: EpisodeList,
+  decorators: [withAudioPlayerContext],
 };
 
 export default meta;

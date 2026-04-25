@@ -1,14 +1,7 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
-import type { ReactNode } from "react";
-import {
-  AudioPlayerAPIContext,
-  AudioPlayerStateContext,
-  AudioPlayerProgressContext,
-  type AudioPlayerState,
-  type AudioPlayerAPI,
-  type AudioEpisode,
-} from "@/contexts/audio-player-context";
+import { type AudioEpisode } from "@/contexts/audio-player-context";
 import { AddToQueueButton } from "@/components/audio-player/add-to-queue-button";
+import { audioPlayerContextDecorator } from "@/test/story-fixtures";
 
 const testEpisode: AudioEpisode = {
   id: "ep-1",
@@ -27,121 +20,39 @@ const playingEpisode: AudioEpisode = {
   duration: 1800,
 };
 
-const noopAPI: AudioPlayerAPI = {
-  playEpisode: () => {},
-  togglePlay: () => {},
-  seek: () => {},
-  skipForward: () => {},
-  skipBack: () => {},
-  setVolume: () => {},
-  setPlaybackSpeed: () => {},
-  closePlayer: () => {},
-  addToQueue: () => {},
-  removeFromQueue: () => {},
-  reorderQueue: () => {},
-  clearQueue: () => {},
-  playNext: () => {},
-  setSleepTimer: () => {},
-  cancelSleepTimer: () => {},
-  getCurrentTime: () => 0,
-};
-
-const baseState: AudioPlayerState = {
+const playingState = {
   currentEpisode: playingEpisode,
   isPlaying: true,
-  isBuffering: false,
   isVisible: true,
   duration: 1800,
-  volume: 1,
-  playbackSpeed: 1,
-  hasError: false,
-  errorMessage: null,
-  queue: [],
-  chapters: null,
-  chaptersLoading: false,
-  sleepTimer: null,
 };
-
-function MockProvider({
-  state,
-  children,
-}: {
-  state: AudioPlayerState;
-  children: ReactNode;
-}) {
-  return (
-    <AudioPlayerAPIContext.Provider value={noopAPI}>
-      <AudioPlayerStateContext.Provider value={state}>
-        <AudioPlayerProgressContext.Provider
-          value={{ currentTime: 0, buffered: 0 }}
-        >
-          {children}
-        </AudioPlayerProgressContext.Provider>
-      </AudioPlayerStateContext.Provider>
-    </AudioPlayerAPIContext.Provider>
-  );
-}
 
 const meta: Meta<typeof AddToQueueButton> = {
   title: "AudioPlayer/AddToQueueButton",
   component: AddToQueueButton,
+  decorators: [audioPlayerContextDecorator({ state: playingState })],
 };
 
 export default meta;
 type Story = StoryObj<typeof AddToQueueButton>;
 
 export const Default: Story = {
-  args: {
-    episode: testEpisode,
-    variant: "full",
-  },
-  decorators: [
-    (Story) => (
-      <MockProvider state={baseState}>
-        <Story />
-      </MockProvider>
-    ),
-  ],
+  args: { episode: testEpisode, variant: "full" },
 };
 
 export const IconVariant: Story = {
-  args: {
-    episode: testEpisode,
-    variant: "icon",
-  },
-  decorators: [
-    (Story) => (
-      <MockProvider state={baseState}>
-        <Story />
-      </MockProvider>
-    ),
-  ],
+  args: { episode: testEpisode, variant: "icon" },
 };
 
 export const AlreadyInQueue: Story = {
-  args: {
-    episode: testEpisode,
-    variant: "full",
-  },
+  args: { episode: testEpisode, variant: "full" },
   decorators: [
-    (Story) => (
-      <MockProvider state={{ ...baseState, queue: [testEpisode] }}>
-        <Story />
-      </MockProvider>
-    ),
+    audioPlayerContextDecorator({
+      state: { ...playingState, queue: [testEpisode] },
+    }),
   ],
 };
 
 export const NowPlaying: Story = {
-  args: {
-    episode: playingEpisode,
-    variant: "full",
-  },
-  decorators: [
-    (Story) => (
-      <MockProvider state={baseState}>
-        <Story />
-      </MockProvider>
-    ),
-  ],
+  args: { episode: playingEpisode, variant: "full" },
 };
