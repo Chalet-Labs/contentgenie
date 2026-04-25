@@ -104,7 +104,7 @@ export function SeekBar() {
 
   return (
     <div className="flex w-full items-center gap-2">
-      <span className="w-10 text-right text-xs tabular-nums text-muted-foreground">
+      <span className="w-14 text-right text-xs tabular-nums text-muted-foreground">
         {formatTime(currentTime)}
       </span>
       <div className="relative flex-1">
@@ -167,7 +167,7 @@ export function SeekBar() {
           onValueChange={handleSeek}
         />
       </div>
-      <span className="w-10 text-xs tabular-nums text-muted-foreground">
+      <span className="w-14 text-xs tabular-nums text-muted-foreground">
         {formatTime(duration)}
       </span>
     </div>

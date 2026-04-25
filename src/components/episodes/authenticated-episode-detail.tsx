@@ -12,7 +12,6 @@ import {
   FileText,
   Mic,
   Rss,
-  ExternalLink,
   Play,
   Pause,
   RefreshCw,
@@ -20,6 +19,14 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import {
+  EpisodeTabs,
+  EpisodeTabsContent,
+  EpisodeTabsList,
+  EpisodeTabsTrigger,
+} from "@/components/episodes/episode-tabs";
+import { EpisodeChaptersList } from "@/components/episodes/episode-chapters-list";
+import { useChapters } from "@/hooks/use-chapters";
 import { cn, stripHtml } from "@/lib/utils";
 import {
   useAudioPlayerState,
@@ -31,7 +38,7 @@ import {
   type SummarizationStep,
 } from "@/components/episodes/summary-display";
 import { SaveButton } from "@/components/episodes/save-button";
-import { ShareButton } from "@/components/ui/share-button";
+import { EpisodeExternalActions } from "@/components/episodes/episode-external-actions";
 import { AddToQueueButton } from "@/components/audio-player/add-to-queue-button";
 import {
   Tooltip,
@@ -80,6 +87,8 @@ export function AuthenticatedEpisodeDetail({
   const playerAPI = useAudioPlayerAPI();
 
   const [episode, setEpisode] = useState<EpisodeData | null>(null);
+  const normalizedChaptersUrl = episode?.chaptersUrl?.trim() || null;
+  const chaptersState = useChapters(normalizedChaptersUrl, isOnline);
   const [podcast, setPodcast] = useState<PodcastData | null>(null);
   const [summaryData, setSummaryData] = useState<SummaryData | null>(null);
   const [isLoadingEpisode, setIsLoadingEpisode] = useState(true);
@@ -440,6 +449,19 @@ export function AuthenticatedEpisodeDetail({
     ? Object.values(podcast.categories)
     : [];
 
+  // Chapters tab visibility is gated by URL presence, not fetch state — Radix
+  // Tabs holds the active value across re-renders, so removing the trigger after
+  // a transient empty/error state would leave no panel rendered. The empty case
+  // is handled by EpisodeChaptersList's in-panel "No chapters available" copy.
+  const hasChapters = normalizedChaptersUrl !== null;
+  const descriptionPlainText = stripHtml(episode.description ?? "");
+  const hasDescription = Boolean(descriptionPlainText.trim());
+  const canPlayEpisode = isOnline && Boolean(episode.enclosureUrl);
+  const chaptersCount =
+    chaptersState.status === "ready"
+      ? chaptersState.chapters.length
+      : undefined;
+
   const isCurrentEpisode =
     playerState.currentEpisode?.id === String(episode.id);
   const isPlayingThis = isCurrentEpisode && playerState.isPlaying;
@@ -456,7 +478,7 @@ export function AuthenticatedEpisodeDetail({
         audioUrl: episode.enclosureUrl,
         artwork: artworkUrl,
         duration: episode.duration,
-        chaptersUrl: episode.chaptersUrl ?? undefined,
+        chaptersUrl: normalizedChaptersUrl ?? undefined,
       });
     }
   };
@@ -636,7 +658,7 @@ export function AuthenticatedEpisodeDetail({
                   // Known v1 limitation: queue items persisted before this feature
                   // won't carry chaptersUrl. Chapters silently won't load for
                   // queue-initiated playback of older queue entries.
-                  chaptersUrl: episode.chaptersUrl ?? undefined,
+                  chaptersUrl: normalizedChaptersUrl ?? undefined,
                 }}
                 variant="full"
               />
@@ -665,76 +687,101 @@ export function AuthenticatedEpisodeDetail({
                 size="lg"
               />
             )}
-            {isOnline && safeEpisodeLink && (
-              <Button variant="outline" size="lg" asChild>
-                <a
-                  href={safeEpisodeLink}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  <ExternalLink className="mr-2 h-4 w-4" />
-                  Episode Page
-                </a>
-              </Button>
-            )}
-            {isOnline && process.env.NEXT_PUBLIC_APP_URL && (
-              <ShareButton
-                title={episode.title}
-                text={episode.title}
-                url={`${process.env.NEXT_PUBLIC_APP_URL}/episode/${encodeURIComponent(episodeId)}`}
-                summary={summaryData?.worthItReason ?? undefined}
-                size="lg"
+            {isOnline && (
+              <EpisodeExternalActions
+                episodeId={episodeId}
+                episodeTitle={episode.title}
+                safeEpisodeLink={safeEpisodeLink}
+                shareSummary={summaryData?.worthItReason ?? undefined}
               />
             )}
           </div>
         </div>
       </div>
 
-      {/* Description */}
-      {episode.description && (
-        <Card>
-          <CardContent className="p-6">
-            <h2 className="mb-3 text-lg font-semibold">About This Episode</h2>
-            <p className="whitespace-pre-wrap text-muted-foreground">
-              {stripHtml(episode.description)}
-            </p>
-          </CardContent>
-        </Card>
-      )}
+      <EpisodeTabs key={episodeId} defaultValue="insights">
+        <EpisodeTabsList aria-label="Episode sections">
+          <EpisodeTabsTrigger value="insights">Insights</EpisodeTabsTrigger>
+          {hasChapters && (
+            <EpisodeTabsTrigger value="chapters" badge={chaptersCount}>
+              Chapters
+            </EpisodeTabsTrigger>
+          )}
+          {hasDescription && (
+            <EpisodeTabsTrigger value="about">About</EpisodeTabsTrigger>
+          )}
+        </EpisodeTabsList>
 
-      {/* AI Summary Section */}
-      <div>
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-xl font-semibold">AI-Powered Insights</h2>
-          {isAdmin &&
-            canRunEpisodeProcessing &&
-            summaryData?.summary &&
-            isOnline &&
-            !isLoadingSummary && (
-              <Button variant="outline" size="sm" onClick={resummarize}>
-                <RefreshCw className="mr-2 h-4 w-4" />
-                Re-summarize
-              </Button>
-            )}
-        </div>
-        <SummaryDisplay
-          summary={summaryData?.summary || null}
-          keyTakeaways={summaryData?.keyTakeaways || null}
-          worthItScore={summaryData?.worthItScore ?? null}
-          worthItReason={summaryData?.worthItReason}
-          worthItDimensions={summaryData?.worthItDimensions}
-          isLoading={isLoadingSummary}
-          error={summaryError}
-          currentStep={
-            (run?.metadata?.step as SummarizationStep | undefined) ?? null
-          }
-          onGenerateSummary={
-            isOnline && canRunEpisodeProcessing ? generateSummary : undefined
-          }
-          overlapLabel={overlapResult.label}
-          overlapLabelKind={overlapResult.labelKind}
-        />
-      </div>
+        <EpisodeTabsContent value="insights">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-xl font-semibold">AI-Powered Insights</h2>
+            {isAdmin &&
+              canRunEpisodeProcessing &&
+              summaryData?.summary &&
+              isOnline &&
+              !isLoadingSummary && (
+                <Button variant="outline" size="sm" onClick={resummarize}>
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  Re-summarize
+                </Button>
+              )}
+          </div>
+          <SummaryDisplay
+            summary={summaryData?.summary || null}
+            keyTakeaways={summaryData?.keyTakeaways || null}
+            worthItScore={summaryData?.worthItScore ?? null}
+            worthItReason={summaryData?.worthItReason}
+            worthItDimensions={summaryData?.worthItDimensions}
+            isLoading={isLoadingSummary}
+            error={summaryError}
+            currentStep={
+              (run?.metadata?.step as SummarizationStep | undefined) ?? null
+            }
+            onGenerateSummary={
+              isOnline && canRunEpisodeProcessing ? generateSummary : undefined
+            }
+            overlapLabel={overlapResult.label}
+            overlapLabelKind={overlapResult.labelKind}
+          />
+        </EpisodeTabsContent>
+
+        {hasChapters && (
+          <EpisodeTabsContent value="chapters">
+            <Card>
+              <CardContent className="p-4">
+                <EpisodeChaptersList
+                  state={chaptersState}
+                  canPlay={canPlayEpisode}
+                  audioEpisode={{
+                    id: String(episode.id),
+                    title: episode.title,
+                    podcastTitle: podcast?.title || "",
+                    audioUrl: episode.enclosureUrl,
+                    artwork: artworkUrl,
+                    duration: episode.duration,
+                    chaptersUrl: normalizedChaptersUrl ?? undefined,
+                  }}
+                />
+              </CardContent>
+            </Card>
+          </EpisodeTabsContent>
+        )}
+
+        {hasDescription && (
+          <EpisodeTabsContent value="about">
+            <Card>
+              <CardContent className="p-6">
+                <h2 className="mb-3 text-lg font-semibold">
+                  About This Episode
+                </h2>
+                <p className="whitespace-pre-wrap text-muted-foreground">
+                  {descriptionPlainText}
+                </p>
+              </CardContent>
+            </Card>
+          </EpisodeTabsContent>
+        )}
+      </EpisodeTabs>
     </div>
   );
 }

@@ -13,10 +13,15 @@ import { useCurrentChapter } from "@/hooks/use-current-chapter";
 import { Button } from "@/components/ui/button";
 
 export function ChapterList() {
-  const { chapters } = useAudioPlayerState();
-  const { seek } = useAudioPlayerAPI();
+  const { chapters, isPlaying } = useAudioPlayerState();
+  const { seek, togglePlay } = useAudioPlayerAPI();
   const { chapter: currentChapter } = useCurrentChapter();
   const activeRef = useRef<HTMLButtonElement>(null);
+
+  const handleSelect = (startTime: number) => {
+    seek(startTime);
+    if (!isPlaying) togglePlay();
+  };
 
   // Auto-scroll to active chapter
   useEffect(() => {
@@ -53,7 +58,7 @@ export function ChapterList() {
             ref={isActive ? activeRef : undefined}
             type="button"
             variant="ghost"
-            onClick={() => seek(chapter.startTime)}
+            onClick={() => handleSelect(chapter.startTime)}
             className={cn(
               "flex h-auto w-full items-center justify-start gap-3 rounded-md px-2 py-2 text-left transition-colors [&_svg]:size-auto",
               isActive && "bg-primary/10",
