@@ -79,6 +79,36 @@ function clearSessionOnServer(): void {
     .catch((err) => console.warn("[player] clear threw:", err));
 }
 
+// Full-field equality on the persisted AudioEpisode shape. Used at the
+// focus-refetch dispatch site so a server reconcile returning content-
+// equal data can skip the dispatch entirely (preserving state.queue
+// reference identity and avoiding a spurious [state.queue] persist
+// effect re-fire). ID-only equality is insufficient: server-side metadata
+// refreshes (title corrections, artwork URLs, chaptersUrl backfill) must
+// still propagate to the client.
+function queuesEqualByContent(
+  a: readonly AudioEpisode[],
+  b: readonly AudioEpisode[],
+): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    const x = a[i];
+    const y = b[i];
+    if (
+      x.id !== y.id ||
+      x.title !== y.title ||
+      x.podcastTitle !== y.podcastTitle ||
+      x.audioUrl !== y.audioUrl ||
+      x.artwork !== y.artwork ||
+      x.duration !== y.duration ||
+      x.chaptersUrl !== y.chaptersUrl
+    ) {
+      return false;
+    }
+  }
+  return true;
+}
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
@@ -593,8 +623,18 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
 
         // Queue reconcile: skip if a local write is pending
         if (queueResult.success && !pendingQueueWriteRef.current) {
-          lastAckedQueueRef.current = queueResult.data;
-          dispatch({ type: "INIT_QUEUE", queue: queueResult.data });
+          const next = queueResult.data;
+          lastAckedQueueRef.current = next;
+          // Skip the dispatch when the server returned content-equal data.
+          // INIT_QUEUE always allocates a new state.queue array, which would
+          // re-fire the [state.queue] persist effect (one wasted localStorage
+          // write per focus event). The reducer must stay pure — its
+          // INIT_QUEUE invariant is "always produces new state" and the
+          // rollback path at the persist effect depends on that to consume
+          // suppressQueueWriteRef. Filter at the dispatch site instead.
+          if (!queuesEqualByContent(stateRef.current.queue, next)) {
+            dispatch({ type: "INIT_QUEUE", queue: next });
+          }
         } else if (!queueResult.success) {
           console.warn("Focus getQueue failed:", queueResult.error);
         }
