@@ -5,6 +5,7 @@ import {
   AudioPlayerProvider,
   type AudioEpisode,
 } from "@/contexts/audio-player-context";
+import { asPodcastIndexEpisodeId } from "@/types/ids";
 import { AddToQueueButton } from "@/components/audio-player/add-to-queue-button";
 import {
   createRenderCountHarness,
@@ -57,7 +58,7 @@ vi.mock("@/app/actions/player-session", () => ({
 }));
 
 const testEpisode: AudioEpisode = {
-  id: "ep-queue-test",
+  id: asPodcastIndexEpisodeId("ep-queue-test"),
   title: "Queue Test Episode",
   podcastTitle: "Test Podcast",
   audioUrl: "https://example.com/audio.mp3",
@@ -65,7 +66,7 @@ const testEpisode: AudioEpisode = {
 };
 
 const unrelatedEpisode: AudioEpisode = {
-  id: "ep-unrelated",
+  id: asPodcastIndexEpisodeId("ep-unrelated"),
   title: "Unrelated Episode",
   podcastTitle: "Other Podcast",
   audioUrl: "https://example.com/other.mp3",
@@ -73,7 +74,7 @@ const unrelatedEpisode: AudioEpisode = {
 };
 
 const secondQueueEpisode: AudioEpisode = {
-  id: "ep-second-in-queue",
+  id: asPodcastIndexEpisodeId("ep-second-in-queue"),
   title: "Second Queue Episode",
   podcastTitle: "Test Podcast",
   audioUrl: "https://example.com/second.mp3",

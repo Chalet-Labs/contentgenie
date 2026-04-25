@@ -2087,7 +2087,7 @@ describe("Cross-device sync: hydration and reconcile", () => {
   it("focus refetch with mutated server metadata still applies the update", async () => {
     const localQueue: AudioEpisode[] = [
       {
-        id: "shared-id",
+        id: asPodcastIndexEpisodeId("shared-id"),
         title: "Old Title",
         podcastTitle: "Podcast",
         audioUrl: "https://example.com/old.mp3",
@@ -2095,7 +2095,7 @@ describe("Cross-device sync: hydration and reconcile", () => {
     ];
     const serverQueue: AudioEpisode[] = [
       {
-        id: "shared-id",
+        id: asPodcastIndexEpisodeId("shared-id"),
         title: "New Title",
         podcastTitle: "Podcast",
         audioUrl: "https://example.com/new.mp3",
