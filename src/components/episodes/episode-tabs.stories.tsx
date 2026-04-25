@@ -1,11 +1,22 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
-import { BookMarked, CheckCircle, Sparkles } from "lucide-react";
+import type { ReactNode } from "react";
+import { CheckCircle, Sparkles } from "lucide-react";
 import {
   EpisodeTabs,
   EpisodeTabsContent,
   EpisodeTabsList,
   EpisodeTabsTrigger,
 } from "@/components/episodes/episode-tabs";
+import { EpisodeChaptersList } from "@/components/episodes/episode-chapters-list";
+import {
+  AudioPlayerAPIContext,
+  AudioPlayerProgressContext,
+  AudioPlayerStateContext,
+  type AudioEpisode,
+  type AudioPlayerAPI,
+  type AudioPlayerState,
+} from "@/contexts/audio-player-context";
+import type { Chapter } from "@/lib/chapters";
 
 const meta: Meta<typeof EpisodeTabs> = {
   title: "Episodes/EpisodeTabs",
@@ -65,44 +76,81 @@ function InsightsPanel() {
   );
 }
 
+const sampleAudioEpisode: AudioEpisode = {
+  id: "story-ep",
+  title: "Why Senior Designers Stop Using Frameworks",
+  podcastTitle: "Design Decisions",
+  audioUrl: "https://example.com/audio.mp3",
+};
+
+const sampleChapters: Chapter[] = [
+  { startTime: 0, title: "Cold open & intros" },
+  { startTime: 312, title: "The trap of over-frameworking" },
+  { startTime: 934, title: "Taste as a team asset" },
+  { startTime: 1820, title: "Hiring for judgment" },
+  { startTime: 2650, title: "Listener questions" },
+  { startTime: 3400, title: "Wrap + next week" },
+];
+
+const noopAPI: AudioPlayerAPI = {
+  playEpisode: () => {},
+  togglePlay: () => {},
+  seek: () => {},
+  skipForward: () => {},
+  skipBack: () => {},
+  getCurrentTime: () => 0,
+  setVolume: () => {},
+  setPlaybackSpeed: () => {},
+  closePlayer: () => {},
+  addToQueue: () => {},
+  removeFromQueue: () => {},
+  reorderQueue: () => {},
+  clearQueue: () => {},
+  playNext: () => {},
+  setSleepTimer: () => {},
+  cancelSleepTimer: () => {},
+};
+
+const playingState: AudioPlayerState = {
+  currentEpisode: sampleAudioEpisode,
+  isPlaying: true,
+  isBuffering: false,
+  isVisible: true,
+  duration: 3600,
+  volume: 1,
+  playbackSpeed: 1,
+  hasError: false,
+  errorMessage: null,
+  queue: [],
+  chapters: sampleChapters,
+  chaptersLoading: false,
+  sleepTimer: null,
+};
+
+function MockAudioPlayer({ children }: { children: ReactNode }) {
+  return (
+    <AudioPlayerAPIContext.Provider value={noopAPI}>
+      <AudioPlayerStateContext.Provider value={playingState}>
+        <AudioPlayerProgressContext.Provider
+          value={{ currentTime: 400, buffered: 0 }}
+        >
+          {children}
+        </AudioPlayerProgressContext.Provider>
+      </AudioPlayerStateContext.Provider>
+    </AudioPlayerAPIContext.Provider>
+  );
+}
+
 function ChaptersPanel() {
   return (
-    <div className="rounded-lg border border-border bg-card p-4">
-      <div className="mb-3 flex items-center gap-2">
-        <BookMarked className="h-4 w-4 text-primary" />
-        <h3 className="text-sm font-semibold">Chapters</h3>
+    <MockAudioPlayer>
+      <div className="rounded-lg border border-border bg-card p-4">
+        <EpisodeChaptersList
+          state={{ status: "ready", chapters: sampleChapters }}
+          audioEpisode={sampleAudioEpisode}
+        />
       </div>
-      <ul className="divide-y divide-border overflow-hidden rounded-lg border border-border">
-        {[
-          { t: "0:00", title: "Cold open & intros" },
-          { t: "5:12", title: "The trap of over-frameworking", active: true },
-          { t: "15:34", title: "Taste as a team asset" },
-          { t: "30:20", title: "Hiring for judgment" },
-          { t: "44:10", title: "Listener questions" },
-          { t: "56:40", title: "Wrap + next week" },
-        ].map((c, i) => (
-          <li key={i}>
-            <button
-              type="button"
-              className={`flex w-full items-center gap-3 px-3 py-2.5 text-left ${
-                c.active ? "bg-primary/[0.08] text-primary" : ""
-              }`}
-            >
-              <span
-                className={`w-12 shrink-0 text-xs font-medium tabular-nums ${c.active ? "text-primary" : "text-muted-foreground"}`}
-              >
-                {c.t}
-              </span>
-              <span
-                className={`flex-1 text-sm ${c.active ? "font-medium text-primary" : ""}`}
-              >
-                {c.title}
-              </span>
-            </button>
-          </li>
-        ))}
-      </ul>
-    </div>
+    </MockAudioPlayer>
   );
 }
 
