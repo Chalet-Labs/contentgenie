@@ -12,7 +12,6 @@ import {
   FileText,
   Mic,
   Rss,
-  ExternalLink,
   Play,
   Pause,
   RefreshCw,
@@ -39,7 +38,7 @@ import {
   type SummarizationStep,
 } from "@/components/episodes/summary-display";
 import { SaveButton } from "@/components/episodes/save-button";
-import { ShareButton } from "@/components/ui/share-button";
+import { EpisodeExternalActions } from "@/components/episodes/episode-external-actions";
 import { AddToQueueButton } from "@/components/audio-player/add-to-queue-button";
 import {
   Tooltip,
@@ -688,25 +687,12 @@ export function AuthenticatedEpisodeDetail({
                 size="lg"
               />
             )}
-            {isOnline && safeEpisodeLink && (
-              <Button variant="outline" size="lg" asChild>
-                <a
-                  href={safeEpisodeLink}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  <ExternalLink className="mr-2 h-4 w-4" />
-                  Episode Page
-                </a>
-              </Button>
-            )}
-            {isOnline && process.env.NEXT_PUBLIC_APP_URL && (
-              <ShareButton
-                title={episode.title}
-                text={episode.title}
-                url={`${process.env.NEXT_PUBLIC_APP_URL}/episode/${encodeURIComponent(episodeId)}`}
-                summary={summaryData?.worthItReason ?? undefined}
-                size="lg"
+            {isOnline && (
+              <EpisodeExternalActions
+                episodeId={episodeId}
+                episodeTitle={episode.title}
+                safeEpisodeLink={safeEpisodeLink}
+                shareSummary={summaryData?.worthItReason ?? undefined}
               />
             )}
           </div>

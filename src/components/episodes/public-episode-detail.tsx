@@ -3,14 +3,7 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import {
-  ArrowLeft,
-  Calendar,
-  Clock,
-  ExternalLink,
-  Mic,
-  Rss,
-} from "lucide-react";
+import { ArrowLeft, Calendar, Clock, Mic, Rss } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -19,7 +12,7 @@ import { CommunityRating } from "@/components/episodes/community-rating";
 import { PublicEpisodeCTA } from "@/components/episodes/public-episode-cta";
 import { SummaryDisplay } from "@/components/episodes/summary-display";
 import { WorthItBadge } from "@/components/episodes/worth-it-badge";
-import { ShareButton } from "@/components/ui/share-button";
+import { EpisodeExternalActions } from "@/components/episodes/episode-external-actions";
 import { OfflineBanner } from "@/components/ui/offline-banner";
 import { useOnlineStatus } from "@/hooks/use-online-status";
 import { stripHtml } from "@/lib/utils";
@@ -271,27 +264,12 @@ export function PublicEpisodeDetail({ episodeId }: PublicEpisodeDetailProps) {
             <Button variant="outline" size="lg" asChild>
               <Link href={currentEpisodeHref}>Add to Queue</Link>
             </Button>
-            {safeEpisodeLink && (
-              <Button variant="outline" size="lg" asChild>
-                <a
-                  href={safeEpisodeLink}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  <ExternalLink className="mr-2 h-4 w-4" />
-                  Episode Page
-                </a>
-              </Button>
-            )}
-            {process.env.NEXT_PUBLIC_APP_URL && (
-              <ShareButton
-                title={episode.title}
-                text={episode.title}
-                url={`${process.env.NEXT_PUBLIC_APP_URL}/episode/${encodeURIComponent(episodeId)}`}
-                summary={summaryData?.worthItReason ?? undefined}
-                size="lg"
-              />
-            )}
+            <EpisodeExternalActions
+              episodeId={episodeId}
+              episodeTitle={episode.title}
+              safeEpisodeLink={safeEpisodeLink}
+              shareSummary={summaryData?.worthItReason ?? undefined}
+            />
           </div>
         </div>
       </div>
