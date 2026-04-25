@@ -62,9 +62,9 @@ export function createSheetMock(options: { includeSheetTitle?: boolean } = {}) {
       } as Record<string, unknown>);
     }
     return (
-      <div data-testid="sheet-trigger" onClick={open}>
+      <button type="button" data-testid="sheet-trigger" onClick={open}>
         {children}
-      </div>
+      </button>
     );
   };
 
@@ -94,9 +94,9 @@ export function createSheetMock(options: { includeSheetTitle?: boolean } = {}) {
       });
     }
     return (
-      <div data-testid="sheet-close" onClick={close}>
+      <button type="button" data-testid="sheet-close" onClick={close}>
         {children}
-      </div>
+      </button>
     );
   };
 

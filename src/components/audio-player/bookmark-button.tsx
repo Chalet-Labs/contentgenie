@@ -203,6 +203,7 @@ export function BookmarkButton() {
               }}
               onKeyDown={handleNoteKeyDown}
               maxLength={MAX_SHORT_TEXT}
+              // eslint-disable-next-line jsx-a11y/no-autofocus -- PopoverContent cancels Radix's default open-focus via `onOpenAutoFocus={e => e.preventDefault()}` (above) so focus stays off the content root; autoFocus restores focus into this first field
               autoFocus
             />
             <div className="flex justify-end">

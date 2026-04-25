@@ -93,6 +93,7 @@ See [.impeccable.md](.impeccable.md) for design context: users, brand personalit
 - `"use client"` only when required; `"use server"` for all server actions.
 - `@/` path alias for all imports — never use relative `./` or `../`.
 - Tailwind for all styling (no CSS modules).
+- Accessibility lint is enforced via `plugin:jsx-a11y/recommended` plus a pinned rule subset (see `.eslintrc.json`). Disclosure buttons need `aria-expanded`; elements with a `role` must carry that role's required ARIA props. `eslint-disable-next-line` comments for `jsx-a11y/*` MUST include a trailing `-- <why>` reason.
 
 ## Environment & secrets
 

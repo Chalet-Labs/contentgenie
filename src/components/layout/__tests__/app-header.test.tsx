@@ -90,7 +90,11 @@ vi.mock("@/components/ui/dropdown-menu", () => ({
   }: {
     children: React.ReactNode;
     onClick?: () => void;
-  }) => <div onClick={onClick}>{children}</div>,
+  }) => (
+    <button type="button" onClick={onClick}>
+      {children}
+    </button>
+  ),
 }));
 
 vi.mock("@/components/ui/separator", () => ({
