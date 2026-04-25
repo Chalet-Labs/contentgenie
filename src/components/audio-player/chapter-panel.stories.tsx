@@ -31,6 +31,8 @@ const playingState = {
   chapters: sampleChapters,
 };
 
+const playingProgress = { currentTime: 150, buffered: 0 };
+
 const chapterTrigger = (
   <Button variant="ghost" size="icon" aria-label="Chapters">
     <BookMarked className="h-4 w-4" />
@@ -56,7 +58,7 @@ export const DesktopPopover: Story = {
   decorators: [
     audioPlayerContextDecorator({
       state: playingState,
-      progress: { currentTime: 150, buffered: 0 },
+      progress: playingProgress,
     }),
     popoverPanelWrapper,
   ],
@@ -71,7 +73,7 @@ export const MobileSheet: Story = {
   decorators: [
     audioPlayerContextDecorator({
       state: playingState,
-      progress: { currentTime: 150, buffered: 0 },
+      progress: playingProgress,
     }),
     sheetPanelWrapper,
   ],
