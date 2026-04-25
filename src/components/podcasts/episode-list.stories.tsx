@@ -1,68 +1,7 @@
-import type { Decorator, Meta, StoryObj } from "@storybook/nextjs-vite";
-import {
-  AudioPlayerAPIContext,
-  AudioPlayerProgressContext,
-  AudioPlayerStateContext,
-  type AudioPlayerAPI,
-  type AudioPlayerProgress,
-  type AudioPlayerState,
-} from "@/contexts/audio-player-context";
+import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { EpisodeList } from "./episode-list";
 import type { PodcastIndexEpisode } from "@/lib/podcastindex";
-
-// Stub the three audio-player contexts so EpisodeCard's action buttons
-// (PlayEpisodeButton, AddToQueueButton, ListenedButton) don't throw during
-// render. The full AudioPlayerProvider would also pull in audio elements
-// and queue persistence we don't need.
-const noopAudioPlayerAPI: AudioPlayerAPI = {
-  playEpisode: () => {},
-  togglePlay: () => {},
-  seek: () => {},
-  skipForward: () => {},
-  skipBack: () => {},
-  setVolume: () => {},
-  setPlaybackSpeed: () => {},
-  closePlayer: () => {},
-  addToQueue: () => {},
-  removeFromQueue: () => {},
-  reorderQueue: () => {},
-  clearQueue: () => {},
-  playNext: () => {},
-  setSleepTimer: () => {},
-  cancelSleepTimer: () => {},
-  getCurrentTime: () => 0,
-};
-
-const idleAudioPlayerState: AudioPlayerState = {
-  currentEpisode: null,
-  isPlaying: false,
-  isBuffering: false,
-  isVisible: false,
-  duration: 0,
-  volume: 1,
-  playbackSpeed: 1,
-  hasError: false,
-  errorMessage: null,
-  queue: [],
-  chapters: null,
-  chaptersLoading: false,
-  sleepTimer: null,
-};
-
-const idleAudioPlayerProgress: AudioPlayerProgress = {
-  currentTime: 0,
-  buffered: 0,
-};
-
-const withAudioPlayerContext: Decorator = (Story) => (
-  <AudioPlayerAPIContext.Provider value={noopAudioPlayerAPI}>
-    <AudioPlayerStateContext.Provider value={idleAudioPlayerState}>
-      <AudioPlayerProgressContext.Provider value={idleAudioPlayerProgress}>
-        <Story />
-      </AudioPlayerProgressContext.Provider>
-    </AudioPlayerStateContext.Provider>
-  </AudioPlayerAPIContext.Provider>
-);
+import { withAudioPlayerContext } from "@/test/story-fixtures";
 
 function makeEpisode(
   id: number,

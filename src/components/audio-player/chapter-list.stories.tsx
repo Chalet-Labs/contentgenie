@@ -1,78 +1,25 @@
-import type { Meta, StoryObj } from "@storybook/nextjs-vite";
-import type { ReactNode } from "react";
-import {
-  AudioPlayerAPIContext,
-  AudioPlayerStateContext,
-  AudioPlayerProgressContext,
-  type AudioPlayerState,
-  type AudioPlayerAPI,
-} from "@/contexts/audio-player-context";
+import type { Decorator, Meta, StoryObj } from "@storybook/nextjs-vite";
 import { ChapterList } from "@/components/audio-player/chapter-list";
 import type { Chapter } from "@/lib/chapters";
+import { audioPlayerContextDecorator } from "@/test/story-fixtures";
 
-const noopAPI: AudioPlayerAPI = {
-  playEpisode: () => {},
-  togglePlay: () => {},
-  seek: () => {},
-  skipForward: () => {},
-  skipBack: () => {},
-  setVolume: () => {},
-  setPlaybackSpeed: () => {},
-  closePlayer: () => {},
-  addToQueue: () => {},
-  removeFromQueue: () => {},
-  reorderQueue: () => {},
-  clearQueue: () => {},
-  playNext: () => {},
-  setSleepTimer: () => {},
-  cancelSleepTimer: () => {},
-  getCurrentTime: () => 0,
+const playingState = {
+  currentEpisode: {
+    id: "1",
+    title: "Test Episode",
+    podcastTitle: "Test Podcast",
+    audioUrl: "https://example.com/audio.mp3",
+  },
+  isPlaying: true,
+  isVisible: true,
+  duration: 3600,
 };
 
-function makeState(chapters: Chapter[] | null): AudioPlayerState {
-  return {
-    currentEpisode: {
-      id: "1",
-      title: "Test Episode",
-      podcastTitle: "Test Podcast",
-      audioUrl: "https://example.com/audio.mp3",
-    },
-    isPlaying: true,
-    isBuffering: false,
-    isVisible: true,
-    duration: 3600,
-    volume: 1,
-    playbackSpeed: 1,
-    hasError: false,
-    errorMessage: null,
-    queue: [],
-    chapters,
-    chaptersLoading: false,
-    sleepTimer: null,
-  };
-}
-
-function MockProvider({
-  state,
-  currentTime,
-  children,
-}: {
-  state: AudioPlayerState;
-  currentTime: number;
-  children: ReactNode;
-}) {
-  return (
-    <AudioPlayerAPIContext.Provider value={noopAPI}>
-      <AudioPlayerStateContext.Provider value={state}>
-        <AudioPlayerProgressContext.Provider
-          value={{ currentTime, buffered: 0 }}
-        >
-          {children}
-        </AudioPlayerProgressContext.Provider>
-      </AudioPlayerStateContext.Provider>
-    </AudioPlayerAPIContext.Provider>
-  );
-}
+const cardWrapper: Decorator = (Story) => (
+  <div className="w-80 rounded-md border p-3">
+    <Story />
+  </div>
+);
 
 const sampleChapters: Chapter[] = [
   { startTime: 0, title: "Introduction" },
@@ -109,6 +56,7 @@ const chaptersWithImages: Chapter[] = [
 const meta: Meta<typeof ChapterList> = {
   title: "AudioPlayer/ChapterList",
   component: ChapterList,
+  decorators: [cardWrapper],
 };
 
 export default meta;
@@ -116,63 +64,47 @@ type Story = StoryObj<typeof ChapterList>;
 
 export const Default: Story = {
   decorators: [
-    (Story) => (
-      <MockProvider state={makeState(sampleChapters)} currentTime={150}>
-        <div className="w-80 rounded-md border p-3">
-          <Story />
-        </div>
-      </MockProvider>
-    ),
+    audioPlayerContextDecorator({
+      state: { ...playingState, chapters: sampleChapters },
+      progress: { currentTime: 150, buffered: 0 },
+    }),
   ],
 };
 
 export const LongList: Story = {
   decorators: [
-    (Story) => (
-      <MockProvider state={makeState(longChapters)} currentTime={600}>
-        <div className="w-80 rounded-md border p-3">
-          <Story />
-        </div>
-      </MockProvider>
-    ),
+    audioPlayerContextDecorator({
+      state: { ...playingState, chapters: longChapters },
+      progress: { currentTime: 600, buffered: 0 },
+    }),
   ],
 };
 
 export const WithThumbnails: Story = {
   decorators: [
-    (Story) => (
-      <MockProvider state={makeState(chaptersWithImages)} currentTime={70}>
-        <div className="w-80 rounded-md border p-3">
-          <Story />
-        </div>
-      </MockProvider>
-    ),
+    audioPlayerContextDecorator({
+      state: { ...playingState, chapters: chaptersWithImages },
+      progress: { currentTime: 70, buffered: 0 },
+    }),
   ],
 };
 
 export const EmptyState: Story = {
   decorators: [
-    (Story) => (
-      <MockProvider state={makeState(null)} currentTime={0}>
-        <div className="w-80 rounded-md border p-3">
-          <Story />
-        </div>
-      </MockProvider>
-    ),
+    audioPlayerContextDecorator({
+      state: { ...playingState, chapters: null },
+    }),
   ],
 };
 
 export const SingleChapter: Story = {
   decorators: [
-    (Story) => (
-      <MockProvider
-        state={makeState([{ startTime: 0, title: "Full Episode" }])}
-        currentTime={30}
-      >
-        <div className="w-80 rounded-md border p-3">
-          <Story />
-        </div>
-      </MockProvider>
-    ),
+    audioPlayerContextDecorator({
+      state: {
+        ...playingState,
+        chapters: [{ startTime: 0, title: "Full Episode" }],
+      },
+      progress: { currentTime: 30, buffered: 0 },
+    }),
   ],
 };
