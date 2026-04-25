@@ -120,67 +120,52 @@ function AboutPanel() {
   );
 }
 
-export const Default: Story = {
-  render: () => (
-    <EpisodeTabs defaultValue="insights">
+function renderEpisodeTabs({
+  defaultValue,
+  hasChapters,
+}: {
+  defaultValue: "insights" | "chapters" | "about";
+  hasChapters: boolean;
+}) {
+  return (
+    <EpisodeTabs defaultValue={defaultValue}>
       <EpisodeTabsList aria-label="Episode sections">
         <EpisodeTabsTrigger value="insights">Insights</EpisodeTabsTrigger>
-        <EpisodeTabsTrigger value="chapters" badge={6}>
-          Chapters
-        </EpisodeTabsTrigger>
+        {hasChapters && (
+          <EpisodeTabsTrigger value="chapters" badge={6}>
+            Chapters
+          </EpisodeTabsTrigger>
+        )}
         <EpisodeTabsTrigger value="about">About</EpisodeTabsTrigger>
       </EpisodeTabsList>
       <EpisodeTabsContent value="insights">
         <InsightsPanel />
       </EpisodeTabsContent>
-      <EpisodeTabsContent value="chapters">
-        <ChaptersPanel />
-      </EpisodeTabsContent>
+      {hasChapters && (
+        <EpisodeTabsContent value="chapters">
+          <ChaptersPanel />
+        </EpisodeTabsContent>
+      )}
       <EpisodeTabsContent value="about">
         <AboutPanel />
       </EpisodeTabsContent>
     </EpisodeTabs>
-  ),
+  );
+}
+
+export const Default: Story = {
+  render: () =>
+    renderEpisodeTabs({ defaultValue: "insights", hasChapters: true }),
 };
 
 export const NoChapters: Story = {
   name: "No Chapters (two-tab variant)",
-  render: () => (
-    <EpisodeTabs defaultValue="insights">
-      <EpisodeTabsList aria-label="Episode sections">
-        <EpisodeTabsTrigger value="insights">Insights</EpisodeTabsTrigger>
-        <EpisodeTabsTrigger value="about">About</EpisodeTabsTrigger>
-      </EpisodeTabsList>
-      <EpisodeTabsContent value="insights">
-        <InsightsPanel />
-      </EpisodeTabsContent>
-      <EpisodeTabsContent value="about">
-        <AboutPanel />
-      </EpisodeTabsContent>
-    </EpisodeTabs>
-  ),
+  render: () =>
+    renderEpisodeTabs({ defaultValue: "insights", hasChapters: false }),
 };
 
 export const ChaptersActive: Story = {
   name: "Chapters Tab Active",
-  render: () => (
-    <EpisodeTabs defaultValue="chapters">
-      <EpisodeTabsList aria-label="Episode sections">
-        <EpisodeTabsTrigger value="insights">Insights</EpisodeTabsTrigger>
-        <EpisodeTabsTrigger value="chapters" badge={6}>
-          Chapters
-        </EpisodeTabsTrigger>
-        <EpisodeTabsTrigger value="about">About</EpisodeTabsTrigger>
-      </EpisodeTabsList>
-      <EpisodeTabsContent value="insights">
-        <InsightsPanel />
-      </EpisodeTabsContent>
-      <EpisodeTabsContent value="chapters">
-        <ChaptersPanel />
-      </EpisodeTabsContent>
-      <EpisodeTabsContent value="about">
-        <AboutPanel />
-      </EpisodeTabsContent>
-    </EpisodeTabs>
-  ),
+  render: () =>
+    renderEpisodeTabs({ defaultValue: "chapters", hasChapters: true }),
 };
