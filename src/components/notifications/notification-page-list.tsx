@@ -139,17 +139,29 @@ export function NotificationPageList({
         prev.map((n) => (n.id === id ? { ...n, pendingDismiss: true } : n)),
       );
       offsetRef.current = Math.max(0, offsetRef.current - 1);
-      const result = await dismissNotification(id);
-      if (result.success) {
-        setItems((prev) => prev.filter((n) => n.id !== id));
-      } else {
+      const rollback = (errorMessage: string) => {
         setItems((prev) =>
           prev.map((n) => (n.id === id ? { ...n, pendingDismiss: false } : n)),
         );
-        offsetRef.current = offsetRef.current + 1;
-        toastErrorWithRetry("Failed to dismiss notification", () =>
-          handleDismiss(id),
-        );
+        offsetRef.current += 1;
+        toastErrorWithRetry(errorMessage, () => handleDismiss(id));
+      };
+      let result: Awaited<ReturnType<typeof dismissNotification>>;
+      try {
+        result = await dismissNotification(id);
+      } catch (err) {
+        console.error("[notifications] dismiss threw", { id, err });
+        rollback("Failed to dismiss notification");
+        return;
+      }
+      if (result.success) {
+        setItems((prev) => prev.filter((n) => n.id !== id));
+      } else {
+        console.error("[notifications] dismiss failed", {
+          id,
+          error: result.error,
+        });
+        rollback(result.error ?? "Failed to dismiss notification");
       }
     });
   }, []);

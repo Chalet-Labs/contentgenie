@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { NOTIFICATIONS_PAGE_SIZE } from "@/lib/notifications-constants";
 
@@ -728,8 +728,11 @@ describe("NotificationPageList", () => {
       );
     });
 
-    // Clean up — resolve the dismiss so no dangling promise.
-    resolveDismiss({ success: true });
+    // Resolve the dismiss inside act() so the success-path setItems runs
+    // before teardown (otherwise React logs an act(...) warning).
+    await act(async () => {
+      resolveDismiss({ success: true });
+    });
   });
 
   // Regression (#315): on dismiss failure the optimistic offset decrement is
