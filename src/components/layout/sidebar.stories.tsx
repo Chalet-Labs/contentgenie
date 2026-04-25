@@ -1,4 +1,5 @@
 import type { Decorator, Meta, StoryObj } from "@storybook/nextjs-vite";
+import { expect, within } from "storybook/test";
 import { SidebarCountsProvider } from "@/contexts/sidebar-counts-context";
 import { PinnedSubscriptionsProvider } from "@/contexts/pinned-subscriptions-context";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
@@ -77,6 +78,15 @@ export const WithAdmin: Story = {
       },
     },
   },
+  play: async ({ canvasElement }) => {
+    // Scope to the iframe's body so the same query works for inline renders
+    // and for the InSheet variant where Radix portals the content out of
+    // canvasElement.
+    const body = within(canvasElement.ownerDocument.body);
+    await expect(
+      await body.findByRole("link", { name: /admin/i }),
+    ).toBeVisible();
+  },
 };
 
 export const InSheet: Story = {
@@ -94,6 +104,12 @@ export const InSheetWithAdmin: Story = {
           "Sidebar rendered inside a Sheet (mobile nav mode) with the admin link visible.",
       },
     },
+  },
+  play: async ({ canvasElement }) => {
+    const body = within(canvasElement.ownerDocument.body);
+    await expect(
+      await body.findByRole("link", { name: /admin/i }),
+    ).toBeVisible();
   },
 };
 

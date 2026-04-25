@@ -42,17 +42,21 @@ jobs:
       - name: Install Playwright Chromium
         run: bunx playwright install chromium --with-deps
 
-      - name: Serve Storybook and run VRT
+      - name: Serve Storybook
         run: |
           echo '{"cleanUrls": false}' > storybook-static/serve.json
           bunx serve storybook-static -p 6006 &
-          SERVE_PID=$!
-          trap "kill $SERVE_PID 2>/dev/null || true" EXIT
+          echo "SERVE_PID=$!" >> "$GITHUB_ENV"
           if ! timeout 60 bash -c 'until curl -sf http://localhost:6006 > /dev/null; do sleep 1; done'; then
             echo "::error::Storybook did not become available on port 6006 within 60s"
             exit 1
           fi
 
+      - name: Storybook smoke tests (test-runner)
+        run: bunx test-storybook --url http://localhost:6006 --maxWorkers 2
+
+      - name: Run VRT
+        run: |
           SNAPSHOT_DIR="tests/visual/__screenshots__"
           if [ -z "$(find "$SNAPSHOT_DIR" -name '*.png' 2>/dev/null)" ]; then
             echo "::warning::No VRT baselines found — generating initial baselines"
@@ -60,6 +64,10 @@ jobs:
           else
             bunx playwright test --config playwright.vrt.config.ts
           fi
+
+      - name: Stop Storybook server
+        if: always()
+        run: kill "$SERVE_PID" 2>/dev/null || true
 
       - name: Upload VRT baselines (initial generation)
         if: success()

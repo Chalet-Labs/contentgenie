@@ -1,6 +1,70 @@
-import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import type { Decorator, Meta, StoryObj } from "@storybook/nextjs-vite";
+import {
+  AudioPlayerAPIContext,
+  AudioPlayerProgressContext,
+  AudioPlayerStateContext,
+  type AudioPlayerAPI,
+  type AudioPlayerProgress,
+  type AudioPlayerState,
+} from "@/contexts/audio-player-context";
 import { EpisodeList } from "./episode-list";
 import type { PodcastIndexEpisode } from "@/lib/podcastindex";
+
+// EpisodeList renders EpisodeCard rows whose action buttons (PlayEpisodeButton,
+// AddToQueueButton, ListenedButton) call useAudioPlayerAPI/State at module
+// mount. Without these contexts the story throws on render. Stub with a
+// minimal noop API + idle state so the visual surface renders without wiring
+// up the full AudioPlayerProvider (which pulls in audio elements, queue
+// persistence, etc.).
+const noopAudioPlayerAPI: AudioPlayerAPI = {
+  playEpisode: () => {},
+  togglePlay: () => {},
+  seek: () => {},
+  skipForward: () => {},
+  skipBack: () => {},
+  setVolume: () => {},
+  setPlaybackSpeed: () => {},
+  closePlayer: () => {},
+  addToQueue: () => {},
+  removeFromQueue: () => {},
+  reorderQueue: () => {},
+  clearQueue: () => {},
+  playNext: () => {},
+  setSleepTimer: () => {},
+  cancelSleepTimer: () => {},
+  getCurrentTime: () => 0,
+};
+
+const idleAudioPlayerState: AudioPlayerState = {
+  currentEpisode: null,
+  isPlaying: false,
+  isBuffering: false,
+  isVisible: false,
+  duration: 0,
+  volume: 1,
+  playbackSpeed: 1,
+  hasError: false,
+  errorMessage: null,
+  queue: [],
+  chapters: null,
+  chaptersLoading: false,
+  sleepTimer: null,
+};
+
+const idleAudioPlayerProgress: AudioPlayerProgress = {
+  currentTime: 0,
+  buffered: 0,
+};
+
+const withAudioPlayerContext: Decorator = (Story) => (
+  <AudioPlayerAPIContext.Provider value={noopAudioPlayerAPI}>
+    <AudioPlayerStateContext.Provider value={idleAudioPlayerState}>
+      <AudioPlayerProgressContext.Provider value={idleAudioPlayerProgress}>
+        <Story />
+      </AudioPlayerProgressContext.Provider>
+    </AudioPlayerStateContext.Provider>
+  </AudioPlayerAPIContext.Provider>
+);
 
 function makeEpisode(
   id: number,
@@ -70,6 +134,7 @@ const sampleEpisodes: PodcastIndexEpisode[] = [
 const meta: Meta<typeof EpisodeList> = {
   title: "Podcasts/EpisodeList",
   component: EpisodeList,
+  decorators: [withAudioPlayerContext],
 };
 
 export default meta;
