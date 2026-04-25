@@ -1,9 +1,13 @@
-import type { Decorator, Meta, StoryObj } from "@storybook/nextjs-vite";
+import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { ListMusic } from "lucide-react";
 import { type AudioEpisode } from "@/contexts/audio-player-context";
 import { Button } from "@/components/ui/button";
 import { QueuePanel } from "@/components/audio-player/queue-panel";
-import { audioPlayerContextDecorator } from "@/test/story-fixtures";
+import {
+  audioPlayerContextDecorator,
+  popoverPanelWrapper,
+  sheetPanelWrapper,
+} from "@/test/story-fixtures";
 
 const playingEpisode: AudioEpisode = {
   id: "ep-playing",
@@ -59,18 +63,6 @@ const baseArgs = {
   trigger: queueTrigger,
 };
 
-const popoverWrapper: Decorator = (Story) => (
-  <div className="flex min-h-[400px] items-end justify-end p-4">
-    <Story />
-  </div>
-);
-
-const sheetWrapper: Decorator = (Story) => (
-  <div className="min-h-[400px]">
-    <Story />
-  </div>
-);
-
 const meta: Meta<typeof QueuePanel> = {
   title: "AudioPlayer/QueuePanel",
   component: QueuePanel,
@@ -83,7 +75,7 @@ export const EmptyQueue: Story = {
   args: baseArgs,
   decorators: [
     audioPlayerContextDecorator({ state: playingState }),
-    popoverWrapper,
+    popoverPanelWrapper,
   ],
 };
 
@@ -93,7 +85,7 @@ export const MultipleItems: Story = {
     audioPlayerContextDecorator({
       state: { ...playingState, queue: queueEpisodes },
     }),
-    popoverWrapper,
+    popoverPanelWrapper,
   ],
 };
 
@@ -103,7 +95,7 @@ export const SingleItem: Story = {
     audioPlayerContextDecorator({
       state: { ...playingState, queue: [queueEpisodes[0]] },
     }),
-    popoverWrapper,
+    popoverPanelWrapper,
   ],
 };
 
@@ -135,7 +127,7 @@ export const LongTitles: Story = {
         ],
       },
     }),
-    popoverWrapper,
+    popoverPanelWrapper,
   ],
 };
 
@@ -149,6 +141,6 @@ export const MobileSheet: Story = {
     audioPlayerContextDecorator({
       state: { ...playingState, queue: queueEpisodes },
     }),
-    sheetWrapper,
+    sheetPanelWrapper,
   ],
 };

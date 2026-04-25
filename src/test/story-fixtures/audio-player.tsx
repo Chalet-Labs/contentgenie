@@ -57,15 +57,9 @@ type AudioPlayerContextOverrides = {
 export function audioPlayerContextDecorator(
   overrides: AudioPlayerContextOverrides = {},
 ): Decorator {
-  const api = overrides.api
-    ? { ...noopAudioPlayerAPI, ...overrides.api }
-    : noopAudioPlayerAPI;
-  const state = overrides.state
-    ? { ...idleAudioPlayerState, ...overrides.state }
-    : idleAudioPlayerState;
-  const progress = overrides.progress
-    ? { ...idleAudioPlayerProgress, ...overrides.progress }
-    : idleAudioPlayerProgress;
+  const api = { ...noopAudioPlayerAPI, ...overrides.api };
+  const state = { ...idleAudioPlayerState, ...overrides.state };
+  const progress = { ...idleAudioPlayerProgress, ...overrides.progress };
 
   const AudioPlayerContextDecorator: Decorator = (Story) => (
     <AudioPlayerAPIContext.Provider value={api}>
@@ -80,3 +74,15 @@ export function audioPlayerContextDecorator(
 }
 
 export const withAudioPlayerContext = audioPlayerContextDecorator();
+
+export const popoverPanelWrapper: Decorator = (Story) => (
+  <div className="flex min-h-[400px] items-end justify-end p-4">
+    <Story />
+  </div>
+);
+
+export const sheetPanelWrapper: Decorator = (Story) => (
+  <div className="min-h-[400px]">
+    <Story />
+  </div>
+);

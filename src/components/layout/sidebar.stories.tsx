@@ -71,7 +71,7 @@ type Story = StoryObj<typeof Sidebar>;
 // the same assertion works for inline and InSheet variants.
 const expectAdminLinkVisible = async (canvasElement: HTMLElement) => {
   const body = within(canvasElement.ownerDocument.body);
-  await expect(await body.findByRole("link", { name: /admin/i })).toBeVisible();
+  expect(await body.findByRole("link", { name: /admin/i })).toBeVisible();
 };
 
 export const Default: Story = {};

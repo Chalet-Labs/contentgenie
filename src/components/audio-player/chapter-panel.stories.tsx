@@ -1,9 +1,13 @@
-import type { Decorator, Meta, StoryObj } from "@storybook/nextjs-vite";
+import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { BookMarked } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ChapterPanel } from "@/components/audio-player/chapter-panel";
 import type { Chapter } from "@/lib/chapters";
-import { audioPlayerContextDecorator } from "@/test/story-fixtures";
+import {
+  audioPlayerContextDecorator,
+  popoverPanelWrapper,
+  sheetPanelWrapper,
+} from "@/test/story-fixtures";
 
 const sampleChapters: Chapter[] = [
   { startTime: 0, title: "Introduction" },
@@ -39,18 +43,6 @@ const baseArgs = {
   trigger: chapterTrigger,
 };
 
-const popoverWrapper: Decorator = (Story) => (
-  <div className="flex min-h-[400px] items-end justify-end p-4">
-    <Story />
-  </div>
-);
-
-const sheetWrapper: Decorator = (Story) => (
-  <div className="min-h-[400px]">
-    <Story />
-  </div>
-);
-
 const meta: Meta<typeof ChapterPanel> = {
   title: "AudioPlayer/ChapterPanel",
   component: ChapterPanel,
@@ -66,7 +58,7 @@ export const DesktopPopover: Story = {
       state: playingState,
       progress: { currentTime: 150, buffered: 0 },
     }),
-    popoverWrapper,
+    popoverPanelWrapper,
   ],
 };
 
@@ -81,6 +73,6 @@ export const MobileSheet: Story = {
       state: playingState,
       progress: { currentTime: 150, buffered: 0 },
     }),
-    sheetWrapper,
+    sheetPanelWrapper,
   ],
 };
