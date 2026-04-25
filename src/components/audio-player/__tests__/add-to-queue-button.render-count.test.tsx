@@ -189,6 +189,23 @@ describe("AddToQueueButton render counts (real AudioPlayerProvider)", () => {
     expect(renders).toBe(baseline);
   });
 
+  // Same-size-different-membership: a remove + add pair lands at the original
+  // queue length, but membership flipped. The Set memo's size pre-check passes,
+  // the for-loop hits `!prev.has(ep.id)`, and a fresh Set is allocated. Verifies
+  // the third branch of queueEpisodeIdsRef isn't accidentally collapsed into a
+  // size-only equality.
+  it("re-renders when queue is replaced with same-size different-membership queue", async () => {
+    render(<TestTree episode={testEpisode} />);
+    await act(async () => capturedAPI!.playEpisode(unrelatedEpisode));
+    await act(async () => capturedAPI!.addToQueue(secondQueueEpisode));
+    const baseline = renders;
+    act(() => {
+      capturedAPI!.removeFromQueue(secondQueueEpisode.id);
+      capturedAPI!.addToQueue(testEpisode);
+    });
+    expect(renders).toBeGreaterThan(baseline);
+  });
+
   // ── Sanity assertion (verify the button still reacts to queue changes) ──────
 
   it("re-renders when its episode is added to the queue", async () => {
