@@ -280,6 +280,26 @@ describe("useChapters", () => {
     expect(result.current).toEqual({ status: "idle" });
   });
 
+  it("rejects non-http URLs without issuing a fetch", () => {
+    const { result } = renderHook(() =>
+      useChapters("ftp://example.com/c.json"),
+    );
+    expect(result.current).toEqual({
+      status: "error",
+      message: "Invalid chapters URL",
+    });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("rejects malformed URLs without issuing a fetch", () => {
+    const { result } = renderHook(() => useChapters("not a url"));
+    expect(result.current).toEqual({
+      status: "error",
+      message: "Invalid chapters URL",
+    });
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
   it("validates the response shape via parseChapters and drops malformed entries", async () => {
     vi.mocked(fetch).mockResolvedValueOnce(
       new Response(

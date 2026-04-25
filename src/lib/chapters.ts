@@ -19,7 +19,14 @@ export interface Chapter {
  * - Sorts by `startTime` ascending
  * - Returns an empty array for any malformed input
  */
-function isHttpUrl(value: string): boolean {
+/**
+ * Lightweight client-side check that a string parses as an http(s) URL.
+ * Server-side SSRF protection (`isSafeUrl` in `lib/security.ts`) does the
+ * authoritative check including DNS resolution and private-IP filtering;
+ * callers in the browser use this as defense-in-depth so a malformed or
+ * non-http URL never reaches the proxy in the first place.
+ */
+export function isHttpUrl(value: string): boolean {
   try {
     const parsed = new URL(value);
     return parsed.protocol === "http:" || parsed.protocol === "https:";

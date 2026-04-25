@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { parseChapters, type Chapter } from "@/lib/chapters";
+import { isHttpUrl, parseChapters, type Chapter } from "@/lib/chapters";
 
 export type UseChaptersState =
   | { status: "idle" }
@@ -70,6 +70,16 @@ export function useChapters(
       return;
     }
 
+    // Defense-in-depth: reject obviously bad URLs in the browser before they
+    // reach the proxy. The server still runs the authoritative SSRF check
+    // (`isSafeUrl` in `lib/security.ts`) — this just keeps malformed input
+    // from round-tripping and produces a deterministic error state.
+    if (!isHttpUrl(chaptersUrl)) {
+      setState({ status: "error", message: "Invalid chapters URL" });
+      return;
+    }
+
+    const targetUrl = chaptersUrl;
     let ignore = false;
     let didTimeout = false;
     const controller = new AbortController();
@@ -81,10 +91,8 @@ export function useChapters(
     async function run() {
       setState({ status: "loading" });
       try {
-        const res = await fetch(
-          `/api/chapters?url=${encodeURIComponent(chaptersUrl!)}`,
-          { signal: controller.signal },
-        );
+        const proxyUrl = `/api/chapters?url=${encodeURIComponent(targetUrl)}`;
+        const res = await fetch(proxyUrl, { signal: controller.signal });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const json: unknown = await res.json();
         const chapters = parseChapters(json);
