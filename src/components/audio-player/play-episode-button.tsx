@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import {
   useAudioPlayerAPI,
   useNowPlayingEpisodeId,
-  useIsPlaying,
+  useIsEpisodePlaying,
   type AudioEpisode,
 } from "@/contexts/audio-player-context";
 
@@ -27,10 +27,9 @@ export function PlayEpisodeButton({
 }: PlayEpisodeButtonProps) {
   const { playEpisode, togglePlay } = useAudioPlayerAPI();
   const nowPlayingId = useNowPlayingEpisodeId();
-  const isPlaying = useIsPlaying();
+  const isActivelyPlaying = useIsEpisodePlaying(episode.id);
 
   const isCurrent = nowPlayingId === episode.id;
-  const isActivelyPlaying = isCurrent && isPlaying;
   const label =
     ariaLabelProp ??
     (isActivelyPlaying

@@ -1,6 +1,6 @@
 import { Profiler, type ProfilerOnRenderCallback } from "react";
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, act } from "@testing-library/react";
+import { render, screen, act } from "@testing-library/react";
 import {
   AudioPlayerProvider,
   useAudioPlayerAPI,
@@ -64,6 +64,14 @@ const testEpisode: AudioEpisode = {
   podcastTitle: "Test Podcast",
   audioUrl: "https://example.com/audio.mp3",
   duration: 600,
+};
+
+const unrelatedEpisode: AudioEpisode = {
+  id: "ep-unrelated",
+  title: "Unrelated Episode",
+  podcastTitle: "Other Podcast",
+  audioUrl: "https://example.com/other.mp3",
+  duration: 300,
 };
 
 // ── Render-count infrastructure ───────────────────────────────────────────────
@@ -157,6 +165,17 @@ describe("PlayEpisodeButton render counts (real AudioPlayerProvider)", () => {
     const baseline = renders;
     await act(async () => capturedAPI!.playEpisode(testEpisode));
     expect(renders).toBeGreaterThan(baseline);
+  });
+
+  // useIsEpisodePlaying must scope to its episodeId argument. A regression that
+  // dropped the `nowPlayingId === episodeId` comparison would make every
+  // PlayEpisodeButton flash "Now playing" while the player plays any episode.
+  it("does not show 'Now playing' when an unrelated episode is playing", async () => {
+    render(<TestTree episode={testEpisode} />);
+    await act(async () => capturedAPI!.playEpisode(unrelatedEpisode));
+    const button = screen.getByRole("button");
+    expect(button).toHaveAttribute("aria-label", "Play episode");
+    expect(button).not.toHaveAttribute("aria-disabled", "true");
   });
 
   it("re-renders when isPlaying toggles for its current episode", async () => {

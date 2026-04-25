@@ -41,7 +41,7 @@ The three values are derived inside `AudioPlayerProvider` from the same single s
 Expose three narrow hooks:
 
 - `useNowPlayingEpisodeId(): string | null`
-- `useIsPlaying(): boolean`
+- `useIsEpisodePlaying(episodeId: string): boolean` (composes the now-playing-id and is-playing slices into a per-episode predicate, so call sites can't accidentally read the global play/pause state without comparing the episode id)
 - `useIsEpisodeInQueue(episodeId: string): boolean`
 
 Migrate `PlayEpisodeButton` and `AddToQueueButton` only. The existing `useAudioPlayerState()` and the fat `AudioPlayerStateContext` remain in place for the ~14 other consumers; their migration is out of scope.
@@ -86,7 +86,7 @@ Accept the jank.
 ## Consequences
 
 - The audio-player context file grows by three `createContext` calls with sentinel-value commentary, a `useMemo` paired with a `useRef` content-equality cache for the queue Set, three exported hooks with full JSDoc, and three new provider-wrapper layers in the JSX.
-- Three new hook entry points in the public surface of `@/contexts/audio-player-context`: `useNowPlayingEpisodeId`, `useIsPlaying`, `useIsEpisodeInQueue`. They throw outside `AudioPlayerProvider`, mirroring the existing convention.
+- Three new hook entry points in the public surface of `@/contexts/audio-player-context`: `useNowPlayingEpisodeId`, `useIsEpisodePlaying`, `useIsEpisodeInQueue`. They throw outside `AudioPlayerProvider`, mirroring the existing convention. `IsPlayingContext` itself stays internal — exposing the raw primitive without an episode id encouraged a footgun where call sites forgot to scope the check to their episode.
 - Hooks intentionally hold **primitive** slice values only. A future contributor tempted to expand `IsPlayingContext` into `{ isPlaying, isBuffering }` would forfeit the bailout. JSDoc on each hook will document this constraint.
 - The shared Storybook decorator (`src/test/story-fixtures/audio-player.tsx`) extends to mount the new contexts. Stories that compose the decorator are unaffected.
 - Indirect unit tests that mock `@/contexts/audio-player-context` and render the migrated buttons (transitively, via `EpisodeCard` etc.) gain three additional keys in their `vi.mock` factories.

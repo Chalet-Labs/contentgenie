@@ -18,7 +18,8 @@ vi.mock("@/contexts/audio-player-context", () => ({
     isPlaying: mockIsPlaying,
   }),
   useNowPlayingEpisodeId: () => mockCurrentEpisode?.id ?? null,
-  useIsPlaying: () => mockIsPlaying,
+  useIsEpisodePlaying: (id: string) =>
+    mockCurrentEpisode?.id === id && mockIsPlaying,
   useIsEpisodeInQueue: (_id: string) => false,
 }));
 

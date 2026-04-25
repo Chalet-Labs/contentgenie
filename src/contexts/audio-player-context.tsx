@@ -1600,15 +1600,30 @@ export function useNowPlayingEpisodeId(): string | null {
 }
 
 /**
- * Returns `true` when the player is actively playing, `false` when paused or
- * stopped. Re-renders only when the playing state toggles.
+ * Returns `true` when `episodeId` is the currently loaded episode AND the
+ * player is actively playing. Re-renders when either the loaded episode id
+ * or the play/pause state changes — both narrow contexts apply Object.is
+ * bailout, so unrelated dispatches (volume, scrub, buffering, queue) never
+ * re-render the consumer.
+ *
+ * Prefer this over composing `useNowPlayingEpisodeId()` and a raw isPlaying
+ * primitive at the call site: forgetting to compare the episode id silently
+ * causes every per-episode button to flash "playing" when any episode plays.
  */
-export function useIsPlaying(): boolean {
-  const ctx = useContext(IsPlayingContext);
-  if (ctx === undefined) {
-    throw new Error("useIsPlaying must be used within AudioPlayerProvider");
+export function useIsEpisodePlaying(episodeId: string): boolean {
+  const nowPlayingId = useContext(NowPlayingEpisodeIdContext);
+  if (nowPlayingId === undefined) {
+    throw new Error(
+      "useIsEpisodePlaying must be used within AudioPlayerProvider",
+    );
   }
-  return ctx;
+  const isPlaying = useContext(IsPlayingContext);
+  if (isPlaying === undefined) {
+    throw new Error(
+      "useIsEpisodePlaying must be used within AudioPlayerProvider",
+    );
+  }
+  return nowPlayingId === episodeId && isPlaying;
 }
 
 /**
