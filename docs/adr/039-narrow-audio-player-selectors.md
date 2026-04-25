@@ -47,7 +47,7 @@ Expose three narrow hooks:
 Migrate `PlayEpisodeButton` and `AddToQueueButton` only. The existing `useAudioPlayerState()` and the fat `AudioPlayerStateContext` remain in place for the ~14 other consumers; their migration is out of scope.
 
 - **Pros:** Uses React's native context bailout — when a memoized provider value's identity is stable, subscribers don't re-render. Builds on the existing precedent (`AudioPlayerProgressContext` is already split for the same reason). Zero new dependencies. No state-model change. Single source of truth — slice values are derived, not duplicated. Fully backward compatible: the fat context stays for unmigrated consumers.
-- **Cons:** Adds two more provider wrappers to a 1,490-line file (the third — Progress — already exists, so the pattern is familiar). Storybook stories that wrap children in the contexts manually need to be extended to mount the new providers (two stories affected: `play-episode-button.stories.tsx`, `add-to-queue-button.stories.tsx`). Indirect tests that mock the context module need their `vi.mock` factories extended with the new hooks (3 files: `play-episode-button.test.tsx`, `episode-card.test.tsx`, `notification-page-list.test.tsx`).
+- **Cons:** Adds two more provider wrappers to a 1,490-line file (the third — Progress — already exists, so the pattern is familiar). The shared Storybook decorator (`src/test/story-fixtures/audio-player.tsx`) needs to mount the new providers. Indirect tests that mock the context module need their `vi.mock` factories extended with the new hooks.
 
 ### Option B: `useSyncExternalStore` with selector functions
 
@@ -79,16 +79,16 @@ Accept the jank.
 - **Native React primitive.** Context bailout via referential equality is exactly the mechanism we need. No external state library, no custom store, no `useSyncExternalStore` boilerplate.
 - **Single source of truth preserved.** The slice contexts hold values derived from the existing reducer's state. We are not creating parallel state — we are projecting one state onto multiple subscription surfaces.
 - **Builds on the existing precedent.** `AudioPlayerProgressContext` was carved off the original "single context" design for the same reason: hot subscribers shouldn't pay for cold updates. ADR-004 explicitly endorsed this pattern.
-- **Bounded blast radius.** Two components migrate. Two stories update. Three indirect test mocks extend. The fat `AudioPlayerStateContext` stays for unmigrated consumers — no cascading rewrites.
+- **Bounded blast radius.** Two components migrate. The shared Storybook decorator updates in one place. Indirect test mocks extend. The fat `AudioPlayerStateContext` stays for unmigrated consumers — no cascading rewrites.
 - **Verifiable via render-count tests.** `React.Profiler` measures the migrated component's actual commit-phase renders directly, regardless of how it subscribes to contexts. A regression that re-adds `useAudioPlayerState()` causes `setVolume`/`setPlaybackSpeed`/buffering ticks to increment renders and fail the isolation assertions. A mirror-subscription `useRef` wrapper would not catch this class of regression because its counter only ticks on slice changes the wrapper itself subscribes to.
 - **Honest about constraint.** When `isPlaying` toggles, all `PlayEpisodeButton` instances still re-render once (they subscribe to that slice, by design — only the active button's icon actually changes, but React still calls the function). The 199 buttons that render no DOM diff are reconciled in microseconds. The wins this ADR claims are eliminating re-renders on **uncorrelated** state changes (volume, scrub, buffer, sleep timer, chapters), not eliminating every re-render.
 
 ## Consequences
 
-- The audio-player context file grows by ~95 lines (three `createContext` calls with sentinel-value commentary, one `useMemo` for the queue Set, three exported hooks with full JSDoc, and three new provider-wrapper layers in the JSX).
+- The audio-player context file grows by three `createContext` calls with sentinel-value commentary, a `useMemo` paired with a `useRef` content-equality cache for the queue Set, three exported hooks with full JSDoc, and three new provider-wrapper layers in the JSX.
 - Three new hook entry points in the public surface of `@/contexts/audio-player-context`: `useNowPlayingEpisodeId`, `useIsPlaying`, `useIsEpisodeInQueue`. They throw outside `AudioPlayerProvider`, mirroring the existing convention.
 - Hooks intentionally hold **primitive** slice values only. A future contributor tempted to expand `IsPlayingContext` into `{ isPlaying, isBuffering }` would forfeit the bailout. JSDoc on each hook will document this constraint.
-- Storybook stories `play-episode-button.stories.tsx` and `add-to-queue-button.stories.tsx` extend their `MockProvider` with the new contexts. Other stories are unaffected.
+- The shared Storybook decorator (`src/test/story-fixtures/audio-player.tsx`) extends to mount the new contexts. Stories that compose the decorator are unaffected.
 - Indirect unit tests that mock `@/contexts/audio-player-context` and render the migrated buttons (transitively, via `EpisodeCard` etc.) gain three additional keys in their `vi.mock` factories.
 - ADR-004 remains in effect; this ADR extends rather than supersedes it. Future state-management questions for the audio player should consider both.
 - `useSyncExternalStore` remains a documented escape hatch (Option B) if a future need surfaces for cross-slice memoized derivations that this approach can't model cheaply.

@@ -78,13 +78,10 @@ const testEpisode: AudioEpisode = {
 let renders = 0;
 let capturedAPI: AudioPlayerAPI | null = null;
 
-// onRender fires on every commit-phase render of any component inside the
-// Profiler tree. Resets to 0 in beforeEach so each test starts clean.
 const onRender: ProfilerOnRenderCallback = () => {
   renders += 1;
 };
 
-// Captures the real API handle so tests can dispatch actions inside act().
 function APIBridge() {
   capturedAPI = useAudioPlayerAPI();
   return null;
@@ -103,7 +100,6 @@ function TestTree({ episode }: { episode: AudioEpisode }) {
 
 describe("PlayEpisodeButton render counts (real AudioPlayerProvider)", () => {
   beforeEach(() => {
-    // Reset counters so tests are independent of each other.
     renders = 0;
     capturedAPI = null;
 

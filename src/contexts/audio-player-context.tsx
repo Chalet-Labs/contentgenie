@@ -1616,11 +1616,11 @@ export function useIsPlaying(): boolean {
 
 /**
  * Returns `true` when `episodeId` is present in the current playback queue.
- * Re-renders when the queue array identity changes (any add/remove/reorder/
- * clear/init), not on volume, speed, or buffering updates. A reorder still
- * triggers a re-render even when `episodeId`'s membership did not flip,
- * because the underlying `Set` is recomputed; React then bails out of DOM
- * diffs when `has(episodeId)` returns the same boolean.
+ * Re-renders only when membership (the set of ids) changes — adds, removes,
+ * clears, and inits with different ids. Reorders, focus-refetch reconciles,
+ * and metadata-only refreshes preserve the underlying Set reference (the
+ * provider memoizes by content equality) and bail out via Object.is.
+ * Volume, speed, buffering, and other unrelated dispatches never re-render.
  */
 export function useIsEpisodeInQueue(episodeId: string): boolean {
   const ctx = useContext(QueueEpisodeIdsContext);
