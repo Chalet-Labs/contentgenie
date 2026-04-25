@@ -133,17 +133,20 @@ export function NotificationPageList({
 
   const handleDismiss = useCallback((id: number) => {
     startTransition(async () => {
+      // Decrement offset optimistically so a concurrent Load more uses the
+      // post-dismiss offset and doesn't skip a server row (#315).
       setItems((prev) =>
         prev.map((n) => (n.id === id ? { ...n, pendingDismiss: true } : n)),
       );
+      offsetRef.current = Math.max(0, offsetRef.current - 1);
       const result = await dismissNotification(id);
       if (result.success) {
         setItems((prev) => prev.filter((n) => n.id !== id));
-        offsetRef.current = Math.max(0, offsetRef.current - 1);
       } else {
         setItems((prev) =>
           prev.map((n) => (n.id === id ? { ...n, pendingDismiss: false } : n)),
         );
+        offsetRef.current = offsetRef.current + 1;
         toastErrorWithRetry("Failed to dismiss notification", () =>
           handleDismiss(id),
         );
