@@ -1,10 +1,7 @@
 import { z } from "zod";
 
 import { SUBSCRIPTION_SORTS } from "@/db/subscription-sorts";
-import {
-  asPodcastIndexEpisodeId,
-  type PodcastIndexEpisodeId,
-} from "@/types/ids";
+import { asPodcastIndexEpisodeId } from "@/types/ids";
 
 /** Shared max-length for short user text (notes, descriptions, etc.). */
 export const MAX_SHORT_TEXT = 500;

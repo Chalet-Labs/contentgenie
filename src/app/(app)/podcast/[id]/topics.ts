@@ -45,10 +45,7 @@ export async function getTopicsByPodcastIndexId(
       .where(lte(sub.rn, TOPICS_PER_EPISODE_LIMIT))
       .orderBy(sub.episodeId, sub.rn);
 
-    const out: Record<PodcastIndexEpisodeId, string[]> = {} as Record<
-      PodcastIndexEpisodeId,
-      string[]
-    >;
+    const out = {} as Record<PodcastIndexEpisodeId, string[]>;
     for (const row of rows) {
       const pi = idToPodcastIndexId.get(row.episodeId);
       if (!pi) continue;
