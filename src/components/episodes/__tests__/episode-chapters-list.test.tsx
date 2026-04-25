@@ -75,6 +75,20 @@ describe("EpisodeChaptersList", () => {
     );
   });
 
+  it("renders a neutral placeholder for idle state without showing the skeleton", () => {
+    const { container } = render(
+      <EpisodeChaptersList
+        state={{ status: "idle" }}
+        audioEpisode={sampleEpisode}
+      />,
+    );
+
+    expect(
+      screen.getByText(/Chapters unavailable right now/),
+    ).toBeInTheDocument();
+    expect(container.querySelectorAll(".animate-pulse").length).toBe(0);
+  });
+
   it("shows the error message when the chapter fetch fails", () => {
     render(
       <EpisodeChaptersList

@@ -37,7 +37,6 @@ export function EpisodeChaptersList({
   const playerAPI = useAudioPlayerAPI();
 
   switch (state.status) {
-    case "idle":
     case "loading":
       return (
         <div className="space-y-2">
@@ -45,6 +44,16 @@ export function EpisodeChaptersList({
           <Skeleton className="h-10 w-full" />
           <Skeleton className="h-10 w-full" />
         </div>
+      );
+
+    case "idle":
+      // No fetch in flight (initial render or post-abort). Don't show a
+      // skeleton — that implies work in progress. Render a neutral
+      // placeholder so the panel isn't blank but doesn't lie about state.
+      return (
+        <p className="text-sm text-muted-foreground">
+          Chapters unavailable right now.
+        </p>
       );
 
     case "error":
