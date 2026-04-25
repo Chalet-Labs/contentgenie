@@ -2,6 +2,23 @@ import { renderHook, waitFor, act } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useChapters } from "@/hooks/use-chapters";
 
+function mockChaptersResponse(chapters: unknown[]) {
+  vi.mocked(fetch).mockResolvedValueOnce(
+    new Response(JSON.stringify({ chapters }), { status: 200 }),
+  );
+}
+
+function mockAbortableFetch() {
+  vi.mocked(fetch).mockImplementationOnce((_input, init) => {
+    return new Promise<Response>((_, reject) => {
+      const signal = (init as RequestInit | undefined)?.signal;
+      signal?.addEventListener("abort", () => {
+        reject(new DOMException("The operation was aborted.", "AbortError"));
+      });
+    });
+  });
+}
+
 describe("useChapters", () => {
   beforeEach(() => {
     vi.stubGlobal("fetch", vi.fn());
@@ -25,14 +42,7 @@ describe("useChapters", () => {
   });
 
   it("transitions loading → ready and routes through /api/chapters", async () => {
-    vi.mocked(fetch).mockResolvedValueOnce(
-      new Response(
-        JSON.stringify({
-          chapters: [{ startTime: 0, title: "Intro" }],
-        }),
-        { status: 200 },
-      ),
-    );
+    mockChaptersResponse([{ startTime: 0, title: "Intro" }]);
 
     const { result } = renderHook(() =>
       useChapters("https://example.com/c.json"),
@@ -80,16 +90,8 @@ describe("useChapters", () => {
   });
 
   it("refetches when chaptersUrl changes", async () => {
-    vi.mocked(fetch)
-      .mockResolvedValueOnce(
-        new Response(JSON.stringify({ chapters: [] }), { status: 200 }),
-      )
-      .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({ chapters: [{ startTime: 0, title: "a" }] }),
-          { status: 200 },
-        ),
-      );
+    mockChaptersResponse([]);
+    mockChaptersResponse([{ startTime: 0, title: "a" }]);
 
     const { result, rerender } = renderHook(
       ({ url }: { url: string | null }) => useChapters(url),
@@ -111,9 +113,7 @@ describe("useChapters", () => {
   });
 
   it("returns to idle when chaptersUrl becomes null", async () => {
-    vi.mocked(fetch).mockResolvedValueOnce(
-      new Response(JSON.stringify({ chapters: [] }), { status: 200 }),
-    );
+    mockChaptersResponse([]);
 
     const { result, rerender } = renderHook(
       ({ url }: { url: string | null }) => useChapters(url),
@@ -158,14 +158,7 @@ describe("useChapters", () => {
 
   it("surfaces a timeout as { status: 'error' } instead of getting stuck loading", async () => {
     vi.useFakeTimers();
-    vi.mocked(fetch).mockImplementationOnce((_input, init) => {
-      return new Promise<Response>((_, reject) => {
-        const signal = (init as RequestInit | undefined)?.signal;
-        signal?.addEventListener("abort", () => {
-          reject(new DOMException("The operation was aborted.", "AbortError"));
-        });
-      });
-    });
+    mockAbortableFetch();
 
     const { result } = renderHook(() =>
       useChapters("https://example.com/c.json"),
@@ -184,12 +177,7 @@ describe("useChapters", () => {
   });
 
   it("skips fetch while offline and retries when isOnline flips back to true", async () => {
-    vi.mocked(fetch).mockResolvedValueOnce(
-      new Response(
-        JSON.stringify({ chapters: [{ startTime: 0, title: "Intro" }] }),
-        { status: 200 },
-      ),
-    );
+    mockChaptersResponse([{ startTime: 0, title: "Intro" }]);
 
     const { result, rerender } = renderHook(
       ({ online }: { online: boolean }) =>
@@ -212,12 +200,7 @@ describe("useChapters", () => {
   });
 
   it("resets to idle when chaptersUrl changes while offline", async () => {
-    vi.mocked(fetch).mockResolvedValueOnce(
-      new Response(
-        JSON.stringify({ chapters: [{ startTime: 0, title: "A" }] }),
-        { status: 200 },
-      ),
-    );
+    mockChaptersResponse([{ startTime: 0, title: "A" }]);
 
     const { result, rerender } = renderHook(
       ({ url, online }: { url: string; online: boolean }) =>
@@ -252,14 +235,7 @@ describe("useChapters", () => {
   });
 
   it("clears stale loading state when offline aborts an in-flight fetch", async () => {
-    vi.mocked(fetch).mockImplementationOnce((_input, init) => {
-      return new Promise<Response>((_, reject) => {
-        const signal = (init as RequestInit | undefined)?.signal;
-        signal?.addEventListener("abort", () => {
-          reject(new DOMException("The operation was aborted.", "AbortError"));
-        });
-      });
-    });
+    mockAbortableFetch();
 
     const { result, rerender } = renderHook(
       ({ online }: { online: boolean }) =>
@@ -301,19 +277,12 @@ describe("useChapters", () => {
   });
 
   it("validates the response shape via parseChapters and drops malformed entries", async () => {
-    vi.mocked(fetch).mockResolvedValueOnce(
-      new Response(
-        JSON.stringify({
-          chapters: [
-            { startTime: 0, title: "Intro" },
-            { startTime: "bogus", title: "Ignored" },
-            { title: "Missing startTime" },
-            { startTime: 60, title: "Outro" },
-          ],
-        }),
-        { status: 200 },
-      ),
-    );
+    mockChaptersResponse([
+      { startTime: 0, title: "Intro" },
+      { startTime: "bogus", title: "Ignored" },
+      { title: "Missing startTime" },
+      { startTime: 60, title: "Outro" },
+    ]);
 
     const { result } = renderHook(() =>
       useChapters("https://example.com/c.json"),
