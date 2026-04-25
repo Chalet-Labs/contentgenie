@@ -53,9 +53,7 @@ jobs:
           fi
 
       - name: Storybook smoke tests (test-runner)
-        env:
-          TEST_RUNNER_FAIL_ON_CONSOLE: "true"
-        run: bunx test-storybook --url http://localhost:6006 --maxWorkers 2
+        run: bunx test-storybook --url http://localhost:6006 --maxWorkers 2 --failOnConsole
 
       - name: Run VRT
         run: |

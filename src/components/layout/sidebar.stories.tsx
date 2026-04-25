@@ -2,7 +2,12 @@ import type { Decorator, Meta, StoryObj } from "@storybook/nextjs-vite";
 import { expect, within } from "storybook/test";
 import { SidebarCountsProvider } from "@/contexts/sidebar-counts-context";
 import { PinnedSubscriptionsProvider } from "@/contexts/pinned-subscriptions-context";
-import { Sheet, SheetContent } from "@/components/ui/sheet";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import {
   PINNED_EXPANDED_STORAGE_NAME,
   PINNED_EXPANDED_STORAGE_VALUE,
@@ -13,12 +18,18 @@ import {
 // .storybook/main.ts to mocks/actions.ts. getDashboardStats stubs non-zero
 // counts and getPinnedSubscriptions stubs 3 seeded pins.
 
+// Mirrors AppHeader's mobile-nav Sheet (sr-only title + description) so Radix
+// Dialog a11y warnings don't trip --failOnConsole during story smoke tests.
 const sheetDecorator: Decorator = (Story) => (
   <Sheet defaultOpen>
     <SheetContent
       side="left"
       className="flex w-[280px] flex-col p-0 sm:w-[320px]"
     >
+      <SheetTitle className="sr-only">Navigation</SheetTitle>
+      <SheetDescription className="sr-only">
+        Primary navigation links and library shortcuts.
+      </SheetDescription>
       <Story />
     </SheetContent>
   </Sheet>
