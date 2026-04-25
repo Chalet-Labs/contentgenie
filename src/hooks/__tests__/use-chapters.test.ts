@@ -251,6 +251,35 @@ describe("useChapters", () => {
     expect(fetch).toHaveBeenCalledTimes(1);
   });
 
+  it("clears stale loading state when offline aborts an in-flight fetch", async () => {
+    vi.mocked(fetch).mockImplementationOnce((_input, init) => {
+      return new Promise<Response>((_, reject) => {
+        const signal = (init as RequestInit | undefined)?.signal;
+        signal?.addEventListener("abort", () => {
+          reject(new DOMException("The operation was aborted.", "AbortError"));
+        });
+      });
+    });
+
+    const { result, rerender } = renderHook(
+      ({ online }: { online: boolean }) =>
+        useChapters("https://example.com/c.json", online),
+      { initialProps: { online: true } },
+    );
+
+    expect(result.current).toEqual({ status: "loading" });
+
+    // Connectivity drops with a fetch in flight. The prior effect's cleanup
+    // aborts the controller; the new effect must reset the stale "loading"
+    // state to idle so the UI doesn't show a perpetual skeleton.
+    await act(async () => {
+      rerender({ online: false });
+      await Promise.resolve();
+    });
+
+    expect(result.current).toEqual({ status: "idle" });
+  });
+
   it("validates the response shape via parseChapters and drops malformed entries", async () => {
     vi.mocked(fetch).mockResolvedValueOnce(
       new Response(

@@ -29,11 +29,13 @@ export type UseChaptersState =
  * dedicated `didTimeout` flag instead.
  *
  * `isOnline` is an optional connectivity hint. When explicitly `false`,
- * the hook skips the fetch and preserves the current state (so a stale
- * `error` from before the network dropped stays visible). When the value
- * flips back to `true`, the effect re-runs and a fresh fetch retries —
- * recovers from a transient offline blip without forcing the user to
- * remount the component.
+ * the hook skips the fetch. State handling depends on the transition:
+ * - Same URL: terminal states (ready/error) are preserved so a transient
+ *   blip doesn't blank already-loaded chapters; a `loading` state is
+ *   reset to idle because the fetch was aborted by the effect cleanup.
+ * - URL changed while offline: state is reset to idle so the prior
+ *   episode's chapters don't render under the new URL.
+ * When `isOnline` flips back to `true`, the effect re-runs and retries.
  */
 export function useChapters(
   chaptersUrl: string | null | undefined,
@@ -51,12 +53,19 @@ export function useChapters(
       return;
     }
     if (isOnline === false) {
-      // Same URL during a connectivity blip: preserve current state so a
-      // ready/error from before the drop stays visible. Different URL while
-      // offline: reset to idle so we don't render the previous episode's
-      // chapters under the new URL once the consumer re-renders.
       if (prevUrl !== chaptersUrl) {
+        // Different URL while offline: drop the prior episode's payload so
+        // it isn't rendered under the new URL.
         setState({ status: "idle" });
+      } else {
+        // Same URL during a connectivity blip: keep terminal state
+        // (ready/error) visible so already-loaded chapters or the prior error
+        // don't disappear. A `loading` state, though, refers to the fetch
+        // the cleanup just aborted — clear it so the UI doesn't show a
+        // perpetual skeleton during the outage.
+        setState((prev) =>
+          prev.status === "loading" ? { status: "idle" } : prev,
+        );
       }
       return;
     }
