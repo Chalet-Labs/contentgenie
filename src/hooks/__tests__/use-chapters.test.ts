@@ -19,6 +19,12 @@ function mockAbortableFetch() {
   });
 }
 
+function renderUseChaptersWithUrl(initialUrl: string | null) {
+  return renderHook(({ url }: { url: string | null }) => useChapters(url), {
+    initialProps: { url: initialUrl },
+  });
+}
+
 describe("useChapters", () => {
   beforeEach(() => {
     vi.stubGlobal("fetch", vi.fn());
@@ -93,9 +99,8 @@ describe("useChapters", () => {
     mockChaptersResponse([]);
     mockChaptersResponse([{ startTime: 0, title: "a" }]);
 
-    const { result, rerender } = renderHook(
-      ({ url }: { url: string | null }) => useChapters(url),
-      { initialProps: { url: "https://example.com/a.json" as string | null } },
+    const { result, rerender } = renderUseChaptersWithUrl(
+      "https://example.com/a.json",
     );
 
     await waitFor(() =>
@@ -115,9 +120,8 @@ describe("useChapters", () => {
   it("returns to idle when chaptersUrl becomes null", async () => {
     mockChaptersResponse([]);
 
-    const { result, rerender } = renderHook(
-      ({ url }: { url: string | null }) => useChapters(url),
-      { initialProps: { url: "https://example.com/a.json" as string | null } },
+    const { result, rerender } = renderUseChaptersWithUrl(
+      "https://example.com/a.json",
     );
 
     await waitFor(() =>
