@@ -73,6 +73,9 @@ vi.mock("@/db", () => ({
           return {
             innerJoin: (...jArgs: unknown[]) => {
               mockInnerJoin(...jArgs);
+              // .where() must be awaitable: getEpisodeAverageRating awaits
+              // the chain directly; isEpisodeSaved/getLibraryEntryByEpisodeId
+              // chain .limit(n) instead.
               const afterWhere = {
                 limit: (n: number) => mockLimit(n),
                 then: (
@@ -144,7 +147,6 @@ vi.mock("@/db", () => ({
   },
 }));
 
-// Mock @/db/helpers
 const mockEnsureUserExists = vi.fn();
 const mockUpsertPodcast = vi.fn();
 vi.mock("@/db/helpers", () => ({
@@ -152,7 +154,6 @@ vi.mock("@/db/helpers", () => ({
   upsertPodcast: (...args: unknown[]) => mockUpsertPodcast(...args),
 }));
 
-// Mock @/db/schema with column-name placeholder objects
 vi.mock("@/db/schema", () => ({
   episodes: { id: "id", podcastIndexId: "podcastIndexId" },
   userLibrary: {
@@ -180,7 +181,6 @@ vi.mock("@/db/library-columns", () => ({
   COLLECTION_LIST_COLUMNS: {},
 }));
 
-// Mock @/lib/schemas/library
 const mockSafeParse = vi.fn();
 const mockSafeParseDate = vi.fn();
 vi.mock("@/lib/schemas/library", () => ({
@@ -258,6 +258,23 @@ describe("saveEpisodeToLibrary", () => {
       expect.objectContaining({ podcastIndexId: "pod1" }),
       { updateOnConflict: "safe" },
     );
+    // The episode insert builds its row from the parsed Zod payload + the
+    // upserted podcast id — pin those mappings so a swap of fields like
+    // (podcastIndexId ↔ title) doesn't slip through.
+    expect(mockInsertValues).toHaveBeenCalledWith(
+      expect.objectContaining({
+        podcastId: 42,
+        podcastIndexId: "ep1",
+        title: "Episode 1",
+        audioUrl: "https://example.com/a.mp3",
+        duration: 600,
+        publishDate: validEpisodeData.publishDate,
+      }),
+    );
+    expect(mockInsertValues).toHaveBeenCalledWith({
+      userId: "user_123",
+      episodeId: 100,
+    });
     expect(mockRevalidatePath).toHaveBeenCalledWith("/library");
     expect(mockRevalidatePath).toHaveBeenCalledWith("/episode/ep1");
   });
@@ -337,6 +354,17 @@ describe("removeEpisodeFromLibrary", () => {
       success: true,
       message: "Episode removed from library",
     });
+    // DELETE must be scoped to the current user — without the userId
+    // predicate any signed-in user could delete any other user's row by
+    // knowing the episode's PodcastIndex id.
+    expect(mockDeleteWhere).toHaveBeenCalledWith(
+      expect.objectContaining({
+        _and: expect.arrayContaining([
+          { col: "userId", val: "user_123" },
+          { col: "episodeId", val: 42 },
+        ]),
+      }),
+    );
     expect(mockDelete).toHaveBeenCalled();
     expect(mockDeleteWhere).toHaveBeenCalled();
     expect(mockRevalidatePath).toHaveBeenCalledWith("/library");
@@ -454,6 +482,25 @@ describe("getUserLibrary", () => {
     collection: null,
   };
 
+  // Second null-rating / null-publishDate item lets us exercise the a-side
+  // of `(a.rating ?? -1) - (b.rating ?? -1)` and the publish-date fallback.
+  const itemD = {
+    id: 4,
+    userId: "user_123",
+    episodeId: 13,
+    savedAt: new Date("2025-10-01T00:00:00Z"),
+    notes: null,
+    rating: null,
+    collectionId: null,
+    episode: {
+      id: 13,
+      title: "Date",
+      publishDate: undefined,
+      podcast: { id: 1 },
+    },
+    collection: null,
+  };
+
   beforeEach(happyPathSetup(mockAuth, mockEnsureUserExists));
   beforeEach(() => {
     mockUserLibraryFindMany.mockResolvedValue([itemA, itemB, itemC]);
@@ -465,6 +512,12 @@ describe("getUserLibrary", () => {
     const result = await getUserLibrary();
     expect(result.error).toBeNull();
     expect(result.items.map((i) => i.id)).toEqual([2, 1, 3]);
+    // findMany must be scoped to the current user.
+    expect(mockUserLibraryFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { col: "userId", val: "user_123" },
+      }),
+    );
   });
 
   it("sorts by savedAt asc when direction is asc", async () => {
@@ -493,11 +546,32 @@ describe("getUserLibrary", () => {
     expect(result.items.map((i) => i.id)).toEqual([2, 1, 3]);
   });
 
-  it("sorts by title (localeCompare) ascending by default direction", async () => {
+  it("handles two items with null rating consistently (covers a-side of `?? -1`)", async () => {
+    mockUserLibraryFindMany.mockResolvedValue([itemA, itemC, itemD]);
+    const { getUserLibrary } = await importLibrary();
+    const result = await getUserLibrary("rating", "desc");
+    // itemA has rating 3; itemC and itemD both have null. The two null-rated
+    // items compare as equal on rating, so their relative order is whatever
+    // Array#sort considers stable for the rating-equal pair.
+    expect(result.items.map((i) => i.id).slice(0, 1)).toEqual([1]);
+    expect(result.items.map((i) => i.id).sort()).toEqual([1, 3, 4]);
+  });
+
+  it("handles two items with missing publishDate (covers a-side of `?? 0`)", async () => {
+    mockUserLibraryFindMany.mockResolvedValue([itemA, itemC, itemD]);
+    const { getUserLibrary } = await importLibrary();
+    const result = await getUserLibrary("publishDate", "desc");
+    // itemA has 2025-12-01; itemC and itemD have undefined → both 0.
+    expect(result.items[0].id).toBe(1);
+  });
+
+  it("sorts titles A-Z when called with direction='desc' (production quirk: title branch is not pre-flipped)", async () => {
+    // Other sort keys compute (b - a) and rely on direction='asc' to flip.
+    // localeCompare already returns positive when a > b, so passing 'desc'
+    // here results in A→Z (Apple, Banana, Cherry → ids 2, 1, 3). This pins
+    // the production behavior; flipping the asymmetry is a separate concern.
     const { getUserLibrary } = await importLibrary();
     const result = await getUserLibrary("title", "desc");
-    // localeCompare returns positive when a > b. With desc direction the
-    // comparison is unflipped → Apple < Banana < Cherry → ids 2, 1, 3.
     expect(result.items.map((i) => i.id)).toEqual([2, 1, 3]);
   });
 
@@ -595,6 +669,18 @@ describe("addBookmark", () => {
     mockInsertReturning.mockReturnValueOnce([{ id: 5 }]);
     const { addBookmark } = await importLibrary();
     await addBookmark(1, 100);
+    expect(mockInsertValues).toHaveBeenCalledWith({
+      userLibraryId: 1,
+      timestamp: 100,
+      note: null,
+    });
+  });
+
+  it("nulls an empty-string note (production uses `||`, not `??`)", async () => {
+    mockUserLibraryFindFirst.mockResolvedValue({ id: 1 });
+    mockInsertReturning.mockReturnValueOnce([{ id: 5 }]);
+    const { addBookmark } = await importLibrary();
+    await addBookmark(1, 100, "");
     expect(mockInsertValues).toHaveBeenCalledWith({
       userLibraryId: 1,
       timestamp: 100,

@@ -1,11 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-
-// ── Mocks ─────────────────────────────────────────────────────────────────
+import {
+  createDrizzleOrmMock,
+  makeClerkAuthMock,
+  makeUserHelpersMock,
+} from "@/app/actions/__tests__/__fixtures";
 
 const mockAuth = vi.fn();
-vi.mock("@clerk/nextjs/server", () => ({
-  auth: (...args: unknown[]) => mockAuth(...args),
-}));
+vi.mock("@clerk/nextjs/server", () => makeClerkAuthMock(() => mockAuth()));
 
 const mockRevalidatePath = vi.fn();
 vi.mock("next/cache", () => ({ revalidatePath: mockRevalidatePath }));
@@ -118,9 +119,9 @@ vi.mock("@/db", () => ({
 }));
 
 const mockEnsureUserExists = vi.fn();
-vi.mock("@/db/helpers", () => ({
-  ensureUserExists: (...args: unknown[]) => mockEnsureUserExists(...args),
-}));
+vi.mock("@/db/helpers", () =>
+  makeUserHelpersMock((...args: unknown[]) => mockEnsureUserExists(...args)),
+);
 
 vi.mock("@/db/library-columns", () => ({
   LIBRARY_ENTRY_COLUMNS: {},
@@ -148,7 +149,7 @@ vi.mock("@/db/schema", () => ({
 }));
 
 vi.mock("drizzle-orm", () => ({
-  eq: vi.fn((col: unknown, val: unknown) => ({ col, val })),
+  ...createDrizzleOrmMock(),
   and: vi.fn((...conds: unknown[]) => ({ _and: conds })),
   desc: vi.fn((col: unknown) => ({ col, direction: "desc" })),
   count: vi.fn((col: unknown) => ({

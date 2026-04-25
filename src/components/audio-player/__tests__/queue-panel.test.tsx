@@ -3,6 +3,7 @@ import React from "react";
 import { render, screen, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { DragEndEvent } from "@dnd-kit/core";
+import type { AudioEpisode } from "@/contexts/audio-player-context";
 import { validEpisode, validEpisode2 } from "@/test/fixtures/audio-episode";
 
 // jsdom doesn't provide ResizeObserver — Radix Popover and the DnD libs need it
@@ -15,34 +16,29 @@ globalThis.ResizeObserver =
   MockResizeObserver as unknown as typeof ResizeObserver;
 
 // jsdom doesn't provide matchMedia — useMediaQuery uses window.matchMedia(query)
-const matchMediaMock = vi.fn().mockImplementation((query: string) => ({
-  matches: false,
-  media: query,
-  onchange: null,
-  addListener: vi.fn(),
-  removeListener: vi.fn(),
-  addEventListener: vi.fn(),
-  removeEventListener: vi.fn(),
-  dispatchEvent: vi.fn(),
-}));
+function fakeMediaQueryList(matches: boolean, query: string) {
+  return {
+    matches,
+    media: query,
+    onchange: null,
+    addListener: vi.fn(),
+    removeListener: vi.fn(),
+    addEventListener: vi.fn(),
+    removeEventListener: vi.fn(),
+    dispatchEvent: vi.fn(),
+  };
+}
+const matchMediaMock = vi
+  .fn()
+  .mockImplementation((q: string) => fakeMediaQueryList(false, q));
 Object.defineProperty(window, "matchMedia", {
   writable: true,
   value: matchMediaMock,
 });
 
 // ── Audio-player context mock ────────────────────────────────────────────
-type Episode = {
-  id: string;
-  title: string;
-  podcastTitle: string;
-  audioUrl: string;
-  artwork?: string;
-  duration?: number;
-  chaptersUrl?: string;
-};
-
 const mockState = {
-  currentEpisode: null as Episode | null,
+  currentEpisode: null as AudioEpisode | null,
   isPlaying: false,
   isBuffering: false,
   isVisible: false,
@@ -51,7 +47,7 @@ const mockState = {
   playbackSpeed: 1,
   hasError: false,
   errorMessage: null as string | null,
-  queue: [] as Episode[],
+  queue: [] as AudioEpisode[],
   chapters: null,
   chaptersLoading: false,
   sleepTimer: null,
@@ -181,7 +177,6 @@ vi.mock("@dnd-kit/sortable", async (importOriginal) => {
   };
 });
 
-// Import after all mocks
 import { QueuePanel } from "@/components/audio-player/queue-panel";
 import { Button } from "@/components/ui/button";
 
@@ -190,8 +185,8 @@ const trigger = <Button aria-label="Open queue">Q</Button>;
 beforeEach(() => {
   vi.clearAllMocks();
   capturedOnDragEnd = undefined;
-  // Reset state object in place so the proxy in the context mock keeps reading
-  // the same reference.
+  // Mutate mockState in place — the context mock closes over this reference,
+  // so reassigning it would orphan the closure.
   Object.assign(mockState, {
     currentEpisode: null,
     queue: [],
@@ -205,16 +200,11 @@ beforeEach(() => {
     chaptersLoading: false,
     sleepTimer: null,
   });
-  matchMediaMock.mockImplementation((query: string) => ({
-    matches: false, // default: mobile
-    media: query,
-    onchange: null,
-    addListener: vi.fn(),
-    removeListener: vi.fn(),
-    addEventListener: vi.fn(),
-    removeEventListener: vi.fn(),
-    dispatchEvent: vi.fn(),
-  }));
+  // QueuePanel queries `(min-width: 768px)`, so `matches: false` selects
+  // the Sheet (narrow-viewport) branch. Tests targeting Popover override.
+  matchMediaMock.mockImplementation((q: string) =>
+    fakeMediaQueryList(false, q),
+  );
 });
 
 afterEach(() => vi.restoreAllMocks());
@@ -248,11 +238,11 @@ describe("NowPlaying", () => {
   });
 
   it("renders Rss icon fallback when episode has no artwork", () => {
-    mockState.currentEpisode = validEpisode2; // no artwork
+    mockState.currentEpisode = validEpisode2;
     const { container } = render(
       <QueuePanel open={true} onOpenChange={vi.fn()} trigger={trigger} />,
     );
-    // No <img> within the Now-Playing block — fallback renders the Rss icon (an SVG)
+    // Fallback path renders the Rss SVG icon, so no <img> elements exist.
     const imgs = container.querySelectorAll("img");
     expect(imgs.length).toBe(0);
   });
@@ -325,7 +315,6 @@ describe("QueueList — populated queue", () => {
       }),
     );
     expect(mockAPI.removeFromQueue).toHaveBeenCalledWith(validEpisode2.id);
-    // playEpisode should NOT have been called for the X button
     expect(mockAPI.playEpisode).not.toHaveBeenCalled();
   });
 });
@@ -384,27 +373,18 @@ describe("handleDragEnd", () => {
 
 // ── Layout switch (desktop vs mobile) ────────────────────────────────────
 describe("layout switch", () => {
-  it("renders inside Popover on desktop", () => {
-    matchMediaMock.mockImplementation((query: string) => ({
-      matches: true, // desktop
-      media: query,
-      onchange: null,
-      addListener: vi.fn(),
-      removeListener: vi.fn(),
-      addEventListener: vi.fn(),
-      removeEventListener: vi.fn(),
-      dispatchEvent: vi.fn(),
-    }));
+  it("renders inside Popover when matchMedia matches the min-width query", () => {
+    matchMediaMock.mockImplementation((q: string) =>
+      fakeMediaQueryList(true, q),
+    );
     mockState.queue = [];
     render(<QueuePanel open={true} onOpenChange={vi.fn()} trigger={trigger} />);
     expect(screen.getByTestId("popover-content")).toBeInTheDocument();
     expect(screen.queryByTestId("sheet-content")).not.toBeInTheDocument();
-    // Sheet-only "Queue" SheetTitle absent
     expect(screen.queryByTestId("sheet-title")).not.toBeInTheDocument();
   });
 
-  it("renders inside Sheet on mobile with title and sr-only description", () => {
-    // matchMedia mock defaults to matches: false in beforeEach (mobile)
+  it("renders inside Sheet with title and sr-only description when the query does not match", () => {
     mockState.queue = [];
     render(<QueuePanel open={true} onOpenChange={vi.fn()} trigger={trigger} />);
     expect(screen.getByTestId("sheet-content")).toBeInTheDocument();
