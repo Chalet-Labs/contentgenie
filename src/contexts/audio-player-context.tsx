@@ -319,18 +319,15 @@ export const AudioPlayerProgressContext =
 // AudioPlayerState. Subscribers re-render only when their specific slice changes,
 // not on every state dispatch. See ADR-039.
 //
-// Each context picks a sentinel that cannot occur as a real runtime value, so
-// hooks can detect "rendered outside AudioPlayerProvider" and throw. The two
-// primitive slices (`string | null`, `boolean`) use `undefined`; the Set slice
-// uses `null` (an empty queue produces `new Set()` which is truthy, so a `!ctx`
-// guard still distinguishes "no provider" from "empty queue").
+// Each context defaults to `undefined` so hooks can detect "rendered outside
+// AudioPlayerProvider" and throw — the runtime never produces undefined.
 export const NowPlayingEpisodeIdContext = createContext<
   string | null | undefined
 >(undefined);
 export const IsPlayingContext = createContext<boolean | undefined>(undefined);
-export const QueueEpisodeIdsContext = createContext<ReadonlySet<string> | null>(
-  null,
-);
+export const QueueEpisodeIdsContext = createContext<
+  ReadonlySet<string> | undefined
+>(undefined);
 
 // ---------------------------------------------------------------------------
 // Provider
@@ -1624,7 +1621,7 @@ export function useIsPlaying(): boolean {
  */
 export function useIsEpisodeInQueue(episodeId: string): boolean {
   const ctx = useContext(QueueEpisodeIdsContext);
-  if (!ctx) {
+  if (ctx === undefined) {
     throw new Error(
       "useIsEpisodeInQueue must be used within AudioPlayerProvider",
     );
