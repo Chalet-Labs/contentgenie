@@ -699,7 +699,7 @@ export function AuthenticatedEpisodeDetail({
         </div>
       </div>
 
-      <EpisodeTabs defaultValue="insights">
+      <EpisodeTabs key={episodeId} defaultValue="insights">
         <EpisodeTabsList aria-label="Episode sections">
           <EpisodeTabsTrigger value="insights">Insights</EpisodeTabsTrigger>
           {hasChapters && (

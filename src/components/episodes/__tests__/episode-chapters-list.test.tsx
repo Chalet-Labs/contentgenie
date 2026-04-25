@@ -267,7 +267,7 @@ describe("EpisodeChaptersList", () => {
     expect(screen.getByText("1:02:05")).toBeInTheDocument();
   });
 
-  it("does not flag any chapter as active when the episode isn't currently playing", () => {
+  it("does not flag any chapter as active when the episode isn't loaded in the player", () => {
     mocks.useAudioPlayerProgress.mockReturnValue({
       currentTime: 600,
       buffered: 0,

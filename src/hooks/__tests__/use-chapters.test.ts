@@ -83,6 +83,26 @@ describe("useChapters", () => {
     expect(result.current).toEqual({ status: "error", message: "HTTP 502" });
   });
 
+  it("surfaces the proxy's structured error message when the response body has one", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(
+      new Response(JSON.stringify({ error: "URL not allowed" }), {
+        status: 403,
+        headers: { "content-type": "application/json" },
+      }),
+    );
+
+    const { result } = renderHook(() =>
+      useChapters("https://example.com/c.json"),
+    );
+
+    await waitFor(() => {
+      expect(result.current).toEqual({
+        status: "error",
+        message: "URL not allowed",
+      });
+    });
+  });
+
   it("surfaces a network failure as { status: 'error' }", async () => {
     vi.mocked(fetch).mockRejectedValueOnce(new Error("offline"));
 

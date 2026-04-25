@@ -93,8 +93,16 @@ export function useChapters(
       try {
         const proxyUrl = `/api/chapters?url=${encodeURIComponent(targetUrl)}`;
         const res = await fetch(proxyUrl, { signal: controller.signal });
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-        const json: unknown = await res.json();
+        const json: unknown = await res.json().catch(() => null);
+        if (!res.ok) {
+          const proxyError =
+            json &&
+            typeof json === "object" &&
+            typeof (json as { error?: unknown }).error === "string"
+              ? (json as { error: string }).error
+              : `HTTP ${res.status}`;
+          throw new Error(proxyError);
+        }
         const chapters = parseChapters(json);
         if (!ignore) {
           setState({ status: "ready", chapters });

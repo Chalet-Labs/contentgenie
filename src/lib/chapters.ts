@@ -11,15 +11,6 @@ export interface Chapter {
 }
 
 /**
- * Parse and validate a JSON Chapters payload.
- *
- * - Filters out entries missing a numeric `startTime`
- * - Filters out entries with `toc: false` (silent markers)
- * - Generates "Chapter N" fallback for entries without a title
- * - Sorts by `startTime` ascending
- * - Returns an empty array for any malformed input
- */
-/**
  * Lightweight client-side check that a string parses as an http(s) URL.
  * Server-side SSRF protection (`isSafeUrl` in `lib/security.ts`) does the
  * authoritative check including DNS resolution and private-IP filtering;
@@ -35,6 +26,15 @@ export function isHttpUrl(value: string): boolean {
   }
 }
 
+/**
+ * Parse and validate a JSON Chapters payload.
+ *
+ * - Filters out entries missing a numeric `startTime`
+ * - Filters out entries with `toc: false` (silent markers)
+ * - Generates "Chapter N" fallback for entries without a title
+ * - Sorts by `startTime` ascending
+ * - Returns an empty array for any malformed input
+ */
 export function parseChapters(json: unknown): Chapter[] {
   if (
     typeof json !== "object" ||
