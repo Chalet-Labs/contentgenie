@@ -10,12 +10,10 @@ import {
 import { EpisodeList } from "./episode-list";
 import type { PodcastIndexEpisode } from "@/lib/podcastindex";
 
-// EpisodeList renders EpisodeCard rows whose action buttons (PlayEpisodeButton,
-// AddToQueueButton, ListenedButton) call useAudioPlayerAPI/State at module
-// mount. Without these contexts the story throws on render. Stub with a
-// minimal noop API + idle state so the visual surface renders without wiring
-// up the full AudioPlayerProvider (which pulls in audio elements, queue
-// persistence, etc.).
+// Stub the three audio-player contexts so EpisodeCard's action buttons
+// (PlayEpisodeButton, AddToQueueButton, ListenedButton) don't throw during
+// render. The full AudioPlayerProvider would also pull in audio elements
+// and queue persistence we don't need.
 const noopAudioPlayerAPI: AudioPlayerAPI = {
   playEpisode: () => {},
   togglePlay: () => {},

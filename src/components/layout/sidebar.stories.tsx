@@ -56,6 +56,13 @@ const meta: Meta<typeof Sidebar> = {
 export default meta;
 type Story = StoryObj<typeof Sidebar>;
 
+// Radix portals SheetContent outside canvasElement; query the iframe body so
+// the same assertion works for inline and InSheet variants.
+const expectAdminLinkVisible = async (canvasElement: HTMLElement) => {
+  const body = within(canvasElement.ownerDocument.body);
+  await expect(await body.findByRole("link", { name: /admin/i })).toBeVisible();
+};
+
 export const Default: Story = {};
 
 export const WithBadges: Story = {
@@ -79,13 +86,7 @@ export const WithAdmin: Story = {
     },
   },
   play: async ({ canvasElement }) => {
-    // Scope to the iframe's body so the same query works for inline renders
-    // and for the InSheet variant where Radix portals the content out of
-    // canvasElement.
-    const body = within(canvasElement.ownerDocument.body);
-    await expect(
-      await body.findByRole("link", { name: /admin/i }),
-    ).toBeVisible();
+    await expectAdminLinkVisible(canvasElement);
   },
 };
 
@@ -106,10 +107,7 @@ export const InSheetWithAdmin: Story = {
     },
   },
   play: async ({ canvasElement }) => {
-    const body = within(canvasElement.ownerDocument.body);
-    await expect(
-      await body.findByRole("link", { name: /admin/i }),
-    ).toBeVisible();
+    await expectAdminLinkVisible(canvasElement);
   },
 };
 

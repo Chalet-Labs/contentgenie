@@ -53,6 +53,8 @@ jobs:
           fi
 
       - name: Storybook smoke tests (test-runner)
+        env:
+          TEST_RUNNER_FAIL_ON_CONSOLE: "true"
         run: bunx test-storybook --url http://localhost:6006 --maxWorkers 2
 
       - name: Run VRT
@@ -67,7 +69,12 @@ jobs:
 
       - name: Stop Storybook server
         if: always()
-        run: kill "$SERVE_PID" 2>/dev/null || true
+        run: |
+          if [ -n "$SERVE_PID" ]; then
+            kill "$SERVE_PID" || echo "::warning::serve PID $SERVE_PID was already gone at cleanup"
+          else
+            echo "::warning::SERVE_PID was never set — Storybook serve step likely failed before backgrounding"
+          fi
 
       - name: Upload VRT baselines (initial generation)
         if: success()
