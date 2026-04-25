@@ -6,6 +6,9 @@ import {
   useAudioPlayerAPI,
   useAudioPlayerState,
   useAudioPlayerProgress,
+  useNowPlayingEpisodeId,
+  useIsPlaying,
+  useIsEpisodeInQueue,
   type AudioEpisode,
 } from "@/contexts/audio-player-context";
 
@@ -1025,6 +1028,36 @@ describe("hooks throw outside provider", () => {
     }
     expect(() => render(<BadConsumer />)).toThrow(
       "useAudioPlayerProgress must be used within AudioPlayerProvider",
+    );
+  });
+
+  it("useNowPlayingEpisodeId throws without provider", () => {
+    function BadConsumer() {
+      useNowPlayingEpisodeId();
+      return null;
+    }
+    expect(() => render(<BadConsumer />)).toThrow(
+      "useNowPlayingEpisodeId must be used within AudioPlayerProvider",
+    );
+  });
+
+  it("useIsPlaying throws without provider", () => {
+    function BadConsumer() {
+      useIsPlaying();
+      return null;
+    }
+    expect(() => render(<BadConsumer />)).toThrow(
+      "useIsPlaying must be used within AudioPlayerProvider",
+    );
+  });
+
+  it("useIsEpisodeInQueue throws without provider", () => {
+    function BadConsumer() {
+      useIsEpisodeInQueue("any");
+      return null;
+    }
+    expect(() => render(<BadConsumer />)).toThrow(
+      "useIsEpisodeInQueue must be used within AudioPlayerProvider",
     );
   });
 });
