@@ -765,12 +765,22 @@ describe("NotificationPageList", () => {
     await user.click(screen.getAllByRole("button", { name: /dismiss/i })[0]);
     expect(mockDismissNotification).toHaveBeenCalledWith(1);
 
-    // Let the dismiss fail — offset should be restored to N.
-    resolveDismiss({ success: false });
+    // Let the dismiss fail — offset should be restored to N. Wrap in act() so
+    // the rollback's setItems flush isn't observed mid-render by waitFor.
+    await act(async () => {
+      resolveDismiss({ success: false });
+    });
     await waitFor(() => {
       // Row reappears after rollback.
       expect(screen.getAllByRole("article")).toHaveLength(N);
     });
+    // Surface the failure to the user so they know the dismiss didn't stick.
+    expect(mockToastError).toHaveBeenCalledWith(
+      "Failed to dismiss notification",
+      expect.objectContaining({
+        action: expect.objectContaining({ label: "Retry" }),
+      }),
+    );
 
     // Load more after the failed dismiss must use the original offset N.
     await user.click(screen.getByRole("button", { name: /load more/i }));
@@ -780,6 +790,61 @@ describe("NotificationPageList", () => {
         N,
         undefined,
       );
+    });
+  });
+
+  // Regression (#315): Load more fired while dismiss is in-flight uses offset
+  // N-1, so the returned page can overlap with rows still in state. If the
+  // dismiss then fails (rollback restores its row), an unguarded append would
+  // produce duplicate ids and React key collisions. The component must dedupe.
+  it("does not duplicate ids when Load more overlaps with a failing dismiss", async () => {
+    let resolveDismiss!: (v: { success: boolean }) => void;
+    mockDismissNotification.mockReturnValue(
+      new Promise<{ success: boolean }>((res) => {
+        resolveDismiss = res;
+      }),
+    );
+    // Server response simulates the overlap: Load more with offset N-1 returns
+    // a row whose id collides with the still-pending dismiss target plus a new
+    // row that has not been seen.
+    mockGetNotifications.mockResolvedValue({
+      notifications: [makeItem({ id: 3 }), makeItem({ id: 4 })],
+      hasMore: false,
+      error: null,
+    });
+
+    const user = userEvent.setup();
+    const N = 3;
+    const items = Array.from({ length: N }, (_, i) => makeItem({ id: i + 1 }));
+    render(
+      <NotificationPageList
+        initialItems={items}
+        initialHasMore={true}
+        initialTopicsByEpisode={{}}
+      />,
+    );
+
+    // Dismiss row 1 — server still pending.
+    await user.click(screen.getAllByRole("button", { name: /dismiss/i })[0]);
+
+    // Load more uses offset N-1; mocked response includes overlapping id 3.
+    await user.click(screen.getByRole("button", { name: /load more/i }));
+    await waitFor(() => {
+      expect(mockGetNotifications).toHaveBeenCalledWith(
+        NOTIFICATIONS_PAGE_SIZE,
+        N - 1,
+        undefined,
+      );
+    });
+
+    // Now fail the dismiss so row 1 reappears via rollback.
+    await act(async () => {
+      resolveDismiss({ success: false });
+    });
+
+    // Final visible state: ids 1, 2, 3, 4 — no duplicates of id 3.
+    await waitFor(() => {
+      expect(screen.getAllByRole("article")).toHaveLength(4);
     });
   });
 

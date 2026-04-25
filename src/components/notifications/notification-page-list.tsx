@@ -138,12 +138,14 @@ export function NotificationPageList({
       setItems((prev) =>
         prev.map((n) => (n.id === id ? { ...n, pendingDismiss: true } : n)),
       );
-      offsetRef.current = Math.max(0, offsetRef.current - 1);
+      const offsetBefore = offsetRef.current;
+      offsetRef.current = Math.max(0, offsetBefore - 1);
+      const offsetDelta = offsetBefore - offsetRef.current;
       const rollback = (errorMessage: string) => {
         setItems((prev) =>
           prev.map((n) => (n.id === id ? { ...n, pendingDismiss: false } : n)),
         );
-        offsetRef.current += 1;
+        offsetRef.current += offsetDelta;
         toastErrorWithRetry(errorMessage, () => handleDismiss(id));
       };
       let result: Awaited<ReturnType<typeof dismissNotification>>;
@@ -273,7 +275,15 @@ export function NotificationPageList({
             );
           }
         }
-        setItems((prev) => [...prev, ...newItems]);
+        // De-dupe by id: a Load more fired during an in-flight dismiss uses
+        // offset N-1; if that dismiss later fails (rollback restores the row),
+        // the appended page can overlap with already-rendered rows. Filtering
+        // here keeps React keys unique without coupling to dismiss state (#315).
+        setItems((prev) => {
+          const seen = new Set(prev.map((n) => n.id));
+          const additions = newItems.filter((n) => !seen.has(n.id));
+          return additions.length === 0 ? prev : [...prev, ...additions];
+        });
         setTopicsByEpisode((prev) => ({ ...prev, ...newTopics }));
         if (newListenedPiIds.length > 0) {
           setListenedIds((prev) =>
