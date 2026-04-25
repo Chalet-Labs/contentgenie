@@ -36,7 +36,7 @@ Add three small contexts alongside the existing fat `AudioPlayerStateContext`:
 2. `IsPlayingContext` — value: `boolean`.
 3. `QueueEpisodeIdsContext` — value: `ReadonlySet<string>`.
 
-The three values are derived inside `AudioPlayerProvider` from the same single source of truth (the reducer's `state`). Only the queue Set requires `useMemo` — primitives bail out automatically.
+The three values are derived inside `AudioPlayerProvider` from the same single source of truth (the reducer's `state`). Only the queue Set requires `useMemo` — primitives bail out automatically. The Set memo additionally compares against the previously-emitted Set by content (a `useRef` cache) so reducer actions that produce a new queue array with identical membership (`REORDER_QUEUE`, focus-refetch INIT_QUEUE, metadata refreshes) preserve the Set reference and let consumers bail out via `Object.is`.
 
 Expose three narrow hooks:
 

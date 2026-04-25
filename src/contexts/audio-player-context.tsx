@@ -1482,12 +1482,26 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
 
   // Derive a Set of queued episode IDs so AddToQueueButton can subscribe to
   // queue membership without holding a reference to the full queue array.
-  // state.queue identity is stable across non-queue dispatches (see reducer),
-  // so this memo only invalidates on real ADD/REMOVE/REORDER/CLEAR/INIT actions.
-  const queueEpisodeIds = useMemo(
-    () => new Set(state.queue.map((ep) => ep.id)),
-    [state.queue],
-  );
+  // Preserve the previous Set reference when membership is unchanged (e.g.
+  // REORDER_QUEUE, or any action that produces a new queue array with the
+  // same ids) so context consumers bail out via Object.is.
+  const queueEpisodeIdsRef = useRef<ReadonlySet<string> | null>(null);
+  const queueEpisodeIds = useMemo(() => {
+    const prev = queueEpisodeIdsRef.current;
+    if (prev && prev.size === state.queue.length) {
+      let same = true;
+      for (const ep of state.queue) {
+        if (!prev.has(ep.id)) {
+          same = false;
+          break;
+        }
+      }
+      if (same) return prev;
+    }
+    const next = new Set(state.queue.map((ep) => ep.id));
+    queueEpisodeIdsRef.current = next;
+    return next;
+  }, [state.queue]);
 
   return (
     <AudioPlayerAPIContext.Provider value={api}>

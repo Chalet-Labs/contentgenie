@@ -63,17 +63,17 @@ export function audioPlayerContextDecorator(
   const api = { ...noopAudioPlayerAPI, ...overrides.api };
   const state = { ...idleAudioPlayerState, ...overrides.state };
   const progress = { ...idleAudioPlayerProgress, ...overrides.progress };
+  const queueEpisodeIds: ReadonlySet<string> = new Set(
+    state.queue.map((ep) => ep.id),
+  );
+  const nowPlayingEpisodeId = state.currentEpisode?.id ?? null;
 
   const AudioPlayerContextDecorator: Decorator = (Story) => (
     <AudioPlayerAPIContext.Provider value={api}>
       <AudioPlayerStateContext.Provider value={state}>
-        <NowPlayingEpisodeIdContext.Provider
-          value={state.currentEpisode?.id ?? null}
-        >
+        <NowPlayingEpisodeIdContext.Provider value={nowPlayingEpisodeId}>
           <IsPlayingContext.Provider value={state.isPlaying}>
-            <QueueEpisodeIdsContext.Provider
-              value={new Set(state.queue.map((ep) => ep.id))}
-            >
+            <QueueEpisodeIdsContext.Provider value={queueEpisodeIds}>
               <AudioPlayerProgressContext.Provider value={progress}>
                 <Story />
               </AudioPlayerProgressContext.Provider>

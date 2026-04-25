@@ -74,6 +74,14 @@ const unrelatedEpisode: AudioEpisode = {
   duration: 300,
 };
 
+const secondQueueEpisode: AudioEpisode = {
+  id: "ep-second-in-queue",
+  title: "Second Queue Episode",
+  podcastTitle: "Test Podcast",
+  audioUrl: "https://example.com/second.mp3",
+  duration: 450,
+};
+
 // ── Render-count infrastructure ───────────────────────────────────────────────
 // React.Profiler measures AddToQueueButton's actual renders regardless of how
 // it subscribes to contexts. A regression that re-adds useAudioPlayerState()
@@ -169,6 +177,19 @@ describe("AddToQueueButton render counts (real AudioPlayerProvider)", () => {
       const audio = document.querySelector("audio");
       audio?.dispatchEvent(new Event("pause"));
     });
+    expect(renders).toBe(baseline);
+  });
+
+  // REORDER_QUEUE produces a new queue array but identical membership.
+  // QueueEpisodeIdsContext memoizes on content equality, so the Set reference
+  // stays stable across reorders and queue-aware consumers must not re-render.
+  it("does not re-render when REORDER_QUEUE leaves membership unchanged", async () => {
+    render(<TestTree episode={testEpisode} />);
+    await act(async () => capturedAPI!.playEpisode(unrelatedEpisode));
+    await act(async () => capturedAPI!.addToQueue(testEpisode));
+    await act(async () => capturedAPI!.addToQueue(secondQueueEpisode));
+    const baseline = renders;
+    act(() => capturedAPI!.reorderQueue(0, 1));
     expect(renders).toBe(baseline);
   });
 
