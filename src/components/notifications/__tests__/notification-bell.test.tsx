@@ -1,11 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import {
-  render,
-  screen,
-  act,
-  fireEvent,
-  waitFor,
-} from "@testing-library/react";
+import { render, screen, act, fireEvent } from "@testing-library/react";
 import { NOTIFICATIONS_CHANGED_EVENT } from "@/lib/events";
 
 const mockGetUnreadCount = vi.fn();
