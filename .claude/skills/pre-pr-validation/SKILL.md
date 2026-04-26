@@ -17,7 +17,7 @@ You should invoke this skill proactively the moment a PR is discussed — don't 
 
 Run this pipeline inline in the calling session. Don't wrap it in a `Task` subagent.
 
-Phase 2.1 itself dispatches a background `Task({run_in_background: true})` for the Codex review, and `/pr-review-toolkit:review-pr all` dispatches further `Task` calls for each specialist reviewer. Subagents can't spawn further subagents — so wrapping this skill in an outer Task blocks the Codex step entirely, and may prevent `/pr-review-toolkit:review-pr` from launching its specialists. Net result: weaker review coverage, no context win (the heavy work was already going to happen in a fresh context; you'd just be stacking one more).
+Phase 2.1 itself dispatches a background `Task({run_in_background: true})` for the Codex review, and `/pr-review-toolkit:review-pr all` dispatches further `Task` calls for each specialist reviewer. Subagents can't spawn further subagents — so wrapping this skill in an outer Task blocks the Codex step entirely, and may prevent `/pr-review-toolkit:review-pr all` from launching its specialists. Net result: weaker review coverage, no context win (the heavy work was already going to happen in a fresh context; you'd just be stacking one more).
 
 If the caller's context is cluttered, the cost is mildly worse triage in Phase 3 — not broken reviews. That trade-off goes in favour of running inline.
 
@@ -82,7 +82,7 @@ The rubric is **additive, not a replacement.** Every reviewer keeps its existing
 
 #### Phase 2.1 — Launch reviewers in parallel
 
-Launch three reviews in parallel (one message, three independent tool calls). Each invocation must explicitly frame the rubric as supplementary and instruct the reviewer to cite section numbers (`[checklist §N]`) for any rubric-derived finding. If Phase 2.0 reported a missing rubric, omit the rubric block and the framing line — the reviewer runs in baseline mode.
+Launch three reviews in parallel (one message, three independent tool calls). Each invocation must explicitly frame the rubric as supplementary and instruct the reviewer to cite section numbers (`[checklist §N]`) for any rubric-derived finding. If the checklist was not found in Phase 2.0, omit the rubric block and the framing line — the reviewer runs in baseline mode.
 
 1. **Codex review** — dispatch a `Task` subagent with `run_in_background: true` to run `codex review --base main` via Bash. The background flag lets the orchestrator proceed without waiting; you'll be notified on completion.
 
