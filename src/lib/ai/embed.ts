@@ -111,6 +111,9 @@ async function requestEmbeddings(
     } catch {
       errorText = "<failed to read error body>";
     }
+    if (errorText.length > 500) {
+      errorText = `${errorText.slice(0, 500)}… [truncated]`;
+    }
     throw new EmbeddingError(
       `OpenRouter embeddings API error: ${response.status} - ${errorText}`,
       response.status,

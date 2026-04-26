@@ -2,6 +2,9 @@
   "name": "contentgenie",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "dev": "doppler run -- next dev --turbo",
     "build": "doppler run -- next build",

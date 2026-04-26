@@ -58,16 +58,26 @@ export async function streamCompletion(
   });
 
   const abortController = new AbortController();
+  const connectController = new AbortController();
+  const connectTimer = setTimeout(
+    () => connectController.abort(),
+    CONNECT_TIMEOUT_MS,
+  );
 
-  const response = await fetch(apiUrl, {
-    method: "POST",
-    headers,
-    body,
-    signal: AbortSignal.any([
-      abortController.signal,
-      AbortSignal.timeout(CONNECT_TIMEOUT_MS),
-    ]),
-  });
+  let response: Response;
+  try {
+    response = await fetch(apiUrl, {
+      method: "POST",
+      headers,
+      body,
+      signal: AbortSignal.any([
+        abortController.signal,
+        connectController.signal,
+      ]),
+    });
+  } finally {
+    clearTimeout(connectTimer);
+  }
 
   if (!response.ok) {
     const errorText = await response
