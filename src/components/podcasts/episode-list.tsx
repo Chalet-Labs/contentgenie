@@ -7,6 +7,10 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { PodcastIndexEpisode } from "@/lib/podcastindex";
 import type { SummaryStatus } from "@/db/schema";
+import {
+  asPodcastIndexEpisodeId,
+  type PodcastIndexEpisodeId,
+} from "@/types/ids";
 
 interface EpisodeListProps {
   episodes: PodcastIndexEpisode[];
@@ -17,15 +21,15 @@ interface EpisodeListProps {
   // String arrays (not Set) because props cross the RSC Flight boundary from
   // Server Components to this Client Component; Set is not serializable on
   // Next.js 14 / React 18 and becomes {} on the client.
-  listenedIds?: string[];
+  listenedIds?: PodcastIndexEpisodeId[];
   // Podcast-index-episode-ids (stringified) that exist in our DB and can be targeted by recordListenEvent.
   // Omit to allow marking on all episodes (library/trending surfaces where every episode is in-DB by construction).
-  knownIds?: string[];
+  knownIds?: PodcastIndexEpisodeId[];
   /**
-   * Top topics per episode, keyed by PodcastIndex id (string). Absent keys render
-   * no chips — episodes without summaries simply show nothing here.
+   * Top topics per episode, keyed by PodcastIndex id. Absent keys render no
+   * chips — episodes without summaries simply show nothing here.
    */
-  topicsByPodcastIndexId?: Record<string, string[]>;
+  topicsByPodcastIndexId?: Record<PodcastIndexEpisodeId, string[]>;
 }
 
 export function EpisodeList({
@@ -105,17 +109,21 @@ export function EpisodeList({
           </p>
         </div>
       ) : (
-        filteredEpisodes.map((episode) => (
-          <EpisodeCard
-            key={episode.id}
-            episode={episode}
-            summaryStatus={statusMap?.[String(episode.id)]}
-            worthItScore={scoreMap?.[String(episode.id)]}
-            isListened={listenedSet.has(String(episode.id))}
-            canMarkListened={knownSet ? knownSet.has(String(episode.id)) : true}
-            topics={topicsByPodcastIndexId?.[String(episode.id)]}
-          />
-        ))
+        filteredEpisodes.map((episode) => {
+          // PodcastIndex API id (number|string) → branded string.
+          const piId = asPodcastIndexEpisodeId(String(episode.id));
+          return (
+            <EpisodeCard
+              key={episode.id}
+              episode={episode}
+              summaryStatus={statusMap?.[piId]}
+              worthItScore={scoreMap?.[piId]}
+              isListened={listenedSet.has(piId)}
+              canMarkListened={knownSet ? knownSet.has(piId) : true}
+              topics={topicsByPodcastIndexId?.[piId]}
+            />
+          );
+        })
       )}
     </div>
   );

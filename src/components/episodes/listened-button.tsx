@@ -12,9 +12,10 @@ import {
 } from "@/components/ui/tooltip";
 import { recordListenEvent } from "@/app/actions/listen-history";
 import { LISTEN_STATE_CHANGED_EVENT } from "@/lib/events";
+import type { PodcastIndexEpisodeId } from "@/types/ids";
 
 interface ListenedButtonProps {
-  podcastIndexEpisodeId: string;
+  podcastIndexEpisodeId: PodcastIndexEpisodeId;
   isListened: boolean;
 }
 

@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { asPodcastIndexEpisodeId } from "@/types/ids";
 
 // Mock Trigger.dev SDK
 vi.mock("@trigger.dev/sdk", () => ({
@@ -108,7 +109,7 @@ describe("trigger/helpers/notifications", () => {
     const singleEpisode = [
       {
         episodeId: 100,
-        podcastIndexEpisodeId: "PI-100",
+        podcastIndexEpisodeId: asPodcastIndexEpisodeId("PI-100"),
         title: "Test Podcast",
         body: "New episode: Test Episode",
       },
@@ -138,13 +139,13 @@ describe("trigger/helpers/notifications", () => {
       await createEpisodeNotifications(1, [
         {
           episodeId: 100,
-          podcastIndexEpisodeId: "PI-100",
+          podcastIndexEpisodeId: asPodcastIndexEpisodeId("PI-100"),
           title: "Test Podcast",
           body: "New episode: Ep X",
         },
         {
           episodeId: 101,
-          podcastIndexEpisodeId: "PI-101",
+          podcastIndexEpisodeId: asPodcastIndexEpisodeId("PI-101"),
           title: "Test Podcast",
           body: "New episode: Ep Y",
         },
@@ -246,7 +247,7 @@ describe("trigger/helpers/notifications", () => {
       await createEpisodeNotifications(1, [
         {
           episodeId: 100,
-          podcastIndexEpisodeId: "PI-999",
+          podcastIndexEpisodeId: asPodcastIndexEpisodeId("PI-999"),
           title: "Test Podcast",
           body: "New episode: Test",
         },
@@ -319,13 +320,13 @@ describe("trigger/helpers/notifications", () => {
       await createEpisodeNotifications(1, [
         {
           episodeId: 100,
-          podcastIndexEpisodeId: "PI-100",
+          podcastIndexEpisodeId: asPodcastIndexEpisodeId("PI-100"),
           title: "Show",
           body: "New episode: A",
         },
         {
           episodeId: 101,
-          podcastIndexEpisodeId: "PI-101",
+          podcastIndexEpisodeId: asPodcastIndexEpisodeId("PI-101"),
           title: "Show",
           body: "New episode: B",
         },
@@ -446,7 +447,7 @@ describe("trigger/helpers/notifications", () => {
       await markSummaryReady(
         1,
         100,
-        "PI-100",
+        asPodcastIndexEpisodeId("PI-100"),
         "Test Podcast",
         "Summary ready: Test Episode",
       );
@@ -475,7 +476,7 @@ describe("trigger/helpers/notifications", () => {
       await markSummaryReady(
         1,
         100,
-        "PI-100",
+        asPodcastIndexEpisodeId("PI-100"),
         "Test Podcast",
         "Summary ready: Test Episode",
       );
@@ -502,7 +503,7 @@ describe("trigger/helpers/notifications", () => {
       await markSummaryReady(
         1,
         100,
-        "PI-100",
+        asPodcastIndexEpisodeId("PI-100"),
         "Test Podcast",
         "Summary ready: Test Episode",
       );
@@ -536,7 +537,7 @@ describe("trigger/helpers/notifications", () => {
       await markSummaryReady(
         1,
         100,
-        "PI-100",
+        asPodcastIndexEpisodeId("PI-100"),
         "Test Podcast",
         "Summary ready: Test Episode",
       );
@@ -567,7 +568,7 @@ describe("trigger/helpers/notifications", () => {
       await markSummaryReady(
         1,
         100,
-        "PI-100",
+        asPodcastIndexEpisodeId("PI-100"),
         "Test Podcast",
         "Summary ready: Test Episode",
       );
@@ -603,7 +604,7 @@ describe("trigger/helpers/notifications", () => {
       await markSummaryReady(
         1,
         100,
-        "PI-100",
+        asPodcastIndexEpisodeId("PI-100"),
         "Test Podcast",
         "Summary ready: Test Episode",
       );
@@ -624,7 +625,7 @@ describe("trigger/helpers/notifications", () => {
       await markSummaryReady(
         1,
         100,
-        "PI-100",
+        asPodcastIndexEpisodeId("PI-100"),
         "Test Podcast",
         "Summary ready: Test Episode",
       );
@@ -654,7 +655,7 @@ describe("trigger/helpers/notifications", () => {
       await markSummaryReady(
         1,
         100,
-        "PI-456",
+        asPodcastIndexEpisodeId("PI-456"),
         "Test Podcast",
         "Summary ready: Test Episode",
       );

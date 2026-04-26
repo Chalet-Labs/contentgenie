@@ -11,6 +11,7 @@ import {
   withoutWindow,
 } from "@/test/mocks/local-storage";
 import { validEpisode } from "@/test/fixtures/audio-episode";
+import { asPodcastIndexEpisodeId } from "@/types/ids";
 
 const STORAGE_KEY = "contentgenie-player-session";
 
@@ -256,7 +257,7 @@ describe("loadPlayerSession", () => {
 
   it("accepts episode without optional fields", () => {
     const minimalEpisode: AudioEpisode = {
-      id: "ep-min",
+      id: asPodcastIndexEpisodeId("ep-min"),
       title: "Minimal",
       podcastTitle: "Pod",
       audioUrl: "https://example.com/a.mp3",

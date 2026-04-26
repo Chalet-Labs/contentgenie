@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import type { TrendingTopic } from "@/db/schema";
 import type { RecommendedEpisodeDTO } from "@/db/library-columns";
+import { asPodcastIndexEpisodeId } from "@/types/ids";
 
 const mockGetTrendingTopicBySlug = vi.fn();
 vi.mock("@/app/actions/dashboard", () => ({
@@ -35,7 +36,7 @@ const climateTopic: TrendingTopic = {
 
 const mockEpisode: RecommendedEpisodeDTO = {
   id: 10,
-  podcastIndexId: "pod-10",
+  podcastIndexId: asPodcastIndexEpisodeId("pod-10"),
   title: "AI Episode",
   description: "About AI",
   audioUrl: "https://example.com/ai.mp3",

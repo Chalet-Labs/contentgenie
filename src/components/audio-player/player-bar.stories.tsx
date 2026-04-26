@@ -1,9 +1,10 @@
+import { asPodcastIndexEpisodeId } from "@/types/ids";
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { PlayerBar } from "./player-bar";
 import { audioPlayerContextDecorator } from "@/test/story-fixtures";
 
 const testEpisode = {
-  id: "ep-1",
+  id: asPodcastIndexEpisodeId("ep-1"),
   title: "How to Build Better Products",
   podcastTitle: "Design Matters",
   audioUrl: "https://example.com/audio.mp3",
@@ -12,7 +13,7 @@ const testEpisode = {
 };
 
 const longTitleEpisode = {
-  id: "ep-2",
+  id: asPodcastIndexEpisodeId("ep-2"),
   title:
     "The Extremely Long Episode Title That Should Be Truncated Because It Exceeds The Available Width In The Player Bar Component",
   podcastTitle: "My Very Long Podcast Name That Also Needs Truncation",
@@ -109,7 +110,7 @@ export const WithQueue: Story = {
         duration: 2400,
         queue: [
           {
-            id: "ep-3",
+            id: asPodcastIndexEpisodeId("ep-3"),
             title: "The Future of Web Development",
             podcastTitle: "Frontend First",
             audioUrl: "https://example.com/audio3.mp3",
@@ -117,7 +118,7 @@ export const WithQueue: Story = {
             duration: 1800,
           },
           {
-            id: "ep-4",
+            id: asPodcastIndexEpisodeId("ep-4"),
             title: "Understanding TypeScript Generics",
             podcastTitle: "TypeScript Weekly",
             audioUrl: "https://example.com/audio4.mp3",

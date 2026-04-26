@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { episodes, episodeTopics, podcasts } from "@/db/schema";
 import { upsertPodcast } from "@/db/helpers";
+import { asPodcastIndexEpisodeId } from "@/types/ids";
 import type { SummaryResult } from "@/lib/openrouter";
 import type {
   PodcastIndexPodcast,
@@ -58,8 +59,11 @@ export async function trackEpisodeRun(
   const podcastId = await ensurePodcast(episode.feedId, podcast);
   if (!podcastId) return;
 
+  // PodcastIndex API id (number|string) → branded string.
+  const piId = asPodcastIndexEpisodeId(episode.id.toString());
+
   const existingEp = await db.query.episodes.findFirst({
-    where: eq(episodes.podcastIndexId, episode.id.toString()),
+    where: eq(episodes.podcastIndexId, piId),
   });
 
   if (existingEp) {
@@ -77,7 +81,7 @@ export async function trackEpisodeRun(
       .insert(episodes)
       .values({
         podcastId,
-        podcastIndexId: episode.id.toString(),
+        podcastIndexId: piId,
         title: episode.title,
         description: episode.description,
         audioUrl: episode.enclosureUrl,
@@ -100,6 +104,8 @@ export async function updateEpisodeStatus(
   episodeId: number | string,
   status: "summarizing",
 ): Promise<void> {
+  // PodcastIndex API id (number|string from caller) → branded string for DB lookup.
+  const piId = asPodcastIndexEpisodeId(String(episodeId));
   await db
     .update(episodes)
     .set({
@@ -107,7 +113,7 @@ export async function updateEpisodeStatus(
       processingError: null,
       updatedAt: new Date(),
     })
-    .where(eq(episodes.podcastIndexId, String(episodeId)));
+    .where(eq(episodes.podcastIndexId, piId));
 }
 
 // persistTranscript is the sole writer of transcript columns — summarize-episode
@@ -121,6 +127,8 @@ export async function persistTranscript(
   source: "podcastindex" | "assemblyai" | "description-url",
 ): Promise<void> {
   const now = new Date();
+  // Trigger payload uses numeric form; brand for DB lookup.
+  const piId = asPodcastIndexEpisodeId(String(episodeId));
   const updated = await db
     .update(episodes)
     .set({
@@ -132,7 +140,7 @@ export async function persistTranscript(
       transcriptRunId: null,
       updatedAt: now,
     })
-    .where(eq(episodes.podcastIndexId, String(episodeId)))
+    .where(eq(episodes.podcastIndexId, piId))
     .returning({ id: episodes.id });
 
   if (updated.length === 0) {
@@ -170,9 +178,12 @@ export async function persistEpisodeSummary(
     throw new Error("Could not find or create podcast in database");
   }
 
+  // PodcastIndex API id (number|string) → branded string.
+  const piId = asPodcastIndexEpisodeId(episode.id.toString());
+
   // May have been created by trackEpisodeRun
   const existingEpisode = await db.query.episodes.findFirst({
-    where: eq(episodes.podcastIndexId, episode.id.toString()),
+    where: eq(episodes.podcastIndexId, piId),
   });
 
   if (existingEpisode) {
@@ -198,7 +209,7 @@ export async function persistEpisodeSummary(
       .insert(episodes)
       .values({
         podcastId,
-        podcastIndexId: episode.id.toString(),
+        podcastIndexId: piId,
         title: episode.title,
         description: episode.description,
         audioUrl: episode.enclosureUrl,

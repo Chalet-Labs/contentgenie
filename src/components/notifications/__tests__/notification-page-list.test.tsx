@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { NOTIFICATIONS_PAGE_SIZE } from "@/lib/notifications-constants";
+import { asPodcastIndexEpisodeId } from "@/types/ids";
 
 // --- Mocks ---
 
@@ -75,7 +76,16 @@ type NotificationItem = React.ComponentProps<
   typeof NotificationPageList
 >["initialItems"][0];
 
-function makeItem(overrides: Partial<NotificationItem> = {}): NotificationItem {
+type MakeItemOverrides = Partial<
+  Omit<NotificationItem, "episodePodcastIndexId">
+> & {
+  episodePodcastIndexId?: string | null;
+};
+
+function makeItem(overrides: MakeItemOverrides = {}): NotificationItem {
+  const { episodePodcastIndexId, ...rest } = overrides;
+  const piId =
+    episodePodcastIndexId === undefined ? "PI-42" : episodePodcastIndexId;
   return {
     id: 1,
     type: "new_episode",
@@ -84,14 +94,14 @@ function makeItem(overrides: Partial<NotificationItem> = {}): NotificationItem {
     isRead: false,
     createdAt: new Date("2026-01-15T10:00:00Z"),
     episodeDbId: 10,
-    episodePodcastIndexId: "PI-42",
+    episodePodcastIndexId: piId === null ? null : asPodcastIndexEpisodeId(piId),
     episodeTitle: "Test Episode",
     podcastTitle: "Test Podcast",
     worthItScore: "7.50",
     audioUrl: "https://example.com/audio.mp3",
     artwork: "https://example.com/art.jpg",
     duration: 3600,
-    ...overrides,
+    ...rest,
   };
 }
 
@@ -387,7 +397,7 @@ describe("NotificationPageList", () => {
         ]}
         initialHasMore={false}
         initialTopicsByEpisode={{}}
-        initialListenedIds={["PI-read"]}
+        initialListenedIds={[asPodcastIndexEpisodeId("PI-read")]}
       />,
     );
     // Row 1: unlistened → clickable Mark-as-listened button exists.
@@ -678,7 +688,7 @@ describe("NotificationPageList", () => {
         initialItems={[makeItem({ id: 1, episodePodcastIndexId: "PI-42" })]}
         initialHasMore={false}
         initialTopicsByEpisode={{}}
-        initialListenedIds={["PI-42"]}
+        initialListenedIds={[asPodcastIndexEpisodeId("PI-42")]}
       />,
     );
     const card = screen.getByRole("article")

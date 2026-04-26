@@ -39,12 +39,13 @@ import {
 } from "@/contexts/audio-player-context";
 import type { Bookmark as BookmarkType } from "@/db/schema";
 import { BOOKMARK_CHANGED_EVENT } from "@/lib/events";
+import type { PodcastIndexEpisodeId } from "@/types/ids";
 
 interface BookmarksListProps {
   libraryEntryId: number;
   episodeDuration?: number | null;
   episodeAudioData?: {
-    podcastIndexId: string;
+    podcastIndexId: PodcastIndexEpisodeId;
     title: string;
     podcastTitle: string;
     audioUrl: string;

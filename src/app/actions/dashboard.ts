@@ -3,6 +3,10 @@
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import {
+  asPodcastIndexEpisodeId,
+  type PodcastIndexEpisodeId,
+} from "@/types/ids";
+import {
   eq,
   desc,
   and,
@@ -193,7 +197,10 @@ export async function getRecentEpisodesFromSubscriptions({
     const allEpisodes = Array.from(episodesByFeed.values()).flat();
 
     // Batch-query DB for worth-it scores (keyed by podcastIndexId = String(ep.id))
-    const podcastIndexIds = allEpisodes.map((ep) => String(ep.id));
+    // PodcastIndex API id (number|string) → branded string.
+    const podcastIndexIds = allEpisodes.map((ep) =>
+      asPodcastIndexEpisodeId(String(ep.id)),
+    );
     const scoreRows =
       podcastIndexIds.length > 0
         ? await db
@@ -205,7 +212,7 @@ export async function getRecentEpisodesFromSubscriptions({
             .where(inArray(episodes.podcastIndexId, podcastIndexIds))
         : [];
 
-    const scoreMap = new Map<string, number | null>();
+    const scoreMap = new Map<PodcastIndexEpisodeId, number | null>();
     for (const row of scoreRows) {
       const parsed =
         row.worthItScore !== null ? parseFloat(row.worthItScore) : null;
@@ -218,7 +225,9 @@ export async function getRecentEpisodesFromSubscriptions({
     // Merge scores onto episodes
     const enrichedEpisodes: RecentEpisode[] = allEpisodes.map((ep) => ({
       ...ep,
-      worthItScore: scoreMap.get(String(ep.id)) ?? null,
+      // PodcastIndex API id (number|string) → branded string for keyed lookup.
+      worthItScore:
+        scoreMap.get(asPodcastIndexEpisodeId(String(ep.id))) ?? null,
     }));
 
     // Sort: scored episodes by score DESC, then unscored by datePublished DESC
@@ -426,7 +435,9 @@ export async function getRecommendedEpisodes(
 }
 
 // Get topic overlap for a single episode — used by the episode detail page.
-export async function getEpisodeTopicOverlap(podcastIndexEpisodeId: string) {
+export async function getEpisodeTopicOverlap(
+  podcastIndexEpisodeId: PodcastIndexEpisodeId,
+) {
   if (!podcastIndexEpisodeId) return EMPTY_OVERLAP_RESULT;
 
   const { userId } = await auth();

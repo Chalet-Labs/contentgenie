@@ -1,3 +1,4 @@
+import { asPodcastIndexEpisodeId } from "@/types/ids";
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { ListMusic } from "lucide-react";
 import { type AudioEpisode } from "@/contexts/audio-player-context";
@@ -10,7 +11,7 @@ import {
 } from "@/test/story-fixtures";
 
 const playingEpisode: AudioEpisode = {
-  id: "ep-playing",
+  id: asPodcastIndexEpisodeId("ep-playing"),
   title: "Currently Playing Episode",
   podcastTitle: "Some Podcast",
   audioUrl: "https://example.com/playing.mp3",
@@ -19,7 +20,7 @@ const playingEpisode: AudioEpisode = {
 
 const queueEpisodes: AudioEpisode[] = [
   {
-    id: "ep-1",
+    id: asPodcastIndexEpisodeId("ep-1"),
     title: "How to Build Better Products",
     podcastTitle: "Design Matters",
     audioUrl: "https://example.com/audio1.mp3",
@@ -27,7 +28,7 @@ const queueEpisodes: AudioEpisode[] = [
     duration: 2400,
   },
   {
-    id: "ep-2",
+    id: asPodcastIndexEpisodeId("ep-2"),
     title: "The Future of AI in Healthcare",
     podcastTitle: "Tech Talk Daily",
     audioUrl: "https://example.com/audio2.mp3",
@@ -35,7 +36,7 @@ const queueEpisodes: AudioEpisode[] = [
     duration: 3600,
   },
   {
-    id: "ep-3",
+    id: asPodcastIndexEpisodeId("ep-3"),
     title:
       "An Extremely Long Title That Should Be Truncated In The Queue Panel",
     podcastTitle: "Conversations With Very Long Podcast Names",
@@ -107,7 +108,7 @@ export const LongTitles: Story = {
         ...playingState,
         queue: [
           {
-            id: "ep-long-1",
+            id: asPodcastIndexEpisodeId("ep-long-1"),
             title:
               "An Episode With An Extremely Long Title That Will Definitely Overflow And Need Truncation In The Queue Panel List",
             podcastTitle:
@@ -116,7 +117,7 @@ export const LongTitles: Story = {
             duration: 4500,
           },
           {
-            id: "ep-long-2",
+            id: asPodcastIndexEpisodeId("ep-long-2"),
             title:
               "Another Very Long Episode Title: Deep Dive Into The Minutiae Of Something Extremely Complicated And Verbose",
             podcastTitle: "The Long-Winded Podcast",

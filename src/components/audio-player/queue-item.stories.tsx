@@ -1,3 +1,4 @@
+import { asPodcastIndexEpisodeId } from "@/types/ids";
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { DndContext } from "@dnd-kit/core";
 import {
@@ -8,7 +9,7 @@ import type { AudioEpisode } from "@/contexts/audio-player-context";
 import { QueueItem } from "@/components/audio-player/queue-item";
 
 const testEpisode: AudioEpisode = {
-  id: "ep-1",
+  id: asPodcastIndexEpisodeId("ep-1"),
   title: "How to Build Better Products",
   podcastTitle: "Design Matters",
   audioUrl: "https://example.com/audio.mp3",
@@ -17,7 +18,7 @@ const testEpisode: AudioEpisode = {
 };
 
 const longTitleEpisode: AudioEpisode = {
-  id: "ep-2",
+  id: asPodcastIndexEpisodeId("ep-2"),
   title:
     "The Extremely Long Episode Title That Should Be Truncated Because It Exceeds The Available Width",
   podcastTitle:

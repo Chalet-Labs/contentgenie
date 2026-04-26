@@ -8,6 +8,7 @@ import {
 import { eq, inArray } from "drizzle-orm";
 import { sendPushToUser, consolePushLogger } from "@/lib/push";
 import { ROUTES } from "@/lib/routes";
+import type { PodcastIndexEpisodeId } from "@/types/ids";
 
 async function getNotificationPrefs(userId: string): Promise<{
   digestFrequency: "realtime" | "daily" | "weekly";
@@ -146,7 +147,7 @@ export async function createBulkNotifications(
         .filter((id): id is number => id != null),
     ),
   );
-  const episodePodcastIndexMap = new Map<number, string>();
+  const episodePodcastIndexMap = new Map<number, PodcastIndexEpisodeId>();
   if (episodeDbIds.length > 0) {
     try {
       const episodeRows = await db.query.episodes.findMany({

@@ -7,9 +7,13 @@ import { episodes, listenHistory } from "@/db/schema";
 import { auth } from "@clerk/nextjs/server";
 import { withAuthAction } from "@/lib/auth-wrapper";
 import type { ActionResult } from "@/types/action-result";
+import {
+  asPodcastIndexEpisodeId,
+  type PodcastIndexEpisodeId,
+} from "@/types/ids";
 
 export async function recordListenEvent(input: {
-  podcastIndexEpisodeId: string;
+  podcastIndexEpisodeId: PodcastIndexEpisodeId;
   completed?: boolean;
   durationSeconds?: number;
 }): Promise<ActionResult> {
@@ -34,11 +38,16 @@ export async function recordListenEvent(input: {
     return { success: false, error: "Invalid durationSeconds" };
   }
 
+  // Post-validation cast — input already trimmed and length-checked.
+  const brandedEpisodeId = asPodcastIndexEpisodeId(
+    trimmedPodcastIndexEpisodeId,
+  );
+
   return withAuthAction(async (userId) => {
     try {
       const episode = await db.query.episodes.findFirst({
         columns: { id: true },
-        where: eq(episodes.podcastIndexId, trimmedPodcastIndexEpisodeId),
+        where: eq(episodes.podcastIndexId, brandedEpisodeId),
       });
 
       if (!episode) {
@@ -55,7 +64,7 @@ export async function recordListenEvent(input: {
         .values({
           userId,
           episodeId,
-          podcastIndexEpisodeId: trimmedPodcastIndexEpisodeId,
+          podcastIndexEpisodeId: brandedEpisodeId,
           startedAt: now,
           completedAt: completed ? now : null,
           listenDurationSeconds: durationSeconds ?? null,

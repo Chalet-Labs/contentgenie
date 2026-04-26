@@ -6,6 +6,7 @@ import {
   type AudioEpisode,
 } from "@/contexts/audio-player-context";
 import { PlayEpisodeButton } from "@/components/audio-player/play-episode-button";
+import { asPodcastIndexEpisodeId } from "@/types/ids";
 import {
   createRenderCountHarness,
   stubHTMLMediaElement,
@@ -57,7 +58,7 @@ vi.mock("@/app/actions/player-session", () => ({
 }));
 
 const testEpisode: AudioEpisode = {
-  id: "ep-render-test",
+  id: asPodcastIndexEpisodeId("ep-render-test"),
   title: "Render Count Test Episode",
   podcastTitle: "Test Podcast",
   audioUrl: "https://example.com/audio.mp3",
@@ -65,7 +66,7 @@ const testEpisode: AudioEpisode = {
 };
 
 const unrelatedEpisode: AudioEpisode = {
-  id: "ep-unrelated",
+  id: asPodcastIndexEpisodeId("ep-unrelated"),
   title: "Unrelated Episode",
   podcastTitle: "Other Podcast",
   audioUrl: "https://example.com/other.mp3",

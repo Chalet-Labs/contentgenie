@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { makeClerkAuthMock } from "@/test/mocks/clerk-server";
+import type { PodcastIndexEpisodeId } from "@/types/ids";
 
 // Mock Clerk auth
 const mockAuth = vi.fn();
@@ -52,7 +53,10 @@ describe("getQueueEpisodeScores", () => {
     mockAuth.mockResolvedValue({ userId: null });
     const { getQueueEpisodeScores } =
       await import("@/app/actions/queue-scores");
-    const result = await getQueueEpisodeScores(["123", "456"]);
+    const result = await getQueueEpisodeScores([
+      "123",
+      "456",
+    ] as PodcastIndexEpisodeId[]);
     expect(result).toEqual({});
     expect(mockSelect).not.toHaveBeenCalled();
   });
@@ -60,7 +64,7 @@ describe("getQueueEpisodeScores", () => {
   it("returns empty object for empty input", async () => {
     const { getQueueEpisodeScores } =
       await import("@/app/actions/queue-scores");
-    const result = await getQueueEpisodeScores([]);
+    const result = await getQueueEpisodeScores([] as PodcastIndexEpisodeId[]);
     expect(result).toEqual({});
     expect(mockSelect).not.toHaveBeenCalled();
   });
@@ -68,7 +72,11 @@ describe("getQueueEpisodeScores", () => {
   it("returns empty object when all IDs are empty strings", async () => {
     const { getQueueEpisodeScores } =
       await import("@/app/actions/queue-scores");
-    const result = await getQueueEpisodeScores(["", "  ", ""]);
+    const result = await getQueueEpisodeScores([
+      "",
+      "  ",
+      "",
+    ] as PodcastIndexEpisodeId[]);
     expect(result).toEqual({});
     expect(mockSelect).not.toHaveBeenCalled();
   });
@@ -81,7 +89,10 @@ describe("getQueueEpisodeScores", () => {
     mockWhere.mockReturnValue(Promise.resolve(dbRows));
     const { getQueueEpisodeScores } =
       await import("@/app/actions/queue-scores");
-    const result = await getQueueEpisodeScores(["111", "222"]);
+    const result = await getQueueEpisodeScores([
+      "111",
+      "222",
+    ] as PodcastIndexEpisodeId[]);
     expect(result).toEqual({
       "111": parseFloat(dbRows[0].worthItScore),
       "222": parseFloat(dbRows[1].worthItScore),
@@ -94,7 +105,9 @@ describe("getQueueEpisodeScores", () => {
     );
     const { getQueueEpisodeScores } =
       await import("@/app/actions/queue-scores");
-    const result = await getQueueEpisodeScores(["333"]);
+    const result = await getQueueEpisodeScores([
+      "333",
+    ] as PodcastIndexEpisodeId[]);
     expect(result).toEqual({ "333": null });
   });
 
@@ -107,14 +120,20 @@ describe("getQueueEpisodeScores", () => {
     );
     const { getQueueEpisodeScores } =
       await import("@/app/actions/queue-scores");
-    const result = await getQueueEpisodeScores(["111", "999"]);
+    const result = await getQueueEpisodeScores([
+      "111",
+      "999",
+    ] as PodcastIndexEpisodeId[]);
     expect(result).toEqual({ "111": 7.0 });
     expect(Object.hasOwn(result, "999")).toBe(false);
   });
 
   it("caps input at 50 IDs", async () => {
     const { inArray } = await import("drizzle-orm");
-    const ids = Array.from({ length: 60 }, (_, i) => String(i + 1));
+    const ids = Array.from(
+      { length: 60 },
+      (_, i) => String(i + 1) as PodcastIndexEpisodeId,
+    );
     const { getQueueEpisodeScores } =
       await import("@/app/actions/queue-scores");
     await getQueueEpisodeScores(ids);
@@ -127,7 +146,9 @@ describe("getQueueEpisodeScores", () => {
     mockWhere.mockReturnValue(Promise.reject(new Error("db failure")));
     const { getQueueEpisodeScores } =
       await import("@/app/actions/queue-scores");
-    const result = await getQueueEpisodeScores(["111"]);
+    const result = await getQueueEpisodeScores([
+      "111",
+    ] as PodcastIndexEpisodeId[]);
     expect(result).toEqual({});
   });
 });

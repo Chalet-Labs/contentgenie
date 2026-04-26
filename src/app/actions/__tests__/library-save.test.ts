@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { makeClerkAuthMock } from "@/test/mocks/clerk-server";
+import { asPodcastIndexEpisodeId } from "@/types/ids";
 
 // Mock Clerk auth
 const mockAuth = vi.fn();
@@ -92,7 +93,7 @@ describe("saveEpisodeToLibrary", () => {
 
     const { saveEpisodeToLibrary } = await import("@/app/actions/library");
     const result = await saveEpisodeToLibrary({
-      podcastIndexId: "ep1",
+      podcastIndexId: asPodcastIndexEpisodeId("ep1"),
       title: "Episode 1",
       podcast: {
         podcastIndexId: "pod1",
@@ -117,7 +118,7 @@ describe("saveEpisodeToLibrary", () => {
 
     const { saveEpisodeToLibrary } = await import("@/app/actions/library");
     const result = await saveEpisodeToLibrary({
-      podcastIndexId: "ep1",
+      podcastIndexId: asPodcastIndexEpisodeId("ep1"),
       title: "Episode 1",
       podcast: {
         podcastIndexId: "pod1",

@@ -2,6 +2,7 @@ import { task, retry, logger, metadata, wait } from "@trigger.dev/sdk";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { episodes } from "@/db/schema";
+import { asPodcastIndexEpisodeId } from "@/types/ids";
 import {
   fetchTranscript,
   extractTranscriptUrl,
@@ -50,6 +51,8 @@ export const fetchTranscriptTask = task({
       force = false,
       triggerSummarize = false,
     } = payload;
+    // Trigger payload uses numeric form; brand for DB lookup.
+    const piId = asPodcastIndexEpisodeId(String(episodeId));
 
     metadata.set("step", "fetching-transcript");
     logger.info("Checking for cached transcription");
@@ -66,7 +69,7 @@ export const fetchTranscriptTask = task({
     if (!force) {
       try {
         const existing = await db.query.episodes.findFirst({
-          where: eq(episodes.podcastIndexId, String(episodeId)),
+          where: eq(episodes.podcastIndexId, piId),
           columns: { transcription: true },
         });
         if (existing?.transcription?.trim()) {
@@ -275,7 +278,7 @@ export const fetchTranscriptTask = task({
           ...(!transcript && { transcriptStatus: "missing" }),
           updatedAt: new Date(),
         })
-        .where(eq(episodes.podcastIndexId, String(episodeId)));
+        .where(eq(episodes.podcastIndexId, piId));
     } catch (err) {
       logger.warn("Failed to clear transcriptRunId", {
         episodeId,
@@ -301,6 +304,8 @@ export const fetchTranscriptTask = task({
     return { transcript, source: dbSource };
   },
   onFailure: async ({ payload }) => {
+    // Trigger payload uses numeric form; brand for DB lookup.
+    const piId = asPodcastIndexEpisodeId(String(payload.episodeId));
     logger.error("Transcript fetch task failed permanently", {
       episodeId: payload.episodeId,
     });
@@ -312,7 +317,7 @@ export const fetchTranscriptTask = task({
           transcriptStatus: "failed",
           updatedAt: new Date(),
         })
-        .where(eq(episodes.podcastIndexId, String(payload.episodeId)));
+        .where(eq(episodes.podcastIndexId, piId));
     } catch (error) {
       logger.error("Failed to update episode status in onFailure", {
         episodeId: payload.episodeId,

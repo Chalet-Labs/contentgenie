@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { AudioEpisode } from "@/contexts/audio-player-context";
+import { asPodcastIndexEpisodeId } from "@/types/ids";
 
 const mockPlayEpisode = vi.fn();
 const mockTogglePlay = vi.fn();
@@ -23,7 +24,7 @@ vi.mock("@/contexts/audio-player-context", () => ({
 import { PlayEpisodeButton } from "@/components/audio-player/play-episode-button";
 
 const episode: AudioEpisode = {
-  id: "ep-42",
+  id: asPodcastIndexEpisodeId("ep-42"),
   title: "Episode Title",
   podcastTitle: "Podcast",
   audioUrl: "https://example.com/a.mp3",

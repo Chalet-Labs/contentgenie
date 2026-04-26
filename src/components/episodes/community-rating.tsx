@@ -5,9 +5,10 @@ import { Star, Users } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { getEpisodeAverageRating } from "@/app/actions/library";
 import { cn } from "@/lib/utils";
+import type { PodcastIndexEpisodeId } from "@/types/ids";
 
 interface CommunityRatingProps {
-  episodePodcastIndexId: string;
+  episodePodcastIndexId: PodcastIndexEpisodeId;
   size?: "sm" | "md" | "lg";
   showCount?: boolean;
 }

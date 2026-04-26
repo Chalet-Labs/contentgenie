@@ -1,7 +1,8 @@
 import type { AudioEpisode } from "@/contexts/audio-player-context";
+import { asPodcastIndexEpisodeId } from "@/types/ids";
 
 export const validEpisode: AudioEpisode = {
-  id: "ep-1",
+  id: asPodcastIndexEpisodeId("ep-1"),
   title: "Test Episode",
   podcastTitle: "Test Podcast",
   audioUrl: "https://example.com/audio.mp3",
@@ -10,7 +11,7 @@ export const validEpisode: AudioEpisode = {
 };
 
 export const validEpisode2: AudioEpisode = {
-  id: "ep-2",
+  id: asPodcastIndexEpisodeId("ep-2"),
   title: "Test Episode 2",
   podcastTitle: "Test Podcast",
   audioUrl: "https://example.com/audio2.mp3",

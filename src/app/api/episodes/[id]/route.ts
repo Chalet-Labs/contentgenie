@@ -6,6 +6,7 @@ import { episodes } from "@/db/schema";
 import { getEpisodeById, getPodcastById } from "@/lib/podcastindex";
 import { createRateLimitChecker } from "@/lib/rate-limit";
 import { parseScoreOrNull } from "@/lib/score-utils";
+import { asPodcastIndexEpisodeId } from "@/types/ids";
 
 const PUBLIC_CACHE_CONTROL = "public, s-maxage=300, stale-while-revalidate=600";
 const checkPublicEpisodeRateLimit = createRateLimitChecker({
@@ -83,13 +84,15 @@ export async function GET(
 
     // RSS-sourced episode: load from database
     if (isRssSourced(id)) {
+      // URL param (canonical "rss-..." form) → branded string for DB lookup.
+      const piId = asPodcastIndexEpisodeId(id);
       // BOLT OPTIMIZATION: Exclude the high-volume transcription field
       // which is not used in the response.
       // Expected impact: ~90% reduction in data transfer when transcripts are present.
       // Note: Uses column exclusion (vs. whitelist in the PodcastIndex path below)
       // because this query needs nearly all episode fields for response mapping.
       const dbEpisode = await db.query.episodes.findFirst({
-        where: eq(episodes.podcastIndexId, id),
+        where: eq(episodes.podcastIndexId, piId),
         columns: {
           transcription: false,
         },
@@ -178,6 +181,9 @@ export async function GET(
         { status: 400 },
       );
     }
+    // Round-trip through Number() so "00123" lookups normalise to "123" — DB
+    // stores the canonical PodcastIndex form. Then brand for DB lookup.
+    const piId = asPodcastIndexEpisodeId(episodeId.toString());
 
     // Fetch episode from PodcastIndex
     let episodeResponse;
@@ -220,7 +226,7 @@ export async function GET(
       // when only checking for cached summary data.
       // Expected impact: Significant reduction in DB I/O and memory usage per episode view.
       const cachedEpisode = await db.query.episodes.findFirst({
-        where: eq(episodes.podcastIndexId, episodeId.toString()),
+        where: eq(episodes.podcastIndexId, piId),
         columns: {
           id: true,
           summary: true,

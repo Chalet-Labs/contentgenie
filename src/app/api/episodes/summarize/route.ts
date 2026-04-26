@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { tasks, auth } from "@trigger.dev/sdk";
 import { db } from "@/db";
 import { episodes, IN_PROGRESS_STATUSES } from "@/db/schema";
+import { asPodcastIndexEpisodeId } from "@/types/ids";
 import {
   checkRateLimit,
   checkDailyLimit,
@@ -39,7 +40,11 @@ export async function POST(request: NextRequest) {
 
     // Check if we already have a cached summary in the database
     const existingEpisode = await db.query.episodes.findFirst({
-      where: eq(episodes.podcastIndexId, episodeId.toString()),
+      // JSON body numeric episode id → branded string for DB lookup.
+      where: eq(
+        episodes.podcastIndexId,
+        asPodcastIndexEpisodeId(episodeId.toString()),
+      ),
     });
 
     // Admin force re-summarize: reject non-admins trying to force
@@ -195,7 +200,8 @@ export async function GET(request: NextRequest) {
 
     // Check if we have a cached summary
     const existingEpisode = await db.query.episodes.findFirst({
-      where: eq(episodes.podcastIndexId, episodeId),
+      // URL search param (raw string) → branded string for DB lookup.
+      where: eq(episodes.podcastIndexId, asPodcastIndexEpisodeId(episodeId)),
     });
 
     if (existingEpisode?.summary && existingEpisode?.processedAt) {

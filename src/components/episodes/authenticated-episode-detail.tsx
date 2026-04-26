@@ -70,6 +70,7 @@ import {
   getSafeEpisodeLink,
   supportsEpisodeProcessing,
 } from "@/components/episodes/episode-detail-shared";
+import { asPodcastIndexEpisodeId } from "@/types/ids";
 
 interface AuthenticatedEpisodeDetailProps {
   episodeId: string;
@@ -107,6 +108,9 @@ export function AuthenticatedEpisodeDetail({
     labelKind: OverlapLabelKind | null;
   }>({ label: null, labelKind: null });
   const canRunEpisodeProcessing = supportsEpisodeProcessing(episodeId);
+  // Route param (URL segment) → branded string. Reused for downstream calls
+  // that key off the PodcastIndex episode-id namespace.
+  const episodeIdBranded = asPodcastIndexEpisodeId(episodeId);
 
   // Realtime subscription to the Trigger.dev run
   const { run } = useRealtimeRun<typeof summarizeEpisode>(runId ?? "", {
@@ -239,7 +243,10 @@ export function AuthenticatedEpisodeDetail({
       }
 
       // Check if episode is saved to library
-      const saved = await isEpisodeSaved(String(data.episode.id));
+      // PodcastIndex API id (number|string) → branded string.
+      const saved = await isEpisodeSaved(
+        asPodcastIndexEpisodeId(String(data.episode.id)),
+      );
       setIsSaved(saved);
     } catch (error) {
       console.error("Error fetching episode:", error);
@@ -293,7 +300,7 @@ export function AuthenticatedEpisodeDetail({
   useEffect(() => {
     if (!isOnline || !episodeLoaded) return;
     let ignore = false;
-    getEpisodeTopicOverlap(episodeId)
+    getEpisodeTopicOverlap(episodeIdBranded)
       .then((result) => {
         if (!ignore)
           setOverlapResult({
@@ -307,7 +314,7 @@ export function AuthenticatedEpisodeDetail({
     return () => {
       ignore = true;
     };
-  }, [isOnline, episodeLoaded, episodeId]);
+  }, [isOnline, episodeLoaded, episodeIdBranded]);
 
   // Generate summary — triggers a background task and subscribes to realtime updates
   const generateSummary = useCallback(async () => {
@@ -462,8 +469,10 @@ export function AuthenticatedEpisodeDetail({
       ? chaptersState.chapters.length
       : undefined;
 
-  const isCurrentEpisode =
-    playerState.currentEpisode?.id === String(episode.id);
+  // PodcastIndex API id (number|string) → branded string.
+  const piId = asPodcastIndexEpisodeId(String(episode.id));
+
+  const isCurrentEpisode = playerState.currentEpisode?.id === piId;
   const isPlayingThis = isCurrentEpisode && playerState.isPlaying;
   const isPausedThis = isCurrentEpisode && !playerState.isPlaying;
 
@@ -472,7 +481,7 @@ export function AuthenticatedEpisodeDetail({
       playerAPI.togglePlay();
     } else {
       playerAPI.playEpisode({
-        id: String(episode.id),
+        id: piId,
         title: episode.title,
         podcastTitle: podcast?.title || "",
         audioUrl: episode.enclosureUrl,
@@ -617,7 +626,7 @@ export function AuthenticatedEpisodeDetail({
                 Community Rating:
               </span>
               <CommunityRating
-                episodePodcastIndexId={episodeId}
+                episodePodcastIndexId={episodeIdBranded}
                 size="md"
                 showCount={true}
               />
@@ -649,7 +658,7 @@ export function AuthenticatedEpisodeDetail({
             {isOnline && episode.enclosureUrl && (
               <AddToQueueButton
                 episode={{
-                  id: String(episode.id),
+                  id: piId,
                   title: episode.title,
                   podcastTitle: podcast?.title || "",
                   audioUrl: episode.enclosureUrl,
@@ -666,7 +675,7 @@ export function AuthenticatedEpisodeDetail({
             {isOnline && (
               <SaveButton
                 episodeData={{
-                  podcastIndexId: String(episode.id),
+                  podcastIndexId: piId,
                   title: episode.title,
                   description: episode.description,
                   audioUrl: episode.enclosureUrl,
@@ -753,7 +762,7 @@ export function AuthenticatedEpisodeDetail({
                   state={chaptersState}
                   canPlay={canPlayEpisode}
                   audioEpisode={{
-                    id: String(episode.id),
+                    id: piId,
                     title: episode.title,
                     podcastTitle: podcast?.title || "",
                     audioUrl: episode.enclosureUrl,

@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { SaveButton } from "@/components/episodes/save-button";
+import { asPodcastIndexEpisodeId } from "@/types/ids";
 
 vi.mock("@/lib/offline-actions", () => ({
   offlineSaveEpisode: vi.fn(),
@@ -23,7 +24,7 @@ vi.mock("@/hooks/use-online-status", () => ({
 }));
 
 const mockEpisodeData = {
-  podcastIndexId: "123",
+  podcastIndexId: asPodcastIndexEpisodeId("123"),
   title: "Test Episode",
   description: "A test episode",
   podcast: {

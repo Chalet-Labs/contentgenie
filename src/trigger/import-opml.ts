@@ -9,6 +9,7 @@ import {
   generateEpisodeSyntheticId,
 } from "@/lib/rss";
 import type { OpmlFeed } from "@/lib/opml";
+import { asPodcastIndexEpisodeId } from "@/types/ids";
 
 const MAX_EPISODES_PER_FEED = 50;
 
@@ -199,7 +200,10 @@ async function importSingleFeed(userId: string, feed: OpmlFeed): Promise<void> {
   if (episodesToInsert.length > 0) {
     const episodeValues = episodesToInsert.map((ep) => ({
       podcastId,
-      podcastIndexId: generateEpisodeSyntheticId(feedUrl, ep.guid),
+      // RSS-sourced synthetic episode id → branded string for insert.
+      podcastIndexId: asPodcastIndexEpisodeId(
+        generateEpisodeSyntheticId(feedUrl, ep.guid),
+      ),
       title: ep.title,
       description: ep.description,
       audioUrl: ep.audioUrl,

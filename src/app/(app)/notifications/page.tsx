@@ -102,14 +102,16 @@ export default async function NotificationsPage({
   ]);
 
   const listenedDbIdSet = new Set(listenedDbIds);
-  const initialListenedIds = notifications
-    .filter(
-      (n) =>
-        n.episodeDbId !== null &&
-        listenedDbIdSet.has(n.episodeDbId) &&
-        n.episodePodcastIndexId,
-    )
-    .map((n) => n.episodePodcastIndexId as string);
+  const initialListenedIds = notifications.flatMap((n) => {
+    if (
+      n.episodeDbId !== null &&
+      listenedDbIdSet.has(n.episodeDbId) &&
+      n.episodePodcastIndexId !== null
+    ) {
+      return [n.episodePodcastIndexId]; // narrowed to PodcastIndexEpisodeId
+    }
+    return [];
+  });
 
   return (
     <div className="py-8">

@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { asPodcastIndexEpisodeId } from "@/types/ids";
 
 // Mock sync-queue before importing offline-actions
 const mockEnqueue = vi.fn();
@@ -28,7 +29,7 @@ vi.mock("@/app/actions/subscriptions", () => ({
 }));
 
 const sampleEpisodeData = {
-  podcastIndexId: "ep-123",
+  podcastIndexId: asPodcastIndexEpisodeId("ep-123"),
   title: "Test Episode",
   description: "A test",
   audioUrl: "https://example.com/audio.mp3",
@@ -174,7 +175,10 @@ describe("offlineUnsaveEpisode", () => {
     mockRemoveEpisodeFromLibrary.mockResolvedValue({ success: true });
 
     const { offlineUnsaveEpisode } = await import("@/lib/offline-actions");
-    const result = await offlineUnsaveEpisode("ep-123", true);
+    const result = await offlineUnsaveEpisode(
+      asPodcastIndexEpisodeId("ep-123"),
+      true,
+    );
 
     expect(mockRemoveEpisodeFromLibrary).toHaveBeenCalledWith("ep-123");
     expect(result.success).toBe(true);
@@ -182,7 +186,7 @@ describe("offlineUnsaveEpisode", () => {
 
   it("enqueues unsave-episode action when offline", async () => {
     const { offlineUnsaveEpisode } = await import("@/lib/offline-actions");
-    await offlineUnsaveEpisode("ep-123", false);
+    await offlineUnsaveEpisode(asPodcastIndexEpisodeId("ep-123"), false);
 
     expect(mockEnqueue).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -194,7 +198,10 @@ describe("offlineUnsaveEpisode", () => {
 
   it("returns queued:true when offline", async () => {
     const { offlineUnsaveEpisode } = await import("@/lib/offline-actions");
-    const result = await offlineUnsaveEpisode("ep-123", false);
+    const result = await offlineUnsaveEpisode(
+      asPodcastIndexEpisodeId("ep-123"),
+      false,
+    );
 
     expect(result.success).toBe(true);
     expect(result.queued).toBe(true);

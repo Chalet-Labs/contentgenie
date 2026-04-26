@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { asPodcastIndexEpisodeId } from "@/types/ids";
 
 // Inner chain: select → from → where → as (stand-in for the subquery object).
 const mockInnerAs = vi.fn(() => ({}));
@@ -65,7 +66,7 @@ describe("getTopicsByPodcastIndexId", () => {
   it("returns {} when no topic rows exist for the requested episodes", async () => {
     mockOuterOrderBy.mockResolvedValue([]);
     const result = await getTopicsByPodcastIndexId([
-      { id: 1, podcastIndexId: "PI-1" },
+      { id: 1, podcastIndexId: asPodcastIndexEpisodeId("PI-1") },
     ]);
     expect(result).toEqual({});
   });
@@ -78,9 +79,14 @@ describe("getTopicsByPodcastIndexId", () => {
       { episodeId: 1, topic: "D" },
     ]);
     const result = await getTopicsByPodcastIndexId([
-      { id: 1, podcastIndexId: "PI-1" },
+      { id: 1, podcastIndexId: asPodcastIndexEpisodeId("PI-1") },
     ]);
-    expect(result["PI-1"]).toEqual(["A", "B", "C", "D"]);
+    expect(result[asPodcastIndexEpisodeId("PI-1")]).toEqual([
+      "A",
+      "B",
+      "C",
+      "D",
+    ]);
   });
 
   it("trusts the DB cap — does not re-cap in JS if extra rows slip through", async () => {
@@ -93,9 +99,11 @@ describe("getTopicsByPodcastIndexId", () => {
     }));
     mockOuterOrderBy.mockResolvedValue(oversized);
     const result = await getTopicsByPodcastIndexId([
-      { id: 1, podcastIndexId: "PI-1" },
+      { id: 1, podcastIndexId: asPodcastIndexEpisodeId("PI-1") },
     ]);
-    expect(result["PI-1"]).toHaveLength(oversized.length);
+    expect(result[asPodcastIndexEpisodeId("PI-1")]).toHaveLength(
+      oversized.length,
+    );
   });
 
   it("remaps DB ids to PodcastIndex ids in the output keys", async () => {
@@ -104,8 +112,8 @@ describe("getTopicsByPodcastIndexId", () => {
       { episodeId: 20, topic: "Y" },
     ]);
     const result = await getTopicsByPodcastIndexId([
-      { id: 10, podcastIndexId: "PI-A" },
-      { id: 20, podcastIndexId: "PI-B" },
+      { id: 10, podcastIndexId: asPodcastIndexEpisodeId("PI-A") },
+      { id: 20, podcastIndexId: asPodcastIndexEpisodeId("PI-B") },
     ]);
     expect(result).toEqual({ "PI-A": ["X"], "PI-B": ["Y"] });
   });
@@ -114,7 +122,7 @@ describe("getTopicsByPodcastIndexId", () => {
     const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     mockOuterOrderBy.mockRejectedValue(new Error("neon unreachable"));
     const result = await getTopicsByPodcastIndexId([
-      { id: 1, podcastIndexId: "PI-1" },
+      { id: 1, podcastIndexId: asPodcastIndexEpisodeId("PI-1") },
     ]);
     expect(result).toEqual({});
     expect(errSpy).toHaveBeenCalledWith(

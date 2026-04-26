@@ -3,6 +3,7 @@ import {
   saveEpisodeToLibrary,
   removeEpisodeFromLibrary,
 } from "@/app/actions/library";
+import type { PodcastIndexEpisodeId } from "@/types/ids";
 import {
   subscribeToPodcast,
   unsubscribeFromPodcast,
@@ -18,7 +19,7 @@ export interface ActionResult {
 }
 
 interface EpisodeData {
-  podcastIndexId: string;
+  podcastIndexId: PodcastIndexEpisodeId;
   title: string;
   description?: string;
   audioUrl?: string;
@@ -99,7 +100,7 @@ export async function offlineSaveEpisode(
 }
 
 export async function offlineUnsaveEpisode(
-  podcastIndexId: string,
+  podcastIndexId: PodcastIndexEpisodeId,
   isOnline: boolean,
 ): Promise<ActionResult> {
   // Online path

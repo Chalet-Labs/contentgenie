@@ -4,10 +4,11 @@ import userEvent from "@testing-library/user-event";
 import { BookmarkButton } from "@/components/audio-player/bookmark-button";
 import type { AudioPlayerState } from "@/contexts/audio-player-context";
 import { BOOKMARK_CHANGED_EVENT } from "@/lib/events";
+import { asPodcastIndexEpisodeId } from "@/types/ids";
 
 const mockState: AudioPlayerState = {
   currentEpisode: {
-    id: "ep-123",
+    id: asPodcastIndexEpisodeId("ep-123"),
     title: "Test Episode",
     podcastTitle: "Test Pod",
     audioUrl: "http://example.com/a.mp3",
@@ -59,7 +60,7 @@ describe("BookmarkButton", () => {
     vi.clearAllMocks();
     vi.useFakeTimers({ shouldAdvanceTime: true });
     mockState.currentEpisode = {
-      id: "ep-123",
+      id: asPodcastIndexEpisodeId("ep-123"),
       title: "Test Episode",
       podcastTitle: "Test Pod",
       audioUrl: "http://example.com/a.mp3",

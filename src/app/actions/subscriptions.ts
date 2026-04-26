@@ -28,6 +28,7 @@ import {
   toggleSubscriptionSchema,
 } from "@/lib/schemas/library";
 import type { ActionResult } from "@/types/action-result";
+import { asPodcastIndexEpisodeId } from "@/types/ids";
 
 const MAX_EPISODES_PER_IMPORT = 50;
 
@@ -158,7 +159,10 @@ export async function addPodcastByRssUrl(
     if (episodesToInsert.length > 0) {
       const episodeValues = episodesToInsert.map((ep) => ({
         podcastId,
-        podcastIndexId: generateEpisodeSyntheticId(trimmedUrl, ep.guid),
+        // RSS-sourced synthetic episode id → branded string.
+        podcastIndexId: asPodcastIndexEpisodeId(
+          generateEpisodeSyntheticId(trimmedUrl, ep.guid),
+        ),
         title: ep.title,
         description: ep.description,
         audioUrl: ep.audioUrl,
@@ -405,7 +409,10 @@ export async function refreshPodcastFeed(podcastId: number) {
     let newEpisodes: typeof fetchedEpisodes = [];
     if (fetchedEpisodes.length > 0) {
       // Deduplicate: find which episodes already exist in DB
-      const fetchedIds = fetchedEpisodes.map((ep) => String(ep.id));
+      // PodcastIndex API id (number|string) → branded string for DB lookup.
+      const fetchedIds = fetchedEpisodes.map((ep) =>
+        asPodcastIndexEpisodeId(String(ep.id)),
+      );
       const existingEpisodes = await db
         .select({ podcastIndexId: episodes.podcastIndexId })
         .from(episodes)
@@ -414,8 +421,9 @@ export async function refreshPodcastFeed(podcastId: number) {
       const existingIds = new Set(
         existingEpisodes.map((e) => e.podcastIndexId),
       );
+      // Reuse fetchedIds (already computed above) to avoid re-branding.
       newEpisodes = fetchedEpisodes.filter(
-        (ep) => !existingIds.has(String(ep.id)),
+        (_, i) => !existingIds.has(fetchedIds[i]),
       );
 
       // Trigger summarization for new episodes (fire-and-forget from server context)

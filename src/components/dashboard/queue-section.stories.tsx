@@ -1,10 +1,11 @@
+import { asPodcastIndexEpisodeId } from "@/types/ids";
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { type AudioEpisode } from "@/contexts/audio-player-context";
 import { QueueSection } from "@/components/dashboard/queue-section";
 import { audioPlayerContextDecorator } from "@/test/story-fixtures";
 
 const nowPlayingEpisode: AudioEpisode = {
-  id: "2001",
+  id: asPodcastIndexEpisodeId("2001"),
   title: "The Future of AI in Healthcare",
   podcastTitle: "Tech Talk Daily",
   audioUrl: "https://example.com/playing.mp3",
@@ -14,7 +15,7 @@ const nowPlayingEpisode: AudioEpisode = {
 
 const queueEpisodes: AudioEpisode[] = [
   {
-    id: "1001",
+    id: asPodcastIndexEpisodeId("1001"),
     title: "How to Build Better Products",
     podcastTitle: "Design Matters",
     audioUrl: "https://example.com/audio1.mp3",
@@ -22,7 +23,7 @@ const queueEpisodes: AudioEpisode[] = [
     duration: 2400,
   },
   {
-    id: "1002",
+    id: asPodcastIndexEpisodeId("1002"),
     title: "Leadership in the Age of Remote Work",
     podcastTitle: "The Management Lab",
     audioUrl: "https://example.com/audio2.mp3",
@@ -30,7 +31,7 @@ const queueEpisodes: AudioEpisode[] = [
     duration: 1800,
   },
   {
-    id: "1003",
+    id: asPodcastIndexEpisodeId("1003"),
     title:
       "An Extremely Long Episode Title That Should Be Truncated When Displayed Inside the Queue Section Card Component",
     podcastTitle: "The Very Verbose and Long-Winded Podcast About Everything",
@@ -98,7 +99,7 @@ export const LongTitles: Story = {
     audioPlayerContextDecorator({
       state: {
         currentEpisode: {
-          id: "long-0",
+          id: asPodcastIndexEpisodeId("long-0"),
           title:
             "An Episode With An Extremely Long Title That Will Definitely Overflow And Need Truncation In The Queue Section On The Dashboard Page",
           podcastTitle:
@@ -116,14 +117,14 @@ export const NoArtwork: Story = {
     audioPlayerContextDecorator({
       state: {
         currentEpisode: {
-          id: "2001",
+          id: asPodcastIndexEpisodeId("2001"),
           title: "Episode Without Artwork",
           podcastTitle: "Text-only Podcast",
           audioUrl: "https://example.com/audio.mp3",
         },
         queue: [
           {
-            id: "1001",
+            id: asPodcastIndexEpisodeId("1001"),
             title: "Another Episode Without Artwork",
             podcastTitle: "Also No Artwork",
             audioUrl: "https://example.com/audio2.mp3",

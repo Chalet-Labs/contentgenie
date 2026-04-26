@@ -4,6 +4,7 @@ import { Calendar, Clock, Mic } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import type { PodcastIndexEpisode } from "@/lib/podcastindex";
 import { formatDuration, formatPublishDate } from "@/lib/podcastindex";
+import { asPodcastIndexEpisodeId } from "@/types/ids";
 import { stripHtml } from "@/lib/utils";
 import type { SummaryStatus } from "@/db/schema";
 import { AddToQueueButton } from "@/components/audio-player/add-to-queue-button";
@@ -31,9 +32,12 @@ export function EpisodeCard({
   canMarkListened = true,
   topics,
 }: EpisodeCardProps) {
+  // PodcastIndex API id (number|string) → branded string.
+  const piId = asPodcastIndexEpisodeId(String(episode.id));
+
   const audioEpisode = episode.enclosureUrl
     ? {
-        id: String(episode.id),
+        id: piId,
         title: episode.title,
         podcastTitle: episode.feedTitle ?? "Podcast",
         audioUrl: episode.enclosureUrl,
@@ -86,10 +90,7 @@ export function EpisodeCard({
         <AddToQueueButton episode={audioEpisode} variant="icon" />
       )}
       {canMarkListened && (
-        <ListenedButton
-          podcastIndexEpisodeId={String(episode.id)}
-          isListened={isListened}
-        />
+        <ListenedButton podcastIndexEpisodeId={piId} isListened={isListened} />
       )}
     </>
   );

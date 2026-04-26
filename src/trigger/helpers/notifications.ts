@@ -3,6 +3,7 @@ import { eq, and, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { sendPushToUser } from "@/lib/push";
 import { ROUTES } from "@/lib/routes";
+import type { PodcastIndexEpisodeId } from "@/types/ids";
 import {
   notifications,
   userSubscriptions,
@@ -70,7 +71,7 @@ const episodeTag = (episodeId: number) => `episode-${episodeId}`;
 
 export type NewEpisodeInput = {
   episodeId: number;
-  podcastIndexEpisodeId: string;
+  podcastIndexEpisodeId: PodcastIndexEpisodeId;
   title: string;
   body: string;
 };
@@ -166,7 +167,7 @@ export async function createEpisodeNotifications(
 export async function markSummaryReady(
   podcastId: number,
   episodeId: number,
-  podcastIndexEpisodeId: string,
+  podcastIndexEpisodeId: PodcastIndexEpisodeId,
   title: string,
   body: string,
 ): Promise<void> {

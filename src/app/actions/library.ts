@@ -14,9 +14,10 @@ import {
   type SavedItemDTO,
 } from "@/db/library-columns";
 import { saveEpisodeSchema, safeParseDate } from "@/lib/schemas/library";
+import type { PodcastIndexEpisodeId } from "@/types/ids";
 
 type EpisodeData = {
-  podcastIndexId: string;
+  podcastIndexId: PodcastIndexEpisodeId;
   title: string;
   description?: string;
   audioUrl?: string;
@@ -123,7 +124,9 @@ export async function saveEpisodeToLibrary(episodeData: EpisodeData) {
 }
 
 // Remove an episode from the user's library
-export async function removeEpisodeFromLibrary(episodePodcastIndexId: string) {
+export async function removeEpisodeFromLibrary(
+  episodePodcastIndexId: PodcastIndexEpisodeId,
+) {
   const { userId } = await auth();
 
   if (!userId) {
@@ -169,7 +172,7 @@ export async function removeEpisodeFromLibrary(episodePodcastIndexId: string) {
 
 // Check if an episode is saved to the user's library
 export async function isEpisodeSaved(
-  episodePodcastIndexId: string,
+  episodePodcastIndexId: PodcastIndexEpisodeId,
 ): Promise<boolean> {
   const { userId } = await auth();
 
@@ -276,7 +279,7 @@ export async function getUserLibrary(
 
 // Update notes for a library entry
 export async function updateLibraryNotes(
-  episodePodcastIndexId: string,
+  episodePodcastIndexId: PodcastIndexEpisodeId,
   notes: string,
 ) {
   const { userId } = await auth();
@@ -451,7 +454,7 @@ export async function deleteBookmark(bookmarkId: number) {
 
 // Update rating for a library entry
 export async function updateLibraryRating(
-  episodePodcastIndexId: string,
+  episodePodcastIndexId: PodcastIndexEpisodeId,
   rating: number,
 ) {
   const { userId } = await auth();
@@ -504,7 +507,9 @@ export async function updateLibraryRating(
 }
 
 // Get average rating for an episode across all users
-export async function getEpisodeAverageRating(episodePodcastIndexId: string) {
+export async function getEpisodeAverageRating(
+  episodePodcastIndexId: PodcastIndexEpisodeId,
+) {
   try {
     const [result] = await db
       .select({
@@ -542,7 +547,7 @@ export async function getEpisodeAverageRating(episodePodcastIndexId: string) {
 
 // Resolve a PodcastIndex episode ID to the user's library entry ID
 export async function getLibraryEntryByEpisodeId(
-  episodePodcastIndexId: string,
+  episodePodcastIndexId: PodcastIndexEpisodeId,
 ): Promise<{ libraryEntryId: number; episodeId: number } | null> {
   const { userId } = await auth();
 

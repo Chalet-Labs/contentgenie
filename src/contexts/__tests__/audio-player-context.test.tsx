@@ -11,6 +11,7 @@ import {
   useIsEpisodeInQueue,
   type AudioEpisode,
 } from "@/contexts/audio-player-context";
+import { asPodcastIndexEpisodeId } from "@/types/ids";
 
 // Mock media-session helpers
 vi.mock("@/lib/media-session", () => ({
@@ -91,7 +92,7 @@ beforeEach(() => {
 });
 
 const mockEpisode: AudioEpisode = {
-  id: "ep-123",
+  id: asPodcastIndexEpisodeId("ep-123"),
   title: "Test Episode",
   podcastTitle: "Test Podcast",
   audioUrl: "https://example.com/audio.mp3",
@@ -100,7 +101,7 @@ const mockEpisode: AudioEpisode = {
 };
 
 const queueEpisode1: AudioEpisode = {
-  id: "q-1",
+  id: asPodcastIndexEpisodeId("q-1"),
   title: "Queue Episode 1",
   podcastTitle: "Queue Podcast",
   audioUrl: "https://example.com/q1.mp3",
@@ -108,7 +109,7 @@ const queueEpisode1: AudioEpisode = {
 };
 
 const queueEpisode2: AudioEpisode = {
-  id: "q-2",
+  id: asPodcastIndexEpisodeId("q-2"),
   title: "Queue Episode 2",
   podcastTitle: "Queue Podcast",
   audioUrl: "https://example.com/q2.mp3",
@@ -116,7 +117,7 @@ const queueEpisode2: AudioEpisode = {
 };
 
 const queueEpisode3: AudioEpisode = {
-  id: "q-3",
+  id: asPodcastIndexEpisodeId("q-3"),
   title: "Queue Episode 3",
   podcastTitle: "Queue Podcast",
   audioUrl: "https://example.com/q3.mp3",
@@ -1083,7 +1084,7 @@ function ChapterConsumer() {
         onClick={() =>
           api.playEpisode({
             ...mockEpisode,
-            id: "ep-with-chapters",
+            id: asPodcastIndexEpisodeId("ep-with-chapters"),
             chaptersUrl: "https://example.com/chapters.json",
           })
         }
@@ -1521,7 +1522,7 @@ describe("Cross-device sync: hydration and reconcile", () => {
   it("replaces queue with server state when server returns a non-empty queue different from local", async () => {
     const serverQueue: AudioEpisode[] = [
       {
-        id: "server-1",
+        id: asPodcastIndexEpisodeId("server-1"),
         title: "Server Ep 1",
         podcastTitle: "Podcast",
         audioUrl: "https://example.com/s1.mp3",
@@ -1550,7 +1551,7 @@ describe("Cross-device sync: hydration and reconcile", () => {
   it("calls setQueue(localQueue) exactly once when server is empty and local cache is non-empty (migration)", async () => {
     const localQueue: AudioEpisode[] = [
       {
-        id: "local-1",
+        id: asPodcastIndexEpisodeId("local-1"),
         title: "Local Ep",
         podcastTitle: "Podcast",
         audioUrl: "https://example.com/l1.mp3",
@@ -1656,7 +1657,7 @@ describe("Cross-device sync: hydration and reconcile", () => {
   it("loads server session episode when a different episode is on device (cross-device sync)", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     const serverEpisode: AudioEpisode = {
-      id: "server-ep-x",
+      id: asPodcastIndexEpisodeId("server-ep-x"),
       title: "Server Episode",
       podcastTitle: "Podcast",
       audioUrl: "https://example.com/server.mp3",
@@ -1691,7 +1692,7 @@ describe("Cross-device sync: hydration and reconcile", () => {
     const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
     const serverQueue: AudioEpisode[] = [
       {
-        id: "server-1",
+        id: asPodcastIndexEpisodeId("server-1"),
         title: "Server Ep",
         podcastTitle: "Podcast",
         audioUrl: "https://example.com/s1.mp3",
@@ -1728,7 +1729,7 @@ describe("Cross-device sync: hydration and reconcile", () => {
   it("migration race: in-flight setQueue suppresses concurrent focus INIT_QUEUE dispatch", async () => {
     const localQueue: AudioEpisode[] = [
       {
-        id: "local-1",
+        id: asPodcastIndexEpisodeId("local-1"),
         title: "Local Ep",
         podcastTitle: "Podcast",
         audioUrl: "https://example.com/l1.mp3",
@@ -1780,7 +1781,7 @@ describe("Cross-device sync: hydration and reconcile", () => {
     // Start with server returning an initial queue (lastAcked = this)
     const initialServerQueue: AudioEpisode[] = [
       {
-        id: "acked-1",
+        id: asPodcastIndexEpisodeId("acked-1"),
         title: "Acked Ep",
         podcastTitle: "Podcast",
         audioUrl: "https://example.com/a1.mp3",
@@ -1865,7 +1866,7 @@ describe("Cross-device sync: hydration and reconcile", () => {
   it("does not write local queue back to server on cold boot when server has a different queue (local-wins regression)", async () => {
     const localQueue: AudioEpisode[] = [
       {
-        id: "local-1",
+        id: asPodcastIndexEpisodeId("local-1"),
         title: "Local Ep",
         podcastTitle: "Podcast",
         audioUrl: "https://example.com/l1.mp3",
@@ -1873,7 +1874,7 @@ describe("Cross-device sync: hydration and reconcile", () => {
     ];
     const serverQueue: AudioEpisode[] = [
       {
-        id: "server-1",
+        id: asPodcastIndexEpisodeId("server-1"),
         title: "Server Ep",
         podcastTitle: "Podcast",
         audioUrl: "https://example.com/s1.mp3",
@@ -2013,7 +2014,7 @@ describe("Cross-device sync: hydration and reconcile", () => {
   it("fires a toast when the migration upload fails", async () => {
     const localQueue: AudioEpisode[] = [
       {
-        id: "local-1",
+        id: asPodcastIndexEpisodeId("local-1"),
         title: "Local Ep",
         podcastTitle: "Podcast",
         audioUrl: "https://example.com/l1.mp3",
@@ -2086,7 +2087,7 @@ describe("Cross-device sync: hydration and reconcile", () => {
   it("focus refetch with mutated server metadata still applies the update", async () => {
     const localQueue: AudioEpisode[] = [
       {
-        id: "shared-id",
+        id: asPodcastIndexEpisodeId("shared-id"),
         title: "Old Title",
         podcastTitle: "Podcast",
         audioUrl: "https://example.com/old.mp3",
@@ -2094,7 +2095,7 @@ describe("Cross-device sync: hydration and reconcile", () => {
     ];
     const serverQueue: AudioEpisode[] = [
       {
-        id: "shared-id",
+        id: asPodcastIndexEpisodeId("shared-id"),
         title: "New Title",
         podcastTitle: "Podcast",
         audioUrl: "https://example.com/new.mp3",
