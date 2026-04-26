@@ -1,6 +1,4 @@
-import type { AiMessage } from "@/lib/ai";
-
-export { generateCompletion } from "@/lib/ai";
+import type { AiMessage } from "@/lib/ai/types";
 
 /** @deprecated Use `AiMessage` from `@/lib/ai` instead. */
 export type OpenRouterMessage = AiMessage;

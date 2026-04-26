@@ -1,9 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import {
-  parseJsonResponse,
-  generateCompletion,
-  SIGNAL_LABELS,
-} from "@/lib/openrouter";
+import { parseJsonResponse, SIGNAL_LABELS } from "@/lib/openrouter";
+import { generateCompletion } from "@/lib/ai";
 
 // generateCompletion routes through @/lib/ai which calls getActiveAiConfig() → DB.
 // Mock the config module so tests never touch the database.

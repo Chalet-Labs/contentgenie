@@ -5,6 +5,8 @@
  * See canonical-topics epic (#376).
  */
 
+import "server-only";
+
 const OPENROUTER_EMBEDDINGS_URL = "https://openrouter.ai/api/v1/embeddings";
 const REQUEST_TIMEOUT_MS = 30_000;
 
