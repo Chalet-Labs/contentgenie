@@ -676,6 +676,9 @@ type _SessionDenormKeys = keyof Omit<
 
 type _Assert<T extends true> = T;
 type _KeysMatch<A, B> = [A, B] extends [B, A] ? true : false;
+// Same shape as _KeysMatch, named for readability when comparing field types
+// (rather than key unions) — see the `_Pi*Branded` invariants below.
+type _TypesMatch<A, B> = [A, B] extends [B, A] ? true : false;
 
 // If either of these fails to compile, the denormalized columns and
 // AudioEpisode have drifted. Fix by adding/removing a column on
@@ -692,14 +695,17 @@ export type _SessionDenormInvariant = _Assert<
 // these columns, the matching assertion fails and the build breaks at the
 // source — see ADR-040 (Drizzle `$type` regression risk).
 export type _EpisodesPiIdBranded = _Assert<
-  _KeysMatch<Episode["podcastIndexId"], PodcastIndexEpisodeId>
+  _TypesMatch<Episode["podcastIndexId"], PodcastIndexEpisodeId>
 >;
 export type _ListenHistoryPiIdBranded = _Assert<
-  _KeysMatch<ListenHistoryEntry["podcastIndexEpisodeId"], PodcastIndexEpisodeId>
+  _TypesMatch<
+    ListenHistoryEntry["podcastIndexEpisodeId"],
+    PodcastIndexEpisodeId
+  >
 >;
 export type _QueueItemsPiIdBranded = _Assert<
-  _KeysMatch<UserQueueItem["episodeId"], PodcastIndexEpisodeId>
+  _TypesMatch<UserQueueItem["episodeId"], PodcastIndexEpisodeId>
 >;
 export type _PlayerSessionPiIdBranded = _Assert<
-  _KeysMatch<UserPlayerSession["episodeId"], PodcastIndexEpisodeId>
+  _TypesMatch<UserPlayerSession["episodeId"], PodcastIndexEpisodeId>
 >;

@@ -4,13 +4,18 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { EpisodeChaptersList } from "@/components/episodes/episode-chapters-list";
 import type { UseChaptersState } from "@/hooks/use-chapters";
 import type { AudioEpisode } from "@/contexts/audio-player-context";
-import { asPodcastIndexEpisodeId } from "@/types/ids";
+import {
+  asPodcastIndexEpisodeId,
+  type PodcastIndexEpisodeId,
+} from "@/types/ids";
 
 const mocks = vi.hoisted(() => ({
-  useAudioPlayerState:
-    vi.fn<
-      () => { currentEpisode: { id: string } | null; isPlaying: boolean }
-    >(),
+  useAudioPlayerState: vi.fn<
+    () => {
+      currentEpisode: { id: PodcastIndexEpisodeId } | null;
+      isPlaying: boolean;
+    }
+  >(),
   useAudioPlayerProgress: vi.fn(),
   useAudioPlayerAPI: vi.fn(),
 }));

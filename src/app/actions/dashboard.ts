@@ -212,7 +212,7 @@ export async function getRecentEpisodesFromSubscriptions({
             .where(inArray(episodes.podcastIndexId, podcastIndexIds))
         : [];
 
-    const scoreMap = new Map<string, number | null>();
+    const scoreMap = new Map<PodcastIndexEpisodeId, number | null>();
     for (const row of scoreRows) {
       const parsed =
         row.worthItScore !== null ? parseFloat(row.worthItScore) : null;
@@ -225,7 +225,9 @@ export async function getRecentEpisodesFromSubscriptions({
     // Merge scores onto episodes
     const enrichedEpisodes: RecentEpisode[] = allEpisodes.map((ep) => ({
       ...ep,
-      worthItScore: scoreMap.get(String(ep.id)) ?? null,
+      // PodcastIndex API id (number|string) → branded string for keyed lookup.
+      worthItScore:
+        scoreMap.get(asPodcastIndexEpisodeId(String(ep.id))) ?? null,
     }));
 
     // Sort: scored episodes by score DESC, then unscored by datePublished DESC

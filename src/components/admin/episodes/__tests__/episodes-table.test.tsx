@@ -14,7 +14,7 @@ vi.mock("@/components/admin/episodes/episode-action-buttons", () => ({
 import { EpisodesTable } from "@/components/admin/episodes/episodes-table";
 import { ROUTES } from "@/lib/routes";
 import type { EpisodeRow } from "@/lib/admin/episode-queries";
-import type { PodcastIndexEpisodeId } from "@/types/ids";
+import { asPodcastIndexEpisodeId } from "@/types/ids";
 
 const makeEpisode = (id: number): EpisodeRow => ({
   id,
@@ -22,7 +22,7 @@ const makeEpisode = (id: number): EpisodeRow => ({
   podcastId: 1,
   podcastTitle: "Test Podcast",
   podcastImageUrl: null,
-  podcastIndexId: `idx_${id}` as PodcastIndexEpisodeId,
+  podcastIndexId: asPodcastIndexEpisodeId(`idx_${id}`),
   publishDate: new Date("2026-01-15"),
   transcriptStatus: "available",
   transcriptSource: "assemblyai",

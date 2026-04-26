@@ -2,10 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { NOTIFICATIONS_PAGE_SIZE } from "@/lib/notifications-constants";
-import {
-  asPodcastIndexEpisodeId,
-  type PodcastIndexEpisodeId,
-} from "@/types/ids";
+import { asPodcastIndexEpisodeId } from "@/types/ids";
 
 // --- Mocks ---
 
@@ -400,7 +397,7 @@ describe("NotificationPageList", () => {
         ]}
         initialHasMore={false}
         initialTopicsByEpisode={{}}
-        initialListenedIds={["PI-read"] as PodcastIndexEpisodeId[]}
+        initialListenedIds={[asPodcastIndexEpisodeId("PI-read")]}
       />,
     );
     // Row 1: unlistened → clickable Mark-as-listened button exists.
@@ -691,7 +688,7 @@ describe("NotificationPageList", () => {
         initialItems={[makeItem({ id: 1, episodePodcastIndexId: "PI-42" })]}
         initialHasMore={false}
         initialTopicsByEpisode={{}}
-        initialListenedIds={["PI-42"] as PodcastIndexEpisodeId[]}
+        initialListenedIds={[asPodcastIndexEpisodeId("PI-42")]}
       />,
     );
     const card = screen.getByRole("article")

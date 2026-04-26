@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { PodcastIndexEpisodeId } from "@/types/ids";
+import { asPodcastIndexEpisodeId } from "@/types/ids";
 
 // Mock database
 const mockSelect = vi.fn();
@@ -42,7 +42,7 @@ describe("getEpisodeAverageRating", () => {
 
     const { getEpisodeAverageRating } = await import("@/app/actions/library");
     const result = await getEpisodeAverageRating(
-      "ep123" as PodcastIndexEpisodeId,
+      asPodcastIndexEpisodeId("ep123"),
     );
 
     expect(result.averageRating).toBe(4.0);
@@ -55,7 +55,7 @@ describe("getEpisodeAverageRating", () => {
 
     const { getEpisodeAverageRating } = await import("@/app/actions/library");
     const result = await getEpisodeAverageRating(
-      "ep123" as PodcastIndexEpisodeId,
+      asPodcastIndexEpisodeId("ep123"),
     );
 
     expect(result.averageRating).toBeNull();
@@ -68,7 +68,7 @@ describe("getEpisodeAverageRating", () => {
 
     const { getEpisodeAverageRating } = await import("@/app/actions/library");
     const result = await getEpisodeAverageRating(
-      "nonexistent" as PodcastIndexEpisodeId,
+      asPodcastIndexEpisodeId("nonexistent"),
     );
 
     expect(result.averageRating).toBeNull();
