@@ -1105,17 +1105,13 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
         }
         // Don't add if currently playing (queue dedup handled by reducer)
         if (current.currentEpisode.id === episode.id) return;
-        // Skip dispatch when the reducer would no-op (episode already queued).
-        // Otherwise the optimistic event fires for a no-op state change and
-        // every notifications-page subscriber pays the re-fetch cost.
         if (current.queue.some((ep) => ep.id === episode.id)) return;
         dispatch({ type: "ADD_TO_QUEUE", episode });
-        window.dispatchEvent(
-          new CustomEvent<NotificationsChangedEventDetail>(
-            NOTIFICATIONS_CHANGED_EVENT,
-            { detail: { episodeDbIds: [] } },
-          ),
-        );
+        // No optimistic NOTIFICATIONS_CHANGED_EVENT dispatch here — the
+        // debounced setQueue path (above) fires the reconciling event with
+        // server-resolved episode ids ~1.5s later. Optimistic dispatch with
+        // an empty payload forced /notifications into a topic-losing
+        // re-fetch (see ADR-041 history).
       },
 
       removeFromQueue: (episodeId: string) => {
@@ -1373,11 +1369,14 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
             : undefined,
         })
           .then((result) => {
-            if (result?.success && result.data?.episodeDbId !== undefined) {
+            const dismissedIds = result?.success
+              ? (result.data?.dismissedEpisodeDbIds ?? [])
+              : [];
+            if (dismissedIds.length > 0) {
               window.dispatchEvent(
                 new CustomEvent<NotificationsChangedEventDetail>(
                   NOTIFICATIONS_CHANGED_EVENT,
-                  { detail: { episodeDbIds: [result.data.episodeDbId] } },
+                  { detail: { episodeDbIds: dismissedIds } },
                 ),
               );
             }

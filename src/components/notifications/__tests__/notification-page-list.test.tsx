@@ -958,15 +958,12 @@ describe("NotificationPageList", () => {
     });
   });
 
-  // Empty-payload re-fetch: optimistic addToQueue dispatch with no episodeDbIds
-  it("NOTIFICATIONS_CHANGED_EVENT with empty payload re-fetches via getNotifications and calls router.refresh", async () => {
+  // Empty-payload events are no-ops — all production dispatch sites only fire
+  // on confirmed dismisses with populated ids. Guards against re-introducing
+  // the topic-losing re-fetch path that was removed in PR #402.
+  it("NOTIFICATIONS_CHANGED_EVENT with empty payload is a no-op (no re-fetch, no item changes)", async () => {
     const item1 = makeItem({ id: 1, episodeDbId: 10 });
     const item2 = makeItem({ id: 2, episodeDbId: 20 });
-    mockGetNotifications.mockResolvedValue({
-      notifications: [makeItem({ id: 99, episodeDbId: 99 })],
-      hasMore: false,
-      error: null,
-    });
 
     render(
       <NotificationPageList
@@ -985,14 +982,8 @@ describe("NotificationPageList", () => {
       );
     });
 
-    await waitFor(() => {
-      expect(mockGetNotifications).toHaveBeenCalledWith(
-        NOTIFICATIONS_PAGE_SIZE,
-        0,
-        undefined,
-      );
-      expect(screen.getAllByRole("article")).toHaveLength(1);
-      expect(mockRefresh).toHaveBeenCalled();
-    });
+    expect(mockGetNotifications).not.toHaveBeenCalled();
+    expect(screen.getAllByRole("article")).toHaveLength(2);
+    expect(mockRefresh).not.toHaveBeenCalled();
   });
 });

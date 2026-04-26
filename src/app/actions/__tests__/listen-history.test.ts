@@ -49,9 +49,7 @@ vi.mock("@/db/helpers", () => ({
 }));
 
 // Mock dismiss helper
-const mockDismissNotificationsForEpisodes = vi
-  .fn()
-  .mockResolvedValue(undefined);
+const mockDismissNotificationsForEpisodes = vi.fn().mockResolvedValue([]);
 vi.mock("@/app/actions/_internal/dismiss-notifications", () => ({
   dismissNotificationsForEpisodes: (...args: unknown[]) =>
     mockDismissNotificationsForEpisodes(...args),
@@ -263,13 +261,30 @@ describe("recordListenEvent", () => {
     expect(consoleSpy).toHaveBeenCalled();
   });
 
-  it("on completed:true success, returns { success: true, data: { episodeDbId: 42 } }", async () => {
+  it("on completed:true success, returns dismissedEpisodeDbIds from the helper", async () => {
+    mockDismissNotificationsForEpisodes.mockResolvedValueOnce([42]);
     const { recordListenEvent } = await import("@/app/actions/listen-history");
     const result = await recordListenEvent({
       podcastIndexEpisodeId: asPodcastIndexEpisodeId("777"),
       completed: true,
     });
-    expect(result).toEqual({ success: true, data: { episodeDbId: 42 } });
+    expect(result).toEqual({
+      success: true,
+      data: { dismissedEpisodeDbIds: [42] },
+    });
+  });
+
+  it("on completed:true with no rows flipped, returns dismissedEpisodeDbIds: []", async () => {
+    mockDismissNotificationsForEpisodes.mockResolvedValueOnce([]);
+    const { recordListenEvent } = await import("@/app/actions/listen-history");
+    const result = await recordListenEvent({
+      podcastIndexEpisodeId: asPodcastIndexEpisodeId("777"),
+      completed: true,
+    });
+    expect(result).toEqual({
+      success: true,
+      data: { dismissedEpisodeDbIds: [] },
+    });
   });
 
   it("on completed:true success, dismiss helper is invoked once with (userId, [episodeDbId])", async () => {
@@ -285,16 +300,19 @@ describe("recordListenEvent", () => {
     );
   });
 
-  it("on completed omitted, dismiss helper NOT invoked; result still success", async () => {
+  it("on completed omitted, dismiss helper NOT invoked; returns empty dismissedEpisodeDbIds", async () => {
     const { recordListenEvent } = await import("@/app/actions/listen-history");
     const result = await recordListenEvent({
       podcastIndexEpisodeId: asPodcastIndexEpisodeId("777"),
     });
-    expect(result.success).toBe(true);
+    expect(result).toEqual({
+      success: true,
+      data: { dismissedEpisodeDbIds: [] },
+    });
     expect(mockDismissNotificationsForEpisodes).not.toHaveBeenCalled();
   });
 
-  it("helper rejection does NOT change result success or data.episodeDbId", async () => {
+  it("helper rejection does NOT change result success; returns empty dismissedEpisodeDbIds", async () => {
     mockDismissNotificationsForEpisodes.mockRejectedValueOnce(
       new Error("dismiss failed"),
     );
@@ -304,7 +322,10 @@ describe("recordListenEvent", () => {
       podcastIndexEpisodeId: asPodcastIndexEpisodeId("777"),
       completed: true,
     });
-    expect(result).toEqual({ success: true, data: { episodeDbId: 42 } });
+    expect(result).toEqual({
+      success: true,
+      data: { dismissedEpisodeDbIds: [] },
+    });
     consoleSpy.mockRestore();
   });
 });

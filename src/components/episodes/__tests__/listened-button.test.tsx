@@ -19,7 +19,7 @@ describe("ListenedButton", () => {
     vi.clearAllMocks();
     mockRecordListenEvent.mockResolvedValue({
       success: true,
-      data: { episodeDbId: 42 },
+      data: { dismissedEpisodeDbIds: [42] },
     });
   });
 
@@ -200,7 +200,7 @@ describe("ListenedButton", () => {
   it("dispatches LISTEN_STATE_CHANGED_EVENT and shows success toast on success", async () => {
     mockRecordListenEvent.mockResolvedValue({
       success: true,
-      data: { episodeDbId: 42 },
+      data: { dismissedEpisodeDbIds: [42] },
     });
 
     const { ListenedButton } =
@@ -231,7 +231,7 @@ describe("ListenedButton", () => {
   it("dispatches NOTIFICATIONS_CHANGED_EVENT with detail.episodeDbIds=[42] on success", async () => {
     mockRecordListenEvent.mockResolvedValue({
       success: true,
-      data: { episodeDbId: 42 },
+      data: { dismissedEpisodeDbIds: [42] },
     });
 
     const { ListenedButton } =
@@ -257,5 +257,41 @@ describe("ListenedButton", () => {
       const event = notifsEvent![0] as CustomEvent<{ episodeDbIds: number[] }>;
       expect(event.detail.episodeDbIds).toEqual([42]);
     });
+  });
+
+  it("does NOT dispatch NOTIFICATIONS_CHANGED_EVENT when dismiss returned no ids", async () => {
+    mockRecordListenEvent.mockResolvedValue({
+      success: true,
+      data: { dismissedEpisodeDbIds: [] },
+    });
+
+    const { ListenedButton } =
+      await import("@/components/episodes/listened-button");
+    const dispatchSpy = vi.spyOn(window, "dispatchEvent");
+    const user = userEvent.setup();
+    render(
+      <ListenedButton
+        podcastIndexEpisodeId={TEST_PI_EPISODE_ID}
+        isListened={false}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Mark as listened" }));
+
+    await waitFor(() => {
+      // LISTEN_STATE_CHANGED_EVENT still fires, but no NOTIFICATIONS_CHANGED_EVENT.
+      const listenEvent = dispatchSpy.mock.calls.find(
+        (call) =>
+          call[0] instanceof CustomEvent &&
+          (call[0] as CustomEvent).type === LISTEN_STATE_CHANGED_EVENT,
+      );
+      expect(listenEvent).toBeTruthy();
+    });
+    const notifsEvent = dispatchSpy.mock.calls.find(
+      (call) =>
+        call[0] instanceof CustomEvent &&
+        (call[0] as CustomEvent).type === NOTIFICATIONS_CHANGED_EVENT,
+    );
+    expect(notifsEvent).toBeUndefined();
   });
 });

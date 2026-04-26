@@ -17,7 +17,7 @@ export async function recordListenEvent(input: {
   podcastIndexEpisodeId: PodcastIndexEpisodeId;
   completed?: boolean;
   durationSeconds?: number;
-}): Promise<ActionResult<{ episodeDbId: number }>> {
+}): Promise<ActionResult<{ dismissedEpisodeDbIds: number[] }>> {
   const { podcastIndexEpisodeId, completed, durationSeconds } = input;
   const trimmedPodcastIndexEpisodeId =
     typeof podcastIndexEpisodeId === "string"
@@ -97,19 +97,23 @@ export async function recordListenEvent(input: {
     // Dismiss path runs AFTER the primary write succeeded. Mirrors the
     // `setQueue` pattern so a future sync throw in the helper cannot
     // propagate back into a failure return.
+    let dismissedEpisodeDbIds: number[] = [];
     if (completed) {
       try {
-        await dismissNotificationsForEpisodes(userId, [episodeId]);
+        dismissedEpisodeDbIds = await dismissNotificationsForEpisodes(userId, [
+          episodeId,
+        ]);
       } catch (dismissError) {
         console.error("[recordListenEvent] dismiss failed", {
           userId,
           episodeId,
           error: dismissError,
         });
+        dismissedEpisodeDbIds = [];
       }
     }
 
-    return { success: true, data: { episodeDbId: episodeId } };
+    return { success: true, data: { dismissedEpisodeDbIds } };
   });
 }
 

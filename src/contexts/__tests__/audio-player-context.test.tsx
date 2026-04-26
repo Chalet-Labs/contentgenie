@@ -2160,7 +2160,7 @@ describe("AudioPlayerProvider — NOTIFICATIONS_CHANGED_EVENT dispatch sites", (
     vi.useRealTimers();
   });
 
-  it("optimistic addToQueue dispatches NOTIFICATIONS_CHANGED_EVENT with episodeDbIds=[]", async () => {
+  it("addToQueue does NOT dispatch NOTIFICATIONS_CHANGED_EVENT optimistically — debounced setQueue is the single source of truth", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     const { NOTIFICATIONS_CHANGED_EVENT } = await import("@/lib/events");
     const dispatchSpy = vi.spyOn(window, "dispatchEvent");
@@ -2180,7 +2180,7 @@ describe("AudioPlayerProvider — NOTIFICATIONS_CHANGED_EVENT dispatch sites", (
 
     dispatchSpy.mockClear();
 
-    // addToQueue a different episode — should trigger the optimistic dispatch
+    // addToQueue a different episode — should NOT immediately dispatch
     await user.click(screen.getByText("Add Q1"));
 
     const notifEvents = dispatchSpy.mock.calls.filter(
@@ -2188,9 +2188,7 @@ describe("AudioPlayerProvider — NOTIFICATIONS_CHANGED_EVENT dispatch sites", (
         call[0] instanceof CustomEvent &&
         (call[0] as CustomEvent).type === NOTIFICATIONS_CHANGED_EVENT,
     );
-    expect(notifEvents.length).toBeGreaterThanOrEqual(1);
-    const event = notifEvents[0][0] as CustomEvent<{ episodeDbIds: number[] }>;
-    expect(event.detail.episodeDbIds).toEqual([]);
+    expect(notifEvents.length).toBe(0);
   });
 
   it("play-immediately branch (currentEpisode=null) does NOT dispatch NOTIFICATIONS_CHANGED_EVENT", async () => {
@@ -2264,11 +2262,11 @@ describe("AudioPlayerProvider — NOTIFICATIONS_CHANGED_EVENT dispatch sites", (
     expect(event.detail.episodeDbIds).toEqual([10]);
   });
 
-  it("onEnded dispatches NOTIFICATIONS_CHANGED_EVENT with episodeDbId from recordListenEvent", async () => {
+  it("onEnded dispatches NOTIFICATIONS_CHANGED_EVENT with confirmed dismissedEpisodeDbIds from recordListenEvent", async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     mockRecordListenEvent.mockResolvedValue({
       success: true,
-      data: { episodeDbId: 99 },
+      data: { dismissedEpisodeDbIds: [99] },
     });
     const { NOTIFICATIONS_CHANGED_EVENT } = await import("@/lib/events");
     const dispatchSpy = vi.spyOn(window, "dispatchEvent");
@@ -2305,5 +2303,43 @@ describe("AudioPlayerProvider — NOTIFICATIONS_CHANGED_EVENT dispatch sites", (
       episodeDbIds: number[];
     }>;
     expect(event.detail.episodeDbIds).toEqual([99]);
+  });
+
+  it("onEnded does NOT dispatch NOTIFICATIONS_CHANGED_EVENT when dismiss returned no ids", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    mockRecordListenEvent.mockResolvedValue({
+      success: true,
+      data: { dismissedEpisodeDbIds: [] },
+    });
+    const { NOTIFICATIONS_CHANGED_EVENT } = await import("@/lib/events");
+    const dispatchSpy = vi.spyOn(window, "dispatchEvent");
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+    render(
+      <AudioPlayerProvider>
+        <TestConsumer />
+      </AudioPlayerProvider>,
+    );
+
+    await user.click(screen.getByText("Play Episode"));
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    dispatchSpy.mockClear();
+
+    await act(async () => {
+      fireAudioEvent("ended");
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const notifEvents = dispatchSpy.mock.calls.filter(
+      (call) =>
+        call[0] instanceof CustomEvent &&
+        (call[0] as CustomEvent).type === NOTIFICATIONS_CHANGED_EVENT,
+    );
+    expect(notifEvents.length).toBe(0);
   });
 });

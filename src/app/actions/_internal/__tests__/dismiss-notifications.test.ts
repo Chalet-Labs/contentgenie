@@ -14,7 +14,8 @@ vi.mock("@/db/schema", () => ({
   },
 }));
 
-const mockWhere = vi.fn().mockResolvedValue(undefined);
+const mockReturning = vi.fn().mockResolvedValue([]);
+const mockWhere = vi.fn().mockReturnValue({ returning: mockReturning });
 const mockSet = vi.fn().mockReturnValue({ where: mockWhere });
 const mockUpdate = vi.fn().mockReturnValue({ set: mockSet });
 
@@ -29,7 +30,8 @@ describe("dismissNotificationsForEpisodes", () => {
     vi.clearAllMocks();
     mockUpdate.mockReturnValue({ set: mockSet });
     mockSet.mockReturnValue({ where: mockWhere });
-    mockWhere.mockResolvedValue(undefined);
+    mockWhere.mockReturnValue({ returning: mockReturning });
+    mockReturning.mockResolvedValue([]);
   });
 
   it("issues an UPDATE on notifications with set({ isDismissed: true })", async () => {
@@ -56,11 +58,12 @@ describe("dismissNotificationsForEpisodes", () => {
     expect(and).toHaveBeenCalled();
   });
 
-  it("returns early without UPDATE when episodeIds is empty", async () => {
+  it("returns early ([]) without UPDATE when episodeIds is empty", async () => {
     const { dismissNotificationsForEpisodes } =
       await import("@/app/actions/_internal/dismiss-notifications");
-    await dismissNotificationsForEpisodes("user_123", []);
+    const result = await dismissNotificationsForEpisodes("user_123", []);
 
+    expect(result).toEqual([]);
     expect(mockUpdate).not.toHaveBeenCalled();
   });
 
@@ -83,25 +86,59 @@ describe("dismissNotificationsForEpisodes", () => {
     expect(passedIds).toContain(10);
   });
 
-  it("returns early (no UPDATE) when all ids are filtered out", async () => {
+  it("returns early ([]) (no UPDATE) when all ids are filtered out", async () => {
     const { dismissNotificationsForEpisodes } =
       await import("@/app/actions/_internal/dismiss-notifications");
-    await dismissNotificationsForEpisodes("user_123", [-1, 0, 1.5]);
+    const result = await dismissNotificationsForEpisodes(
+      "user_123",
+      [-1, 0, 1.5],
+    );
 
+    expect(result).toEqual([]);
     expect(mockUpdate).not.toHaveBeenCalled();
   });
 
-  it("swallows DB errors (no throw) and calls console.error", async () => {
+  it("returns episode ids actually flipped, deduped, with nulls dropped", async () => {
+    mockReturning.mockResolvedValueOnce([
+      { episodeId: 42 },
+      { episodeId: 42 },
+      { episodeId: 10 },
+      { episodeId: null },
+    ]);
+
+    const { dismissNotificationsForEpisodes } =
+      await import("@/app/actions/_internal/dismiss-notifications");
+    const result = await dismissNotificationsForEpisodes(
+      "user_123",
+      [42, 10, 99],
+    );
+
+    expect(result).toHaveLength(2);
+    expect(result).toContain(42);
+    expect(result).toContain(10);
+  });
+
+  it("returns [] when no rows were already-dismissed-or-missing", async () => {
+    mockReturning.mockResolvedValueOnce([]);
+
+    const { dismissNotificationsForEpisodes } =
+      await import("@/app/actions/_internal/dismiss-notifications");
+    const result = await dismissNotificationsForEpisodes("user_123", [42]);
+
+    expect(result).toEqual([]);
+  });
+
+  it("swallows DB errors, returns [], and calls console.error", async () => {
     const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const dbError = new Error("connection refused");
-    mockWhere.mockRejectedValue(dbError);
+    mockReturning.mockRejectedValueOnce(dbError);
 
     const { dismissNotificationsForEpisodes } =
       await import("@/app/actions/_internal/dismiss-notifications");
 
     await expect(
       dismissNotificationsForEpisodes("user_123", [42]),
-    ).resolves.toBeUndefined();
+    ).resolves.toEqual([]);
 
     expect(errorSpy).toHaveBeenCalledWith(
       "[dismissNotificationsForEpisodes] failed",

@@ -142,47 +142,30 @@ export function NotificationPageList({
     const handler = (e: Event) => {
       const detail = (e as CustomEvent<NotificationsChangedEventDetail>).detail;
       const ids = new Set(detail?.episodeDbIds ?? []);
-      if (ids.size > 0) {
-        setItems((prev) => {
-          const next = prev.filter(
-            (n) => n.episodeDbId === null || !ids.has(n.episodeDbId),
-          );
-          // Mirror handleDismiss: keep offsetRef in sync so a subsequent
-          // Load more uses the post-filter offset and doesn't skip rows.
-          const removed = prev.length - next.length;
-          if (removed > 0) {
-            offsetRef.current = Math.max(0, offsetRef.current - removed);
-          }
-          return next;
-        });
-      } else {
-        void (async () => {
-          try {
-            const result = await getNotifications(
-              NOTIFICATIONS_PAGE_SIZE,
-              0,
-              filter,
-            );
-            if (result.error) {
-              console.error("[notifications] re-fetch returned error", {
-                error: result.error,
-              });
-              return;
-            }
-            setItems(result.notifications);
-            setHasMore(result.hasMore ?? false);
-            offsetRef.current = result.notifications.length;
-          } catch (err) {
-            console.error("[notifications] re-fetch on event failed", err);
-          }
-        })();
+      // All production dispatch sites only fire on confirmed dismisses with
+      // populated ids — an empty payload is a no-op event we don't act on.
+      if (ids.size === 0) return;
+      let removed = 0;
+      setItems((prev) => {
+        const next = prev.filter(
+          (n) => n.episodeDbId === null || !ids.has(n.episodeDbId),
+        );
+        removed = prev.length - next.length;
+        return next;
+      });
+      // Mirror handleDismiss: keep offsetRef in sync so a subsequent
+      // Load more uses the post-filter offset and doesn't skip rows.
+      // Done outside the updater so a StrictMode double-invocation or
+      // concurrent re-render doesn't decrement twice.
+      if (removed > 0) {
+        offsetRef.current = Math.max(0, offsetRef.current - removed);
       }
       router.refresh();
     };
     window.addEventListener(NOTIFICATIONS_CHANGED_EVENT, handler);
     return () =>
       window.removeEventListener(NOTIFICATIONS_CHANGED_EVENT, handler);
-  }, [filter, router]);
+  }, [router]);
 
   const handleDismiss = useCallback((id: number) => {
     startTransition(async () => {
