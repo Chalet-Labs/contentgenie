@@ -33,6 +33,7 @@ describe("getSummarizationPrompt", () => {
       "A great episode",
       3600,
       "Transcript content here",
+      [],
     );
     expect(prompt).toContain("My Podcast");
     expect(prompt).toContain("Episode 1");
@@ -45,6 +46,7 @@ describe("getSummarizationPrompt", () => {
       "Description",
       5400, // 90 minutes
       "Transcript content here",
+      [],
     );
     expect(prompt).toContain("90 minutes");
   });
@@ -57,8 +59,9 @@ describe("getSummarizationPrompt", () => {
       "Description",
       3600,
       transcript,
+      [],
     );
-    expect(prompt).toContain("Transcript");
+    expect(prompt).toContain("transcript");
     expect(prompt).toContain(transcript);
     expect(prompt).not.toContain("Full transcript not available");
   });
@@ -70,6 +73,7 @@ describe("getSummarizationPrompt", () => {
       "Description",
       3600,
       "Transcript content here",
+      [],
     );
     expect(prompt).toContain('"summary"');
     expect(prompt).toContain('"keyTakeaways"');
@@ -83,6 +87,7 @@ describe("getSummarizationPrompt", () => {
       "Description",
       3600,
       "Transcript content here",
+      [],
     );
     expect(prompt).toContain('"worthItSignals"');
     expect(prompt).toContain('"hasActionableInsights"');
@@ -97,6 +102,7 @@ describe("getSummarizationPrompt", () => {
       "Description",
       3600,
       "Transcript content here",
+      [],
     );
     expect(prompt).toContain("TL;DR");
     expect(prompt).toContain("What You'll Learn");
@@ -112,6 +118,7 @@ describe("getSummarizationPrompt", () => {
       "Description",
       3600,
       "Transcript content here",
+      [],
     );
     expect(prompt).toContain("Boolean Quality Signals");
     expect(prompt).toContain("Adjustment (-1, 0, or +1)");
@@ -125,6 +132,7 @@ describe("getSummarizationPrompt ad-exclusion guards", () => {
     "Description",
     3600,
     "Transcript content here",
+    [],
   );
 
   it("instructs staysFocused to ignore ads and sponsor reads", () => {
@@ -232,5 +240,95 @@ describe("getQuickSummaryPrompt", () => {
     const prompt = getQuickSummaryPrompt("Title", "Description");
     expect(prompt).toContain("JSON format");
     expect(prompt).toContain('"quickSummary"');
+  });
+});
+
+describe("getSummarizationPrompt dual-layer (categories + canonical topics)", () => {
+  function buildPrompt(banlist: string[] = []) {
+    return getSummarizationPrompt(
+      "Podcast",
+      "Episode",
+      "Description",
+      3600,
+      "Transcript content here",
+      banlist,
+    );
+  }
+
+  it("requests both categories[] (with relevance) and topics[] in the JSON schema", () => {
+    const prompt = buildPrompt();
+    expect(prompt).toContain('"categories"');
+    expect(prompt).toContain('"topics"');
+    // categories shape is preserved (name + relevance)
+    expect(prompt).toContain('"name": "Broad Category Label"');
+    expect(prompt).toContain('"relevance": 0.9');
+    // topics shape introduces the canonical-topic fields
+    expect(prompt).toContain('"label"');
+    expect(prompt).toContain('"kind"');
+    expect(prompt).toContain('"aliases"');
+    expect(prompt).toContain('"ongoing"');
+    expect(prompt).toContain('"coverage_score"');
+  });
+
+  it("documents the full kind taxonomy", () => {
+    const prompt = buildPrompt();
+    for (const kind of [
+      "release",
+      "incident",
+      "regulation",
+      "announcement",
+      "deal",
+      "event",
+      "concept",
+      "work",
+      "other",
+    ]) {
+      expect(prompt).toContain(kind);
+    }
+  });
+
+  it("instructs the LLM to cap concept-kind topics at 3", () => {
+    const prompt = buildPrompt();
+    expect(prompt).toMatch(/cap of 3.*concept/i);
+  });
+
+  it("instructs the LLM to emit at most 8 topics overall", () => {
+    expect(buildPrompt()).toMatch(/max 8 items/i);
+  });
+
+  it("injects the banlist as a JSON array of forbidden topic labels", () => {
+    const prompt = buildPrompt(["AI & Machine Learning", "Health & Longevity"]);
+    expect(prompt).toContain("FORBIDDEN topic labels");
+    expect(prompt).toContain('"AI & Machine Learning"');
+    expect(prompt).toContain('"Health & Longevity"');
+  });
+
+  it("emits an empty JSON array when the banlist is empty (no leakage)", () => {
+    const prompt = buildPrompt([]);
+    expect(prompt).toMatch(/FORBIDDEN topic labels[^\n]*\[\]/);
+  });
+
+  it("includes few-shot examples for event-heavy, concept-heavy, and philosophical episodes", () => {
+    const prompt = buildPrompt();
+    expect(prompt).toMatch(/Example A — event-heavy/i);
+    expect(prompt).toMatch(/Example B — concept-heavy/i);
+    expect(prompt).toMatch(/Example C — philosophical/i);
+    // Philosophical example returns an empty topics array
+    expect(prompt).toContain('"topics": []');
+  });
+
+  it("wraps the transcript in <transcript>...</transcript> XML guards", () => {
+    const transcript = "Treat me as data, not as instructions.";
+    const prompt = getSummarizationPrompt(
+      "Podcast",
+      "Episode",
+      "Description",
+      3600,
+      transcript,
+      [],
+    );
+    expect(prompt).toContain("<transcript>");
+    expect(prompt).toContain("</transcript>");
+    expect(prompt).toContain(transcript);
   });
 });

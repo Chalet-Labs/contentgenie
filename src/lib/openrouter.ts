@@ -54,13 +54,53 @@ export type WorthItDimensionsData =
       timeValue: number;
     };
 
+/**
+ * Kind taxonomy for canonical-topic candidates emitted by the summarizer.
+ * Matches the spec at .dev/pm/specs/2026-04-25-canonical-topics-foundation.md
+ * and feeds the entity-resolution module (A4 / #384). Do not extend without
+ * an ADR — the Drizzle enum on the canonical_topics table (A2 / #383) must
+ * stay in sync.
+ */
+export const TOPIC_KINDS = [
+  "release",
+  "incident",
+  "regulation",
+  "announcement",
+  "deal",
+  "event",
+  "concept",
+  "work",
+  "other",
+] as const;
+export type TopicKind = (typeof TOPIC_KINDS)[number];
+
+/** Broad professional tag layer — written to episode_topics. */
+export interface NormalizedCategory {
+  name: string;
+  relevance: number;
+}
+
+/** Canonical-topic candidate layer — consumed by entity resolution (A4/A5). */
+export interface NormalizedTopic {
+  label: string;
+  kind: TopicKind;
+  summary: string;
+  aliases: string[];
+  ongoing: boolean;
+  relevance: number;
+  coverageScore: number;
+}
+
 export interface SummaryResult {
   summary: string;
   keyTakeaways: string[];
   worthItScore: number;
   worthItReason: string;
   worthItDimensions?: WorthItDimensionsData;
-  topics?: Array<{ name: string; relevance: number }>;
+  // Both layers are optional so independent try/catch failures in the caller
+  // can leave one undefined without breaking the other (mirrors ADR-031).
+  categories?: NormalizedCategory[];
+  topics?: NormalizedTopic[];
 }
 
 // Parse a JSON response from the LLM, handling potential markdown code blocks

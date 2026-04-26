@@ -261,10 +261,10 @@ describe("persistEpisodeSummary", () => {
     ).rejects.toThrow("Could not find or create podcast in database");
   });
 
-  describe("topic persistence", () => {
-    const summaryWithTopics = {
+  describe("category persistence", () => {
+    const summaryWithCategories = {
       ...baseSummary,
-      topics: [
+      categories: [
         { name: "AI & Machine Learning", relevance: 0.9 },
         { name: "Data Science", relevance: 0.75 },
       ],
@@ -284,7 +284,7 @@ describe("persistEpisodeSummary", () => {
       await persistEpisodeSummary(
         baseEpisode as never,
         undefined,
-        summaryWithTopics,
+        summaryWithCategories,
       );
 
       expect(mockDelete).toHaveBeenCalledTimes(1);
@@ -311,7 +311,7 @@ describe("persistEpisodeSummary", () => {
       await persistEpisodeSummary(
         baseEpisode as never,
         undefined,
-        summaryWithTopics,
+        summaryWithCategories,
       );
 
       expect(episodesChain.returning).toHaveBeenCalled();
@@ -322,7 +322,7 @@ describe("persistEpisodeSummary", () => {
       ]);
     });
 
-    it("does not delete or insert topics when topics array is empty", async () => {
+    it("does not delete or insert categories when categories array is empty", async () => {
       mockPodcastsFindFirst.mockResolvedValue({ id: 1 });
       mockEpisodesFindFirst.mockResolvedValue({ id: 10 });
       makeSimpleUpdateChain();
@@ -331,14 +331,14 @@ describe("persistEpisodeSummary", () => {
         await import("@/trigger/helpers/database");
       await persistEpisodeSummary(baseEpisode as never, undefined, {
         ...baseSummary,
-        topics: [],
+        categories: [],
       });
 
       expect(mockDelete).not.toHaveBeenCalled();
       expect(mockInsert).not.toHaveBeenCalled();
     });
 
-    it("does not delete or insert topics when topics is undefined", async () => {
+    it("does not delete or insert categories when categories is undefined", async () => {
       mockPodcastsFindFirst.mockResolvedValue({ id: 1 });
       mockEpisodesFindFirst.mockResolvedValue({ id: 10 });
       makeSimpleUpdateChain();
@@ -371,7 +371,7 @@ describe("persistEpisodeSummary", () => {
         persistEpisodeSummary(
           baseEpisode as never,
           undefined,
-          summaryWithTopics,
+          summaryWithCategories,
         ),
       ).rejects.toThrow("insert failed");
 

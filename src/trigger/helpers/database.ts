@@ -150,20 +150,22 @@ export async function persistTranscript(
   }
 }
 
-async function persistTopics(
+async function persistCategories(
   episodeId: number,
-  topics: SummaryResult["topics"],
+  categories: SummaryResult["categories"],
 ): Promise<void> {
-  if (!topics || topics.length === 0) return;
-  // Delete-then-insert to reconcile stale topics on re-summarization.
+  if (!categories || categories.length === 0) return;
+  // Delete-then-insert to reconcile stale categories on re-summarization.
   // No transaction — benign failure mode matches the existing pattern
-  // (summary saved without topics; Trigger.dev retries self-heal).
+  // (summary saved without categories; Trigger.dev retries self-heal).
+  // Note: the table is still called `episode_topics` for now (the rename
+  // there belongs to A2/#383 — schema work).
   await db.delete(episodeTopics).where(eq(episodeTopics.episodeId, episodeId));
   await db.insert(episodeTopics).values(
-    topics.map((t) => ({
+    categories.map((c) => ({
       episodeId,
-      topic: t.name,
-      relevance: t.relevance.toFixed(2),
+      topic: c.name,
+      relevance: c.relevance.toFixed(2),
     })),
   );
 }
@@ -203,7 +205,7 @@ export async function persistEpisodeSummary(
       })
       .where(eq(episodes.id, existingEpisode.id));
 
-    await persistTopics(existingEpisode.id, summary.topics);
+    await persistCategories(existingEpisode.id, summary.categories);
   } else {
     const [inserted] = await db
       .insert(episodes)
@@ -228,7 +230,7 @@ export async function persistEpisodeSummary(
       .returning({ id: episodes.id });
 
     if (inserted) {
-      await persistTopics(inserted.id, summary.topics);
+      await persistCategories(inserted.id, summary.categories);
     }
   }
 }

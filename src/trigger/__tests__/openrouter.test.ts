@@ -13,6 +13,11 @@ vi.mock("@/lib/prompts", () => ({
   getSummarizationPrompt: vi.fn().mockReturnValue("Mock Summarization Prompt"),
 }));
 
+vi.mock("@/lib/category-banlist", () => ({
+  getCategoryBanlist: vi.fn().mockResolvedValue([]),
+  invalidateCategoryBanlist: vi.fn(),
+}));
+
 import { generateEpisodeSummary } from "@/trigger/helpers/ai-summary";
 import { generateCompletion } from "@/lib/ai";
 import { parseJsonResponse } from "@/lib/openrouter";
@@ -63,13 +68,19 @@ describe("generateEpisodeSummary", () => {
       mockTranscript,
     );
 
-    expect(result).toEqual(mockParsedResult);
+    // generateEpisodeSummary now always populates categories/topics (empty when
+    // the LLM omits them) and a worthItDimensions slot — assert the meaningful
+    // fields rather than full-shape equality.
+    expect(result).toMatchObject(mockParsedResult);
+    expect(result.categories).toEqual([]);
+    expect(result.topics).toEqual([]);
     expect(getSummarizationPrompt).toHaveBeenCalledWith(
       "Test Podcast",
       "Test Episode",
       "Test Description",
       3600,
       mockTranscript,
+      [],
     );
     expect(generateCompletion).toHaveBeenCalledWith([
       { role: "system", content: SYSTEM_PROMPT },
@@ -125,6 +136,7 @@ describe("generateEpisodeSummary", () => {
       "",
       0,
       "test transcript",
+      [],
     );
   });
 });
