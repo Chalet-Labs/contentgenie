@@ -2,13 +2,15 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { NOTIFICATIONS_PAGE_SIZE } from "@/lib/notifications-constants";
+import { NOTIFICATIONS_CHANGED_EVENT } from "@/lib/events";
 import { asPodcastIndexEpisodeId } from "@/types/ids";
 
 // --- Mocks ---
 
 const mockPush = vi.fn();
+const mockRefresh = vi.fn();
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: mockPush }),
+  useRouter: () => ({ push: mockPush, refresh: mockRefresh }),
 }));
 
 const mockToastError = vi.fn();
@@ -896,5 +898,141 @@ describe("NotificationPageList", () => {
       // One new row appended (2 initial + 1 loaded)
       expect(screen.getAllByRole("article")).toHaveLength(3);
     });
+  });
+
+  // BLOCKING #1 fix verification: local state filter removes dismissed row immediately
+  it("NOTIFICATIONS_CHANGED_EVENT with payload filters items by episodeDbId and calls router.refresh", async () => {
+    const item1 = makeItem({ id: 1, episodeDbId: 10 });
+    const item2 = makeItem({ id: 2, episodeDbId: 20 });
+    render(
+      <NotificationPageList
+        initialItems={[item1, item2]}
+        initialHasMore={false}
+        initialTopicsByEpisode={{}}
+      />,
+    );
+    expect(screen.getAllByRole("article")).toHaveLength(2);
+
+    await act(async () => {
+      window.dispatchEvent(
+        new CustomEvent(NOTIFICATIONS_CHANGED_EVENT, {
+          detail: { episodeDbIds: [10] },
+        }),
+      );
+    });
+
+    await waitFor(() => {
+      expect(screen.getAllByRole("article")).toHaveLength(1);
+      expect(mockRefresh).toHaveBeenCalled();
+    });
+  });
+
+  // Data-loss guard: rows with episodeDbId === null (legacy / non-episode
+  // notifications) MUST be preserved when an event filter runs. A naive
+  // implementation that drops the `=== null` clause would silently delete
+  // unrelated notifications.
+  it("NOTIFICATIONS_CHANGED_EVENT with payload preserves rows where episodeDbId is null", async () => {
+    const matched = makeItem({ id: 1, episodeDbId: 10 });
+    const other = makeItem({ id: 2, episodeDbId: 20 });
+    const nullEp = makeItem({ id: 3, episodeDbId: null });
+    render(
+      <NotificationPageList
+        initialItems={[matched, other, nullEp]}
+        initialHasMore={false}
+        initialTopicsByEpisode={{}}
+      />,
+    );
+    expect(screen.getAllByRole("article")).toHaveLength(3);
+
+    await act(async () => {
+      window.dispatchEvent(
+        new CustomEvent(NOTIFICATIONS_CHANGED_EVENT, {
+          detail: { episodeDbIds: [10] },
+        }),
+      );
+    });
+
+    await waitFor(() => {
+      // matched (10) is removed; other (20) and nullEp (null) remain
+      expect(screen.getAllByRole("article")).toHaveLength(2);
+    });
+  });
+
+  // Regression (#315 mirror): an event-driven filter must decrement offsetRef
+  // by the number of removed rows so a subsequent Load more uses the
+  // post-filter offset and doesn't skip a server row. Mirrors handleDismiss's
+  // optimistic offset adjustment for a different removal source.
+  it("NOTIFICATIONS_CHANGED_EVENT decrements offsetRef so subsequent Load more uses correct offset", async () => {
+    const N = 3;
+    const items = Array.from({ length: N }, (_, i) =>
+      makeItem({ id: i + 1, episodeDbId: (i + 1) * 10 }),
+    );
+    mockGetNotifications.mockResolvedValue({
+      notifications: [makeItem({ id: 999, episodeDbId: 999 })],
+      hasMore: false,
+      error: null,
+    });
+
+    const user = userEvent.setup();
+    render(
+      <NotificationPageList
+        initialItems={items}
+        initialHasMore={true}
+        initialTopicsByEpisode={{}}
+      />,
+    );
+
+    // Filter out two episodes via the event (10, 20) — third (30) remains.
+    await act(async () => {
+      window.dispatchEvent(
+        new CustomEvent(NOTIFICATIONS_CHANGED_EVENT, {
+          detail: { episodeDbIds: [10, 20] },
+        }),
+      );
+    });
+
+    await waitFor(() => {
+      expect(screen.getAllByRole("article")).toHaveLength(1);
+    });
+
+    // Load more must use offset N - 2 (post-filter offset), not N — otherwise
+    // two server-side rows at positions N-2 and N-1 would be skipped.
+    await user.click(screen.getByRole("button", { name: /load more/i }));
+    await waitFor(() => {
+      expect(mockGetNotifications).toHaveBeenCalledWith(
+        NOTIFICATIONS_PAGE_SIZE,
+        N - 2,
+        undefined,
+      );
+    });
+  });
+
+  // Empty-payload events are no-ops — all production dispatch sites only fire
+  // on confirmed dismisses with populated ids. Guards against re-introducing
+  // the topic-losing re-fetch path that was removed in PR #402.
+  it("NOTIFICATIONS_CHANGED_EVENT with empty payload is a no-op (no re-fetch, no item changes)", async () => {
+    const item1 = makeItem({ id: 1, episodeDbId: 10 });
+    const item2 = makeItem({ id: 2, episodeDbId: 20 });
+
+    render(
+      <NotificationPageList
+        initialItems={[item1, item2]}
+        initialHasMore={false}
+        initialTopicsByEpisode={{}}
+      />,
+    );
+    expect(screen.getAllByRole("article")).toHaveLength(2);
+
+    await act(async () => {
+      window.dispatchEvent(
+        new CustomEvent(NOTIFICATIONS_CHANGED_EVENT, {
+          detail: { episodeDbIds: [] },
+        }),
+      );
+    });
+
+    expect(mockGetNotifications).not.toHaveBeenCalled();
+    expect(screen.getAllByRole("article")).toHaveLength(2);
+    expect(mockRefresh).not.toHaveBeenCalled();
   });
 });

@@ -1,7 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, act, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { LISTEN_STATE_CHANGED_EVENT } from "@/lib/events";
+import {
+  LISTEN_STATE_CHANGED_EVENT,
+  NOTIFICATIONS_CHANGED_EVENT,
+} from "@/lib/events";
 import { asPodcastIndexEpisodeId } from "@/types/ids";
 
 const TEST_PI_EPISODE_ID = asPodcastIndexEpisodeId("ep-1");
@@ -14,7 +17,10 @@ vi.mock("@/app/actions/listen-history", () => ({
 describe("ListenedButton", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockRecordListenEvent.mockResolvedValue({ success: true });
+    mockRecordListenEvent.mockResolvedValue({
+      success: true,
+      data: { dismissedEpisodeDbIds: [42] },
+    });
   });
 
   afterEach(() => {
@@ -192,7 +198,10 @@ describe("ListenedButton", () => {
   });
 
   it("dispatches LISTEN_STATE_CHANGED_EVENT and shows success toast on success", async () => {
-    mockRecordListenEvent.mockResolvedValue({ success: true });
+    mockRecordListenEvent.mockResolvedValue({
+      success: true,
+      data: { dismissedEpisodeDbIds: [42] },
+    });
 
     const { ListenedButton } =
       await import("@/components/episodes/listened-button");
@@ -217,5 +226,72 @@ describe("ListenedButton", () => {
       expect(dispatched).toBeTruthy();
       expect(toast.success).toHaveBeenCalledWith("Marked as listened");
     });
+  });
+
+  it("dispatches NOTIFICATIONS_CHANGED_EVENT with detail.episodeDbIds=[42] on success", async () => {
+    mockRecordListenEvent.mockResolvedValue({
+      success: true,
+      data: { dismissedEpisodeDbIds: [42] },
+    });
+
+    const { ListenedButton } =
+      await import("@/components/episodes/listened-button");
+    const dispatchSpy = vi.spyOn(window, "dispatchEvent");
+    const user = userEvent.setup();
+    render(
+      <ListenedButton
+        podcastIndexEpisodeId={TEST_PI_EPISODE_ID}
+        isListened={false}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Mark as listened" }));
+
+    await waitFor(() => {
+      const notifsEvent = dispatchSpy.mock.calls.find(
+        (call) =>
+          call[0] instanceof CustomEvent &&
+          (call[0] as CustomEvent).type === NOTIFICATIONS_CHANGED_EVENT,
+      );
+      expect(notifsEvent).toBeTruthy();
+      const event = notifsEvent![0] as CustomEvent<{ episodeDbIds: number[] }>;
+      expect(event.detail.episodeDbIds).toEqual([42]);
+    });
+  });
+
+  it("does NOT dispatch NOTIFICATIONS_CHANGED_EVENT when dismiss returned no ids", async () => {
+    mockRecordListenEvent.mockResolvedValue({
+      success: true,
+      data: { dismissedEpisodeDbIds: [] },
+    });
+
+    const { ListenedButton } =
+      await import("@/components/episodes/listened-button");
+    const dispatchSpy = vi.spyOn(window, "dispatchEvent");
+    const user = userEvent.setup();
+    render(
+      <ListenedButton
+        podcastIndexEpisodeId={TEST_PI_EPISODE_ID}
+        isListened={false}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Mark as listened" }));
+
+    await waitFor(() => {
+      // LISTEN_STATE_CHANGED_EVENT still fires, but no NOTIFICATIONS_CHANGED_EVENT.
+      const listenEvent = dispatchSpy.mock.calls.find(
+        (call) =>
+          call[0] instanceof CustomEvent &&
+          (call[0] as CustomEvent).type === LISTEN_STATE_CHANGED_EVENT,
+      );
+      expect(listenEvent).toBeTruthy();
+    });
+    const notifsEvent = dispatchSpy.mock.calls.find(
+      (call) =>
+        call[0] instanceof CustomEvent &&
+        (call[0] as CustomEvent).type === NOTIFICATIONS_CHANGED_EVENT,
+    );
+    expect(notifsEvent).toBeUndefined();
   });
 });

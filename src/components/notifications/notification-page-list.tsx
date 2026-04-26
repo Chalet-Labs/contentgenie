@@ -27,7 +27,11 @@ import { EpisodeCard } from "@/components/episodes/episode-card";
 import { ListenedButton } from "@/components/episodes/listened-button";
 import { formatRelativeTime } from "@/lib/utils";
 import { ROUTES } from "@/lib/routes";
-import { LISTEN_STATE_CHANGED_EVENT } from "@/lib/events";
+import {
+  LISTEN_STATE_CHANGED_EVENT,
+  NOTIFICATIONS_CHANGED_EVENT,
+  type NotificationsChangedEventDetail,
+} from "@/lib/events";
 import { NOTIFICATIONS_PAGE_SIZE } from "@/lib/notifications-constants";
 import type { PodcastIndexEpisodeId } from "@/types/ids";
 
@@ -133,6 +137,35 @@ export function NotificationPageList({
     return () =>
       window.removeEventListener(LISTEN_STATE_CHANGED_EVENT, refresh);
   }, []);
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<NotificationsChangedEventDetail>).detail;
+      const ids = new Set(detail?.episodeDbIds ?? []);
+      // All production dispatch sites only fire on confirmed dismisses with
+      // populated ids — an empty payload is a no-op event we don't act on.
+      if (ids.size === 0) return;
+      let removed = 0;
+      setItems((prev) => {
+        const next = prev.filter(
+          (n) => n.episodeDbId === null || !ids.has(n.episodeDbId),
+        );
+        removed = prev.length - next.length;
+        return next;
+      });
+      // Mirror handleDismiss: keep offsetRef in sync so a subsequent
+      // Load more uses the post-filter offset and doesn't skip rows.
+      // Done outside the updater so a StrictMode double-invocation or
+      // concurrent re-render doesn't decrement twice.
+      if (removed > 0) {
+        offsetRef.current = Math.max(0, offsetRef.current - removed);
+      }
+      router.refresh();
+    };
+    window.addEventListener(NOTIFICATIONS_CHANGED_EVENT, handler);
+    return () =>
+      window.removeEventListener(NOTIFICATIONS_CHANGED_EVENT, handler);
+  }, [router]);
 
   const handleDismiss = useCallback((id: number) => {
     startTransition(async () => {

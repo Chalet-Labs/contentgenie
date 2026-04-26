@@ -11,7 +11,11 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { recordListenEvent } from "@/app/actions/listen-history";
-import { LISTEN_STATE_CHANGED_EVENT } from "@/lib/events";
+import {
+  LISTEN_STATE_CHANGED_EVENT,
+  NOTIFICATIONS_CHANGED_EVENT,
+  type NotificationsChangedEventDetail,
+} from "@/lib/events";
 import type { PodcastIndexEpisodeId } from "@/types/ids";
 
 interface ListenedButtonProps {
@@ -54,6 +58,10 @@ export function ListenedButton({
           completed: true,
         });
         if (!result || result.success !== true) {
+          console.error("[ListenedButton] recordListenEvent returned failure", {
+            podcastIndexEpisodeId,
+            error: result && "error" in result ? result.error : "no result",
+          });
           setOptimisticOn(false);
           toast.error(
             (result && "error" in result && result.error) ||
@@ -63,6 +71,15 @@ export function ListenedButton({
         }
         toast.success("Marked as listened");
         window.dispatchEvent(new CustomEvent(LISTEN_STATE_CHANGED_EVENT));
+        const dismissedIds = result.data?.dismissedEpisodeDbIds ?? [];
+        if (dismissedIds.length > 0) {
+          window.dispatchEvent(
+            new CustomEvent<NotificationsChangedEventDetail>(
+              NOTIFICATIONS_CHANGED_EVENT,
+              { detail: { episodeDbIds: dismissedIds } },
+            ),
+          );
+        }
       } catch (e) {
         console.error("[ListenedButton] recordListenEvent threw", {
           podcastIndexEpisodeId,

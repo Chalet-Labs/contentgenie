@@ -51,6 +51,10 @@ import {
   savePlayerSession as savePlayerSessionAction,
   clearPlayerSession as clearPlayerSessionAction,
 } from "@/app/actions/player-session";
+import {
+  NOTIFICATIONS_CHANGED_EVENT,
+  type NotificationsChangedEventDetail,
+} from "@/lib/events";
 
 // ---------------------------------------------------------------------------
 // Server-sync helpers (fire-and-forget; best-effort with warn-on-failure)
@@ -707,6 +711,19 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
         const result = await setQueueAction(snapshot);
         if (result.success) {
           lastAckedQueueRef.current = snapshot;
+          // Only dispatch when the server actually dismissed something.
+          // Empty array means "queue saved, nothing to reconcile" — firing
+          // the event would force every notifications-page subscriber to
+          // treat it as the optimistic-empty-payload sentinel and re-fetch.
+          const dismissedIds = result.data?.dismissedEpisodeDbIds ?? [];
+          if (dismissedIds.length > 0) {
+            window.dispatchEvent(
+              new CustomEvent<NotificationsChangedEventDetail>(
+                NOTIFICATIONS_CHANGED_EVENT,
+                { detail: { episodeDbIds: dismissedIds } },
+              ),
+            );
+          }
         } else {
           toast.error("Couldn't sync queue", {
             description: "Your queue change couldn't be saved. Rolling back.",
@@ -1088,7 +1105,13 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
         }
         // Don't add if currently playing (queue dedup handled by reducer)
         if (current.currentEpisode.id === episode.id) return;
+        if (current.queue.some((ep) => ep.id === episode.id)) return;
         dispatch({ type: "ADD_TO_QUEUE", episode });
+        // No optimistic NOTIFICATIONS_CHANGED_EVENT dispatch here — the
+        // debounced setQueue path (above) fires the reconciling event with
+        // server-resolved episode ids ~1.5s later. Optimistic dispatch with
+        // an empty payload forced /notifications into a topic-losing
+        // re-fetch (see ADR-041 history).
       },
 
       removeFromQueue: (episodeId: string) => {
@@ -1344,7 +1367,23 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
           durationSeconds: isFinite(audio.duration)
             ? Math.floor(audio.duration)
             : undefined,
-        });
+        })
+          .then((result) => {
+            const dismissedIds = result?.success
+              ? (result.data?.dismissedEpisodeDbIds ?? [])
+              : [];
+            if (dismissedIds.length > 0) {
+              window.dispatchEvent(
+                new CustomEvent<NotificationsChangedEventDetail>(
+                  NOTIFICATIONS_CHANGED_EVENT,
+                  { detail: { episodeDbIds: dismissedIds } },
+                ),
+              );
+            }
+          })
+          .catch(() => {
+            // swallow — listen-history handles its own logging
+          });
       }
 
       // End-of-episode sleep timer: fade out and skip auto-play-next

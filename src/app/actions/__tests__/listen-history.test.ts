@@ -48,6 +48,13 @@ vi.mock("@/db/helpers", () => ({
   ensureUserExists: (...args: unknown[]) => mockEnsureUserExists(...args),
 }));
 
+// Mock dismiss helper
+const mockDismissNotificationsForEpisodes = vi.fn().mockResolvedValue([]);
+vi.mock("@/app/actions/_internal/dismiss-notifications", () => ({
+  dismissNotificationsForEpisodes: (...args: unknown[]) =>
+    mockDismissNotificationsForEpisodes(...args),
+}));
+
 // Mock schema
 vi.mock("@/db/schema", () => ({
   listenHistory: {
@@ -117,7 +124,7 @@ describe("recordListenEvent", () => {
     const result = await recordListenEvent({
       podcastIndexEpisodeId: asPodcastIndexEpisodeId("99999"),
     });
-    expect(result).toEqual({ success: true });
+    expect(result.success).toBe(true);
     expect(mockFindFirst).toHaveBeenCalledTimes(1);
     expect(mockInsert).toHaveBeenCalledTimes(1);
     expect(mockValues).toHaveBeenCalledTimes(1);
@@ -137,7 +144,7 @@ describe("recordListenEvent", () => {
       completed: true,
       durationSeconds: 1800,
     });
-    expect(result).toEqual({ success: true });
+    expect(result.success).toBe(true);
     expect(mockInsert).toHaveBeenCalledTimes(1);
     const insertedValues = mockValues.mock.calls[0][0];
     expect(insertedValues).toMatchObject({
@@ -252,6 +259,75 @@ describe("recordListenEvent", () => {
       error: "Failed to record listen event",
     });
     expect(consoleSpy).toHaveBeenCalled();
+  });
+
+  it("on completed:true success, returns dismissedEpisodeDbIds from the helper", async () => {
+    mockDismissNotificationsForEpisodes.mockResolvedValueOnce([42]);
+    const { recordListenEvent } = await import("@/app/actions/listen-history");
+    const result = await recordListenEvent({
+      podcastIndexEpisodeId: asPodcastIndexEpisodeId("777"),
+      completed: true,
+    });
+    expect(result).toEqual({
+      success: true,
+      data: { dismissedEpisodeDbIds: [42] },
+    });
+  });
+
+  it("on completed:true with no rows flipped, returns dismissedEpisodeDbIds: []", async () => {
+    mockDismissNotificationsForEpisodes.mockResolvedValueOnce([]);
+    const { recordListenEvent } = await import("@/app/actions/listen-history");
+    const result = await recordListenEvent({
+      podcastIndexEpisodeId: asPodcastIndexEpisodeId("777"),
+      completed: true,
+    });
+    expect(result).toEqual({
+      success: true,
+      data: { dismissedEpisodeDbIds: [] },
+    });
+  });
+
+  it("on completed:true success, dismiss helper is invoked once with (userId, [episodeDbId])", async () => {
+    const { recordListenEvent } = await import("@/app/actions/listen-history");
+    await recordListenEvent({
+      podcastIndexEpisodeId: asPodcastIndexEpisodeId("777"),
+      completed: true,
+    });
+    expect(mockDismissNotificationsForEpisodes).toHaveBeenCalledTimes(1);
+    expect(mockDismissNotificationsForEpisodes).toHaveBeenCalledWith(
+      "user_123",
+      [42],
+    );
+  });
+
+  it("on completed omitted, dismiss helper NOT invoked; returns empty dismissedEpisodeDbIds", async () => {
+    const { recordListenEvent } = await import("@/app/actions/listen-history");
+    const result = await recordListenEvent({
+      podcastIndexEpisodeId: asPodcastIndexEpisodeId("777"),
+    });
+    expect(result).toEqual({
+      success: true,
+      data: { dismissedEpisodeDbIds: [] },
+    });
+    expect(mockDismissNotificationsForEpisodes).not.toHaveBeenCalled();
+  });
+
+  it("helper rejection does NOT change result success; returns empty dismissedEpisodeDbIds", async () => {
+    mockDismissNotificationsForEpisodes.mockRejectedValueOnce(
+      new Error("dismiss failed"),
+    );
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const { recordListenEvent } = await import("@/app/actions/listen-history");
+    const result = await recordListenEvent({
+      podcastIndexEpisodeId: asPodcastIndexEpisodeId("777"),
+      completed: true,
+    });
+    expect(result).toEqual({
+      success: true,
+      data: { dismissedEpisodeDbIds: [] },
+    });
+    expect(consoleSpy).toHaveBeenCalled();
+    consoleSpy.mockRestore();
   });
 });
 

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, act, fireEvent } from "@testing-library/react";
+import { NOTIFICATIONS_CHANGED_EVENT } from "@/lib/events";
 
 const mockGetUnreadCount = vi.fn();
 const mockGetNotificationSummary = vi.fn();
@@ -470,6 +471,29 @@ describe("NotificationBell", () => {
     expect(consoleError).toHaveBeenCalled();
 
     consoleError.mockRestore();
+  });
+
+  it("(k) NOTIFICATIONS_CHANGED_EVENT triggers fetchUnreadCount", async () => {
+    mockGetUnreadCount.mockResolvedValue(5);
+    render(<NotificationBell />);
+    // Flush initial fetch
+    await act(async () => {
+      await Promise.resolve();
+    });
+    vi.clearAllMocks();
+    mockGetUnreadCount.mockResolvedValue(3);
+
+    // Dispatch and let the async handler run
+    await act(async () => {
+      window.dispatchEvent(
+        new CustomEvent(NOTIFICATIONS_CHANGED_EVENT, {
+          detail: { episodeDbIds: [10] },
+        }),
+      );
+      await Promise.resolve();
+    });
+
+    expect(mockGetUnreadCount).toHaveBeenCalledTimes(1);
   });
 
   it("(j) ignores stale summary resolution after open → close → open race", async () => {
