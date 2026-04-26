@@ -49,7 +49,7 @@ The brand is applied at the type origin via Drizzle's column-type hint (`text(..
 - `episodes.podcastIndexId`, `listenHistory.podcastIndexEpisodeId` columns.
 - `ROUTES.episode(id)` parameter.
 - `AudioEpisode.id` and `EpisodeDenormRow.episodeId`.
-- Server-action signatures that take or return PI episode ids (`recordListenEvent`, `isEpisodeSaved`, `saveEpisode`, `removeFromLibrary`, `getQueueEpisodeScores`, `getTopicsByPodcastIndexId`, etc.).
+- Server-action signatures that take or return PI episode ids (`recordListenEvent`, `isEpisodeSaved`, `saveEpisode`, `removeFromLibrary`, `getTopicsByPodcastIndexId`, etc.). _(`getQueueEpisodeScores` was in this list when ADR-040 landed; the action was removed in #394.)_
 - Component prop types: `listenedIds`, `knownIds`, `topicsByPodcastIndexId`, `initialListenedIds`.
 
 **Out of scope (deferred until pain surfaces):**

@@ -28,6 +28,10 @@ const TOUCH_SENSOR_OPTIONS = {
   activationConstraint: { delay: 250, tolerance: 5 },
 };
 
+const KEYBOARD_SENSOR_OPTIONS = {
+  coordinateGetter: sortableKeyboardCoordinates,
+};
+
 function NowPlaying() {
   const { currentEpisode } = useAudioPlayerState();
 
@@ -77,22 +81,19 @@ function NowPlaying() {
 interface QueueListProps {
   /**
    * Optional max-height for the scrollable list area (e.g. "50vh").
-   * When omitted, the list flows naturally — used by the dashboard card
-   * which sizes itself inside the page grid.
+   * When omitted, the list flows naturally with no height cap.
    */
   maxHeight?: string;
 }
 
-export function QueueList({ maxHeight }: QueueListProps = {}) {
+export function QueueList({ maxHeight }: QueueListProps) {
   const { queue } = useAudioPlayerState();
   const { removeFromQueue, reorderQueue, clearQueue, playEpisode } =
     useAudioPlayerAPI();
 
   const mouseSensor = useSensor(MouseSensor);
   const touchSensor = useSensor(TouchSensor, TOUCH_SENSOR_OPTIONS);
-  const keyboardSensor = useSensor(KeyboardSensor, {
-    coordinateGetter: sortableKeyboardCoordinates,
-  });
+  const keyboardSensor = useSensor(KeyboardSensor, KEYBOARD_SENSOR_OPTIONS);
   const sensors = useSensors(mouseSensor, touchSensor, keyboardSensor);
 
   function handleDragEnd(event: DragEndEvent) {
@@ -105,6 +106,10 @@ export function QueueList({ maxHeight }: QueueListProps = {}) {
       reorderQueue(oldIndex, newIndex);
     }
   }
+
+  const scrollProps = maxHeight
+    ? { className: "overflow-y-auto", style: { maxHeight } }
+    : {};
 
   if (queue.length === 0) {
     return (
@@ -145,10 +150,7 @@ export function QueueList({ maxHeight }: QueueListProps = {}) {
           Clear all
         </Button>
       </div>
-      <div
-        className={maxHeight ? "overflow-y-auto" : undefined}
-        style={maxHeight ? { maxHeight } : undefined}
-      >
+      <div {...scrollProps}>
         <DndContext
           sensors={sensors}
           collisionDetection={closestCenter}

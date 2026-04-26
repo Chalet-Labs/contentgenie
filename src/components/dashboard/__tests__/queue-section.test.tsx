@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import type {
   AudioEpisode,
   AudioPlayerState,
@@ -99,10 +100,9 @@ describe("QueueSection", () => {
       makeEpisode({ id: "1002" }),
     ];
     await renderQueueSection();
-    // Both the CardHeader total badge and QueueList's "Up Next" badge show "2"
-    // here because the queue length and the total are equal when nothing plays.
-    const badges = screen.getAllByText("2");
-    expect(badges.length).toBeGreaterThanOrEqual(1);
+    // Two badges show "2" here: the CardHeader total badge and QueueList's
+    // "Up Next" badge — equal because total = queue length when nothing plays.
+    expect(screen.getAllByText("2")).toHaveLength(2);
   });
 
   it("count badge includes the current episode in the total", async () => {
@@ -121,5 +121,16 @@ describe("QueueSection", () => {
     // QueueList renders a "Now Playing" label above the artwork tile
     expect(screen.getByText("Now Playing")).toBeInTheDocument();
     expect(screen.getByText("Now Playing Ep")).toBeInTheDocument();
+  });
+
+  it("clicking a queue row forwards play+remove to the audio player API", async () => {
+    mockState.queue = [makeEpisode({ id: "1001", title: "Clickable Ep" })];
+    await renderQueueSection();
+    const user = userEvent.setup();
+    await user.click(
+      screen.getByRole("button", { name: /play clickable ep/i }),
+    );
+    expect(mockAPI.playEpisode).toHaveBeenCalledTimes(1);
+    expect(mockAPI.removeFromQueue).toHaveBeenCalledTimes(1);
   });
 });
