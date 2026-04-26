@@ -326,6 +326,7 @@ describe("recordListenEvent", () => {
       success: true,
       data: { dismissedEpisodeDbIds: [] },
     });
+    expect(consoleSpy).toHaveBeenCalled();
     consoleSpy.mockRestore();
   });
 });

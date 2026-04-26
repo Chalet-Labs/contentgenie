@@ -958,6 +958,55 @@ describe("NotificationPageList", () => {
     });
   });
 
+  // Regression (#315 mirror): an event-driven filter must decrement offsetRef
+  // by the number of removed rows so a subsequent Load more uses the
+  // post-filter offset and doesn't skip a server row. Mirrors handleDismiss's
+  // optimistic offset adjustment for a different removal source.
+  it("NOTIFICATIONS_CHANGED_EVENT decrements offsetRef so subsequent Load more uses correct offset", async () => {
+    const N = 3;
+    const items = Array.from({ length: N }, (_, i) =>
+      makeItem({ id: i + 1, episodeDbId: (i + 1) * 10 }),
+    );
+    mockGetNotifications.mockResolvedValue({
+      notifications: [makeItem({ id: 999, episodeDbId: 999 })],
+      hasMore: false,
+      error: null,
+    });
+
+    const user = userEvent.setup();
+    render(
+      <NotificationPageList
+        initialItems={items}
+        initialHasMore={true}
+        initialTopicsByEpisode={{}}
+      />,
+    );
+
+    // Filter out two episodes via the event (10, 20) — third (30) remains.
+    await act(async () => {
+      window.dispatchEvent(
+        new CustomEvent(NOTIFICATIONS_CHANGED_EVENT, {
+          detail: { episodeDbIds: [10, 20] },
+        }),
+      );
+    });
+
+    await waitFor(() => {
+      expect(screen.getAllByRole("article")).toHaveLength(1);
+    });
+
+    // Load more must use offset N - 2 (post-filter offset), not N — otherwise
+    // two server-side rows at positions N-2 and N-1 would be skipped.
+    await user.click(screen.getByRole("button", { name: /load more/i }));
+    await waitFor(() => {
+      expect(mockGetNotifications).toHaveBeenCalledWith(
+        NOTIFICATIONS_PAGE_SIZE,
+        N - 2,
+        undefined,
+      );
+    });
+  });
+
   // Empty-payload events are no-ops — all production dispatch sites only fire
   // on confirmed dismisses with populated ids. Guards against re-introducing
   // the topic-losing re-fetch path that was removed in PR #402.
