@@ -162,6 +162,13 @@
       "when": 1776961693717,
       "tag": "0022_brainy_blink",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1777222169431,
+      "tag": "0023_enable_pgvector",
+      "breakpoints": true
     }
   ]
 }
