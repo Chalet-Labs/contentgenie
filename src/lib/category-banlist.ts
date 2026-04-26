@@ -35,26 +35,39 @@ function write(value: CachedBanlist): void {
   (globalThis as Record<string, unknown>)[GLOBAL_KEY] = value;
 }
 
-export async function getCategoryBanlist(): Promise<string[]> {
+export async function getCategoryBanlist(): Promise<readonly string[]> {
   const cached = read();
   const now = Date.now();
   if (cached && now - cached.loadedAt < TTL_MS) {
     return cached.banlist;
   }
 
-  const rows = await db
-    .select({
-      topic: episodeTopics.topic,
-      n: sql<number>`count(*)`.as("n"),
-    })
-    .from(episodeTopics)
-    .groupBy(episodeTopics.topic)
-    .orderBy(desc(sql`count(*)`))
-    .limit(TOP_N);
+  // Soft-fail: a missing banlist degrades prompt quality (LLM gets no
+  // negative-examples hint, validator drops nothing on the banlist criterion)
+  // but must NOT abort summarization. Prefer a stale cache to an empty list
+  // so a transient Neon hiccup during a deploy doesn't strand the LLM with
+  // zero hints. The summarizer is on a multi-second-cost retry loop; banlist
+  // failure should not amplify that.
+  try {
+    const rows = await db
+      .select({
+        topic: episodeTopics.topic,
+        n: sql<number>`count(*)`.as("n"),
+      })
+      .from(episodeTopics)
+      .groupBy(episodeTopics.topic)
+      .orderBy(desc(sql`count(*)`))
+      .limit(TOP_N);
 
-  const banlist = rows.map((r) => r.topic);
-  write({ banlist, loadedAt: now });
-  return banlist;
+    const banlist = rows.map((r) => r.topic);
+    write({ banlist, loadedAt: now });
+    return banlist;
+  } catch (err) {
+    console.warn(
+      `[category-banlist] DB query failed, using ${cached ? "stale cache" : "empty banlist"}: ${err instanceof Error ? err.message : String(err)}`,
+    );
+    return cached?.banlist ?? [];
+  }
 }
 
 export function invalidateCategoryBanlist(): void {

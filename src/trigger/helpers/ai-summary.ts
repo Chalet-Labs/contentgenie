@@ -49,9 +49,25 @@ function coerceAliases(v: unknown): string[] {
     .filter((s) => s.length > 0);
 }
 
-const MAX_CATEGORIES = 8; // upper bound from issue (3–8 items)
-const MAX_TOPICS = 8;
-const MAX_CONCEPT_TOPICS = 3; // safety net mirroring the prompt's concept cap
+const LOG_PREFIX = "[ai-summary]";
+export const MAX_CATEGORIES = 8;
+export const MAX_TOPICS = 8;
+export const MAX_CONCEPT_TOPICS = 3; // safety net mirroring the prompt's concept cap
+
+// Legacy custom prompts (prior to dual-layer split) emit broad tags as
+// `topics: [{ name, relevance }]`. The new prompt asks for `categories` in
+// that slot. Detect the legacy shape so we don't strand custom-prompt
+// installations with zero persisted broad tags.
+function looksLikeLegacyCategoriesArray(v: unknown): boolean {
+  if (!Array.isArray(v) || v.length === 0) return false;
+  return v.every(
+    (e) =>
+      e !== null &&
+      typeof e === "object" &&
+      typeof (e as Record<string, unknown>).name === "string" &&
+      typeof (e as Record<string, unknown>).relevance === "number",
+  );
+}
 
 export type {
   SummaryResult,
@@ -60,16 +76,18 @@ export type {
 } from "@/lib/openrouter";
 
 /**
- * Normalize the raw `categories` field from the LLM response into a clean
- * NormalizedCategory[]. Filters non-object/non-string-name entries, drops
- * labels that fail validation (with a structured warning), title-cases names,
- * clamps relevance into [0,1], dedupes by normalized name (highest relevance
- * wins), sorts descending, caps at MAX_CATEGORIES.
+ * Highest-relevance-wins dedup is intentional: re-summarization sometimes
+ * returns the same name with a downgraded relevance, and we keep the strongest
+ * signal so `episode_topics.relevance` ranking stays stable across re-runs.
+ *
+ * Categories are NOT filtered by the category banlist — categories ARE the
+ * banlist's source population. The banlist exists to keep canonical-topic
+ * candidates from collapsing onto broad tags; applying it here would silently
+ * strip the most popular tags ("AI & Machine Learning" et al) from new
+ * episodes. Structural rejections (empty / too long / control chars /
+ * instruction-shaped) still apply.
  */
-export function normalizeCategories(
-  raw: unknown,
-  banlist: readonly string[],
-): NormalizedCategory[] {
+export function normalizeCategories(raw: unknown): NormalizedCategory[] {
   if (!Array.isArray(raw)) return [];
   const deduped = new Map<string, NormalizedCategory>();
   for (const entry of raw) {
@@ -77,10 +95,10 @@ export function normalizeCategories(
     const e = entry as Record<string, unknown>;
     if (typeof e.name !== "string") continue;
     const trimmed = e.name.trim();
-    const v = validateTopicLabel(trimmed, banlist);
+    const v = validateTopicLabel(trimmed, []);
     if (!v.ok) {
       console.warn(
-        `[ai-summary] category dropped (${v.reason}): ${trimmed.slice(0, 40)}`,
+        `${LOG_PREFIX} category dropped (${v.reason}): ${trimmed.slice(0, 40)}`,
       );
       continue;
     }
@@ -101,11 +119,14 @@ export function normalizeCategories(
 }
 
 /**
- * Normalize the raw `topics` field from the LLM response into a clean
- * NormalizedTopic[]. Coerces unknown kinds to 'other', clamps relevance and
- * coverage_score to [0,1], maps snake_case `coverage_score` → camelCase
- * `coverageScore`, enforces the concept cap (3) and overall cap (8) as a
- * safety net behind the prompt-level instructions.
+ * Maps snake_case `coverage_score` → camelCase `coverageScore` (the wire
+ * format from the LLM uses snake_case to match the spec). The concept cap
+ * (3) and overall cap (8) are enforced here as a safety net behind the
+ * prompt-level instructions — the prompt may drift but the cap stays.
+ *
+ * NOTE: `summary` and `aliases` are NOT routed through `validateTopicLabel`;
+ * only `.trim()`. Downstream consumers (entity-resolution module, A4) must
+ * treat them as untrusted strings.
  */
 export function normalizeTopics(
   raw: unknown,
@@ -123,7 +144,7 @@ export function normalizeTopics(
     const v = validateTopicLabel(trimmed, banlist);
     if (!v.ok) {
       console.warn(
-        `[ai-summary] topic dropped (${v.reason}): ${trimmed.slice(0, 40)}`,
+        `${LOG_PREFIX} topic dropped (${v.reason}): ${trimmed.slice(0, 40)}`,
       );
       continue;
     }
@@ -158,8 +179,10 @@ export async function generateEpisodeSummary(
   customPrompt?: string | null,
 ): Promise<SummaryResult> {
   // Banlist is fetched once per call. The module-scope cache (1h TTL) means
-  // ingestion bursts share a single DB hit. Custom prompts don't need it,
-  // but we still fetch — the cache amortizes it to ~free.
+  // warm-cache cost is ~free; cold start pays one extra DB round-trip per
+  // worker instance. Used by both the prompt (forbidden topic labels) and
+  // the post-LLM `normalizeTopics` validator (drops banlisted candidates),
+  // so the fetch is load-bearing on both prompt branches.
   const banlist = await getCategoryBanlist();
 
   const prompt = customPrompt
@@ -184,6 +207,9 @@ export async function generateEpisodeSummary(
     { role: "user", content: prompt },
   ]);
 
+  // Only the JSON parse itself falls back to the unparsed-summary envelope;
+  // downstream signal coercion and the two normalizer try/catches handle
+  // their own failures so we don't lose partial structured output.
   let raw: Record<string, unknown>;
   try {
     raw = parseJsonResponse<Record<string, unknown>>(completion);
@@ -218,7 +244,7 @@ export async function generateEpisodeSummary(
     for (const key of WORTH_IT_SIGNAL_KEYS) {
       if (key in signalObj && typeof signalObj[key] !== "boolean") {
         console.warn(
-          `[ai-summary] non-boolean signal coerced: ${key}=${signalObj[key]} → ${toSignalBoolean(signalObj[key])}`,
+          `${LOG_PREFIX} non-boolean signal coerced: ${key}=${signalObj[key]} → ${toSignalBoolean(signalObj[key])}`,
         );
       }
     }
@@ -267,7 +293,7 @@ export async function generateEpisodeSummary(
       );
       if (result.worthItScore !== computed) {
         console.warn(
-          `[ai-summary] worthItScore mismatch: LLM=${result.worthItScore}, computed=${computed}. Using computed value.`,
+          `${LOG_PREFIX} worthItScore mismatch: LLM=${result.worthItScore}, computed=${computed}. Using computed value.`,
         );
       }
       result.worthItScore = computed;
@@ -284,25 +310,71 @@ export async function generateEpisodeSummary(
     result.worthItScore = 5;
   }
 
-  // Independent failure handling for the two topic layers (load-bearing per
-  // issue #381 and ADR-031). A parse failure in one normalizer must NOT
-  // strand the other.
+  // Independent try/catch per topic layer — if the categories layer parse
+  // throws, the canonical-topics layer must still ship (and vice versa).
+  // They feed independent downstream consumers (broad-tag UI ranking vs.
+  // entity-resolution candidates) so neither failure should strand the other.
+  // Mirrors ADR-031's "summary persists even when topics fail" principle.
+  //
+  // Custom prompts (which bypass `getSummarizationPrompt`) emit the legacy
+  // shape `topics: [{ name, relevance }]` for broad tags. If `categories` is
+  // absent and `topics` looks legacy, fold it into the categories layer so
+  // custom-prompt installations don't lose their `episode_topics` rows.
+  let categoriesRaw: unknown;
+  let topicsRaw: unknown;
+  let categoriesAccessFailed = false;
+  let topicsAccessFailed = false;
   try {
-    result.categories = normalizeCategories(raw.categories, banlist);
+    categoriesRaw = raw.categories;
   } catch (err) {
+    categoriesAccessFailed = true;
     console.warn(
-      `[ai-summary] normalizeCategories failed: ${err instanceof Error ? err.message : String(err)}`,
+      `${LOG_PREFIX} normalizeCategories failed (raw.categories access threw): ${err instanceof Error ? err.message : String(err)}`,
     );
+  }
+  try {
+    topicsRaw = raw.topics;
+  } catch (err) {
+    topicsAccessFailed = true;
+    console.warn(
+      `${LOG_PREFIX} normalizeTopics failed (raw.topics access threw): ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+  const useLegacyShape =
+    categoriesRaw === undefined && looksLikeLegacyCategoriesArray(topicsRaw);
+
+  if (categoriesAccessFailed) {
     result.categories = undefined;
+  } else {
+    try {
+      result.categories = normalizeCategories(
+        useLegacyShape ? topicsRaw : categoriesRaw,
+      );
+    } catch (err) {
+      console.warn(
+        `${LOG_PREFIX} normalizeCategories failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
+      result.categories = undefined;
+    }
   }
 
-  try {
-    result.topics = normalizeTopics(raw.topics, banlist);
-  } catch (err) {
-    console.warn(
-      `[ai-summary] normalizeTopics failed: ${err instanceof Error ? err.message : String(err)}`,
-    );
+  if (topicsAccessFailed) {
     result.topics = undefined;
+  } else {
+    try {
+      // If we just folded `raw.topics` into categories above, skip canonical
+      // normalization for that same payload — a legacy `{name, relevance}`
+      // entry would always fail the `label` check anyway.
+      result.topics = normalizeTopics(
+        useLegacyShape ? undefined : topicsRaw,
+        banlist,
+      );
+    } catch (err) {
+      console.warn(
+        `${LOG_PREFIX} normalizeTopics failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
+      result.topics = undefined;
+    }
   }
 
   return result;

@@ -37,7 +37,11 @@ import {
   generateEpisodeSummary,
   normalizeCategories,
   normalizeTopics,
+  MAX_CATEGORIES,
+  MAX_TOPICS,
+  MAX_CONCEPT_TOPICS,
 } from "@/trigger/helpers/ai-summary";
+import { MAX_LABEL_LENGTH } from "@/lib/topic-label-validator";
 import type {
   PodcastIndexEpisode,
   PodcastIndexPodcast,
@@ -140,31 +144,17 @@ describe("generateEpisodeSummary", () => {
       expect(result.categories).toEqual([{ name: "Topic One", relevance: 1 }]);
     });
 
-    it("returns only top 8 categories when more than 8 are provided", async () => {
-      const result = await summarizeWithCategories([
-        { name: "Topic A", relevance: 0.95 },
-        { name: "Topic B", relevance: 0.9 },
-        { name: "Topic C", relevance: 0.85 },
-        { name: "Topic D", relevance: 0.8 },
-        { name: "Topic E", relevance: 0.75 },
-        { name: "Topic F", relevance: 0.7 },
-        { name: "Topic G", relevance: 0.65 },
-        { name: "Topic H", relevance: 0.6 },
-        { name: "Topic I", relevance: 0.55 },
-        { name: "Topic J", relevance: 0.5 },
-      ]);
+    it("returns only top MAX_CATEGORIES categories when more are provided", async () => {
+      const inputs = Array.from({ length: MAX_CATEGORIES + 2 }, (_, i) => ({
+        name: `Topic ${String.fromCharCode(65 + i)}`,
+        relevance: 0.95 - i * 0.05,
+      }));
+      const result = await summarizeWithCategories(inputs);
 
-      expect(result.categories).toHaveLength(8);
-      expect(result.categories!.map((c) => c.name)).toEqual([
-        "Topic A",
-        "Topic B",
-        "Topic C",
-        "Topic D",
-        "Topic E",
-        "Topic F",
-        "Topic G",
-        "Topic H",
-      ]);
+      expect(result.categories).toHaveLength(MAX_CATEGORIES);
+      expect(result.categories!.map((c) => c.name)).toEqual(
+        inputs.slice(0, MAX_CATEGORIES).map((c) => c.name),
+      );
     });
 
     it("deduplicates categories after title-case normalization, keeping highest relevance", async () => {
@@ -181,9 +171,9 @@ describe("generateEpisodeSummary", () => {
       });
     });
 
-    it("filters out entries with name exceeding 80 characters", async () => {
+    it("filters out entries with name exceeding MAX_LABEL_LENGTH", async () => {
       const result = await summarizeWithCategories([
-        { name: "A".repeat(81), relevance: 0.9 },
+        { name: "A".repeat(MAX_LABEL_LENGTH + 1), relevance: 0.9 },
         { name: "Valid Topic", relevance: 0.7 },
       ]);
       expect(result.categories).toEqual([
@@ -268,6 +258,53 @@ describe("generateEpisodeSummary", () => {
 
       expect(result.categories).toEqual([
         { name: "Custom Prompt Topic", relevance: 0.8 },
+      ]);
+    });
+
+    // Custom-prompt installations predate the dual-layer split and emit
+    // broad tags as `topics: [{name, relevance}]`. The fallback maps that
+    // legacy shape into `categories` so `episode_topics` keeps getting
+    // populated.
+    it("falls back to raw.topics for categories when custom prompt emits the legacy shape", async () => {
+      mockParseJsonResponse.mockReturnValue({
+        ...mockSummaryResult,
+        // No `categories` field; legacy `topics` shape only
+        topics: [
+          { name: "machine learning", relevance: 0.9 },
+          { name: "leadership", relevance: 0.7 },
+        ],
+      });
+
+      const result = await generateEpisodeSummary(
+        mockPodcast,
+        mockEpisode,
+        "transcript text",
+        "Custom {{transcript}}",
+      );
+
+      expect(result.categories).toEqual([
+        { name: "Machine Learning", relevance: 0.9 },
+        { name: "Leadership", relevance: 0.7 },
+      ]);
+      // Legacy entries don't have `label`, so canonical-topics layer is empty
+      expect(result.topics).toEqual([]);
+    });
+
+    it("does NOT fall back when categories is present (new-shape wins)", async () => {
+      mockParseJsonResponse.mockReturnValue({
+        ...mockSummaryResult,
+        categories: [{ name: "New Shape", relevance: 0.5 }],
+        topics: [{ name: "Legacy", relevance: 0.9 }],
+      });
+
+      const result = await generateEpisodeSummary(
+        mockPodcast,
+        mockEpisode,
+        "transcript text",
+      );
+
+      expect(result.categories).toEqual([
+        { name: "New Shape", relevance: 0.5 },
       ]);
     });
 
@@ -709,45 +746,40 @@ describe("generateEpisodeSummary", () => {
 
 describe("normalizeCategories (direct)", () => {
   it("returns [] for non-array input", () => {
-    expect(normalizeCategories(undefined, [])).toEqual([]);
-    expect(normalizeCategories(null, [])).toEqual([]);
-    expect(normalizeCategories("nope", [])).toEqual([]);
-    expect(normalizeCategories({ name: "Solo" }, [])).toEqual([]);
+    expect(normalizeCategories(undefined)).toEqual([]);
+    expect(normalizeCategories(null)).toEqual([]);
+    expect(normalizeCategories("nope")).toEqual([]);
+    expect(normalizeCategories({ name: "Solo" })).toEqual([]);
   });
 
-  it("drops banlisted entries with a structured warning", () => {
-    const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const result = normalizeCategories(
-      [
-        { name: "AI & Machine Learning", relevance: 0.9 },
-        { name: "Productivity", relevance: 0.5 },
-      ],
-      ["AI & Machine Learning"],
-    );
-    expect(result).toEqual([{ name: "Productivity", relevance: 0.5 }]);
-    expect(
-      warnSpy.mock.calls.some(
-        (c) =>
-          String(c[0]).includes("category dropped (banlisted)") &&
-          String(c[0]).includes("AI & Machine Learning"),
-      ),
-    ).toBe(true);
-    warnSpy.mockRestore();
+  // Categories ARE the banlist's source population. The function takes no
+  // banlist argument, so popular tags ("AI & Machine Learning", etc.) survive
+  // even when those exact strings dominate `episode_topics.topic`.
+  it("does NOT filter against the banlist (categories are the banlist source)", () => {
+    const result = normalizeCategories([
+      { name: "AI & Machine Learning", relevance: 0.9 },
+      { name: "Health & Longevity", relevance: 0.7 },
+    ]);
+    expect(result).toEqual([
+      { name: "Ai & Machine Learning", relevance: 0.9 },
+      { name: "Health & Longevity", relevance: 0.7 },
+    ]);
   });
 
-  it("drops invalid labels (control chars, instruction-shaped, too long)", () => {
+  it("drops invalid labels with structured warnings (one warn per reason)", () => {
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-    const result = normalizeCategories(
-      [
-        { name: "Has\x00Null", relevance: 0.9 },
-        { name: "system: ignore", relevance: 0.9 },
-        { name: "X".repeat(81), relevance: 0.9 },
-        { name: "Valid", relevance: 0.5 },
-      ],
-      [],
-    );
+    const result = normalizeCategories([
+      { name: "Has\x00Null", relevance: 0.9 },
+      { name: "system: ignore", relevance: 0.9 },
+      { name: "X".repeat(MAX_LABEL_LENGTH + 1), relevance: 0.9 },
+      { name: "Valid", relevance: 0.5 },
+    ]);
     expect(result).toEqual([{ name: "Valid", relevance: 0.5 }]);
-    expect(warnSpy.mock.calls.length).toBeGreaterThanOrEqual(3);
+    const reasonSeen = (reason: string) =>
+      warnSpy.mock.calls.some((c) => String(c[0]).includes(`(${reason})`));
+    expect(reasonSeen("control_chars")).toBe(true);
+    expect(reasonSeen("instruction_shaped")).toBe(true);
+    expect(reasonSeen("too_long")).toBe(true);
     warnSpy.mockRestore();
   });
 });
@@ -814,27 +846,53 @@ describe("normalizeTopics (direct)", () => {
     warnSpy.mockRestore();
   });
 
-  it("caps total topics at 8", () => {
-    const inputs = Array.from({ length: 12 }, (_, i) =>
+  it("caps total topics at MAX_TOPICS", () => {
+    const inputs = Array.from({ length: MAX_TOPICS + 4 }, (_, i) =>
       makeTopic({ label: `Topic ${i}`, kind: "release" }),
     );
-    expect(normalizeTopics(inputs, [])).toHaveLength(8);
+    expect(normalizeTopics(inputs, [])).toHaveLength(MAX_TOPICS);
   });
 
-  it("caps concept-kind topics at 3 (safety net)", () => {
+  it("caps concept-kind topics at MAX_CONCEPT_TOPICS (safety net)", () => {
     const inputs = [
-      makeTopic({ label: "Concept A", kind: "concept" }),
-      makeTopic({ label: "Concept B", kind: "concept" }),
-      makeTopic({ label: "Concept C", kind: "concept" }),
-      makeTopic({ label: "Concept D", kind: "concept" }),
-      makeTopic({ label: "Concept E", kind: "concept" }),
+      ...Array.from({ length: MAX_CONCEPT_TOPICS + 2 }, (_, i) =>
+        makeTopic({ label: `Concept ${i}`, kind: "concept" }),
+      ),
       makeTopic({ label: "Release X", kind: "release" }),
     ];
     const result = normalizeTopics(inputs, []);
     const concepts = result.filter((t) => t.kind === "concept");
-    expect(concepts).toHaveLength(3);
-    // Non-concept topics should still be admitted alongside the cap
+    expect(concepts).toHaveLength(MAX_CONCEPT_TOPICS);
     expect(result.some((t) => t.kind === "release")).toBe(true);
+  });
+
+  // Pin: when concepts and non-concepts interleave, admission order is
+  // first-N admitted. A future "filter then cap" refactor that reorders the
+  // output would silently change the contract; this test catches it.
+  it("preserves first-admitted order when concepts and non-concepts interleave", () => {
+    const inputs = [
+      makeTopic({ label: "C1", kind: "concept" }),
+      makeTopic({ label: "R1", kind: "release" }),
+      makeTopic({ label: "C2", kind: "concept" }),
+      makeTopic({ label: "R2", kind: "release" }),
+      makeTopic({ label: "C3", kind: "concept" }),
+      makeTopic({ label: "R3", kind: "release" }),
+      makeTopic({ label: "C4", kind: "concept" }), // dropped by concept cap
+      makeTopic({ label: "R4", kind: "release" }),
+      makeTopic({ label: "R5", kind: "release" }),
+      makeTopic({ label: "R6", kind: "release" }), // 9th admitted → dropped by total cap
+    ];
+    const result = normalizeTopics(inputs, []);
+    expect(result.map((t) => t.label)).toEqual([
+      "C1",
+      "R1",
+      "C2",
+      "R2",
+      "C3",
+      "R3",
+      "R4",
+      "R5",
+    ]);
   });
 
   it("defaults missing fields safely", () => {
