@@ -60,12 +60,17 @@ A hard cap of 5 disambiguator calls per episode bounds LLM cost; excess topics s
 
 ### Soft-merge with atomic path compression
 
-Reconciliation may merge canonical A into canonical B. Junction rows pointing at A are rewritten to the **terminal** canonical id inside the same transaction:
+Reconciliation may merge canonical A into canonical B. Junction rows pointing at A are rewritten to the **terminal** canonical id inside the same transaction. Because the junction has a `(episode_id, canonical_topic_id)` unique constraint, a plain `UPDATE` would conflict whenever an episode is already linked to both winner and loser. The compression is therefore a re-insert on the winner with conflicts ignored, followed by a delete of the loser-pointing rows:
 
-```
-UPDATE episode_canonical_topics SET canonical_topic_id = winner.id
+```sql
+INSERT INTO episode_canonical_topics (episode_id, canonical_topic_id, /* ... */)
+SELECT episode_id, winner.id, /* ... */
+FROM episode_canonical_topics
 WHERE canonical_topic_id = loser.id
-ON CONFLICT (episode_id, canonical_topic_id) DO NOTHING
+ON CONFLICT (episode_id, canonical_topic_id) DO NOTHING;
+
+DELETE FROM episode_canonical_topics
+WHERE canonical_topic_id = loser.id;
 ```
 
 Read paths never chase `merged_into_id` pointers — there is no chain depth to bound, no cycle risk to detect, no double-counting in joins. Path compression at write time is one operation that eliminates an entire class of bugs.
@@ -100,7 +105,7 @@ Maintained either via junction triggers or nightly recompute against `episode_ca
 \b(\d+\.\d+(?:\.\d+)?|\d{4}|v\d+)\b
 ```
 
-Covers semver (`4.7`, `4.6.1`), 4-digit years, and `v`-prefixed versions. Tunable in `entity-resolution-constants.ts` without schema change.
+Covers semver (`4.7`, `4.6.1`), 4-digit years, and `v`-prefixed versions. Tunable in `src/lib/entity-resolution-constants.ts` (planned, lands in EPIC A) without schema change.
 
 ### Concept extraction is constrained against Layer-1 categories
 
@@ -110,7 +115,7 @@ The summarization prompt receives a sample banlist of existing `episode_topics.t
 
 Mirrors the graceful-degradation pattern from [ADR-031](031-episode-topics-junction-table.md) and [ADR-027](027-summarize-episode-pure-consumer.md): summary and categories ship even if the resolver fails. Canonical-topic parse failure must not block category persistence — categories ship under their own try/catch.
 
-### Day-1 lite admin merge + observability inside EPIC A
+### Admin merge and observability ship with EPIC A
 
 `match_method` histograms, similarity logging, and a minimal admin merge/unmerge UI all land inside EPIC A. The "ship without UI" thesis depends on day-1 visibility and the ability to fix bad canonicals before they accumulate. Without observability, the validate-quality-before-UX thesis is unverifiable; without admin merge, week-1 bad canonicals are baked in by the time Feature 1 ships.
 
@@ -121,14 +126,13 @@ Mirrors the graceful-degradation pattern from [ADR-031](031-episode-topics-junct
 - **Concurrent-insert serialization via advisory lock.** Without it, two parallel summarization runs reliably create duplicate canonicals during launch-day news bursts. The partial unique index is a DB-level backstop, but advisory locks serialize at the application layer where the resolver can re-kNN inside the lock and find the freshly inserted canonical.
 - **Dual embeddings, not single.** A single embedding over `label + summary` couples identity with episode context — same-entity drift across episodes (different framings → different embeddings of the same entity) and same-context collapse across entities (similar episode framings → close embeddings of unrelated entities). Separating them is cheap (~8KB per canonical) and structurally correct.
 - **Top-1 for auto-match, top-20 for disambiguator.** Auto-match must remain conservative — only the closest neighbor is a candidate. Top-5 is too narrow for the `concept` kind, where the right canonical may be rank 6–20.
-- **Soft-merge with atomic path compression on merge.** Read-time pointer chasing is a footgun: chain depth grows over time, cycles are possible if the merge transaction races with another, and joins double-count when both source and target are referenced. Path compression at write time is one operation that eliminates the entire class of bugs.
-- **Path-compression mutates junction rows.** The alternative (read-time pointer chasing) is correctness-bug-prone; the cost (~100 row updates per merge, ~10 merges/day at steady state) is acceptable.
+- **Soft-merge with atomic path compression on merge.** Read-time pointer chasing is a footgun: chain depth grows, cycles are possible under racing merges, and joins double-count when both source and target are referenced. Path compression mutates ~100 junction rows per typical merge (~10 merges/day at steady state) — a bounded write cost that eliminates the entire class of read-time bugs.
 - **Restrict-cascade on `merged_into_id`.** A merged row with NULL target violates the audit trail. Hard delete must route through an explicit reparent flow.
 - **Derived `episode_count`.** Optimistic counters drift under soft-merge + episode-delete cascades. Recompute is cheap and correct.
 - **`ongoing` flag.** Without it, reconciliation perpetually merges WWDC-2026 canonicals across the year as separate dormant entries reactivate. The `ongoing` exemption is structural, not a workaround.
 - **Concept banlist sampling.** The `concept` kind is the most LLM-fuzzy bucket. Constraining it against existing categories prevents it becoming a junk drawer. Top-50 banlist refreshed on a 1-hour TTL with a manual invalidation hook from the admin UI.
 - **Pairwise winner-vs-loser verification, not group-judge.** Group-judge ("are these all the same?") is a known over-merge mode. Pairwise verification of winner against each loser (N-1 calls instead of N(N-1)/2) is structurally safer at sub-quadratic cost. Reject the cluster if any loser fails verification.
-- **Auto-match 0.92, disambiguate 0.82.** Raised from 0.75 in earlier draft per Codex review — 0.75 on 1024-dim cosine judges semantically adjacent but unrelated concepts and inflates LLM cost. Tuned post-launch via `match_method` histogram.
+- **Auto-match 0.92, disambiguate 0.82.** Lower thresholds (e.g. 0.75) on 1024-dim cosine merge semantically adjacent but unrelated concepts and inflate LLM cost; the 0.92/0.82 pair holds the bar high enough to avoid that. Tunable post-launch via `match_method` histogram.
 
 ## Consequences
 
