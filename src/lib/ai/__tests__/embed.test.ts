@@ -269,6 +269,97 @@ describe("embed helpers", () => {
       message: expect.stringMatching(/malformed/i),
     });
   });
+
+  // 13. Single-input cardinality mismatch (response has > 1 row)
+  it("generateEmbedding rejects when response has more than one row", async () => {
+    vi.stubEnv("OPENROUTER_API_KEY", "test-key");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            data: [
+              { index: 0, embedding: makeVec(EMBEDDING_DIMENSION) },
+              { index: 1, embedding: makeVec(EMBEDDING_DIMENSION) },
+            ],
+          }),
+      }),
+    );
+    await expect(generateEmbedding("hello")).rejects.toMatchObject({
+      name: "EmbeddingError",
+      message: expect.stringMatching(/count mismatch.*expected 1.*received 2/i),
+    });
+  });
+
+  // 14. Single-input index mismatch (response row has non-zero index)
+  it("generateEmbedding rejects when single-row index is not 0", async () => {
+    vi.stubEnv("OPENROUTER_API_KEY", "test-key");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            data: [{ index: 1, embedding: makeVec(EMBEDDING_DIMENSION) }],
+          }),
+      }),
+    );
+    await expect(generateEmbedding("hello")).rejects.toMatchObject({
+      name: "EmbeddingError",
+      message: expect.stringMatching(/index mismatch.*expected 0.*got 1/i),
+    });
+  });
+
+  // 15. Non-finite element rejected by row validation
+  it("generateEmbedding rejects when embedding contains a NaN value", async () => {
+    vi.stubEnv("OPENROUTER_API_KEY", "test-key");
+    const bad = makeVec(EMBEDDING_DIMENSION);
+    bad[3] = Number.NaN;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ data: [{ index: 0, embedding: bad }] }),
+      }),
+    );
+    await expect(generateEmbedding("hello")).rejects.toMatchObject({
+      name: "EmbeddingError",
+      message: expect.stringMatching(/non-finite/i),
+    });
+  });
+
+  // 16. Non-numeric element rejected by row validation
+  it("generateEmbedding rejects when embedding contains a non-numeric value", async () => {
+    vi.stubEnv("OPENROUTER_API_KEY", "test-key");
+    const bad: unknown[] = Array(EMBEDDING_DIMENSION).fill(0.1);
+    bad[5] = "0.2";
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ data: [{ index: 0, embedding: bad }] }),
+      }),
+    );
+    await expect(generateEmbedding("hello")).rejects.toMatchObject({
+      name: "EmbeddingError",
+      message: expect.stringMatching(/non-finite/i),
+    });
+  });
+
+  // 17. Fetch timeout surfaces as typed EmbeddingError
+  it("generateEmbedding rejects with EmbeddingError on request timeout", async () => {
+    vi.stubEnv("OPENROUTER_API_KEY", "test-key");
+    const timeoutErr = new DOMException(
+      "The operation timed out.",
+      "TimeoutError",
+    );
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(timeoutErr));
+    await expect(generateEmbedding("hello")).rejects.toMatchObject({
+      name: "EmbeddingError",
+      message: expect.stringMatching(/timed out/i),
+    });
+  });
 });
 
 describe("public surface", () => {

@@ -2,10 +2,11 @@
  * OpenRouter embedding helper — generates dense vector embeddings for text
  * using {@link EMBEDDING_MODEL} (1024-dim).
  *
- * See ADR-039 (canonical topics).
+ * See canonical-topics epic (#376).
  */
 
 const OPENROUTER_EMBEDDINGS_URL = "https://openrouter.ai/api/v1/embeddings";
+const REQUEST_TIMEOUT_MS = 30_000;
 
 /** Embedding model deployed for all ContentGenie vector representations. */
 export const EMBEDDING_MODEL = "perplexity/pplx-embed-v1-0.6b" as const;
@@ -19,7 +20,7 @@ export const EMBEDDING_DIMENSION = 1024 as const;
  * original `cause` (native ES2022 `Error.cause`) for structured upstream
  * error handling.
  *
- * See ADR-039 (canonical topics).
+ * See canonical-topics epic (#376).
  */
 export class EmbeddingError extends Error {
   readonly name = "EmbeddingError" as const;
@@ -47,14 +48,24 @@ function assertEmbeddingRow(
   row: unknown,
   rowIndex?: number,
 ): asserts row is EmbeddingRow {
+  const loc = rowIndex !== undefined ? ` (row ${rowIndex})` : "";
   if (
     !row ||
     typeof row !== "object" ||
     typeof (row as EmbeddingRow).index !== "number" ||
+    !Number.isSafeInteger((row as EmbeddingRow).index) ||
     !Array.isArray((row as EmbeddingRow).embedding)
   ) {
-    const loc = rowIndex !== undefined ? ` (row ${rowIndex})` : "";
     throw new EmbeddingError(`Malformed embedding row${loc} from OpenRouter`);
+  }
+  const embedding = (row as EmbeddingRow).embedding;
+  for (let i = 0; i < embedding.length; i++) {
+    const value = embedding[i];
+    if (typeof value !== "number" || !Number.isFinite(value)) {
+      throw new EmbeddingError(
+        `Malformed embedding row${loc}: non-finite value at index ${i}`,
+      );
+    }
   }
 }
 
@@ -78,10 +89,14 @@ async function requestEmbeddings(
         "X-Title": "ContentGenie",
       },
       body: JSON.stringify({ model: EMBEDDING_MODEL, input }),
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });
   } catch (err) {
+    const isTimeout = (err as Error)?.name === "TimeoutError";
     throw new EmbeddingError(
-      "Network error contacting OpenRouter embeddings endpoint",
+      isTimeout
+        ? `OpenRouter embeddings request timed out after ${REQUEST_TIMEOUT_MS}ms`
+        : "Network error contacting OpenRouter embeddings endpoint",
       undefined,
       err,
     );
@@ -128,13 +143,23 @@ async function requestEmbeddings(
  * Reads `OPENROUTER_API_KEY` at call time so the key can be rotated or
  * mocked in tests without reloading the module.
  *
- * See ADR-039 (canonical topics).
+ * See canonical-topics epic (#376).
  *
  * @throws {EmbeddingError} On missing API key, HTTP errors, malformed JSON,
- *   empty response, or dimension mismatch.
+ *   empty response, cardinality mismatch, or dimension mismatch.
  */
 export async function generateEmbedding(text: string): Promise<number[]> {
   const rows = await requestEmbeddings(text);
+  if (rows.length !== 1) {
+    throw new EmbeddingError(
+      `Embedding count mismatch: expected 1, received ${rows.length}`,
+    );
+  }
+  if (rows[0].index !== 0) {
+    throw new EmbeddingError(
+      `Embedding index mismatch: expected 0, got ${rows[0].index}`,
+    );
+  }
   const embedding = rows[0].embedding;
   assertDimension(embedding);
   return embedding;
@@ -148,7 +173,7 @@ export async function generateEmbedding(text: string): Promise<number[]> {
  * Reads `OPENROUTER_API_KEY` at call time so the key can be rotated or
  * mocked in tests without reloading the module.
  *
- * See ADR-039 (canonical topics).
+ * See canonical-topics epic (#376).
  *
  * @throws {EmbeddingError} On missing API key, HTTP errors, malformed JSON,
  *   empty response, or per-row dimension mismatch.
