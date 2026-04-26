@@ -103,11 +103,11 @@ Launch three reviews in parallel (one message, three independent tool calls). Ea
 
 2. `/pr-review-toolkit:review-pr all` — code-reviewer, pr-test-analyzer, silent-failure-hunter, type-design-analyzer, comment-analyzer, code-simplifier. **Immediately before** the Skill call, type the following directive into the conversation so it's salient when the slash command's spawned subagent prompts are constructed:
 
-   > Apply `docs/code-review-checklist.md` (loaded above in Phase 2.0) as a **supplementary rubric** for every reviewer subagent — in addition to each subagent's normal specialty (CLAUDE.md compliance, test coverage, silent failures, type design, comments, simplification). The rubric does not replace or narrow any existing review scope; both rubric-derived and specialty-derived findings should appear. Cite section numbers in rubric-derived findings (`[checklist §N]`). Skip the rubric pass if no rubric was loaded.
+   > Apply `docs/code-review-checklist.md` (loaded above in Phase 2.0) as a **supplementary rubric** for every reviewer subagent — in addition to each subagent's normal specialty (CLAUDE.md compliance, test coverage, silent failures, type design, comments, simplification). The rubric does not replace or narrow any existing review scope; both rubric-derived and specialty-derived findings should appear. Cite section numbers in rubric-derived findings (`[checklist §N]`).
 
 3. `/simplify` — reuse/quality/efficiency pass. **Immediately before** the Skill call, type:
 
-   > Apply `docs/code-review-checklist.md` as a **supplementary rubric** alongside the normal `/simplify` reuse/quality/efficiency pass — both contribute findings; the rubric does not narrow scope. Section 5 (consolidation conditions) is especially load-bearing for this layer — do not defer obvious extractions behind "rule of three" when all four conditions hold. Cite section numbers (`[checklist §N]`) in rubric-derived findings. Skip the rubric pass if no rubric was loaded.
+   > Apply `docs/code-review-checklist.md` as a **supplementary rubric** alongside the normal `/simplify` reuse/quality/efficiency pass — both contribute findings; the rubric does not narrow scope. Section 5 (consolidation conditions) is especially load-bearing for this layer — do not defer obvious extractions behind "rule of three" when all four conditions hold. Cite section numbers (`[checklist §N]`) in rubric-derived findings.
 
 Launch all three in the same message. Don't enter Phase 3 until the Codex task callback arrives and both Skill calls have returned. Don't run `codex:setup` — it's one-time init, not part of the pipeline.
 
