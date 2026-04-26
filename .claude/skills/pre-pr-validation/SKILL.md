@@ -1,6 +1,6 @@
 ---
 name: pre-pr-validation
-description: Use before any `gh pr create` — invoke this skill as soon as the user asks to open, create, submit, or file a pull request, without waiting for the hook to bounce the command. Runs the full pre-PR pipeline: rebase onto main, build check (tsc/lint/test are enforced per commit by the husky hook), loads `docs/code-review-checklist.md` as a supplementary rubric (graceful skip if missing), parallel multi-tool review (Codex review via `codex review --base main`, `/pr-review-toolkit:review-pr all`, `/simplify`) with the rubric framing each layer, validates every finding, auto-fixes all valid ones without pausing for approval, re-verifies, pushes, writes the sentinel that unblocks PR creation, then opens the PR. A PreToolUse hook guards `gh pr create` until a fresh sentinel exists, so triggering this skill proactively whenever PRs are mentioned is the path of least friction.
+description: Use before any `gh pr create` — invoke this skill as soon as the user asks to open, create, submit, or file a pull request, without waiting for the hook to bounce the command. Runs the full pre-PR pipeline: rebase onto main, build check (tsc/lint/test are enforced per commit by the husky hook), loads `docs/code-review-checklist.md` as a supplementary rubric (graceful skip if missing), parallel multi-tool review (Codex review via `codex review --base main`, `/pr-review-toolkit:review-pr all`, `/simplify`), validates every finding, auto-fixes all valid ones without pausing for approval, re-verifies, pushes, writes the sentinel that unblocks PR creation, then opens the PR. A PreToolUse hook guards `gh pr create` until a fresh sentinel exists, so triggering this skill proactively whenever PRs are mentioned is the path of least friction.
 ---
 
 # Pre-PR Validation
@@ -17,7 +17,7 @@ You should invoke this skill proactively the moment a PR is discussed — don't 
 
 Run this pipeline inline in the calling session. Don't wrap it in a `Task` subagent.
 
-Phase 2 itself dispatches a background `Task({run_in_background: true})` for the Codex review, and `/pr-review-toolkit:review-pr all` dispatches further `Task` calls for each specialist reviewer. Subagents can't spawn further subagents — so wrapping this skill in an outer Task blocks the Codex step entirely, and may prevent `/pr-review-toolkit:review-pr` from launching its specialists. Net result: weaker review coverage, no context win (the heavy work was already going to happen in a fresh context; you'd just be stacking one more).
+Phase 2.1 itself dispatches a background `Task({run_in_background: true})` for the Codex review, and `/pr-review-toolkit:review-pr all` dispatches further `Task` calls for each specialist reviewer. Subagents can't spawn further subagents — so wrapping this skill in an outer Task blocks the Codex step entirely, and may prevent `/pr-review-toolkit:review-pr` from launching its specialists. Net result: weaker review coverage, no context win (the heavy work was already going to happen in a fresh context; you'd just be stacking one more).
 
 If the caller's context is cluttered, the cost is mildly worse triage in Phase 3 — not broken reviews. That trade-off goes in favour of running inline.
 
@@ -78,7 +78,7 @@ If the file does not exist:
 - Print a one-line warning: `WARNING: docs/code-review-checklist.md not found — proceeding without rubric injection`.
 - Continue to Phase 2.1 with no rubric loaded. Do **not** fail the pipeline — the gate stays forward-compatible with branches/repos that haven't adopted the checklist.
 
-The rubric is **additive, not a replacement.** Every reviewer keeps its existing scope and specialty (Codex's heuristics, code-reviewer's CLAUDE.md compliance pass, pr-test-analyzer's coverage analysis, silent-failure-hunter, type-design-analyzer, comment-analyzer, code-simplifier, `/simplify`'s reuse/quality/efficiency pass). The rubric runs as a supplementary pass on top — both rubric-derived and specialty-derived findings should appear in Phase 3. Do not narrow any reviewer to "rubric only."
+The rubric is **additive, not a replacement.** Every reviewer keeps its existing scope and specialty (Codex's heuristics, code-reviewer's CLAUDE.md compliance pass, pr-test-analyzer's coverage analysis, silent-failure-hunter, type-design-analyzer, comment-analyzer, code-simplifier, `/simplify`'s reuse/quality/efficiency pass). The rubric runs as a supplementary pass on top — both rubric-derived and specialty-derived findings should appear in Phase 3.
 
 #### Phase 2.1 — Launch reviewers in parallel
 
@@ -195,7 +195,8 @@ Title: `type: Description`, under 70 characters, same convention as commits. Use
 - Unattended means unattended. Phase 3 → Phase 4 runs without an approval pause.
 - Rubric load is graceful: missing `docs/code-review-checklist.md` warns and proceeds; never fails the pipeline.
 - Rubric is a rubric, not a passive read: every reviewer layer must be told to **apply** and **cite** the checklist (`[checklist §N]`), not just have it loaded.
-- Rubric is additive: every reviewer keeps its existing scope; the rubric is a supplementary pass. Do not narrow Codex / `/pr-review-toolkit:review-pr` / `/simplify` to rubric-only.
+- Rubric is additive: every reviewer keeps its existing scope; the rubric is a supplementary pass. Do not narrow Codex / `/pr-review-toolkit:review-pr all` / `/simplify` to rubric-only.
+- Rubric propagation is hybrid by design: Codex inlines the rubric directly into its `Task` prompt (a backgrounded subagent has no shared conversation context — inlining is the only reliable channel). The two slash commands rely on conversation salience for their spawned subagents to inherit the directive. If a future version of `/pr-review-toolkit:review-pr` or `/simplify` isolates its subagent prompts from upstream conversation, the rubric framing on those layers will silently fall through; the smoke-test convention of looking for `[checklist §N]` citations in Phase 3 is what catches that regression.
 
 ## Failure modes
 
