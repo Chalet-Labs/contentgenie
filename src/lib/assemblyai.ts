@@ -1,3 +1,5 @@
+import "server-only";
+
 const API_BASE_URL = "https://api.assemblyai.com/v2";
 
 const DEFAULT_SPEECH_MODELS = ["universal-2"];

@@ -1,3 +1,5 @@
+import "server-only";
+
 import { createHash } from "node:crypto";
 import webpush from "web-push";
 import { db } from "@/db";

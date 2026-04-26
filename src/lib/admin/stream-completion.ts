@@ -1,3 +1,5 @@
+import "server-only";
+
 import type { AiMessage } from "@/lib/ai/types";
 
 const OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions";
@@ -56,7 +58,11 @@ export async function streamCompletion(
   });
 
   const abortController = new AbortController();
-  const timeout = setTimeout(() => abortController.abort(), CONNECT_TIMEOUT_MS);
+  const connectController = new AbortController();
+  const connectTimer = setTimeout(
+    () => connectController.abort(),
+    CONNECT_TIMEOUT_MS,
+  );
 
   let response: Response;
   try {
@@ -64,14 +70,14 @@ export async function streamCompletion(
       method: "POST",
       headers,
       body,
-      signal: abortController.signal,
+      signal: AbortSignal.any([
+        abortController.signal,
+        connectController.signal,
+      ]),
     });
-  } catch (err) {
-    clearTimeout(timeout);
-    throw err;
+  } finally {
+    clearTimeout(connectTimer);
   }
-
-  clearTimeout(timeout);
 
   if (!response.ok) {
     const errorText = await response

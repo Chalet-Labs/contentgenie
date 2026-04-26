@@ -1,3 +1,5 @@
+import "server-only";
+
 import type { AiProvider, AiMessage, AiCompletionOptions } from "../types";
 
 const OPENROUTER_API_URL = "https://openrouter.ai/api/v1/chat/completions";

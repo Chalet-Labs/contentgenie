@@ -1,3 +1,5 @@
+import "server-only";
+
 import { Pool } from "@neondatabase/serverless";
 import { RateLimiterPostgres, RateLimiterMemory } from "rate-limiter-flexible";
 
