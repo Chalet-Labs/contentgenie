@@ -21,6 +21,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Changed
 
+- Dashboard queue now uses the same drag-and-drop / click-to-play / remove / clear-all UI as the audio player queue — `QueueList` (previously inlined in `queue-panel.tsx`) is now a shared component at `src/components/audio-player/queue-list.tsx` with an optional `maxHeight` prop. The dashboard's bespoke `QueueSection` shrinks to a thin `<Card>` shell wrapping `<QueueList />`. Removed the per-row "Get score" / Trigger.dev realtime flow (and the now-unused `getQueueEpisodeScores` server action) — scoring lives on the episode page (#394).
 - Audio player: narrow context selectors for affordance buttons (PlayEpisodeButton, AddToQueueButton) — eliminates re-renders on volume/scrub/buffering ticks. The provider also memoizes `QueueEpisodeIdsContext` against content equality so reorders (and any non-membership-changing queue refresh) preserve the Set reference and don't re-render queue-aware consumers. See ADR-039.
 - Internal: introduced `PodcastIndexEpisodeId` branded type to disambiguate the PodcastIndex episode id namespace from DB-internal and Clerk user ids at compile time. No runtime behaviour change. See ADR-040.
 - Topics query (`getTopicsByPodcastIndexId`) now caps per-episode results with a Postgres `row_number() OVER (PARTITION BY episode_id)` window function instead of a JS loop, so only `TOPICS_PER_EPISODE_LIMIT` rows are sent across the wire per episode (3a).
