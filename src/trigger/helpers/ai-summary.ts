@@ -58,9 +58,17 @@ export const MAX_CONCEPT_TOPICS = 3; // safety net mirroring the prompt's concep
 // `topics: [{ name, relevance }]`. The new prompt asks for `categories` in
 // that slot. Detect the legacy shape so we don't strand custom-prompt
 // installations with zero persisted broad tags.
+//
+// `some` (not `every`) is intentional — partial-acceptance per Codex P1 review.
+// A single malformed entry (bad `relevance` value, missing `name`) shouldn't
+// drop the entire fallback; `normalizeCategories` already filters non-`name`
+// entries. Trade-off: a custom prompt that emits a mixed bag of legacy tags
+// AND new canonical-topic objects in the same `topics` array will lose the
+// canonical-topic side (folded as legacy). That mixed-shape case is contrived;
+// the common case (one bad entry in an otherwise-legacy array) wins.
 function looksLikeLegacyCategoriesArray(v: unknown): boolean {
   if (!Array.isArray(v) || v.length === 0) return false;
-  return v.every(
+  return v.some(
     (e) =>
       e !== null &&
       typeof e === "object" &&
@@ -94,11 +102,13 @@ export function normalizeCategories(raw: unknown): NormalizedCategory[] {
     if (!entry || typeof entry !== "object") continue;
     const e = entry as Record<string, unknown>;
     if (typeof e.name !== "string") continue;
-    const trimmed = e.name.trim();
-    const v = validateTopicLabel(trimmed, []);
+    // Validate the raw label so the validator's CONTROL_CHARS check sees any
+    // leading/trailing control chars (`\n`, `\t`, etc.). Trimming before
+    // validation would silently strip them and bypass that guard.
+    const v = validateTopicLabel(e.name, []);
     if (!v.ok) {
       console.warn(
-        `${LOG_PREFIX} category dropped (${v.reason}): ${trimmed.slice(0, 40)}`,
+        `${LOG_PREFIX} category dropped (${v.reason}): ${e.name.slice(0, 40)}`,
       );
       continue;
     }
@@ -107,14 +117,14 @@ export function normalizeCategories(raw: unknown): NormalizedCategory[] {
         ? clamp01(e.relevance)
         : NaN;
     if (Number.isNaN(relevance)) continue;
-    const name = toTitleCase(trimmed);
+    const name = toTitleCase(e.name.trim());
     const existing = deduped.get(name);
     if (!existing || relevance > existing.relevance) {
       deduped.set(name, { name, relevance });
     }
   }
   return Array.from(deduped.values())
-    .sort((a, b) => b.relevance - a.relevance)
+    .sort((a, b) => b.relevance - a.relevance || a.name.localeCompare(b.name))
     .slice(0, MAX_CATEGORIES);
 }
 
@@ -140,11 +150,13 @@ export function normalizeTopics(
     if (!entry || typeof entry !== "object") continue;
     const e = entry as Record<string, unknown>;
     if (typeof e.label !== "string") continue;
-    const trimmed = e.label.trim();
-    const v = validateTopicLabel(trimmed, banlist);
+    // Validate the raw label so the validator's CONTROL_CHARS check sees any
+    // leading/trailing control chars (`\n`, `\t`, etc.). Trimming before
+    // validation would silently strip them and bypass that guard.
+    const v = validateTopicLabel(e.label, banlist);
     if (!v.ok) {
       console.warn(
-        `${LOG_PREFIX} topic dropped (${v.reason}): ${trimmed.slice(0, 40)}`,
+        `${LOG_PREFIX} topic dropped (${v.reason}): ${e.label.slice(0, 40)}`,
       );
       continue;
     }
@@ -154,7 +166,7 @@ export function normalizeTopics(
       conceptCount += 1;
     }
     out.push({
-      label: trimmed,
+      label: e.label.trim(),
       kind,
       summary: typeof e.summary === "string" ? e.summary.trim() : "",
       aliases: coerceAliases(e.aliases),
@@ -210,9 +222,16 @@ export async function generateEpisodeSummary(
   // Only the JSON parse itself falls back to the unparsed-summary envelope;
   // downstream signal coercion and the two normalizer try/catches handle
   // their own failures so we don't lose partial structured output.
+  // `parseJsonResponse` returns any valid JSON, including primitives and
+  // `null` — guard for non-object before dereferencing summary fields below
+  // so a `JSON null` payload doesn't TypeError on `raw.summary`.
   let raw: Record<string, unknown>;
   try {
-    raw = parseJsonResponse<Record<string, unknown>>(completion);
+    const parsed = parseJsonResponse<unknown>(completion);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      throw new Error("Parsed payload is not a JSON object");
+    }
+    raw = parsed as Record<string, unknown>;
   } catch {
     return {
       summary: completion,
@@ -305,11 +324,6 @@ export async function generateEpisodeSummary(
       };
     }
   }
-  // Neither format (custom prompt returning raw score) — keep as-is, default if missing
-  if (typeof result.worthItScore !== "number") {
-    result.worthItScore = 5;
-  }
-
   // Independent try/catch per topic layer — if the categories layer parse
   // throws, the canonical-topics layer must still ship (and vice versa).
   // They feed independent downstream consumers (broad-tag UI ranking vs.
@@ -329,7 +343,7 @@ export async function generateEpisodeSummary(
   } catch (err) {
     categoriesAccessFailed = true;
     console.warn(
-      `${LOG_PREFIX} normalizeCategories failed (raw.categories access threw): ${err instanceof Error ? err.message : String(err)}`,
+      `${LOG_PREFIX} normalizeCategories failed: raw.categories access threw: ${err instanceof Error ? err.message : String(err)}`,
     );
   }
   try {
@@ -337,11 +351,15 @@ export async function generateEpisodeSummary(
   } catch (err) {
     topicsAccessFailed = true;
     console.warn(
-      `${LOG_PREFIX} normalizeTopics failed (raw.topics access threw): ${err instanceof Error ? err.message : String(err)}`,
+      `${LOG_PREFIX} normalizeTopics failed: raw.topics access threw: ${err instanceof Error ? err.message : String(err)}`,
     );
   }
+  // Precedence: when both `categories` and (legacy-shaped) `topics` are
+  // present, the new `categories` field wins — `useLegacyShape` requires
+  // `categoriesRaw == null`. Loose nullish (`== null`) catches both
+  // `undefined` (field absent) and explicit `null` from LLM output.
   const useLegacyShape =
-    categoriesRaw === undefined && looksLikeLegacyCategoriesArray(topicsRaw);
+    categoriesRaw == null && looksLikeLegacyCategoriesArray(topicsRaw);
 
   if (categoriesAccessFailed) {
     result.categories = undefined;

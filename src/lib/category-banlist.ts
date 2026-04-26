@@ -21,7 +21,7 @@ const TTL_MS = 60 * 60 * 1000; // 1 hour
 const TOP_N = 50;
 
 interface CachedBanlist {
-  banlist: string[];
+  banlist: readonly string[];
   loadedAt: number;
 }
 
@@ -59,7 +59,10 @@ export async function getCategoryBanlist(): Promise<readonly string[]> {
       .orderBy(desc(sql`count(*)`))
       .limit(TOP_N);
 
-    const banlist = rows.map((r) => r.topic);
+    // Freeze the cached array so a caller doing
+    // `(await getCategoryBanlist() as string[]).push(...)` can't silently
+    // corrupt the module-scope cache for the rest of the TTL window.
+    const banlist = Object.freeze(rows.map((r) => r.topic));
     write({ banlist, loadedAt: now });
     return banlist;
   } catch (err) {
