@@ -711,16 +711,19 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
         const result = await setQueueAction(snapshot);
         if (result.success) {
           lastAckedQueueRef.current = snapshot;
-          window.dispatchEvent(
-            new CustomEvent<NotificationsChangedEventDetail>(
-              NOTIFICATIONS_CHANGED_EVENT,
-              {
-                detail: {
-                  episodeDbIds: result.data?.dismissedEpisodeDbIds ?? [],
-                },
-              },
-            ),
-          );
+          // Only dispatch when the server actually dismissed something.
+          // Empty array means "queue saved, nothing to reconcile" — firing
+          // the event would force every notifications-page subscriber to
+          // treat it as the optimistic-empty-payload sentinel and re-fetch.
+          const dismissedIds = result.data?.dismissedEpisodeDbIds ?? [];
+          if (dismissedIds.length > 0) {
+            window.dispatchEvent(
+              new CustomEvent<NotificationsChangedEventDetail>(
+                NOTIFICATIONS_CHANGED_EVENT,
+                { detail: { episodeDbIds: dismissedIds } },
+              ),
+            );
+          }
         } else {
           toast.error("Couldn't sync queue", {
             description: "Your queue change couldn't be saved. Rolling back.",
@@ -1102,6 +1105,10 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
         }
         // Don't add if currently playing (queue dedup handled by reducer)
         if (current.currentEpisode.id === episode.id) return;
+        // Skip dispatch when the reducer would no-op (episode already queued).
+        // Otherwise the optimistic event fires for a no-op state change and
+        // every notifications-page subscriber pays the re-fetch cost.
+        if (current.queue.some((ep) => ep.id === episode.id)) return;
         dispatch({ type: "ADD_TO_QUEUE", episode });
         window.dispatchEvent(
           new CustomEvent<NotificationsChangedEventDetail>(

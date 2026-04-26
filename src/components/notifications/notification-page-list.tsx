@@ -143,9 +143,18 @@ export function NotificationPageList({
       const detail = (e as CustomEvent<NotificationsChangedEventDetail>).detail;
       const ids = new Set(detail?.episodeDbIds ?? []);
       if (ids.size > 0) {
-        setItems((prev) =>
-          prev.filter((n) => n.episodeDbId === null || !ids.has(n.episodeDbId)),
-        );
+        setItems((prev) => {
+          const next = prev.filter(
+            (n) => n.episodeDbId === null || !ids.has(n.episodeDbId),
+          );
+          // Mirror handleDismiss: keep offsetRef in sync so a subsequent
+          // Load more uses the post-filter offset and doesn't skip rows.
+          const removed = prev.length - next.length;
+          if (removed > 0) {
+            offsetRef.current = Math.max(0, offsetRef.current - removed);
+          }
+          return next;
+        });
       } else {
         void (async () => {
           try {
@@ -154,11 +163,15 @@ export function NotificationPageList({
               0,
               filter,
             );
-            if (!result.error) {
-              setItems(result.notifications);
-              setHasMore(result.hasMore ?? false);
-              offsetRef.current = result.notifications.length;
+            if (result.error) {
+              console.error("[notifications] re-fetch returned error", {
+                error: result.error,
+              });
+              return;
             }
+            setItems(result.notifications);
+            setHasMore(result.hasMore ?? false);
+            offsetRef.current = result.notifications.length;
           } catch (err) {
             console.error("[notifications] re-fetch on event failed", err);
           }

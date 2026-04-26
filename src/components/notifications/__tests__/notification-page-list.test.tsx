@@ -927,6 +927,37 @@ describe("NotificationPageList", () => {
     });
   });
 
+  // Data-loss guard: rows with episodeDbId === null (legacy / non-episode
+  // notifications) MUST be preserved when an event filter runs. A naive
+  // implementation that drops the `=== null` clause would silently delete
+  // unrelated notifications.
+  it("NOTIFICATIONS_CHANGED_EVENT with payload preserves rows where episodeDbId is null", async () => {
+    const matched = makeItem({ id: 1, episodeDbId: 10 });
+    const other = makeItem({ id: 2, episodeDbId: 20 });
+    const nullEp = makeItem({ id: 3, episodeDbId: null });
+    render(
+      <NotificationPageList
+        initialItems={[matched, other, nullEp]}
+        initialHasMore={false}
+        initialTopicsByEpisode={{}}
+      />,
+    );
+    expect(screen.getAllByRole("article")).toHaveLength(3);
+
+    await act(async () => {
+      window.dispatchEvent(
+        new CustomEvent(NOTIFICATIONS_CHANGED_EVENT, {
+          detail: { episodeDbIds: [10] },
+        }),
+      );
+    });
+
+    await waitFor(() => {
+      // matched (10) is removed; other (20) and nullEp (null) remain
+      expect(screen.getAllByRole("article")).toHaveLength(2);
+    });
+  });
+
   // Empty-payload re-fetch: optimistic addToQueue dispatch with no episodeDbIds
   it("NOTIFICATIONS_CHANGED_EVENT with empty payload re-fetches via getNotifications and calls router.refresh", async () => {
     const item1 = makeItem({ id: 1, episodeDbId: 10 });

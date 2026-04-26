@@ -58,6 +58,10 @@ export function ListenedButton({
           completed: true,
         });
         if (!result || result.success !== true) {
+          console.error("[ListenedButton] recordListenEvent returned failure", {
+            podcastIndexEpisodeId,
+            error: result && "error" in result ? result.error : "no result",
+          });
           setOptimisticOn(false);
           toast.error(
             (result && "error" in result && result.error) ||

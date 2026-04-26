@@ -45,6 +45,7 @@ export async function recordListenEvent(input: {
   );
 
   return withAuthAction(async (userId) => {
+    let episodeId: number;
     try {
       const episode = await db.query.episodes.findFirst({
         columns: { id: true },
@@ -57,7 +58,7 @@ export async function recordListenEvent(input: {
 
       await ensureUserExists(userId);
 
-      const { id: episodeId } = episode;
+      episodeId = episode.id;
       const now = new Date();
 
       await db
@@ -73,11 +74,8 @@ export async function recordListenEvent(input: {
         .onConflictDoUpdate({
           target: [listenHistory.userId, listenHistory.episodeId],
           set: {
-            // Preserve the first listen time (startedAt is NOT NULL, so COALESCE fallback is a safety net only)
             startedAt: sql`COALESCE(${listenHistory.startedAt}, ${now})`,
-            // Update completedAt when this is a completion event
             completedAt: completed ? now : sql`${listenHistory.completedAt}`,
-            // Keep the longest listen duration
             listenDurationSeconds:
               durationSeconds !== undefined
                 ? sql`GREATEST(COALESCE(${listenHistory.listenDurationSeconds}, 0), ${durationSeconds})`
@@ -85,20 +83,6 @@ export async function recordListenEvent(input: {
             updatedAt: now,
           },
         });
-
-      if (completed) {
-        try {
-          await dismissNotificationsForEpisodes(userId, [episodeId]);
-        } catch (dismissError) {
-          console.error("[recordListenEvent] dismiss failed", {
-            userId,
-            episodeId,
-            error: dismissError,
-          });
-        }
-      }
-
-      return { success: true, data: { episodeDbId: episodeId } };
     } catch (e) {
       console.error("[recordListenEvent] failed", {
         userId,
@@ -109,6 +93,23 @@ export async function recordListenEvent(input: {
       });
       return { success: false, error: "Failed to record listen event" };
     }
+
+    // Dismiss path runs AFTER the primary write succeeded. Mirrors the
+    // `setQueue` pattern so a future sync throw in the helper cannot
+    // propagate back into a failure return.
+    if (completed) {
+      try {
+        await dismissNotificationsForEpisodes(userId, [episodeId]);
+      } catch (dismissError) {
+        console.error("[recordListenEvent] dismiss failed", {
+          userId,
+          episodeId,
+          error: dismissError,
+        });
+      }
+    }
+
+    return { success: true, data: { episodeDbId: episodeId } };
   });
 }
 
