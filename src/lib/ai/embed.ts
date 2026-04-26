@@ -2,7 +2,7 @@
  * OpenRouter embedding helper — generates dense vector embeddings for text
  * using {@link EMBEDDING_MODEL} (1024-dim).
  *
- * See ADR-039 (canonical topics) — link will be added once #382 lands.
+ * See ADR-039 (canonical topics).
  */
 
 const OPENROUTER_EMBEDDINGS_URL = "https://openrouter.ai/api/v1/embeddings";
@@ -16,24 +16,23 @@ export const EMBEDDING_DIMENSION = 1024 as const;
 /**
  * Thrown by embedding helpers on API errors, missing configuration, or
  * dimension mismatches. Carries an optional HTTP {@link status} and the
- * original {@link cause} for structured upstream error handling.
+ * original `cause` (native ES2022 `Error.cause`) for structured upstream
+ * error handling.
  *
- * See ADR-039 (canonical topics) — link will be added once #382 lands.
+ * See ADR-039 (canonical topics).
  */
 export class EmbeddingError extends Error {
   readonly name = "EmbeddingError" as const;
   readonly status?: number;
-  readonly cause?: unknown;
 
   constructor(message: string, status?: number, cause?: unknown) {
-    super(message);
+    super(message, { cause });
     this.status = status;
-    this.cause = cause;
   }
 }
 
 type EmbeddingRow = { index: number; embedding: number[] };
-type EmbeddingsResponse = { data?: EmbeddingRow[] };
+type EmbeddingsResponse = { data?: unknown };
 
 function assertDimension(embedding: number[], rowIndex?: number): void {
   if (embedding.length !== EMBEDDING_DIMENSION) {
@@ -44,37 +43,57 @@ function assertDimension(embedding: number[], rowIndex?: number): void {
   }
 }
 
-/**
- * Generates a single embedding vector for the given text.
- *
- * Reads `OPENROUTER_API_KEY` at call time so the key can be rotated or
- * stubbed in tests without reloading the module.
- *
- * See ADR-039 (canonical topics) — link will be added once #382 lands.
- *
- * @throws {EmbeddingError} On missing API key, HTTP errors, malformed JSON,
- *   empty response, or dimension mismatch.
- */
-export async function generateEmbedding(text: string): Promise<number[]> {
-  const apiKey = process.env.OPENROUTER_API_KEY || "";
+function assertEmbeddingRow(
+  row: unknown,
+  rowIndex?: number,
+): asserts row is EmbeddingRow {
+  if (
+    !row ||
+    typeof row !== "object" ||
+    typeof (row as EmbeddingRow).index !== "number" ||
+    !Array.isArray((row as EmbeddingRow).embedding)
+  ) {
+    const loc = rowIndex !== undefined ? ` (row ${rowIndex})` : "";
+    throw new EmbeddingError(`Malformed embedding row${loc} from OpenRouter`);
+  }
+}
+
+async function requestEmbeddings(
+  input: string | string[],
+): Promise<EmbeddingRow[]> {
+  const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) {
     throw new EmbeddingError("OpenRouter API key is not configured");
   }
 
-  const response = await fetch(OPENROUTER_EMBEDDINGS_URL, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-      "HTTP-Referer":
-        process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
-      "X-Title": "ContentGenie",
-    },
-    body: JSON.stringify({ model: EMBEDDING_MODEL, input: text }),
-  });
+  let response: Response;
+  try {
+    response = await fetch(OPENROUTER_EMBEDDINGS_URL, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+        "HTTP-Referer":
+          process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
+        "X-Title": "ContentGenie",
+      },
+      body: JSON.stringify({ model: EMBEDDING_MODEL, input }),
+    });
+  } catch (err) {
+    throw new EmbeddingError(
+      "Network error contacting OpenRouter embeddings endpoint",
+      undefined,
+      err,
+    );
+  }
 
   if (!response.ok) {
-    const errorText = await response.text();
+    let errorText = "";
+    try {
+      errorText = await response.text();
+    } catch {
+      errorText = "<failed to read error body>";
+    }
     throw new EmbeddingError(
       `OpenRouter embeddings API error: ${response.status} - ${errorText}`,
       response.status,
@@ -96,7 +115,27 @@ export async function generateEmbedding(text: string): Promise<number[]> {
     throw new EmbeddingError("No embeddings returned from OpenRouter");
   }
 
-  const embedding = data.data[0].embedding;
+  const rows = data.data;
+  for (let i = 0; i < rows.length; i++) {
+    assertEmbeddingRow(rows[i], i);
+  }
+  return rows as EmbeddingRow[];
+}
+
+/**
+ * Generates a single embedding vector for the given text.
+ *
+ * Reads `OPENROUTER_API_KEY` at call time so the key can be rotated or
+ * mocked in tests without reloading the module.
+ *
+ * See ADR-039 (canonical topics).
+ *
+ * @throws {EmbeddingError} On missing API key, HTTP errors, malformed JSON,
+ *   empty response, or dimension mismatch.
+ */
+export async function generateEmbedding(text: string): Promise<number[]> {
+  const rows = await requestEmbeddings(text);
+  const embedding = rows[0].embedding;
   assertDimension(embedding);
   return embedding;
 }
@@ -107,59 +146,36 @@ export async function generateEmbedding(text: string): Promise<number[]> {
  * row is validated against {@link EMBEDDING_DIMENSION}.
  *
  * Reads `OPENROUTER_API_KEY` at call time so the key can be rotated or
- * stubbed in tests without reloading the module.
+ * mocked in tests without reloading the module.
  *
- * See ADR-039 (canonical topics) — link will be added once #382 lands.
+ * See ADR-039 (canonical topics).
  *
  * @throws {EmbeddingError} On missing API key, HTTP errors, malformed JSON,
  *   empty response, or per-row dimension mismatch.
  */
 export async function generateEmbeddings(texts: string[]): Promise<number[][]> {
-  const apiKey = process.env.OPENROUTER_API_KEY || "";
-  if (!apiKey) {
-    throw new EmbeddingError("OpenRouter API key is not configured");
+  if (texts.length === 0) {
+    return [];
   }
 
-  const response = await fetch(OPENROUTER_EMBEDDINGS_URL, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-      "HTTP-Referer":
-        process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
-      "X-Title": "ContentGenie",
-    },
-    body: JSON.stringify({ model: EMBEDDING_MODEL, input: texts }),
-  });
+  const rows = await requestEmbeddings(texts);
+  rows.sort((a, b) => a.index - b.index);
 
-  if (!response.ok) {
-    const errorText = await response.text();
+  if (rows.length !== texts.length) {
     throw new EmbeddingError(
-      `OpenRouter embeddings API error: ${response.status} - ${errorText}`,
-      response.status,
+      `Embedding count mismatch: requested ${texts.length}, received ${rows.length}`,
     );
   }
-
-  let data: EmbeddingsResponse;
-  try {
-    data = (await response.json()) as EmbeddingsResponse;
-  } catch (err) {
-    throw new EmbeddingError(
-      "Invalid JSON from OpenRouter embeddings",
-      undefined,
-      err,
-    );
+  for (let i = 0; i < rows.length; i++) {
+    if (rows[i].index !== i) {
+      throw new EmbeddingError(
+        `Embedding index mismatch at position ${i}: got index ${rows[i].index}`,
+      );
+    }
   }
 
-  if (!Array.isArray(data?.data) || data.data.length === 0) {
-    throw new EmbeddingError("No embeddings returned from OpenRouter");
-  }
-
-  const sorted = [...data.data].sort((a, b) => a.index - b.index);
-
-  for (const row of sorted) {
+  return rows.map((row) => {
     assertDimension(row.embedding, row.index);
-  }
-
-  return sorted.map((row) => row.embedding);
+    return row.embedding;
+  });
 }

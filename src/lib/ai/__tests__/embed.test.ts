@@ -1,17 +1,15 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import {
   generateEmbedding,
   generateEmbeddings,
   EmbeddingError,
+  EMBEDDING_DIMENSION,
+  EMBEDDING_MODEL,
 } from "@/lib/ai/embed";
 
 const makeVec = (n: number): number[] => Array<number>(n).fill(0.1);
 
 describe("embed helpers", () => {
-  beforeEach(() => {
-    vi.stubGlobal("fetch", vi.fn());
-  });
-
   afterEach(() => {
     vi.restoreAllMocks();
     vi.unstubAllEnvs();
@@ -22,7 +20,7 @@ describe("embed helpers", () => {
   it("generateEmbedding returns embedding and sends correct request", async () => {
     vi.stubEnv("OPENROUTER_API_KEY", "test-key");
     vi.stubEnv("NEXT_PUBLIC_APP_URL", "https://example.com");
-    const embedding = makeVec(1024);
+    const embedding = makeVec(EMBEDDING_DIMENSION);
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       json: () => Promise.resolve({ data: [{ index: 0, embedding }] }),
@@ -45,14 +43,14 @@ describe("embed helpers", () => {
     );
     const body = JSON.parse(fetchMock.mock.calls[0][1].body as string);
     expect(body.input).toBe("hello");
-    expect(body.model).toBe("perplexity/pplx-embed-v1-0.6b");
+    expect(body.model).toBe(EMBEDDING_MODEL);
   });
 
   // 2. Batch success — sorted by index
   it("generateEmbeddings returns vectors sorted by response index", async () => {
     vi.stubEnv("OPENROUTER_API_KEY", "test-key");
-    const emb0 = makeVec(1024);
-    const emb1 = makeVec(1024);
+    const emb0 = makeVec(EMBEDDING_DIMENSION);
+    const emb1 = makeVec(EMBEDDING_DIMENSION);
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       json: () =>
@@ -71,6 +69,10 @@ describe("embed helpers", () => {
     expect(result[0]).toEqual(emb0);
     expect(result[1]).toEqual(emb1);
     expect(fetchMock).toHaveBeenCalledOnce();
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body as string);
+    expect(body.input).toEqual(["text0", "text1"]);
+    expect(body.model).toBe(EMBEDDING_MODEL);
   });
 
   // 3. 429 typed error
@@ -85,6 +87,23 @@ describe("embed helpers", () => {
       }),
     );
     await expect(generateEmbedding("hello")).rejects.toMatchObject({
+      name: "EmbeddingError",
+      status: 429,
+    });
+  });
+
+  // 3b. Batch 429 typed error
+  it("generateEmbeddings rejects with EmbeddingError on 429", async () => {
+    vi.stubEnv("OPENROUTER_API_KEY", "test-key");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 429,
+        text: () => Promise.resolve("Rate limited"),
+      }),
+    );
+    await expect(generateEmbeddings(["a", "b"])).rejects.toMatchObject({
       name: "EmbeddingError",
       status: 429,
     });
@@ -137,7 +156,9 @@ describe("embed helpers", () => {
     const err = await generateEmbedding("hello").catch((e: unknown) => e);
     expect(err).toBeInstanceOf(EmbeddingError);
     expect((err as EmbeddingError).message).toContain("512");
-    expect((err as EmbeddingError).message).toContain("1024");
+    expect((err as EmbeddingError).message).toContain(
+      String(EMBEDDING_DIMENSION),
+    );
   });
 
   // 6b. Dimension mismatch — generateEmbeddings, per-row assertion (mixed-length batch)
@@ -150,7 +171,7 @@ describe("embed helpers", () => {
         json: () =>
           Promise.resolve({
             data: [
-              { index: 0, embedding: makeVec(1024) },
+              { index: 0, embedding: makeVec(EMBEDDING_DIMENSION) },
               { index: 1, embedding: makeVec(768) },
             ],
           }),
@@ -159,7 +180,9 @@ describe("embed helpers", () => {
     const err = await generateEmbeddings(["a", "b"]).catch((e: unknown) => e);
     expect(err).toBeInstanceOf(EmbeddingError);
     expect((err as EmbeddingError).message).toContain("768");
-    expect((err as EmbeddingError).message).toContain("1024");
+    expect((err as EmbeddingError).message).toContain(
+      String(EMBEDDING_DIMENSION),
+    );
   });
 
   // 7. Missing API key
@@ -184,6 +207,66 @@ describe("embed helpers", () => {
     await expect(generateEmbedding("hello")).rejects.toMatchObject({
       name: "EmbeddingError",
       message: expect.stringMatching(/No embeddings returned/i),
+    });
+  });
+
+  // 9. Empty-input batch returns [] without calling fetch
+  it("generateEmbeddings returns [] for empty input without calling fetch", async () => {
+    vi.stubEnv("OPENROUTER_API_KEY", "test-key");
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    await expect(generateEmbeddings([])).resolves.toEqual([]);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  // 10. Response missing `data` key
+  it("generateEmbedding rejects when response has no data field", async () => {
+    vi.stubEnv("OPENROUTER_API_KEY", "test-key");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({}),
+      }),
+    );
+    await expect(generateEmbedding("hello")).rejects.toMatchObject({
+      name: "EmbeddingError",
+      message: expect.stringMatching(/No embeddings returned/i),
+    });
+  });
+
+  // 11. Cardinality mismatch (response has fewer rows than input)
+  it("generateEmbeddings rejects when response cardinality does not match input length", async () => {
+    vi.stubEnv("OPENROUTER_API_KEY", "test-key");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            data: [{ index: 0, embedding: makeVec(EMBEDDING_DIMENSION) }],
+          }),
+      }),
+    );
+    await expect(generateEmbeddings(["a", "b", "c"])).rejects.toMatchObject({
+      name: "EmbeddingError",
+      message: expect.stringMatching(/count mismatch|cardinality/i),
+    });
+  });
+
+  // 12. Malformed row (missing embedding)
+  it("generateEmbedding rejects on malformed row missing embedding field", async () => {
+    vi.stubEnv("OPENROUTER_API_KEY", "test-key");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ data: [{ index: 0 }] }),
+      }),
+    );
+    await expect(generateEmbedding("hello")).rejects.toMatchObject({
+      name: "EmbeddingError",
+      message: expect.stringMatching(/malformed/i),
     });
   });
 });
