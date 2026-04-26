@@ -232,6 +232,14 @@ export async function generateEpisodeSummary(
       throw new Error("Parsed payload is not a JSON object");
     }
     raw = parsed as Record<string, unknown>;
+    // Treat a missing or blank `summary` as a structured-response failure.
+    // Otherwise the episode would persist as `summaryStatus='completed'`
+    // with an empty body — better to fall back to the unparsed-completion
+    // envelope so the user sees the raw model output (or trip the upstream
+    // retry path) than to ship a blank "completed" summary.
+    if (typeof raw.summary !== "string" || raw.summary.trim().length === 0) {
+      throw new Error("Parsed payload missing required `summary` field");
+    }
   } catch {
     return {
       summary: completion,
@@ -354,12 +362,17 @@ export async function generateEpisodeSummary(
       `${LOG_PREFIX} normalizeTopics failed: raw.topics access threw: ${err instanceof Error ? err.message : String(err)}`,
     );
   }
-  // Precedence: when both `categories` and (legacy-shaped) `topics` are
-  // present, the new `categories` field wins — `useLegacyShape` requires
-  // `categoriesRaw == null`. Loose nullish (`== null`) catches both
-  // `undefined` (field absent) and explicit `null` from LLM output.
+  // Precedence: when `categories` is a usable array (even if empty? no — see
+  // below), the new field wins. Fall back to the legacy `topics` shape when
+  // `categoriesRaw` is missing, null, OR malformed (string, object, primitive,
+  // empty array). A custom prompt that emits `"categories": "..."` would
+  // otherwise leave us with zero persisted broad tags even when `topics`
+  // contains valid legacy `{name, relevance}` entries — which is the
+  // pre-refactor regression Codex P1 flagged.
+  const categoriesIsUsableArray =
+    Array.isArray(categoriesRaw) && (categoriesRaw as unknown[]).length > 0;
   const useLegacyShape =
-    categoriesRaw == null && looksLikeLegacyCategoriesArray(topicsRaw);
+    !categoriesIsUsableArray && looksLikeLegacyCategoriesArray(topicsRaw);
 
   if (categoriesAccessFailed) {
     result.categories = undefined;

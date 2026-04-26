@@ -308,6 +308,36 @@ describe("generateEpisodeSummary", () => {
       ]);
     });
 
+    // Regression — Codex P1 (round 2): a non-null but malformed
+    // `categories` payload (string, object, empty array) used to disable
+    // the legacy fallback even when `topics` carried valid legacy entries.
+    it.each([
+      ["string-shaped categories", "this is not an array"],
+      ["object-shaped categories", { not: "an array" }],
+      ["empty array categories", []],
+    ])("falls back to legacy topics when categories is %s", async (_, bad) => {
+      mockParseJsonResponse.mockReturnValue({
+        ...mockSummaryResult,
+        categories: bad,
+        topics: [
+          { name: "machine learning", relevance: 0.9 },
+          { name: "leadership", relevance: 0.7 },
+        ],
+      });
+
+      const result = await generateEpisodeSummary(
+        mockPodcast,
+        mockEpisode,
+        "transcript text",
+        "Custom {{transcript}}",
+      );
+
+      expect(result.categories).toEqual([
+        { name: "Machine Learning", relevance: 0.9 },
+        { name: "Leadership", relevance: 0.7 },
+      ]);
+    });
+
     it("omits categories field on LLM parse failure (fallback path)", async () => {
       mockGenerateCompletion.mockResolvedValue("not valid json {{}}");
       mockParseJsonResponse.mockImplementation(() => {
@@ -323,6 +353,41 @@ describe("generateEpisodeSummary", () => {
       expect(Object.hasOwn(result, "categories")).toBe(false);
       expect(Object.hasOwn(result, "topics")).toBe(false);
     });
+
+    // Regression — Copilot review (round 2): a parsed payload missing or
+    // blank `summary` used to silently land as `summaryStatus='completed'`
+    // with an empty body. Now treated as a structured-response failure so
+    // the user sees the raw completion instead of a blank "completed"
+    // summary.
+    it.each([
+      ["missing summary", { keyTakeaways: ["foo"], worthItReason: "ok" }],
+      [
+        "non-string summary",
+        { summary: 42, keyTakeaways: [], worthItReason: "ok" },
+      ],
+      [
+        "blank summary",
+        { summary: "   ", keyTakeaways: [], worthItReason: "ok" },
+      ],
+    ])(
+      "falls back to the unparsed-completion envelope when payload has %s",
+      async (_, payload) => {
+        const completion = "<<raw model output that didn't include a summary>>";
+        mockGenerateCompletion.mockResolvedValue(completion);
+        mockParseJsonResponse.mockReturnValue(payload);
+
+        const result = await generateEpisodeSummary(
+          mockPodcast,
+          mockEpisode,
+          "transcript text",
+        );
+
+        expect(result.summary).toBe(completion);
+        expect(result.worthItReason).toBe(
+          "Unable to parse structured response",
+        );
+      },
+    );
   });
 
   it("uses default getSummarizationPrompt when customPrompt is not provided", async () => {
