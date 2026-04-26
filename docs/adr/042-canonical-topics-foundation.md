@@ -48,7 +48,7 @@ Two HNSW indexes (one per column) are maintained.
 Resolution runs **inside a transaction guarded by a Postgres advisory lock** keyed on `hashtext(lower(label) || '|' || kind)`, serializing concurrent inserts of the same brand-new entity:
 
 1. **Acquire advisory lock** for `(normalized_label, kind)`. Concurrent runs block here, then re-execute the steps below — second arrival sees the canonical the first arrival just inserted.
-2. **kNN candidate fetch.** Cosine over `identity_embedding`, top-1 (auto-match candidate) and top-20 (disambiguator candidate pool). Per-query `SET LOCAL hnsw.ef_search = 200`. Filtered: `status='active' AND (kind IN ('concept','work') OR last_seen > now() - 90d OR ongoing = true)`.
+2. **kNN candidate fetch.** Cosine over `identity_embedding`, top-1 (auto-match candidate) and top-20 (disambiguator candidate pool). Per-query `SET LOCAL hnsw.ef_search = 200`. Filtered: `status='active' AND (kind IN ('concept','work') OR last_seen > now() - interval '90 days' OR ongoing = true)`.
 3. **Version-token pre-gate.** Regex over both labels: if numeric/version tokens differ (`4.6` vs `4.7`, `2024` vs `2025`, `WWDC 2025` vs `WWDC 2026`), force the disambiguator path regardless of similarity. Catches the "Opus 4.6 vs 4.7 at 0.95 cosine" failure mode that pure cosine cannot.
 4. **Decision:**
    - top-1 cosine > **0.92** AND same `kind` AND version-gate passes → **auto-match**
@@ -102,7 +102,7 @@ Maintained either via junction triggers or nightly recompute against `episode_ca
 ### Version-token regex pre-gate
 
 ```
-\b(\d+\.\d+(?:\.\d+)?|\d{4}|v\d+)\b
+\b(\d+\.\d+(?:\.\d+)?|\d{4}|v\d+(?:\.\d+)*)\b
 ```
 
 Covers semver (`4.7`, `4.6.1`), 4-digit years, and `v`-prefixed versions. Tunable in `src/lib/entity-resolution-constants.ts` (planned, lands in EPIC A) without schema change.
