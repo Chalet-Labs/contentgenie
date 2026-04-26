@@ -12,6 +12,7 @@ import {
 import type { NotificationSummary } from "@/app/actions/notifications";
 import { NotificationPopover } from "@/components/notifications/notification-popover";
 import { formatRelativeTime } from "@/lib/utils";
+import { NOTIFICATIONS_CHANGED_EVENT } from "@/lib/events";
 
 const POLL_INTERVAL_MS = 60_000;
 
@@ -46,6 +47,12 @@ export function NotificationBell() {
     fetchUnreadCount();
     const interval = setInterval(fetchUnreadCount, POLL_INTERVAL_MS);
     return () => clearInterval(interval);
+  }, [fetchUnreadCount]);
+
+  useEffect(() => {
+    window.addEventListener(NOTIFICATIONS_CHANGED_EVENT, fetchUnreadCount);
+    return () =>
+      window.removeEventListener(NOTIFICATIONS_CHANGED_EVENT, fetchUnreadCount);
   }, [fetchUnreadCount]);
 
   // Close on route change (skip initial mount — popover starts closed)

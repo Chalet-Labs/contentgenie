@@ -1,10 +1,11 @@
 "use server";
 
-import { eq, asc } from "drizzle-orm";
+import { eq, asc, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { ensureUserExists } from "@/db/helpers";
-import { userQueueItems } from "@/db/schema";
+import { episodes, userQueueItems } from "@/db/schema";
 import { withAuthAction } from "@/lib/auth-wrapper";
+import { dismissNotificationsForEpisodes } from "@/app/actions/_internal/dismiss-notifications";
 import {
   queueSchema,
   toAudioEpisode,
@@ -41,15 +42,16 @@ export async function getQueue(): Promise<ActionResult<AudioEpisode[]>> {
  * commit arrives last on the database.
  */
 export async function setQueue(
-  episodes: AudioEpisode[],
-): Promise<ActionResult> {
+  queueEpisodes: AudioEpisode[],
+): Promise<ActionResult<{ dismissedEpisodeDbIds: number[] }>> {
   return withAuthAction(async (userId) => {
-    const parsed = queueSchema.safeParse(episodes);
+    const parsed = queueSchema.safeParse(queueEpisodes);
     if (!parsed.success) {
       console.warn("[setQueue] validation failed", parsed.error.issues);
       return { success: false as const, error: "Invalid queue data" };
     }
 
+    // ----- PRIMARY WRITE (outer try/catch — failure flips to { success: false }) -----
     try {
       await ensureUserExists(userId);
 
@@ -74,12 +76,28 @@ export async function setQueue(
           .delete(userQueueItems)
           .where(eq(userQueueItems.userId, userId));
       }
-
-      return { success: true as const };
     } catch (e) {
       console.error("Failed to set queue:", e);
       return { success: false as const, error: "Failed to set queue" };
     }
+
+    // ----- DISMISS PATH (inner try/catch — failure logs only, action still succeeds) -----
+    let dismissedEpisodeDbIds: number[] = [];
+    if (parsed.data.length > 0) {
+      try {
+        const piIds = parsed.data.map((e) => e.id);
+        const rows = await db
+          .select({ id: episodes.id })
+          .from(episodes)
+          .where(inArray(episodes.podcastIndexId, piIds));
+        dismissedEpisodeDbIds = rows.map((r) => r.id);
+        await dismissNotificationsForEpisodes(userId, dismissedEpisodeDbIds);
+      } catch (e) {
+        console.error("[setQueue] dismiss path failed", { userId, error: e });
+        dismissedEpisodeDbIds = [];
+      }
+    }
+    return { success: true as const, data: { dismissedEpisodeDbIds } };
   });
 }
 

@@ -17,6 +17,15 @@ import {
 const mockAuth = vi.fn();
 vi.mock("@clerk/nextjs/server", () => makeClerkAuthMock(() => mockAuth()));
 
+// Mock dismiss helper
+const mockDismissNotificationsForEpisodes = vi
+  .fn()
+  .mockResolvedValue(undefined);
+vi.mock("@/app/actions/_internal/dismiss-notifications", () => ({
+  dismissNotificationsForEpisodes: (...args: unknown[]) =>
+    mockDismissNotificationsForEpisodes(...args),
+}));
+
 // Mock database
 const mockInsert = vi.fn();
 const mockInsertValues = vi.fn();
@@ -24,12 +33,18 @@ const mockDelete = vi.fn();
 const mockDeleteWhere = vi.fn();
 const mockFindMany = vi.fn();
 const mockBatch = vi.fn();
+const mockSelectWhere = vi.fn();
 
 vi.mock("@/db", () => ({
   db: {
     batch: (...args: unknown[]) => mockBatch(...args),
     insert: makeInsertChain(mockInsert, mockInsertValues),
     delete: makeDeleteChain(mockDelete, mockDeleteWhere),
+    select: (_cols: unknown) => ({
+      from: (_table: unknown) => ({
+        where: (...args: unknown[]) => mockSelectWhere(...args),
+      }),
+    }),
     query: {
       userQueueItems: {
         findMany: (...args: unknown[]) => mockFindMany(...args),
@@ -58,10 +73,19 @@ vi.mock("@/db/schema", () => ({
     chaptersUrl: "chaptersUrl",
     updatedAt: "updatedAt",
   },
+  episodes: {
+    id: "episodes.id",
+    podcastIndexId: "episodes.podcastIndexId",
+  },
 }));
 
 // Mock drizzle-orm (shared factory lives in __fixtures.ts)
-vi.mock("drizzle-orm", () => createDrizzleOrmMock());
+vi.mock("drizzle-orm", () => ({
+  ...createDrizzleOrmMock(),
+  inArray: vi.fn((col: unknown, vals: unknown) => ({
+    _inArray: { col, vals },
+  })),
+}));
 
 const importAction = async () => import("@/app/actions/listening-queue");
 
@@ -289,6 +313,92 @@ describe("setQueue", () => {
       (await importAction()).setQueue([validEpisode]),
     ),
   );
+
+  it("issues a SELECT to resolve episode podcastIndexIds to integer ids after batch", async () => {
+    mockSelectWhere.mockResolvedValue([{ id: 10 }, { id: 11 }]);
+    const { setQueue } = await importAction();
+    await setQueue([validEpisode, validEpisode2]);
+    expect(mockSelectWhere).toHaveBeenCalledTimes(1);
+    const { inArray } = await import("drizzle-orm");
+    expect(inArray).toHaveBeenCalledWith(
+      "episodes.podcastIndexId",
+      expect.arrayContaining([validEpisode.id, validEpisode2.id]),
+    );
+  });
+
+  it("calls dismiss helper with resolved integer ids", async () => {
+    mockSelectWhere.mockResolvedValue([{ id: 10 }, { id: 11 }]);
+    const { setQueue } = await importAction();
+    await setQueue([validEpisode, validEpisode2]);
+    expect(mockDismissNotificationsForEpisodes).toHaveBeenCalledWith(
+      "user_123",
+      [10, 11],
+    );
+  });
+
+  it("returns { success: true, data: { dismissedEpisodeDbIds: [10, 11] } }", async () => {
+    mockSelectWhere.mockResolvedValue([{ id: 10 }, { id: 11 }]);
+    const { setQueue } = await importAction();
+    const result = await setQueue([validEpisode, validEpisode2]);
+    expect(result).toEqual({
+      success: true,
+      data: { dismissedEpisodeDbIds: [10, 11] },
+    });
+  });
+
+  it("with empty array does NOT issue the resolution SELECT and returns dismissedEpisodeDbIds: []", async () => {
+    const { setQueue } = await importAction();
+    const result = await setQueue([]);
+    expect(mockSelectWhere).not.toHaveBeenCalled();
+    expect(result).toEqual({
+      success: true,
+      data: { dismissedEpisodeDbIds: [] },
+    });
+  });
+
+  it("inner-catch isolation: resolution SELECT throwing still returns success with empty dismissedEpisodeDbIds", async () => {
+    mockSelectWhere.mockRejectedValueOnce(new Error("select failed"));
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const { setQueue } = await importAction();
+    const result = await setQueue([validEpisode]);
+    expect(result).toEqual({
+      success: true,
+      data: { dismissedEpisodeDbIds: [] },
+    });
+    expect(consoleSpy).toHaveBeenCalled();
+    consoleSpy.mockRestore();
+  });
+
+  it("inner-catch isolation: dismiss helper throwing still returns success with empty dismissedEpisodeDbIds", async () => {
+    mockSelectWhere.mockResolvedValue([{ id: 10 }]);
+    mockDismissNotificationsForEpisodes.mockRejectedValueOnce(
+      new Error("dismiss failed"),
+    );
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const { setQueue } = await importAction();
+    const result = await setQueue([validEpisode]);
+    expect(result).toEqual({
+      success: true,
+      data: { dismissedEpisodeDbIds: [] },
+    });
+    expect(consoleSpy).toHaveBeenCalled();
+    consoleSpy.mockRestore();
+  });
+
+  it("only resolved ids are passed to helper when resolution returns a subset", async () => {
+    // validEpisode and validEpisode2 submitted, but only one found in DB
+    mockSelectWhere.mockResolvedValue([{ id: 10 }]);
+    const { setQueue } = await importAction();
+    const result = await setQueue([validEpisode, validEpisode2]);
+    expect(mockDismissNotificationsForEpisodes).toHaveBeenCalledWith(
+      "user_123",
+      [10],
+    );
+    expect(result).toEqual({
+      success: true,
+      data: { dismissedEpisodeDbIds: [10] },
+    });
+  });
 });
 
 describe("clearQueue", () => {

@@ -51,6 +51,10 @@ import {
   savePlayerSession as savePlayerSessionAction,
   clearPlayerSession as clearPlayerSessionAction,
 } from "@/app/actions/player-session";
+import {
+  NOTIFICATIONS_CHANGED_EVENT,
+  type NotificationsChangedEventDetail,
+} from "@/lib/events";
 
 // ---------------------------------------------------------------------------
 // Server-sync helpers (fire-and-forget; best-effort with warn-on-failure)
@@ -707,6 +711,16 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
         const result = await setQueueAction(snapshot);
         if (result.success) {
           lastAckedQueueRef.current = snapshot;
+          window.dispatchEvent(
+            new CustomEvent<NotificationsChangedEventDetail>(
+              NOTIFICATIONS_CHANGED_EVENT,
+              {
+                detail: {
+                  episodeDbIds: result.data?.dismissedEpisodeDbIds ?? [],
+                },
+              },
+            ),
+          );
         } else {
           toast.error("Couldn't sync queue", {
             description: "Your queue change couldn't be saved. Rolling back.",
@@ -1089,6 +1103,12 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
         // Don't add if currently playing (queue dedup handled by reducer)
         if (current.currentEpisode.id === episode.id) return;
         dispatch({ type: "ADD_TO_QUEUE", episode });
+        window.dispatchEvent(
+          new CustomEvent<NotificationsChangedEventDetail>(
+            NOTIFICATIONS_CHANGED_EVENT,
+            { detail: { episodeDbIds: [] } },
+          ),
+        );
       },
 
       removeFromQueue: (episodeId: string) => {
@@ -1344,7 +1364,20 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
           durationSeconds: isFinite(audio.duration)
             ? Math.floor(audio.duration)
             : undefined,
-        });
+        })
+          .then((result) => {
+            if (result?.success && result.data?.episodeDbId !== undefined) {
+              window.dispatchEvent(
+                new CustomEvent<NotificationsChangedEventDetail>(
+                  NOTIFICATIONS_CHANGED_EVENT,
+                  { detail: { episodeDbIds: [result.data.episodeDbId] } },
+                ),
+              );
+            }
+          })
+          .catch(() => {
+            // swallow — listen-history handles its own logging
+          });
       }
 
       // End-of-episode sleep timer: fade out and skip auto-play-next

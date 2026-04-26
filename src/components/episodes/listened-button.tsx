@@ -11,7 +11,11 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { recordListenEvent } from "@/app/actions/listen-history";
-import { LISTEN_STATE_CHANGED_EVENT } from "@/lib/events";
+import {
+  LISTEN_STATE_CHANGED_EVENT,
+  NOTIFICATIONS_CHANGED_EVENT,
+  type NotificationsChangedEventDetail,
+} from "@/lib/events";
 import type { PodcastIndexEpisodeId } from "@/types/ids";
 
 interface ListenedButtonProps {
@@ -63,6 +67,14 @@ export function ListenedButton({
         }
         toast.success("Marked as listened");
         window.dispatchEvent(new CustomEvent(LISTEN_STATE_CHANGED_EVENT));
+        if (result.data?.episodeDbId !== undefined) {
+          window.dispatchEvent(
+            new CustomEvent<NotificationsChangedEventDetail>(
+              NOTIFICATIONS_CHANGED_EVENT,
+              { detail: { episodeDbIds: [result.data.episodeDbId] } },
+            ),
+          );
+        }
       } catch (e) {
         console.error("[ListenedButton] recordListenEvent threw", {
           podcastIndexEpisodeId,

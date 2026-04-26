@@ -27,7 +27,11 @@ import { EpisodeCard } from "@/components/episodes/episode-card";
 import { ListenedButton } from "@/components/episodes/listened-button";
 import { formatRelativeTime } from "@/lib/utils";
 import { ROUTES } from "@/lib/routes";
-import { LISTEN_STATE_CHANGED_EVENT } from "@/lib/events";
+import {
+  LISTEN_STATE_CHANGED_EVENT,
+  NOTIFICATIONS_CHANGED_EVENT,
+  type NotificationsChangedEventDetail,
+} from "@/lib/events";
 import { NOTIFICATIONS_PAGE_SIZE } from "@/lib/notifications-constants";
 import type { PodcastIndexEpisodeId } from "@/types/ids";
 
@@ -133,6 +137,39 @@ export function NotificationPageList({
     return () =>
       window.removeEventListener(LISTEN_STATE_CHANGED_EVENT, refresh);
   }, []);
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<NotificationsChangedEventDetail>).detail;
+      const ids = new Set(detail?.episodeDbIds ?? []);
+      if (ids.size > 0) {
+        setItems((prev) =>
+          prev.filter((n) => n.episodeDbId === null || !ids.has(n.episodeDbId)),
+        );
+      } else {
+        void (async () => {
+          try {
+            const result = await getNotifications(
+              NOTIFICATIONS_PAGE_SIZE,
+              0,
+              filter,
+            );
+            if (!result.error) {
+              setItems(result.notifications);
+              setHasMore(result.hasMore ?? false);
+              offsetRef.current = result.notifications.length;
+            }
+          } catch (err) {
+            console.error("[notifications] re-fetch on event failed", err);
+          }
+        })();
+      }
+      router.refresh();
+    };
+    window.addEventListener(NOTIFICATIONS_CHANGED_EVENT, handler);
+    return () =>
+      window.removeEventListener(NOTIFICATIONS_CHANGED_EVENT, handler);
+  }, [filter, router]);
 
   const handleDismiss = useCallback((id: number) => {
     startTransition(async () => {

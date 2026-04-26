@@ -2141,3 +2141,169 @@ describe("Cross-device sync: hydration and reconcile", () => {
     ]);
   });
 });
+
+describe("AudioPlayerProvider — NOTIFICATIONS_CHANGED_EVENT dispatch sites", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    playMock.mockResolvedValue(undefined);
+    mockLoadPrefs.mockReturnValue({ volume: 0.8, playbackSpeed: 1.5 });
+    mockLoadQueue.mockReturnValue([]);
+    mockGetQueue.mockResolvedValue({ success: true, data: [] });
+    mockSetQueueAction.mockResolvedValue({
+      success: true,
+      data: { dismissedEpisodeDbIds: [] },
+    });
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.useRealTimers();
+  });
+
+  it("optimistic addToQueue dispatches NOTIFICATIONS_CHANGED_EVENT with episodeDbIds=[]", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const { NOTIFICATIONS_CHANGED_EVENT } = await import("@/lib/events");
+    const dispatchSpy = vi.spyOn(window, "dispatchEvent");
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+    render(
+      <AudioPlayerProvider>
+        <TestConsumer />
+      </AudioPlayerProvider>,
+    );
+
+    // Play an episode so currentEpisode is set (so ADD_TO_QUEUE branch fires)
+    await user.click(screen.getByText("Play Episode"));
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    dispatchSpy.mockClear();
+
+    // addToQueue a different episode — should trigger the optimistic dispatch
+    await user.click(screen.getByText("Add Q1"));
+
+    const notifEvents = dispatchSpy.mock.calls.filter(
+      (call) =>
+        call[0] instanceof CustomEvent &&
+        (call[0] as CustomEvent).type === NOTIFICATIONS_CHANGED_EVENT,
+    );
+    expect(notifEvents.length).toBeGreaterThanOrEqual(1);
+    const event = notifEvents[0][0] as CustomEvent<{ episodeDbIds: number[] }>;
+    expect(event.detail.episodeDbIds).toEqual([]);
+  });
+
+  it("play-immediately branch (currentEpisode=null) does NOT dispatch NOTIFICATIONS_CHANGED_EVENT", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const { NOTIFICATIONS_CHANGED_EVENT } = await import("@/lib/events");
+    const dispatchSpy = vi.spyOn(window, "dispatchEvent");
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+    render(
+      <AudioPlayerProvider>
+        <TestConsumer />
+      </AudioPlayerProvider>,
+    );
+
+    dispatchSpy.mockClear();
+
+    // No currentEpisode — addToQueue falls into playEpisode branch
+    await user.click(screen.getByText("Add Q1"));
+
+    const notifEvents = dispatchSpy.mock.calls.filter(
+      (call) =>
+        call[0] instanceof CustomEvent &&
+        (call[0] as CustomEvent).type === NOTIFICATIONS_CHANGED_EVENT,
+    );
+    expect(notifEvents.length).toBe(0);
+  });
+
+  it("reconciling debounced setQueue dispatches NOTIFICATIONS_CHANGED_EVENT with dismissedEpisodeDbIds", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    mockSetQueueAction.mockResolvedValue({
+      success: true,
+      data: { dismissedEpisodeDbIds: [10] },
+    });
+    const { NOTIFICATIONS_CHANGED_EVENT } = await import("@/lib/events");
+    const dispatchSpy = vi.spyOn(window, "dispatchEvent");
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+    render(
+      <AudioPlayerProvider>
+        <TestConsumer />
+      </AudioPlayerProvider>,
+    );
+
+    // Play an episode to set currentEpisode
+    await user.click(screen.getByText("Play Episode"));
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    // Add to queue — triggers the debounce timer
+    await user.click(screen.getByText("Add Q1"));
+    dispatchSpy.mockClear();
+
+    // Advance debounce timer (1500ms) and let setQueue resolve
+    await act(async () => {
+      vi.advanceTimersByTime(3000);
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const notifEvents = dispatchSpy.mock.calls.filter(
+      (call) =>
+        call[0] instanceof CustomEvent &&
+        (call[0] as CustomEvent).type === NOTIFICATIONS_CHANGED_EVENT,
+    );
+    expect(notifEvents.length).toBeGreaterThanOrEqual(1);
+    const event = notifEvents[notifEvents.length - 1][0] as CustomEvent<{
+      episodeDbIds: number[];
+    }>;
+    expect(event.detail.episodeDbIds).toEqual([10]);
+  });
+
+  it("onEnded dispatches NOTIFICATIONS_CHANGED_EVENT with episodeDbId from recordListenEvent", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    mockRecordListenEvent.mockResolvedValue({
+      success: true,
+      data: { episodeDbId: 99 },
+    });
+    const { NOTIFICATIONS_CHANGED_EVENT } = await import("@/lib/events");
+    const dispatchSpy = vi.spyOn(window, "dispatchEvent");
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+
+    render(
+      <AudioPlayerProvider>
+        <TestConsumer />
+      </AudioPlayerProvider>,
+    );
+
+    await user.click(screen.getByText("Play Episode"));
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    dispatchSpy.mockClear();
+
+    // Trigger audio ended event
+    await act(async () => {
+      fireAudioEvent("ended");
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    const notifEvents = dispatchSpy.mock.calls.filter(
+      (call) =>
+        call[0] instanceof CustomEvent &&
+        (call[0] as CustomEvent).type === NOTIFICATIONS_CHANGED_EVENT,
+    );
+    expect(notifEvents.length).toBeGreaterThanOrEqual(1);
+    const event = notifEvents[notifEvents.length - 1][0] as CustomEvent<{
+      episodeDbIds: number[];
+    }>;
+    expect(event.detail.episodeDbIds).toEqual([99]);
+  });
+});

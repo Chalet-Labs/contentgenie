@@ -2,13 +2,15 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { NOTIFICATIONS_PAGE_SIZE } from "@/lib/notifications-constants";
+import { NOTIFICATIONS_CHANGED_EVENT } from "@/lib/events";
 import { asPodcastIndexEpisodeId } from "@/types/ids";
 
 // --- Mocks ---
 
 const mockPush = vi.fn();
+const mockRefresh = vi.fn();
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: mockPush }),
+  useRouter: () => ({ push: mockPush, refresh: mockRefresh }),
 }));
 
 const mockToastError = vi.fn();
@@ -895,6 +897,71 @@ describe("NotificationPageList", () => {
     await waitFor(() => {
       // One new row appended (2 initial + 1 loaded)
       expect(screen.getAllByRole("article")).toHaveLength(3);
+    });
+  });
+
+  // BLOCKING #1 fix verification: local state filter removes dismissed row immediately
+  it("NOTIFICATIONS_CHANGED_EVENT with payload filters items by episodeDbId and calls router.refresh", async () => {
+    const item1 = makeItem({ id: 1, episodeDbId: 10 });
+    const item2 = makeItem({ id: 2, episodeDbId: 20 });
+    render(
+      <NotificationPageList
+        initialItems={[item1, item2]}
+        initialHasMore={false}
+        initialTopicsByEpisode={{}}
+      />,
+    );
+    expect(screen.getAllByRole("article")).toHaveLength(2);
+
+    await act(async () => {
+      window.dispatchEvent(
+        new CustomEvent(NOTIFICATIONS_CHANGED_EVENT, {
+          detail: { episodeDbIds: [10] },
+        }),
+      );
+    });
+
+    await waitFor(() => {
+      expect(screen.getAllByRole("article")).toHaveLength(1);
+      expect(mockRefresh).toHaveBeenCalled();
+    });
+  });
+
+  // Empty-payload re-fetch: optimistic addToQueue dispatch with no episodeDbIds
+  it("NOTIFICATIONS_CHANGED_EVENT with empty payload re-fetches via getNotifications and calls router.refresh", async () => {
+    const item1 = makeItem({ id: 1, episodeDbId: 10 });
+    const item2 = makeItem({ id: 2, episodeDbId: 20 });
+    mockGetNotifications.mockResolvedValue({
+      notifications: [makeItem({ id: 99, episodeDbId: 99 })],
+      hasMore: false,
+      error: null,
+    });
+
+    render(
+      <NotificationPageList
+        initialItems={[item1, item2]}
+        initialHasMore={false}
+        initialTopicsByEpisode={{}}
+      />,
+    );
+    expect(screen.getAllByRole("article")).toHaveLength(2);
+
+    await act(async () => {
+      window.dispatchEvent(
+        new CustomEvent(NOTIFICATIONS_CHANGED_EVENT, {
+          detail: { episodeDbIds: [] },
+        }),
+      );
+    });
+
+    await waitFor(() => {
+      expect(mockGetNotifications).toHaveBeenCalledWith(
+        NOTIFICATIONS_PAGE_SIZE,
+        0,
+        undefined,
+      );
+      expect(screen.getAllByRole("article")).toHaveLength(1);
+      expect(mockRefresh).toHaveBeenCalled();
     });
   });
 });

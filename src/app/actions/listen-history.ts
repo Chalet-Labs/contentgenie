@@ -6,6 +6,7 @@ import { ensureUserExists } from "@/db/helpers";
 import { episodes, listenHistory } from "@/db/schema";
 import { auth } from "@clerk/nextjs/server";
 import { withAuthAction } from "@/lib/auth-wrapper";
+import { dismissNotificationsForEpisodes } from "@/app/actions/_internal/dismiss-notifications";
 import type { ActionResult } from "@/types/action-result";
 import {
   asPodcastIndexEpisodeId,
@@ -16,7 +17,7 @@ export async function recordListenEvent(input: {
   podcastIndexEpisodeId: PodcastIndexEpisodeId;
   completed?: boolean;
   durationSeconds?: number;
-}): Promise<ActionResult> {
+}): Promise<ActionResult<{ episodeDbId: number }>> {
   const { podcastIndexEpisodeId, completed, durationSeconds } = input;
   const trimmedPodcastIndexEpisodeId =
     typeof podcastIndexEpisodeId === "string"
@@ -85,7 +86,19 @@ export async function recordListenEvent(input: {
           },
         });
 
-      return { success: true };
+      if (completed) {
+        try {
+          await dismissNotificationsForEpisodes(userId, [episodeId]);
+        } catch (dismissError) {
+          console.error("[recordListenEvent] dismiss failed", {
+            userId,
+            episodeId,
+            error: dismissError,
+          });
+        }
+      }
+
+      return { success: true, data: { episodeDbId: episodeId } };
     } catch (e) {
       console.error("[recordListenEvent] failed", {
         userId,
