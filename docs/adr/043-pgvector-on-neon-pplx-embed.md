@@ -33,11 +33,11 @@ This ADR records both decisions and the recall-budget rationale (`ef_search`) th
 
 ### Versioning: `embedding_model_version` column on `canonical_topics`
 
-- Default `'perplexity/pplx-embed-v1-0.6b'` — the OpenRouter model id, matching `EMBEDDING_MODEL` in `src/lib/ai/embed.ts`. Stamped on insert, never read by the resolver itself.
+- Default `'perplexity/pplx-embed-v1-0.6b'` — the OpenRouter model id, matching `EMBEDDING_MODEL` in `src/lib/ai/embed.ts`. Stamped on insert. Not read by the resolver at steady state; engaged only as a version-gate in the kNN WHERE clause during model swaps (see migration step 3 below) to prevent cross-space matches.
 - Records which canonicals were embedded under which model so a future swap can issue a filtered re-embed (`WHERE embedding_model_version = 'perplexity/pplx-embed-v1-0.6b'`) instead of a full reindex.
 - Prevents threshold tuning from being silently invalidated: `AUTO_MATCH_SIMILARITY_THRESHOLD = 0.92` and `DISAMBIGUATE_SIMILARITY_THRESHOLD = 0.82` are calibrated for 1024-dim cosine on this specific model. A model swap requires re-tuning, and the column makes the swap auditable.
 
-## Alternatives Considered
+## Options Considered
 
 | Alternative                                            | Why not                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
 | ------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
