@@ -22,7 +22,7 @@ This ADR records both decisions and the recall-budget rationale (`ef_search`) th
 
 - No new infrastructure. `canonical_topics` lives in the same Neon Postgres that already hosts the rest of the schema; `DATABASE_URL` is reused via the existing Doppler-managed configuration.
 - HNSW indexes with `vector_cosine_ops` and pgvector defaults: `m = 16`, `ef_construction = 64`. One HNSW index per embedding column → two HNSW indexes total on `canonical_topics` (one over `identity_embedding`, one over `context_embedding`).
-- Recall-time tuning is per-query, not per-index: `SET LOCAL hnsw.ef_search = 200` inside the resolver transaction. Centralized as `HNSW_EF_SEARCH = 200` in `src/lib/entity-resolution-constants.ts` (planned, lands in EPIC A) so it can be tuned without schema change.
+- Recall-time tuning is per-query, not per-index: `SET LOCAL hnsw.ef_search = 200` inside the resolver transaction. This value will be centralized as `HNSW_EF_SEARCH = 200` in `src/lib/entity-resolution-constants.ts` in EPIC A so it can be tuned without schema change.
 
 ### Embedding model: `pplx-embed-v1-0.6b` via OpenRouter
 
@@ -54,7 +54,7 @@ The spec is the source of truth for the broader pipeline-shape alternatives (pur
 
 The HNSW index returns the top-K nearest neighbors **before** the WHERE clause is applied. Inside the resolver, the kNN query is filtered by:
 
-```
+```sql
 status = 'active'
 AND (kind IN ('concept','work')
      OR last_seen > now() - interval '90 days'
