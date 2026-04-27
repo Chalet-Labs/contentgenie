@@ -101,7 +101,7 @@ A partial unique index on `(lower(normalized_label), kind) WHERE status='active'
 
 ### Decay and the `ongoing` flag
 
-- **Event-type kinds** (`release`, `incident`, `regulation`, `announcement`, `deal`, `event`) → `status='dormant'` after 180 days unless `ongoing=true`.
+- **Event-type kinds** (`release`, `incident`, `regulation`, `announcement`, `deal`, `event`, `other`) → `status='dormant'` after 180 days unless `ongoing=true`.
 - **Topic-type kinds** (`concept`, `work`) → never decay.
 - `ongoing=true` exempts a canonical from decay regardless of kind. Inferred from kind context by the LLM during extraction. Covers WWDC 2026, Bitcoin halving, multi-month rollouts, ongoing regulations — without this flag, reconciliation perpetually re-creates these canonicals as separate dormant entries reactivate.
 
