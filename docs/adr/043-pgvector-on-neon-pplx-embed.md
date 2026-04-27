@@ -3,7 +3,7 @@
 **Status:** Accepted
 **Date:** 2026-04-27
 **Issue:** [#382](https://github.com/Chalet-Labs/contentgenie/issues/382) (part of epic [#376](https://github.com/Chalet-Labs/contentgenie/issues/376))
-**Spec:** [`.dev/pm/specs/2026-04-25-canonical-topics-foundation.md`](../../.dev/pm/specs/2026-04-25-canonical-topics-foundation.md) (Approved)
+**Spec:** `.dev/pm/specs/2026-04-25-canonical-topics-foundation.md` (Approved; internal — not committed to the repo)
 **Relates to:** [ADR-042](042-canonical-topics-foundation.md)
 
 ---
@@ -98,5 +98,5 @@ The `embedding_model_version` column makes a model swap a contained operation ra
 
 ## Reference
 
-- Spec: [`.dev/pm/specs/2026-04-25-canonical-topics-foundation.md`](../../.dev/pm/specs/2026-04-25-canonical-topics-foundation.md) — risks **R1**, **R6**, **R8**, **R9**, **R10**; threshold-tuning hooks in `src/lib/entity-resolution-constants.ts`; HNSW index DDL specifics.
+- Spec: `.dev/pm/specs/2026-04-25-canonical-topics-foundation.md` (internal) — risks **R1**, **R6**, **R8**, **R9**, **R10**; threshold-tuning hooks in `src/lib/entity-resolution-constants.ts`; HNSW index DDL specifics.
 - Architecture wrapper: [ADR-042](042-canonical-topics-foundation.md).

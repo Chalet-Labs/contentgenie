@@ -3,7 +3,7 @@
 **Status:** Accepted
 **Date:** 2026-04-27
 **Issue:** [#382](https://github.com/Chalet-Labs/contentgenie/issues/382) (part of epic [#376](https://github.com/Chalet-Labs/contentgenie/issues/376))
-**Spec:** [`.dev/pm/specs/2026-04-25-canonical-topics-foundation.md`](../../.dev/pm/specs/2026-04-25-canonical-topics-foundation.md) (Approved)
+**Spec:** `.dev/pm/specs/2026-04-25-canonical-topics-foundation.md` (Approved; internal — not committed to the repo)
 **Relates to:** [ADR-022](022-trending-topics-snapshot.md), [ADR-027](027-summarize-episode-pure-consumer.md), [ADR-031](031-episode-topics-junction-table.md), [ADR-033](033-cross-episode-topic-ranking.md), [ADR-034](034-personal-topic-overlap-indicators.md), [ADR-043](043-pgvector-on-neon-pplx-embed.md)
 
 ---
@@ -19,7 +19,7 @@ What users actually want is two things the current system cannot deliver:
 
 The core technical problem is **entity resolution**: extracting topics at the right granularity _and_ canonicalizing them across episodes so different surface forms collapse to the same canonical entity.
 
-The full alternatives table, technical design, threshold tuning hooks, work breakdown, and risk register live in the [spec](../../.dev/pm/specs/2026-04-25-canonical-topics-foundation.md). This ADR records the architectural decisions; the embedding model and pgvector storage choice live in [ADR-043](043-pgvector-on-neon-pplx-embed.md) as a separable concern.
+The full alternatives table, technical design, threshold tuning hooks, work breakdown, and risk register live in the spec (`.dev/pm/specs/2026-04-25-canonical-topics-foundation.md`). This ADR records the architectural decisions; the embedding model and pgvector storage choice live in [ADR-043](043-pgvector-on-neon-pplx-embed.md) as a separable concern.
 
 ## Decision
 
@@ -101,7 +101,7 @@ Maintained either via junction triggers or nightly recompute against `episode_ca
 
 ### Version-token regex pre-gate
 
-```
+```regex
 \b(\d+\.\d+(?:\.\d+)?|\d{4}|v\d+(?:\.\d+)*)\b
 ```
 
@@ -167,5 +167,5 @@ Mirrors the graceful-degradation pattern from [ADR-031](031-episode-topics-junct
 
 ## Reference
 
-- Spec: [`.dev/pm/specs/2026-04-25-canonical-topics-foundation.md`](../../.dev/pm/specs/2026-04-25-canonical-topics-foundation.md) — full alternatives table, ingestion + reconciliation pipelines, threshold tuning hooks, work breakdown, risk register.
+- Spec: `.dev/pm/specs/2026-04-25-canonical-topics-foundation.md` (internal) — full alternatives table, ingestion + reconciliation pipelines, threshold tuning hooks, work breakdown, risk register.
 - Embedding model + pgvector storage: [ADR-043](043-pgvector-on-neon-pplx-embed.md).
