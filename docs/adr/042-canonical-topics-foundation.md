@@ -21,6 +21,15 @@ The core technical problem is **entity resolution**: extracting topics at the ri
 
 The full alternatives table, technical design, threshold tuning hooks, work breakdown, and risk register live in the spec (`.dev/pm/specs/2026-04-25-canonical-topics-foundation.md`). This ADR records the architectural decisions; the embedding model and pgvector storage choice live in [ADR-043](043-pgvector-on-neon-pplx-embed.md) as a separable concern.
 
+## Options Considered
+
+- **Keep the current category-only model.** Rejected because broad tags are useful for navigation but cannot represent named entities or support cross-podcast dedup, clustering, or synthesis at the level users actually care about.
+- **Improve extraction but keep exact-string topic matching.** Rejected because surface-form variation ("Opus 4.7" vs "Claude Opus 4.7" vs "Anthropic's new Opus") makes string normalization alone too brittle for reliable canonicalization.
+- **Use embeddings-only nearest-neighbor matching.** Rejected because similarity search is helpful for candidate retrieval but not sufficient for high-confidence entity resolution when labels are ambiguous or context-sensitive.
+- **Use LLM-only canonicalization without an embedding-backed candidate set.** Rejected because it is more expensive, harder to make deterministic, and less efficient at reusing existing canonical topics at scale.
+
+The chosen approach combines the strengths of these alternatives: preserve existing categories for current UX, add canonical topics for specific entities/concepts, use embeddings to retrieve candidates, and use LLM judgment only where semantic disambiguation is actually needed.
+
 ## Decision
 
 **Hybrid embeddings + LLM disambiguation pipeline, with a two-layer topic model.** The system extracts two parallel topic layers in a single LLM summarization call:
