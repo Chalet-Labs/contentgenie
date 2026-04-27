@@ -45,7 +45,7 @@ Two HNSW indexes (one per column) are maintained.
 
 ### Three-tier resolution pipeline
 
-Resolution runs **inside a transaction guarded by a Postgres advisory lock** keyed on `hashtext(lower(label) || '|' || kind)`, serializing concurrent inserts of the same brand-new entity:
+Resolution runs **inside a transaction guarded by a Postgres advisory lock** keyed on `hashtext(normalized_label || '|' || kind)`, serializing concurrent inserts of the same brand-new entity:
 
 1. **Acquire advisory lock** for `(normalized_label, kind)`. Concurrent runs block here, then re-execute the steps below — second arrival sees the canonical the first arrival just inserted.
 2. **kNN candidate fetch.** Cosine over `identity_embedding`, top-1 (auto-match candidate) and top-20 (disambiguator candidate pool). Per-query `SET LOCAL hnsw.ef_search = 200`. Filtered: `status='active' AND (kind IN ('concept','work') OR last_seen > now() - interval '90 days' OR ongoing = true)`.
@@ -127,7 +127,7 @@ Mirrors the graceful-degradation pattern from [ADR-031](031-episode-topics-junct
 - **Dual embeddings, not single.** A single embedding over `label + summary` couples identity with episode context — same-entity drift across episodes (different framings → different embeddings of the same entity) and same-context collapse across entities (similar episode framings → close embeddings of unrelated entities). Separating them is cheap (~8KB per canonical) and structurally correct.
 - **Top-1 for auto-match, top-20 for disambiguator.** Auto-match must remain conservative — only the closest neighbor is a candidate. Top-5 is too narrow for the `concept` kind, where the right canonical may be rank 6–20.
 - **Soft-merge with atomic path compression on merge.** Read-time pointer chasing is a footgun: chain depth grows, cycles are possible under racing merges, and joins double-count when both source and target are referenced. Path compression mutates ~100 junction rows per typical merge (~10 merges/day at steady state) — a bounded write cost that eliminates the entire class of read-time bugs.
-- **Restrict-cascade on `merged_into_id`.** A merged row with NULL target violates the audit trail. Hard delete must route through an explicit reparent flow.
+- **`merged_into_id` uses `ON DELETE RESTRICT` (not `SET NULL`).** A merged row with a NULL target violates the audit trail. Hard delete must route through an explicit reparent flow.
 - **Derived `episode_count`.** Optimistic counters drift under soft-merge + episode-delete cascades. Recompute is cheap and correct.
 - **`ongoing` flag.** Without it, reconciliation perpetually merges WWDC-2026 canonicals across the year as separate dormant entries reactivate. The `ongoing` exemption is structural, not a workaround.
 - **Concept banlist sampling.** The `concept` kind is the most LLM-fuzzy bucket. Constraining it against existing categories prevents it becoming a junk drawer. Top-50 banlist refreshed on a 1-hour TTL with a manual invalidation hook from the admin UI.

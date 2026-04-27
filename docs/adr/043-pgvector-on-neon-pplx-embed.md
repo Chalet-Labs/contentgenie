@@ -63,7 +63,7 @@ AND (kind IN ('concept','work')
 
 When the candidate set is heavily filtered (e.g., a popular event-type entity with most of its near-neighbors dormant), the post-filter survivor count can drop below the requested `LIMIT` even if pgvector returned `LIMIT` raw rows. The resolver needs at least 20 survivors for the disambiguator pool (top-20) and at least 1 for auto-match (top-1).
 
-Setting `hnsw.ef_search = 200` widens the search front so post-filter survivors reliably saturate the disambiguator pool. The trade-off is query latency, which grows roughly linearly with `ef_search`. 200 is the starter value; tunable per-query in `src/lib/entity-resolution-constants.ts` without schema or index change.
+Setting `hnsw.ef_search = 200` widens the search front so post-filter survivors reliably saturate the disambiguator pool. The trade-off is query latency, which grows roughly linearly with `ef_search`. 200 is the starter value; tunable per-query in `src/lib/entity-resolution-constants.ts` (planned, lands in EPIC A) without schema or index change.
 
 This setting mitigates spec risk **R1** ("HNSW filter-after-index returns <K results"). Per-query `SET LOCAL` keeps the budget scoped to the resolver's transaction; non-resolver queries (admin browsing, analytics) inherit the index default.
 
