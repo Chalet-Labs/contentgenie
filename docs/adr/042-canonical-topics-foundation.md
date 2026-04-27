@@ -140,7 +140,7 @@ Mirrors the graceful-degradation pattern from [ADR-031](031-episode-topics-junct
 - **`merged_into_id` uses `ON DELETE RESTRICT` (not `SET NULL`).** A merged row with a NULL target violates the audit trail. Hard delete must route through an explicit reparent flow.
 - **Derived `episode_count`.** Optimistic counters drift under soft-merge + episode-delete cascades. Recompute is cheap and correct.
 - **`ongoing` flag.** Without it, reconciliation perpetually merges WWDC-2026 canonicals across the year as separate dormant entries reactivate. The `ongoing` exemption is structural, not a workaround.
-- **Concept banlist sampling.** The `concept` kind is the most LLM-fuzzy bucket. Constraining it against existing categories prevents it becoming a junk drawer. Top-50 banlist refreshed on a 1-hour TTL with a manual invalidation hook from the admin UI.
+- **Concept banlist sampling.** The `concept` kind is the most LLM-fuzzy bucket. Constraining it against existing categories prevents it from becoming a junk drawer. Top-50 banlist refreshed on a 1-hour TTL with a manual invalidation hook from the admin UI.
 - **Pairwise winner-vs-loser verification, not group-judge.** Group-judge ("are these all the same?") is a known over-merge mode. Pairwise verification of winner against each loser (N-1 calls instead of N(N-1)/2) is structurally safer at sub-quadratic cost. Reject the cluster if any loser fails verification.
 - **Auto-match 0.92, disambiguate 0.82.** Lower thresholds (e.g. 0.75) on 1024-dim cosine merge semantically adjacent but unrelated concepts and inflate LLM cost; the 0.92/0.82 pair holds the bar high enough to avoid that. Tunable post-launch via `match_method` histogram.
 
