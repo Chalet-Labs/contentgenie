@@ -98,5 +98,5 @@ The `embedding_model_version` column makes a model swap a contained operation ra
 
 ## Reference
 
-- Spec: `.dev/pm/specs/2026-04-25-canonical-topics-foundation.md` (internal) — risks **R1**, **R6**, **R8**, **R9**, **R10**; threshold-tuning hooks in `src/lib/entity-resolution-constants.ts`; HNSW index DDL specifics.
+- Spec: `.dev/pm/specs/2026-04-25-canonical-topics-foundation.md` (internal) — risks **R1**, **R6**, **R8**, **R9**, **R10**; planned threshold-tuning hook in `src/lib/entity-resolution-constants.ts` (to land in EPIC A); HNSW index DDL specifics.
 - Architecture wrapper: [ADR-042](042-canonical-topics-foundation.md).
