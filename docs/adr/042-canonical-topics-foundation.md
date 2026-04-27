@@ -45,7 +45,7 @@ Two HNSW indexes (one per column) are maintained.
 
 ### Three-tier resolution pipeline
 
-Resolution runs **inside a transaction guarded by a Postgres advisory lock** keyed on `hashtext(normalized_label || '|' || kind)`, serializing concurrent inserts of the same brand-new entity:
+Resolution runs **inside a transaction guarded by a Postgres advisory lock** keyed on `hashtextextended(normalized_label || '|' || kind, 0)` (64-bit, lower collision risk than the 32-bit `hashtext`), serializing concurrent inserts of the same brand-new entity:
 
 1. **Acquire advisory lock** for `(normalized_label, kind)`. Concurrent runs block here, then re-execute the steps below — second arrival sees the canonical the first arrival just inserted.
 2. **kNN candidate fetch.** Cosine over `identity_embedding`, top-1 (auto-match candidate) and top-20 (disambiguator candidate pool). Per-query `SET LOCAL hnsw.ef_search = 200`. Filtered: `status='active' AND (kind IN ('concept','work') OR last_seen > now() - interval '90 days' OR ongoing = true)`.
@@ -63,14 +63,15 @@ A hard cap of 5 disambiguator calls per episode bounds LLM cost; excess topics s
 Reconciliation may merge canonical A into canonical B. Junction rows pointing at A are rewritten to the **terminal** canonical id inside the same transaction. Because the junction has a `(episode_id, canonical_topic_id)` unique constraint, a plain `UPDATE` would conflict whenever an episode is already linked to both winner and loser. The compression is therefore a re-insert on the winner with conflicts ignored, followed by a delete of the loser-pointing rows:
 
 ```sql
-INSERT INTO episode_canonical_topics (episode_id, canonical_topic_id, /* ... */)
-SELECT episode_id, winner.id, /* ... */
+-- $1 = winner canonical id, $2 = loser canonical id
+INSERT INTO episode_canonical_topics (episode_id, canonical_topic_id)
+SELECT episode_id, $1
 FROM episode_canonical_topics
-WHERE canonical_topic_id = loser.id
+WHERE canonical_topic_id = $2
 ON CONFLICT (episode_id, canonical_topic_id) DO NOTHING;
 
 DELETE FROM episode_canonical_topics
-WHERE canonical_topic_id = loser.id;
+WHERE canonical_topic_id = $2;
 ```
 
 Read paths never chase `merged_into_id` pointers — there is no chain depth to bound, no cycle risk to detect, no double-counting in joins. Path compression at write time is one operation that eliminates an entire class of bugs.
