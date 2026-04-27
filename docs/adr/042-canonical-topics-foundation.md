@@ -10,7 +10,7 @@
 
 ## Context
 
-Today's topic system extracts **broad categorical tags** ("AI & Machine Learning", "Leadership & Career Development", "AI Business Strategy"). These describe the general subject area an episode covers but don't capture the specific named things an episode actually discusses. The mechanical reason is the summarization prompt: it constrains topics to _"2-5 words, professional, Title Case"_ (`src/lib/prompts.ts:91`), producing categories by design. Even relaxing the prompt would not be enough — exact-string matching would still fail on "Opus 4.7" vs "Claude Opus 4.7" vs "Anthropic's new Opus".
+Today's topic system extracts **broad categorical tags** ("AI & Machine Learning", "Leadership & Career Development", "AI Business Strategy"). These describe the general subject area an episode covers but don't capture the specific named things an episode actually discusses. The mechanical reason is the summarization prompt: it constrains topics to _"2-5 words, professional, Title Case"_ (see the `categories` section in `src/lib/prompts.ts`), producing categories by design. Even relaxing the prompt would not be enough — exact-string matching would still fail on "Opus 4.7" vs "Claude Opus 4.7" vs "Anthropic's new Opus".
 
 What users actually want is two things the current system cannot deliver:
 
@@ -141,7 +141,7 @@ Mirrors the graceful-degradation pattern from [ADR-031](031-episode-topics-junct
 - **Two layers permanently.** Categories and canonical topics coexist forever. Slightly more storage and query complexity than a single-layer system, in exchange for preserving existing UI and avoiding a forced migration. Could collapse later if categories prove unused.
 - **Dual embeddings double per-canonical embedding storage.** ~8KB extra per row (2× `vector(1024)` at 4 bytes/float). At 100K canonicals, ~800MB additional storage plus two HNSW indexes.
 - **Advisory lock contention adds latency under burst ingestion.** Two parallel summarizations of the same brand-new entity serialize on the lock — the second waits for the first to commit. Worst case ~500ms added latency for the loser. Accepted; the alternative (duplicate canonicals) is structural data corruption.
-- **Path-compression mutates junction rows on merge.** A reconciliation merge of A→B issues an UPDATE on every `episode_canonical_topics` row pointing at A. Bounded (~100 rows per typical canonical, ~10 merges/day at steady state).
+- **Path-compression mutates junction rows on merge.** A reconciliation merge of A→B re-inserts `episode_canonical_topics` rows pointing at B with `ON CONFLICT (episode_id, canonical_topic_id) DO NOTHING`, then deletes the rows that were pointing at A. Bounded (~100 rows per typical canonical, ~10 merges/day at steady state).
 - **Custom-prompt users bypass canonical-topic extraction silently.** Same stance as [ADR-031](031-episode-topics-junction-table.md). Custom prompts are user-supplied and may target specific JSON formats; forcing the new schema would break their parsers. They keep category-only behavior.
 - **Event-type dormancy may cause stale matches on year-old episodes.** A user listening to a year-old episode about "Opus 4.6 release" sees correct dedup if the canonical still has junction rows, but a _new_ extraction of the same event might create a duplicate canonical (because the original is dormant and excluded from kNN). Reconciliation eventually merges them. Mitigated for recurring events by `ongoing=true`.
 - **Backfilled episodes have thinner topic data than newly summarized ones.** Stored summaries are condensed (~600 chars); some topics mentioned only in transcripts won't appear in summaries. Mitigated by an admin "full re-summarize" button per episode.
@@ -151,7 +151,7 @@ Mirrors the graceful-degradation pattern from [ADR-031](031-episode-topics-junct
 ### Failure modes mitigated
 
 - **Concurrent insert race creates duplicate canonicals** — advisory lock + partial unique index.
-- **Soft-merge chain or cycle bugs** — atomic path compression at merge time + CHECK constraint preventing `merged_into_id` from pointing at a non-active row + `merged_into_id <> id` self-cycle ban.
+- **Soft-merge chain or cycle bugs** — atomic path compression at merge time + the `(status='merged') ⇔ (merged_into_id IS NOT NULL)` biconditional CHECK + `merged_into_id <> id` self-cycle ban. The "always points at an active row" property is upheld by the reconciliation transaction (which compresses any pointer that would land on a merged row), not by a CHECK constraint — Postgres CHECKs validate only the current row, so the referenced row's status cannot be enforced declaratively.
 - **Junction unique-constraint conflict on merge** — `ON CONFLICT (episode_id, canonical_topic_id) DO NOTHING`.
 - **Counter drift on `episode_count`** — derived, recomputed in reconciliation; gating reads recomputed count, not stored count.
 - **Recurring events silently dormant** — `ongoing` flag exempts from decay.

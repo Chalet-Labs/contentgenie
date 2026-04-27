@@ -74,7 +74,7 @@ The `embedding_model_version` column makes a model swap a contained operation ra
 1. **Add the new model.** Update `EMBEDDING_MODEL` in `src/lib/ai/embed.ts` to the new model id. Default `embedding_model_version` for new inserts changes to the new tag.
 2. **Filtered re-embed via Trigger.dev backfill.** Batch-iterate `WHERE embedding_model_version = 'perplexity/pplx-embed-v1-0.6b'` via `generateEmbeddings(texts[])` (the helper exposed in `src/lib/ai/embed.ts` already supports batch input). For each batch, regenerate `identity_embedding` and `context_embedding` from the source `label`, `aliases`, and `summary`; UPDATE rows in a single transaction and stamp the new `embedding_model_version`. Bounded throughput; can run for days without affecting the resolver.
 3. **Tolerate mixed-version state.** During migration the resolver's kNN sees both old and new vectors. Cosine similarity comparing across embedding-model spaces is meaningless, but the disambiguator's LLM stage is robust to noisy candidates. Thresholds may shift after the swap (re-tune via `entity-resolution-constants.ts`).
-4. **Verify and finalize.** When `WHERE embedding_model_version = 'perplexity/pplx-embed-v1-0.6b'` returns zero rows, the migration is complete. The HNSW indexes are rebuilt automatically by pgvector as inserts/updates land.
+4. **Verify and finalize.** When `WHERE embedding_model_version = 'perplexity/pplx-embed-v1-0.6b'` returns zero rows, the migration is complete. The HNSW indexes are updated automatically by pgvector as vector rows are inserted or updated — pgvector links new vectors into the existing graph incrementally rather than performing a batch rebuild.
 
 ## Consequences
 
@@ -87,7 +87,7 @@ The `embedding_model_version` column makes a model swap a contained operation ra
 
 ### Negative
 
-- **Two HNSW indexes per canonical row** (one each for `identity_embedding` and `context_embedding`). Memory growth is bounded by dormancy decay — only `status='active'` rows are queried — but the indexes themselves index every row regardless of status. At 100K canonicals, expect ~800MB raw vector storage (2× `vector(1024)` × 4 bytes/float × 100K) plus comparable HNSW index overhead — see spec **R10** for the full breakdown. Revisit at 500K active canonicals.
+- **Two HNSW indexes per canonical row** (one each for `identity_embedding` and `context_embedding`). Query workload is bounded by dormancy decay — only `status='active'` rows are matched against — but storage and index growth track every row retained in `canonical_topics`, because the HNSW indexes cover every row regardless of status. At 100K canonicals, expect ~800MB raw vector storage (2× `vector(1024)` × 4 bytes/float × 100K) plus comparable HNSW index overhead — see spec **R10** for the full breakdown. Revisit at 500K active canonicals.
 - **OpenRouter is the embedding-generation dependency.** Pricing or availability changes propagate to ingestion latency and cost. Mitigated by MIT-licensed fallback weights and the documented filtered-re-embed migration path (spec **R6**).
 - **Threshold values are model-specific.** `AUTO_MATCH_SIMILARITY_THRESHOLD = 0.92` and `DISAMBIGUATE_SIMILARITY_THRESHOLD = 0.82` are calibrated for this model on 1024-dim cosine. A model swap requires re-tuning, which is the load-bearing reason `embedding_model_version` exists.
 - **HNSW filter-after-index recall risk.** Mitigated by `ef_search = 200` and the OR-clause that includes `concept`/`work` and `ongoing` candidates regardless of `last_seen`.
