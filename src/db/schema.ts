@@ -553,7 +553,9 @@ export const episodeCanonicalTopics = pgTable(
     canonicalTopicId: integer("canonical_topic_id")
       .references(() => canonicalTopics.id, { onDelete: "cascade" })
       .notNull(),
-    matchMethod: text("match_method").notNull(),
+    matchMethod: text("match_method")
+      .$type<"auto" | "llm_disambig" | "new">()
+      .notNull(),
     similarityToTopMatch: real("similarity_to_top_match"),
     coverageScore: real("coverage_score").notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),

@@ -244,7 +244,7 @@ describe.skipIf(!process.env.DATABASE_URL)(
         .values({
           episodeId: fixtureEpisodeId,
           canonicalTopicId: fixtureTopicId,
-          matchMethod: "manual",
+          matchMethod: "manual" as any,
           coverageScore: 0.5,
         })
         .catch((e) => e);
