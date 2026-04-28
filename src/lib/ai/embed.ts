@@ -7,14 +7,12 @@
 
 import "server-only";
 
+import { EMBEDDING_DIMENSION, EMBEDDING_MODEL } from "@/lib/ai/embed-constants";
+
+export { EMBEDDING_DIMENSION, EMBEDDING_MODEL };
+
 const OPENROUTER_EMBEDDINGS_URL = "https://openrouter.ai/api/v1/embeddings";
 const REQUEST_TIMEOUT_MS = 30_000;
-
-/** Embedding model deployed for all ContentGenie vector representations. */
-export const EMBEDDING_MODEL = "perplexity/pplx-embed-v1-0.6b" as const;
-
-/** Dimensionality of every vector returned by {@link EMBEDDING_MODEL}. */
-export const EMBEDDING_DIMENSION = 1024 as const;
 
 /**
  * Thrown by embedding helpers on API errors, missing configuration, or

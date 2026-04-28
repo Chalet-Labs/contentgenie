@@ -21,6 +21,10 @@ import { relations, sql } from "drizzle-orm";
 import type { WorthItSignals } from "@/lib/openrouter";
 import type { PodcastIndexEpisodeId } from "@/types/ids";
 import {
+  EMBEDDING_DIMENSION as EMBEDDING_DIM,
+  EMBEDDING_MODEL,
+} from "@/lib/ai/embed-constants";
+import {
   DEFAULT_SUBSCRIPTION_SORT,
   SUBSCRIPTION_SORTS,
   type SubscriptionSort,
@@ -478,14 +482,14 @@ export const canonicalTopics = pgTable(
     relevance: real("relevance").notNull(),
     episodeCount: integer("episode_count").notNull().default(0),
     identityEmbedding: vector("identity_embedding", {
-      dimensions: 1024,
+      dimensions: EMBEDDING_DIM,
     }).notNull(),
     contextEmbedding: vector("context_embedding", {
-      dimensions: 1024,
+      dimensions: EMBEDDING_DIM,
     }).notNull(),
     embeddingModelVersion: varchar("embedding_model_version")
       .notNull()
-      .default("pplx-embed-v1-0.6b"),
+      .default(EMBEDDING_MODEL),
     // Self-FK: only set when status = 'merged'; callback form breaks the circular type reference.
     mergedIntoId: integer("merged_into_id").references(
       (): AnyPgColumn => canonicalTopics.id,
@@ -512,7 +516,10 @@ export const canonicalTopics = pgTable(
       "ct_merged_biconditional",
       sql`(${table.status} = 'merged' AND ${table.mergedIntoId} IS NOT NULL) OR (${table.status} <> 'merged' AND ${table.mergedIntoId} IS NULL)`,
     ),
-    check("ct_no_self_merge", sql`${table.mergedIntoId} <> ${table.id}`),
+    check(
+      "ct_no_self_merge",
+      sql`${table.mergedIntoId} IS NULL OR ${table.mergedIntoId} <> ${table.id}`,
+    ),
     check(
       "ct_relevance_range",
       sql`${table.relevance} >= 0 AND ${table.relevance} <= 1`,
@@ -523,7 +530,7 @@ export const canonicalTopics = pgTable(
   ],
 );
 
-// Aliases for canonical topics (admin + resolver; alias content validated at app layer)
+// Aliases for canonical topics (admin + resolver)
 export const canonicalTopicAliases = pgTable(
   "canonical_topic_aliases",
   {
@@ -539,6 +546,7 @@ export const canonicalTopicAliases = pgTable(
       table.canonicalTopicId,
       sql`lower(${table.alias})`,
     ),
+    check("cta_alias_not_blank", sql`length(btrim(${table.alias})) > 0`),
   ],
 );
 

@@ -1,5 +1,5 @@
 {
-  "id": "6bae585c-8546-4013-b214-58096e55f09f",
+  "id": "4e600f03-748a-46b4-b5ac-7bd80e20325a",
   "prevId": "f359d653-2fd5-4306-ae2e-7d0419ca7c34",
   "version": "7",
   "dialect": "postgresql",
@@ -218,7 +218,12 @@
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
-      "checkConstraints": {},
+      "checkConstraints": {
+        "cta_alias_not_blank": {
+          "name": "cta_alias_not_blank",
+          "value": "length(btrim(\"canonical_topic_aliases\".\"alias\")) > 0"
+        }
+      },
       "isRLSEnabled": false
     },
     "public.canonical_topics": {
@@ -301,7 +306,7 @@
           "type": "varchar",
           "primaryKey": false,
           "notNull": true,
-          "default": "'pplx-embed-v1-0.6b'"
+          "default": "'perplexity/pplx-embed-v1-0.6b'"
         },
         "merged_into_id": {
           "name": "merged_into_id",
@@ -426,7 +431,7 @@
         },
         "ct_no_self_merge": {
           "name": "ct_no_self_merge",
-          "value": "\"canonical_topics\".\"merged_into_id\" <> \"canonical_topics\".\"id\""
+          "value": "\"canonical_topics\".\"merged_into_id\" IS NULL OR \"canonical_topics\".\"merged_into_id\" <> \"canonical_topics\".\"id\""
         },
         "ct_relevance_range": {
           "name": "ct_relevance_range",

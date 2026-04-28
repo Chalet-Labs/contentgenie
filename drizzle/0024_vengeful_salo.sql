@@ -4,7 +4,8 @@ CREATE TABLE "canonical_topic_aliases" (
 	"id" serial PRIMARY KEY NOT NULL,
 	"canonical_topic_id" integer NOT NULL,
 	"alias" text NOT NULL,
-	"created_at" timestamp DEFAULT now() NOT NULL
+	"created_at" timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT "cta_alias_not_blank" CHECK (length(btrim("canonical_topic_aliases"."alias")) > 0)
 );
 --> statement-breakpoint
 CREATE TABLE "canonical_topics" (
@@ -19,12 +20,12 @@ CREATE TABLE "canonical_topics" (
 	"episode_count" integer DEFAULT 0 NOT NULL,
 	"identity_embedding" vector(1024) NOT NULL,
 	"context_embedding" vector(1024) NOT NULL,
-	"embedding_model_version" varchar DEFAULT 'pplx-embed-v1-0.6b' NOT NULL,
+	"embedding_model_version" varchar DEFAULT 'perplexity/pplx-embed-v1-0.6b' NOT NULL,
 	"merged_into_id" integer,
 	"created_at" timestamp DEFAULT now() NOT NULL,
 	"last_seen" timestamp DEFAULT now() NOT NULL,
 	CONSTRAINT "ct_merged_biconditional" CHECK (("canonical_topics"."status" = 'merged' AND "canonical_topics"."merged_into_id" IS NOT NULL) OR ("canonical_topics"."status" <> 'merged' AND "canonical_topics"."merged_into_id" IS NULL)),
-	CONSTRAINT "ct_no_self_merge" CHECK ("canonical_topics"."merged_into_id" <> "canonical_topics"."id"),
+	CONSTRAINT "ct_no_self_merge" CHECK ("canonical_topics"."merged_into_id" IS NULL OR "canonical_topics"."merged_into_id" <> "canonical_topics"."id"),
 	CONSTRAINT "ct_relevance_range" CHECK ("canonical_topics"."relevance" >= 0 AND "canonical_topics"."relevance" <= 1),
 	CONSTRAINT "ct_episode_count_gte_0" CHECK ("canonical_topics"."episode_count" >= 0),
 	CONSTRAINT "ct_label_not_blank" CHECK (length(btrim("canonical_topics"."label")) > 0),
