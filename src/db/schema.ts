@@ -769,10 +769,11 @@ export const canonicalTopicsRelations = relations(
     mergedFrom: many(canonicalTopics, { relationName: "merged_topics" }),
     aliases: many(canonicalTopicAliases),
     episodes: many(episodeCanonicalTopics),
-    digest: one(canonicalTopicDigests, {
-      fields: [canonicalTopics.id],
-      references: [canonicalTopicDigests.canonicalTopicId],
-    }),
+    // FK lives on canonical_topic_digests.canonical_topic_id; the inverse side
+    // declares fields/references in canonicalTopicDigestsRelations below. Wiring
+    // them here too would make Drizzle infer a non-nullable `digest` even though
+    // a canonical may have no cached digest yet.
+    digest: one(canonicalTopicDigests),
   }),
 );
 

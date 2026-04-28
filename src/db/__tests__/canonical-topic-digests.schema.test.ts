@@ -8,6 +8,7 @@ import { sql } from "drizzle-orm";
 import { db } from "@/db";
 import { canonicalTopics, canonicalTopicDigests } from "@/db/schema";
 import { EMBEDDING_DIMENSION } from "@/lib/ai/embed-constants";
+import { expectInsertRejects } from "./schema-test-helpers";
 
 // Stable fixture embedding — content irrelevant for constraint tests.
 const EMBEDDING = Array.from({ length: EMBEDDING_DIMENSION }, () => 0.001);
@@ -21,35 +22,6 @@ const validDigest = {
   episodeCountAtGeneration: 3,
   modelUsed: "claude-sonnet-4-6",
 };
-
-// Helper: look for a Postgres SQLSTATE code on the thrown error.
-// The Neon HTTP driver wraps the NeonDbError in `err.cause` rather than
-// surfacing it directly on the thrown object.
-function pgCode(err: unknown): string | undefined {
-  const e = err as { code?: string; cause?: { code?: string } };
-  return e?.cause?.code ?? e?.code;
-}
-
-// Helper: pull the violated constraint name out of a Postgres error so
-// individual constraint tests can pin to the specific check, not just the
-// SQLSTATE class.
-function pgConstraint(err: unknown): string | undefined {
-  const e = err as { constraint?: string; cause?: { constraint?: string } };
-  return e?.cause?.constraint ?? e?.constraint;
-}
-
-// Wrap an insert/update promise and assert it rejects with the given SQLSTATE
-// (and optional constraint name). Centralises the awkward `.catch((e) => e)`
-// pattern so each constraint test reads as a single expectation.
-async function expectInsertRejects(
-  insertPromise: Promise<unknown>,
-  sqlstate: "23514" | "23505",
-  constraint?: string,
-) {
-  const err = await insertPromise.catch((e: unknown) => e);
-  expect(pgCode(err)).toBe(sqlstate);
-  if (constraint) expect(pgConstraint(err)).toBe(constraint);
-}
 
 let fixtureTopicId: number;
 
@@ -77,9 +49,8 @@ describe.skipIf(!process.env.DATABASE_URL)(
     });
 
     afterAll(async () => {
-      await db.execute(
-        sql`DELETE FROM canonical_topic_digests WHERE canonical_topic_id IN (SELECT id FROM canonical_topics WHERE starts_with(label, '__schema_test_'))`,
-      );
+      // Deleting the parent canonical_topics row cascades digest cleanup
+      // via the FK ON DELETE CASCADE.
       await db.execute(
         sql`DELETE FROM canonical_topics WHERE starts_with(label, '__schema_test_')`,
       );
@@ -91,17 +62,39 @@ describe.skipIf(!process.env.DATABASE_URL)(
       );
     });
 
-    // 1. Happy path — guard against silent column-drop / default drift.
-    it("inserts a fully-valid digest row with expected defaults", async () => {
+    // Round-trips every column to guard against silent column-drop, jsonb
+    // shape drift (e.g. an accidental double-stringify), or default drift.
+    it("inserts a fully-valid digest row and round-trips every column", async () => {
       const [row] = await db
         .insert(canonicalTopicDigests)
         .values({ ...validDigest, canonicalTopicId: fixtureTopicId })
         .returning();
       expect(row.id).toBeTypeOf("number");
-      expect(row.generatedAt).toBeTruthy();
+      expect(row.canonicalTopicId).toBe(fixtureTopicId);
+      expect(row.digestMarkdown).toBe(validDigest.digestMarkdown);
+      expect(row.consensusPoints).toEqual(validDigest.consensusPoints);
+      expect(row.disagreementPoints).toEqual(validDigest.disagreementPoints);
+      expect(row.episodeIds).toEqual(validDigest.episodeIds);
+      expect(row.episodeCountAtGeneration).toBe(
+        validDigest.episodeCountAtGeneration,
+      );
+      expect(row.modelUsed).toBe(validDigest.modelUsed);
+      expect(row.generatedAt).toBeInstanceOf(Date);
     });
 
-    // 2. UNIQUE constraint — one digest per canonical topic.
+    it("accepts episode_count_at_generation = 0 (inclusive lower bound)", async () => {
+      const [row] = await db
+        .insert(canonicalTopicDigests)
+        .values({
+          ...validDigest,
+          canonicalTopicId: fixtureTopicId,
+          episodeCountAtGeneration: 0,
+          episodeIds: [],
+        })
+        .returning();
+      expect(row.episodeCountAtGeneration).toBe(0);
+    });
+
     it("rejects a second digest for the same canonical_topic_id (ctd_canonical_topic_uidx)", async () => {
       await db
         .insert(canonicalTopicDigests)
@@ -116,7 +109,6 @@ describe.skipIf(!process.env.DATABASE_URL)(
       );
     });
 
-    // 3. CHECK constraint — episode_count_at_generation must be >= 0.
     it("rejects episode_count_at_generation = -1 (ctd_episode_count_gte_0)", async () => {
       await expectInsertRejects(
         db.insert(canonicalTopicDigests).values({
@@ -127,6 +119,34 @@ describe.skipIf(!process.env.DATABASE_URL)(
         "23514",
         "ctd_episode_count_gte_0",
       );
+    });
+
+    it("cascades digest deletion when the parent canonical_topic is deleted", async () => {
+      const [tmp] = await db
+        .insert(canonicalTopics)
+        .values({
+          label: "__schema_test_cascade",
+          normalizedLabel: "__schema_test_cascade",
+          kind: "concept",
+          status: "active",
+          summary: "__schema_test_summary",
+          ongoing: false,
+          relevance: 0.5,
+          episodeCount: 1,
+          identityEmbedding: EMBEDDING,
+          contextEmbedding: EMBEDDING,
+        })
+        .returning({ id: canonicalTopics.id });
+      await db
+        .insert(canonicalTopicDigests)
+        .values({ ...validDigest, canonicalTopicId: tmp.id });
+
+      await db.execute(sql`DELETE FROM canonical_topics WHERE id = ${tmp.id}`);
+
+      const remaining = await db.execute<{ count: number }>(
+        sql`SELECT COUNT(*)::int AS count FROM canonical_topic_digests WHERE canonical_topic_id = ${tmp.id}`,
+      );
+      expect(remaining.rows[0].count).toBe(0);
     });
   },
 );
