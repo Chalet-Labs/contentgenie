@@ -226,7 +226,7 @@ describe.skipIf(!process.env.DATABASE_URL)(
         EntityResolutionError,
       );
       await expect(resolveTopic(input)).rejects.toMatchObject({
-        reason: "disambig_failed",
+        reason: "disambig_parse_failed",
       });
 
       const canonicalRows = await db.execute<{ id: number }>(

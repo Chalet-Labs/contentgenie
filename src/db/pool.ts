@@ -23,7 +23,10 @@ function getPool(): Pool {
   if (!_pool) {
     const connectionString = process.env.DATABASE_URL;
     if (!connectionString) {
-      throw new Error("DATABASE_URL environment variable is not set.");
+      throw new Error(
+        "DATABASE_URL environment variable is not set. Run `doppler setup` " +
+          "and use the doppler-wrapped scripts in package.json (e.g. `bun run dev`).",
+      );
     }
     _pool = new Pool({ connectionString });
   }
@@ -45,7 +48,5 @@ export function getDbPool(): NeonDatabase<typeof schema> {
 export function transactional<T>(
   fn: (tx: NeonDatabase<typeof schema>) => Promise<T>,
 ): Promise<T> {
-  return getDbPool().transaction(async (tx) =>
-    fn(tx as NeonDatabase<typeof schema>),
-  );
+  return getDbPool().transaction((tx) => fn(tx));
 }

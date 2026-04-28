@@ -10,6 +10,10 @@ import {
   type ResolveTopicInput,
 } from "@/lib/entity-resolution";
 import { EMBEDDING_DIMENSION } from "@/lib/ai/embed-constants";
+import {
+  AUTO_MATCH_SIMILARITY_THRESHOLD,
+  DISAMBIGUATE_SIMILARITY_THRESHOLD,
+} from "@/lib/entity-resolution-constants";
 
 // ---- Mocks ------------------------------------------------------------------
 
@@ -285,21 +289,13 @@ describe("resolveTopic", () => {
       expect(generateCompletionMock).not.toHaveBeenCalled();
     });
 
-    it("(11) alias dedup counts only newly-inserted aliases (per-canonical)", async () => {
+    it("(11) aliasesAdded equals the count of rows returned by alias inserts", async () => {
       setTxFixtures([
         {
           match: "lower(normalized_label)",
           rows: [{ id: 5, kind: "release" }],
         },
         { match: "UPDATE canonical_topics", rows: [] },
-        // First alias upsert (existing) returns 0 rows; second (new) returns 1.
-        // The MockTx will use the FIRST matching fixture; for a deterministic
-        // sequence we'd need a counter — easier: use a regex matcher and
-        // distinguish by whether the SQL params include "existing" vs "new"
-        // through a side-channel. For this test, configure so any alias-insert
-        // returns rows once, then 0. We approximate: alias-insert returns 1
-        // row total (one inserted), so the count equals the unique aliases
-        // actually inserted in this resolver call.
         { match: "INSERT INTO canonical_topic_aliases", rows: [{ id: 1 }] },
         { match: "INSERT INTO episode_canonical_topics", rows: [] },
       ]);
@@ -308,29 +304,14 @@ describe("resolveTopic", () => {
         makeInput({ aliases: ["existing", "new"] }),
       );
 
-      // Both inserts hit the same fixture (returns 1 row each), so count is 2.
-      // The semantic guarantee is "rows returned by RETURNING id" — the test
-      // verifies the resolver iterates aliases and tallies row counts, not
-      // that DB-level dedup happened (that's the schema test's concern).
+      // Both alias inserts hit the same fixture (returns 1 row each), so the
+      // total is 2. DB-level dedup on the partial unique index is asserted by
+      // the schema-level integration test, not this mock-based test.
       expect(result.aliasesAdded).toBe(2);
       expect(result.matchMethod).toBe("auto");
     });
 
-    it("(12) transaction rollback on kNN error — no INSERTs recorded", async () => {
-      setTxFixtures([
-        { match: "lower(normalized_label)", rows: [] },
-        { match: "SET LOCAL hnsw.ef_search", rows: [] },
-      ]);
-
-      // Override transactional mock once: have it throw on the kNN call.
-      const txExecuteThrow = async () => {
-        throw new Error("kNN exploded");
-      };
-      void txExecuteThrow;
-      // Easier: queue a fixture-less tx and intercept by a marker SQL — the
-      // resolver will reach the kNN, find no fixture, then hit our
-      // intercept. We use the existing serializer — but to throw, we mock
-      // `transactional` to inject error after the SET LOCAL.
+    it("(12) kNN error aborts before any inserts are issued", async () => {
       const { transactional } = await import("@/db/pool");
       const transactionalMock = vi.mocked(transactional);
       transactionalMock.mockImplementationOnce(async (fn) => {
@@ -508,15 +489,17 @@ describe("resolveTopic", () => {
 
       const paramsA = await captureBindOnce("Foo");
       const paramsB = await captureBindOnce(" Foo ");
-      // Both invocations should bind the same normalized label string.
+      // Both invocations bind the same JSON-encoded [normalizedLabel, kind]
+      // tuple — distinct (label, kind) pairs cannot collide on the lock key.
       expect(paramsA).toEqual(paramsB);
-      expect(paramsA).toContain("foo");
+      expect(paramsA).toContain('["foo","release"]');
     });
 
-    it("(15) boundary — top-1 sim exactly 0.92 routes to disambig (strict >, not >=)", async () => {
-      // Exact-lookup miss → kNN returns sim=0.92 → not auto (strict >),
-      // not disambig (≥0.82) so disambig DOES fire. Mock LLM to pick the
-      // top candidate — assert matchMethod is 'llm_disambig', not 'auto'.
+    it("(15) boundary — top-1 sim exactly at AUTO_MATCH_SIMILARITY_THRESHOLD routes to disambig (strict >)", async () => {
+      // Exact-lookup miss → kNN returns sim equal to the threshold → not auto
+      // (strict >), but ≥ DISAMBIGUATE_SIMILARITY_THRESHOLD so disambig fires.
+      // Mock LLM to pick the top candidate; assert matchMethod is
+      // 'llm_disambig', not 'auto'.
       setTxFixtures([
         { match: "lower(normalized_label)", rows: [] },
         { match: "SET LOCAL hnsw.ef_search", rows: [] },
@@ -530,18 +513,23 @@ describe("resolveTopic", () => {
               summary: "",
               last_seen: new Date(),
               ongoing: false,
-              similarity: 0.92,
+              similarity: AUTO_MATCH_SIMILARITY_THRESHOLD,
             },
           ],
         },
       ]);
-      // TX-2 fixtures
       setTxFixtures([
-        { match: "lower(normalized_label)", rows: [] }, // miss
+        { match: "lower(normalized_label)", rows: [] },
         { match: "SET LOCAL hnsw.ef_search", rows: [] },
         {
           match: "WHERE id =",
-          rows: [{ id: 7, kind: "release", similarity: 0.92 }],
+          rows: [
+            {
+              id: 7,
+              kind: "release",
+              similarity: AUTO_MATCH_SIMILARITY_THRESHOLD,
+            },
+          ],
         },
         { match: "UPDATE canonical_topics", rows: [] },
         { match: "INSERT INTO canonical_topic_aliases", rows: [{ id: 1 }] },
@@ -554,7 +542,7 @@ describe("resolveTopic", () => {
       expect(generateCompletionMock).toHaveBeenCalledTimes(1);
     });
 
-    it("(16) boundary — top-1 sim exactly 0.82 routes to disambig (>=, inclusive)", async () => {
+    it("(16) boundary — top-1 sim exactly at DISAMBIGUATE_SIMILARITY_THRESHOLD routes to disambig (>=, inclusive)", async () => {
       setTxFixtures([
         { match: "lower(normalized_label)", rows: [] },
         { match: "SET LOCAL hnsw.ef_search", rows: [] },
@@ -568,7 +556,7 @@ describe("resolveTopic", () => {
               summary: "",
               last_seen: new Date(),
               ongoing: false,
-              similarity: 0.82,
+              similarity: DISAMBIGUATE_SIMILARITY_THRESHOLD,
             },
           ],
         },
@@ -578,7 +566,13 @@ describe("resolveTopic", () => {
         { match: "SET LOCAL hnsw.ef_search", rows: [] },
         {
           match: "WHERE id =",
-          rows: [{ id: 8, kind: "release", similarity: 0.82 }],
+          rows: [
+            {
+              id: 8,
+              kind: "release",
+              similarity: DISAMBIGUATE_SIMILARITY_THRESHOLD,
+            },
+          ],
         },
         { match: "UPDATE canonical_topics", rows: [] },
         { match: "INSERT INTO canonical_topic_aliases", rows: [{ id: 1 }] },
@@ -712,7 +706,11 @@ describe("resolveTopic", () => {
       expect(result.similarityToTopMatch).toBeNull();
     });
 
-    it("(5) malformed JSON → throws EntityResolutionError(disambig_failed); no inserts", async () => {
+    it("(5) malformed JSON → throws disambig_parse_failed; no inserts", async () => {
+      // Parse failure throws in callDisambiguator before TX-2 opens, so TX-2
+      // fixtures are never consumed. The single resolveTopic call below is
+      // sufficient evidence — the rejection assertion captures the throw, and
+      // the recorded SQL shows no INSERT was issued.
       setTxFixtures([
         { match: "lower(normalized_label)", rows: [] },
         { match: "SET LOCAL hnsw.ef_search", rows: [] },
@@ -731,44 +729,11 @@ describe("resolveTopic", () => {
           ],
         },
       ]);
-      // TX-2 will run `acquireLock` then `exactLookup` then throw on parse.
-      setTxFixtures([{ match: "lower(normalized_label)", rows: [] }]);
       generateCompletionMock.mockResolvedValueOnce("not json");
 
-      await expect(resolveTopic(makeInput())).rejects.toBeInstanceOf(
-        EntityResolutionError,
-      );
-      try {
-        await resolveTopic(makeInput());
-      } catch {
-        // ignore - we exercise above
-      }
-
-      // Replay once for assertions on inserts. Reset state and run again.
-      txFixturesQueue.length = 0;
-      txCallLog.length = 0;
-      setTxFixtures([
-        { match: "lower(normalized_label)", rows: [] },
-        { match: "SET LOCAL hnsw.ef_search", rows: [] },
-        {
-          match: "identity_embedding <=>",
-          rows: [
-            {
-              id: 1,
-              label: "Cand",
-              kind: "release",
-              summary: "",
-              last_seen: new Date(),
-              ongoing: false,
-              similarity: 0.85,
-            },
-          ],
-        },
-      ]);
-      setTxFixtures([{ match: "lower(normalized_label)", rows: [] }]);
-      generateCompletionMock.mockResolvedValueOnce("not json");
       await expect(resolveTopic(makeInput())).rejects.toMatchObject({
-        reason: "disambig_failed",
+        name: "EntityResolutionError",
+        reason: "disambig_parse_failed",
       });
 
       const calls = allRecordedCalls();
@@ -778,7 +743,7 @@ describe("resolveTopic", () => {
       ).toBe(0);
     });
 
-    it("(6) zod validation fails (chosen_id is a string) → disambig_failed", async () => {
+    it("(6) zod validation fails (chosen_id is a string) → disambig_parse_failed", async () => {
       setTxFixtures([
         { match: "lower(normalized_label)", rows: [] },
         { match: "SET LOCAL hnsw.ef_search", rows: [] },
@@ -797,17 +762,16 @@ describe("resolveTopic", () => {
           ],
         },
       ]);
-      setTxFixtures([{ match: "lower(normalized_label)", rows: [] }]);
       generateCompletionMock.mockResolvedValueOnce('{"chosen_id": "abc"}');
 
       await expect(resolveTopic(makeInput())).rejects.toMatchObject({
-        reason: "disambig_failed",
+        reason: "disambig_parse_failed",
       });
       const calls = allRecordedCalls();
       expect(findCalls(calls, "INSERT INTO canonical_topics").length).toBe(0);
     });
 
-    it("(7) generateCompletion rejects → disambig_failed with cause set", async () => {
+    it("(7) generateCompletion rejects → disambig_transport_failed with cause set", async () => {
       setTxFixtures([
         { match: "lower(normalized_label)", rows: [] },
         { match: "SET LOCAL hnsw.ef_search", rows: [] },
@@ -826,7 +790,6 @@ describe("resolveTopic", () => {
           ],
         },
       ]);
-      setTxFixtures([{ match: "lower(normalized_label)", rows: [] }]);
       const networkErr = new Error("ETIMEDOUT");
       generateCompletionMock.mockRejectedValueOnce(networkErr);
 
@@ -836,7 +799,7 @@ describe("resolveTopic", () => {
       } catch (e) {
         expect(e).toBeInstanceOf(EntityResolutionError);
         const er = e as EntityResolutionError;
-        expect(er.reason).toBe("disambig_failed");
+        expect(er.reason).toBe("disambig_transport_failed");
         expect(er.cause).toBe(networkErr);
       }
     });

@@ -42,7 +42,7 @@ Resolver work splits into:
 - **(lock released — outside any tx)** Build the disambiguator prompt; call `generateCompletion`; parse + zod-validate the response.
 - **TX-2** (only on the disambig path): re-acquire the lock → re-run exact-lookup → bounded id-confirmation re-kNN → finalize via UPDATE/INSERT → commit.
 
-The advisory lock is held only across fast Postgres-only steps. Document this as the canonical idiom for resolver-style code that combines a serialising lock with an LLM round-trip. Both transactions hash the same lock key (`hashtextextended(normalizeLabel(label) || '|' || kind, 0)`), so any canonical that lands during the LLM window is detected by TX-2's exact-lookup and reused.
+The advisory lock is held only across fast Postgres-only steps. Document this as the canonical idiom for resolver-style code that combines a serialising lock with an LLM round-trip. Both transactions hash the same lock key (a JSON-encoded `[normalizeLabel(label), kind]` tuple — see Decision §6 for collision-safety details), so any canonical that lands during the LLM window is detected by TX-2's exact-lookup and reused.
 
 ### 3. Canonical `normalizeLabel(s) = lower(trim(s))`
 
@@ -63,7 +63,7 @@ SELECT id, kind FROM canonical_topics
 WHERE lower(normalized_label) = $1 AND kind = $2 AND status = 'active' LIMIT 1
 ```
 
-with `$1` bound to `normalizeLabel(input.label)` (already lowercased + trimmed; the `lower()` on the column side mirrors the partial unique index expression at `src/db/schema.ts:511`). On hit, treat as auto-match (similarity := 1.0) and skip kNN entirely. This:
+with `$1` bound to `normalizeLabel(input.label)` (already lowercased + trimmed; the `lower()` on the column side mirrors the `ct_normalized_label_kind_active_uidx` partial unique index expression in `src/db/schema.ts`). On hit, treat as auto-match (similarity := 1.0) and skip kNN entirely. This:
 
 - handles the 91–180 day event-type gap (ADR-042 line 156),
 - replaces the broken `ON CONFLICT DO NOTHING` recovery path that re-ran the same blind kNN,
@@ -76,14 +76,14 @@ The `INSERT ... ON CONFLICT DO NOTHING` recovery on new-insert (when 0 rows are 
 Distinguish:
 
 - **(a)** Model returned valid JSON with `chosen_id: null` (legitimate "no match" judgement) → route to new-insert in TX-2.
-- **(b)** Parse / transport / schema-validation failure → throw `EntityResolutionError("disambig_failed", { cause })` between TX-1 and TX-2 (the disambiguator runs outside the `transactional` blocks); TX-2 never opens, so no canonical or junction can be inserted on this path. The error surfaces to the A5 caller, which catches it (per ADR-027 / ADR-031 graceful-degradation) and continues with categories-only persistence for that one topic — one topic skipped, not the whole episode.
+- **(b)** Failure → throw `EntityResolutionError` between TX-1 and TX-2 (the disambiguator runs outside the `transactional` blocks); TX-2 never opens, so no canonical or junction can be inserted on this path. Two distinct reasons are used so observability can distinguish operational from model defects: `"disambig_transport_failed"` (network / `generateCompletion` rejected — typically retryable) vs `"disambig_parse_failed"` (response was non-JSON, or zod schema rejected the shape — model misbehavior, not retryable as-is). The error surfaces to the A5 caller, which catches it (per ADR-027 / ADR-031 graceful-degradation) and continues with categories-only persistence for that one topic — one topic skipped, not the whole episode.
 
 Treating both as `chosen_id: null` would let a transient OpenRouter outage burst spurious canonicals into the canonical set; (b) is an outage signal, not a no-match judgement.
 
 ### 6. Lock-key hash + recall budget
 
-- `pg_advisory_xact_lock(hashtextextended(${normalizeLabel(label)} || '|' || ${kind}, 0))` — 64-bit hash, ADR-042 §"Three-tier resolution pipeline". The issue body specified `hashtext(...)` (32-bit); the lower collision risk of `hashtextextended` is the right pick.
-- `SET LOCAL hnsw.ef_search = 200` is issued before any kNN-issuing transaction. `HNSW_EF_SEARCH` is a compile-time integer constant inlined via `sql.raw(...)`; an `assert` at module load checks it's a positive integer literal, so no user-controlled value can ever reach `SET LOCAL`.
+- `pg_advisory_xact_lock(hashtextextended($key, 0))` — 64-bit hash, per ADR-042 §"Three-tier resolution pipeline". `$key` is `JSON.stringify([normalizeLabel(label), kind])` built in JS so distinct `(label, kind)` pairs always produce distinct strings — a pipe (or any other) separator inside the label cannot collide two pairs onto the same lock.
+- `SET LOCAL hnsw.ef_search = 200` is issued before each kNN query. The three constants interpolated unquoted via `sql.raw(...)` (`HNSW_EF_SEARCH`, `RECENT_EVENT_WINDOW_DAYS`, `KNN_DISAMBIG_CANDIDATE_POOL`) are validated at module load as positive-integer literals, so no user-controlled value can reach `SET LOCAL` / `LIMIT` / `interval`.
 
 ## Options Considered
 

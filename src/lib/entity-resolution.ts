@@ -8,11 +8,16 @@ import { EMBEDDING_DIMENSION } from "@/lib/ai/embed-constants";
 import { generateCompletion } from "@/lib/ai/generate";
 import {
   AUTO_MATCH_SIMILARITY_THRESHOLD,
+  DISAMBIG_MAX_TOKENS,
+  DISAMBIG_TEMPERATURE,
   DISAMBIGUATE_SIMILARITY_THRESHOLD,
+  EXACT_MATCH_SIMILARITY,
   HNSW_EF_SEARCH,
   KNN_DISAMBIG_CANDIDATE_POOL,
+  OTHER_KIND_RELEVANCE_FLOOR,
   RECENT_EVENT_WINDOW_DAYS,
   VERSION_TOKEN_REGEX,
+  type MatchMethod,
 } from "@/lib/entity-resolution-constants";
 import {
   parseJsonResponse,
@@ -34,18 +39,32 @@ import { getEntityDisambiguatorPrompt } from "@/lib/prompts/entity-disambiguator
 
 export type ResolveTopicInput = NormalizedTopic & {
   episodeId: number;
-  identityEmbedding: number[];
-  contextEmbedding: number[];
+  identityEmbedding: readonly number[];
+  contextEmbedding: readonly number[];
 };
 
-export interface ResolveTopicResult {
+interface ResolveTopicResultBase {
   canonicalId: number;
-  matchMethod: "auto" | "llm_disambig" | "new";
-  similarityToTopMatch: number | null;
   aliasesAdded: number;
-  versionTokenForcedDisambig: boolean;
   candidatesConsidered: number;
 }
+
+export type ResolveTopicResult =
+  | (ResolveTopicResultBase & {
+      matchMethod: "auto";
+      similarityToTopMatch: number;
+      versionTokenForcedDisambig: false;
+    })
+  | (ResolveTopicResultBase & {
+      matchMethod: "llm_disambig";
+      similarityToTopMatch: number;
+      versionTokenForcedDisambig: boolean;
+    })
+  | (ResolveTopicResultBase & {
+      matchMethod: "new";
+      similarityToTopMatch: null;
+      versionTokenForcedDisambig: boolean;
+    });
 
 interface KnnCandidate {
   id: number;
@@ -89,22 +108,41 @@ export function normalizeLabel(s: string): string {
   return s.trim().toLowerCase();
 }
 
+/**
+ * Build the advisory-lock key. JSON-encoding `[normalizedLabel, kind]`
+ * makes the input structurally unambiguous: distinct (label, kind) pairs
+ * cannot produce the same key even if a label happens to contain `|`,
+ * brackets, or other separator candidates.
+ */
+function buildLockKey(label: string, kind: TopicKind): string {
+  return JSON.stringify([normalizeLabel(label), kind]);
+}
+
 // Pgvector wants a textual representation `'[v1,v2,...]'::vector`. Drizzle's
 // `vector()` column type uses a custom encoder for `db.insert(...).values(...)`,
 // but raw `sql\`${arr}::vector\`` interpolates a JS array as a record literal
 // (`(v1, v2, ...)`), which Postgres can't cast. Format it as a single string
-// here. Numbers come from `generateEmbedding` (pre-validated finite floats),
+// here. Numbers are validated finite by `resolveTopic` before this is reached,
 // so there's no SQL-injection surface — they're still bound as a single param.
 function formatVector(values: readonly number[]): string {
   return `[${values.join(",")}]`;
 }
 
+export type EntityResolutionReason =
+  | "invalid_embedding_dim"
+  | "invalid_embedding_value"
+  | "other_below_relevance_floor"
+  | "disambig_transport_failed"
+  | "disambig_parse_failed"
+  | "conflict_recovery_failed";
+
 export class EntityResolutionError extends Error {
   readonly name = "EntityResolutionError" as const;
-  readonly reason: string;
-  constructor(reason: string, options?: { cause?: unknown }) {
+  constructor(
+    readonly reason: EntityResolutionReason,
+    options?: { cause?: unknown },
+  ) {
     super(reason, options);
-    this.reason = reason;
   }
 }
 
@@ -133,7 +171,7 @@ async function acquireLock(
   kind: TopicKind,
 ): Promise<void> {
   await tx.execute(
-    sql`SELECT pg_advisory_xact_lock(hashtextextended(${normalizeLabel(label)} || '|' || ${kind}, 0))`,
+    sql`SELECT pg_advisory_xact_lock(hashtextextended(${buildLockKey(label, kind)}, 0))`,
   );
 }
 
@@ -155,40 +193,29 @@ async function setEfSearch(tx: Tx): Promise<void> {
   );
 }
 
-async function runKnn(tx: Tx, embedding: number[]): Promise<KnnCandidate[]> {
+async function runKnn(
+  tx: Tx,
+  embedding: readonly number[],
+): Promise<KnnCandidate[]> {
+  const vec = formatVector(embedding);
   const result = await tx.execute(
     sql`SELECT id, label, kind, summary,
-              1 - (identity_embedding <=> ${formatVector(embedding)}::vector) AS similarity
+              1 - (identity_embedding <=> ${vec}::vector) AS similarity
        FROM canonical_topics
        WHERE status = 'active'
          AND (kind IN ('concept', 'work')
               OR last_seen > now() - interval '${sql.raw(String(RECENT_EVENT_WINDOW_DAYS))} days'
               OR ongoing = true)
-       ORDER BY identity_embedding <=> ${formatVector(embedding)}::vector
+       ORDER BY identity_embedding <=> ${vec}::vector
        LIMIT ${sql.raw(String(KNN_DISAMBIG_CANDIDATE_POOL))}`,
   );
-  return result.rows.map((row) => {
-    const r = row as {
-      id: number;
-      label: string;
-      kind: TopicKind;
-      summary: string;
-      similarity: number;
-    };
-    return {
-      id: r.id,
-      label: r.label,
-      kind: r.kind,
-      summary: r.summary,
-      similarity: r.similarity,
-    };
-  });
+  return result.rows as KnnCandidate[];
 }
 
 async function confirmCandidate(
   tx: Tx,
   chosenId: number,
-  embedding: number[],
+  embedding: readonly number[],
 ): Promise<{ id: number; kind: TopicKind; similarity: number } | null> {
   const result = await tx.execute(
     sql`SELECT id, kind, 1 - (identity_embedding <=> ${formatVector(embedding)}::vector) AS similarity
@@ -230,15 +257,19 @@ async function insertJunction(
   args: {
     episodeId: number;
     canonicalId: number;
-    matchMethod: "auto" | "llm_disambig" | "new";
+    matchMethod: MatchMethod;
     similarity: number | null;
     coverageScore: number;
   },
 ): Promise<void> {
+  // ON CONFLICT DO NOTHING guards against duplicate-topic crashes when the
+  // same episode references the same canonical twice (e.g. two normalized
+  // topics that resolve to the same canonical via different paths).
   await tx.execute(
     sql`INSERT INTO episode_canonical_topics
          (episode_id, canonical_topic_id, match_method, similarity_to_top_match, coverage_score)
-       VALUES (${args.episodeId}, ${args.canonicalId}, ${args.matchMethod}, ${args.similarity}, ${args.coverageScore})`,
+       VALUES (${args.episodeId}, ${args.canonicalId}, ${args.matchMethod}, ${args.similarity}, ${args.coverageScore})
+       ON CONFLICT (episode_id, canonical_topic_id) DO NOTHING`,
   );
 }
 
@@ -267,6 +298,36 @@ async function insertCanonical(
   return row?.id ?? null;
 }
 
+/**
+ * Common write trio shared by every successful match path: update last_seen,
+ * upsert aliases, write the junction row. Centralising this means a future
+ * audit/log addition is a single-site change rather than six.
+ */
+async function finalizeMatch(
+  tx: Tx,
+  args: {
+    input: ResolveTopicInput;
+    canonicalId: number;
+    matchMethod: MatchMethod;
+    similarity: number | null;
+  },
+): Promise<number> {
+  await updateLastSeen(tx, args.canonicalId);
+  const aliasesAdded = await upsertAliases(
+    tx,
+    args.canonicalId,
+    args.input.aliases,
+  );
+  await insertJunction(tx, {
+    episodeId: args.input.episodeId,
+    canonicalId: args.canonicalId,
+    matchMethod: args.matchMethod,
+    similarity: args.similarity,
+    coverageScore: args.input.coverageScore,
+  });
+  return aliasesAdded;
+}
+
 // ---- Main entry point ------------------------------------------------------
 
 export async function resolveTopic(
@@ -277,6 +338,15 @@ export async function resolveTopic(
     input.contextEmbedding.length !== EMBEDDING_DIMENSION
   ) {
     throw new EntityResolutionError("invalid_embedding_dim");
+  }
+  if (
+    !input.identityEmbedding.every(Number.isFinite) ||
+    !input.contextEmbedding.every(Number.isFinite)
+  ) {
+    throw new EntityResolutionError("invalid_embedding_value");
+  }
+  if (input.kind === "other" && input.relevance < OTHER_KIND_RELEVANCE_FLOOR) {
+    throw new EntityResolutionError("other_below_relevance_floor");
   }
 
   const tx1Result = await transactional<ResolveTopicResult | PendingDisambig>(
@@ -307,19 +377,16 @@ async function runTx1(
 
   const exact = await exactLookup(tx, input.label, input.kind);
   if (exact !== null) {
-    await updateLastSeen(tx, exact.id);
-    const aliasesAdded = await upsertAliases(tx, exact.id, input.aliases);
-    await insertJunction(tx, {
-      episodeId: input.episodeId,
+    const aliasesAdded = await finalizeMatch(tx, {
+      input,
       canonicalId: exact.id,
       matchMethod: "auto",
-      similarity: 1.0,
-      coverageScore: input.coverageScore,
+      similarity: EXACT_MATCH_SIMILARITY,
     });
     return {
       canonicalId: exact.id,
       matchMethod: "auto",
-      similarityToTopMatch: 1.0,
+      similarityToTopMatch: EXACT_MATCH_SIMILARITY,
       aliasesAdded,
       versionTokenForcedDisambig: false,
       candidatesConsidered: 0,
@@ -329,25 +396,20 @@ async function runTx1(
   await setEfSearch(tx);
   const candidates = await runKnn(tx, input.identityEmbedding);
   const top = candidates[0];
-  const versionMismatch = top
-    ? hasVersionTokenMismatch(input.label, top.label)
-    : false;
+  const versionMismatch =
+    top !== undefined && hasVersionTokenMismatch(input.label, top.label);
 
-  // Auto-match
   if (
     top &&
     top.similarity > AUTO_MATCH_SIMILARITY_THRESHOLD &&
     top.kind === input.kind &&
     !versionMismatch
   ) {
-    await updateLastSeen(tx, top.id);
-    const aliasesAdded = await upsertAliases(tx, top.id, input.aliases);
-    await insertJunction(tx, {
-      episodeId: input.episodeId,
+    const aliasesAdded = await finalizeMatch(tx, {
+      input,
       canonicalId: top.id,
       matchMethod: "auto",
       similarity: top.similarity,
-      coverageScore: input.coverageScore,
     });
     return {
       canonicalId: top.id,
@@ -359,7 +421,6 @@ async function runTx1(
     };
   }
 
-  // Disambig defer
   const needsDisambig =
     versionMismatch ||
     candidates.some((c) => c.similarity >= DISAMBIGUATE_SIMILARITY_THRESHOLD);
@@ -374,13 +435,11 @@ async function runTx1(
   // Pure new-insert
   const newId = await insertCanonical(tx, input);
   if (newId !== null) {
-    const aliasesAdded = await upsertAliases(tx, newId, input.aliases);
-    await insertJunction(tx, {
-      episodeId: input.episodeId,
+    const aliasesAdded = await finalizeMatch(tx, {
+      input,
       canonicalId: newId,
       matchMethod: "new",
       similarity: null,
-      coverageScore: input.coverageScore,
     });
     return {
       canonicalId: newId,
@@ -392,26 +451,24 @@ async function runTx1(
     };
   }
 
-  // ON CONFLICT DO NOTHING returned 0 rows — recover via exact-lookup,
-  // never another kNN (kNN can't see active-but-old event-type rows;
-  // ADR-042 line 156 / ADR-044).
+  // Recovery on `INSERT ... ON CONFLICT DO NOTHING` returning 0 rows: use
+  // exact-lookup, never another kNN. ADR-042 documents the 91–180 day window
+  // where active event-type canonicals are excluded from kNN; recovering via
+  // a second kNN would loop or duplicate. ADR-044 §4 is the durable record.
   const recovered = await exactLookup(tx, input.label, input.kind);
   if (recovered === null) {
     throw new EntityResolutionError("conflict_recovery_failed");
   }
-  await updateLastSeen(tx, recovered.id);
-  const aliasesAdded = await upsertAliases(tx, recovered.id, input.aliases);
-  await insertJunction(tx, {
-    episodeId: input.episodeId,
+  const aliasesAdded = await finalizeMatch(tx, {
+    input,
     canonicalId: recovered.id,
     matchMethod: "auto",
-    similarity: 1.0,
-    coverageScore: input.coverageScore,
+    similarity: EXACT_MATCH_SIMILARITY,
   });
   return {
     canonicalId: recovered.id,
     matchMethod: "auto",
-    similarityToTopMatch: 1.0,
+    similarityToTopMatch: EXACT_MATCH_SIMILARITY,
     aliasesAdded,
     versionTokenForcedDisambig: false,
     candidatesConsidered: candidates.length,
@@ -424,27 +481,24 @@ async function callDisambiguator(
 ): Promise<number | null> {
   const prompt = getEntityDisambiguatorPrompt(
     { label: input.label, kind: input.kind, summary: input.summary },
-    candidates.map((c) => ({
-      id: c.id,
-      label: c.label,
-      kind: c.kind,
-      summary: c.summary,
-    })),
+    candidates,
   );
   let raw: string;
   try {
     raw = await generateCompletion([{ role: "user", content: prompt }], {
-      maxTokens: 256,
-      temperature: 0,
+      maxTokens: DISAMBIG_MAX_TOKENS,
+      temperature: DISAMBIG_TEMPERATURE,
     });
   } catch (err) {
-    throw new EntityResolutionError("disambig_failed", { cause: err });
+    throw new EntityResolutionError("disambig_transport_failed", {
+      cause: err,
+    });
   }
   try {
     const parsed = parseJsonResponse<unknown>(raw);
     return disambigSchema.parse(parsed).chosen_id;
   } catch (err) {
-    throw new EntityResolutionError("disambig_failed", { cause: err });
+    throw new EntityResolutionError("disambig_parse_failed", { cause: err });
   }
 }
 
@@ -457,48 +511,39 @@ async function runTx2(
 ): Promise<ResolveTopicResult> {
   await acquireLock(tx, input.label, input.kind);
 
-  const candidateConsidered = candidates.length;
-
-  // Some other writer may have landed our entity while we were talking to
-  // the LLM — defer to it (ADR-044 §two-phase split).
+  // Defer to anything another writer landed during the LLM round-trip.
   const exact = await exactLookup(tx, input.label, input.kind);
   if (exact !== null) {
-    await updateLastSeen(tx, exact.id);
-    const aliasesAdded = await upsertAliases(tx, exact.id, input.aliases);
-    await insertJunction(tx, {
-      episodeId: input.episodeId,
+    const aliasesAdded = await finalizeMatch(tx, {
+      input,
       canonicalId: exact.id,
       matchMethod: "auto",
-      similarity: 1.0,
-      coverageScore: input.coverageScore,
+      similarity: EXACT_MATCH_SIMILARITY,
     });
     return {
       canonicalId: exact.id,
       matchMethod: "auto",
-      similarityToTopMatch: 1.0,
+      similarityToTopMatch: EXACT_MATCH_SIMILARITY,
       aliasesAdded,
-      versionTokenForcedDisambig,
-      candidatesConsidered: candidateConsidered,
+      versionTokenForcedDisambig: false,
+      candidatesConsidered: candidates.length,
     };
   }
 
-  const candidateMatch =
-    chosenId !== null ? candidates.find((c) => c.id === chosenId) : undefined;
-  if (chosenId !== null && candidateMatch) {
+  const llmPickedExisting =
+    chosenId !== null && candidates.some((c) => c.id === chosenId);
+  if (llmPickedExisting) {
     const confirmed = await confirmCandidate(
       tx,
       chosenId,
       input.identityEmbedding,
     );
     if (confirmed && confirmed.kind === input.kind) {
-      await updateLastSeen(tx, confirmed.id);
-      const aliasesAdded = await upsertAliases(tx, confirmed.id, input.aliases);
-      await insertJunction(tx, {
-        episodeId: input.episodeId,
+      const aliasesAdded = await finalizeMatch(tx, {
+        input,
         canonicalId: confirmed.id,
         matchMethod: "llm_disambig",
         similarity: confirmed.similarity,
-        coverageScore: input.coverageScore,
       });
       return {
         canonicalId: confirmed.id,
@@ -506,21 +551,19 @@ async function runTx2(
         similarityToTopMatch: confirmed.similarity,
         aliasesAdded,
         versionTokenForcedDisambig,
-        candidatesConsidered: candidateConsidered,
+        candidatesConsidered: candidates.length,
       };
     }
-    // fall through to new-insert if candidate disappeared / wrong kind
+    // confirmed candidate gone or wrong kind: fall through to new-insert
   }
 
   const newId = await insertCanonical(tx, input);
   if (newId !== null) {
-    const aliasesAdded = await upsertAliases(tx, newId, input.aliases);
-    await insertJunction(tx, {
-      episodeId: input.episodeId,
+    const aliasesAdded = await finalizeMatch(tx, {
+      input,
       canonicalId: newId,
       matchMethod: "new",
       similarity: null,
-      coverageScore: input.coverageScore,
     });
     return {
       canonicalId: newId,
@@ -528,7 +571,7 @@ async function runTx2(
       similarityToTopMatch: null,
       aliasesAdded,
       versionTokenForcedDisambig,
-      candidatesConsidered: candidateConsidered,
+      candidatesConsidered: candidates.length,
     };
   }
 
@@ -536,21 +579,18 @@ async function runTx2(
   if (recovered === null) {
     throw new EntityResolutionError("conflict_recovery_failed");
   }
-  await updateLastSeen(tx, recovered.id);
-  const aliasesAdded = await upsertAliases(tx, recovered.id, input.aliases);
-  await insertJunction(tx, {
-    episodeId: input.episodeId,
+  const aliasesAdded = await finalizeMatch(tx, {
+    input,
     canonicalId: recovered.id,
     matchMethod: "auto",
-    similarity: 1.0,
-    coverageScore: input.coverageScore,
+    similarity: EXACT_MATCH_SIMILARITY,
   });
   return {
     canonicalId: recovered.id,
     matchMethod: "auto",
-    similarityToTopMatch: 1.0,
+    similarityToTopMatch: EXACT_MATCH_SIMILARITY,
     aliasesAdded,
-    versionTokenForcedDisambig,
-    candidatesConsidered: candidateConsidered,
+    versionTokenForcedDisambig: false,
+    candidatesConsidered: candidates.length,
   };
 }

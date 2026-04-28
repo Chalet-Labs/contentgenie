@@ -26,9 +26,8 @@ interface DisambiguatorCandidate {
 }
 
 // XML-escape for prompt payload (server-side string interpolation into an
-// XML-shaped LLM prompt — not HTML/DOM output). Mirrors the helper in
-// `src/lib/prompts.ts` but kept local so this module stays dependency-free
-// per ADR-044 / plan T2.
+// XML-shaped LLM prompt — not HTML/DOM output). Kept local so this module
+// stays dependency-free.
 const XML_ESCAPES: Record<string, string> = {
   "&": "&amp;",
   "<": "&lt;",
