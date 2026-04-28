@@ -1,0 +1,1 @@
+ALTER TABLE "canonical_topics" ADD CONSTRAINT "ct_normalized_label_not_blank" CHECK (length(btrim("canonical_topics"."normalized_label")) > 0);

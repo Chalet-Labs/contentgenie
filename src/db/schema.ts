@@ -1,5 +1,6 @@
 import {
   pgTable,
+  pgEnum,
   text,
   timestamp,
   boolean,
@@ -7,15 +8,22 @@ import {
   serial,
   json,
   decimal,
+  real,
   index,
   uniqueIndex,
   check,
   varchar,
   bigint,
+  vector,
+  type AnyPgColumn,
 } from "drizzle-orm/pg-core";
 import { relations, sql } from "drizzle-orm";
 import type { WorthItSignals } from "@/lib/openrouter";
 import type { PodcastIndexEpisodeId } from "@/types/ids";
+import {
+  EMBEDDING_DIMENSION as EMBEDDING_DIM,
+  EMBEDDING_MODEL,
+} from "@/lib/ai/embed-constants";
 import {
   DEFAULT_SUBSCRIPTION_SORT,
   SUBSCRIPTION_SORTS,
@@ -23,6 +31,25 @@ import {
 } from "@/db/subscription-sorts";
 
 export { DEFAULT_SUBSCRIPTION_SORT, SUBSCRIPTION_SORTS, type SubscriptionSort };
+
+// Canonical topic enums (ADR-042 — see docs/adr/042-canonical-topics-foundation.md)
+export const canonicalTopicKindEnum = pgEnum("canonical_topic_kind", [
+  "release",
+  "incident",
+  "regulation",
+  "announcement",
+  "deal",
+  "event",
+  "concept",
+  "work",
+  "other",
+]);
+
+export const canonicalTopicStatusEnum = pgEnum("canonical_topic_status", [
+  "active",
+  "merged",
+  "dormant",
+]);
 
 // Rate limits table (managed by rate-limiter-flexible, see ADR-001).
 // Defined here so drizzle-kit push doesn't try to drop it.
@@ -441,6 +468,131 @@ export const userPlayerSession = pgTable("user_player_session", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+// Canonical Topics — persistent, deduplicated topic graph (ADR-042, ADR-043)
+export const canonicalTopics = pgTable(
+  "canonical_topics",
+  {
+    id: serial("id").primaryKey(),
+    label: text("label").notNull(),
+    normalizedLabel: text("normalized_label").notNull(),
+    kind: canonicalTopicKindEnum("kind").notNull(),
+    status: canonicalTopicStatusEnum("status").notNull().default("active"),
+    summary: text("summary").notNull(),
+    ongoing: boolean("ongoing").notNull().default(false),
+    relevance: real("relevance").notNull(),
+    episodeCount: integer("episode_count").notNull().default(0),
+    identityEmbedding: vector("identity_embedding", {
+      dimensions: EMBEDDING_DIM,
+    }).notNull(),
+    contextEmbedding: vector("context_embedding", {
+      dimensions: EMBEDDING_DIM,
+    }).notNull(),
+    embeddingModelVersion: varchar("embedding_model_version")
+      .notNull()
+      .default(EMBEDDING_MODEL),
+    // Self-FK: only set when status = 'merged'; callback form breaks the circular type reference.
+    mergedIntoId: integer("merged_into_id").references(
+      (): AnyPgColumn => canonicalTopics.id,
+      { onDelete: "restrict" },
+    ),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    lastSeen: timestamp("last_seen").defaultNow().notNull(),
+  },
+  (table) => [
+    // HNSW vector indexes (ADR-043: m=16, ef_construction=64, cosine distance)
+    index("ct_identity_embedding_hnsw_idx")
+      .using("hnsw", table.identityEmbedding.op("vector_cosine_ops"))
+      .with({ m: 16, ef_construction: 64 }),
+    index("ct_context_embedding_hnsw_idx")
+      .using("hnsw", table.contextEmbedding.op("vector_cosine_ops"))
+      .with({ m: 16, ef_construction: 64 }),
+    // Partial unique: same (normalizedLabel, kind) pair may exist as dormant/merged
+    uniqueIndex("ct_normalized_label_kind_active_uidx")
+      .on(sql`lower(${table.normalizedLabel})`, table.kind)
+      .where(sql`${table.status} = 'active'`),
+    index("ct_merged_into_id_idx").on(table.mergedIntoId),
+    // Schema-level integrity (ADR-042 §"Invariants enforced at the DB layer")
+    check(
+      "ct_merged_biconditional",
+      sql`(${table.status} = 'merged' AND ${table.mergedIntoId} IS NOT NULL) OR (${table.status} <> 'merged' AND ${table.mergedIntoId} IS NULL)`,
+    ),
+    check(
+      "ct_no_self_merge",
+      sql`${table.mergedIntoId} IS NULL OR ${table.mergedIntoId} <> ${table.id}`,
+    ),
+    check(
+      "ct_relevance_range",
+      sql`${table.relevance} >= 0 AND ${table.relevance} <= 1`,
+    ),
+    check("ct_episode_count_gte_0", sql`${table.episodeCount} >= 0`),
+    check("ct_label_not_blank", sql`length(btrim(${table.label})) > 0`),
+    check(
+      "ct_normalized_label_not_blank",
+      sql`length(btrim(${table.normalizedLabel})) > 0`,
+    ),
+    check("ct_summary_not_blank", sql`length(btrim(${table.summary})) > 0`),
+  ],
+);
+
+// Aliases for canonical topics (admin + resolver)
+export const canonicalTopicAliases = pgTable(
+  "canonical_topic_aliases",
+  {
+    id: serial("id").primaryKey(),
+    canonicalTopicId: integer("canonical_topic_id")
+      .references(() => canonicalTopics.id, { onDelete: "cascade" })
+      .notNull(),
+    alias: text("alias").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("cta_topic_alias_lower_uidx").on(
+      table.canonicalTopicId,
+      sql`lower(${table.alias})`,
+    ),
+    check("cta_alias_not_blank", sql`length(btrim(${table.alias})) > 0`),
+  ],
+);
+
+// Junction: episode ↔ canonical_topic (one row per resolved (episode, topic) pair)
+export const episodeCanonicalTopics = pgTable(
+  "episode_canonical_topics",
+  {
+    id: serial("id").primaryKey(),
+    episodeId: integer("episode_id")
+      .references(() => episodes.id, { onDelete: "cascade" })
+      .notNull(),
+    canonicalTopicId: integer("canonical_topic_id")
+      .references(() => canonicalTopics.id, { onDelete: "cascade" })
+      .notNull(),
+    matchMethod: text("match_method")
+      .$type<"auto" | "llm_disambig" | "new">()
+      .notNull(),
+    similarityToTopMatch: real("similarity_to_top_match"),
+    coverageScore: real("coverage_score").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("ect_episode_canonical_uidx").on(
+      table.episodeId,
+      table.canonicalTopicId,
+    ),
+    index("ect_canonical_id_idx").on(table.canonicalTopicId),
+    check(
+      "ect_match_method_enum",
+      sql`${table.matchMethod} IN ('auto', 'llm_disambig', 'new')`,
+    ),
+    check(
+      "ect_coverage_score_range",
+      sql`${table.coverageScore} >= 0 AND ${table.coverageScore} <= 1`,
+    ),
+    check(
+      "ect_similarity_range",
+      sql`${table.similarityToTopMatch} IS NULL OR (${table.similarityToTopMatch} >= 0 AND ${table.similarityToTopMatch} <= 1)`,
+    ),
+  ],
+);
+
 // Relations
 export const usersRelations = relations(users, ({ many, one }) => ({
   subscriptions: many(userSubscriptions),
@@ -467,6 +619,7 @@ export const episodesRelations = relations(episodes, ({ one, many }) => ({
   notifications: many(notifications),
   listenHistory: many(listenHistory),
   topics: many(episodeTopics),
+  canonicalTopics: many(episodeCanonicalTopics),
 }));
 
 export const episodeTopicsRelations = relations(episodeTopics, ({ one }) => ({
@@ -573,6 +726,44 @@ export const userPlayerSessionRelations = relations(
     user: one(users, {
       fields: [userPlayerSession.userId],
       references: [users.id],
+    }),
+  }),
+);
+
+export const canonicalTopicsRelations = relations(
+  canonicalTopics,
+  ({ one, many }) => ({
+    mergedInto: one(canonicalTopics, {
+      fields: [canonicalTopics.mergedIntoId],
+      references: [canonicalTopics.id],
+      relationName: "merged_topics",
+    }),
+    mergedFrom: many(canonicalTopics, { relationName: "merged_topics" }),
+    aliases: many(canonicalTopicAliases),
+    episodes: many(episodeCanonicalTopics),
+  }),
+);
+
+export const canonicalTopicAliasesRelations = relations(
+  canonicalTopicAliases,
+  ({ one }) => ({
+    canonicalTopic: one(canonicalTopics, {
+      fields: [canonicalTopicAliases.canonicalTopicId],
+      references: [canonicalTopics.id],
+    }),
+  }),
+);
+
+export const episodeCanonicalTopicsRelations = relations(
+  episodeCanonicalTopics,
+  ({ one }) => ({
+    episode: one(episodes, {
+      fields: [episodeCanonicalTopics.episodeId],
+      references: [episodes.id],
+    }),
+    canonicalTopic: one(canonicalTopics, {
+      fields: [episodeCanonicalTopics.canonicalTopicId],
+      references: [canonicalTopics.id],
     }),
   }),
 );
@@ -709,3 +900,16 @@ export type _QueueItemsPiIdBranded = _Assert<
 export type _PlayerSessionPiIdBranded = _Assert<
   _TypesMatch<UserPlayerSession["episodeId"], PodcastIndexEpisodeId>
 >;
+
+export type CanonicalTopic = typeof canonicalTopics.$inferSelect;
+export type NewCanonicalTopic = typeof canonicalTopics.$inferInsert;
+export type CanonicalTopicKind =
+  (typeof canonicalTopicKindEnum.enumValues)[number];
+export type CanonicalTopicStatus =
+  (typeof canonicalTopicStatusEnum.enumValues)[number];
+
+export type CanonicalTopicAlias = typeof canonicalTopicAliases.$inferSelect;
+export type NewCanonicalTopicAlias = typeof canonicalTopicAliases.$inferInsert;
+export type EpisodeCanonicalTopic = typeof episodeCanonicalTopics.$inferSelect;
+export type NewEpisodeCanonicalTopic =
+  typeof episodeCanonicalTopics.$inferInsert;
