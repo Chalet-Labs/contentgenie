@@ -8,7 +8,7 @@ import { sql } from "drizzle-orm";
 import { db } from "@/db";
 import { canonicalTopics, canonicalTopicDigests } from "@/db/schema";
 import { EMBEDDING_DIMENSION } from "@/lib/ai/embed-constants";
-import { expectInsertRejects } from "./schema-test-helpers";
+import { expectInsertRejects } from "@/db/__tests__/schema-test-helpers";
 
 // Stable fixture embedding — content irrelevant for constraint tests.
 const EMBEDDING = Array.from({ length: EMBEDDING_DIMENSION }, () => 0.001);
@@ -52,13 +52,13 @@ describe.skipIf(!process.env.DATABASE_URL)(
       // Deleting the parent canonical_topics row cascades digest cleanup
       // via the FK ON DELETE CASCADE.
       await db.execute(
-        sql`DELETE FROM canonical_topics WHERE starts_with(label, '__schema_test_')`,
+        sql`DELETE FROM canonical_topics WHERE starts_with(label, '__schema_test_digest_')`,
       );
     });
 
     afterEach(async () => {
       await db.execute(
-        sql`DELETE FROM canonical_topic_digests WHERE canonical_topic_id IN (SELECT id FROM canonical_topics WHERE starts_with(label, '__schema_test_'))`,
+        sql`DELETE FROM canonical_topic_digests WHERE canonical_topic_id IN (SELECT id FROM canonical_topics WHERE starts_with(label, '__schema_test_digest_'))`,
       );
     });
 
@@ -125,8 +125,8 @@ describe.skipIf(!process.env.DATABASE_URL)(
       const [tmp] = await db
         .insert(canonicalTopics)
         .values({
-          label: "__schema_test_cascade",
-          normalizedLabel: "__schema_test_cascade",
+          label: "__schema_test_digest_cascade",
+          normalizedLabel: "__schema_test_digest_cascade",
           kind: "concept",
           status: "active",
           summary: "__schema_test_summary",

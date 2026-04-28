@@ -20,6 +20,7 @@ export async function expectInsertRejects(
   constraint?: string,
 ) {
   const err = await insertPromise.catch((e: unknown) => e);
+  expect(err).toBeDefined();
   expect(pgCode(err)).toBe(sqlstate);
   if (constraint) expect(pgConstraint(err)).toBe(constraint);
 }

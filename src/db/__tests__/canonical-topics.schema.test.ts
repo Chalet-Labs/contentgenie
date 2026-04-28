@@ -15,7 +15,7 @@ import {
   EMBEDDING_DIMENSION as EMBEDDING_DIM,
   EMBEDDING_MODEL,
 } from "@/lib/ai/embed-constants";
-import { expectInsertRejects } from "./schema-test-helpers";
+import { expectInsertRejects } from "@/db/__tests__/schema-test-helpers";
 
 // Stable 1024-dim fixture — content irrelevant for constraint tests.
 const EMBEDDING = Array.from({ length: EMBEDDING_DIM }, () => 0.001);
