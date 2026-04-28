@@ -15,12 +15,14 @@ vi.mock("next/link", () => ({
     href,
     children,
     className,
+    "aria-label": ariaLabel,
   }: {
     href: string;
     children: React.ReactNode;
     className?: string;
+    "aria-label"?: string;
   }) => (
-    <a href={href} className={className}>
+    <a href={href} className={className} aria-label={ariaLabel}>
       {children}
     </a>
   ),
@@ -178,5 +180,24 @@ describe("EpisodeCard (podcasts wrapper)", () => {
       screen.queryByRole("button", { name: "Mark as listened" }),
     ).toBeNull();
     expect(screen.getByLabelText("Already listened")).toBeInTheDocument();
+  });
+
+  it("forwards canonicalTopics to primitive — chip link is rendered", () => {
+    render(
+      <EpisodeCard
+        episode={mockEpisode}
+        canonicalTopics={[{ id: 7, label: "Creatine", kind: "concept" }]}
+      />,
+    );
+    expect(
+      screen.getByRole("link", { name: /Topic: Creatine/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("renders no Topic: link when canonicalTopics is omitted", () => {
+    render(<EpisodeCard episode={mockEpisode} />);
+    expect(
+      screen.queryByRole("link", { name: /Topic:/i }),
+    ).not.toBeInTheDocument();
   });
 });

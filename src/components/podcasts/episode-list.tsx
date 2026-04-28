@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { PodcastIndexEpisode } from "@/lib/podcastindex";
 import type { SummaryStatus } from "@/db/schema";
+import type { CanonicalTopicChip } from "@/db/library-columns";
 import {
   asPodcastIndexEpisodeId,
   type PodcastIndexEpisodeId,
@@ -30,6 +31,14 @@ interface EpisodeListProps {
    * chips — episodes without summaries simply show nothing here.
    */
   topicsByPodcastIndexId?: Record<PodcastIndexEpisodeId, string[]>;
+  /**
+   * Canonical topic chips per episode, keyed by PodcastIndex id. Top 3 per
+   * episode, pre-filtered to active status by the batch fetcher.
+   */
+  canonicalTopicsByPodcastIndexId?: Record<
+    PodcastIndexEpisodeId,
+    CanonicalTopicChip[]
+  >;
 }
 
 export function EpisodeList({
@@ -41,6 +50,7 @@ export function EpisodeList({
   listenedIds,
   knownIds,
   topicsByPodcastIndexId,
+  canonicalTopicsByPodcastIndexId,
 }: EpisodeListProps) {
   const [query, setQuery] = useState("");
   const trimmedQuery = query.trim();
@@ -121,6 +131,7 @@ export function EpisodeList({
               isListened={listenedSet.has(piId)}
               canMarkListened={knownSet ? knownSet.has(piId) : true}
               topics={topicsByPodcastIndexId?.[piId]}
+              canonicalTopics={canonicalTopicsByPodcastIndexId?.[piId]}
             />
           );
         })

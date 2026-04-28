@@ -7,6 +7,7 @@ import { formatDuration, formatPublishDate } from "@/lib/podcastindex";
 import { asPodcastIndexEpisodeId } from "@/types/ids";
 import { stripHtml } from "@/lib/utils";
 import type { SummaryStatus } from "@/db/schema";
+import type { CanonicalTopicChip } from "@/db/library-columns";
 import { AddToQueueButton } from "@/components/audio-player/add-to-queue-button";
 import { PlayEpisodeButton } from "@/components/audio-player/play-episode-button";
 import { ListenedButton } from "@/components/episodes/listened-button";
@@ -21,6 +22,8 @@ interface EpisodeCardProps {
   canMarkListened?: boolean;
   /** Top topics for this episode, rendered as chips under the title (primitive caps at 3). */
   topics?: string[];
+  /** Canonical topic chips rendered below category badges (capped at 3 by primitive). */
+  canonicalTopics?: CanonicalTopicChip[];
 }
 
 export function EpisodeCard({
@@ -31,6 +34,7 @@ export function EpisodeCard({
   isListened = false,
   canMarkListened = true,
   topics,
+  canonicalTopics,
 }: EpisodeCardProps) {
   // PodcastIndex API id (number|string) → branded string.
   const piId = asPodcastIndexEpisodeId(String(episode.id));
@@ -108,6 +112,7 @@ export function EpisodeCard({
       score={worthItScore ?? undefined}
       status={summaryStatus}
       topics={topics}
+      canonicalTopics={canonicalTopics}
       meta={meta}
       primaryAction={primaryAction}
       secondaryActions={secondaryActions}

@@ -12,6 +12,7 @@ import {
   PODCAST_LIST_COLUMNS,
   COLLECTION_LIST_COLUMNS,
   type SavedItemDTO,
+  type CanonicalTopicChip,
 } from "@/db/library-columns";
 import { saveEpisodeSchema, safeParseDate } from "@/lib/schemas/library";
 import type { PodcastIndexEpisodeId } from "@/types/ids";
@@ -231,6 +232,14 @@ export async function getUserLibrary(
             podcast: {
               columns: PODCAST_LIST_COLUMNS,
             },
+            canonicalTopics: {
+              columns: { coverageScore: true },
+              with: {
+                canonicalTopic: {
+                  columns: { id: true, label: true, kind: true, status: true },
+                },
+              },
+            },
           },
         },
         collection: {
@@ -270,7 +279,29 @@ export async function getUserLibrary(
       return sortDirection === "asc" ? -comparison : comparison;
     });
 
-    return { items: sortedItems, error: null };
+    // Collapse junction rows → CanonicalTopicChip[]: active-only, top-3 by coverageScore desc
+    const mappedItems: SavedItemDTO[] = sortedItems.map((item) => {
+      const chips: CanonicalTopicChip[] = (item.episode.canonicalTopics ?? [])
+        .filter((j) => j.canonicalTopic?.status === "active")
+        .sort((a, b) => (b.coverageScore ?? 0) - (a.coverageScore ?? 0))
+        .slice(0, 3)
+        .map((j) => ({
+          id: j.canonicalTopic.id,
+          label: j.canonicalTopic.label,
+          kind: j.canonicalTopic.kind,
+          status: j.canonicalTopic.status,
+        }));
+
+      return {
+        ...item,
+        episode: {
+          ...item.episode,
+          canonicalTopics: chips.length > 0 ? chips : undefined,
+        },
+      };
+    });
+
+    return { items: mappedItems, error: null };
   } catch (error) {
     console.error("Error fetching library:", error);
     return { items: [], error: "Failed to load library" };
