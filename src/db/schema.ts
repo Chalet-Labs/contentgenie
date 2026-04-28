@@ -7,6 +7,7 @@ import {
   integer,
   serial,
   json,
+  jsonb,
   decimal,
   real,
   index,
@@ -593,6 +594,33 @@ export const episodeCanonicalTopics = pgTable(
   ],
 );
 
+// Cache table: per-canonical-topic synthesis digest (staleness gate: ADR-042 §"Digest staleness")
+export const canonicalTopicDigests = pgTable(
+  "canonical_topic_digests",
+  {
+    id: serial("id").primaryKey(),
+    canonicalTopicId: integer("canonical_topic_id")
+      .references(() => canonicalTopics.id, { onDelete: "cascade" })
+      .notNull(),
+    digestMarkdown: text("digest_markdown").notNull(),
+    consensusPoints: jsonb("consensus_points").$type<string[]>().notNull(),
+    disagreementPoints: jsonb("disagreement_points")
+      .$type<string[]>()
+      .notNull(),
+    episodeIds: integer("episode_ids").array().notNull(),
+    episodeCountAtGeneration: integer("episode_count_at_generation").notNull(),
+    modelUsed: text("model_used").notNull(),
+    generatedAt: timestamp("generated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("ctd_canonical_topic_uidx").on(table.canonicalTopicId),
+    check(
+      "ctd_episode_count_gte_0",
+      sql`${table.episodeCountAtGeneration} >= 0`,
+    ),
+  ],
+);
+
 // Relations
 export const usersRelations = relations(users, ({ many, one }) => ({
   subscriptions: many(userSubscriptions),
@@ -741,6 +769,11 @@ export const canonicalTopicsRelations = relations(
     mergedFrom: many(canonicalTopics, { relationName: "merged_topics" }),
     aliases: many(canonicalTopicAliases),
     episodes: many(episodeCanonicalTopics),
+    // FK lives on canonical_topic_digests.canonical_topic_id; the inverse side
+    // declares fields/references in canonicalTopicDigestsRelations below. Wiring
+    // them here too would make Drizzle infer a non-nullable `digest` even though
+    // a canonical may have no cached digest yet.
+    digest: one(canonicalTopicDigests),
   }),
 );
 
@@ -763,6 +796,16 @@ export const episodeCanonicalTopicsRelations = relations(
     }),
     canonicalTopic: one(canonicalTopics, {
       fields: [episodeCanonicalTopics.canonicalTopicId],
+      references: [canonicalTopics.id],
+    }),
+  }),
+);
+
+export const canonicalTopicDigestsRelations = relations(
+  canonicalTopicDigests,
+  ({ one }) => ({
+    canonicalTopic: one(canonicalTopics, {
+      fields: [canonicalTopicDigests.canonicalTopicId],
       references: [canonicalTopics.id],
     }),
   }),
@@ -913,3 +956,6 @@ export type NewCanonicalTopicAlias = typeof canonicalTopicAliases.$inferInsert;
 export type EpisodeCanonicalTopic = typeof episodeCanonicalTopics.$inferSelect;
 export type NewEpisodeCanonicalTopic =
   typeof episodeCanonicalTopics.$inferInsert;
+
+export type CanonicalTopicDigest = typeof canonicalTopicDigests.$inferSelect;
+export type NewCanonicalTopicDigest = typeof canonicalTopicDigests.$inferInsert;

@@ -15,6 +15,7 @@ import {
   EMBEDDING_DIMENSION as EMBEDDING_DIM,
   EMBEDDING_MODEL,
 } from "@/lib/ai/embed-constants";
+import { expectInsertRejects } from "@/db/__tests__/schema-test-helpers";
 
 // Stable 1024-dim fixture — content irrelevant for constraint tests.
 const EMBEDDING = Array.from({ length: EMBEDDING_DIM }, () => 0.001);
@@ -33,35 +34,6 @@ const validTopic = {
   contextEmbedding: EMBEDDING,
   embeddingModelVersion: EMBEDDING_MODEL,
 };
-
-// Helper: look for a Postgres SQLSTATE code on the thrown error.
-// The Neon HTTP driver wraps the NeonDbError in `err.cause` rather than
-// surfacing it directly on the thrown object.
-function pgCode(err: unknown): string | undefined {
-  const e = err as { code?: string; cause?: { code?: string } };
-  return e?.cause?.code ?? e?.code;
-}
-
-// Helper: pull the violated constraint name out of a Postgres error so
-// individual constraint tests can pin to the specific check, not just the
-// SQLSTATE class.
-function pgConstraint(err: unknown): string | undefined {
-  const e = err as { constraint?: string; cause?: { constraint?: string } };
-  return e?.cause?.constraint ?? e?.constraint;
-}
-
-// Wrap an insert/update promise and assert it rejects with the given SQLSTATE
-// (and optional constraint name). Centralises the awkward `.catch((e) => e)`
-// pattern so each constraint test reads as a single expectation.
-async function expectInsertRejects(
-  insertPromise: Promise<unknown>,
-  sqlstate: "23514" | "23505",
-  constraint?: string,
-) {
-  const err = await insertPromise.catch((e: unknown) => e);
-  expect(pgCode(err)).toBe(sqlstate);
-  if (constraint) expect(pgConstraint(err)).toBe(constraint);
-}
 
 // Helper: insert a minimal valid episode fixture for junction tests.
 // Returns the episode id from the first episode that exists in the DB.
