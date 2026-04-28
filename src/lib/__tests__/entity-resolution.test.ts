@@ -296,7 +296,10 @@ describe("resolveTopic", () => {
           rows: [{ id: 5, kind: "release" }],
         },
         { match: "UPDATE canonical_topics", rows: [] },
-        { match: "INSERT INTO canonical_topic_aliases", rows: [{ id: 1 }] },
+        {
+          match: "INSERT INTO canonical_topic_aliases",
+          rows: [{ id: 1 }, { id: 2 }],
+        },
         { match: "INSERT INTO episode_canonical_topics", rows: [] },
       ]);
 
@@ -304,9 +307,8 @@ describe("resolveTopic", () => {
         makeInput({ aliases: ["existing", "new"] }),
       );
 
-      // Both alias inserts hit the same fixture (returns 1 row each), so the
-      // total is 2. DB-level dedup on the partial unique index is asserted by
-      // the schema-level integration test, not this mock-based test.
+      // Batch INSERT returns 2 rows (one per newly inserted alias). DB-level
+      // dedup on the partial unique index is asserted by the integration test.
       expect(result.aliasesAdded).toBe(2);
       expect(result.matchMethod).toBe("auto");
     });

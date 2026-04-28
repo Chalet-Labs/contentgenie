@@ -154,8 +154,10 @@ export function hasVersionTokenMismatch(a: string, b: string): boolean {
 }
 
 function extractVersionTokens(label: string): Set<string> {
-  const re = new RegExp(VERSION_TOKEN_REGEX.source, VERSION_TOKEN_REGEX.flags);
-  const matches = Array.from(label.toLowerCase().matchAll(re), (m) => m[0]);
+  const matches = Array.from(
+    label.toLowerCase().matchAll(VERSION_TOKEN_REGEX),
+    (m) => m[0],
+  );
   return new Set(matches);
 }
 
@@ -238,18 +240,19 @@ async function upsertAliases(
   canonicalId: number,
   aliases: readonly string[],
 ): Promise<number> {
-  let inserted = 0;
-  for (const alias of aliases) {
-    if (alias.trim().length === 0) continue;
-    const result = await tx.execute(
-      sql`INSERT INTO canonical_topic_aliases (canonical_topic_id, alias)
-         VALUES (${canonicalId}, ${alias})
-         ON CONFLICT (canonical_topic_id, lower(alias)) DO NOTHING
-         RETURNING id`,
-    );
-    inserted += result.rows.length;
-  }
-  return inserted;
+  const valid = aliases.filter((a) => a.trim().length > 0);
+  if (valid.length === 0) return 0;
+  const values = sql.join(
+    valid.map((alias) => sql`(${canonicalId}, ${alias})`),
+    sql`, `,
+  );
+  const result = await tx.execute(
+    sql`INSERT INTO canonical_topic_aliases (canonical_topic_id, alias)
+       VALUES ${values}
+       ON CONFLICT (canonical_topic_id, lower(alias)) DO NOTHING
+       RETURNING id`,
+  );
+  return result.rows.length;
 }
 
 async function insertJunction(
