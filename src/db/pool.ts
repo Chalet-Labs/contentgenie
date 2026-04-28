@@ -3,7 +3,7 @@ import "server-only";
 import { Pool } from "@neondatabase/serverless";
 import { drizzle, type NeonDatabase } from "drizzle-orm/neon-serverless";
 
-import * as schema from "./schema";
+import * as schema from "@/db/schema";
 
 /**
  * Pool-backed Drizzle client + `transactional()` helper.

@@ -240,7 +240,7 @@ async function upsertAliases(
   canonicalId: number,
   aliases: readonly string[],
 ): Promise<number> {
-  const valid = aliases.filter((a) => a.trim().length > 0);
+  const valid = aliases.map((a) => a.trim()).filter((a) => a.length > 0);
   if (valid.length === 0) return 0;
   const values = sql.join(
     valid.map((alias) => sql`(${canonicalId}, ${alias})`),
