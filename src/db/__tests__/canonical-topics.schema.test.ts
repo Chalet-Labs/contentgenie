@@ -11,9 +11,13 @@ import {
   canonicalTopicAliases,
   episodeCanonicalTopics,
 } from "@/db/schema";
+import {
+  EMBEDDING_DIMENSION as EMBEDDING_DIM,
+  EMBEDDING_MODEL,
+} from "@/lib/ai/embed-constants";
 
 // Stable 1024-dim fixture — content irrelevant for constraint tests.
-const EMBEDDING = Array.from({ length: 1024 }, () => 0.001);
+const EMBEDDING = Array.from({ length: EMBEDDING_DIM }, () => 0.001);
 
 // Base row that satisfies every constraint (happy path).
 const validTopic = {
@@ -27,7 +31,7 @@ const validTopic = {
   episodeCount: 0,
   identityEmbedding: EMBEDDING,
   contextEmbedding: EMBEDDING,
-  embeddingModelVersion: "pplx-embed-v1-0.6b",
+  embeddingModelVersion: EMBEDDING_MODEL,
 };
 
 // Helper: look for a Postgres SQLSTATE code on the thrown error.
@@ -36,6 +40,27 @@ const validTopic = {
 function pgCode(err: unknown): string | undefined {
   const e = err as { code?: string; cause?: { code?: string } };
   return e?.cause?.code ?? e?.code;
+}
+
+// Helper: pull the violated constraint name out of a Postgres error so
+// individual constraint tests can pin to the specific check, not just the
+// SQLSTATE class.
+function pgConstraint(err: unknown): string | undefined {
+  const e = err as { constraint?: string; cause?: { constraint?: string } };
+  return e?.cause?.constraint ?? e?.constraint;
+}
+
+// Wrap an insert/update promise and assert it rejects with the given SQLSTATE
+// (and optional constraint name). Centralises the awkward `.catch((e) => e)`
+// pattern so each constraint test reads as a single expectation.
+async function expectInsertRejects(
+  insertPromise: Promise<unknown>,
+  sqlstate: "23514" | "23505",
+  constraint?: string,
+) {
+  const err = await insertPromise.catch((e: unknown) => e);
+  expect(pgCode(err)).toBe(sqlstate);
+  if (constraint) expect(pgConstraint(err)).toBe(constraint);
 }
 
 // Helper: insert a minimal valid episode fixture for junction tests.
@@ -72,13 +97,21 @@ describe.skipIf(!process.env.DATABASE_URL)(
 
     afterAll(async () => {
       await db.execute(
+        sql`DELETE FROM canonical_topic_aliases WHERE canonical_topic_id IN (SELECT id FROM canonical_topics WHERE label LIKE '__schema_test_%')`,
+      );
+      await db.execute(
         sql`DELETE FROM canonical_topics WHERE label LIKE '__schema_test_%'`,
       );
     });
 
     afterEach(async () => {
-      // Remove any test rows inserted mid-test (excluding the fixture row
-      // which is cleaned up in afterAll).
+      // Remove any test rows inserted mid-test. Aliases attached to the
+      // long-lived fixture topic are cleaned out too so alias-uniqueness
+      // tests can re-use the same alias text without leaking into the
+      // next case.
+      await db.execute(
+        sql`DELETE FROM canonical_topic_aliases WHERE canonical_topic_id IN (SELECT id FROM canonical_topics WHERE label LIKE '__schema_test_%')`,
+      );
       await db.execute(
         sql`DELETE FROM canonical_topics WHERE label LIKE '__schema_test_%' AND label != '__schema_test_fixture'`,
       );
@@ -87,41 +120,57 @@ describe.skipIf(!process.env.DATABASE_URL)(
       );
     });
 
-    // Happy path — guard against silent schema drift on the basic insert path.
-    it("inserts a fully-valid canonical_topic row", async () => {
+    // Happy path — guard against silent schema drift on the basic insert path,
+    // including the column defaults that aren't explicitly set in `validTopic`.
+    it("inserts a fully-valid canonical_topic row with expected defaults", async () => {
+      // Use a row that omits status / ongoing / episodeCount /
+      // embeddingModelVersion so the DB defaults flow through.
       const [row] = await db
         .insert(canonicalTopics)
-        .values({ ...validTopic, label: "__schema_test_happy_path" })
-        .returning({ id: canonicalTopics.id });
+        .values({
+          label: "__schema_test_happy_path",
+          normalizedLabel: "__schema_test_happy_path",
+          kind: "concept",
+          summary: "__schema_test_summary",
+          relevance: 0.5,
+          identityEmbedding: EMBEDDING,
+          contextEmbedding: EMBEDDING,
+        })
+        .returning();
       expect(row.id).toBeTypeOf("number");
+      expect(row.status).toBe("active");
+      expect(row.ongoing).toBe(false);
+      expect(row.episodeCount).toBe(0);
+      expect(row.embeddingModelVersion).toBe(EMBEDDING_MODEL);
     });
 
     // 1. Biconditional direction A — merged with NULL target is rejected.
     it("rejects status=merged with merged_into_id=NULL (ct_merged_biconditional A)", async () => {
-      const err = await db
-        .insert(canonicalTopics)
-        .values({
+      await expectInsertRejects(
+        db.insert(canonicalTopics).values({
           ...validTopic,
           label: "__schema_test_bicond_a",
           status: "merged",
           mergedIntoId: null,
-        })
-        .catch((e) => e);
-      expect(pgCode(err)).toBe("23514");
+        }),
+        "23514",
+        "ct_merged_biconditional",
+      );
     });
 
-    // 2. Biconditional direction B — active with a non-null target is rejected.
-    it("rejects status=active with merged_into_id set (ct_merged_biconditional B)", async () => {
-      const err = await db
-        .insert(canonicalTopics)
-        .values({
+    // 2. Biconditional direction B — any non-merged status with a target id is
+    //    rejected (the constraint covers active *and* dormant equally).
+    it("rejects status<>'merged' with merged_into_id set (ct_merged_biconditional B)", async () => {
+      await expectInsertRejects(
+        db.insert(canonicalTopics).values({
           ...validTopic,
           label: "__schema_test_bicond_b",
           status: "active",
           mergedIntoId: fixtureTopicId,
-        })
-        .catch((e) => e);
-      expect(pgCode(err)).toBe("23514");
+        }),
+        "23514",
+        "ct_merged_biconditional",
+      );
     });
 
     // 3. Self-merge ban — UPDATE to point merged_into_id at own id.
@@ -131,73 +180,194 @@ describe.skipIf(!process.env.DATABASE_URL)(
         .values({ ...validTopic, label: "__schema_test_self_merge" })
         .returning({ id: canonicalTopics.id });
 
-      const err = await db
-        .execute(
+      await expectInsertRejects(
+        db.execute(
           sql`UPDATE canonical_topics SET status = 'merged', merged_into_id = ${row.id} WHERE id = ${row.id}`,
-        )
-        .catch((e) => e);
-      expect(pgCode(err)).toBe("23514");
+        ),
+        "23514",
+        "ct_no_self_merge",
+      );
     });
 
     // 4. Relevance below 0.
     it("rejects relevance = -0.1 (ct_relevance_range)", async () => {
-      const err = await db
-        .insert(canonicalTopics)
-        .values({
+      await expectInsertRejects(
+        db.insert(canonicalTopics).values({
           ...validTopic,
           label: "__schema_test_rel_low",
           relevance: -0.1,
-        })
-        .catch((e) => e);
-      expect(pgCode(err)).toBe("23514");
+        }),
+        "23514",
+        "ct_relevance_range",
+      );
     });
 
     // 5. Relevance above 1.
     it("rejects relevance = 1.5 (ct_relevance_range)", async () => {
-      const err = await db
-        .insert(canonicalTopics)
-        .values({
+      await expectInsertRejects(
+        db.insert(canonicalTopics).values({
           ...validTopic,
           label: "__schema_test_rel_high",
           relevance: 1.5,
-        })
-        .catch((e) => e);
-      expect(pgCode(err)).toBe("23514");
+        }),
+        "23514",
+        "ct_relevance_range",
+      );
     });
 
     // 6. episode_count negative.
     it("rejects episode_count = -1 (ct_episode_count_gte_0)", async () => {
-      const err = await db
-        .insert(canonicalTopics)
-        .values({
+      await expectInsertRejects(
+        db.insert(canonicalTopics).values({
           ...validTopic,
           label: "__schema_test_count_neg",
           episodeCount: -1,
-        })
-        .catch((e) => e);
-      expect(pgCode(err)).toBe("23514");
+        }),
+        "23514",
+        "ct_episode_count_gte_0",
+      );
     });
 
     // 7. Blank label (whitespace only).
     it("rejects label = '   ' (ct_label_not_blank)", async () => {
-      const err = await db
-        .insert(canonicalTopics)
-        .values({ ...validTopic, label: "   " })
-        .catch((e) => e);
-      expect(pgCode(err)).toBe("23514");
+      await expectInsertRejects(
+        db.insert(canonicalTopics).values({ ...validTopic, label: "   " }),
+        "23514",
+        "ct_label_not_blank",
+      );
     });
 
     // 8. Blank summary (empty string).
     it("rejects summary = '' (ct_summary_not_blank)", async () => {
-      const err = await db
-        .insert(canonicalTopics)
-        .values({
+      await expectInsertRejects(
+        db.insert(canonicalTopics).values({
           ...validTopic,
           label: "__schema_test_blank_sum",
           summary: "",
+        }),
+        "23514",
+        "ct_summary_not_blank",
+      );
+    });
+
+    // Boundary positives — make sure inclusive ranges actually allow the edges.
+    it("accepts relevance = 0", async () => {
+      const [row] = await db
+        .insert(canonicalTopics)
+        .values({
+          ...validTopic,
+          label: "__schema_test_rel_zero",
+          relevance: 0,
         })
-        .catch((e) => e);
-      expect(pgCode(err)).toBe("23514");
+        .returning({ id: canonicalTopics.id });
+      expect(row.id).toBeTypeOf("number");
+    });
+
+    it("accepts relevance = 1", async () => {
+      const [row] = await db
+        .insert(canonicalTopics)
+        .values({
+          ...validTopic,
+          label: "__schema_test_rel_one",
+          relevance: 1,
+        })
+        .returning({ id: canonicalTopics.id });
+      expect(row.id).toBeTypeOf("number");
+    });
+
+    it("accepts coverage_score = 0", async () => {
+      const [row] = await db
+        .insert(episodeCanonicalTopics)
+        .values({
+          episodeId: fixtureEpisodeId,
+          canonicalTopicId: fixtureTopicId,
+          matchMethod: "auto",
+          coverageScore: 0,
+        })
+        .returning({ id: episodeCanonicalTopics.id });
+      expect(row.id).toBeTypeOf("number");
+    });
+
+    it("accepts coverage_score = 1", async () => {
+      const [row] = await db
+        .insert(episodeCanonicalTopics)
+        .values({
+          episodeId: fixtureEpisodeId,
+          canonicalTopicId: fixtureTopicId,
+          matchMethod: "auto",
+          coverageScore: 1,
+        })
+        .returning({ id: episodeCanonicalTopics.id });
+      expect(row.id).toBeTypeOf("number");
+    });
+
+    it("accepts similarity_to_top_match = 0", async () => {
+      const [row] = await db
+        .insert(episodeCanonicalTopics)
+        .values({
+          episodeId: fixtureEpisodeId,
+          canonicalTopicId: fixtureTopicId,
+          matchMethod: "auto",
+          coverageScore: 0.5,
+          similarityToTopMatch: 0,
+        })
+        .returning({ id: episodeCanonicalTopics.id });
+      expect(row.id).toBeTypeOf("number");
+    });
+
+    it("accepts similarity_to_top_match = 1", async () => {
+      const [row] = await db
+        .insert(episodeCanonicalTopics)
+        .values({
+          episodeId: fixtureEpisodeId,
+          canonicalTopicId: fixtureTopicId,
+          matchMethod: "auto",
+          coverageScore: 0.5,
+          similarityToTopMatch: 1,
+        })
+        .returning({ id: episodeCanonicalTopics.id });
+      expect(row.id).toBeTypeOf("number");
+    });
+
+    // State machine: walk a topic through active → merged → dormant and assert
+    // the FK / status combination round-trips cleanly via the biconditional.
+    it("supports active → merged → dormant transitions", async () => {
+      const [a] = await db
+        .insert(canonicalTopics)
+        .values({
+          ...validTopic,
+          label: "__schema_test_sm_a",
+          normalizedLabel: "__schema_test_sm_a",
+        })
+        .returning({ id: canonicalTopics.id });
+
+      const [b] = await db
+        .insert(canonicalTopics)
+        .values({
+          ...validTopic,
+          label: "__schema_test_sm_b",
+          normalizedLabel: "__schema_test_sm_b",
+        })
+        .returning({ id: canonicalTopics.id });
+
+      // active → merged (pointing at A) — must succeed.
+      await db.execute(
+        sql`UPDATE canonical_topics SET status = 'merged', merged_into_id = ${a.id} WHERE id = ${b.id}`,
+      );
+
+      // merged → dormant — clearing merged_into_id must succeed.
+      await db.execute(
+        sql`UPDATE canonical_topics SET status = 'dormant', merged_into_id = NULL WHERE id = ${b.id}`,
+      );
+
+      const after = await db.execute<{
+        status: string;
+        merged_into_id: number | null;
+      }>(
+        sql`SELECT status, merged_into_id FROM canonical_topics WHERE id = ${b.id}`,
+      );
+      expect(after.rows[0].status).toBe("dormant");
+      expect(after.rows[0].merged_into_id).toBeNull();
     });
 
     // 9. Partial unique index on (lower(normalized_label), kind) WHERE status='active'.
@@ -211,17 +381,17 @@ describe.skipIf(!process.env.DATABASE_URL)(
       });
 
       // Second active row with same pair — must fail.
-      const err = await db
-        .insert(canonicalTopics)
-        .values({
+      await expectInsertRejects(
+        db.insert(canonicalTopics).values({
           ...validTopic,
           label: "__schema_test_puidx_2",
           normalizedLabel: "__schema_test_puidx",
           kind: "concept",
           status: "active",
-        })
-        .catch((e) => e);
-      expect(pgCode(err)).toBe("23505");
+        }),
+        "23505",
+        "ct_normalized_label_kind_active_uidx",
+      );
 
       // Dormant row with same pair — must succeed (partial filter excludes it).
       const [dormant] = await db
@@ -239,45 +409,47 @@ describe.skipIf(!process.env.DATABASE_URL)(
 
     // 10. Junction match_method must be one of 'auto','llm_disambig','new'.
     it("rejects match_method='manual' (ect_match_method_enum)", async () => {
-      const err = await db
-        .insert(episodeCanonicalTopics)
-        .values({
+      await expectInsertRejects(
+        db.insert(episodeCanonicalTopics).values({
           episodeId: fixtureEpisodeId,
           canonicalTopicId: fixtureTopicId,
-          matchMethod: "manual" as any,
+          // 'manual' is not in the enum union; cast just to bypass the
+          // TypeScript-side narrowing so the DB constraint is what fails.
+          matchMethod: "manual" as unknown as "auto",
           coverageScore: 0.5,
-        })
-        .catch((e) => e);
-      expect(pgCode(err)).toBe("23514");
+        }),
+        "23514",
+        "ect_match_method_enum",
+      );
     });
 
     // 11. Junction coverage_score must be in [0,1].
     it("rejects coverage_score = 1.1 (ect_coverage_score_range)", async () => {
-      const err = await db
-        .insert(episodeCanonicalTopics)
-        .values({
+      await expectInsertRejects(
+        db.insert(episodeCanonicalTopics).values({
           episodeId: fixtureEpisodeId,
           canonicalTopicId: fixtureTopicId,
           matchMethod: "auto",
           coverageScore: 1.1,
-        })
-        .catch((e) => e);
-      expect(pgCode(err)).toBe("23514");
+        }),
+        "23514",
+        "ect_coverage_score_range",
+      );
     });
 
     // 12a. Junction similarity_to_top_match = -0.5 is rejected.
     it("rejects similarity_to_top_match = -0.5 (ect_similarity_range)", async () => {
-      const err = await db
-        .insert(episodeCanonicalTopics)
-        .values({
+      await expectInsertRejects(
+        db.insert(episodeCanonicalTopics).values({
           episodeId: fixtureEpisodeId,
           canonicalTopicId: fixtureTopicId,
           matchMethod: "auto",
           coverageScore: 0.5,
           similarityToTopMatch: -0.5,
-        })
-        .catch((e) => e);
-      expect(pgCode(err)).toBe("23514");
+        }),
+        "23514",
+        "ect_similarity_range",
+      );
     });
 
     // 12b. Junction similarity_to_top_match = NULL is accepted.
@@ -293,6 +465,80 @@ describe.skipIf(!process.env.DATABASE_URL)(
         })
         .returning({ id: episodeCanonicalTopics.id });
       expect(row.id).toBeTypeOf("number");
+    });
+
+    // 13. Junction (episode_id, canonical_topic_id) is unique.
+    it("rejects duplicate (episode_id, canonical_topic_id) pair (ect_episode_canonical_uidx)", async () => {
+      await db.insert(episodeCanonicalTopics).values({
+        episodeId: fixtureEpisodeId,
+        canonicalTopicId: fixtureTopicId,
+        matchMethod: "auto",
+        coverageScore: 0.5,
+      });
+
+      await expectInsertRejects(
+        db.insert(episodeCanonicalTopics).values({
+          episodeId: fixtureEpisodeId,
+          canonicalTopicId: fixtureTopicId,
+          matchMethod: "auto",
+          coverageScore: 0.6,
+        }),
+        "23505",
+        "ect_episode_canonical_uidx",
+      );
+    });
+
+    // 14. Aliases — unique per (canonical_topic, lower(alias)).
+    it("rejects case-insensitive duplicate alias on same canonical (cta_topic_alias_lower_uidx)", async () => {
+      await db.insert(canonicalTopicAliases).values({
+        canonicalTopicId: fixtureTopicId,
+        alias: "AcMe",
+      });
+
+      await expectInsertRejects(
+        db.insert(canonicalTopicAliases).values({
+          canonicalTopicId: fixtureTopicId,
+          alias: "acme",
+        }),
+        "23505",
+        "cta_topic_alias_lower_uidx",
+      );
+    });
+
+    // 15. The same alias text is allowed under a different canonical topic.
+    it("allows same alias text under different canonical topics", async () => {
+      const [other] = await db
+        .insert(canonicalTopics)
+        .values({
+          ...validTopic,
+          label: "__schema_test_alias_other",
+          normalizedLabel: "__schema_test_alias_other",
+        })
+        .returning({ id: canonicalTopics.id });
+
+      const [a1] = await db
+        .insert(canonicalTopicAliases)
+        .values({ canonicalTopicId: fixtureTopicId, alias: "acme" })
+        .returning({ id: canonicalTopicAliases.id });
+      const [a2] = await db
+        .insert(canonicalTopicAliases)
+        .values({ canonicalTopicId: other.id, alias: "acme" })
+        .returning({ id: canonicalTopicAliases.id });
+
+      expect(a1.id).toBeTypeOf("number");
+      expect(a2.id).toBeTypeOf("number");
+    });
+
+    // 16. Aliases must not be blank (whitespace-only).
+    it("rejects blank alias (cta_alias_not_blank)", async () => {
+      await expectInsertRejects(
+        db.insert(canonicalTopicAliases).values({
+          canonicalTopicId: fixtureTopicId,
+          alias: "   ",
+        }),
+        "23514",
+        "cta_alias_not_blank",
+      );
     });
   },
 );
