@@ -96,11 +96,13 @@ describe.skipIf(!process.env.DATABASE_URL)(
     });
 
     afterAll(async () => {
+      // Underscores are LIKE wildcards — use starts_with for a literal-prefix match
+      // so cleanup never collides with unrelated rows on a shared dev DB.
       await db.execute(
-        sql`DELETE FROM canonical_topic_aliases WHERE canonical_topic_id IN (SELECT id FROM canonical_topics WHERE label LIKE '__schema_test_%')`,
+        sql`DELETE FROM canonical_topic_aliases WHERE canonical_topic_id IN (SELECT id FROM canonical_topics WHERE starts_with(label, '__schema_test_'))`,
       );
       await db.execute(
-        sql`DELETE FROM canonical_topics WHERE label LIKE '__schema_test_%'`,
+        sql`DELETE FROM canonical_topics WHERE starts_with(label, '__schema_test_')`,
       );
     });
 
@@ -110,10 +112,10 @@ describe.skipIf(!process.env.DATABASE_URL)(
       // tests can re-use the same alias text without leaking into the
       // next case.
       await db.execute(
-        sql`DELETE FROM canonical_topic_aliases WHERE canonical_topic_id IN (SELECT id FROM canonical_topics WHERE label LIKE '__schema_test_%')`,
+        sql`DELETE FROM canonical_topic_aliases WHERE canonical_topic_id IN (SELECT id FROM canonical_topics WHERE starts_with(label, '__schema_test_'))`,
       );
       await db.execute(
-        sql`DELETE FROM canonical_topics WHERE label LIKE '__schema_test_%' AND label != '__schema_test_fixture'`,
+        sql`DELETE FROM canonical_topics WHERE starts_with(label, '__schema_test_') AND label != '__schema_test_fixture'`,
       );
       await db.execute(
         sql`DELETE FROM episode_canonical_topics WHERE episode_id = ${fixtureEpisodeId} AND canonical_topic_id = ${fixtureTopicId}`,
@@ -234,6 +236,19 @@ describe.skipIf(!process.env.DATABASE_URL)(
         db.insert(canonicalTopics).values({ ...validTopic, label: "   " }),
         "23514",
         "ct_label_not_blank",
+      );
+    });
+
+    // 7b. Blank normalizedLabel (whitespace only) — guards the active uniqueness key.
+    it("rejects normalizedLabel = '   ' (ct_normalized_label_not_blank)", async () => {
+      await expectInsertRejects(
+        db.insert(canonicalTopics).values({
+          ...validTopic,
+          label: "__schema_test_blank_norm",
+          normalizedLabel: "   ",
+        }),
+        "23514",
+        "ct_normalized_label_not_blank",
       );
     });
 

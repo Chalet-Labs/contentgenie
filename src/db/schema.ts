@@ -526,6 +526,10 @@ export const canonicalTopics = pgTable(
     ),
     check("ct_episode_count_gte_0", sql`${table.episodeCount} >= 0`),
     check("ct_label_not_blank", sql`length(btrim(${table.label})) > 0`),
+    check(
+      "ct_normalized_label_not_blank",
+      sql`length(btrim(${table.normalizedLabel})) > 0`,
+    ),
     check("ct_summary_not_blank", sql`length(btrim(${table.summary})) > 0`),
   ],
 );
