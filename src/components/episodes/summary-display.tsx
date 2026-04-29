@@ -54,6 +54,7 @@ const STEP_ORDER: SummarizationStep[] = [
   "fetching-podcast",
   "generating-summary",
   "saving-results",
+  "resolving-topics",
 ];
 
 const DIMENSION_LABELS: Record<string, string> = {

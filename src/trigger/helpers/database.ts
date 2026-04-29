@@ -237,19 +237,19 @@ async function forceUpsertAliases(
   canonicalId: number,
   aliases: readonly string[],
 ): Promise<number> {
-  let aliasesAdded = 0;
-  for (const alias of aliases) {
-    const trimmed = alias.trim();
-    if (!trimmed) continue;
-    const aliasResult = await tx.execute(
-      sql`INSERT INTO canonical_topic_aliases (canonical_topic_id, alias)
-           VALUES (${canonicalId}, ${trimmed})
-           ON CONFLICT (canonical_topic_id, lower(alias)) DO NOTHING
-           RETURNING id`,
-    );
-    if (aliasResult.rows.length > 0) aliasesAdded++;
-  }
-  return aliasesAdded;
+  const valid = aliases.map((a) => a.trim()).filter((a) => a.length > 0);
+  if (valid.length === 0) return 0;
+  const values = sql.join(
+    valid.map((alias) => sql`(${canonicalId}, ${alias})`),
+    sql`, `,
+  );
+  const result = await tx.execute(
+    sql`INSERT INTO canonical_topic_aliases (canonical_topic_id, alias)
+         VALUES ${values}
+         ON CONFLICT (canonical_topic_id, lower(alias)) DO NOTHING
+         RETURNING id`,
+  );
+  return result.rows.length;
 }
 
 /**

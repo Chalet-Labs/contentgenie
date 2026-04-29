@@ -138,11 +138,14 @@ export type EntityResolutionReason =
 
 export class EntityResolutionError extends Error {
   readonly name = "EntityResolutionError" as const;
+  /** True when the LLM disambiguator was called but a later step failed. */
+  readonly usedDisambiguator: boolean;
   constructor(
     readonly reason: EntityResolutionReason,
-    options?: { cause?: unknown },
+    options?: { cause?: unknown; usedDisambiguator?: boolean },
   ) {
     super(reason, options);
+    this.usedDisambiguator = options?.usedDisambiguator ?? false;
   }
 }
 
@@ -361,15 +364,28 @@ export async function resolveTopic(
   }
 
   const chosenId = await callDisambiguator(input, tx1Result.candidates);
-  return transactional<ResolveTopicResult>(async (tx2) =>
-    runTx2(
-      tx2 as unknown as Tx,
-      input,
-      tx1Result.candidates,
-      chosenId,
-      tx1Result.versionTokenForcedDisambig,
-    ),
-  );
+  try {
+    return await transactional<ResolveTopicResult>(async (tx2) =>
+      runTx2(
+        tx2 as unknown as Tx,
+        input,
+        tx1Result.candidates,
+        chosenId,
+        tx1Result.versionTokenForcedDisambig,
+      ),
+    );
+  } catch (err) {
+    if (err instanceof EntityResolutionError) {
+      throw new EntityResolutionError(err.reason, {
+        cause: err,
+        usedDisambiguator: true,
+      });
+    }
+    throw new EntityResolutionError("conflict_recovery_failed", {
+      cause: err,
+      usedDisambiguator: true,
+    });
+  }
 }
 
 async function runTx1(

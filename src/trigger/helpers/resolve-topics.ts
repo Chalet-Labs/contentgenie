@@ -127,11 +127,11 @@ export async function resolveAndPersistEpisodeTopics(
         candidatesSamples.push(result.candidatesConsidered);
       resolved++;
     } catch (err) {
-      if (
-        err instanceof EntityResolutionError &&
-        err.reason === "other_below_relevance_floor"
-      ) {
-        continue;
+      if (err instanceof EntityResolutionError) {
+        if (err.usedDisambiguator) disambigCount++;
+        if (err.reason === "other_below_relevance_floor") {
+          continue;
+        }
       }
       failed++;
       logger.warn("[resolve-topics] per-topic failure", {

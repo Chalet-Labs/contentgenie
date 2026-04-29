@@ -194,6 +194,7 @@ describe("forceInsertNewCanonical", () => {
     const calls = getTxLog(0);
     const knnCalls = findCalls(calls, "<=>");
     expect(knnCalls).toHaveLength(0);
+    expect(findCalls(calls, "INSERT INTO canonical_topics")).toHaveLength(0);
   });
 
   it("inserts new canonical and writes junction with match_method='new' on exact-lookup miss", async () => {

@@ -41,7 +41,7 @@ The orchestrator's "force-new" path is **not** a raw `INSERT`. ADR-044 §3 (cano
 - Acquire `pg_advisory_xact_lock(hashtextextended(JSON.stringify([normalizeLabel(label), kind]), 0))`.
 - Run exact-lookup. If a row with `(lower(normalized_label), kind, status='active')` already exists, treat it as auto-match (similarity := 1.0) and skip the insert.
 - Otherwise run the existing "new" insert path (`INSERT ... ON CONFLICT DO NOTHING RETURNING id`); on zero-row return, exact-lookup again (recovery; never another kNN, per ADR-044 §4).
-- Write `episode_canonical_topics` with `match_method='new'` and the same coverage-score field as the resolver path.
+- Write `episode_canonical_topics`: the pre-insert exact-hit branch and the zero-row recovery branch use `match_method='auto'` (similarity := 1.0); only the true new-insert branch uses `match_method='new'` (similarity := null). The coverage-score field is identical across all three paths.
 
 Skipping the lock or the exact-lookup would re-introduce both failure modes ADR-044 explicitly closed:
 
@@ -50,7 +50,7 @@ Skipping the lock or the exact-lookup would re-introduce both failure modes ADR-
 
 Path-wise the helper is a strict subset of TX-1's new-insert tail. Implementation can either inline the SQL or reuse `transactional()` and the same SQL helpers in `entity-resolution.ts`; this ADR pins the _behaviour_ (lock + exact-lookup + insert + junction), not the source-code factoring.
 
-`match_method='new'` is correct on the over-budget path — the canonical was minted without a kNN-driven decision, the same as a pure new-insert, even though the cause is administrative rather than evidential. Future analytics can correlate `match_method='new'` rows with the orchestrator's `versionTokenForcedDisambig=false, candidatesConsidered=0` shape if it ever needs to break down "new because no neighbours" vs "new because over budget".
+`match_method='new'` is correct for the **true new-insert branch** of the over-budget path — the canonical was minted without a kNN-driven decision, the same as a pure new-insert, even though the cause is administrative rather than evidential. The pre-insert exact-hit branch and the zero-row recovery branch both use `match_method='auto'` (similarity := 1.0) because an existing canonical was found without inserting a new one. Future analytics can correlate `match_method='new'` rows with the orchestrator's `versionTokenForcedDisambig=false, candidatesConsidered=0` shape if it ever needs to break down "new because no neighbours" vs "new because over budget".
 
 ### 3. Resolution runs after summary persistence; failure never blocks summary
 
