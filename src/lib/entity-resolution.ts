@@ -80,7 +80,7 @@ interface PendingDisambig {
   versionTokenForcedDisambig: boolean;
 }
 
-type Tx = {
+export type Tx = {
   execute: (query: unknown) => Promise<{ rows: unknown[] }>;
 };
 
@@ -250,13 +250,16 @@ async function confirmCandidate(
   return row ?? null;
 }
 
-async function updateLastSeen(tx: Tx, canonicalId: number): Promise<void> {
+export async function updateLastSeen(
+  tx: Tx,
+  canonicalId: number,
+): Promise<void> {
   await tx.execute(
     sql`UPDATE canonical_topics SET last_seen = now() WHERE id = ${canonicalId}`,
   );
 }
 
-async function upsertAliases(
+export async function upsertAliases(
   tx: Tx,
   canonicalId: number,
   aliases: readonly string[],

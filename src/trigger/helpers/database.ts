@@ -11,9 +11,12 @@ import type {
 import {
   EntityResolutionError,
   normalizeLabel,
+  updateLastSeen,
+  upsertAliases,
   validateResolveTopicInput,
   type ResolveTopicInput,
   type ResolveTopicResult,
+  type Tx,
 } from "@/lib/entity-resolution";
 import { EXACT_MATCH_SIMILARITY } from "@/lib/entity-resolution-constants";
 import { transactional } from "@/db/pool";
@@ -160,8 +163,6 @@ export async function persistTranscript(
   }
 }
 
-type Tx = { execute: (query: unknown) => Promise<{ rows: unknown[] }> };
-
 function buildLockKey(label: string, kind: TopicKind): string {
   return JSON.stringify([normalizeLabel(label), kind]);
 }
@@ -223,32 +224,6 @@ async function forceWriteJunction(
   );
 }
 
-async function forceUpdateLastSeen(tx: Tx, canonicalId: number): Promise<void> {
-  await tx.execute(
-    sql`UPDATE canonical_topics SET last_seen = now() WHERE id = ${canonicalId}`,
-  );
-}
-
-async function forceUpsertAliases(
-  tx: Tx,
-  canonicalId: number,
-  aliases: readonly string[],
-): Promise<number> {
-  const valid = aliases.map((a) => a.trim()).filter((a) => a.length > 0);
-  if (valid.length === 0) return 0;
-  const values = sql.join(
-    valid.map((alias) => sql`(${canonicalId}, ${alias})`),
-    sql`, `,
-  );
-  const result = await tx.execute(
-    sql`INSERT INTO canonical_topic_aliases (canonical_topic_id, alias)
-         VALUES ${values}
-         ON CONFLICT (canonical_topic_id, lower(alias)) DO NOTHING
-         RETURNING id`,
-  );
-  return result.rows.length;
-}
-
 /**
  * Over-budget insert path: lock + exact-lookup + insert + junction.
  * Mirrors TX-1's new-insert tail without the kNN (ADR-045 §2).
@@ -267,12 +242,8 @@ export async function forceInsertNewCanonical(
 
     const exact = await forceExactLookup(rawTx, input.label, input.kind);
     if (exact !== null) {
-      await forceUpdateLastSeen(rawTx, exact.id);
-      const aliasesAdded = await forceUpsertAliases(
-        rawTx,
-        exact.id,
-        input.aliases,
-      );
+      await updateLastSeen(rawTx, exact.id);
+      const aliasesAdded = await upsertAliases(rawTx, exact.id, input.aliases);
       await forceWriteJunction(
         rawTx,
         input.episodeId,
@@ -302,12 +273,8 @@ export async function forceInsertNewCanonical(
       }
     }
 
-    await forceUpdateLastSeen(rawTx, canonicalId);
-    const aliasesAdded = await forceUpsertAliases(
-      rawTx,
-      canonicalId,
-      input.aliases,
-    );
+    await updateLastSeen(rawTx, canonicalId);
+    const aliasesAdded = await upsertAliases(rawTx, canonicalId, input.aliases);
 
     if (isRecovery) {
       await forceWriteJunction(
