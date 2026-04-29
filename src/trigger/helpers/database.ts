@@ -11,14 +11,11 @@ import type {
 import {
   EntityResolutionError,
   normalizeLabel,
+  validateResolveTopicInput,
   type ResolveTopicInput,
   type ResolveTopicResult,
 } from "@/lib/entity-resolution";
-import {
-  EXACT_MATCH_SIMILARITY,
-  OTHER_KIND_RELEVANCE_FLOOR,
-} from "@/lib/entity-resolution-constants";
-import { EMBEDDING_DIMENSION } from "@/lib/ai/embed-constants";
+import { EXACT_MATCH_SIMILARITY } from "@/lib/entity-resolution-constants";
 import { transactional } from "@/db/pool";
 import type { TopicKind } from "@/lib/openrouter";
 
@@ -259,21 +256,7 @@ async function forceUpsertAliases(
 export async function forceInsertNewCanonical(
   input: ResolveTopicInput,
 ): Promise<ResolveTopicResult> {
-  if (input.kind === "other" && input.relevance < OTHER_KIND_RELEVANCE_FLOOR) {
-    throw new EntityResolutionError("other_below_relevance_floor");
-  }
-  if (
-    input.identityEmbedding.length !== EMBEDDING_DIMENSION ||
-    input.contextEmbedding.length !== EMBEDDING_DIMENSION
-  ) {
-    throw new EntityResolutionError("invalid_embedding_dim");
-  }
-  if (
-    !input.identityEmbedding.every(Number.isFinite) ||
-    !input.contextEmbedding.every(Number.isFinite)
-  ) {
-    throw new EntityResolutionError("invalid_embedding_value");
-  }
+  validateResolveTopicInput(input);
 
   return transactional(async (tx) => {
     const rawTx = tx as unknown as Tx;

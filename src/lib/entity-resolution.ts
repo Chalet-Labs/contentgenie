@@ -149,6 +149,24 @@ export class EntityResolutionError extends Error {
   }
 }
 
+export function validateResolveTopicInput(input: ResolveTopicInput): void {
+  if (input.kind === "other" && input.relevance < OTHER_KIND_RELEVANCE_FLOOR) {
+    throw new EntityResolutionError("other_below_relevance_floor");
+  }
+  if (
+    input.identityEmbedding.length !== EMBEDDING_DIMENSION ||
+    input.contextEmbedding.length !== EMBEDDING_DIMENSION
+  ) {
+    throw new EntityResolutionError("invalid_embedding_dim");
+  }
+  if (
+    !input.identityEmbedding.every(Number.isFinite) ||
+    !input.contextEmbedding.every(Number.isFinite)
+  ) {
+    throw new EntityResolutionError("invalid_embedding_value");
+  }
+}
+
 export function hasVersionTokenMismatch(a: string, b: string): boolean {
   const tokensA = extractVersionTokens(a);
   const tokensB = extractVersionTokens(b);
@@ -339,21 +357,7 @@ async function finalizeMatch(
 export async function resolveTopic(
   input: ResolveTopicInput,
 ): Promise<ResolveTopicResult> {
-  if (
-    input.identityEmbedding.length !== EMBEDDING_DIMENSION ||
-    input.contextEmbedding.length !== EMBEDDING_DIMENSION
-  ) {
-    throw new EntityResolutionError("invalid_embedding_dim");
-  }
-  if (
-    !input.identityEmbedding.every(Number.isFinite) ||
-    !input.contextEmbedding.every(Number.isFinite)
-  ) {
-    throw new EntityResolutionError("invalid_embedding_value");
-  }
-  if (input.kind === "other" && input.relevance < OTHER_KIND_RELEVANCE_FLOOR) {
-    throw new EntityResolutionError("other_below_relevance_floor");
-  }
+  validateResolveTopicInput(input);
 
   const tx1Result = await transactional<ResolveTopicResult | PendingDisambig>(
     async (tx1) => runTx1(tx1 as unknown as Tx, input),
