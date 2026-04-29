@@ -62,12 +62,14 @@ vi.mock("@/trigger/helpers/notifications", () => ({
 }));
 
 vi.mock("@/lib/ai/config", () => ({
-  getActiveAiConfig: vi.fn().mockResolvedValue({
-    provider: "openrouter",
-    model: "google/gemini-2.0-flash-001",
-    summarizationPrompt: null,
-  }),
+  getActiveAiConfig: vi.fn(),
 }));
+
+const DEFAULT_AI_CONFIG = {
+  provider: "openrouter",
+  model: "google/gemini-2.0-flash-001",
+  summarizationPrompt: null,
+} as const;
 
 const mockResolveAndPersistEpisodeTopics = vi.fn().mockResolvedValue({
   resolved: 0,
@@ -151,6 +153,7 @@ async function expectEpisodeNotFound(episodeId: number): Promise<void> {
 describe("summarize-episode task", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(getActiveAiConfig).mockResolvedValue(DEFAULT_AI_CONFIG as never);
     // Default: episode has a transcript in the DB
     mockFindFirst.mockResolvedValue({ transcription: "Full transcript text" });
     makeUpdateChain();
@@ -468,11 +471,6 @@ describe("summarize-episode task", () => {
       vi.mocked(generateEpisodeSummary).mockResolvedValue(
         mockSummaryWithTopics,
       );
-      vi.mocked(getActiveAiConfig).mockResolvedValue({
-        provider: "openrouter",
-        model: "google/gemini-2.0-flash-001",
-        summarizationPrompt: null,
-      } as never);
 
       await taskConfig.run({ episodeId: 123 }, mockCtx);
 
@@ -509,11 +507,6 @@ describe("summarize-episode task", () => {
     it("calls resolveAndPersistEpisodeTopics with empty topics when summary.topics is undefined", async () => {
       setupHappyPath();
       vi.mocked(generateEpisodeSummary).mockResolvedValue(mockSummary); // no topics
-      vi.mocked(getActiveAiConfig).mockResolvedValue({
-        provider: "openrouter",
-        model: "google/gemini-2.0-flash-001",
-        summarizationPrompt: null,
-      } as never);
 
       await taskConfig.run({ episodeId: 123 }, mockCtx);
 
