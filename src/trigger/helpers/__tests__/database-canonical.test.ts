@@ -71,23 +71,33 @@ function serializeSql(sqlObj: unknown): { sqlText: string; params: unknown[] } {
   return { sqlText: parts.join(" "), params };
 }
 
+type ResolveRows = (sqlText: string, params: unknown[]) => unknown[];
+
+function createRecordingTx(resolveRows: ResolveRows): {
+  execute: (sqlObj: unknown) => Promise<{ rows: unknown[] }>;
+} {
+  const recorded: RecordedCall[] = [];
+  txCallLog.push(recorded);
+  return {
+    execute: async (sqlObj: unknown) => {
+      const { sqlText, params } = serializeSql(sqlObj);
+      recorded.push({ sql: sqlText, params });
+      return { rows: resolveRows(sqlText, params) };
+    },
+  };
+}
+
 vi.mock("@/db/pool", () => ({
   transactional: vi.fn(async (fn: (tx: unknown) => Promise<unknown>) => {
     const fixtures = txFixturesQueue.shift() ?? { rows: [] };
-    const recorded: RecordedCall[] = [];
-    txCallLog.push(recorded);
-    const tx = {
-      execute: async (sqlObj: unknown) => {
-        const { sqlText, params } = serializeSql(sqlObj);
-        recorded.push({ sql: sqlText, params });
-        const fixture = fixtures.rows.find((f) =>
-          typeof f.match === "string"
-            ? sqlText.includes(f.match)
-            : f.match.test(sqlText),
-        );
-        return { rows: fixture?.rows ?? [] };
-      },
-    };
+    const tx = createRecordingTx((sqlText) => {
+      const fixture = fixtures.rows.find((f) =>
+        typeof f.match === "string"
+          ? sqlText.includes(f.match)
+          : f.match.test(sqlText),
+      );
+      return fixture?.rows ?? [];
+    });
     return fn(tx);
   }),
 }));
@@ -231,28 +241,22 @@ describe("forceInsertNewCanonical", () => {
     const { transactional } = await import("@/db/pool");
     const transactionalMock = vi.mocked(transactional);
     transactionalMock.mockImplementationOnce(async (fn) => {
-      const recorded: RecordedCall[] = [];
-      txCallLog.push(recorded);
       let exactLookupCalls = 0;
-      const tx = {
-        execute: async (sqlObj: unknown) => {
-          const { sqlText, params } = serializeSql(sqlObj);
-          recorded.push({ sql: sqlText, params });
-          if (sqlText.includes("lower(normalized_label)")) {
-            exactLookupCalls += 1;
-            if (exactLookupCalls === 1) return { rows: [] }; // initial miss
-            return { rows: [{ id: 66, kind: "release" }] }; // recovery hit
-          }
-          if (
-            sqlText.includes("INSERT INTO canonical_topics") &&
-            !sqlText.includes("alias")
-          ) {
-            return { rows: [] }; // simulate race → 0 rows
-          }
-          // last_seen update, junction write, etc.
-          return { rows: [] };
-        },
-      };
+      const tx = createRecordingTx((sqlText) => {
+        if (sqlText.includes("lower(normalized_label)")) {
+          exactLookupCalls += 1;
+          if (exactLookupCalls === 1) return []; // initial miss
+          return [{ id: 66, kind: "release" }]; // recovery hit
+        }
+        if (
+          sqlText.includes("INSERT INTO canonical_topics") &&
+          !sqlText.includes("alias")
+        ) {
+          return []; // simulate race → 0 rows
+        }
+        // last_seen update, junction write, etc.
+        return [];
+      });
       return fn(tx as never);
     });
 
