@@ -29,7 +29,7 @@ export async function getCanonicalTopicsByPodcastIndexId(
         rn: sql<number>`
           row_number() over (
             partition by ${episodeCanonicalTopics.episodeId}
-            order by ${episodeCanonicalTopics.coverageScore} desc
+            order by ${episodeCanonicalTopics.coverageScore} desc, ${canonicalTopics.id} asc
           )
         `.as("rn"),
       })

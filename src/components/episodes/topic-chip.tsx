@@ -53,15 +53,15 @@ export function TopicChip({
       href={`/topic/${canonicalTopicId}`}
       className={cn(
         badgeVariants({ variant: "outline" }),
-        "gap-1 text-xs font-normal hover:bg-accent/60",
+        "max-w-[10rem] gap-1 text-xs font-normal hover:bg-accent/60",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
         status === "dormant" && "opacity-60",
         className,
       )}
       aria-label={`Topic: ${label} — ${kind}`}
     >
-      <Icon className={cn("h-3 w-3", iconClass)} aria-hidden="true" />
-      <span className="truncate">{label}</span>
+      <Icon className={cn("h-3 w-3 shrink-0", iconClass)} aria-hidden="true" />
+      <span className="min-w-0 truncate">{label}</span>
     </Link>
   );
 }

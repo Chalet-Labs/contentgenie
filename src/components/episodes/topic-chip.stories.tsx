@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
-import { TopicChip } from "./topic-chip";
+import { TopicChip } from "@/components/episodes/topic-chip";
 
 const meta: Meta<typeof TopicChip> = {
   title: "Topics/TopicChip",

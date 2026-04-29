@@ -287,7 +287,7 @@ export async function getUserLibrary(
           if (!ct || ct.status !== "active") return [];
           return [{ coverageScore: j.coverageScore, ct }];
         })
-        .sort((a, b) => b.coverageScore - a.coverageScore)
+        .sort((a, b) => b.coverageScore - a.coverageScore || a.ct.id - b.ct.id)
         .slice(0, CANONICAL_TOPICS_PER_EPISODE)
         .map(({ ct }) => ({
           id: ct.id,

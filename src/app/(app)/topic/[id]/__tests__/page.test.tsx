@@ -95,26 +95,15 @@ describe("TopicPage", () => {
     vi.resetAllMocks();
   });
 
-  it("calls notFound() for NaN id", async () => {
-    await expect(TopicPage({ params: { id: "abc" } })).rejects.toThrow(
-      "NEXT_NOT_FOUND",
-    );
-    expect(mockNotFound).toHaveBeenCalledOnce();
-  });
-
-  it("calls notFound() for negative id", async () => {
-    await expect(TopicPage({ params: { id: "-1" } })).rejects.toThrow(
-      "NEXT_NOT_FOUND",
-    );
-    expect(mockNotFound).toHaveBeenCalledOnce();
-  });
-
-  it("calls notFound() for zero id", async () => {
-    await expect(TopicPage({ params: { id: "0" } })).rejects.toThrow(
-      "NEXT_NOT_FOUND",
-    );
-    expect(mockNotFound).toHaveBeenCalledOnce();
-  });
+  it.each(["abc", "-1", "0", "01", "1e2", "2147483648"])(
+    "calls notFound() for invalid id %s",
+    async (id) => {
+      await expect(TopicPage({ params: { id } })).rejects.toThrow(
+        "NEXT_NOT_FOUND",
+      );
+      expect(mockNotFound).toHaveBeenCalledOnce();
+    },
+  );
 
   it("calls notFound() when DB returns null", async () => {
     mockFindFirst.mockResolvedValue(null);

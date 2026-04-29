@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
-import { SavedEpisodeCard } from "./saved-episode-card";
+import { SavedEpisodeCard } from "@/components/library/saved-episode-card";
 import type { SavedItemDTO } from "@/db/library-columns";
 import { asPodcastIndexEpisodeId } from "@/types/ids";
 import { withAudioPlayerContext } from "@/test/story-fixtures";

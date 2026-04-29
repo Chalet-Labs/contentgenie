@@ -1,5 +1,5 @@
 // Stub for server actions in Storybook
-const noop = async () => ({ success: true, message: "Storybook mock" });
+const noop = async () => ({ success: true });
 
 export const saveEpisodeToLibrary = noop;
 export const removeEpisodeFromLibrary = noop;

@@ -13,9 +13,15 @@ interface TopicPageProps {
   params: { id: string };
 }
 
+// Postgres serial/integer max is 2^31-1; values above this would cause a DB range error.
+const POSTGRES_MAX_INT = 2_147_483_647;
+
 export default async function TopicPage({ params }: TopicPageProps) {
-  const parsed = Number(params.id);
-  if (!Number.isInteger(parsed) || parsed <= 0) {
+  if (!/^[1-9][0-9]*$/.test(params.id)) {
+    notFound();
+  }
+  const parsed = parseInt(params.id, 10);
+  if (parsed > POSTGRES_MAX_INT) {
     notFound();
   }
 
