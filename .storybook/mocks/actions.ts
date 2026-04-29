@@ -15,6 +15,18 @@ export const getEpisodeAverageRating = async () => ({
   error: null,
 });
 export const createCollection = noop;
+export const updateCollection = noop;
+export const deleteCollection = noop;
+export const getUserCollections = async () => ({
+  collections: [],
+  error: null,
+});
+export const getCollection = async () => ({
+  collection: null,
+  items: [],
+  error: null,
+});
+export const moveEpisodeToCollection = noop;
 export const subscribeToPodcast = noop;
 export const unsubscribeFromPodcast = noop;
 export const setSubscriptionSort = noop;
