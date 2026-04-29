@@ -600,6 +600,130 @@ describe("getUserLibrary", () => {
     expect(result.error).toBe("Failed to load library");
     expect(consoleSpy).toHaveBeenCalled();
   });
+
+  it("attaches top-3 active canonical topics sorted by coverageScore desc", async () => {
+    const itemWithTopics = {
+      ...itemA,
+      episode: {
+        ...itemA.episode,
+        canonicalTopics: [
+          {
+            coverageScore: 0.5,
+            canonicalTopic: {
+              id: 10,
+              label: "Topic A",
+              kind: "concept",
+              status: "active",
+            },
+          },
+          {
+            coverageScore: 0.9,
+            canonicalTopic: {
+              id: 11,
+              label: "Topic B",
+              kind: "release",
+              status: "active",
+            },
+          },
+          {
+            coverageScore: 0.7,
+            canonicalTopic: {
+              id: 12,
+              label: "Topic C",
+              kind: "event",
+              status: "active",
+            },
+          },
+          {
+            coverageScore: 0.3,
+            canonicalTopic: {
+              id: 13,
+              label: "Topic D",
+              kind: "deal",
+              status: "merged",
+            },
+          },
+        ],
+      },
+    };
+    mockUserLibraryFindMany.mockResolvedValue([itemWithTopics]);
+    const { getUserLibrary } = await importLibrary();
+    const result = await getUserLibrary();
+    expect(result.error).toBeNull();
+    expect(result.items[0].episode.canonicalTopics).toEqual([
+      { id: 11, label: "Topic B", kind: "release", status: "active" },
+      { id: 12, label: "Topic C", kind: "event", status: "active" },
+      { id: 10, label: "Topic A", kind: "concept", status: "active" },
+    ]);
+  });
+
+  it("filters out non-active canonical topics leaving canonicalTopics undefined", async () => {
+    const itemWithInactiveTopics = {
+      ...itemA,
+      episode: {
+        ...itemA.episode,
+        canonicalTopics: [
+          {
+            coverageScore: 0.8,
+            canonicalTopic: {
+              id: 20,
+              label: "Merged",
+              kind: "concept",
+              status: "merged",
+            },
+          },
+          {
+            coverageScore: 0.6,
+            canonicalTopic: {
+              id: 21,
+              label: "Dormant",
+              kind: "release",
+              status: "dormant",
+            },
+          },
+        ],
+      },
+    };
+    mockUserLibraryFindMany.mockResolvedValue([itemWithInactiveTopics]);
+    const { getUserLibrary } = await importLibrary();
+    const result = await getUserLibrary();
+    expect(result.items[0].episode.canonicalTopics).toBeUndefined();
+  });
+
+  it("caps canonical topics at 3 even when more than 3 are active", async () => {
+    const itemWithManyTopics = {
+      ...itemA,
+      episode: {
+        ...itemA.episode,
+        canonicalTopics: Array.from({ length: 5 }, (_, i) => ({
+          coverageScore: 1 - i * 0.1,
+          canonicalTopic: {
+            id: 100 + i,
+            label: `Topic ${i}`,
+            kind: "concept",
+            status: "active",
+          },
+        })),
+      },
+    };
+    mockUserLibraryFindMany.mockResolvedValue([itemWithManyTopics]);
+    const { getUserLibrary } = await importLibrary();
+    const result = await getUserLibrary();
+    expect(result.items[0].episode.canonicalTopics).toHaveLength(3);
+    expect(result.items[0].episode.canonicalTopics?.map((c) => c.id)).toEqual([
+      100, 101, 102,
+    ]);
+  });
+
+  it("leaves episode.canonicalTopics undefined when episode has no junction rows", async () => {
+    // itemA/itemB/itemC have no canonicalTopics in episode — baseline behaviour preserved
+    const { getUserLibrary } = await importLibrary();
+    const result = await getUserLibrary();
+    expect(result.error).toBeNull();
+    result.items.forEach((item) => {
+      expect(item.episode.canonicalTopics).toBeUndefined();
+    });
+  });
 });
 
 // ── updateLibraryNotes ────────────────────────────────────────────────────

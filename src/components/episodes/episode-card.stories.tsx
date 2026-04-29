@@ -140,3 +140,23 @@ export const WithTopics: Story = {
     topics: ["AI", "Machine Learning", "Podcast Tech", "Extra Topic"],
   },
 };
+
+export const WithCanonicalTopics: Story = {
+  args: {
+    canonicalTopics: [
+      { id: 1, label: "Claude Opus 4.7 release", kind: "release" },
+      { id: 2, label: "Anthropic funding round", kind: "deal" },
+      { id: 3, label: "AI Safety", kind: "regulation" },
+    ],
+  },
+};
+
+export const WithBothTopicLayers: Story = {
+  args: {
+    topics: ["AI", "Machine Learning"],
+    canonicalTopics: [
+      { id: 1, label: "Claude Opus 4.7 release", kind: "release" },
+      { id: 2, label: "OpenAI outage", kind: "incident" },
+    ],
+  },
+};

@@ -181,6 +181,7 @@ export function SavedEpisodeCard({
           episode.description ? stripHtml(episode.description) : undefined
         }
         score={episode.worthItScore}
+        canonicalTopics={episode.canonicalTopics}
         meta={meta}
         secondaryActions={secondaryActions}
         accent="none"

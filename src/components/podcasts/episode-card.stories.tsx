@@ -139,3 +139,16 @@ export const WithTopics: Story = {
     topics: ["AI", "Developer Tools", "Startups"],
   },
 };
+
+export const WithCanonicalTopics: Story = {
+  args: {
+    episode: { ...baseEpisode, feedTitle: "Tech Talk Daily" },
+    summaryStatus: "completed",
+    worthItScore: "8.10",
+    canonicalTopics: [
+      { id: 1, label: "Claude Opus 4.7 release", kind: "release" },
+      { id: 2, label: "OpenAI API outage", kind: "incident" },
+      { id: 3, label: "EU AI Act", kind: "regulation" },
+    ],
+  },
+};
