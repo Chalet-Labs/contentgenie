@@ -4,66 +4,10 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { db } from "@/db";
 import { canonicalTopics } from "@/db/schema";
-
-const MAX_MERGE_DEPTH = 16;
-
-type CanonicalTopic = typeof canonicalTopics.$inferSelect;
-
-type WalkerResult = { terminal: CanonicalTopic } | { error: "cycle" | "depth" };
-
-async function walkMergedChain(start: CanonicalTopic): Promise<WalkerResult> {
-  const seen = new Set<number>();
-  let current = start;
-  let depth = 0;
-
-  while (current.status === "merged") {
-    if (depth >= MAX_MERGE_DEPTH) {
-      console.error("[topic] merge depth exceeded", {
-        startId: start.id,
-        currentId: current.id,
-        depth,
-      });
-      return { error: "depth" };
-    }
-
-    if (seen.has(current.id)) {
-      console.error("[topic] merge cycle detected", {
-        startId: start.id,
-        cycleAtId: current.id,
-        seen: Array.from(seen),
-      });
-      return { error: "cycle" };
-    }
-
-    seen.add(current.id);
-
-    const nextId = current.mergedIntoId;
-    if (!nextId) {
-      // merged but no pointer — schema invariant violated
-      console.error("[topic] merged topic has null mergedIntoId", {
-        id: current.id,
-      });
-      return { error: "cycle" };
-    }
-
-    const next = await db.query.canonicalTopics.findFirst({
-      where: eq(canonicalTopics.id, nextId),
-    });
-
-    if (!next) {
-      console.error("[topic] merge chain broken — target not found", {
-        from: current.id,
-        to: nextId,
-      });
-      return { error: "cycle" };
-    }
-
-    depth++;
-    current = next;
-  }
-
-  return { terminal: current };
-}
+import {
+  walkMergedChain,
+  TOPIC_DISPLAY_COLUMNS,
+} from "@/app/(app)/topic/[id]/merge-walker";
 
 interface TopicPageProps {
   params: { id: string };
@@ -71,11 +15,12 @@ interface TopicPageProps {
 
 export default async function TopicPage({ params }: TopicPageProps) {
   const parsed = Number(params.id);
-  if (!Number.isInteger(parsed) || parsed <= 0 || Number.isNaN(parsed)) {
+  if (!Number.isInteger(parsed) || parsed <= 0) {
     notFound();
   }
 
   const topic = await db.query.canonicalTopics.findFirst({
+    columns: TOPIC_DISPLAY_COLUMNS,
     where: eq(canonicalTopics.id, parsed),
   });
 

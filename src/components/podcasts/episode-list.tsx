@@ -32,8 +32,9 @@ interface EpisodeListProps {
    */
   topicsByPodcastIndexId?: Record<PodcastIndexEpisodeId, string[]>;
   /**
-   * Canonical topic chips per episode, keyed by PodcastIndex id. Top 3 per
-   * episode, pre-filtered to active status by the batch fetcher.
+   * Top active canonical topic chips per episode, keyed by PodcastIndex id.
+   * Filter and per-episode cap are enforced upstream in
+   * getCanonicalTopicsByPodcastIndexId.
    */
   canonicalTopicsByPodcastIndexId?: Record<
     PodcastIndexEpisodeId,

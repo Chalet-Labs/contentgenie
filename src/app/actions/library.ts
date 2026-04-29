@@ -15,6 +15,7 @@ import {
   type CanonicalTopicChip,
 } from "@/db/library-columns";
 import { saveEpisodeSchema, safeParseDate } from "@/lib/schemas/library";
+import { CANONICAL_TOPICS_PER_EPISODE } from "@/lib/episodes/topic-display";
 import type { PodcastIndexEpisodeId } from "@/types/ids";
 
 type EpisodeData = {
@@ -279,17 +280,20 @@ export async function getUserLibrary(
       return sortDirection === "asc" ? -comparison : comparison;
     });
 
-    // Collapse junction rows → CanonicalTopicChip[]: active-only, top-3 by coverageScore desc
     const mappedItems: SavedItemDTO[] = sortedItems.map((item) => {
       const chips: CanonicalTopicChip[] = (item.episode.canonicalTopics ?? [])
-        .filter((j) => j.canonicalTopic?.status === "active")
-        .sort((a, b) => (b.coverageScore ?? 0) - (a.coverageScore ?? 0))
-        .slice(0, 3)
-        .map((j) => ({
-          id: j.canonicalTopic.id,
-          label: j.canonicalTopic.label,
-          kind: j.canonicalTopic.kind,
-          status: j.canonicalTopic.status,
+        .flatMap((j) => {
+          const ct = j.canonicalTopic;
+          if (!ct || ct.status !== "active") return [];
+          return [{ coverageScore: j.coverageScore, ct }];
+        })
+        .sort((a, b) => b.coverageScore - a.coverageScore)
+        .slice(0, CANONICAL_TOPICS_PER_EPISODE)
+        .map(({ ct }) => ({
+          id: ct.id,
+          label: ct.label,
+          kind: ct.kind,
+          status: ct.status,
         }));
 
       return {

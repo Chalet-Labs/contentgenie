@@ -25,7 +25,7 @@ import { podcasts, episodes as episodesTable } from "@/db/schema";
 import type { SummaryStatus } from "@/db/schema";
 import { getBackNavigation } from "@/app/(app)/podcast/[id]/back-navigation";
 import { getTopicsByPodcastIndexId } from "@/app/(app)/podcast/[id]/topics";
-import { getCanonicalTopicsByEpisodeId } from "@/app/(app)/podcast/[id]/canonical-topics";
+import { getCanonicalTopicsByPodcastIndexId } from "@/app/(app)/podcast/[id]/canonical-topics";
 
 const PODCAST_PAGE_EPISODE_LIMIT = 200;
 
@@ -98,11 +98,11 @@ async function loadRssPodcast(podcastIndexId: string) {
   const [
     listenedInternalIds,
     topicsByPodcastIndexId,
-    canonicalTopicsByEpisodeId,
+    canonicalTopicsByPodcastIndexId,
   ] = await Promise.all([
     getListenedEpisodeIds(dbEpisodes.map((ep) => ep.id)),
     getTopicsByPodcastIndexId(dbEpisodes),
-    getCanonicalTopicsByEpisodeId(dbEpisodes),
+    getCanonicalTopicsByPodcastIndexId(dbEpisodes),
   ]);
   const listenedInternalIdSet = new Set(listenedInternalIds);
   const listenedIds = dbEpisodes
@@ -158,7 +158,7 @@ async function loadRssPodcast(podcastIndexId: string) {
     scoreMap,
     listenedIds,
     topicsByPodcastIndexId,
-    canonicalTopicsByEpisodeId,
+    canonicalTopicsByPodcastIndexId,
   };
 }
 
@@ -186,7 +186,7 @@ export default async function PodcastPage({
       scoreMap,
       listenedIds,
       topicsByPodcastIndexId,
-      canonicalTopicsByEpisodeId,
+      canonicalTopicsByPodcastIndexId,
     } = data;
     const subscribed = await isSubscribedToPodcast(podcast.podcastIndexId);
     const categories = (podcast.categories as string[]) ?? [];
@@ -302,7 +302,7 @@ export default async function PodcastPage({
             scoreMap={scoreMap}
             listenedIds={listenedIds}
             topicsByPodcastIndexId={topicsByPodcastIndexId}
-            canonicalTopicsByPodcastIndexId={canonicalTopicsByEpisodeId}
+            canonicalTopicsByPodcastIndexId={canonicalTopicsByPodcastIndexId}
           />
         </div>
       </div>
@@ -347,11 +347,11 @@ export default async function PodcastPage({
     const [
       listenedInternalIds,
       topicsByPodcastIndexId,
-      canonicalTopicsByEpisodeId,
+      canonicalTopicsByPodcastIndexId,
     ] = await Promise.all([
       getListenedEpisodeIds(dbEpisodeData.map((e) => e.id)),
       getTopicsByPodcastIndexId(dbEpisodeData),
-      getCanonicalTopicsByEpisodeId(dbEpisodeData),
+      getCanonicalTopicsByPodcastIndexId(dbEpisodeData),
     ]);
     const listenedInternalIdSet = new Set(listenedInternalIds);
     const piListenedIds = dbEpisodeData
@@ -502,7 +502,7 @@ export default async function PodcastPage({
             listenedIds={piListenedIds}
             knownIds={piKnownIds}
             topicsByPodcastIndexId={topicsByPodcastIndexId}
-            canonicalTopicsByPodcastIndexId={canonicalTopicsByEpisodeId}
+            canonicalTopicsByPodcastIndexId={canonicalTopicsByPodcastIndexId}
           />
         </div>
       </div>

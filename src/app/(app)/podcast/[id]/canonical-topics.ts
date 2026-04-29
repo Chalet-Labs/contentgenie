@@ -2,17 +2,14 @@ import { inArray, lte, sql, eq, and } from "drizzle-orm";
 import { db } from "@/db";
 import { episodeCanonicalTopics, canonicalTopics } from "@/db/schema";
 import type { CanonicalTopicChip } from "@/db/library-columns";
+import { CANONICAL_TOPICS_PER_EPISODE } from "@/lib/episodes/topic-display";
 import type { PodcastIndexEpisodeId } from "@/types/ids";
 
-const CANONICAL_TOPICS_PER_EPISODE = 3;
-
 /**
- * Batch-fetch top canonical-topic chips per episode, keyed by PodcastIndex id.
- *
- * Runs a single JOIN with a window-function rank — no N+1 queries.
+ * Single JOIN + window-function rank (avoids N+1).
  * Returns `{}` on DB failure so a transient outage doesn't crash the page.
  */
-export async function getCanonicalTopicsByEpisodeId(
+export async function getCanonicalTopicsByPodcastIndexId(
   dbEpisodes: { id: number; podcastIndexId: PodcastIndexEpisodeId }[],
 ): Promise<Record<PodcastIndexEpisodeId, CanonicalTopicChip[]>> {
   if (dbEpisodes.length === 0) return {};
@@ -74,7 +71,7 @@ export async function getCanonicalTopicsByEpisodeId(
     }
     return out;
   } catch (err) {
-    console.error("[podcast] getCanonicalTopicsByEpisodeId failed", err);
+    console.error("[podcast] getCanonicalTopicsByPodcastIndexId failed", err);
     return {};
   }
 }

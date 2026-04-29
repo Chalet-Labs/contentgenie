@@ -22,7 +22,7 @@ interface EpisodeCardProps {
   canMarkListened?: boolean;
   /** Top topics for this episode, rendered as chips under the title (primitive caps at 3). */
   topics?: string[];
-  /** Canonical topic chips rendered below category badges (capped at 3 by primitive). */
+  /** Canonical topic chips forwarded to the primitive. */
   canonicalTopics?: CanonicalTopicChip[];
 }
 

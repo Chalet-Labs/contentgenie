@@ -7,7 +7,10 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { WorthItBadge } from "@/components/episodes/worth-it-badge";
 import { parseScoreOrNull } from "@/lib/score-utils";
-import { MAX_DISPLAYED_TOPICS } from "@/lib/episodes/topic-display";
+import {
+  CANONICAL_TOPICS_PER_EPISODE,
+  MAX_DISPLAYED_TOPICS,
+} from "@/lib/episodes/topic-display";
 import type { SummaryStatus } from "@/db/schema";
 import type { CanonicalTopicChip } from "@/db/library-columns";
 import { TopicChip } from "@/components/episodes/topic-chip";
@@ -53,7 +56,7 @@ export interface EpisodeCardProps {
   secondaryActions?: ReactNode;
   /** When true, marks the card as listened. Drives the left-accent bar: `isListened !== true` renders the bar; `true` hides it. */
   isListened?: boolean;
-  /** Up to 3 canonical topic chips rendered below the string-topics category row. */
+  /** Canonical topic chips. Capped at CANONICAL_TOPICS_PER_EPISODE by the primitive. */
   canonicalTopics?: CanonicalTopicChip[];
   /**
    * Invoked when the user clicks the title or artwork link. Runs alongside the
@@ -217,15 +220,17 @@ export function EpisodeCard({
 
             {canonicalTopics && canonicalTopics.length > 0 && (
               <div className="mt-1.5 flex flex-wrap gap-1">
-                {canonicalTopics.slice(0, 3).map((chip) => (
-                  <TopicChip
-                    key={chip.id}
-                    canonicalTopicId={chip.id}
-                    label={chip.label}
-                    kind={chip.kind}
-                    status={chip.status}
-                  />
-                ))}
+                {canonicalTopics
+                  .slice(0, CANONICAL_TOPICS_PER_EPISODE)
+                  .map((chip) => (
+                    <TopicChip
+                      key={chip.id}
+                      canonicalTopicId={chip.id}
+                      label={chip.label}
+                      kind={chip.kind}
+                      status={chip.status}
+                    />
+                  ))}
               </div>
             )}
 
