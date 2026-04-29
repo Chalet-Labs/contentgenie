@@ -62,12 +62,13 @@ function makeTopic(overrides: Partial<NormalizedTopic> = {}): NormalizedTopic {
   };
 }
 
+let nextCanonicalId = 1;
 function makeResolveResult(
   matchMethod: "auto" | "llm_disambig" | "new",
   overrides: Record<string, unknown> = {},
 ) {
   const base = {
-    canonicalId: Math.floor(Math.random() * 1000) + 1,
+    canonicalId: nextCanonicalId++,
     aliasesAdded: 0,
     candidatesConsidered: 5,
     versionTokenForcedDisambig: false,
