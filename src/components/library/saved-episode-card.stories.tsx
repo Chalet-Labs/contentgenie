@@ -4,7 +4,7 @@ import type { SavedItemDTO } from "@/db/library-columns";
 import { asPodcastIndexEpisodeId } from "@/types/ids";
 import { withAudioPlayerContext } from "@/test/story-fixtures";
 
-const podcastIndexId = asPodcastIndexEpisodeId("PI-789");
+const podcastIndexId = asPodcastIndexEpisodeId("789");
 
 const baseItem: SavedItemDTO = {
   id: 1,
@@ -26,7 +26,7 @@ const baseItem: SavedItemDTO = {
     worthItScore: null,
     podcast: {
       id: 10,
-      podcastIndexId: "PC-10",
+      podcastIndexId: "10",
       title: "Tech Talk Daily",
       imageUrl: "https://picsum.photos/seed/podcast/80/80",
     },
