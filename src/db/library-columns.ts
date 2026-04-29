@@ -2,6 +2,9 @@
 
 import type { PodcastIndexEpisodeId } from "@/types/ids";
 import { type OverlapLabelKind } from "@/lib/topic-overlap";
+import type { CanonicalTopicKind, CanonicalTopicStatus } from "@/db/schema";
+
+export type { CanonicalTopicKind, CanonicalTopicStatus };
 
 // -- Column selection constants (Drizzle `columns` allowlist) --
 
@@ -40,6 +43,13 @@ export const COLLECTION_LIST_COLUMNS = {
 
 // -- DTO types (match query return shapes) --
 
+export interface CanonicalTopicChip {
+  id: number;
+  label: string;
+  kind: CanonicalTopicKind;
+  status?: CanonicalTopicStatus;
+}
+
 export interface EpisodeListDTO {
   id: number;
   podcastIndexId: PodcastIndexEpisodeId;
@@ -49,6 +59,7 @@ export interface EpisodeListDTO {
   duration: number | null;
   publishDate: Date | null;
   worthItScore: string | null;
+  canonicalTopics?: CanonicalTopicChip[];
 }
 
 export interface PodcastListDTO {

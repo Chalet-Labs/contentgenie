@@ -1,5 +1,5 @@
 // Stub for server actions in Storybook
-const noop = async () => ({ success: true, message: "Storybook mock" });
+const noop = async () => ({ success: true });
 
 export const saveEpisodeToLibrary = noop;
 export const removeEpisodeFromLibrary = noop;
@@ -14,6 +14,19 @@ export const getEpisodeAverageRating = async () => ({
   ratingCount: 15,
   error: null,
 });
+export const createCollection = noop;
+export const updateCollection = noop;
+export const deleteCollection = noop;
+export const getUserCollections = async () => ({
+  collections: [],
+  error: null,
+});
+export const getCollection = async () => ({
+  collection: null,
+  items: [],
+  error: null,
+});
+export const moveEpisodeToCollection = noop;
 export const subscribeToPodcast = noop;
 export const unsubscribeFromPodcast = noop;
 export const setSubscriptionSort = noop;
