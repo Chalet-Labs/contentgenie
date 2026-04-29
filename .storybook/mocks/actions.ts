@@ -14,6 +14,7 @@ export const getEpisodeAverageRating = async () => ({
   ratingCount: 15,
   error: null,
 });
+export const createCollection = noop;
 export const subscribeToPodcast = noop;
 export const unsubscribeFromPodcast = noop;
 export const setSubscriptionSort = noop;
