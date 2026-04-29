@@ -2,6 +2,7 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { NormalizedTopic } from "@/lib/openrouter";
+import { MAX_DISAMBIG_CALLS_PER_EPISODE } from "@/lib/entity-resolution-constants";
 
 // ---- Mocks ------------------------------------------------------------------
 
@@ -237,30 +238,29 @@ describe("resolveAndPersistEpisodeTopics", () => {
     expect(result.failed).toBe(1);
   });
 
-  it("budget: topics 6-7 use forceInsertNewCanonical when first 5 return llm_disambig", async () => {
-    const embs = Array.from({ length: 7 }, (_, i) =>
+  it("budget: topics beyond MAX_DISAMBIG_CALLS_PER_EPISODE use forceInsertNewCanonical", async () => {
+    const overflow = 2;
+    const total = MAX_DISAMBIG_CALLS_PER_EPISODE + overflow;
+    const embs = Array.from({ length: total }, (_, i) =>
       buildEmbedding(i * 0.01 + 0.01),
     );
     mockGenerateEmbeddings
       .mockResolvedValueOnce(embs)
       .mockResolvedValueOnce(embs);
 
-    // First 5 topics → llm_disambig (burns budget)
+    // First MAX_DISAMBIG_CALLS_PER_EPISODE topics → llm_disambig (burns budget)
     const llmResult = makeResolveResult("llm_disambig");
-    mockResolveTopic
-      .mockResolvedValueOnce(llmResult)
-      .mockResolvedValueOnce(llmResult)
-      .mockResolvedValueOnce(llmResult)
-      .mockResolvedValueOnce(llmResult)
-      .mockResolvedValueOnce(llmResult);
+    for (let i = 0; i < MAX_DISAMBIG_CALLS_PER_EPISODE; i++) {
+      mockResolveTopic.mockResolvedValueOnce(llmResult);
+    }
 
-    // Topics 6 and 7 → forceInsertNewCanonical
+    // Remaining topics → forceInsertNewCanonical
     const forceResult = makeResolveResult("new");
-    mockForceInsertNewCanonical
-      .mockResolvedValueOnce(forceResult)
-      .mockResolvedValueOnce(forceResult);
+    for (let i = 0; i < overflow; i++) {
+      mockForceInsertNewCanonical.mockResolvedValueOnce(forceResult);
+    }
 
-    const topics = Array.from({ length: 7 }, (_, i) =>
+    const topics = Array.from({ length: total }, (_, i) =>
       makeTopic({ label: `Topic ${i + 1}` }),
     );
 
@@ -268,10 +268,122 @@ describe("resolveAndPersistEpisodeTopics", () => {
       await import("@/trigger/helpers/resolve-topics");
     const result = await resolveAndPersistEpisodeTopics(1, topics, "summary");
 
-    expect(mockResolveTopic).toHaveBeenCalledTimes(5);
-    expect(mockForceInsertNewCanonical).toHaveBeenCalledTimes(2);
+    expect(mockResolveTopic).toHaveBeenCalledTimes(
+      MAX_DISAMBIG_CALLS_PER_EPISODE,
+    );
+    expect(mockForceInsertNewCanonical).toHaveBeenCalledTimes(overflow);
     expect(result.budgetExhausted).toBe(true);
-    expect(result.matchMethodDistribution.new).toBeGreaterThanOrEqual(2);
+    expect(result.matchMethodDistribution.new).toBeGreaterThanOrEqual(overflow);
+  });
+
+  it("budget boundary: the cap'th disambig still uses resolveTopic; the next switches to forceInsert", async () => {
+    const total = MAX_DISAMBIG_CALLS_PER_EPISODE + 1;
+    const embs = Array.from({ length: total }, () => buildEmbedding());
+    mockGenerateEmbeddings
+      .mockResolvedValueOnce(embs)
+      .mockResolvedValueOnce(embs);
+
+    for (let i = 0; i < MAX_DISAMBIG_CALLS_PER_EPISODE; i++) {
+      mockResolveTopic.mockResolvedValueOnce(makeResolveResult("llm_disambig"));
+    }
+    mockForceInsertNewCanonical.mockResolvedValueOnce(makeResolveResult("new"));
+
+    const topics = Array.from({ length: total }, (_, i) =>
+      makeTopic({ label: `T${i}` }),
+    );
+
+    const { resolveAndPersistEpisodeTopics } =
+      await import("@/trigger/helpers/resolve-topics");
+    await resolveAndPersistEpisodeTopics(1, topics, "summary");
+
+    expect(mockResolveTopic).toHaveBeenCalledTimes(
+      MAX_DISAMBIG_CALLS_PER_EPISODE,
+    );
+    expect(mockForceInsertNewCanonical).toHaveBeenCalledTimes(1);
+  });
+
+  it("matchMethodDistribution counts each match_method exactly", async () => {
+    const embs = [
+      buildEmbedding(),
+      buildEmbedding(),
+      buildEmbedding(),
+      buildEmbedding(),
+    ];
+    mockGenerateEmbeddings
+      .mockResolvedValueOnce(embs)
+      .mockResolvedValueOnce(embs);
+    mockResolveTopic
+      .mockResolvedValueOnce(makeResolveResult("auto"))
+      .mockResolvedValueOnce(makeResolveResult("auto"))
+      .mockResolvedValueOnce(makeResolveResult("llm_disambig"))
+      .mockResolvedValueOnce(makeResolveResult("new"));
+
+    const topics = Array.from({ length: 4 }, (_, i) =>
+      makeTopic({ label: `T${i}` }),
+    );
+
+    const { resolveAndPersistEpisodeTopics } =
+      await import("@/trigger/helpers/resolve-topics");
+    const result = await resolveAndPersistEpisodeTopics(1, topics, "summary");
+
+    expect(result.matchMethodDistribution).toEqual({
+      auto: 2,
+      llm_disambig: 1,
+      new: 1,
+    });
+  });
+
+  it("counts versionTokenForcedDisambig occurrences across topics", async () => {
+    const embs = [buildEmbedding(), buildEmbedding(), buildEmbedding()];
+    mockGenerateEmbeddings
+      .mockResolvedValueOnce(embs)
+      .mockResolvedValueOnce(embs);
+    mockResolveTopic
+      .mockResolvedValueOnce(
+        makeResolveResult("llm_disambig", { versionTokenForcedDisambig: true }),
+      )
+      .mockResolvedValueOnce(
+        makeResolveResult("auto", { versionTokenForcedDisambig: false }),
+      )
+      .mockResolvedValueOnce(
+        makeResolveResult("llm_disambig", { versionTokenForcedDisambig: true }),
+      );
+
+    const topics = Array.from({ length: 3 }, (_, i) =>
+      makeTopic({ label: `T${i}` }),
+    );
+
+    const { resolveAndPersistEpisodeTopics } =
+      await import("@/trigger/helpers/resolve-topics");
+    const result = await resolveAndPersistEpisodeTopics(1, topics, "summary");
+
+    expect(result.versionTokenForcedDisambig).toBe(2);
+  });
+
+  it("EntityResolutionError('other_below_relevance_floor') is treated as a skip, not a failure", async () => {
+    const embs = [buildEmbedding(), buildEmbedding()];
+    mockGenerateEmbeddings
+      .mockResolvedValueOnce(embs)
+      .mockResolvedValueOnce(embs);
+
+    const { EntityResolutionError } = await import("@/lib/entity-resolution");
+    mockResolveTopic
+      .mockResolvedValueOnce(makeResolveResult("auto"))
+      .mockRejectedValueOnce(
+        new (EntityResolutionError as unknown as new (reason: string) => Error)(
+          "other_below_relevance_floor",
+        ),
+      );
+
+    const topics = [makeTopic({ label: "Real" }), makeTopic({ label: "Junk" })];
+
+    const { resolveAndPersistEpisodeTopics } =
+      await import("@/trigger/helpers/resolve-topics");
+    const result = await resolveAndPersistEpisodeTopics(1, topics, "summary");
+
+    expect(result.resolved).toBe(1);
+    expect(result.failed).toBe(0);
+    expect(result.topicCount).toBe(2);
   });
 
   it("does not call forceInsertNewCanonical when all topics resolve via auto", async () => {

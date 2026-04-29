@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { EMBEDDING_DIMENSION } from "@/lib/ai/embed-constants";
 import type { ResolveTopicInput } from "@/lib/entity-resolution";
+import { EXACT_MATCH_SIMILARITY } from "@/lib/entity-resolution-constants";
 
 // ---- Transactional mock (mirrors entity-resolution.test.ts pattern) ----------
 
@@ -187,7 +188,7 @@ describe("forceInsertNewCanonical", () => {
     const result = await forceInsertNewCanonical(input);
 
     expect(result.matchMethod).toBe("auto");
-    expect(result.similarityToTopMatch).toBe(1.0);
+    expect(result.similarityToTopMatch).toBe(EXACT_MATCH_SIMILARITY);
     expect(result.canonicalId).toBe(55);
     // Must NOT run a kNN (<=> operator)
     const calls = getTxLog(0);
@@ -299,6 +300,17 @@ describe("forceInsertNewCanonical", () => {
     await expect(forceInsertNewCanonical(input)).rejects.toMatchObject({
       reason: "invalid_embedding_value",
     });
+  });
+
+  it("throws EntityResolutionError('other_below_relevance_floor') when kind='other' and relevance below floor", async () => {
+    const input = makeInput({ kind: "other", relevance: 0.3 });
+
+    const { forceInsertNewCanonical } =
+      await import("@/trigger/helpers/database");
+    await expect(forceInsertNewCanonical(input)).rejects.toMatchObject({
+      reason: "other_below_relevance_floor",
+    });
+    expect(txCallLog).toHaveLength(0);
   });
 
   it("inserts aliases into canonical_topic_aliases after canonical is minted", async () => {

@@ -14,7 +14,10 @@ import {
   type ResolveTopicInput,
   type ResolveTopicResult,
 } from "@/lib/entity-resolution";
-import { EXACT_MATCH_SIMILARITY } from "@/lib/entity-resolution-constants";
+import {
+  EXACT_MATCH_SIMILARITY,
+  OTHER_KIND_RELEVANCE_FLOOR,
+} from "@/lib/entity-resolution-constants";
 import { EMBEDDING_DIMENSION } from "@/lib/ai/embed-constants";
 import { transactional } from "@/db/pool";
 import type { TopicKind } from "@/lib/openrouter";
@@ -229,6 +232,26 @@ async function forceUpdateLastSeen(tx: Tx, canonicalId: number): Promise<void> {
   );
 }
 
+async function forceUpsertAliases(
+  tx: Tx,
+  canonicalId: number,
+  aliases: readonly string[],
+): Promise<number> {
+  let aliasesAdded = 0;
+  for (const alias of aliases) {
+    const trimmed = alias.trim();
+    if (!trimmed) continue;
+    const aliasResult = await tx.execute(
+      sql`INSERT INTO canonical_topic_aliases (canonical_topic_id, alias)
+           VALUES (${canonicalId}, ${trimmed})
+           ON CONFLICT (canonical_topic_id, lower(alias)) DO NOTHING
+           RETURNING id`,
+    );
+    if (aliasResult.rows.length > 0) aliasesAdded++;
+  }
+  return aliasesAdded;
+}
+
 /**
  * Over-budget insert path: lock + exact-lookup + insert + junction.
  * Mirrors TX-1's new-insert tail without the kNN (ADR-045 §2).
@@ -236,6 +259,9 @@ async function forceUpdateLastSeen(tx: Tx, canonicalId: number): Promise<void> {
 export async function forceInsertNewCanonical(
   input: ResolveTopicInput,
 ): Promise<ResolveTopicResult> {
+  if (input.kind === "other" && input.relevance < OTHER_KIND_RELEVANCE_FLOOR) {
+    throw new EntityResolutionError("other_below_relevance_floor");
+  }
   if (
     input.identityEmbedding.length !== EMBEDDING_DIMENSION ||
     input.contextEmbedding.length !== EMBEDDING_DIMENSION
@@ -259,21 +285,11 @@ export async function forceInsertNewCanonical(
     const exact = await forceExactLookup(rawTx, input.label, input.kind);
     if (exact !== null) {
       await forceUpdateLastSeen(rawTx, exact.id);
-      // Insert aliases via addAliasIfNew within the same tx scope is not
-      // straightforward here since addAliasIfNew opens its own tx. Instead,
-      // inline the alias upsert directly.
-      let aliasesAdded = 0;
-      for (const alias of input.aliases) {
-        const trimmed = alias.trim();
-        if (!trimmed) continue;
-        const aliasResult = await rawTx.execute(
-          sql`INSERT INTO canonical_topic_aliases (canonical_topic_id, alias)
-               VALUES (${exact.id}, ${trimmed})
-               ON CONFLICT (canonical_topic_id, lower(alias)) DO NOTHING
-               RETURNING id`,
-        );
-        if (aliasResult.rows.length > 0) aliasesAdded++;
-      }
+      const aliasesAdded = await forceUpsertAliases(
+        rawTx,
+        exact.id,
+        input.aliases,
+      );
       await forceWriteJunction(
         rawTx,
         input.episodeId,
@@ -292,31 +308,23 @@ export async function forceInsertNewCanonical(
       };
     }
 
-    const newId = await forceInsertCanonical(rawTx, input);
-    const isRecovery = newId === null;
-    const recoveredId = isRecovery
-      ? ((await forceExactLookup(rawTx, input.label, input.kind))?.id ?? null)
-      : null;
-    const canonicalId = newId ?? recoveredId;
-
+    let canonicalId = await forceInsertCanonical(rawTx, input);
+    let isRecovery = false;
     if (canonicalId === null) {
-      throw new EntityResolutionError("conflict_recovery_failed");
+      isRecovery = true;
+      canonicalId =
+        (await forceExactLookup(rawTx, input.label, input.kind))?.id ?? null;
+      if (canonicalId === null) {
+        throw new EntityResolutionError("conflict_recovery_failed");
+      }
     }
 
     await forceUpdateLastSeen(rawTx, canonicalId);
-
-    let aliasesAdded = 0;
-    for (const alias of input.aliases) {
-      const trimmed = alias.trim();
-      if (!trimmed) continue;
-      const aliasResult = await rawTx.execute(
-        sql`INSERT INTO canonical_topic_aliases (canonical_topic_id, alias)
-             VALUES (${canonicalId}, ${trimmed})
-             ON CONFLICT (canonical_topic_id, lower(alias)) DO NOTHING
-             RETURNING id`,
-      );
-      if (aliasResult.rows.length > 0) aliasesAdded++;
-    }
+    const aliasesAdded = await forceUpsertAliases(
+      rawTx,
+      canonicalId,
+      input.aliases,
+    );
 
     if (isRecovery) {
       await forceWriteJunction(

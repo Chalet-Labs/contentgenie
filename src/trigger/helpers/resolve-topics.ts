@@ -1,7 +1,7 @@
 import { logger, metadata } from "@trigger.dev/sdk";
 
 import { generateEmbeddings } from "@/lib/ai/embed";
-import { resolveTopic } from "@/lib/entity-resolution";
+import { EntityResolutionError, resolveTopic } from "@/lib/entity-resolution";
 import {
   MAX_DISAMBIG_CALLS_PER_EPISODE,
   type MatchMethod,
@@ -43,6 +43,18 @@ function contextText(topic: NormalizedTopic): string {
   return `${topic.label} — ${topic.summary}`;
 }
 
+function emptyResult(topicCount: number, failed = 0): ResolveTopicsResult {
+  return {
+    resolved: 0,
+    failed,
+    matchMethodDistribution: { auto: 0, llm_disambig: 0, new: 0 },
+    versionTokenForcedDisambig: 0,
+    candidatesConsidered: { p50: 0, max: 0 },
+    budgetExhausted: false,
+    topicCount,
+  };
+}
+
 export async function resolveAndPersistEpisodeTopics(
   episodeId: number,
   topics: NormalizedTopic[],
@@ -52,15 +64,7 @@ export async function resolveAndPersistEpisodeTopics(
   const topicCount = topics.length;
 
   if (opts?.skipResolution || topicCount === 0) {
-    return {
-      resolved: 0,
-      failed: 0,
-      matchMethodDistribution: { auto: 0, llm_disambig: 0, new: 0 },
-      versionTokenForcedDisambig: 0,
-      candidatesConsidered: { p50: 0, max: 0 },
-      budgetExhausted: false,
-      topicCount,
-    };
+    return emptyResult(topicCount);
   }
 
   const identityTexts = topics.map(identityText);
@@ -82,17 +86,8 @@ export async function resolveAndPersistEpisodeTopics(
         err,
       },
     );
-    metadata.root.increment("topics_resolved", 0);
     metadata.root.increment("topics_failed", topicCount);
-    return {
-      resolved: 0,
-      failed: topicCount,
-      matchMethodDistribution: { auto: 0, llm_disambig: 0, new: 0 },
-      versionTokenForcedDisambig: 0,
-      candidatesConsidered: { p50: 0, max: 0 },
-      budgetExhausted: false,
-      topicCount,
-    };
+    return emptyResult(topicCount, topicCount);
   }
 
   let resolved = 0;
@@ -132,6 +127,12 @@ export async function resolveAndPersistEpisodeTopics(
         candidatesSamples.push(result.candidatesConsidered);
       resolved++;
     } catch (err) {
+      if (
+        err instanceof EntityResolutionError &&
+        err.reason === "other_below_relevance_floor"
+      ) {
+        continue;
+      }
       failed++;
       logger.warn("[resolve-topics] per-topic failure", {
         episodeId,
