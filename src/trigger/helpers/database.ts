@@ -9,7 +9,9 @@ import type {
   PodcastIndexEpisode,
 } from "@/lib/podcastindex";
 import {
+  buildLockKey,
   EntityResolutionError,
+  insertCanonical,
   normalizeLabel,
   updateLastSeen,
   upsertAliases,
@@ -163,14 +165,6 @@ export async function persistTranscript(
   }
 }
 
-function buildLockKey(label: string, kind: TopicKind): string {
-  return JSON.stringify([normalizeLabel(label), kind]);
-}
-
-function formatVector(values: readonly number[]): string {
-  return `[${values.join(",")}]`;
-}
-
 async function forceExactLookup(
   tx: Tx,
   label: string,
@@ -181,31 +175,6 @@ async function forceExactLookup(
   );
   const row = result.rows[0] as { id: number } | undefined;
   return row ?? null;
-}
-
-async function forceInsertCanonical(
-  tx: Tx,
-  input: ResolveTopicInput,
-): Promise<number | null> {
-  const result = await tx.execute(
-    sql`INSERT INTO canonical_topics
-         (label, normalized_label, kind, summary, ongoing, relevance,
-          identity_embedding, context_embedding)
-       VALUES (
-         ${input.label},
-         ${normalizeLabel(input.label)},
-         ${input.kind},
-         ${input.summary},
-         ${input.ongoing},
-         ${input.relevance},
-         ${formatVector(input.identityEmbedding)}::vector,
-         ${formatVector(input.contextEmbedding)}::vector
-       )
-       ON CONFLICT DO NOTHING
-       RETURNING id`,
-  );
-  const row = result.rows[0] as { id: number } | undefined;
-  return row?.id ?? null;
 }
 
 async function forceWriteJunction(
@@ -262,7 +231,7 @@ export async function forceInsertNewCanonical(
       };
     }
 
-    let canonicalId = await forceInsertCanonical(rawTx, input);
+    let canonicalId = await insertCanonical(rawTx, input);
     let isRecovery = false;
     if (canonicalId === null) {
       isRecovery = true;

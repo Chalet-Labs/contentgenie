@@ -114,7 +114,7 @@ export function normalizeLabel(s: string): string {
  * cannot produce the same key even if a label happens to contain `|`,
  * brackets, or other separator candidates.
  */
-function buildLockKey(label: string, kind: TopicKind): string {
+export function buildLockKey(label: string, kind: TopicKind): string {
   return JSON.stringify([normalizeLabel(label), kind]);
 }
 
@@ -124,7 +124,7 @@ function buildLockKey(label: string, kind: TopicKind): string {
 // (`(v1, v2, ...)`), which Postgres can't cast. Format it as a single string
 // here. Numbers are validated finite by `resolveTopic` before this is reached,
 // so there's no SQL-injection surface — they're still bound as a single param.
-function formatVector(values: readonly number[]): string {
+export function formatVector(values: readonly number[]): string {
   return `[${values.join(",")}]`;
 }
 
@@ -300,7 +300,7 @@ async function insertJunction(
   );
 }
 
-async function insertCanonical(
+export async function insertCanonical(
   tx: Tx,
   input: ResolveTopicInput,
 ): Promise<number | null> {
