@@ -55,3 +55,10 @@ export type MatchMethod = (typeof MATCH_METHODS)[number];
  */
 export const VERSION_TOKEN_REGEX =
   /\b(\d+\.\d+(?:\.\d+)?|\d{4}|v\d+(?:\.\d+)*)\b/g;
+
+/**
+ * Per-episode hard cap on disambiguator LLM calls. Topics beyond this limit
+ * short-circuit to `forceInsertNewCanonical` (ADR-042 §"Three-tier resolution
+ * pipeline"; ADR-045 §1 — orchestrator owns the cap).
+ */
+export const MAX_DISAMBIG_CALLS_PER_EPISODE = 5;

@@ -45,6 +45,7 @@ const STEP_LABELS: Record<SummarizationStep, string> = {
   "fetching-podcast": "Fetching podcast info",
   "generating-summary": "Generating AI summary",
   "saving-results": "Saving results",
+  "resolving-topics": "Resolving topics",
   completed: "Complete",
 };
 

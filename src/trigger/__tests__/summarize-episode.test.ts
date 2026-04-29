@@ -69,6 +69,21 @@ vi.mock("@/lib/ai/config", () => ({
   }),
 }));
 
+const mockResolveAndPersistEpisodeTopics = vi.fn().mockResolvedValue({
+  resolved: 0,
+  failed: 0,
+  matchMethodDistribution: { auto: 0, llm_disambig: 0, new: 0 },
+  versionTokenForcedDisambig: 0,
+  candidatesConsidered: { p50: 0, max: 0 },
+  budgetExhausted: false,
+  topicCount: 0,
+});
+
+vi.mock("@/trigger/helpers/resolve-topics", () => ({
+  resolveAndPersistEpisodeTopics: (...args: unknown[]) =>
+    mockResolveAndPersistEpisodeTopics(...args),
+}));
+
 import { getEpisodeById, getPodcastById } from "@/trigger/helpers/podcastindex";
 import { generateEpisodeSummary } from "@/trigger/helpers/ai-summary";
 import {
@@ -79,6 +94,7 @@ import {
   markSummaryReady,
   resolvePodcastId,
 } from "@/trigger/helpers/notifications";
+import { getActiveAiConfig } from "@/lib/ai/config";
 import { summarizeEpisode } from "@/trigger/summarize-episode";
 
 // The task mock returns the raw config object, so `.run` and `.onFailure` are available at runtime
@@ -420,5 +436,147 @@ describe("summarize-episode task", () => {
     await taskConfig.run({ episodeId: 123 }, mockCtx);
 
     expect(markSummaryReady).toHaveBeenCalledTimes(1);
+  });
+
+  describe("canonical-topic resolver integration", () => {
+    const mockSummaryWithTopics = {
+      ...mockSummary,
+      topics: [
+        {
+          label: "Rust Programming",
+          kind: "concept" as const,
+          summary: "Systems language",
+          aliases: [],
+          ongoing: true,
+          relevance: 0.9,
+          coverageScore: 0.7,
+        },
+      ],
+    };
+
+    function setupHappyPath() {
+      vi.mocked(getEpisodeById).mockResolvedValue({
+        episode: mockEpisode,
+      } as never);
+      vi.mocked(getPodcastById).mockResolvedValue({
+        feed: mockPodcast,
+      } as never);
+      vi.mocked(persistEpisodeSummary).mockResolvedValue(undefined);
+      vi.mocked(resolvePodcastId).mockResolvedValue(99);
+      mockFindFirst
+        .mockResolvedValueOnce({ transcription: "Full transcript text" })
+        .mockResolvedValueOnce({ id: 42 });
+    }
+
+    it("calls resolveAndPersistEpisodeTopics when topics present and summarizationPrompt is null", async () => {
+      setupHappyPath();
+      vi.mocked(generateEpisodeSummary).mockResolvedValue(
+        mockSummaryWithTopics,
+      );
+      vi.mocked(getActiveAiConfig).mockResolvedValue({
+        provider: "openrouter",
+        model: "google/gemini-2.0-flash-001",
+        summarizationPrompt: null,
+      } as never);
+
+      await taskConfig.run({ episodeId: 123 }, mockCtx);
+
+      expect(mockResolveAndPersistEpisodeTopics).toHaveBeenCalledTimes(1);
+      expect(mockResolveAndPersistEpisodeTopics).toHaveBeenCalledWith(
+        42,
+        mockSummaryWithTopics.topics,
+        mockSummaryWithTopics.summary,
+        { skipResolution: false },
+      );
+    });
+
+    it("skips resolveAndPersistEpisodeTopics when summarizationPrompt is set", async () => {
+      setupHappyPath();
+      vi.mocked(generateEpisodeSummary).mockResolvedValue(
+        mockSummaryWithTopics,
+      );
+      vi.mocked(getActiveAiConfig).mockResolvedValue({
+        provider: "openrouter",
+        model: "custom",
+        summarizationPrompt: "custom prompt",
+      } as never);
+
+      await taskConfig.run({ episodeId: 123 }, mockCtx);
+
+      expect(mockResolveAndPersistEpisodeTopics).toHaveBeenCalledWith(
+        42,
+        mockSummaryWithTopics.topics,
+        mockSummaryWithTopics.summary,
+        { skipResolution: true },
+      );
+    });
+
+    it("calls resolveAndPersistEpisodeTopics with empty topics when summary.topics is undefined", async () => {
+      setupHappyPath();
+      vi.mocked(generateEpisodeSummary).mockResolvedValue(mockSummary); // no topics
+      vi.mocked(getActiveAiConfig).mockResolvedValue({
+        provider: "openrouter",
+        model: "google/gemini-2.0-flash-001",
+        summarizationPrompt: null,
+      } as never);
+
+      await taskConfig.run({ episodeId: 123 }, mockCtx);
+
+      expect(mockResolveAndPersistEpisodeTopics).toHaveBeenCalledWith(
+        expect.any(Number),
+        [],
+        mockSummary.summary,
+        { skipResolution: false },
+      );
+    });
+
+    it("orchestrator throwing does NOT cause task failure; metadata.root.increment('completed', 1) still fires", async () => {
+      setupHappyPath();
+      vi.mocked(generateEpisodeSummary).mockResolvedValue(
+        mockSummaryWithTopics,
+      );
+      mockResolveAndPersistEpisodeTopics.mockRejectedValueOnce(
+        new Error("embedding batch failed"),
+      );
+
+      const result = await taskConfig.run({ episodeId: 123 }, mockCtx);
+
+      expect(result).toMatchObject({ summary: mockSummary.summary });
+      const completedCalls = mockMetadataRootIncrement.mock.calls.filter(
+        ([key]) => key === "completed",
+      );
+      expect(completedCalls).toHaveLength(1);
+      expect(completedCalls[0]).toEqual(["completed", 1]);
+    });
+
+    it("markSummaryReady still runs before resolver step", async () => {
+      setupHappyPath();
+      vi.mocked(generateEpisodeSummary).mockResolvedValue(
+        mockSummaryWithTopics,
+      );
+
+      const callOrder: string[] = [];
+      vi.mocked(markSummaryReady).mockImplementation(async () => {
+        callOrder.push("markSummaryReady");
+      });
+      mockResolveAndPersistEpisodeTopics.mockImplementation(async () => {
+        callOrder.push("resolveTopics");
+        return {
+          resolved: 1,
+          failed: 0,
+          matchMethodDistribution: { auto: 1, llm_disambig: 0, new: 0 },
+          versionTokenForcedDisambig: 0,
+          candidatesConsidered: { p50: 0, max: 0 },
+          budgetExhausted: false,
+          topicCount: 1,
+        };
+      });
+
+      await taskConfig.run({ episodeId: 123 }, mockCtx);
+
+      expect(callOrder.indexOf("markSummaryReady")).toBeLessThan(
+        callOrder.indexOf("resolveTopics"),
+      );
+    });
   });
 });

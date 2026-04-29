@@ -21,6 +21,7 @@ import {
   markSummaryReady,
   resolvePodcastId,
 } from "@/trigger/helpers/notifications";
+import { resolveAndPersistEpisodeTopics } from "@/trigger/helpers/resolve-topics";
 import { getActiveAiConfig } from "@/lib/ai/config";
 import { db } from "@/db";
 import { episodes } from "@/db/schema";
@@ -243,6 +244,7 @@ export const summarizeEpisode = task({
 
     // Update the existing notification row in place (created by the poller on discovery).
     // No-ops silently if no prior row exists (admin-triggered re-summarization).
+    let episodeDbId: number | null = null;
     try {
       const podcastDbId = await resolvePodcastId(episode.feedId);
       if (podcastDbId) {
@@ -250,7 +252,7 @@ export const summarizeEpisode = task({
           where: eq(episodes.podcastIndexId, piId),
           columns: { id: true },
         });
-        const episodeDbId = dbEpisode?.id ?? null;
+        episodeDbId = dbEpisode?.id ?? null;
         if (episodeDbId != null) {
           await markSummaryReady(
             podcastDbId,
@@ -269,6 +271,28 @@ export const summarizeEpisode = task({
       logger.warn("Failed to update notifications", {
         episodeId,
         error: notifErr instanceof Error ? notifErr.message : String(notifErr),
+      });
+    }
+
+    setStep("resolving-topics");
+    try {
+      if (episodeDbId == null) {
+        logger.warn(
+          "[summarize-episode] skipping resolver: episode DB id unavailable",
+          { episodeId },
+        );
+      } else {
+        await resolveAndPersistEpisodeTopics(
+          episodeDbId,
+          summary.topics ?? [],
+          summary.summary,
+          { skipResolution: aiConfig.summarizationPrompt !== null },
+        );
+      }
+    } catch (err) {
+      logger.warn("[summarize-episode] canonical-topic resolution failed", {
+        episodeId,
+        err,
       });
     }
 

@@ -8,6 +8,7 @@ export const SUMMARIZATION_STEPS = [
   "fetching-podcast",
   "generating-summary",
   "saving-results",
+  "resolving-topics",
   "completed",
 ] as const;
 
