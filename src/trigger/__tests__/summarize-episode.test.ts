@@ -141,6 +141,13 @@ function metricCalls(key: string): unknown[][] {
   return mockMetadataRootIncrement.mock.calls.filter(([k]) => k === key);
 }
 
+async function expectEpisodeNotFound(episodeId: number): Promise<void> {
+  vi.mocked(getEpisodeById).mockResolvedValue({ episode: null } as never);
+  await expect(taskConfig.run({ episodeId }, mockCtx)).rejects.toThrow(
+    `Episode ${episodeId} not found`,
+  );
+}
+
 describe("summarize-episode task", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -203,11 +210,7 @@ describe("summarize-episode task", () => {
   });
 
   it("throws AbortTaskRunError when episode is not found", async () => {
-    vi.mocked(getEpisodeById).mockResolvedValue({ episode: null } as never);
-
-    await expect(taskConfig.run({ episodeId: 999 }, mockCtx)).rejects.toThrow(
-      "Episode 999 not found",
-    );
+    await expectEpisodeNotFound(999);
   });
 
   it("aborts when transcript is missing — writes failed status to DB before throwing", async () => {
@@ -324,12 +327,7 @@ describe("summarize-episode task", () => {
   });
 
   it("does not call metadata.root.increment('completed') when episode is not found", async () => {
-    vi.mocked(getEpisodeById).mockResolvedValue({ episode: null } as never);
-
-    await expect(taskConfig.run({ episodeId: 999 }, mockCtx)).rejects.toThrow(
-      "Episode 999 not found",
-    );
-
+    await expectEpisodeNotFound(999);
     expect(metricCalls("completed")).toHaveLength(0);
   });
 
