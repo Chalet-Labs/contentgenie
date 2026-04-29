@@ -137,6 +137,10 @@ function makeUpdateChain(resolvedValue: unknown = undefined) {
   return { setFn, whereFn };
 }
 
+function metricCalls(key: string): unknown[][] {
+  return mockMetadataRootIncrement.mock.calls.filter(([k]) => k === key);
+}
+
 describe("summarize-episode task", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -316,11 +320,7 @@ describe("summarize-episode task", () => {
 
     await taskConfig.run({ episodeId: 123 }, mockCtx);
 
-    const completedCalls = mockMetadataRootIncrement.mock.calls.filter(
-      ([key]) => key === "completed",
-    );
-    expect(completedCalls).toHaveLength(1);
-    expect(completedCalls[0]).toEqual(["completed", 1]);
+    expect(metricCalls("completed")).toEqual([["completed", 1]]);
   });
 
   it("does not call metadata.root.increment('completed') when episode is not found", async () => {
@@ -330,10 +330,7 @@ describe("summarize-episode task", () => {
       "Episode 999 not found",
     );
 
-    const completedCalls = mockMetadataRootIncrement.mock.calls.filter(
-      ([key]) => key === "completed",
-    );
-    expect(completedCalls).toHaveLength(0);
+    expect(metricCalls("completed")).toHaveLength(0);
   });
 
   it("onFailure preserves existing processingError instead of overwriting", async () => {
@@ -542,11 +539,7 @@ describe("summarize-episode task", () => {
       const result = await taskConfig.run({ episodeId: 123 }, mockCtx);
 
       expect(result).toMatchObject({ summary: mockSummary.summary });
-      const completedCalls = mockMetadataRootIncrement.mock.calls.filter(
-        ([key]) => key === "completed",
-      );
-      expect(completedCalls).toHaveLength(1);
-      expect(completedCalls[0]).toEqual(["completed", 1]);
+      expect(metricCalls("completed")).toEqual([["completed", 1]]);
     });
 
     it("markSummaryReady still runs before resolver step", async () => {
