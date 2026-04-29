@@ -43,10 +43,28 @@ vi.mock("@trigger.dev/sdk", () => ({
   logger: { info: vi.fn(), warn: vi.fn() },
 }));
 
+// vi.mock is hoisted — top-level import sees the mocks.
+import { resolveAndPersistEpisodeTopics } from "@/trigger/helpers/resolve-topics";
+import { EntityResolutionError } from "@/lib/entity-resolution";
+
 // ---- Helpers -----------------------------------------------------------------
 
 function buildEmbedding(seed = 0.001): number[] {
   return Array.from({ length: 1024 }, (_, i) => seed + i * 0.000001);
+}
+
+/**
+ * Mocks both `generateEmbeddings` calls (identity + context) for an N-topic
+ * batch. Returns the embeddings used so tests can re-use them in assertions.
+ */
+function mockEmbeddings(count: number, seed = 0): number[][] {
+  const embs = Array.from({ length: count }, (_, i) =>
+    buildEmbedding(seed + (i + 1) * 0.01),
+  );
+  mockGenerateEmbeddings
+    .mockResolvedValueOnce(embs)
+    .mockResolvedValueOnce(embs);
+  return embs;
 }
 
 function makeTopic(overrides: Partial<NormalizedTopic> = {}): NormalizedTopic {
@@ -60,6 +78,12 @@ function makeTopic(overrides: Partial<NormalizedTopic> = {}): NormalizedTopic {
     coverageScore: 0.6,
     ...overrides,
   };
+}
+
+function makeTopics(count: number, labelPrefix = "T"): NormalizedTopic[] {
+  return Array.from({ length: count }, (_, i) =>
+    makeTopic({ label: `${labelPrefix}${i}` }),
+  );
 }
 
 let nextCanonicalId = 1;
@@ -79,6 +103,10 @@ function makeResolveResult(
   return base;
 }
 
+function metricCalls(key: string): unknown[][] {
+  return mockMetadataRootIncrement.mock.calls.filter(([k]) => k === key);
+}
+
 // ---- Tests ------------------------------------------------------------------
 
 beforeEach(() => {
@@ -91,8 +119,6 @@ afterEach(() => {
 
 describe("resolveAndPersistEpisodeTopics", () => {
   it("returns zero-shape result with no calls when topics is empty", async () => {
-    const { resolveAndPersistEpisodeTopics } =
-      await import("@/trigger/helpers/resolve-topics");
     const result = await resolveAndPersistEpisodeTopics(1, [], "some summary");
 
     expect(result.resolved).toBe(0);
@@ -103,12 +129,9 @@ describe("resolveAndPersistEpisodeTopics", () => {
   });
 
   it("returns zero-shape result with no calls when opts.skipResolution is true", async () => {
-    const { resolveAndPersistEpisodeTopics } =
-      await import("@/trigger/helpers/resolve-topics");
-    const topics = [makeTopic()];
     const result = await resolveAndPersistEpisodeTopics(
       1,
-      topics,
+      [makeTopic()],
       "some summary",
       { skipResolution: true },
     );
@@ -119,121 +142,68 @@ describe("resolveAndPersistEpisodeTopics", () => {
     expect(mockResolveTopic).not.toHaveBeenCalled();
   });
 
-  it("makes exactly 2 generateEmbeddings calls for 3 topics (one per column)", async () => {
-    const identityEmbeddings = [
-      buildEmbedding(0.1),
-      buildEmbedding(0.2),
-      buildEmbedding(0.3),
-    ];
-    const contextEmbeddings = [
-      buildEmbedding(0.4),
-      buildEmbedding(0.5),
-      buildEmbedding(0.6),
-    ];
-    mockGenerateEmbeddings
-      .mockResolvedValueOnce(identityEmbeddings)
-      .mockResolvedValueOnce(contextEmbeddings);
+  it("makes exactly 2 generateEmbeddings calls regardless of topic count", async () => {
+    mockEmbeddings(3);
     mockResolveTopic.mockResolvedValue(makeResolveResult("auto"));
 
-    const topics = [
-      makeTopic({ label: "Alpha", aliases: ["a"] }),
-      makeTopic({ label: "Beta" }),
-      makeTopic({ label: "Gamma", summary: "gamma summary" }),
-    ];
-
-    const { resolveAndPersistEpisodeTopics } =
-      await import("@/trigger/helpers/resolve-topics");
-    const result = await resolveAndPersistEpisodeTopics(1, topics, "summary");
+    const result = await resolveAndPersistEpisodeTopics(
+      1,
+      makeTopics(3),
+      "summary",
+    );
 
     expect(mockGenerateEmbeddings).toHaveBeenCalledTimes(2);
     expect(result.resolved).toBe(3);
     expect(result.topicCount).toBe(3);
   });
 
-  it("passes correct identity text (label | aliases) to first generateEmbeddings call", async () => {
-    mockGenerateEmbeddings
-      .mockResolvedValueOnce([buildEmbedding()])
-      .mockResolvedValueOnce([buildEmbedding()]);
+  it.each([
+    {
+      name: "label | aliases",
+      topic: { label: "Alpha", aliases: ["a", "b"] },
+      callIndex: 0,
+      expected: "Alpha | a, b",
+    },
+    {
+      name: "label only when aliases empty",
+      topic: { label: "NoAlias", aliases: [] },
+      callIndex: 0,
+      expected: "NoAlias",
+    },
+    {
+      name: "label — summary",
+      topic: { label: "Alpha", summary: "alpha is the first" },
+      callIndex: 1,
+      expected: "Alpha — alpha is the first",
+    },
+    {
+      name: "label only when summary empty",
+      topic: { label: "NoSummary", summary: "" },
+      callIndex: 1,
+      expected: "NoSummary",
+    },
+  ])("embedding text format: $name", async ({ topic, callIndex, expected }) => {
+    mockEmbeddings(1);
     mockResolveTopic.mockResolvedValue(makeResolveResult("auto"));
 
-    const topic = makeTopic({ label: "Alpha", aliases: ["a", "b"] });
+    await resolveAndPersistEpisodeTopics(1, [makeTopic(topic)], "summary");
 
-    const { resolveAndPersistEpisodeTopics } =
-      await import("@/trigger/helpers/resolve-topics");
-    await resolveAndPersistEpisodeTopics(1, [topic], "summary");
-
-    const identityTexts = mockGenerateEmbeddings.mock.calls[0][0] as string[];
-    expect(identityTexts[0]).toBe("Alpha | a, b");
-  });
-
-  it("uses just label as identity text when aliases is empty", async () => {
-    mockGenerateEmbeddings
-      .mockResolvedValueOnce([buildEmbedding()])
-      .mockResolvedValueOnce([buildEmbedding()]);
-    mockResolveTopic.mockResolvedValue(makeResolveResult("auto"));
-
-    const topic = makeTopic({ label: "NoAlias", aliases: [] });
-
-    const { resolveAndPersistEpisodeTopics } =
-      await import("@/trigger/helpers/resolve-topics");
-    await resolveAndPersistEpisodeTopics(1, [topic], "summary");
-
-    const identityTexts = mockGenerateEmbeddings.mock.calls[0][0] as string[];
-    expect(identityTexts[0]).toBe("NoAlias");
-  });
-
-  it("passes correct context text (label — summary) to second generateEmbeddings call", async () => {
-    mockGenerateEmbeddings
-      .mockResolvedValueOnce([buildEmbedding()])
-      .mockResolvedValueOnce([buildEmbedding()]);
-    mockResolveTopic.mockResolvedValue(makeResolveResult("auto"));
-
-    const topic = makeTopic({ label: "Alpha", summary: "alpha is the first" });
-
-    const { resolveAndPersistEpisodeTopics } =
-      await import("@/trigger/helpers/resolve-topics");
-    await resolveAndPersistEpisodeTopics(1, [topic], "summary");
-
-    const contextTexts = mockGenerateEmbeddings.mock.calls[1][0] as string[];
-    expect(contextTexts[0]).toBe("Alpha — alpha is the first");
-  });
-
-  it("uses just label as context text when summary is empty", async () => {
-    mockGenerateEmbeddings
-      .mockResolvedValueOnce([buildEmbedding()])
-      .mockResolvedValueOnce([buildEmbedding()]);
-    mockResolveTopic.mockResolvedValue(makeResolveResult("auto"));
-
-    const topic = makeTopic({ label: "NoSummary", summary: "" });
-
-    const { resolveAndPersistEpisodeTopics } =
-      await import("@/trigger/helpers/resolve-topics");
-    await resolveAndPersistEpisodeTopics(1, [topic], "summary");
-
-    const contextTexts = mockGenerateEmbeddings.mock.calls[1][0] as string[];
-    expect(contextTexts[0]).toBe("NoSummary");
+    const texts = mockGenerateEmbeddings.mock.calls[callIndex][0] as string[];
+    expect(texts[0]).toBe(expected);
   });
 
   it("per-topic failure increments failed, others succeed, no rethrow", async () => {
-    const emb = [buildEmbedding(), buildEmbedding(), buildEmbedding()];
-    mockGenerateEmbeddings
-      .mockResolvedValueOnce(emb)
-      .mockResolvedValueOnce(emb);
-
+    mockEmbeddings(3);
     mockResolveTopic
       .mockResolvedValueOnce(makeResolveResult("auto"))
       .mockRejectedValueOnce(new Error("topic error"))
       .mockResolvedValueOnce(makeResolveResult("auto"));
 
-    const topics = [
-      makeTopic(),
-      makeTopic({ label: "Failing" }),
-      makeTopic({ label: "Third" }),
-    ];
-
-    const { resolveAndPersistEpisodeTopics } =
-      await import("@/trigger/helpers/resolve-topics");
-    const result = await resolveAndPersistEpisodeTopics(1, topics, "summary");
+    const result = await resolveAndPersistEpisodeTopics(
+      1,
+      makeTopics(3),
+      "summary",
+    );
 
     expect(result.resolved).toBe(2);
     expect(result.failed).toBe(1);
@@ -242,32 +212,22 @@ describe("resolveAndPersistEpisodeTopics", () => {
   it("budget: topics beyond MAX_DISAMBIG_CALLS_PER_EPISODE use forceInsertNewCanonical", async () => {
     const overflow = 2;
     const total = MAX_DISAMBIG_CALLS_PER_EPISODE + overflow;
-    const embs = Array.from({ length: total }, (_, i) =>
-      buildEmbedding(i * 0.01 + 0.01),
-    );
-    mockGenerateEmbeddings
-      .mockResolvedValueOnce(embs)
-      .mockResolvedValueOnce(embs);
+    mockEmbeddings(total);
 
-    // First MAX_DISAMBIG_CALLS_PER_EPISODE topics → llm_disambig (burns budget)
-    const llmResult = makeResolveResult("llm_disambig");
     for (let i = 0; i < MAX_DISAMBIG_CALLS_PER_EPISODE; i++) {
-      mockResolveTopic.mockResolvedValueOnce(llmResult);
+      mockResolveTopic.mockResolvedValueOnce(makeResolveResult("llm_disambig"));
     }
-
-    // Remaining topics → forceInsertNewCanonical
-    const forceResult = makeResolveResult("new");
     for (let i = 0; i < overflow; i++) {
-      mockForceInsertNewCanonical.mockResolvedValueOnce(forceResult);
+      mockForceInsertNewCanonical.mockResolvedValueOnce(
+        makeResolveResult("new"),
+      );
     }
 
-    const topics = Array.from({ length: total }, (_, i) =>
-      makeTopic({ label: `Topic ${i + 1}` }),
+    const result = await resolveAndPersistEpisodeTopics(
+      1,
+      makeTopics(total),
+      "summary",
     );
-
-    const { resolveAndPersistEpisodeTopics } =
-      await import("@/trigger/helpers/resolve-topics");
-    const result = await resolveAndPersistEpisodeTopics(1, topics, "summary");
 
     expect(mockResolveTopic).toHaveBeenCalledTimes(
       MAX_DISAMBIG_CALLS_PER_EPISODE,
@@ -279,23 +239,14 @@ describe("resolveAndPersistEpisodeTopics", () => {
 
   it("budget boundary: the cap'th disambig still uses resolveTopic; the next switches to forceInsert", async () => {
     const total = MAX_DISAMBIG_CALLS_PER_EPISODE + 1;
-    const embs = Array.from({ length: total }, () => buildEmbedding());
-    mockGenerateEmbeddings
-      .mockResolvedValueOnce(embs)
-      .mockResolvedValueOnce(embs);
+    mockEmbeddings(total);
 
     for (let i = 0; i < MAX_DISAMBIG_CALLS_PER_EPISODE; i++) {
       mockResolveTopic.mockResolvedValueOnce(makeResolveResult("llm_disambig"));
     }
     mockForceInsertNewCanonical.mockResolvedValueOnce(makeResolveResult("new"));
 
-    const topics = Array.from({ length: total }, (_, i) =>
-      makeTopic({ label: `T${i}` }),
-    );
-
-    const { resolveAndPersistEpisodeTopics } =
-      await import("@/trigger/helpers/resolve-topics");
-    await resolveAndPersistEpisodeTopics(1, topics, "summary");
+    await resolveAndPersistEpisodeTopics(1, makeTopics(total), "summary");
 
     expect(mockResolveTopic).toHaveBeenCalledTimes(
       MAX_DISAMBIG_CALLS_PER_EPISODE,
@@ -304,28 +255,18 @@ describe("resolveAndPersistEpisodeTopics", () => {
   });
 
   it("matchMethodDistribution counts each match_method exactly", async () => {
-    const embs = [
-      buildEmbedding(),
-      buildEmbedding(),
-      buildEmbedding(),
-      buildEmbedding(),
-    ];
-    mockGenerateEmbeddings
-      .mockResolvedValueOnce(embs)
-      .mockResolvedValueOnce(embs);
+    mockEmbeddings(4);
     mockResolveTopic
       .mockResolvedValueOnce(makeResolveResult("auto"))
       .mockResolvedValueOnce(makeResolveResult("auto"))
       .mockResolvedValueOnce(makeResolveResult("llm_disambig"))
       .mockResolvedValueOnce(makeResolveResult("new"));
 
-    const topics = Array.from({ length: 4 }, (_, i) =>
-      makeTopic({ label: `T${i}` }),
+    const result = await resolveAndPersistEpisodeTopics(
+      1,
+      makeTopics(4),
+      "summary",
     );
-
-    const { resolveAndPersistEpisodeTopics } =
-      await import("@/trigger/helpers/resolve-topics");
-    const result = await resolveAndPersistEpisodeTopics(1, topics, "summary");
 
     expect(result.matchMethodDistribution).toEqual({
       auto: 2,
@@ -335,10 +276,7 @@ describe("resolveAndPersistEpisodeTopics", () => {
   });
 
   it("counts versionTokenForcedDisambig occurrences across topics", async () => {
-    const embs = [buildEmbedding(), buildEmbedding(), buildEmbedding()];
-    mockGenerateEmbeddings
-      .mockResolvedValueOnce(embs)
-      .mockResolvedValueOnce(embs);
+    mockEmbeddings(3);
     mockResolveTopic
       .mockResolvedValueOnce(
         makeResolveResult("llm_disambig", { versionTokenForcedDisambig: true }),
@@ -350,37 +288,28 @@ describe("resolveAndPersistEpisodeTopics", () => {
         makeResolveResult("llm_disambig", { versionTokenForcedDisambig: true }),
       );
 
-    const topics = Array.from({ length: 3 }, (_, i) =>
-      makeTopic({ label: `T${i}` }),
+    const result = await resolveAndPersistEpisodeTopics(
+      1,
+      makeTopics(3),
+      "summary",
     );
-
-    const { resolveAndPersistEpisodeTopics } =
-      await import("@/trigger/helpers/resolve-topics");
-    const result = await resolveAndPersistEpisodeTopics(1, topics, "summary");
 
     expect(result.versionTokenForcedDisambig).toBe(2);
   });
 
   it("EntityResolutionError('other_below_relevance_floor') is treated as a skip, not a failure", async () => {
-    const embs = [buildEmbedding(), buildEmbedding()];
-    mockGenerateEmbeddings
-      .mockResolvedValueOnce(embs)
-      .mockResolvedValueOnce(embs);
-
-    const { EntityResolutionError } = await import("@/lib/entity-resolution");
+    mockEmbeddings(2);
     mockResolveTopic
       .mockResolvedValueOnce(makeResolveResult("auto"))
       .mockRejectedValueOnce(
-        new (EntityResolutionError as unknown as new (reason: string) => Error)(
-          "other_below_relevance_floor",
-        ),
+        new EntityResolutionError("other_below_relevance_floor"),
       );
 
-    const topics = [makeTopic({ label: "Real" }), makeTopic({ label: "Junk" })];
-
-    const { resolveAndPersistEpisodeTopics } =
-      await import("@/trigger/helpers/resolve-topics");
-    const result = await resolveAndPersistEpisodeTopics(1, topics, "summary");
+    const result = await resolveAndPersistEpisodeTopics(
+      1,
+      [makeTopic({ label: "Real" }), makeTopic({ label: "Junk" })],
+      "summary",
+    );
 
     expect(result.resolved).toBe(1);
     expect(result.failed).toBe(0);
@@ -388,106 +317,63 @@ describe("resolveAndPersistEpisodeTopics", () => {
   });
 
   it("does not call forceInsertNewCanonical when all topics resolve via auto", async () => {
-    const embs = Array.from({ length: 8 }, (_, i) =>
-      buildEmbedding(i * 0.01 + 0.01),
-    );
-    mockGenerateEmbeddings
-      .mockResolvedValueOnce(embs)
-      .mockResolvedValueOnce(embs);
-
+    mockEmbeddings(8);
     mockResolveTopic.mockResolvedValue(makeResolveResult("auto"));
 
-    const topics = Array.from({ length: 8 }, (_, i) =>
-      makeTopic({ label: `Topic ${i + 1}` }),
+    const result = await resolveAndPersistEpisodeTopics(
+      1,
+      makeTopics(8),
+      "summary",
     );
-
-    const { resolveAndPersistEpisodeTopics } =
-      await import("@/trigger/helpers/resolve-topics");
-    const result = await resolveAndPersistEpisodeTopics(1, topics, "summary");
 
     expect(mockForceInsertNewCanonical).not.toHaveBeenCalled();
     expect(result.budgetExhausted).toBe(false);
   });
 
   it("calls metadata.root.increment for topics_resolved and topics_failed once each", async () => {
-    const embs = [buildEmbedding(), buildEmbedding()];
-    mockGenerateEmbeddings
-      .mockResolvedValueOnce(embs)
-      .mockResolvedValueOnce(embs);
+    mockEmbeddings(2);
     mockResolveTopic
       .mockResolvedValueOnce(makeResolveResult("auto"))
       .mockRejectedValueOnce(new Error("fail"));
 
-    const topics = [makeTopic(), makeTopic({ label: "Fail" })];
+    await resolveAndPersistEpisodeTopics(1, makeTopics(2), "summary");
 
-    const { resolveAndPersistEpisodeTopics } =
-      await import("@/trigger/helpers/resolve-topics");
-    await resolveAndPersistEpisodeTopics(1, topics, "summary");
-
-    const resolvedCalls = mockMetadataRootIncrement.mock.calls.filter(
-      ([key]) => key === "topics_resolved",
-    );
-    const failedCalls = mockMetadataRootIncrement.mock.calls.filter(
-      ([key]) => key === "topics_failed",
-    );
-    expect(resolvedCalls).toHaveLength(1);
-    expect(resolvedCalls[0]).toEqual(["topics_resolved", 1]);
-    expect(failedCalls).toHaveLength(1);
-    expect(failedCalls[0]).toEqual(["topics_failed", 1]);
+    expect(metricCalls("topics_resolved")).toEqual([["topics_resolved", 1]]);
+    expect(metricCalls("topics_failed")).toEqual([["topics_failed", 1]]);
   });
 
   it("candidatesConsidered.p50 and .max reflect mocked resolver outputs", async () => {
-    const embs = [buildEmbedding(), buildEmbedding(), buildEmbedding()];
-    mockGenerateEmbeddings
-      .mockResolvedValueOnce(embs)
-      .mockResolvedValueOnce(embs);
-
-    mockResolveTopic
-      .mockResolvedValueOnce(
-        makeResolveResult("auto", { candidatesConsidered: 3 }),
-      )
-      .mockResolvedValueOnce(
-        makeResolveResult("auto", { candidatesConsidered: 7 }),
-      )
-      .mockResolvedValueOnce(
-        makeResolveResult("auto", { candidatesConsidered: 5 }),
+    mockEmbeddings(3);
+    for (const candidatesConsidered of [3, 7, 5]) {
+      mockResolveTopic.mockResolvedValueOnce(
+        makeResolveResult("auto", { candidatesConsidered }),
       );
+    }
 
-    const topics = Array.from({ length: 3 }, (_, i) =>
-      makeTopic({ label: `T${i}` }),
+    const result = await resolveAndPersistEpisodeTopics(
+      1,
+      makeTopics(3),
+      "summary",
     );
 
-    const { resolveAndPersistEpisodeTopics } =
-      await import("@/trigger/helpers/resolve-topics");
-    const result = await resolveAndPersistEpisodeTopics(1, topics, "summary");
-
     expect(result.candidatesConsidered.max).toBe(7);
-    // Median of [3, 7, 5] sorted → [3, 5, 7]; p50 = 5
+    // Median of sorted [3, 5, 7] is 5
     expect(result.candidatesConsidered.p50).toBe(5);
   });
 
   it("embedding batch failure returns failed=topicCount, resolved=0, increments topics_failed, does not throw", async () => {
     mockGenerateEmbeddings.mockRejectedValue(new Error("embed api down"));
 
-    const topics = [
-      makeTopic({ label: "A" }),
-      makeTopic({ label: "B" }),
-      makeTopic({ label: "C" }),
-    ];
-
-    const { resolveAndPersistEpisodeTopics } =
-      await import("@/trigger/helpers/resolve-topics");
-    const result = await resolveAndPersistEpisodeTopics(1, topics, "summary");
+    const result = await resolveAndPersistEpisodeTopics(
+      1,
+      makeTopics(3),
+      "summary",
+    );
 
     expect(result.resolved).toBe(0);
     expect(result.failed).toBe(3);
     expect(result.topicCount).toBe(3);
     expect(mockResolveTopic).not.toHaveBeenCalled();
-
-    const failedCalls = mockMetadataRootIncrement.mock.calls.filter(
-      ([key]) => key === "topics_failed",
-    );
-    expect(failedCalls).toHaveLength(1);
-    expect(failedCalls[0]).toEqual(["topics_failed", 3]);
+    expect(metricCalls("topics_failed")).toEqual([["topics_failed", 3]]);
   });
 });
