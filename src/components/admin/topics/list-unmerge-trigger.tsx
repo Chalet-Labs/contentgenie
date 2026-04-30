@@ -35,6 +35,8 @@ export function ListUnmergeTrigger({ topic }: ListUnmergeTriggerProps) {
       } else {
         toast.error(`Failed to load suggestions: ${res.error}`);
       }
+    } catch {
+      toast.error("Failed to load suggestions. Please try again.");
     } finally {
       setLoading(false);
     }
