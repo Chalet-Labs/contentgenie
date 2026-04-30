@@ -1,9 +1,17 @@
 import "server-only";
 
-import { Pool } from "@neondatabase/serverless";
+import { Pool, neonConfig } from "@neondatabase/serverless";
 import { drizzle, type NeonDatabase } from "drizzle-orm/neon-serverless";
+import ws from "ws";
 
 import * as schema from "@/db/schema";
+
+// Trigger.dev's worker runtime has no global `WebSocket`, so the Neon Pool
+// driver throws "All attempts to open a WebSocket … failed" on every
+// transaction. Wiring the `ws` polyfill here makes transactional() work in
+// any Node runtime; environments that already expose a global `WebSocket`
+// (Vercel Node 22+) ignore this override at connect time.
+neonConfig.webSocketConstructor = ws;
 
 /**
  * Pool-backed Drizzle client + `transactional()` helper.
