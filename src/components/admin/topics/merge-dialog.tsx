@@ -41,6 +41,15 @@ export function MergeDialog({ topic, open, onClose }: MergeDialogProps) {
   const deferredSearch = useDeferredValue(search);
 
   useEffect(() => {
+    if (open) {
+      setSearch("");
+      setResults([]);
+      setSelected(null);
+      setSubmitting(false);
+    }
+  }, [open, topic.id]);
+
+  useEffect(() => {
     if (!deferredSearch) {
       setResults([]);
       return;
