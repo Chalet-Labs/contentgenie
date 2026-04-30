@@ -80,7 +80,7 @@ interface PendingDisambig {
   versionTokenForcedDisambig: boolean;
 }
 
-type Tx = {
+export type Tx = {
   execute: (query: unknown) => Promise<{ rows: unknown[] }>;
 };
 
@@ -114,7 +114,7 @@ export function normalizeLabel(s: string): string {
  * cannot produce the same key even if a label happens to contain `|`,
  * brackets, or other separator candidates.
  */
-function buildLockKey(label: string, kind: TopicKind): string {
+export function buildLockKey(label: string, kind: TopicKind): string {
   return JSON.stringify([normalizeLabel(label), kind]);
 }
 
@@ -124,7 +124,7 @@ function buildLockKey(label: string, kind: TopicKind): string {
 // (`(v1, v2, ...)`), which Postgres can't cast. Format it as a single string
 // here. Numbers are validated finite by `resolveTopic` before this is reached,
 // so there's no SQL-injection surface — they're still bound as a single param.
-function formatVector(values: readonly number[]): string {
+export function formatVector(values: readonly number[]): string {
   return `[${values.join(",")}]`;
 }
 
@@ -138,11 +138,32 @@ export type EntityResolutionReason =
 
 export class EntityResolutionError extends Error {
   readonly name = "EntityResolutionError" as const;
+  /** True when the LLM disambiguator was called but a later step failed. */
+  readonly usedDisambiguator: boolean;
   constructor(
     readonly reason: EntityResolutionReason,
-    options?: { cause?: unknown },
+    options?: { cause?: unknown; usedDisambiguator?: boolean },
   ) {
     super(reason, options);
+    this.usedDisambiguator = options?.usedDisambiguator ?? false;
+  }
+}
+
+export function validateResolveTopicInput(input: ResolveTopicInput): void {
+  if (input.kind === "other" && input.relevance < OTHER_KIND_RELEVANCE_FLOOR) {
+    throw new EntityResolutionError("other_below_relevance_floor");
+  }
+  if (
+    input.identityEmbedding.length !== EMBEDDING_DIMENSION ||
+    input.contextEmbedding.length !== EMBEDDING_DIMENSION
+  ) {
+    throw new EntityResolutionError("invalid_embedding_dim");
+  }
+  if (
+    !input.identityEmbedding.every(Number.isFinite) ||
+    !input.contextEmbedding.every(Number.isFinite)
+  ) {
+    throw new EntityResolutionError("invalid_embedding_value");
   }
 }
 
@@ -177,7 +198,7 @@ async function acquireLock(
   );
 }
 
-async function exactLookup(
+export async function exactLookup(
   tx: Tx,
   label: string,
   kind: TopicKind,
@@ -229,13 +250,16 @@ async function confirmCandidate(
   return row ?? null;
 }
 
-async function updateLastSeen(tx: Tx, canonicalId: number): Promise<void> {
+export async function updateLastSeen(
+  tx: Tx,
+  canonicalId: number,
+): Promise<void> {
   await tx.execute(
     sql`UPDATE canonical_topics SET last_seen = now() WHERE id = ${canonicalId}`,
   );
 }
 
-async function upsertAliases(
+export async function upsertAliases(
   tx: Tx,
   canonicalId: number,
   aliases: readonly string[],
@@ -255,7 +279,7 @@ async function upsertAliases(
   return result.rows.length;
 }
 
-async function insertJunction(
+export async function insertJunction(
   tx: Tx,
   args: {
     episodeId: number;
@@ -276,7 +300,7 @@ async function insertJunction(
   );
 }
 
-async function insertCanonical(
+export async function insertCanonical(
   tx: Tx,
   input: ResolveTopicInput,
 ): Promise<number | null> {
@@ -336,21 +360,7 @@ async function finalizeMatch(
 export async function resolveTopic(
   input: ResolveTopicInput,
 ): Promise<ResolveTopicResult> {
-  if (
-    input.identityEmbedding.length !== EMBEDDING_DIMENSION ||
-    input.contextEmbedding.length !== EMBEDDING_DIMENSION
-  ) {
-    throw new EntityResolutionError("invalid_embedding_dim");
-  }
-  if (
-    !input.identityEmbedding.every(Number.isFinite) ||
-    !input.contextEmbedding.every(Number.isFinite)
-  ) {
-    throw new EntityResolutionError("invalid_embedding_value");
-  }
-  if (input.kind === "other" && input.relevance < OTHER_KIND_RELEVANCE_FLOOR) {
-    throw new EntityResolutionError("other_below_relevance_floor");
-  }
+  validateResolveTopicInput(input);
 
   const tx1Result = await transactional<ResolveTopicResult | PendingDisambig>(
     async (tx1) => runTx1(tx1 as unknown as Tx, input),
@@ -361,15 +371,29 @@ export async function resolveTopic(
   }
 
   const chosenId = await callDisambiguator(input, tx1Result.candidates);
-  return transactional<ResolveTopicResult>(async (tx2) =>
-    runTx2(
-      tx2 as unknown as Tx,
-      input,
-      tx1Result.candidates,
-      chosenId,
-      tx1Result.versionTokenForcedDisambig,
-    ),
-  );
+
+  try {
+    return await transactional<ResolveTopicResult>(async (tx2) =>
+      runTx2(
+        tx2 as unknown as Tx,
+        input,
+        tx1Result.candidates,
+        chosenId,
+        tx1Result.versionTokenForcedDisambig,
+      ),
+    );
+  } catch (err) {
+    if (err instanceof EntityResolutionError) {
+      throw new EntityResolutionError(err.reason, {
+        cause: err,
+        usedDisambiguator: true,
+      });
+    }
+    throw new EntityResolutionError("conflict_recovery_failed", {
+      cause: err,
+      usedDisambiguator: true,
+    });
+  }
 }
 
 async function runTx1(
@@ -495,13 +519,17 @@ async function callDisambiguator(
   } catch (err) {
     throw new EntityResolutionError("disambig_transport_failed", {
       cause: err,
+      usedDisambiguator: true,
     });
   }
   try {
     const parsed = parseJsonResponse<unknown>(raw);
     return disambigSchema.parse(parsed).chosen_id;
   } catch (err) {
-    throw new EntityResolutionError("disambig_parse_failed", { cause: err });
+    throw new EntityResolutionError("disambig_parse_failed", {
+      cause: err,
+      usedDisambiguator: true,
+    });
   }
 }
 

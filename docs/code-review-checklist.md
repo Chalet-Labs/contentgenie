@@ -102,6 +102,32 @@ All four conditions held — `aria-expanded` was the newly-introduced contract t
 
 ---
 
+## 6. Grep before writing a new helper
+
+Section 5 tells you when to extract _noticed_ duplication. This section is about not creating it in the first place.
+
+**Rule.** Before adding a function that:
+
+- Performs a SQL operation against a known table,
+- Wraps a common utility (vector formatting, lock-key building, label normalization, advisory-lock acquisition),
+- Mirrors a name pattern already used elsewhere (`forceX` next to an existing `X`, `internalY` next to a public `Y`),
+
+grep the codebase for the SQL fragment, the table name, or the operation. Examples:
+
+```
+rg -n "INSERT INTO canonical_topics"
+rg -n "function (build|format|normalize)\w+"
+rg -n "pg_advisory_xact_lock"
+```
+
+If a private helper (`function`, not `export function`) already exists in a sibling module, **promote it to `export` rather than recreating it**. A `forceX` / `internalX` prefix on a byte-identical implementation is a smell — the "force" or "internal" semantic almost always belongs at the _call site_, not on a parallel copy of the helper.
+
+**Why this section exists.** PR #412 (canonical-topic resolver integration) shipped with six near-identical helper pairs — `forceUpsertAliases`/`upsertAliases`, `forceUpdateLastSeen`/`updateLastSeen`, `forceInsertCanonical`/`insertCanonical`, `forceExactLookup`/`exactLookup`, plus duplicated `formatVector` and `buildLockKey`. Root cause: the resolver's SQL helpers in `src/lib/entity-resolution.ts` were declared as private `function`s, so the orchestrator integration in `src/trigger/helpers/database.ts` recreated them with a `force` prefix instead of promoting the originals to exports. Pre-PR multi-tool review (Codex, `/pr-review-toolkit:review-pr all`, `/simplify`) missed all six because `/simplify`'s reuse pass is diff-scoped — it does not grep the wider codebase for similar SQL or helper patterns.
+
+**Diagnostic for reviewers.** When you see a new helper named `forceX` / `internalX` / `legacyX`, ask: "is this byte-identical to an existing `X`?" If yes, the right fix is a single `export` + import, not a parallel implementation.
+
+---
+
 ## Keeping this checklist alive
 
 - If a reviewer catches something not in here, add it in the same PR — the checklist is a living doc, not a quarterly chore.

@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { episodes, episodeTopics, podcasts } from "@/db/schema";
 import { upsertPodcast } from "@/db/helpers";
@@ -8,6 +8,21 @@ import type {
   PodcastIndexPodcast,
   PodcastIndexEpisode,
 } from "@/lib/podcastindex";
+import {
+  buildLockKey,
+  EntityResolutionError,
+  exactLookup,
+  insertCanonical,
+  insertJunction,
+  updateLastSeen,
+  upsertAliases,
+  validateResolveTopicInput,
+  type ResolveTopicInput,
+  type ResolveTopicResult,
+  type Tx,
+} from "@/lib/entity-resolution";
+import { EXACT_MATCH_SIMILARITY } from "@/lib/entity-resolution-constants";
+import { transactional } from "@/db/pool";
 
 /**
  * Ensures a podcast exists in the database, creating it if necessary.
@@ -148,6 +163,117 @@ export async function persistTranscript(
       `Episode ${episodeId} not found for transcript persistence`,
     );
   }
+}
+
+/**
+ * Over-budget insert path: lock + exact-lookup + insert + junction.
+ * Mirrors TX-1's new-insert tail without the kNN (ADR-045 §2).
+ */
+export async function forceInsertNewCanonical(
+  input: ResolveTopicInput,
+): Promise<ResolveTopicResult> {
+  validateResolveTopicInput(input);
+
+  return transactional(async (tx) => {
+    const rawTx = tx as unknown as Tx;
+
+    await rawTx.execute(
+      sql`SELECT pg_advisory_xact_lock(hashtextextended(${buildLockKey(input.label, input.kind)}, 0))`,
+    );
+
+    const exact = await exactLookup(rawTx, input.label, input.kind);
+    if (exact !== null) {
+      await updateLastSeen(rawTx, exact.id);
+      const aliasesAdded = await upsertAliases(rawTx, exact.id, input.aliases);
+      await insertJunction(rawTx, {
+        episodeId: input.episodeId,
+        canonicalId: exact.id,
+        matchMethod: "auto",
+        similarity: EXACT_MATCH_SIMILARITY,
+        coverageScore: input.coverageScore,
+      });
+      return {
+        canonicalId: exact.id,
+        matchMethod: "auto" as const,
+        similarityToTopMatch: EXACT_MATCH_SIMILARITY,
+        aliasesAdded,
+        versionTokenForcedDisambig: false as const,
+        candidatesConsidered: 0,
+      };
+    }
+
+    let canonicalId = await insertCanonical(rawTx, input);
+    let isRecovery = false;
+    if (canonicalId === null) {
+      isRecovery = true;
+      canonicalId =
+        (await exactLookup(rawTx, input.label, input.kind))?.id ?? null;
+      if (canonicalId === null) {
+        throw new EntityResolutionError("conflict_recovery_failed");
+      }
+    }
+
+    await updateLastSeen(rawTx, canonicalId);
+    const aliasesAdded = await upsertAliases(rawTx, canonicalId, input.aliases);
+
+    if (isRecovery) {
+      await insertJunction(rawTx, {
+        episodeId: input.episodeId,
+        canonicalId,
+        matchMethod: "auto",
+        similarity: EXACT_MATCH_SIMILARITY,
+        coverageScore: input.coverageScore,
+      });
+      return {
+        canonicalId,
+        matchMethod: "auto" as const,
+        similarityToTopMatch: EXACT_MATCH_SIMILARITY,
+        aliasesAdded,
+        versionTokenForcedDisambig: false as const,
+        candidatesConsidered: 0,
+      };
+    }
+
+    await insertJunction(rawTx, {
+      episodeId: input.episodeId,
+      canonicalId,
+      matchMethod: "new",
+      similarity: null,
+      coverageScore: input.coverageScore,
+    });
+
+    return {
+      canonicalId,
+      matchMethod: "new" as const,
+      similarityToTopMatch: null,
+      aliasesAdded,
+      versionTokenForcedDisambig: false as const,
+      candidatesConsidered: 0,
+    };
+  });
+}
+
+/**
+ * Inserts a single alias for an existing canonical topic.
+ * Returns true if a row was created, false on conflict or blank input.
+ */
+export async function addAliasIfNew(
+  canonicalId: number,
+  alias: string,
+): Promise<boolean> {
+  const trimmed = alias.trim();
+  if (!trimmed) return false;
+
+  return transactional(async (tx) => {
+    const rawTx = tx as unknown as Tx;
+    const result = await rawTx.execute(
+      sql`INSERT INTO canonical_topic_aliases (canonical_topic_id, alias)
+           VALUES (${canonicalId}, ${trimmed})
+           ON CONFLICT (canonical_topic_id, lower(alias)) DO NOTHING
+           RETURNING id`,
+    );
+    return result.rows.length > 0;
+  });
 }
 
 async function persistCategories(

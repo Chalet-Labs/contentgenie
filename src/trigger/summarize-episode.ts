@@ -21,6 +21,7 @@ import {
   markSummaryReady,
   resolvePodcastId,
 } from "@/trigger/helpers/notifications";
+import { resolveAndPersistEpisodeTopics } from "@/trigger/helpers/resolve-topics";
 import { getActiveAiConfig } from "@/lib/ai/config";
 import { db } from "@/db";
 import { episodes } from "@/db/schema";
@@ -243,32 +244,61 @@ export const summarizeEpisode = task({
 
     // Update the existing notification row in place (created by the poller on discovery).
     // No-ops silently if no prior row exists (admin-triggered re-summarization).
+    let episodeDbId: number | null = null;
+    try {
+      const dbEpisode = await db.query.episodes.findFirst({
+        where: eq(episodes.podcastIndexId, piId),
+        columns: { id: true },
+      });
+      episodeDbId = dbEpisode?.id ?? null;
+    } catch (err) {
+      logger.warn("Could not resolve episode DB id after summary persistence", {
+        episodeId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+
     try {
       const podcastDbId = await resolvePodcastId(episode.feedId);
-      if (podcastDbId) {
-        const dbEpisode = await db.query.episodes.findFirst({
-          where: eq(episodes.podcastIndexId, piId),
-          columns: { id: true },
+      if (podcastDbId && episodeDbId != null) {
+        await markSummaryReady(
+          podcastDbId,
+          episodeDbId,
+          piId,
+          podcast?.title ?? episode.title,
+          `Summary ready: ${episode.title}`,
+        );
+      } else if (episodeDbId == null) {
+        logger.warn("Could not resolve episode DB id for markSummaryReady", {
+          episodeId,
         });
-        const episodeDbId = dbEpisode?.id ?? null;
-        if (episodeDbId != null) {
-          await markSummaryReady(
-            podcastDbId,
-            episodeDbId,
-            piId,
-            podcast?.title ?? episode.title,
-            `Summary ready: ${episode.title}`,
-          );
-        } else {
-          logger.warn("Could not resolve episode DB id for markSummaryReady", {
-            episodeId,
-          });
-        }
       }
     } catch (notifErr) {
       logger.warn("Failed to update notifications", {
         episodeId,
         error: notifErr instanceof Error ? notifErr.message : String(notifErr),
+      });
+    }
+
+    setStep("resolving-topics");
+    try {
+      if (episodeDbId == null) {
+        logger.warn(
+          "[summarize-episode] skipping resolver: episode DB id unavailable",
+          { episodeId },
+        );
+      } else {
+        await resolveAndPersistEpisodeTopics(
+          episodeDbId,
+          summary.topics ?? [],
+          summary.summary,
+          { skipResolution: aiConfig.summarizationPrompt !== null },
+        );
+      }
+    } catch (err) {
+      logger.warn("[summarize-episode] canonical-topic resolution failed", {
+        episodeId,
+        err,
       });
     }
 
