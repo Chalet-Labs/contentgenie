@@ -1,6 +1,6 @@
 # ADR-046: Admin Canonical-Topic Merge / Unmerge Transaction Pattern
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-04-30
 **Issue:** [#385](https://github.com/Chalet-Labs/contentgenie/issues/385) (epic [#376](https://github.com/Chalet-Labs/contentgenie/issues/376))
 **Relates to:** [ADR-042](042-canonical-topics-foundation.md), [ADR-044](044-entity-resolution-transactional-pattern.md), [ADR-031](031-episode-topics-junction-table.md), [ADR-028](028-admin-panel-architecture.md)
@@ -88,8 +88,8 @@ Sorting before encoding means a `(loserId=12, winnerId=7)` and a `(loserId=7, wi
 
 ```ts
 export function transactional<T>(
-  fn: (tx: Tx) => Promise<T>,
-  options?: { tx?: Tx },
+  fn: (tx: NeonDatabase<typeof schema>) => Promise<T>,
+  options?: { tx?: NeonDatabase<typeof schema> },
 ): Promise<T> {
   if (options?.tx) return fn(options.tx);
   return getDbPool().transaction((tx) => fn(tx));

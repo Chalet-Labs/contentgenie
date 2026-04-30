@@ -1,3 +1,4 @@
+import { neon } from "@neondatabase/serverless";
 import { loadAdminTopicSearchParams } from "@/lib/search-params/admin-topics";
 import { getCanonicalTopicsListQuery } from "@/lib/admin/topic-queries";
 import { TopicsFiltersBar } from "@/components/admin/topics/topics-filters-bar";
@@ -10,12 +11,26 @@ export default async function AdminTopicsPage({
 }) {
   const parsed = loadAdminTopicSearchParams(searchParams);
 
+  console.log(
+    "[AdminTopicsPage] searchParams:",
+    JSON.stringify(searchParams),
+    "parsed:",
+    JSON.stringify(parsed),
+    "DB_URL prefix:",
+    process.env.DATABASE_URL?.slice(0, 30),
+  );
   const { rows, totalCount } = await getCanonicalTopicsListQuery({
     search: parsed.search ?? undefined,
     status: parsed.status ?? undefined,
     kind: parsed.kind ?? undefined,
     page: parsed.page > 0 ? parsed.page : 1,
   });
+  console.log(
+    "[AdminTopicsPage] rows:",
+    rows.length,
+    "totalCount:",
+    totalCount,
+  );
 
   return (
     <div className="space-y-4">
