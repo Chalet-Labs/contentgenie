@@ -1,14 +1,12 @@
 {
   "_meta": {
     "name": "philosophical-no-topic",
-    "scenario": "An AI summarization model returns an empty topic array — e.g., for abstract philosophical content where no discrete topics could be extracted. normalizeTopics([], []) returns [] and resolveAndPersistEpisodeTopics early-exits (resolve-topics.ts:66) before calling generateEmbeddings or transactional(). No canonical inserts occur.",
+    "scenario": "An AI summarization model returns an empty topic array — e.g., for abstract philosophical content where no discrete topics could be extracted. normalizeTopics([], []) returns [] and resolveAndPersistEpisodeTopics early-exits (in resolveAndPersistEpisodeTopics's empty-topics guard) before calling generateEmbeddings or transactional(). No canonical inserts occur.",
     "expectedOutcome": "normalizeTopics returns []; resolveAndPersistEpisodeTopics returns {topicCount: 0, resolved: 0, failed: 0}; txCallLog is empty (no transactional() invocations)."
   },
   "aiRawOutput": {
     "topics": []
   },
   "inputs": [],
-  "expected": {
-    "canonicalCount": 0
-  }
+  "expected": {}
 }

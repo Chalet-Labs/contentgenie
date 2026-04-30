@@ -94,6 +94,10 @@
   ],
   "expected": {
     "canonicalCount": 1,
-    "aliasCountAtLeast": 4
+    "aliasCountAtLeast": 4,
+    "matchMethodDistribution": {
+      "auto": 3,
+      "llm_disambig": 1
+    }
   }
 }

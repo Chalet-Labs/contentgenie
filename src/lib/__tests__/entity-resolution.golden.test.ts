@@ -39,26 +39,40 @@ function allRecordedCalls(): RecordedCall[] {
   return txCallLog.flat();
 }
 
-vi.mock("@/db/pool", () => ({
-  transactional: vi.fn(async (fn: (tx: unknown) => Promise<unknown>) => {
-    const fixtures = txFixturesQueue.shift() ?? { rows: [] };
-    const recorded: RecordedCall[] = [];
-    txCallLog.push(recorded);
-    const tx = {
-      execute: async (sqlObj: unknown) => {
-        const { sqlText, params } = serializeSql(sqlObj);
-        recorded.push({ sql: sqlText, params });
-        const fixture = fixtures.rows.find((f) =>
-          typeof f.match === "string"
-            ? sqlText.includes(f.match)
-            : f.match.test(sqlText),
-        );
-        return { rows: fixture?.rows ?? [] };
-      },
-    };
-    return fn(tx);
-  }),
-}));
+// When the fixture queue is empty, fall through to the real `transactional`
+// so the real-DB sub-suite (concurrent-insert-race) hits Postgres normally.
+// Mocked sub-suites queue fixtures via `setTxFixtures` and the mock intercepts.
+vi.mock("@/db/pool", async () => {
+  const actual = await vi.importActual<typeof import("@/db/pool")>("@/db/pool");
+  return {
+    ...actual,
+    transactional: vi.fn(async (fn: (tx: unknown) => Promise<unknown>) => {
+      if (txFixturesQueue.length === 0) {
+        return (
+          actual.transactional as unknown as (
+            cb: (tx: unknown) => Promise<unknown>,
+          ) => Promise<unknown>
+        )(fn);
+      }
+      const fixtures = txFixturesQueue.shift() ?? { rows: [] };
+      const recorded: RecordedCall[] = [];
+      txCallLog.push(recorded);
+      const tx = {
+        execute: async (sqlObj: unknown) => {
+          const { sqlText, params } = serializeSql(sqlObj);
+          recorded.push({ sql: sqlText, params });
+          const fixture = fixtures.rows.find((f) =>
+            typeof f.match === "string"
+              ? sqlText.includes(f.match)
+              : f.match.test(sqlText),
+          );
+          return { rows: fixture?.rows ?? [] };
+        },
+      };
+      return fn(tx);
+    }),
+  };
+});
 
 const generateCompletionMock = vi.fn();
 vi.mock("@/lib/ai/generate", () => ({
@@ -92,7 +106,6 @@ vi.mock("@/trigger/helpers/database", () => ({
 // vi.mock is hoisted — top-level imports see the mocks.
 import { db } from "@/db";
 import { sql } from "drizzle-orm";
-import { canonicalTopics } from "@/db/schema";
 import { EMBEDDING_DIMENSION } from "@/lib/ai/embed-constants";
 import {
   hasVersionTokenMismatch,
@@ -103,10 +116,16 @@ import {
 import {
   AUTO_MATCH_SIMILARITY_THRESHOLD,
   DISAMBIGUATE_SIMILARITY_THRESHOLD,
+  type MatchMethod,
 } from "@/lib/entity-resolution-constants";
 import { resolveAndPersistEpisodeTopics } from "@/trigger/helpers/resolve-topics";
 import { normalizeTopics } from "@/trigger/helpers/ai-summary";
 import type { TopicKind } from "@/lib/openrouter";
+
+// First runtime-allocated canonical id used by the mock harness.
+// Fixtures referencing newly-inserted canonicals (e.g. concept-clustering)
+// rely on this value to seed kNN candidates for subsequent inputs.
+const MOCK_NEW_CANONICAL_BASE_ID = 900;
 
 // ---- Serializer (verbatim from entity-resolution.test.ts) -------------------
 
@@ -185,10 +204,10 @@ type ResolverGoldenFixture = {
     canonicalCount?: number;
     canonicalCountAtMost?: number;
     aliasCountAtLeast?: number;
-    matchMethodDistribution?: Partial<Record<string, number>>;
+    matchMethodDistribution?: Partial<Record<MatchMethod, number>>;
     versionTokenForcedDisambig?: number;
     perInput?: Array<{
-      matchMethod?: string;
+      matchMethod?: MatchMethod;
       versionTokenForcedDisambig?: boolean;
     }>;
     junctionCountForSingleCanonical?: number;
@@ -269,7 +288,7 @@ async function runFixtureWithMockDb(
   const seedMap = new Map((fixture.seedCanonicals ?? []).map((s) => [s.id, s]));
 
   // Running counter for new canonical IDs inserted during this run.
-  let nextNewId = 900;
+  let nextNewId = MOCK_NEW_CANONICAL_BASE_ID;
 
   for (const entry of fixture.inputs) {
     const normalizedInputLabel = entry.label.trim().toLowerCase();
@@ -469,43 +488,62 @@ describe("entity-resolution golden dataset", () => {
         versionAdjacentReleasesFixture as unknown as ResolverGoldenFixture;
       const results = await runFixtureWithMockDb(fixture);
 
-      expect(results).toHaveLength(1);
-      expect(results[0].result.matchMethod).toBe(
-        fixture.expected.perInput?.[0]?.matchMethod,
+      // Anchor against literal expected behaviour, not just the fixture's own
+      // declarations — pinning at the assertion site stops a fixture edit from
+      // silently flipping the contract.
+      expect(fixture.expected.perInput?.[0]?.matchMethod).toBe("new");
+      expect(fixture.expected.perInput?.[0]?.versionTokenForcedDisambig).toBe(
+        true,
       );
-      expect(results[0].result.versionTokenForcedDisambig).toBe(
-        fixture.expected.perInput?.[0]?.versionTokenForcedDisambig,
-      );
+      expect(fixture.expected.canonicalCount).toBe(2);
+      expect(fixture.expected.versionTokenForcedDisambig).toBe(1);
 
-      // canonicalCount=2: seed + newly inserted canonical
-      expect(seenCanonicalIds.size).toBe(fixture.expected.canonicalCount);
+      expect(results).toHaveLength(fixture.inputs.length);
+      expect(results[0].result.matchMethod).toBe("new");
+      expect(results[0].result.versionTokenForcedDisambig).toBe(true);
+      expect(seenCanonicalIds.size).toBe(2);
 
-      // versionTokenForcedDisambig count across all inputs
       const forcedCount = results.filter(
         (r) => r.result.versionTokenForcedDisambig,
       ).length;
-      expect(forcedCount).toBe(fixture.expected.versionTokenForcedDisambig);
+      expect(forcedCount).toBe(1);
     });
 
     it("alias-clusters", async () => {
       const fixture = aliasClustersFixture as unknown as ResolverGoldenFixture;
       const results = await runFixtureWithMockDb(fixture);
 
-      expect(results).toHaveLength(4);
+      expect(results).toHaveLength(fixture.inputs.length);
 
-      // All 4 inputs resolve to the same canonical
       const uniqueCanonicals = new Set(
         results.map((r) => r.result.canonicalId),
       );
       expect(uniqueCanonicals.size).toBe(fixture.expected.canonicalCount);
 
-      // Alias SQL emissions: count actual INSERT INTO canonical_topic_aliases calls
+      // Counts production SQL emissions, not pre-registered fixture rows —
+      // verifies the resolver actually attempted ≥4 alias upserts.
       const aliasInsertCalls = allRecordedCalls().filter((c) =>
         c.sql.includes("INSERT INTO canonical_topic_aliases"),
       );
-      expect(aliasInsertCalls.length).toBeGreaterThanOrEqual(
-        fixture.expected.aliasCountAtLeast!,
-      );
+      const minAliases = fixture.expected.aliasCountAtLeast;
+      expect(minAliases, "aliasCountAtLeast must be set").toBeDefined();
+      expect(aliasInsertCalls.length).toBeGreaterThanOrEqual(minAliases ?? 0);
+
+      // Pin the match-method distribution that the fixture's _meta describes:
+      // 3 auto + 1 llm_disambig (input 3 forces version-token disambig).
+      const distribution: Partial<Record<MatchMethod, number>> = {};
+      for (const { result } of results) {
+        distribution[result.matchMethod] =
+          (distribution[result.matchMethod] ?? 0) + 1;
+      }
+      const expectedDistribution = fixture.expected.matchMethodDistribution;
+      expect(
+        expectedDistribution,
+        "matchMethodDistribution must be set",
+      ).toBeDefined();
+      for (const [method, count] of Object.entries(expectedDistribution!)) {
+        expect(distribution[method as MatchMethod] ?? 0).toBe(count);
+      }
     });
 
     it("concept-clustering", async () => {
@@ -513,30 +551,29 @@ describe("entity-resolution golden dataset", () => {
         conceptClusteringFixture as unknown as ResolverGoldenFixture;
       const results = await runFixtureWithMockDb(fixture);
 
-      expect(results).toHaveLength(3);
+      expect(results).toHaveLength(fixture.inputs.length);
 
+      // Pin the canonical-split count: a regression that collapses all 3
+      // creatine forms onto one canonical must fail loudly, not pass with
+      // `>= 1 && <= 2`.
       const uniqueCanonicals = new Set(
         results.map((r) => r.result.canonicalId),
       );
-      expect(uniqueCanonicals.size).toBeGreaterThanOrEqual(1);
-      if (fixture.expected.canonicalCountAtMost !== undefined) {
-        expect(uniqueCanonicals.size).toBeLessThanOrEqual(
-          fixture.expected.canonicalCountAtMost,
-        );
-      }
+      expect(fixture.expected.canonicalCount).toBe(2);
+      expect(uniqueCanonicals.size).toBe(2);
 
-      // Assert match method distribution
-      const distribution: Record<string, number> = {};
+      const distribution: Partial<Record<MatchMethod, number>> = {};
       for (const { result } of results) {
         distribution[result.matchMethod] =
           (distribution[result.matchMethod] ?? 0) + 1;
       }
-      if (fixture.expected.matchMethodDistribution) {
-        for (const [method, count] of Object.entries(
-          fixture.expected.matchMethodDistribution,
-        )) {
-          expect(distribution[method] ?? 0).toBe(count);
-        }
+      const expectedDistribution = fixture.expected.matchMethodDistribution;
+      expect(
+        expectedDistribution,
+        "matchMethodDistribution must be set",
+      ).toBeDefined();
+      for (const [method, count] of Object.entries(expectedDistribution!)) {
+        expect(distribution[method as MatchMethod] ?? 0).toBe(count);
       }
     });
 
@@ -580,12 +617,7 @@ describe("entity-resolution golden dataset", () => {
     });
 
     afterAll(async () => {
-      await db.execute(
-        sql`DELETE FROM canonical_topic_aliases WHERE canonical_topic_id IN (SELECT id FROM canonical_topics WHERE starts_with(label, ${CONCURRENT_PREFIX}))`,
-      );
-      await db.execute(
-        sql`DELETE FROM episode_canonical_topics WHERE canonical_topic_id IN (SELECT id FROM canonical_topics WHERE starts_with(label, ${CONCURRENT_PREFIX}))`,
-      );
+      // FK cascade from canonical_topics handles aliases and junctions.
       await db.execute(
         sql`DELETE FROM canonical_topics WHERE starts_with(label, ${CONCURRENT_PREFIX})`,
       );
@@ -594,10 +626,7 @@ describe("entity-resolution golden dataset", () => {
     it("concurrent-insert-race", async () => {
       const fixture =
         concurrentInsertRaceFixture as unknown as ResolverGoldenFixture;
-
-      const { generateCompletion } = await import("@/lib/ai/generate");
-      const mockedGen = vi.mocked(generateCompletion);
-      mockedGen.mockReset();
+      const inputKind = fixture.inputs[0].kind;
 
       const { resultA, resultB } = await runFixtureWithRealDb(
         fixture,
@@ -605,29 +634,31 @@ describe("entity-resolution golden dataset", () => {
         episodeIdB,
       );
 
-      // Both calls collapse to the same canonical
+      expect(fixture.expected.canonicalCount).toBe(1);
+      expect(fixture.expected.junctionCountForSingleCanonical).toBe(2);
+
       expect(resultA.canonicalId).toBe(resultB.canonicalId);
 
-      // Exactly 1 canonical in the DB for this label prefix
+      // Strict scope: a stray row of the same prefix but different kind
+      // would slip past a starts_with-only check.
       const canonicalRows = await db.execute<{ id: number }>(
-        sql`SELECT id FROM canonical_topics WHERE starts_with(label, ${CONCURRENT_PREFIX}) ORDER BY id LIMIT 10`,
+        sql`SELECT id FROM canonical_topics
+            WHERE starts_with(label, ${CONCURRENT_PREFIX})
+              AND kind = ${inputKind}`,
       );
-      expect(canonicalRows.rows.length).toBe(
-        fixture.expected.canonicalCount ?? 1,
-      );
+      expect(canonicalRows.rows.length).toBe(fixture.expected.canonicalCount);
 
-      // Exactly 2 junction rows pointing at the canonical
       const junctionRows = await db.execute<{ episode_id: number }>(
         sql`SELECT episode_id FROM episode_canonical_topics WHERE canonical_topic_id = ${resultA.canonicalId}`,
       );
       expect(junctionRows.rows.length).toBe(
-        fixture.expected.junctionCountForSingleCanonical ?? 2,
+        fixture.expected.junctionCountForSingleCanonical,
       );
       const epIds = junctionRows.rows.map((r) => r.episode_id).sort();
       expect(epIds).toEqual([episodeIdA, episodeIdB].sort());
 
-      // Disambiguator must NOT have been called (empty-slot fast path)
-      expect(mockedGen).not.toHaveBeenCalled();
+      // Empty-slot fast path: TX-1 exact-lookup catches both arrivals.
+      expect(generateCompletionMock).not.toHaveBeenCalled();
     });
   });
 });

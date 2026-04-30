@@ -60,7 +60,7 @@
     }
   ],
   "expected": {
-    "canonicalCountAtMost": 2,
+    "canonicalCount": 2,
     "matchMethodDistribution": {
       "new": 2,
       "llm_disambig": 1
