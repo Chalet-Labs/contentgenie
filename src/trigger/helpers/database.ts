@@ -11,8 +11,9 @@ import type {
 import {
   buildLockKey,
   EntityResolutionError,
+  exactLookup,
   insertCanonical,
-  normalizeLabel,
+  insertJunction,
   updateLastSeen,
   upsertAliases,
   validateResolveTopicInput,
@@ -22,7 +23,6 @@ import {
 } from "@/lib/entity-resolution";
 import { EXACT_MATCH_SIMILARITY } from "@/lib/entity-resolution-constants";
 import { transactional } from "@/db/pool";
-import type { TopicKind } from "@/lib/openrouter";
 
 /**
  * Ensures a podcast exists in the database, creating it if necessary.
@@ -165,34 +165,6 @@ export async function persistTranscript(
   }
 }
 
-async function forceExactLookup(
-  tx: Tx,
-  label: string,
-  kind: TopicKind,
-): Promise<{ id: number } | null> {
-  const result = await tx.execute(
-    sql`SELECT id FROM canonical_topics WHERE lower(normalized_label) = ${normalizeLabel(label)} AND kind = ${kind} AND status = 'active' LIMIT 1`,
-  );
-  const row = result.rows[0] as { id: number } | undefined;
-  return row ?? null;
-}
-
-async function forceWriteJunction(
-  tx: Tx,
-  episodeId: number,
-  canonicalId: number,
-  matchMethod: "auto" | "new",
-  similarity: number | null,
-  coverageScore: number,
-): Promise<void> {
-  await tx.execute(
-    sql`INSERT INTO episode_canonical_topics
-         (episode_id, canonical_topic_id, match_method, similarity_to_top_match, coverage_score)
-       VALUES (${episodeId}, ${canonicalId}, ${matchMethod}, ${similarity}, ${coverageScore})
-       ON CONFLICT (episode_id, canonical_topic_id) DO NOTHING`,
-  );
-}
-
 /**
  * Over-budget insert path: lock + exact-lookup + insert + junction.
  * Mirrors TX-1's new-insert tail without the kNN (ADR-045 §2).
@@ -209,18 +181,17 @@ export async function forceInsertNewCanonical(
       sql`SELECT pg_advisory_xact_lock(hashtextextended(${buildLockKey(input.label, input.kind)}, 0))`,
     );
 
-    const exact = await forceExactLookup(rawTx, input.label, input.kind);
+    const exact = await exactLookup(rawTx, input.label, input.kind);
     if (exact !== null) {
       await updateLastSeen(rawTx, exact.id);
       const aliasesAdded = await upsertAliases(rawTx, exact.id, input.aliases);
-      await forceWriteJunction(
-        rawTx,
-        input.episodeId,
-        exact.id,
-        "auto",
-        EXACT_MATCH_SIMILARITY,
-        input.coverageScore,
-      );
+      await insertJunction(rawTx, {
+        episodeId: input.episodeId,
+        canonicalId: exact.id,
+        matchMethod: "auto",
+        similarity: EXACT_MATCH_SIMILARITY,
+        coverageScore: input.coverageScore,
+      });
       return {
         canonicalId: exact.id,
         matchMethod: "auto" as const,
@@ -236,7 +207,7 @@ export async function forceInsertNewCanonical(
     if (canonicalId === null) {
       isRecovery = true;
       canonicalId =
-        (await forceExactLookup(rawTx, input.label, input.kind))?.id ?? null;
+        (await exactLookup(rawTx, input.label, input.kind))?.id ?? null;
       if (canonicalId === null) {
         throw new EntityResolutionError("conflict_recovery_failed");
       }
@@ -246,14 +217,13 @@ export async function forceInsertNewCanonical(
     const aliasesAdded = await upsertAliases(rawTx, canonicalId, input.aliases);
 
     if (isRecovery) {
-      await forceWriteJunction(
-        rawTx,
-        input.episodeId,
+      await insertJunction(rawTx, {
+        episodeId: input.episodeId,
         canonicalId,
-        "auto",
-        EXACT_MATCH_SIMILARITY,
-        input.coverageScore,
-      );
+        matchMethod: "auto",
+        similarity: EXACT_MATCH_SIMILARITY,
+        coverageScore: input.coverageScore,
+      });
       return {
         canonicalId,
         matchMethod: "auto" as const,
@@ -264,14 +234,13 @@ export async function forceInsertNewCanonical(
       };
     }
 
-    await forceWriteJunction(
-      rawTx,
-      input.episodeId,
+    await insertJunction(rawTx, {
+      episodeId: input.episodeId,
       canonicalId,
-      "new",
-      null,
-      input.coverageScore,
-    );
+      matchMethod: "new",
+      similarity: null,
+      coverageScore: input.coverageScore,
+    });
 
     return {
       canonicalId,

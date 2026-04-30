@@ -198,7 +198,7 @@ async function acquireLock(
   );
 }
 
-async function exactLookup(
+export async function exactLookup(
   tx: Tx,
   label: string,
   kind: TopicKind,
@@ -279,7 +279,7 @@ export async function upsertAliases(
   return result.rows.length;
 }
 
-async function insertJunction(
+export async function insertJunction(
   tx: Tx,
   args: {
     episodeId: number;
@@ -370,21 +370,7 @@ export async function resolveTopic(
     return tx1Result;
   }
 
-  let chosenId: number | null;
-  try {
-    chosenId = await callDisambiguator(input, tx1Result.candidates);
-  } catch (err) {
-    if (
-      err instanceof EntityResolutionError &&
-      err.reason === "disambig_parse_failed"
-    ) {
-      throw new EntityResolutionError(err.reason, {
-        cause: err,
-        usedDisambiguator: true,
-      });
-    }
-    throw err;
-  }
+  const chosenId = await callDisambiguator(input, tx1Result.candidates);
 
   try {
     return await transactional<ResolveTopicResult>(async (tx2) =>
@@ -533,13 +519,17 @@ async function callDisambiguator(
   } catch (err) {
     throw new EntityResolutionError("disambig_transport_failed", {
       cause: err,
+      usedDisambiguator: true,
     });
   }
   try {
     const parsed = parseJsonResponse<unknown>(raw);
     return disambigSchema.parse(parsed).chosen_id;
   } catch (err) {
-    throw new EntityResolutionError("disambig_parse_failed", { cause: err });
+    throw new EntityResolutionError("disambig_parse_failed", {
+      cause: err,
+      usedDisambiguator: true,
+    });
   }
 }
 

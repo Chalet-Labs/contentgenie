@@ -87,7 +87,7 @@ The orchestrator emits a structured log line and increments `metadata.root` coun
 }
 ```
 
-A9 (#388) consumes these counters; this issue ships them. The shape is documented here so #388 can land without re-litigating field names.
+A9 (#387) consumes these counters; this issue ships them. The shape is documented here so #387 can land without re-litigating field names.
 
 ## Consequences
 

@@ -483,7 +483,7 @@ describe("summarize-episode task", () => {
       );
     });
 
-    it("skips resolveAndPersistEpisodeTopics when summarizationPrompt is set", async () => {
+    it("calls resolveAndPersistEpisodeTopics with skipResolution: true when summarizationPrompt is set", async () => {
       setupHappyPath();
       vi.mocked(generateEpisodeSummary).mockResolvedValue(
         mockSummaryWithTopics,
