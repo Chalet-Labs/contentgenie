@@ -1,9 +1,10 @@
 import { notFound } from "next/navigation";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import {
   canonicalTopics,
   canonicalTopicAliases,
+  canonicalTopicAdminLog,
   episodeCanonicalTopics,
   episodes,
 } from "@/db/schema";
@@ -56,11 +57,32 @@ export default async function AdminTopicDetailPage({
   const walkerResult =
     topic.status === "merged" ? await walkMergedChain(topic) : null;
 
-  // Suggest episodes from the most recent merge audit row for the unmerge dialog
-  const suggestedEpisodes = recentJunctions.map((j) => ({
-    id: j.episodeId,
-    title: j.episodeTitle,
-  }));
+  // Suggest episodes from the most recent merge audit row.
+  // After a merge, the loser has zero junctions (all moved to winner), so we
+  // cannot derive the list from the live junction table. The audit log stores
+  // the reassigned episode IDs in metadata.reassigned (array of integers).
+  let suggestedEpisodes: { id: number; title: string }[] = [];
+  if (topic.status === "merged") {
+    const latestMergeRow = await db
+      .select({ metadata: canonicalTopicAdminLog.metadata })
+      .from(canonicalTopicAdminLog)
+      .where(eq(canonicalTopicAdminLog.loserId, id))
+      .orderBy(desc(canonicalTopicAdminLog.createdAt))
+      .limit(1);
+    const meta = latestMergeRow[0]?.metadata as
+      | { reassigned?: number[] }
+      | undefined;
+    const reassignedIds = Array.isArray(meta?.reassigned)
+      ? (meta.reassigned as number[])
+      : [];
+    if (reassignedIds.length > 0) {
+      const episodeRows = await db
+        .select({ id: episodes.id, title: episodes.title })
+        .from(episodes)
+        .where(inArray(episodes.id, reassignedIds));
+      suggestedEpisodes = episodeRows;
+    }
+  }
 
   return (
     <div className="space-y-6">

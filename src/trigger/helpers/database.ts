@@ -497,11 +497,14 @@ export function mergeCanonicals(
     const newWinnerEpisodeCount = countResult.rows[0]?.episode_count ?? 0;
 
     // 8. Audit log insert.
+    const reassignedEpisodeIds = updateJunctionResult.rows.map(
+      (r) => r.episode_id,
+    );
     const metadata = JSON.stringify({
       episode_count_loser: loserEpisodeCount,
       conflicts_dropped: conflictsDropped,
       conflict_episode_ids: conflictEpisodeIds,
-      reassigned: episodesReassigned,
+      reassigned: reassignedEpisodeIds,
     });
     await tx.execute(
       sql`INSERT INTO canonical_topic_admin_log (actor, action, loser_id, winner_id, metadata)
