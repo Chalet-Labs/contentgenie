@@ -477,9 +477,9 @@ export function mergeCanonicals(
     // 6. Alias copy: loser's label + all its aliases become winner aliases.
     const aliasInsertResult = await tx.execute(
       sql`INSERT INTO canonical_topic_aliases (canonical_topic_id, alias)
-            SELECT ${winnerId}, alias FROM canonical_topic_aliases WHERE canonical_topic_id = ${loserId}
+            SELECT ${winnerId}::integer, alias FROM canonical_topic_aliases WHERE canonical_topic_id = ${loserId}
             UNION
-            SELECT ${winnerId}, label FROM canonical_topics WHERE id = ${loserId}
+            SELECT ${winnerId}::integer, label FROM canonical_topics WHERE id = ${loserId}
           ON CONFLICT (canonical_topic_id, lower(alias)) DO NOTHING`,
     );
     const aliasesCopied = aliasInsertResult.rows.length;
@@ -576,7 +576,7 @@ export function unmergeCanonicals(
       const insertResult = await tx.execute<{ id: number }>(
         sql`INSERT INTO episode_canonical_topics
               (episode_id, canonical_topic_id, match_method, similarity_to_top_match, coverage_score)
-            SELECT ${episodeId}, ${loserId}, 'auto', 1.0, COALESCE((
+            SELECT ${episodeId}::integer, ${loserId}::integer, 'auto', 1.0, COALESCE((
               SELECT coverage_score FROM episode_canonical_topics
                WHERE canonical_topic_id = ${previousWinnerId} AND episode_id = ${episodeId}
             ), 0.5)
