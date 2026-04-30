@@ -8,10 +8,11 @@ import * as schema from "@/db/schema";
 
 // Trigger.dev's worker runtime has no global `WebSocket`, so the Neon Pool
 // driver throws "All attempts to open a WebSocket … failed" on every
-// transaction. Wiring the `ws` polyfill here makes transactional() work in
-// any Node runtime; environments that already expose a global `WebSocket`
-// (Vercel Node 22+) ignore this override at connect time.
-neonConfig.webSocketConstructor = ws;
+// transaction. Guard avoids overriding a native WebSocket in environments
+// that already have one (e.g., Vercel Node 22+).
+if (typeof globalThis.WebSocket === "undefined") {
+  neonConfig.webSocketConstructor = ws;
+}
 
 /**
  * Pool-backed Drizzle client + `transactional()` helper.
