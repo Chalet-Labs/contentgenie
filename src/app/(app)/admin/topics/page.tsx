@@ -19,6 +19,11 @@ export default async function AdminTopicsPage({
     "DB_URL prefix:",
     process.env.DATABASE_URL?.slice(0, 30),
   );
+  // debug: raw SQL count
+  const rawSql = neon(process.env.DATABASE_URL!);
+  const rawCount =
+    await rawSql`SELECT COUNT(*)::integer as c FROM canonical_topics`;
+  console.log("[AdminTopicsPage] raw SQL count:", rawCount[0]?.c);
   const { rows, totalCount } = await getCanonicalTopicsListQuery({
     search: parsed.search ?? undefined,
     status: parsed.status ?? undefined,
