@@ -194,6 +194,7 @@ export async function forceInsertNewCanonical(
         matchMethod: "auto",
         similarity: EXACT_MATCH_SIMILARITY,
         coverageScore: input.coverageScore,
+        versionTokenForcedDisambig: false,
       });
       return {
         canonicalId: exact.id,
@@ -226,6 +227,7 @@ export async function forceInsertNewCanonical(
         matchMethod: "auto",
         similarity: EXACT_MATCH_SIMILARITY,
         coverageScore: input.coverageScore,
+        versionTokenForcedDisambig: false,
       });
       return {
         canonicalId,
@@ -243,6 +245,7 @@ export async function forceInsertNewCanonical(
       matchMethod: "new",
       similarity: null,
       coverageScore: input.coverageScore,
+      versionTokenForcedDisambig: false,
     });
 
     return {

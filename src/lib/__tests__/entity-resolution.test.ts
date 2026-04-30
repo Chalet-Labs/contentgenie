@@ -1016,5 +1016,70 @@ describe("resolveTopic", () => {
         reason: "invalid_embedding_dim",
       });
     });
+
+    it("(T7) versionTokenForcedDisambig=true is written to the junction INSERT params", async () => {
+      // Simulate a version-token mismatch that forces the LLM disambiguator path.
+      // TX-1 finds a candidate with a version-mismatch → returns PendingDisambig.
+      // TX-2 LLM picks an existing canonical → insertJunction is called with versionTokenForcedDisambig=true.
+      const topId = 99;
+      setTxFixtures([
+        // TX-1
+        { match: "lower(normalized_label)", rows: [] }, // exact-lookup miss
+        { match: "SET LOCAL hnsw.ef_search", rows: [] },
+        {
+          match: "identity_embedding <=>",
+          rows: [
+            {
+              id: topId,
+              label: "Opus 4.6 release", // version mismatch with input "Opus 4.7 release"
+              kind: "release",
+              summary: "...",
+              last_seen: new Date(),
+              ongoing: false,
+              similarity: 0.98,
+            },
+          ],
+        },
+      ]);
+      setTxFixtures([
+        // TX-2
+        { match: "lower(normalized_label)", rows: [] }, // exact-lookup miss
+        {
+          match: "identity_embedding <=>",
+          rows: [
+            {
+              id: topId,
+              label: "Opus 4.6 release",
+              kind: "release",
+              summary: "...",
+              similarity: 0.98,
+            },
+          ],
+        },
+        { match: "UPDATE canonical_topics", rows: [] },
+        { match: "INSERT INTO canonical_topic_aliases", rows: [{ id: 1 }] },
+        { match: "INSERT INTO episode_canonical_topics", rows: [] },
+      ]);
+
+      // LLM picks the existing candidate (topId)
+      generateCompletionMock.mockResolvedValueOnce(
+        JSON.stringify({ chosen_id: topId }),
+      );
+
+      const result = await resolveTopic(
+        makeInput({ label: "Opus 4.7 release" }),
+      );
+
+      expect(result.versionTokenForcedDisambig).toBe(true);
+      expect(result.matchMethod).toBe("llm_disambig");
+
+      // The junction INSERT must carry the boolean as a bound parameter
+      const junctionCalls = findCalls(
+        allRecordedCalls(),
+        "INSERT INTO episode_canonical_topics",
+      );
+      expect(junctionCalls.length).toBe(1);
+      expect(junctionCalls[0].params).toContain(true);
+    });
   });
 });

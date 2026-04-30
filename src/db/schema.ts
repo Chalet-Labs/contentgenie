@@ -572,6 +572,9 @@ export const episodeCanonicalTopics = pgTable(
       .notNull(),
     similarityToTopMatch: real("similarity_to_top_match"),
     coverageScore: real("coverage_score").notNull(),
+    versionTokenForcedDisambig: boolean("version_token_forced_disambig")
+      .notNull()
+      .default(false),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => [

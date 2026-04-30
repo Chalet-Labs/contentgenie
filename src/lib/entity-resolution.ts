@@ -287,6 +287,7 @@ export async function insertJunction(
     matchMethod: MatchMethod;
     similarity: number | null;
     coverageScore: number;
+    versionTokenForcedDisambig: boolean;
   },
 ): Promise<void> {
   // ON CONFLICT DO NOTHING guards against duplicate-topic crashes when the
@@ -294,8 +295,8 @@ export async function insertJunction(
   // topics that resolve to the same canonical via different paths).
   await tx.execute(
     sql`INSERT INTO episode_canonical_topics
-         (episode_id, canonical_topic_id, match_method, similarity_to_top_match, coverage_score)
-       VALUES (${args.episodeId}, ${args.canonicalId}, ${args.matchMethod}, ${args.similarity}, ${args.coverageScore})
+         (episode_id, canonical_topic_id, match_method, similarity_to_top_match, coverage_score, version_token_forced_disambig)
+       VALUES (${args.episodeId}, ${args.canonicalId}, ${args.matchMethod}, ${args.similarity}, ${args.coverageScore}, ${args.versionTokenForcedDisambig})
        ON CONFLICT (episode_id, canonical_topic_id) DO NOTHING`,
   );
 }
@@ -337,6 +338,7 @@ async function finalizeMatch(
     canonicalId: number;
     matchMethod: MatchMethod;
     similarity: number | null;
+    versionTokenForcedDisambig: boolean;
   },
 ): Promise<number> {
   await updateLastSeen(tx, args.canonicalId);
@@ -351,6 +353,7 @@ async function finalizeMatch(
     matchMethod: args.matchMethod,
     similarity: args.similarity,
     coverageScore: args.input.coverageScore,
+    versionTokenForcedDisambig: args.versionTokenForcedDisambig,
   });
   return aliasesAdded;
 }
@@ -409,6 +412,7 @@ async function runTx1(
       canonicalId: exact.id,
       matchMethod: "auto",
       similarity: EXACT_MATCH_SIMILARITY,
+      versionTokenForcedDisambig: false,
     });
     return {
       canonicalId: exact.id,
@@ -437,6 +441,7 @@ async function runTx1(
       canonicalId: top.id,
       matchMethod: "auto",
       similarity: top.similarity,
+      versionTokenForcedDisambig: false,
     });
     return {
       canonicalId: top.id,
@@ -467,6 +472,7 @@ async function runTx1(
       canonicalId: newId,
       matchMethod: "new",
       similarity: null,
+      versionTokenForcedDisambig: false,
     });
     return {
       canonicalId: newId,
@@ -491,6 +497,7 @@ async function runTx1(
     canonicalId: recovered.id,
     matchMethod: "auto",
     similarity: EXACT_MATCH_SIMILARITY,
+    versionTokenForcedDisambig: false,
   });
   return {
     canonicalId: recovered.id,
@@ -550,6 +557,7 @@ async function runTx2(
       canonicalId: exact.id,
       matchMethod: "auto",
       similarity: EXACT_MATCH_SIMILARITY,
+      versionTokenForcedDisambig: false,
     });
     return {
       canonicalId: exact.id,
@@ -575,6 +583,7 @@ async function runTx2(
         canonicalId: confirmed.id,
         matchMethod: "llm_disambig",
         similarity: confirmed.similarity,
+        versionTokenForcedDisambig,
       });
       return {
         canonicalId: confirmed.id,
@@ -595,6 +604,7 @@ async function runTx2(
       canonicalId: newId,
       matchMethod: "new",
       similarity: null,
+      versionTokenForcedDisambig,
     });
     return {
       canonicalId: newId,
@@ -615,6 +625,7 @@ async function runTx2(
     canonicalId: recovered.id,
     matchMethod: "auto",
     similarity: EXACT_MATCH_SIMILARITY,
+    versionTokenForcedDisambig: false,
   });
   return {
     canonicalId: recovered.id,
