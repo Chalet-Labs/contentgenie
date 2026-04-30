@@ -13,6 +13,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { MergeDialog } from "@/components/admin/topics/merge-dialog";
+import { ListUnmergeTrigger } from "@/components/admin/topics/list-unmerge-trigger";
 import { TOPICS_PAGE_SIZE } from "@/lib/admin/topic-queries";
 import type { CanonicalTopicRow } from "@/lib/admin/topic-queries";
 
@@ -118,6 +119,9 @@ export function TopicsTable({
                       >
                         Merge
                       </Button>
+                    )}
+                    {topic.status === "merged" && (
+                      <ListUnmergeTrigger topic={topic} />
                     )}
                   </TableCell>
                 </TableRow>

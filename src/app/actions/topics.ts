@@ -13,6 +13,7 @@ import {
 import {
   getCanonicalTopicsListQuery,
   getAdminAuditLogQuery,
+  getUnmergeSuggestionsQuery,
   type CanonicalTopicRow,
   type AdminAuditRow,
 } from "@/lib/admin/topic-queries";
@@ -46,6 +47,10 @@ const topicsListSchema = z.object({
 const auditLogSchema = z.object({
   canonicalId: z.number().int().positive().optional(),
   page: z.number().int().min(1),
+});
+
+const unmergeSuggestionsSchema = z.object({
+  loserId: z.number().int().positive(),
 });
 
 // ---------------------------------------------------------------------------
@@ -139,6 +144,22 @@ export async function getCanonicalTopicsList(input: {
       };
     }
     const data = await getCanonicalTopicsListQuery(parsed.data);
+    return { success: true, data };
+  });
+}
+
+export async function getUnmergeSuggestions(input: {
+  loserId: number;
+}): Promise<ActionResult<{ id: number; title: string }[]>> {
+  return withAdminAction(async () => {
+    const parsed = unmergeSuggestionsSchema.safeParse(input);
+    if (!parsed.success) {
+      return {
+        success: false,
+        error: parsed.error.issues[0]?.message ?? "Invalid input",
+      };
+    }
+    const data = await getUnmergeSuggestionsQuery(parsed.data.loserId);
     return { success: true, data };
   });
 }

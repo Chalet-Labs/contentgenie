@@ -1,20 +1,23 @@
 import { notFound } from "next/navigation";
-import { eq, desc, inArray } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 import { db } from "@/db";
 import {
   canonicalTopics,
   canonicalTopicAliases,
-  canonicalTopicAdminLog,
   episodeCanonicalTopics,
   episodes,
 } from "@/db/schema";
-import { getAdminAuditLogQuery } from "@/lib/admin/topic-queries";
+import {
+  getAdminAuditLogQuery,
+  getUnmergeSuggestionsQuery,
+} from "@/lib/admin/topic-queries";
 import { AuditLogList } from "@/components/admin/topics/audit-log-list";
 import {
   walkMergedChain,
   TOPIC_DISPLAY_COLUMNS,
 } from "@/app/(app)/topic/[id]/merge-walker";
 import { UnmergeDialogTrigger } from "@/components/admin/topics/unmerge-dialog-trigger";
+import { MergeDialogTrigger } from "@/components/admin/topics/merge-dialog-trigger";
 
 export default async function AdminTopicDetailPage({
   params,
@@ -57,40 +60,8 @@ export default async function AdminTopicDetailPage({
   const walkerResult =
     topic.status === "merged" ? await walkMergedChain(topic) : null;
 
-  // Suggest episodes from the most recent merge audit row.
-  // After a merge, the loser has zero junctions (all moved to winner), so we
-  // cannot derive the list from the live junction table. The audit log stores
-  // both reassigned episode IDs (rows that moved to the winner) and
-  // conflict_episode_ids (rows the loser dropped because the winner already
-  // had them). ADR-046 §7 requires both to be candidates for re-attachment.
-  let suggestedEpisodes: { id: number; title: string }[] = [];
-  if (topic.status === "merged") {
-    const latestMergeRow = await db
-      .select({ metadata: canonicalTopicAdminLog.metadata })
-      .from(canonicalTopicAdminLog)
-      .where(eq(canonicalTopicAdminLog.loserId, id))
-      .orderBy(desc(canonicalTopicAdminLog.createdAt))
-      .limit(1);
-    const meta = latestMergeRow[0]?.metadata as
-      | { reassigned?: number[]; conflict_episode_ids?: number[] }
-      | undefined;
-    const reassignedIds = Array.isArray(meta?.reassigned)
-      ? meta.reassigned
-      : [];
-    const conflictIds = Array.isArray(meta?.conflict_episode_ids)
-      ? meta.conflict_episode_ids
-      : [];
-    const candidateIds = Array.from(
-      new Set([...reassignedIds, ...conflictIds]),
-    );
-    if (candidateIds.length > 0) {
-      const episodeRows = await db
-        .select({ id: episodes.id, title: episodes.title })
-        .from(episodes)
-        .where(inArray(episodes.id, candidateIds));
-      suggestedEpisodes = episodeRows;
-    }
-  }
+  const suggestedEpisodes =
+    topic.status === "merged" ? await getUnmergeSuggestionsQuery(id) : [];
 
   return (
     <div className="space-y-6">
@@ -120,6 +91,20 @@ export default async function AdminTopicDetailPage({
             </p>
           )}
         </div>
+      )}
+
+      {topic.status === "active" && (
+        <MergeDialogTrigger
+          topic={{
+            id: topic.id,
+            label: topic.label,
+            kind: topic.kind,
+            status: topic.status,
+            episodeCount: topic.episodeCount,
+            lastSeen: new Date(),
+            mergedIntoId: topic.mergedIntoId,
+          }}
+        />
       )}
 
       {topic.status === "merged" && (
