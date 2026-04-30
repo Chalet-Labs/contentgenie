@@ -244,11 +244,19 @@ export const summarizeEpisode = task({
 
     // Update the existing notification row in place (created by the poller on discovery).
     // No-ops silently if no prior row exists (admin-triggered re-summarization).
-    const dbEpisode = await db.query.episodes.findFirst({
-      where: eq(episodes.podcastIndexId, piId),
-      columns: { id: true },
-    });
-    const episodeDbId = dbEpisode?.id ?? null;
+    let episodeDbId: number | null = null;
+    try {
+      const dbEpisode = await db.query.episodes.findFirst({
+        where: eq(episodes.podcastIndexId, piId),
+        columns: { id: true },
+      });
+      episodeDbId = dbEpisode?.id ?? null;
+    } catch (err) {
+      logger.warn("Could not resolve episode DB id after summary persistence", {
+        episodeId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
 
     try {
       const podcastDbId = await resolvePodcastId(episode.feedId);

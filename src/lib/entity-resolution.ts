@@ -370,7 +370,22 @@ export async function resolveTopic(
     return tx1Result;
   }
 
-  const chosenId = await callDisambiguator(input, tx1Result.candidates);
+  let chosenId: number | null;
+  try {
+    chosenId = await callDisambiguator(input, tx1Result.candidates);
+  } catch (err) {
+    if (
+      err instanceof EntityResolutionError &&
+      err.reason === "disambig_parse_failed"
+    ) {
+      throw new EntityResolutionError(err.reason, {
+        cause: err,
+        usedDisambiguator: true,
+      });
+    }
+    throw err;
+  }
+
   try {
     return await transactional<ResolveTopicResult>(async (tx2) =>
       runTx2(
