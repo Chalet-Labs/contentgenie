@@ -438,10 +438,14 @@ describe("unmergeCanonicals", () => {
   it("(7) unmerge happy path with default alsoRemoveFromWinner=true removes winner junction rows", async () => {
     setTxFixtures([
       {
+        match: /SELECT status, merged_into_id FROM canonical_topics/,
+        rows: [{ status: "merged", merged_into_id: 9 }],
+      },
+      { match: "pg_advisory_xact_lock", rows: [] },
+      {
         match: "FOR UPDATE",
         rows: [{ id: 5, status: "merged", merged_into_id: 9 }],
       },
-      { match: "pg_advisory_xact_lock", rows: [] },
       { match: "SET status = 'active'", rows: [{ id: 5 }] },
       { match: "INSERT INTO episode_canonical_topics", rows: [{ id: 100 }] },
       { match: "DELETE FROM episode_canonical_topics", rows: [{ id: 200 }] },
@@ -469,10 +473,14 @@ describe("unmergeCanonicals", () => {
   it("(8) unmerge with alsoRemoveFromWinner=false leaves winner rows intact", async () => {
     setTxFixtures([
       {
+        match: /SELECT status, merged_into_id FROM canonical_topics/,
+        rows: [{ status: "merged", merged_into_id: 9 }],
+      },
+      { match: "pg_advisory_xact_lock", rows: [] },
+      {
         match: "FOR UPDATE",
         rows: [{ id: 5, status: "merged", merged_into_id: 9 }],
       },
-      { match: "pg_advisory_xact_lock", rows: [] },
       { match: "SET status = 'active'", rows: [{ id: 5 }] },
       { match: "INSERT INTO episode_canonical_topics", rows: [{ id: 100 }] },
       { match: "SET episode_count", rows: [{ episode_count: 1 }] },
@@ -499,8 +507,8 @@ describe("unmergeCanonicals", () => {
   it("(9) unmerge of non-merged topic throws not-merged", async () => {
     setTxFixtures([
       {
-        match: "FOR UPDATE",
-        rows: [{ id: 3, status: "active", merged_into_id: null }],
+        match: /SELECT status, merged_into_id FROM canonical_topics/,
+        rows: [{ status: "active", merged_into_id: null }],
       },
     ]);
 
@@ -515,7 +523,12 @@ describe("unmergeCanonicals", () => {
   });
 
   it("(9b) unmerge of missing topic throws not-merged", async () => {
-    setTxFixtures([{ match: "FOR UPDATE", rows: [] }]);
+    setTxFixtures([
+      {
+        match: /SELECT status, merged_into_id FROM canonical_topics/,
+        rows: [],
+      },
+    ]);
 
     const { unmergeCanonicals } = await import("@/trigger/helpers/database");
     await expect(
@@ -527,13 +540,42 @@ describe("unmergeCanonicals", () => {
     ).rejects.toThrow("not-merged");
   });
 
-  it("(10) unmerge lock ordering: SELECT FOR UPDATE precedes pg_advisory_xact_lock", async () => {
+  it("(9c) unmerge throws not-merged when merged_into_id changes between probe and lock (race window)", async () => {
     setTxFixtures([
+      // Probe sees winner=9
+      {
+        match: /SELECT status, merged_into_id FROM canonical_topics/,
+        rows: [{ status: "merged", merged_into_id: 9 }],
+      },
+      { match: "pg_advisory_xact_lock", rows: [] },
+      // After advisory lock, FOR UPDATE re-read shows winner=11 (concurrent re-merge)
+      {
+        match: "FOR UPDATE",
+        rows: [{ id: 5, status: "merged", merged_into_id: 11 }],
+      },
+    ]);
+
+    const { unmergeCanonicals } = await import("@/trigger/helpers/database");
+    await expect(
+      unmergeCanonicals({
+        loserId: 5,
+        episodeIdsToReassign: [],
+        actor: "user_race",
+      }),
+    ).rejects.toThrow("not-merged");
+  });
+
+  it("(10) unmerge lock ordering: probe → advisory lock → SELECT FOR UPDATE (matches mergeCanonicals to avoid deadlock)", async () => {
+    setTxFixtures([
+      {
+        match: /SELECT status, merged_into_id FROM canonical_topics/,
+        rows: [{ status: "merged", merged_into_id: 9 }],
+      },
+      { match: "pg_advisory_xact_lock", rows: [] },
       {
         match: "FOR UPDATE",
         rows: [{ id: 5, status: "merged", merged_into_id: 9 }],
       },
-      { match: "pg_advisory_xact_lock", rows: [] },
       { match: "SET status = 'active'", rows: [{ id: 5 }] },
       { match: "INSERT INTO episode_canonical_topics", rows: [{ id: 100 }] },
       { match: "DELETE FROM episode_canonical_topics", rows: [] },
@@ -550,26 +592,35 @@ describe("unmergeCanonicals", () => {
     });
 
     const calls = getTxCalls();
-    const preflightIdx = calls.findIndex(
+    const probeIdx = calls.findIndex(
       (c) =>
-        c.sql.toLowerCase().includes("for update") &&
-        c.sql.toLowerCase().includes("canonical_topics"),
+        c.sql.toLowerCase().includes("select status, merged_into_id") &&
+        !c.sql.toLowerCase().includes("for update"),
     );
     const lockIdx = calls.findIndex((c) =>
       c.sql.toLowerCase().includes("pg_advisory_xact_lock"),
     );
-    expect(preflightIdx).toBeGreaterThanOrEqual(0);
+    const forUpdateIdx = calls.findIndex((c) =>
+      c.sql.toLowerCase().includes("for update"),
+    );
+    expect(probeIdx).toBeGreaterThanOrEqual(0);
     expect(lockIdx).toBeGreaterThanOrEqual(0);
-    expect(preflightIdx).toBeLessThan(lockIdx);
+    expect(forUpdateIdx).toBeGreaterThanOrEqual(0);
+    expect(probeIdx).toBeLessThan(lockIdx);
+    expect(lockIdx).toBeLessThan(forUpdateIdx);
   });
 
   it("(11-unmerge) audit log metadata captures episode_ids and also_removed_from_winner", async () => {
     setTxFixtures([
       {
+        match: /SELECT status, merged_into_id FROM canonical_topics/,
+        rows: [{ status: "merged", merged_into_id: 9 }],
+      },
+      { match: "pg_advisory_xact_lock", rows: [] },
+      {
         match: "FOR UPDATE",
         rows: [{ id: 5, status: "merged", merged_into_id: 9 }],
       },
-      { match: "pg_advisory_xact_lock", rows: [] },
       { match: "SET status = 'active'", rows: [{ id: 5 }] },
       {
         match: "INSERT INTO episode_canonical_topics",
@@ -602,10 +653,14 @@ describe("unmergeCanonicals", () => {
   it("(12-unmerge) reassigns episodes via single set-based INSERT (regression guard against N+1 loop)", async () => {
     setTxFixtures([
       {
+        match: /SELECT status, merged_into_id FROM canonical_topics/,
+        rows: [{ status: "merged", merged_into_id: 9 }],
+      },
+      { match: "pg_advisory_xact_lock", rows: [] },
+      {
         match: "FOR UPDATE",
         rows: [{ id: 5, status: "merged", merged_into_id: 9 }],
       },
-      { match: "pg_advisory_xact_lock", rows: [] },
       { match: "SET status = 'active'", rows: [{ id: 5 }] },
       {
         match: "INSERT INTO episode_canonical_topics",

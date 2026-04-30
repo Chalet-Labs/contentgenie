@@ -530,10 +530,12 @@ export function mergeCanonicals(
  * Reverse a merge: revive `loserId` to 'active' and re-assign the supplied
  * episode IDs back to it.
  *
- * Lock ordering (ADR-046 §4):
- *   1. SELECT … FOR UPDATE on the loser row (row-level lock; also reads merged_into_id)
- *   2. Read previousWinnerId from the locked row
- *   3. Acquire sorted-pair advisory lock (now both IDs are known)
+ * Lock ordering (ADR-046 §4) — must match mergeCanonicals (advisory → row) to
+ * avoid deadlocks on concurrent merge/unmerge of the same pair:
+ *   1. Non-locking probe of (status, merged_into_id) to discover previousWinnerId
+ *   2. Acquire sorted-pair advisory lock (matches mergeCanonicals order)
+ *   3. Re-read FOR UPDATE and re-validate — closes the race window where a
+ *      concurrent merge-chain may have moved merged_into_id between probe and lock
  *   4. Atomic UPDATE reversing status + merged_into_id
  */
 export function unmergeCanonicals(
@@ -548,7 +550,27 @@ export function unmergeCanonicals(
   } = args;
 
   return transactional(async (tx) => {
-    // 1. Preflight SELECT FOR UPDATE — also acquires row-level lock.
+    // 1. Non-locking probe to discover previousWinnerId.
+    const probeResult = await tx.execute<{
+      status: string;
+      merged_into_id: number | null;
+    }>(
+      sql`SELECT status, merged_into_id FROM canonical_topics WHERE id = ${loserId}`,
+    );
+    const probe = probeResult.rows[0];
+    if (!probe || probe.status !== "merged") throw new Error("not-merged");
+    const previousWinnerId = probe.merged_into_id;
+    if (previousWinnerId == null) throw new Error("invariant-violated");
+
+    // 2. Advisory lock FIRST (matches mergeCanonicals order — no inversion).
+    const lockKey = buildMergeLockKey(loserId, previousWinnerId);
+    await tx.execute(
+      sql`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`,
+    );
+
+    // 3. Re-read FOR UPDATE and re-validate. A concurrent merge chain may have
+    //    re-merged the loser into a different winner between the probe and the
+    //    lock; the advisory lock we hold is for the wrong pair in that case.
     const preflightResult = await tx.execute<{
       id: number;
       status: string;
@@ -558,16 +580,7 @@ export function unmergeCanonicals(
     );
     const row = preflightResult.rows[0];
     if (!row || row.status !== "merged") throw new Error("not-merged");
-
-    // 2. Read previousWinnerId. CHECK invariant guarantees non-null when merged.
-    const previousWinnerId = row.merged_into_id;
-    if (previousWinnerId == null) throw new Error("invariant-violated");
-
-    // 3. Acquire sorted-pair advisory lock.
-    const lockKey = buildMergeLockKey(loserId, previousWinnerId);
-    await tx.execute(
-      sql`SELECT pg_advisory_xact_lock(hashtextextended(${lockKey}, 0))`,
-    );
+    if (row.merged_into_id !== previousWinnerId) throw new Error("not-merged");
 
     // 4. Atomic reverse UPDATE.
     await tx.execute(
