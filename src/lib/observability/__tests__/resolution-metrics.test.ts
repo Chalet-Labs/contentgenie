@@ -3,10 +3,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const mockSelect = vi.fn();
+const mockExecute = vi.fn();
 
 vi.mock("@/db", () => ({
   db: {
     select: (...args: unknown[]) => mockSelect(...args),
+    execute: (...args: unknown[]) => mockExecute(...args),
   },
 }));
 
@@ -48,7 +50,14 @@ vi.mock("drizzle-orm", () => ({
   isNotNull: (col: unknown) => mockIsNotNull(col),
 }));
 
-// Helper: creates a fluent query chain that resolves to the given rows
+vi.mock("@/lib/entity-resolution-constants", () => ({
+  MATCH_METHODS: ["auto", "llm_disambig", "new"],
+}));
+
+vi.mock("@/lib/search-params/admin-topics-observability", () => ({
+  WINDOW_KEYS: ["today", "7d", "30d"],
+}));
+
 function makeChain(rows: unknown[]) {
   const chain: Record<string, unknown> = {};
   const methods = ["from", "where", "groupBy", "orderBy", "limit"];
@@ -148,10 +157,8 @@ describe("getSimilarityHistogram", () => {
   });
 
   it("zero-fills missing buckets — returns exactly 20 entries for default bucketSize 0.05", async () => {
-    // DB returns only one bucket
     mockSelect.mockReturnValue(makeChain([{ bucket: 0.9, count: 5 }]));
     const result = await getSimilarityHistogram();
-    // 0.00..0.95 in 0.05 steps = 20 buckets
     expect(result).toHaveLength(20);
     expect(result.every((r) => typeof r.bucket === "number")).toBe(true);
     expect(result.every((r) => typeof r.count === "number")).toBe(true);
@@ -176,6 +183,18 @@ describe("getSimilarityHistogram", () => {
     expect(result).toHaveLength(20);
     expect(result.every((r) => r.count === 0)).toBe(true);
   });
+
+  it("similarity=1.0 rows are folded into the 0.95 bucket", async () => {
+    // DB returns a row with bucket=1.0 (exact-lookup hit, EXACT_MATCH_SIMILARITY=1.0)
+    // The least() cap collapses it into 0.95 before reaching our code.
+    // Simulate what the DB returns after the least() expression: bucket=0.95.
+    mockSelect.mockReturnValue(makeChain([{ bucket: 0.95, count: 5 }]));
+    const result = await getSimilarityHistogram();
+    expect(result).toHaveLength(20);
+    const bucket95 = result.find((b) => Math.abs(b.bucket - 0.95) < 0.001);
+    expect(bucket95).toBeDefined();
+    expect(bucket95!.count).toBe(5);
+  });
 });
 
 describe("getDisambigForcedCount", () => {
@@ -183,12 +202,9 @@ describe("getDisambigForcedCount", () => {
     vi.clearAllMocks();
   });
 
-  it("returns { versionTokenForced, total } from count queries", async () => {
-    let callCount = 0;
-    mockSelect.mockImplementation(() => {
-      callCount++;
-      if (callCount === 1) return makeChain([{ value: 100 }]); // total
-      return makeChain([{ value: 12 }]); // forced
+  it("returns { versionTokenForced, total } from a single aggregate query", async () => {
+    mockExecute.mockResolvedValue({
+      rows: [{ total: 100, forced: 12 }],
     });
     const result = await getDisambigForcedCount();
     expect(result.total).toBe(100);
@@ -196,7 +212,9 @@ describe("getDisambigForcedCount", () => {
   });
 
   it("returns zeros when no rows in the junction", async () => {
-    mockSelect.mockReturnValue(makeChain([{ value: 0 }]));
+    mockExecute.mockResolvedValue({
+      rows: [{ total: 0, forced: 0 }],
+    });
     const result = await getDisambigForcedCount();
     expect(result.total).toBe(0);
     expect(result.versionTokenForced).toBe(0);
@@ -204,16 +222,24 @@ describe("getDisambigForcedCount", () => {
 });
 
 describe("windowFromKey", () => {
-  it("returns 1-day window for 'today'", () => {
+  it("'today' anchors start to UTC midnight, end is now", () => {
     const before = Date.now();
     const { start, end } = windowFromKey("today");
     const after = Date.now();
+
     expect(end.getTime()).toBeGreaterThanOrEqual(before);
     expect(end.getTime()).toBeLessThanOrEqual(after + 1);
-    const diffMs = end.getTime() - start.getTime();
-    // Should be approximately 1 day (allow 1s tolerance)
-    expect(diffMs).toBeGreaterThanOrEqual(24 * 60 * 60 * 1000 - 1000);
-    expect(diffMs).toBeLessThanOrEqual(24 * 60 * 60 * 1000 + 1000);
+
+    // start must be UTC midnight today
+    expect(start.getUTCHours()).toBe(0);
+    expect(start.getUTCMinutes()).toBe(0);
+    expect(start.getUTCSeconds()).toBe(0);
+    expect(start.getUTCMilliseconds()).toBe(0);
+
+    // start is today (same UTC date as end)
+    expect(start.getUTCFullYear()).toBe(end.getUTCFullYear());
+    expect(start.getUTCMonth()).toBe(end.getUTCMonth());
+    expect(start.getUTCDate()).toBe(end.getUTCDate());
   });
 
   it("returns 7-day window for '7d'", () => {

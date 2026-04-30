@@ -1,9 +1,10 @@
 import { parseAsStringLiteral, createLoader } from "nuqs/server";
 
+export const WINDOW_KEYS = ["today", "7d", "30d"] as const;
+export type WindowKey = (typeof WINDOW_KEYS)[number];
+
 export const adminTopicsObservabilitySearchParams = {
-  window: parseAsStringLiteral(["today", "7d", "30d"] as const).withDefault(
-    "7d",
-  ),
+  window: parseAsStringLiteral(WINDOW_KEYS).withDefault("7d"),
 };
 
 export const loadAdminTopicsObservabilitySearchParams = createLoader(

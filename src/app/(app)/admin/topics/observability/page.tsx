@@ -10,13 +10,26 @@ import {
   getDisambigForcedCount,
   windowFromKey,
 } from "@/lib/observability/resolution-metrics";
-import { loadAdminTopicsObservabilitySearchParams } from "@/lib/search-params/admin-topics-observability";
+import {
+  WINDOW_KEYS,
+  loadAdminTopicsObservabilitySearchParams,
+} from "@/lib/search-params/admin-topics-observability";
+import { MATCH_METHODS } from "@/lib/entity-resolution-constants";
 
-const WINDOWS = [
-  { key: "today", label: "Today" },
-  { key: "7d", label: "7 days" },
-  { key: "30d", label: "30 days" },
-] as const;
+const WINDOW_LABELS: Record<(typeof WINDOW_KEYS)[number], string> = {
+  today: "Today",
+  "7d": "7 days",
+  "30d": "30 days",
+};
+
+const MATCH_METHOD_META: Record<
+  (typeof MATCH_METHODS)[number],
+  { label: string }
+> = {
+  auto: { label: "Auto" },
+  llm_disambig: { label: "LLM disambig" },
+  new: { label: "New canonical" },
+};
 
 export default async function ObservabilityPage({
   searchParams,
@@ -25,26 +38,24 @@ export default async function ObservabilityPage({
 }) {
   const { window: windowKey } =
     await loadAdminTopicsObservabilitySearchParams(searchParams);
-  const { start, end } = windowFromKey(windowKey);
+  const window = windowFromKey(windowKey);
 
   const [matchMethod, similarityBuckets, disambigForced] = await Promise.all([
-    getMatchMethodHistogram({ start, end }),
-    getSimilarityHistogram({ start, end }),
-    getDisambigForcedCount({ start, end }),
+    getMatchMethodHistogram(window),
+    getSimilarityHistogram(window),
+    getDisambigForcedCount(window),
   ]);
 
-  const matchMethodTotal =
-    matchMethod.auto + matchMethod.llm_disambig + matchMethod.new;
+  const matchMethodTotal = MATCH_METHODS.reduce(
+    (sum, m) => sum + matchMethod[m],
+    0,
+  );
 
-  const matchMethodRows = [
-    { key: "auto", label: "Auto", count: matchMethod.auto },
-    {
-      key: "llm_disambig",
-      label: "LLM disambig",
-      count: matchMethod.llm_disambig,
-    },
-    { key: "new", label: "New canonical", count: matchMethod.new },
-  ];
+  const matchMethodRows = MATCH_METHODS.map((m) => ({
+    key: m,
+    label: MATCH_METHOD_META[m].label,
+    count: matchMethod[m],
+  }));
 
   const maxSimilarityCount = Math.max(
     ...similarityBuckets.map((b) => b.count),
@@ -55,12 +66,12 @@ export default async function ObservabilityPage({
 
   return (
     <div className="space-y-6">
-      {/* Time-window selector */}
       <nav className="flex gap-2">
-        {WINDOWS.map(({ key, label }) => (
+        {WINDOW_KEYS.map((key) => (
           <Link
             key={key}
             href={`?window=${key}`}
+            aria-current={windowKey === key ? "page" : undefined}
             className={cn(
               "rounded-md px-3 py-1.5 text-sm font-medium transition-colors",
               windowKey === key
@@ -68,13 +79,12 @@ export default async function ObservabilityPage({
                 : "text-muted-foreground hover:bg-muted hover:text-foreground",
             )}
           >
-            {label}
+            {WINDOW_LABELS[key]}
           </Link>
         ))}
       </nav>
 
       <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-        {/* Card 1: Match-method distribution */}
         <Card>
           <CardHeader>
             <CardTitle>Match method distribution</CardTitle>
@@ -105,7 +115,6 @@ export default async function ObservabilityPage({
           </CardContent>
         </Card>
 
-        {/* Card 2: Similarity histogram */}
         <Card>
           <CardHeader>
             <CardTitle>Similarity histogram</CardTitle>
@@ -122,10 +131,7 @@ export default async function ObservabilityPage({
                     <span className="w-10 shrink-0 text-right text-xs text-muted-foreground">
                       {bucket.toFixed(2)}
                     </span>
-                    <div
-                      className="h-3 bg-primary"
-                      style={{ width: `${pct}%` }}
-                    />
+                    <Progress value={pct} max={100} className="h-3" />
                     <span className="text-xs text-muted-foreground">
                       {count}
                     </span>
@@ -136,7 +142,6 @@ export default async function ObservabilityPage({
           </CardContent>
         </Card>
 
-        {/* Card 3: Version-token forced disambig count */}
         <Card>
           <CardHeader>
             <CardTitle>Version-token forced disambig</CardTitle>

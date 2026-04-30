@@ -2,19 +2,20 @@ import "server-only";
 
 import { db } from "@/db";
 import { episodeCanonicalTopics } from "@/db/schema";
-import { count, sql, and, gte, lte, isNotNull, eq } from "drizzle-orm";
+import { count, sql, and, gte, lte, isNotNull } from "drizzle-orm";
+import {
+  MATCH_METHODS,
+  type MatchMethod,
+} from "@/lib/entity-resolution-constants";
+import { type WindowKey } from "@/lib/search-params/admin-topics-observability";
 
 export interface ResolutionMetricRecord {
-  matchMethod: "auto" | "llm_disambig" | "new";
+  matchMethod: MatchMethod;
   similarityToTopMatch: number | null;
   versionTokenForcedDisambig: boolean;
 }
 
-export interface MatchMethodHistogram {
-  auto: number;
-  llm_disambig: number;
-  new: number;
-}
+export type MatchMethodHistogram = Record<MatchMethod, number>;
 
 export interface SimilarityBucket {
   bucket: number;
@@ -26,6 +27,9 @@ export interface DisambigForcedCount {
   total: number;
 }
 
+const MS_PER_DAY = 24 * 60 * 60 * 1000;
+const DEFAULT_BUCKET_SIZE = 0.05;
+
 /**
  * No-op stub in v1. The canonical write path is the resolver's `insertJunction`,
  * which already persists all dimensions to `episode_canonical_topics`.
@@ -34,19 +38,26 @@ export interface DisambigForcedCount {
  */
 export async function recordResolutionMetric(
   _record: ResolutionMetricRecord,
-): Promise<void> {
-  // Intentional no-op — see JSDoc above.
-}
+): Promise<void> {}
 
-/** Returns time window boundaries for a named key. */
-export function windowFromKey(key: "today" | "7d" | "30d"): {
-  start: Date;
-  end: Date;
-} {
-  const end = new Date();
-  const days = key === "today" ? 1 : key === "7d" ? 7 : 30;
-  const start = new Date(end.getTime() - days * 24 * 60 * 60 * 1000);
-  return { start, end };
+/**
+ * Returns time window boundaries for a named key.
+ *
+ * - `"today"` is calendar-aligned: UTC midnight today → now.
+ * - `"7d"` and `"30d"` are rolling windows: now − N×24h → now.
+ */
+export function windowFromKey(key: WindowKey): { start: Date; end: Date } {
+  const now = new Date();
+  if (key === "today") {
+    const d = now;
+    const start = new Date(
+      Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()),
+    );
+    return { start, end: now };
+  }
+  const days = key === "7d" ? 7 : 30;
+  const start = new Date(now.getTime() - days * MS_PER_DAY);
+  return { start, end: now };
 }
 
 function buildTimeFilter(window?: { start: Date; end: Date }) {
@@ -59,8 +70,8 @@ function buildTimeFilter(window?: { start: Date; end: Date }) {
 
 /**
  * Returns the distribution of match methods over the given time window.
- * Always returns all three keys (`auto`, `llm_disambig`, `new`),
- * defaulting to 0 for any key not present in the DB result.
+ * Always returns all keys from `MATCH_METHODS`, defaulting to 0 for any
+ * key not present in the DB result.
  */
 export async function getMatchMethodHistogram(window?: {
   start: Date;
@@ -78,9 +89,11 @@ export async function getMatchMethodHistogram(window?: {
 
   const rows = await (timeFilter ? query.where(timeFilter) : query);
 
-  const result: MatchMethodHistogram = { auto: 0, llm_disambig: 0, new: 0 };
+  const result = Object.fromEntries(
+    MATCH_METHODS.map((m) => [m, 0]),
+  ) as MatchMethodHistogram;
   for (const row of rows) {
-    const method = row.matchMethod as keyof MatchMethodHistogram;
+    const method = row.matchMethod as MatchMethod;
     if (method in result) {
       result[method] = Number(row.count);
     }
@@ -94,13 +107,14 @@ export async function getMatchMethodHistogram(window?: {
  * Excludes rows where `similarity_to_top_match IS NULL` (those are
  * pure `match_method='new'` resolutions with no comparison performed).
  * Missing buckets are zero-filled so the dashboard always renders 20 bars.
+ * Similarity = 1.0 (exact-lookup hits) is capped into the 0.95 bucket via `least()`.
  */
 export async function getSimilarityHistogram(
   window?: { start: Date; end: Date },
-  bucketSize: number = 0.05,
+  bucketSize: number = DEFAULT_BUCKET_SIZE,
 ): Promise<SimilarityBucket[]> {
   const col = episodeCanonicalTopics.similarityToTopMatch;
-  const bucketExpr = sql<number>`floor(${col} / ${bucketSize}) * ${bucketSize}`;
+  const bucketExpr = sql<number>`least(floor(${col} / ${bucketSize}) * ${bucketSize}, 0.95)`;
 
   const nullFilter = isNotNull(col);
   const timeFilter = buildTimeFilter(window);
@@ -113,17 +127,19 @@ export async function getSimilarityHistogram(
     })
     .from(episodeCanonicalTopics)
     .where(whereClause)
-    .groupBy(sql`floor(${col} / ${bucketSize}) * ${bucketSize}`)
-    .orderBy(sql`floor(${col} / ${bucketSize}) * ${bucketSize}`);
+    .groupBy(
+      sql<number>`least(floor(${col} / ${bucketSize}) * ${bucketSize}, 0.95)`,
+    )
+    .orderBy(
+      sql<number>`least(floor(${col} / ${bucketSize}) * ${bucketSize}, 0.95)`,
+    );
 
-  // Build a map of bucket → count from DB results
   const bucketMap = new Map<number, number>();
   for (const row of rows) {
     const key = Math.round(row.bucket * 1000) / 1000;
     bucketMap.set(key, Number(row.count));
   }
 
-  // Zero-fill the full 0.00..0.95 range (20 buckets for default bucketSize 0.05)
   const numBuckets = Math.round(1 / bucketSize);
   const result: SimilarityBucket[] = [];
   for (let i = 0; i < numBuckets; i++) {
@@ -143,27 +159,16 @@ export async function getDisambigForcedCount(window?: {
 }): Promise<DisambigForcedCount> {
   const timeFilter = buildTimeFilter(window);
 
-  const totalQuery = db.select({ value: count() }).from(episodeCanonicalTopics);
-
-  const forcedQuery = db
-    .select({ value: count() })
-    .from(episodeCanonicalTopics)
-    .where(
-      timeFilter
-        ? and(
-            eq(episodeCanonicalTopics.versionTokenForcedDisambig, true),
-            timeFilter,
-          )
-        : eq(episodeCanonicalTopics.versionTokenForcedDisambig, true),
-    );
-
-  const [totalRows, forcedRows] = await Promise.all([
-    timeFilter ? totalQuery.where(timeFilter) : totalQuery,
-    forcedQuery,
-  ]);
-
-  return {
-    total: Number(totalRows[0]?.value ?? 0),
-    versionTokenForced: Number(forcedRows[0]?.value ?? 0),
+  const result = await db.execute(sql`
+    SELECT
+      count(*)::int AS total,
+      count(*) FILTER (WHERE version_token_forced_disambig)::int AS forced
+    FROM episode_canonical_topics
+    ${timeFilter ? sql`WHERE created_at >= ${window!.start} AND created_at <= ${window!.end}` : sql``}
+  `);
+  const { total, forced } = result.rows[0] as {
+    total: number;
+    forced: number;
   };
+  return { total: Number(total), versionTokenForced: Number(forced) };
 }

@@ -2,8 +2,6 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import React from "react";
 
-// ---- Mocks ------------------------------------------------------------------
-
 vi.mock("@/lib/observability/resolution-metrics", () => ({
   getMatchMethodHistogram: vi.fn(),
   getSimilarityHistogram: vi.fn(),
@@ -13,23 +11,28 @@ vi.mock("@/lib/observability/resolution-metrics", () => ({
 
 vi.mock("@/lib/search-params/admin-topics-observability", () => ({
   loadAdminTopicsObservabilitySearchParams: vi.fn(),
+  WINDOW_KEYS: ["today", "7d", "30d"],
 }));
 
-// Prevent "server-only" from crashing the test environment
 vi.mock("server-only", () => ({}));
 
-// next/link renders as a plain anchor in the test environment
+vi.mock("@/lib/entity-resolution-constants", () => ({
+  MATCH_METHODS: ["auto", "llm_disambig", "new"],
+}));
+
 vi.mock("next/link", () => ({
   default: ({
     href,
     children,
     className,
+    "aria-current": ariaCurrent,
   }: {
     href: string;
     children: React.ReactNode;
     className?: string;
+    "aria-current"?: React.AriaAttributes["aria-current"];
   }) => (
-    <a href={href} className={className}>
+    <a href={href} className={className} aria-current={ariaCurrent}>
       {children}
     </a>
   ),
@@ -99,38 +102,35 @@ describe("ObservabilityPage", () => {
 
   it("renders match-method counts correctly", async () => {
     await renderPage();
-    // Auto: 50, llm_disambig: 30, new: 20 — total 100
     expect(screen.getByText("50 (50%)")).toBeInTheDocument();
     expect(screen.getByText("30 (30%)")).toBeInTheDocument();
     expect(screen.getByText("20 (20%)")).toBeInTheDocument();
   });
 
-  it("renders similarity buckets with width style values", async () => {
+  it("renders similarity buckets", async () => {
     await renderPage();
-    // The bar divs have inline style width — check at least one non-zero bucket renders
-    const bars = document.querySelectorAll('div[style*="width"]');
-    expect(bars.length).toBeGreaterThan(0);
+    const progressBars = document.querySelectorAll('[role="progressbar"]');
+    expect(progressBars.length).toBeGreaterThan(0);
   });
 
   it("renders version-token-forced caption", async () => {
     await renderPage();
-    // Caption text includes "12 of 100" — may appear in multiple nodes
     const matches = screen.getAllByText(/12 of 100/);
     expect(matches.length).toBeGreaterThan(0);
   });
 
-  it("active window link has active className", async () => {
+  it("active window link has aria-current='page'", async () => {
     mockLoader.mockResolvedValue({ window: "7d" });
     await renderPage({ window: "7d" });
     const link = screen.getByRole("link", { name: "7 days" });
-    expect(link.className).toContain("bg-primary");
+    expect(link).toHaveAttribute("aria-current", "page");
   });
 
-  it("inactive window links do not have active className", async () => {
+  it("inactive window links do not have aria-current", async () => {
     mockLoader.mockResolvedValue({ window: "7d" });
     await renderPage({ window: "7d" });
     const todayLink = screen.getByRole("link", { name: "Today" });
-    expect(todayLink.className).not.toContain("bg-primary");
+    expect(todayLink).not.toHaveAttribute("aria-current");
   });
 
   it("renders safely when all metric data is zeroed (empty-state safety)", async () => {
@@ -150,7 +150,6 @@ describe("ObservabilityPage", () => {
       total: 0,
     });
 
-    // Should not throw — empty state renders gracefully
     await expect(renderPage()).resolves.not.toThrow();
     expect(
       screen.getByText(/No resolutions in this window/),
