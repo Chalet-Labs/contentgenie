@@ -30,7 +30,11 @@
       "Bash(drizzle-kit:*)",
       "Bash(eslint:*)",
       "Bash(tsc:*)",
-      "Bash(vercel:*)"
+      "Bash(vercel:*)",
+      "Skill(dlc:*)",
+      "Skill(project-manager:*)",
+      "Skill(cdt:*)",
+      "Skill(council:*)"
     ],
     "deny": [
       "Bash(sudo:*)",
