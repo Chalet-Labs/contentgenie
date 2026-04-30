@@ -8,6 +8,7 @@ const tabs = [
   { href: "/admin", label: "Overview", exact: true },
   { href: "/admin/settings", label: "Settings", exact: false },
   { href: "/admin/episodes", label: "Episodes", exact: false },
+  { href: "/admin/topics", label: "Topics", exact: false },
 ];
 
 export function AdminTabNav() {

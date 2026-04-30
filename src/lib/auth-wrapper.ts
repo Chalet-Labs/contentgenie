@@ -15,7 +15,10 @@
  */
 import { auth } from "@clerk/nextjs/server";
 
+import { ADMIN_ROLE } from "@/lib/auth-roles";
+
 type UnauthorizedFailure = { success: false; error: "Unauthorized" };
+type ForbiddenFailure = { success: false; error: "Forbidden" };
 
 /**
  * Runs `fn` with the authenticated `userId`. Returns an `Unauthorized`
@@ -27,5 +30,19 @@ export async function withAuthAction<T>(
 ): Promise<T | UnauthorizedFailure> {
   const { userId } = await auth();
   if (!userId) return { success: false, error: "Unauthorized" };
+  return fn(userId);
+}
+
+/**
+ * Runs `fn` with the authenticated admin `userId`. Returns a `Forbidden`
+ * failure for both anonymous callers and signed-in non-admin users — using
+ * the same error for both avoids probing the auth state from the client.
+ */
+export async function withAdminAction<T>(
+  fn: (userId: string) => Promise<T>,
+): Promise<T | ForbiddenFailure> {
+  const { userId, has } = await auth();
+  if (!userId) return { success: false, error: "Forbidden" };
+  if (!has({ role: ADMIN_ROLE })) return { success: false, error: "Forbidden" };
   return fn(userId);
 }
