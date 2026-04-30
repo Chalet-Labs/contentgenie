@@ -1,0 +1,51 @@
+{
+  "_meta": {
+    "name": "version-adjacent-releases",
+    "scenario": "A new model release 'Claude Opus 4.7' is resolved against an existing canonical 'Claude Opus 4.6'. The kNN returns the seed at high cosine similarity (0.95, above AUTO_MATCH_SIMILARITY_THRESHOLD 0.92), but the version-token pre-gate (ADR-042 §version-token regex pre-gate) detects a version mismatch and forces the disambiguator path. The LLM returns chosen_id: null (they are different releases), producing a new canonical.",
+    "expectedOutcome": "canonicalCount=2 (seed + new); the resolved input has matchMethod='new' and versionTokenForcedDisambig=true, confirming the version gate fired and the disambiguator correctly rejected the existing canonical."
+  },
+  "seedCanonicals": [
+    {
+      "id": 1,
+      "label": "Claude Opus 4.6",
+      "normalizedLabel": "claude opus 4.6",
+      "kind": "release",
+      "summary": "Anthropic released Claude Opus 4.6.",
+      "ongoing": false,
+      "relevance": 0.9
+    }
+  ],
+  "inputs": [
+    {
+      "label": "Claude Opus 4.7",
+      "kind": "release",
+      "summary": "Anthropic released Claude Opus 4.7 with improved reasoning.",
+      "aliases": ["Opus 4.7"],
+      "ongoing": false,
+      "relevance": 0.9,
+      "coverageScore": 0.8,
+      "knnCandidates": [
+        {
+          "id": 1,
+          "label": "Claude Opus 4.6",
+          "kind": "release",
+          "summary": "Anthropic released Claude Opus 4.6.",
+          "similarity": 0.95
+        }
+      ],
+      "disambiguatorResponse": {
+        "chosenId": null
+      }
+    }
+  ],
+  "expected": {
+    "canonicalCount": 2,
+    "versionTokenForcedDisambig": 1,
+    "perInput": [
+      {
+        "matchMethod": "new",
+        "versionTokenForcedDisambig": true
+      }
+    ]
+  }
+}

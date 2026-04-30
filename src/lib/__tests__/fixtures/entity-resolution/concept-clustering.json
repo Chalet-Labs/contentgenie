@@ -1,0 +1,69 @@
+{
+  "_meta": {
+    "name": "concept-clustering",
+    "scenario": "Three surface forms of the 'creatine' concept are resolved sequentially starting from an empty seed. Input 1 ('creatine') finds no kNN candidates and creates a new canonical (mock harness assigns id=900). Input 2 ('creatine supplementation') returns canonical 900 at similarity 0.88, which is in the disambig band (>= DISAMBIGUATE_SIMILARITY_THRESHOLD=0.82, < AUTO_MATCH_SIMILARITY_THRESHOLD=0.92); the LLM returns chosen_id=900, producing llm_disambig. Input 3 ('creatine monohydrate') returns canonical 900 at similarity 0.85 (also in disambig band); the LLM returns chosen_id=null, producing a second new canonical (id=901). This tests the concept-clustering behaviour where similar but semantically distinct sub-concepts are correctly split.",
+    "expectedOutcome": "canonicalCountAtMost=2; matchMethodDistribution={new: 2, llm_disambig: 1} — two distinct canonicals emerge, and the middle form is merged via LLM disambiguation."
+  },
+  "seedCanonicals": [],
+  "inputs": [
+    {
+      "label": "creatine",
+      "kind": "concept",
+      "summary": "Creatine is a naturally occurring compound used in energy production.",
+      "aliases": [],
+      "ongoing": false,
+      "relevance": 0.85,
+      "coverageScore": 0.7,
+      "knnCandidates": []
+    },
+    {
+      "label": "creatine supplementation",
+      "kind": "concept",
+      "summary": "Using creatine as a dietary supplement to enhance athletic performance.",
+      "aliases": ["creatine supplements"],
+      "ongoing": false,
+      "relevance": 0.8,
+      "coverageScore": 0.65,
+      "knnCandidates": [
+        {
+          "id": 900,
+          "label": "creatine",
+          "kind": "concept",
+          "summary": "Creatine is a naturally occurring compound used in energy production.",
+          "similarity": 0.88
+        }
+      ],
+      "disambiguatorResponse": {
+        "chosenId": 900
+      }
+    },
+    {
+      "label": "creatine monohydrate",
+      "kind": "concept",
+      "summary": "Creatine monohydrate is the most studied form of creatine supplement.",
+      "aliases": ["mono creatine"],
+      "ongoing": false,
+      "relevance": 0.8,
+      "coverageScore": 0.65,
+      "knnCandidates": [
+        {
+          "id": 900,
+          "label": "creatine",
+          "kind": "concept",
+          "summary": "Creatine is a naturally occurring compound used in energy production.",
+          "similarity": 0.85
+        }
+      ],
+      "disambiguatorResponse": {
+        "chosenId": null
+      }
+    }
+  ],
+  "expected": {
+    "canonicalCountAtMost": 2,
+    "matchMethodDistribution": {
+      "new": 2,
+      "llm_disambig": 1
+    }
+  }
+}

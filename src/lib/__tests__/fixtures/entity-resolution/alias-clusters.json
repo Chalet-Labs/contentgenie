@@ -1,0 +1,99 @@
+{
+  "_meta": {
+    "name": "alias-clusters",
+    "scenario": "Four surface-form variants of 'Claude Opus 4.7' are resolved sequentially against a pre-seeded canonical. All four kNN lookups return the seed at similarity 0.94 (above AUTO_MATCH_SIMILARITY_THRESHOLD 0.92). Inputs 1, 2, 4 have version tokens matching the seed ('4.7'), so they auto-match. Input 3 ('Anthropic's new Opus') has no version token while the seed has '4.7' — hasVersionTokenMismatch returns true — which forces the disambiguator; the LLM returns chosen_id pointing at the seed, producing llm_disambig. Each successful match path issues one alias-upsert call, accumulating >=4 alias SQL emissions in total (ADR-042 §alias upsert).",
+    "expectedOutcome": "canonicalCount=1 (all 4 inputs collapse to the single seed canonical); aliasCountAtLeast=4 (each input issues one INSERT INTO canonical_topic_aliases call to the mock DB, verified by counting SQL call emissions, not fixture-row registrations)."
+  },
+  "seedCanonicals": [
+    {
+      "id": 10,
+      "label": "Claude Opus 4.7",
+      "normalizedLabel": "claude opus 4.7",
+      "kind": "release",
+      "summary": "Anthropic's flagship model Opus 4.7.",
+      "ongoing": false,
+      "relevance": 0.9
+    }
+  ],
+  "inputs": [
+    {
+      "label": "Opus 4.7",
+      "kind": "release",
+      "summary": "The Opus 4.7 model from Anthropic.",
+      "aliases": ["Opus 4.7 model"],
+      "ongoing": false,
+      "relevance": 0.85,
+      "coverageScore": 0.7,
+      "knnCandidates": [
+        {
+          "id": 10,
+          "label": "Claude Opus 4.7",
+          "kind": "release",
+          "summary": "Anthropic's flagship model Opus 4.7.",
+          "similarity": 0.94
+        }
+      ]
+    },
+    {
+      "label": "Claude Opus 4.7",
+      "kind": "release",
+      "summary": "Claude Opus 4.7 capabilities overview.",
+      "aliases": ["Claude Opus 4.7 model"],
+      "ongoing": false,
+      "relevance": 0.9,
+      "coverageScore": 0.75,
+      "knnCandidates": [
+        {
+          "id": 10,
+          "label": "Claude Opus 4.7",
+          "kind": "release",
+          "summary": "Anthropic's flagship model Opus 4.7.",
+          "similarity": 0.94
+        }
+      ]
+    },
+    {
+      "label": "Anthropic's new Opus",
+      "kind": "release",
+      "summary": "Anthropic released a new Opus model.",
+      "aliases": ["new Opus model"],
+      "ongoing": false,
+      "relevance": 0.8,
+      "coverageScore": 0.65,
+      "knnCandidates": [
+        {
+          "id": 10,
+          "label": "Claude Opus 4.7",
+          "kind": "release",
+          "summary": "Anthropic's flagship model Opus 4.7.",
+          "similarity": 0.94
+        }
+      ],
+      "disambiguatorResponse": {
+        "chosenId": 10
+      }
+    },
+    {
+      "label": "Opus 4.7 release",
+      "kind": "release",
+      "summary": "The official Opus 4.7 release from Anthropic.",
+      "aliases": ["Opus 4.7 launch"],
+      "ongoing": false,
+      "relevance": 0.85,
+      "coverageScore": 0.7,
+      "knnCandidates": [
+        {
+          "id": 10,
+          "label": "Claude Opus 4.7",
+          "kind": "release",
+          "summary": "Anthropic's flagship model Opus 4.7.",
+          "similarity": 0.94
+        }
+      ]
+    }
+  ],
+  "expected": {
+    "canonicalCount": 1,
+    "aliasCountAtLeast": 4
+  }
+}
