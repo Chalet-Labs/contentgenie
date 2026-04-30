@@ -104,6 +104,8 @@ vi.mock("@/trigger/helpers/database", () => ({
 }));
 
 // vi.mock is hoisted — top-level imports see the mocks.
+import { transactional } from "@/db/pool";
+import { generateEmbeddings } from "@/lib/ai/embed";
 import { db } from "@/db";
 import { sql } from "drizzle-orm";
 import { EMBEDDING_DIMENSION } from "@/lib/ai/embed-constants";
@@ -276,13 +278,17 @@ interface RunFixtureResult {
   result: ResolveTopicResult;
 }
 
-// Tracks canonical IDs seen across inputs so we can assert canonicalCount.
-let seenCanonicalIds: Set<number>;
+interface RunFixtureOutput {
+  results: RunFixtureResult[];
+  seenCanonicalIds: Set<number>;
+}
 
 async function runFixtureWithMockDb(
   fixture: ResolverGoldenFixture,
-): Promise<RunFixtureResult[]> {
-  seenCanonicalIds = new Set((fixture.seedCanonicals ?? []).map((s) => s.id));
+): Promise<RunFixtureOutput> {
+  const seenCanonicalIds = new Set(
+    (fixture.seedCanonicals ?? []).map((s) => s.id),
+  );
   const results: RunFixtureResult[] = [];
 
   const seedMap = new Map((fixture.seedCanonicals ?? []).map((s) => [s.id, s]));
@@ -359,7 +365,6 @@ async function runFixtureWithMockDb(
         const candidate = (entry.knnCandidates ?? []).find(
           (c) => c.id === chosenId,
         );
-        tx2Fixtures.push({ match: "SET LOCAL hnsw.ef_search", rows: [] });
         tx2Fixtures.push({
           match: "WHERE id =",
           rows: candidate
@@ -389,6 +394,7 @@ async function runFixtureWithMockDb(
             match: "INSERT INTO canonical_topics",
             rows: [{ id: newId }],
           });
+          tx2Fixtures.push({ match: "UPDATE canonical_topics", rows: [] });
           tx2Fixtures.push({
             match: "INSERT INTO canonical_topic_aliases",
             rows: [{ id: 1 }],
@@ -406,6 +412,7 @@ async function runFixtureWithMockDb(
           match: "INSERT INTO canonical_topics",
           rows: [{ id: newId }],
         });
+        tx2Fixtures.push({ match: "UPDATE canonical_topics", rows: [] });
         tx2Fixtures.push({
           match: "INSERT INTO canonical_topic_aliases",
           rows: [{ id: 1 }],
@@ -425,6 +432,7 @@ async function runFixtureWithMockDb(
         { match: "SET LOCAL hnsw.ef_search", rows: [] },
         { match: "identity_embedding <=>", rows: [] },
         { match: "INSERT INTO canonical_topics", rows: [{ id: newId }] },
+        { match: "UPDATE canonical_topics", rows: [] },
         { match: "INSERT INTO canonical_topic_aliases", rows: [{ id: 1 }] },
         { match: "INSERT INTO episode_canonical_topics", rows: [] },
       ]);
@@ -436,7 +444,7 @@ async function runFixtureWithMockDb(
     results.push({ input: entry, result });
   }
 
-  return results;
+  return { results, seenCanonicalIds };
 }
 
 async function runFixtureWithRealDb(
@@ -464,6 +472,8 @@ beforeEach(() => {
   txFixturesQueue.length = 0;
   txCallLog.length = 0;
   generateCompletionMock.mockReset();
+  vi.mocked(transactional).mockClear();
+  vi.mocked(generateEmbeddings).mockClear();
 });
 
 afterEach(() => {
@@ -486,7 +496,7 @@ describe("entity-resolution golden dataset", () => {
     it("version-adjacent-releases", async () => {
       const fixture =
         versionAdjacentReleasesFixture as unknown as ResolverGoldenFixture;
-      const results = await runFixtureWithMockDb(fixture);
+      const { results, seenCanonicalIds } = await runFixtureWithMockDb(fixture);
 
       // Anchor against literal expected behaviour, not just the fixture's own
       // declarations — pinning at the assertion site stops a fixture edit from
@@ -511,45 +521,37 @@ describe("entity-resolution golden dataset", () => {
 
     it("alias-clusters", async () => {
       const fixture = aliasClustersFixture as unknown as ResolverGoldenFixture;
-      const results = await runFixtureWithMockDb(fixture);
+      const { results } = await runFixtureWithMockDb(fixture);
 
       expect(results).toHaveLength(fixture.inputs.length);
 
       const uniqueCanonicals = new Set(
         results.map((r) => r.result.canonicalId),
       );
-      expect(uniqueCanonicals.size).toBe(fixture.expected.canonicalCount);
+      expect(uniqueCanonicals.size).toBe(1);
 
       // Counts production SQL emissions, not pre-registered fixture rows —
       // verifies the resolver actually attempted ≥4 alias upserts.
       const aliasInsertCalls = allRecordedCalls().filter((c) =>
         c.sql.includes("INSERT INTO canonical_topic_aliases"),
       );
-      const minAliases = fixture.expected.aliasCountAtLeast;
-      expect(minAliases, "aliasCountAtLeast must be set").toBeDefined();
-      expect(aliasInsertCalls.length).toBeGreaterThanOrEqual(minAliases ?? 0);
+      expect(aliasInsertCalls.length).toBeGreaterThanOrEqual(4);
 
-      // Pin the match-method distribution that the fixture's _meta describes:
-      // 3 auto + 1 llm_disambig (input 3 forces version-token disambig).
+      // Pin the match-method distribution: 3 auto + 1 llm_disambig.
+      // Input 3 ("Anthropic's new Opus") triggers version-token disambig.
       const distribution: Partial<Record<MatchMethod, number>> = {};
       for (const { result } of results) {
         distribution[result.matchMethod] =
           (distribution[result.matchMethod] ?? 0) + 1;
       }
-      const expectedDistribution = fixture.expected.matchMethodDistribution;
-      expect(
-        expectedDistribution,
-        "matchMethodDistribution must be set",
-      ).toBeDefined();
-      for (const [method, count] of Object.entries(expectedDistribution!)) {
-        expect(distribution[method as MatchMethod] ?? 0).toBe(count);
-      }
+      expect(distribution.auto ?? 0).toBe(3);
+      expect(distribution.llm_disambig ?? 0).toBe(1);
     });
 
     it("concept-clustering", async () => {
       const fixture =
         conceptClusteringFixture as unknown as ResolverGoldenFixture;
-      const results = await runFixtureWithMockDb(fixture);
+      const { results } = await runFixtureWithMockDb(fixture);
 
       expect(results).toHaveLength(fixture.inputs.length);
 
@@ -567,14 +569,10 @@ describe("entity-resolution golden dataset", () => {
         distribution[result.matchMethod] =
           (distribution[result.matchMethod] ?? 0) + 1;
       }
-      const expectedDistribution = fixture.expected.matchMethodDistribution;
-      expect(
-        expectedDistribution,
-        "matchMethodDistribution must be set",
-      ).toBeDefined();
-      for (const [method, count] of Object.entries(expectedDistribution!)) {
-        expect(distribution[method as MatchMethod] ?? 0).toBe(count);
-      }
+      // Pin literal distribution: 2 new-inserts + 1 llm_disambig.
+      // "creatine supplementation" merges via LLM; "creatine monohydrate" splits.
+      expect(distribution.new ?? 0).toBe(2);
+      expect(distribution.llm_disambig ?? 0).toBe(1);
     });
 
     it("philosophical-no-topic", async () => {
@@ -593,8 +591,10 @@ describe("entity-resolution golden dataset", () => {
       expect(result.resolved).toBe(0);
       expect(result.failed).toBe(0);
 
-      // No transactional() was called (no SQL emissions)
-      expect(txCallLog).toHaveLength(0);
+      // Pin the early-exit contract: transactional() and generateEmbeddings()
+      // must not be called for empty-topic input.
+      expect(vi.mocked(transactional)).not.toHaveBeenCalled();
+      expect(vi.mocked(generateEmbeddings)).not.toHaveBeenCalled();
     });
   });
 
