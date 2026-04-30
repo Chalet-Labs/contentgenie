@@ -60,7 +60,9 @@ export default async function AdminTopicDetailPage({
   // Suggest episodes from the most recent merge audit row.
   // After a merge, the loser has zero junctions (all moved to winner), so we
   // cannot derive the list from the live junction table. The audit log stores
-  // the reassigned episode IDs in metadata.reassigned (array of integers).
+  // both reassigned episode IDs (rows that moved to the winner) and
+  // conflict_episode_ids (rows the loser dropped because the winner already
+  // had them). ADR-046 §7 requires both to be candidates for re-attachment.
   let suggestedEpisodes: { id: number; title: string }[] = [];
   if (topic.status === "merged") {
     const latestMergeRow = await db
@@ -70,16 +72,22 @@ export default async function AdminTopicDetailPage({
       .orderBy(desc(canonicalTopicAdminLog.createdAt))
       .limit(1);
     const meta = latestMergeRow[0]?.metadata as
-      | { reassigned?: number[] }
+      | { reassigned?: number[]; conflict_episode_ids?: number[] }
       | undefined;
     const reassignedIds = Array.isArray(meta?.reassigned)
-      ? (meta.reassigned as number[])
+      ? meta.reassigned
       : [];
-    if (reassignedIds.length > 0) {
+    const conflictIds = Array.isArray(meta?.conflict_episode_ids)
+      ? meta.conflict_episode_ids
+      : [];
+    const candidateIds = Array.from(
+      new Set([...reassignedIds, ...conflictIds]),
+    );
+    if (candidateIds.length > 0) {
       const episodeRows = await db
         .select({ id: episodes.id, title: episodes.title })
         .from(episodes)
-        .where(inArray(episodes.id, reassignedIds));
+        .where(inArray(episodes.id, candidateIds));
       suggestedEpisodes = episodeRows;
     }
   }

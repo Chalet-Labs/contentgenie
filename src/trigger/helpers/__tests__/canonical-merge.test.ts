@@ -362,6 +362,70 @@ describe("mergeCanonicals", () => {
       conflict_episode_ids: [41, 42],
     });
   });
+
+  it("(12-merge) metadata.reassigned is an array of episode IDs (regression guard)", async () => {
+    setTxFixtures([
+      {
+        match: "FOR UPDATE",
+        rows: [
+          { id: 1, status: "active", episode_count: 3 },
+          { id: 2, status: "active", episode_count: 5 },
+        ],
+      },
+      {
+        match: "DELETE FROM episode_canonical_topics",
+        rows: [{ episode_id: 50 }],
+      },
+      {
+        match: "UPDATE episode_canonical_topics",
+        rows: [{ episode_id: 51 }, { episode_id: 52 }, { episode_id: 53 }],
+      },
+      { match: "SET status = 'merged'", rows: [{ id: 1 }] },
+      { match: "canonical_topic_aliases", rows: [] },
+      { match: "SET episode_count", rows: [{ episode_count: 8 }] },
+      { match: "canonical_topic_admin_log", rows: [{ id: 7 }] },
+    ]);
+
+    const { mergeCanonicals } = await import("@/trigger/helpers/database");
+    await mergeCanonicals({ loserId: 1, winnerId: 2, actor: "user_f" });
+
+    const auditCall = findCalls(getTxCalls(), "canonical_topic_admin_log")[0];
+    const metadataParam = auditCall?.params.find(
+      (p) => typeof p === "string" && p.includes("reassigned"),
+    );
+    const meta = JSON.parse(metadataParam as string) as {
+      reassigned: unknown;
+      conflict_episode_ids: unknown;
+    };
+    expect(Array.isArray(meta.reassigned)).toBe(true);
+    expect(meta.reassigned).toEqual([51, 52, 53]);
+    expect(Array.isArray(meta.conflict_episode_ids)).toBe(true);
+    expect(meta.conflict_episode_ids).toEqual([50]);
+  });
+
+  it("(13-merge) rejects already-merged loser with not-active error (no audit row written)", async () => {
+    setTxFixtures([
+      {
+        match: "FOR UPDATE",
+        rows: [
+          { id: 1, status: "merged", episode_count: 0 },
+          { id: 2, status: "active", episode_count: 5 },
+        ],
+      },
+    ]);
+
+    const { mergeCanonicals } = await import("@/trigger/helpers/database");
+    await expect(
+      mergeCanonicals({ loserId: 1, winnerId: 2, actor: "user_g" }),
+    ).rejects.toThrow("not-active");
+
+    expect(findCalls(getTxCalls(), "canonical_topic_admin_log")).toHaveLength(
+      0,
+    );
+    expect(
+      findCalls(getTxCalls(), "DELETE FROM episode_canonical_topics"),
+    ).toHaveLength(0);
+  });
 });
 
 // ===========================================================================
@@ -505,8 +569,10 @@ describe("unmergeCanonicals", () => {
       },
       { match: "pg_advisory_xact_lock", rows: [] },
       { match: "SET status = 'active'", rows: [{ id: 5 }] },
-      { match: "INSERT INTO episode_canonical_topics", rows: [{ id: 100 }] },
-      { match: "INSERT INTO episode_canonical_topics", rows: [{ id: 101 }] },
+      {
+        match: "INSERT INTO episode_canonical_topics",
+        rows: [{ id: 100 }, { id: 101 }],
+      },
       { match: "DELETE FROM episode_canonical_topics", rows: [] },
       { match: "SET episode_count", rows: [{ episode_count: 2 }] },
       { match: "SET episode_count", rows: [{ episode_count: 3 }] },
@@ -529,5 +595,40 @@ describe("unmergeCanonicals", () => {
     const meta = JSON.parse(metadataParam as string) as Record<string, unknown>;
     expect(meta.episode_ids).toEqual([88, 99]);
     expect(meta.also_removed_from_winner).toBe(true);
+  });
+
+  it("(12-unmerge) reassigns episodes via single set-based INSERT (regression guard against N+1 loop)", async () => {
+    setTxFixtures([
+      {
+        match: "FOR UPDATE",
+        rows: [{ id: 5, status: "merged", merged_into_id: 9 }],
+      },
+      { match: "pg_advisory_xact_lock", rows: [] },
+      { match: "SET status = 'active'", rows: [{ id: 5 }] },
+      {
+        match: "INSERT INTO episode_canonical_topics",
+        rows: [{ id: 200 }, { id: 201 }, { id: 202 }],
+      },
+      { match: "DELETE FROM episode_canonical_topics", rows: [] },
+      { match: "SET episode_count", rows: [{ episode_count: 3 }] },
+      { match: "SET episode_count", rows: [{ episode_count: 1 }] },
+      { match: "canonical_topic_admin_log", rows: [{ id: 14 }] },
+    ]);
+
+    const { unmergeCanonicals } = await import("@/trigger/helpers/database");
+    const result = await unmergeCanonicals({
+      loserId: 5,
+      episodeIdsToReassign: [77, 88, 99],
+      actor: "user_l",
+    });
+
+    expect(result.episodesReassigned).toBe(3);
+    expect(result.episodesSkipped).toBe(0);
+
+    const inserts = findCalls(
+      getTxCalls(),
+      "INSERT INTO episode_canonical_topics",
+    );
+    expect(inserts).toHaveLength(1);
   });
 });

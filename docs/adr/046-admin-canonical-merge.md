@@ -58,7 +58,7 @@ The two statements run inside the same transaction, so no intermediate state is 
 
 **Why not a single combined CTE** (`WITH deleted AS (DELETE …), updated AS (UPDATE …) SELECT …`)? Postgres data-modifying CTEs all run on the _pre-statement_ snapshot — the `UPDATE` arm would still see the conflict rows the `DELETE` arm is removing and try to repoint them to `winnerId`, hitting the partial unique index. Two sequential statements inside the same transaction is the only correct shape. The advisory lock plus the transaction boundary together guarantee no other writer interleaves.
 
-### 3. `episode_count` is recomputed, not adjusted
+### 3. `episode_count` is recomputed on winner, zeroed on loser
 
 After the junction rewrite, `episode_count` on the winner is re-derived from the live junction table:
 
@@ -72,6 +72,8 @@ UPDATE canonical_topics
 ```
 
 This is more expensive than `winner.episodeCount += loser.episodeCount - conflictCount`, but it is the only path that survives concurrent inserts during the merge transaction (a resolver writing a junction row at the same time on the winner side increases the count we should reflect). The CHECK `ct_episode_count_gte_0` continues to hold.
+
+The loser's `episode_count` is set to `0` in the same UPDATE that flips status to `'merged'` (junctions just moved away, so the count is zero by definition). Doing it inside the biconditional UPDATE keeps the operation a single statement and prevents admin pages from showing a stale count after the merge.
 
 ### 4. Stable, permutation-safe advisory-lock key
 
@@ -107,7 +109,7 @@ CREATE TABLE canonical_topic_admin_log (
   action       TEXT NOT NULL,             -- 'merge' | 'unmerge'
   loser_id     INTEGER NOT NULL,          -- always the row whose status flipped
   winner_id    INTEGER NOT NULL,          -- merge target (or original target on unmerge)
-  metadata     JSONB,                     -- { episode_count_loser, conflicts, episode_ids }
+  metadata     JSONB,                     -- merge: { episode_count_loser, conflicts_dropped, conflict_episode_ids[], reassigned[] }; unmerge: { episode_ids, reassigned, skipped, also_removed_from_winner }
   created_at   TIMESTAMP NOT NULL DEFAULT NOW(),
   CHECK (action IN ('merge', 'unmerge'))
 );
@@ -127,14 +129,14 @@ The `actor`, `loser_id`, and `winner_id` columns are NOT FK constraints to `user
 1. Single-row preflight: `SELECT id, status, merged_into_id … FOR UPDATE` on the loser. Throw if status ≠ 'merged'. Read `previousWinnerId` from the row.
 2. **Now** acquire the sorted advisory lock for `[loserId, previousWinnerId]`. Lock ordering is load-bearing: the partner ID is unknown until the preflight read, so the lock cannot be taken first. The `FOR UPDATE` row lock from step 1 covers the brief gap.
 3. Atomically clearing `status='active', merged_into_id=NULL` (the biconditional CHECK still holds because both columns transition in one statement).
-4. For each episode in `episodeIdsToReassign`, attempting `INSERT INTO episode_canonical_topics (episode_id, canonical_topic_id, …) VALUES (?, ?, …) ON CONFLICT (episode_id, canonical_topic_id) DO NOTHING`. matchMethod = `auto`, similarity = `1.0` (caller-supplied = high confidence); coverage_score is preserved from the winner's existing junction row when one exists or set to a default.
+4. A single set-based `INSERT INTO episode_canonical_topics … SELECT … FROM unnest(ARRAY[ids]) … LEFT JOIN episode_canonical_topics prev ON …  ON CONFLICT (episode_id, canonical_topic_id) DO NOTHING` reattaches the requested episodes to the loser. matchMethod = `'auto'`, similarity = `1.0` (caller-supplied = high confidence); coverage_score is preserved from the winner's existing junction row via the LEFT JOIN, or defaults to `0.5` when no winner row exists. `RETURNING id` lets the caller compute `episodesReassigned` and `episodesSkipped` (skipped = inputs minus inserted). Single statement avoids a per-episode round-trip in the hot path.
 5. **`alsoRemoveFromWinner` (default `true`).** A follow-up `DELETE FROM episode_canonical_topics WHERE canonical_topic_id = $previousWinnerId AND episode_id = ANY($episodeIdsToReassign)` runs inside the same transaction. The default is `true` because unmerge's semantic purpose is to _reverse_ the merge — leaving winner rows attached for those episodes attributes the same episode to two distinct canonicals (silent corruption). Opt-out (`false`) is supported for the rare case where an admin wants the duplication (e.g., the merge was incorrect _and_ the winner legitimately covers those episodes too), but that is the surprising path. The Zod schema on `adminUnmergeCanonicals` sets `.default(true)`.
 6. Recomputing `episode_count` on both the loser (newly active) and the winner from the live junction (same recompute pattern as merge §3).
 7. Writing an audit row with `action='unmerge'`, metadata including the episode-ids list, counts, and the `also_removed_from_winner` flag.
 
-The episode-ids list is required input. The admin UI surfaces this with a multi-select that defaults to the audit log's recorded merge-metadata `conflict_episode_ids`, but the admin must explicitly confirm.
+The episode-ids list is required input. The admin UI surfaces it with a multi-select that defaults to the union of `metadata.reassigned` and `metadata.conflict_episode_ids` from the latest merge audit row for this loser; the admin must explicitly confirm. Reassigned IDs are the rows that moved from loser→winner; conflict IDs are loser rows that were dropped because the winner already had them. Both are reasonable candidates for re-attachment to the loser on unmerge.
 
-The merge writes the dropped-conflict episode_ids into the audit row metadata, so the unmerge UI can pre-populate the list. This is the only "memory" of the original merge — without it, unmerge would have no way to suggest sensible defaults.
+The merge writes both arrays into the audit row metadata, so the unmerge UI can pre-populate the list. This is the only "memory" of the original merge — without it, unmerge would have no way to suggest sensible defaults.
 
 ### 8. Server-action role gate
 

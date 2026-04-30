@@ -51,6 +51,16 @@ const auditLogSchema = z.object({
 // Actions
 // ---------------------------------------------------------------------------
 
+// Domain errors thrown by the merge/unmerge helpers in src/trigger/helpers/database.ts.
+// Anything else is treated as an unexpected failure and rethrown.
+const MERGE_DOMAIN_ERRORS = new Set([
+  "self-merge",
+  "not-found",
+  "not-active",
+  "not-merged",
+  "invariant-violated",
+]);
+
 export async function adminMergeCanonicals(input: {
   loserId: number;
   winnerId: number;
@@ -64,10 +74,18 @@ export async function adminMergeCanonicals(input: {
       };
     }
     const { loserId, winnerId } = parsed.data;
-    const data = await mergeCanonicals({ loserId, winnerId, actor: userId });
-    revalidatePath("/admin/topics");
-    revalidatePath(`/admin/topics/${loserId}`);
-    return { success: true, data };
+    try {
+      const data = await mergeCanonicals({ loserId, winnerId, actor: userId });
+      revalidatePath("/admin/topics");
+      revalidatePath(`/admin/topics/${loserId}`);
+      revalidatePath(`/admin/topics/${winnerId}`);
+      return { success: true, data };
+    } catch (e) {
+      if (e instanceof Error && MERGE_DOMAIN_ERRORS.has(e.message)) {
+        return { success: false, error: e.message };
+      }
+      throw e;
+    }
   });
 }
 
@@ -85,15 +103,23 @@ export async function adminUnmergeCanonicals(input: {
       };
     }
     const { loserId, episodeIdsToReassign, alsoRemoveFromWinner } = parsed.data;
-    const data = await unmergeCanonicals({
-      loserId,
-      episodeIdsToReassign,
-      alsoRemoveFromWinner,
-      actor: userId,
-    });
-    revalidatePath("/admin/topics");
-    revalidatePath(`/admin/topics/${loserId}`);
-    return { success: true, data };
+    try {
+      const data = await unmergeCanonicals({
+        loserId,
+        episodeIdsToReassign,
+        alsoRemoveFromWinner,
+        actor: userId,
+      });
+      revalidatePath("/admin/topics");
+      revalidatePath(`/admin/topics/${loserId}`);
+      revalidatePath(`/admin/topics/${data.previousWinnerId}`);
+      return { success: true, data };
+    } catch (e) {
+      if (e instanceof Error && MERGE_DOMAIN_ERRORS.has(e.message)) {
+        return { success: false, error: e.message };
+      }
+      throw e;
+    }
   });
 }
 
@@ -116,14 +142,6 @@ export async function getCanonicalTopicsList(input: {
   });
 }
 
-/**
- * Fetch paginated admin audit log entries.
- *
- * Intentional improvement over the issue spec (which used `{ limit }`):
- * this action accepts `{ canonicalId?, page }` so the detail page can scope
- * results to one canonical and a future global overview can paginate without
- * API changes.
- */
 export async function getAdminAuditLog(input: {
   canonicalId?: number;
   page: number;

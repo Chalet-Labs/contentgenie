@@ -95,6 +95,26 @@ describe("adminMergeCanonicals", () => {
     });
     expect(mockRevalidatePath).toHaveBeenCalledWith("/admin/topics");
     expect(mockRevalidatePath).toHaveBeenCalledWith("/admin/topics/1");
+    expect(mockRevalidatePath).toHaveBeenCalledWith("/admin/topics/2");
+  });
+
+  it("domain error from helper → ActionResult error (no rethrow)", async () => {
+    mockAuth.mockResolvedValue(makeAdminAuth());
+    mockMergeCanonicals.mockRejectedValue(new Error("not-active"));
+
+    const result = await adminMergeCanonicals({ loserId: 1, winnerId: 2 });
+
+    expect(result).toEqual({ success: false, error: "not-active" });
+    expect(mockRevalidatePath).not.toHaveBeenCalled();
+  });
+
+  it("unexpected error from helper → rethrows", async () => {
+    mockAuth.mockResolvedValue(makeAdminAuth());
+    mockMergeCanonicals.mockRejectedValue(new Error("unexpected-db-failure"));
+
+    await expect(
+      adminMergeCanonicals({ loserId: 1, winnerId: 2 }),
+    ).rejects.toThrow("unexpected-db-failure");
   });
 
   it("Zod: rejects non-integer loserId", async () => {
@@ -160,6 +180,19 @@ describe("adminUnmergeCanonicals", () => {
     );
     expect(mockRevalidatePath).toHaveBeenCalledWith("/admin/topics");
     expect(mockRevalidatePath).toHaveBeenCalledWith("/admin/topics/5");
+    expect(mockRevalidatePath).toHaveBeenCalledWith("/admin/topics/9");
+  });
+
+  it("domain error from unmerge helper → ActionResult error", async () => {
+    mockAuth.mockResolvedValue(makeAdminAuth());
+    mockUnmergeCanonicals.mockRejectedValue(new Error("not-merged"));
+
+    const result = await adminUnmergeCanonicals({
+      loserId: 5,
+      episodeIdsToReassign: [77],
+    });
+
+    expect(result).toEqual({ success: false, error: "not-merged" });
   });
 
   it("Zod: rejects missing episodeIdsToReassign", async () => {

@@ -10,19 +10,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { canonicalTopicStatusEnum, canonicalTopicKindEnum } from "@/db/schema";
 
-const STATUS_OPTIONS = ["active", "merged", "dormant"] as const;
-const KIND_OPTIONS = [
-  "release",
-  "incident",
-  "regulation",
-  "announcement",
-  "deal",
-  "event",
-  "concept",
-  "work",
-  "other",
-] as const;
+const STATUS_OPTIONS = canonicalTopicStatusEnum.enumValues;
+const KIND_OPTIONS = canonicalTopicKindEnum.enumValues;
 
 export function TopicsFiltersBar() {
   const router = useRouter();

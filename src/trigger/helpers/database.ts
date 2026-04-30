@@ -440,6 +440,7 @@ export function mergeCanonicals(
     const loserRow = preflight.rows.find((r) => r.id === loserId);
     const winnerRow = preflight.rows.find((r) => r.id === winnerId);
     if (!loserRow || !winnerRow) throw new Error("not-found");
+    if (loserRow.status !== "active") throw new Error("not-active");
     const loserEpisodeCount = loserRow.episode_count ?? 0;
 
     // 4a. DELETE conflicts — loser rows whose (episode, winner) pair already exists.
@@ -466,11 +467,13 @@ export function mergeCanonicals(
     );
     const episodesReassigned = updateJunctionResult.rows.length;
 
-    // 5. Atomic biconditional UPDATE: sets status='merged' AND merged_into_id=$winnerId
-    //    in one statement to satisfy the ct_merged_biconditional CHECK.
+    // 5. Atomic biconditional UPDATE: sets status='merged', merged_into_id=$winnerId,
+    //    and zeroes loser episode_count in one statement (junctions just moved away,
+    //    so the count is now zero by definition). Single statement satisfies the
+    //    ct_merged_biconditional CHECK.
     await tx.execute(
       sql`UPDATE canonical_topics
-             SET status = 'merged', merged_into_id = ${winnerId}
+             SET status = 'merged', merged_into_id = ${winnerId}, episode_count = 0
            WHERE id = ${loserId} AND status = 'active'`,
     );
 
@@ -508,7 +511,7 @@ export function mergeCanonicals(
     });
     await tx.execute(
       sql`INSERT INTO canonical_topic_admin_log (actor, action, loser_id, winner_id, metadata)
-          VALUES (${actor}, ${ADMIN_LOG_ACTIONS[0]}, ${loserId}, ${winnerId}, ${metadata}::jsonb)`,
+          VALUES (${actor}, ${ADMIN_LOG_ACTIONS.merge}, ${loserId}, ${winnerId}, ${metadata}::jsonb)`,
     );
 
     return {
@@ -572,26 +575,34 @@ export function unmergeCanonicals(
            WHERE id = ${loserId} AND status = 'merged'`,
     );
 
-    // 5. Re-assign each requested episode to the loser.
+    // 5. Re-assign requested episodes to the loser in one set-based INSERT.
+    //    Uses unnest() to expand the array of IDs into rows, LEFT JOINs the
+    //    previous winner's junction to copy coverage_score (0.5 fallback),
+    //    and ON CONFLICT DO NOTHING handles rows already attached to the loser.
     let episodesReassigned = 0;
-    let episodesSkipped = 0;
-    for (const episodeId of episodeIdsToReassign) {
+    if (episodeIdsToReassign.length > 0) {
       const insertResult = await tx.execute<{ id: number }>(
         sql`INSERT INTO episode_canonical_topics
               (episode_id, canonical_topic_id, match_method, similarity_to_top_match, coverage_score)
-            SELECT ${episodeId}::integer, ${loserId}::integer, 'auto', 1.0, COALESCE((
-              SELECT coverage_score FROM episode_canonical_topics
-               WHERE canonical_topic_id = ${previousWinnerId} AND episode_id = ${episodeId}
-            ), 0.5)
+            SELECT
+              ids.episode_id::integer,
+              ${loserId}::integer,
+              'auto',
+              1.0,
+              COALESCE(prev.coverage_score, 0.5)
+            FROM unnest(ARRAY[${sql.join(
+              episodeIdsToReassign.map((id) => sql`${id}`),
+              sql`, `,
+            )}]::int[]) AS ids(episode_id)
+            LEFT JOIN episode_canonical_topics prev
+              ON prev.canonical_topic_id = ${previousWinnerId}
+             AND prev.episode_id = ids.episode_id
             ON CONFLICT (episode_id, canonical_topic_id) DO NOTHING
             RETURNING id`,
       );
-      if (insertResult.rows.length > 0) {
-        episodesReassigned++;
-      } else {
-        episodesSkipped++;
-      }
+      episodesReassigned = insertResult.rows.length;
     }
+    const episodesSkipped = episodeIdsToReassign.length - episodesReassigned;
 
     // 6. Remove winner's junction rows (default true — avoids silent duplicate attribution).
     let episodesRemovedFromWinner = 0;
@@ -637,7 +648,7 @@ export function unmergeCanonicals(
     });
     await tx.execute(
       sql`INSERT INTO canonical_topic_admin_log (actor, action, loser_id, winner_id, metadata)
-          VALUES (${actor}, ${ADMIN_LOG_ACTIONS[1]}, ${loserId}, ${previousWinnerId}, ${metadata}::jsonb)`,
+          VALUES (${actor}, ${ADMIN_LOG_ACTIONS.unmerge}, ${loserId}, ${previousWinnerId}, ${metadata}::jsonb)`,
     );
 
     return {

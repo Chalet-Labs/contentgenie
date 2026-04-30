@@ -36,7 +36,6 @@ export function MergeDialog({ topic, open, onClose }: MergeDialogProps) {
   const [search, setSearch] = useState("");
   const [results, setResults] = useState<CanonicalTopicRow[]>([]);
   const [selected, setSelected] = useState<CanonicalTopicRow | null>(null);
-  const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
 
   const deferredSearch = useDeferredValue(search);
@@ -51,12 +50,21 @@ export function MergeDialog({ topic, open, onClose }: MergeDialogProps) {
       search: deferredSearch,
       status: "active",
       page: 1,
-    }).then((res) => {
-      if (cancelled) return;
-      if (res.success) {
-        setResults(res.data.rows.filter((r) => r.id !== topic.id));
-      }
-    });
+    })
+      .then((res) => {
+        if (cancelled) return;
+        if (res.success) {
+          setResults(res.data.rows.filter((r) => r.id !== topic.id));
+        } else {
+          toast.error(`Search failed: ${res.error}`);
+        }
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        toast.error(
+          `Search failed: ${err instanceof Error ? err.message : "Unknown error"}`,
+        );
+      });
     return () => {
       cancelled = true;
     };
