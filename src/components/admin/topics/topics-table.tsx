@@ -133,18 +133,14 @@ export function TopicsTable({
             </span>
             <div className="flex gap-2">
               {hasPrev && (
-                <Link href={buildPageLink(currentPage - 1)}>
-                  <Button variant="outline" size="sm">
-                    Previous
-                  </Button>
-                </Link>
+                <Button asChild variant="outline" size="sm">
+                  <Link href={buildPageLink(currentPage - 1)}>Previous</Link>
+                </Button>
               )}
               {hasNext && (
-                <Link href={buildPageLink(currentPage + 1)}>
-                  <Button variant="outline" size="sm">
-                    Next
-                  </Button>
-                </Link>
+                <Button asChild variant="outline" size="sm">
+                  <Link href={buildPageLink(currentPage + 1)}>Next</Link>
+                </Button>
               )}
             </div>
           </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
@@ -41,6 +41,12 @@ export function UnmergeDialog({
   );
   const [alsoRemoveFromWinner, setAlsoRemoveFromWinner] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setSelectedIds(new Set(suggestedEpisodes.map((e) => e.id)));
+    }
+  }, [open, suggestedEpisodes]);
 
   function toggleEpisode(id: number) {
     setSelectedIds((prev) => {
@@ -130,8 +136,8 @@ export function UnmergeDialog({
           </Button>
           <Button
             onClick={handleConfirm}
-            disabled={selectedIds.size === 0 || submitting}
-            aria-disabled={selectedIds.size === 0 || submitting}
+            disabled={submitting}
+            aria-disabled={submitting}
           >
             {submitting ? "Unmerging…" : "Confirm"}
           </Button>

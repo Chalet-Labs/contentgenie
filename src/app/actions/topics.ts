@@ -16,6 +16,7 @@ import {
   type CanonicalTopicRow,
   type AdminAuditRow,
 } from "@/lib/admin/topic-queries";
+import { canonicalTopicStatusEnum, canonicalTopicKindEnum } from "@/db/schema";
 import type { ActionResult } from "@/types/action-result";
 
 // ---------------------------------------------------------------------------
@@ -37,8 +38,8 @@ const unmergeSchema = z.object({
 
 const topicsListSchema = z.object({
   search: z.string().optional(),
-  status: z.string().optional(),
-  kind: z.string().optional(),
+  status: z.enum(canonicalTopicStatusEnum.enumValues).optional(),
+  kind: z.enum(canonicalTopicKindEnum.enumValues).optional(),
   page: z.number().int().min(1),
 });
 

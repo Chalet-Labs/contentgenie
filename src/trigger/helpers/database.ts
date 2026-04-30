@@ -483,7 +483,8 @@ export function mergeCanonicals(
             SELECT ${winnerId}::integer, alias FROM canonical_topic_aliases WHERE canonical_topic_id = ${loserId}
             UNION
             SELECT ${winnerId}::integer, label FROM canonical_topics WHERE id = ${loserId}
-          ON CONFLICT (canonical_topic_id, lower(alias)) DO NOTHING`,
+          ON CONFLICT (canonical_topic_id, lower(alias)) DO NOTHING
+          RETURNING alias`,
     );
     const aliasesCopied = aliasInsertResult.rows.length;
 

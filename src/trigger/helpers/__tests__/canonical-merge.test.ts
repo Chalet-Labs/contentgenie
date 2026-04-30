@@ -95,12 +95,14 @@ vi.mock("@/db/pool", () => ({
       if (opts?.tx) return fn(opts.tx);
       const fixtures = txFixturesQueue.shift() ?? [];
       const tx = createRecordingTx((sqlText) => {
-        const fixture = fixtures.find((f) =>
+        const fixtureIndex = fixtures.findIndex((f) =>
           typeof f.match === "string"
             ? sqlText.includes(f.match)
             : f.match.test(sqlText),
         );
-        return fixture?.rows ?? [];
+        if (fixtureIndex < 0) return [];
+        const [fixture] = fixtures.splice(fixtureIndex, 1);
+        return fixture.rows;
       });
       lastTx = tx;
       return fn(tx);

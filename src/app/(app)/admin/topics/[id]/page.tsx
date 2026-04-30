@@ -21,8 +21,8 @@ export default async function AdminTopicDetailPage({
 }: {
   params: { id: string };
 }) {
-  const id = parseInt(params.id, 10);
-  if (isNaN(id)) notFound();
+  if (!/^\d+$/.test(params.id)) notFound();
+  const id = Number(params.id);
 
   const topic = await db.query.canonicalTopics.findFirst({
     columns: TOPIC_DISPLAY_COLUMNS,

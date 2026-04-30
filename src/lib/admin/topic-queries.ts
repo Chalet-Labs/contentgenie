@@ -77,7 +77,7 @@ export async function getCanonicalTopicsListQuery(
       })
       .from(canonicalTopics)
       .where(where)
-      .orderBy(desc(canonicalTopics.episodeCount))
+      .orderBy(desc(canonicalTopics.lastSeen))
       .limit(TOPICS_PAGE_SIZE)
       .offset(offset),
     db.select({ total: count() }).from(canonicalTopics).where(where),

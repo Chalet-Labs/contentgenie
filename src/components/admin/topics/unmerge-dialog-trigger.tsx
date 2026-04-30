@@ -35,7 +35,12 @@ export function UnmergeDialogTrigger({
 
   return (
     <>
-      <Button variant="destructive" size="sm" onClick={() => setOpen(true)}>
+      <Button
+        variant="destructive"
+        size="sm"
+        aria-expanded={open}
+        onClick={() => setOpen(true)}
+      >
         Unmerge
       </Button>
       <UnmergeDialog

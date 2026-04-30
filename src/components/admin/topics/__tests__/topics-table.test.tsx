@@ -4,7 +4,6 @@ import userEvent from "@testing-library/user-event";
 import type { CanonicalTopicRow } from "@/lib/admin/topic-queries";
 
 // Mock the dialog so we can assert it opens.
-const mockOnMerge = vi.fn();
 vi.mock("@/components/admin/topics/merge-dialog", () => ({
   MergeDialog: ({
     topic,

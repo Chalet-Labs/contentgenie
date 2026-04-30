@@ -116,7 +116,7 @@ describe("UnmergeDialog", () => {
     expect(checkbox).toBeChecked();
   });
 
-  it("disables Confirm when no episodes are selected", async () => {
+  it("keeps Confirm enabled when no episodes are selected (zero-reassignment allowed)", async () => {
     const user = userEvent.setup();
     render(
       <UnmergeDialog
@@ -129,7 +129,7 @@ describe("UnmergeDialog", () => {
     for (const ep of sampleEpisodes) {
       await user.click(screen.getByRole("checkbox", { name: ep.title }));
     }
-    expect(screen.getByRole("button", { name: /confirm/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /confirm/i })).not.toBeDisabled();
   });
 
   it("submitting calls adminUnmergeCanonicals with selected ids and alsoRemoveFromWinner", async () => {

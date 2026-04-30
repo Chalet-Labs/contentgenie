@@ -30,6 +30,7 @@ import {
   SUBSCRIPTION_SORTS,
   type SubscriptionSort,
 } from "@/db/subscription-sorts";
+import type { AdminLogAction } from "@/db/canonical-topic-admin-log-constants";
 
 export { DEFAULT_SUBSCRIPTION_SORT, SUBSCRIPTION_SORTS, type SubscriptionSort };
 
@@ -629,7 +630,7 @@ export const canonicalTopicAdminLog = pgTable(
   {
     id: serial("id").primaryKey(),
     actor: text("actor").notNull(),
-    action: text("action").notNull(),
+    action: text("action").notNull().$type<AdminLogAction>(),
     loserId: integer("loser_id").notNull(),
     winnerId: integer("winner_id").notNull(),
     metadata: jsonb("metadata"),
