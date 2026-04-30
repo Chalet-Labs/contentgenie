@@ -1,0 +1,32 @@
+{
+  "_meta": {
+    "name": "concurrent-insert-race",
+    "scenario": "Two parallel resolveTopic calls are fired with identical (label, kind) pairs against a real Postgres instance. The advisory-lock + ON CONFLICT DO NOTHING mechanism (ADR-044 §4 exact-lookup catches both arrivals) ensures exactly one canonical row is created regardless of which call wins the insert race. The label uses a timestamp placeholder to avoid cross-run collisions. The disambiguator must NOT be called (empty-slot fast path — the second arrival finds the canonical via exact-lookup in TX-1).",
+    "expectedOutcome": "canonicalCount=1 in the database (both calls see the same canonical id); junctionCountForSingleCanonical=2 (one junction per distinct episode id); generateCompletion never called."
+  },
+  "seedCanonicals": [],
+  "inputs": [
+    {
+      "label": "__er_golden_concurrent_<TS>",
+      "kind": "concept",
+      "summary": "Concurrent insert race test topic.",
+      "aliases": [],
+      "ongoing": false,
+      "relevance": 0.5,
+      "coverageScore": 0.5
+    },
+    {
+      "label": "__er_golden_concurrent_<TS>",
+      "kind": "concept",
+      "summary": "Concurrent insert race test topic.",
+      "aliases": [],
+      "ongoing": false,
+      "relevance": 0.5,
+      "coverageScore": 0.5
+    }
+  ],
+  "expected": {
+    "canonicalCount": 1,
+    "junctionCountForSingleCanonical": 2
+  }
+}
