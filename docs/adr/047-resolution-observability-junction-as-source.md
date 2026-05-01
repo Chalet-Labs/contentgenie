@@ -62,6 +62,8 @@ The junction is the metric source, but `insertJunction` uses `ON CONFLICT (episo
 
 We use junction timestamps (not `episodes.processedAt`): the junction's own timestamps describe the resolution event we care about, and merges that reparent rows preserve them. Filtering on `episodes.processedAt` would entangle the metric with episode-summary scheduling.
 
+**Backfill on rollout.** Because this project uses `drizzle-kit push` (not `migrate`), the migration's nullable-then-default sequence is flattened into a single `ALTER TABLE ... ADD COLUMN updated_at timestamp NOT NULL DEFAULT now()`. Every legacy row reads `updated_at = ALTER TABLE timestamp` until backfilled, which would inflate 24h/7d/30d cards with historical rows for up to 30 days. The deploy procedure must run `scripts/backfill-junction-updated-at.sql` immediately after `bun run db:push` (with the resolver paused) so legacy rows reset to `updated_at = created_at`. See ADR-026 §"Backfill via appended SQL" for the same pattern.
+
 ### 4. Dashboard layer uses simple UI primitives + `<Progress>`, not Recharts
 
 The existing repo has `src/components/ui/progress.tsx` but no `chart.tsx`. The "lite" scope of #387 — three cards with simple histograms — does not justify the Recharts bundle (~80KB gzipped) or the shadcn `chart` install. Implementation sticks to existing UI primitives, with `<Progress>` used anywhere a bar visualization is needed:
