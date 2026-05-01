@@ -5,10 +5,13 @@
 //
 // Vitest hoisting note: `vi.mock("@/db/pool", factory)` is hoisted per file
 // above all imports, and CANNOT be re-exported from this module — the call
-// itself must remain inline in each consumer test file. Top-level imports
-// referenced inside the factory body fail with "cannot access ... before
-// initialization", so the factory must be `async` and dynamic-import the
-// helpers it needs:
+// itself must remain inline in each consumer test file. A factory body that
+// references a *static* top-level import races module-init: the factory runs
+// the first time `@/db/pool` is imported, which (for resolver-under-test
+// files) happens via the production import chain *before* the test file's
+// own helper imports finish evaluating, producing
+// "Cannot access '__vi_import_*__' before initialization". The robust fix is
+// an `async` factory that dynamic-imports the helpers it needs:
 //
 //   vi.mock("@/db/pool", async () => {
 //     const { createTransactionalFixtureMock } = await import(
@@ -23,9 +26,11 @@
 // mixed-mode files that interleave mocked sub-suites with real-DB sub-suites
 // guarded by `describe.skipIf(!DATABASE_URL)`.
 //
-// Module-scoped state is per worker/file (Vitest isolates test files into
-// separate module graphs by default), so two test files can each maintain
-// their own fixture queue without cross-talk.
+// Module-scoped state is safe under Vitest's default per-file isolation
+// (`isolate: true`, the project's setting): each test file evaluates the
+// module graph independently, so two files can't cross-pollute the queue.
+// Setting `isolate: false` would invalidate that — call out in review if
+// the project ever flips it.
 
 import { vi } from "vitest";
 
@@ -39,15 +44,11 @@ export interface RecordedCall {
   params: unknown[];
 }
 
-export interface TxFixtures {
-  rows: SqlFixture[];
-}
-
-export const txFixturesQueue: TxFixtures[] = [];
+export const txFixturesQueue: SqlFixture[][] = [];
 export const txCallLog: RecordedCall[][] = [];
 
 export function setTxFixtures(rows: SqlFixture[]): void {
-  txFixturesQueue.push({ rows });
+  txFixturesQueue.push(rows);
 }
 
 export function getTxLog(index: number): RecordedCall[] {
@@ -111,17 +112,22 @@ export function serializeSql(sqlObj: unknown): {
   return { sqlText: parts.join(" "), params };
 }
 
+// A fixture is matched via `find` (not consumed), so the same fixture row
+// can answer multiple `tx.execute(...)` calls within a single tx — needed
+// for resolver paths that issue the same SQL twice (e.g. recovery
+// exact-lookup). To distinguish first vs second calls, install a custom
+// `mockImplementationOnce` on the mocked `transactional`.
 function consumeFixturesAndRun(
   fn: (tx: unknown) => Promise<unknown>,
 ): Promise<unknown> {
-  const fixtures = txFixturesQueue.shift() ?? { rows: [] };
+  const fixtures = txFixturesQueue.shift() ?? [];
   const recorded: RecordedCall[] = [];
   txCallLog.push(recorded);
   const tx = {
     execute: async (sqlObj: unknown) => {
       const { sqlText, params } = serializeSql(sqlObj);
       recorded.push({ sql: sqlText, params });
-      const fixture = fixtures.rows.find((f) =>
+      const fixture = fixtures.find((f) =>
         typeof f.match === "string"
           ? sqlText.includes(f.match)
           : f.match.test(sqlText),
@@ -150,12 +156,12 @@ export function createTransactionalFixtureMock() {
  * real-DB sub-suites guarded by `describe.skipIf(!DATABASE_URL)`.
  */
 export function createTransactionalFixtureMockWithFallthrough(
-  actual: typeof import("@/db/pool"),
+  realTransactional: typeof import("@/db/pool").transactional,
 ) {
   return vi.fn(async (fn: (tx: unknown) => Promise<unknown>) => {
     if (txFixturesQueue.length === 0) {
       return (
-        actual.transactional as unknown as (
+        realTransactional as unknown as (
           cb: (tx: unknown) => Promise<unknown>,
         ) => Promise<unknown>
       )(fn);

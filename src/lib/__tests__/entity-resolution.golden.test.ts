@@ -26,7 +26,9 @@ vi.mock("@/db/pool", async () => {
     await import("@/test/sql-fixture-queue");
   return {
     ...actual,
-    transactional: createTransactionalFixtureMockWithFallthrough(actual),
+    transactional: createTransactionalFixtureMockWithFallthrough(
+      actual.transactional,
+    ),
   };
 });
 

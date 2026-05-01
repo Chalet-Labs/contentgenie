@@ -29,11 +29,8 @@ import { buildEmbedding } from "@/test/embeddings";
 
 // Each call to `transactional(cb)` runs `cb(mockTx)` against a fresh MockTx
 // pre-loaded with fixtures keyed by SQL substring. Tests register fixtures
-// per-tx via `setTxFixtures(...)`.
-//
-// Note: `vi.mock` is hoisted above all imports, so the factory must dynamic-
-// import the harness — top-level imports aren't bound when the factory runs.
-
+// per-tx via `setTxFixtures(...)`. See @/test/sql-fixture-queue header for
+// the factory dynamic-import rationale.
 vi.mock("@/db/pool", async () => {
   const { createTransactionalFixtureMock } =
     await import("@/test/sql-fixture-queue");
