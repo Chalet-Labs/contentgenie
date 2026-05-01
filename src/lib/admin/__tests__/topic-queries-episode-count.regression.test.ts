@@ -82,6 +82,7 @@ describe.skipIf(!process.env.DATABASE_URL)(
             matchMethod: "auto",
             similarity: 0.95,
             coverageScore: 0.8,
+            versionTokenForcedDisambig: false,
           });
         }
         for (const episodeId of fixtureEpisodeIds.slice(0, 3)) {
@@ -91,6 +92,7 @@ describe.skipIf(!process.env.DATABASE_URL)(
             matchMethod: "auto",
             similarity: 0.95,
             coverageScore: 0.8,
+            versionTokenForcedDisambig: false,
           });
         }
       });

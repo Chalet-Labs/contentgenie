@@ -53,7 +53,7 @@ export type ResolveTopicResult =
   | (ResolveTopicResultBase & {
       matchMethod: "auto";
       similarityToTopMatch: number;
-      versionTokenForcedDisambig: false;
+      versionTokenForcedDisambig: boolean;
     })
   | (ResolveTopicResultBase & {
       matchMethod: "llm_disambig";
@@ -287,16 +287,29 @@ export async function insertJunction(
     matchMethod: MatchMethod;
     similarity: number | null;
     coverageScore: number;
+    versionTokenForcedDisambig: boolean;
   },
 ): Promise<void> {
-  // ON CONFLICT DO NOTHING guards against duplicate-topic crashes when the
+  // ON CONFLICT DO UPDATE guards against duplicate-topic crashes when the
   // same episode references the same canonical twice (e.g. two normalized
-  // topics that resolve to the same canonical via different paths).
+  // topics that resolve to the same canonical via different paths, or a
+  // recovery-path retry). On collision the latest resolution outcome wins
+  // for the metric fields and `updated_at` advances to now() so the rolling-
+  // window observability cards filter on the actual observation time, not
+  // the original first-write time. (episode_id, canonical_topic_id) is the
+  // unique index `ect_episode_canonical_uidx` used as the ON CONFLICT target;
+  // those columns are not the PK (`id` is) but they cannot change on conflict
+  // because they are the conflict key (ADR-047).
   await tx.execute(
     sql`INSERT INTO episode_canonical_topics
-         (episode_id, canonical_topic_id, match_method, similarity_to_top_match, coverage_score)
-       VALUES (${args.episodeId}, ${args.canonicalId}, ${args.matchMethod}, ${args.similarity}, ${args.coverageScore})
-       ON CONFLICT (episode_id, canonical_topic_id) DO NOTHING`,
+         (episode_id, canonical_topic_id, match_method, similarity_to_top_match, coverage_score, version_token_forced_disambig)
+       VALUES (${args.episodeId}, ${args.canonicalId}, ${args.matchMethod}, ${args.similarity}, ${args.coverageScore}, ${args.versionTokenForcedDisambig})
+       ON CONFLICT (episode_id, canonical_topic_id) DO UPDATE SET
+         match_method                  = EXCLUDED.match_method,
+         similarity_to_top_match       = EXCLUDED.similarity_to_top_match,
+         coverage_score                = EXCLUDED.coverage_score,
+         version_token_forced_disambig = EXCLUDED.version_token_forced_disambig,
+         updated_at                    = now()`,
   );
 }
 
@@ -337,6 +350,7 @@ async function finalizeMatch(
     canonicalId: number;
     matchMethod: MatchMethod;
     similarity: number | null;
+    versionTokenForcedDisambig: boolean;
   },
 ): Promise<number> {
   await updateLastSeen(tx, args.canonicalId);
@@ -351,6 +365,7 @@ async function finalizeMatch(
     matchMethod: args.matchMethod,
     similarity: args.similarity,
     coverageScore: args.input.coverageScore,
+    versionTokenForcedDisambig: args.versionTokenForcedDisambig,
   });
   return aliasesAdded;
 }
@@ -409,6 +424,7 @@ async function runTx1(
       canonicalId: exact.id,
       matchMethod: "auto",
       similarity: EXACT_MATCH_SIMILARITY,
+      versionTokenForcedDisambig: false,
     });
     return {
       canonicalId: exact.id,
@@ -437,6 +453,7 @@ async function runTx1(
       canonicalId: top.id,
       matchMethod: "auto",
       similarity: top.similarity,
+      versionTokenForcedDisambig: false,
     });
     return {
       canonicalId: top.id,
@@ -467,6 +484,7 @@ async function runTx1(
       canonicalId: newId,
       matchMethod: "new",
       similarity: null,
+      versionTokenForcedDisambig: false,
     });
     return {
       canonicalId: newId,
@@ -491,6 +509,7 @@ async function runTx1(
     canonicalId: recovered.id,
     matchMethod: "auto",
     similarity: EXACT_MATCH_SIMILARITY,
+    versionTokenForcedDisambig: false,
   });
   return {
     canonicalId: recovered.id,
@@ -550,13 +569,14 @@ async function runTx2(
       canonicalId: exact.id,
       matchMethod: "auto",
       similarity: EXACT_MATCH_SIMILARITY,
+      versionTokenForcedDisambig,
     });
     return {
       canonicalId: exact.id,
       matchMethod: "auto",
       similarityToTopMatch: EXACT_MATCH_SIMILARITY,
       aliasesAdded,
-      versionTokenForcedDisambig: false,
+      versionTokenForcedDisambig,
       candidatesConsidered: candidates.length,
     };
   }
@@ -575,6 +595,7 @@ async function runTx2(
         canonicalId: confirmed.id,
         matchMethod: "llm_disambig",
         similarity: confirmed.similarity,
+        versionTokenForcedDisambig,
       });
       return {
         canonicalId: confirmed.id,
@@ -595,6 +616,7 @@ async function runTx2(
       canonicalId: newId,
       matchMethod: "new",
       similarity: null,
+      versionTokenForcedDisambig,
     });
     return {
       canonicalId: newId,
@@ -615,13 +637,14 @@ async function runTx2(
     canonicalId: recovered.id,
     matchMethod: "auto",
     similarity: EXACT_MATCH_SIMILARITY,
+    versionTokenForcedDisambig,
   });
   return {
     canonicalId: recovered.id,
     matchMethod: "auto",
     similarityToTopMatch: EXACT_MATCH_SIMILARITY,
     aliasesAdded,
-    versionTokenForcedDisambig: false,
+    versionTokenForcedDisambig,
     candidatesConsidered: candidates.length,
   };
 }
