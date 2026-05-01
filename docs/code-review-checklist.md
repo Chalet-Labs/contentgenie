@@ -100,7 +100,7 @@ All four conditions held — `aria-expanded` was the newly-introduced contract t
 
 **Counterpoint.** "Rule of three" is a guard against premature abstraction of an _unknown_ shape. It is not a blanket license to defer obvious consolidation when the shape is clear from two call sites and a behavioral contract is at stake. Do not cite rule-of-three to punt on condition (3).
 
-**Reviewers MUST flag duplication that meets all four §5 conditions and require it fixed in the PR introducing it. They MUST NOT defer it to a follow-up issue** — see §7 for the reviewer-scope contract this enforces.
+**Reviewers MUST flag duplication that meets all four §5 conditions and require it fixed in the PR introducing or extending it. They MUST NOT defer it to a follow-up issue** — see §7 for the reviewer-scope contract this enforces.
 
 **Bad — defer to follow-up (flagged).** _(Reviewer comment, PR #417 thread.)_
 
@@ -144,7 +144,7 @@ If a private helper (`function`, not `export function`) already exists in a sibl
 
 Code review exists to fix issues at hand. "Defer to a follow-up issue" is a tool with a narrow legitimate use, not a default escape hatch.
 
-**In-scope by default.** Anything the PR introduces, modifies, or extends is in-scope for review and fix in that same PR. If a reviewer noticed it because the diff put it under their nose, the fix is in-scope. Duplication added or extended by the diff is in-scope. "I noticed it" = "fix it here."
+**In-scope by default.** Anything the PR introduces, modifies, or extends is in-scope for review and fix in that same PR. If a reviewer noticed it because it is visible in the diff (including context lines), the fix is considered in-scope by default, subject to the deferral criteria below. Duplication added or extended by the diff is in-scope. I noticed it = fix it here.
 
 **Legitimately deferrable.** A finding is deferrable to a follow-up issue only when **both** hold:
 
