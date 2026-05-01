@@ -86,6 +86,7 @@ describe("recordResolutionMetric", () => {
     );
     expect(result).toBeUndefined();
     expect(mockSelect).not.toHaveBeenCalled();
+    expect(mockExecute).not.toHaveBeenCalled();
   });
 });
 
@@ -142,6 +143,15 @@ describe("getSimilarityHistogram", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
+
+  it.each([0, -0.05, NaN, Infinity, 1.1])(
+    "throws RangeError for invalid bucketSize=%s",
+    async (bad) => {
+      await expect(getSimilarityHistogram(undefined, bad)).rejects.toThrow(
+        RangeError,
+      );
+    },
+  );
 
   it("returns bucket-count rows mapped to { bucket, count } shape", async () => {
     mockSelect.mockReturnValue(makeChain([{ bucket: 0.85, count: 12 }]));

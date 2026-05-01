@@ -112,6 +112,9 @@ export async function getSimilarityHistogram(
   window?: { start: Date; end: Date },
   bucketSize: number = DEFAULT_BUCKET_SIZE,
 ): Promise<SimilarityBucket[]> {
+  if (!Number.isFinite(bucketSize) || bucketSize <= 0 || bucketSize > 1) {
+    throw new RangeError("bucketSize must be a finite number in (0, 1]");
+  }
   const col = episodeCanonicalTopics.similarityToTopMatch;
   const numBuckets = Math.ceil(1 / bucketSize);
   const maxBucket = (numBuckets - 1) * bucketSize;
