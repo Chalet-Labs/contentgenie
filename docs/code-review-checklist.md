@@ -27,7 +27,7 @@ Scope: general code-review concerns surfaced across recent PRs. Each entry cites
 <ul id="topic-list">…</ul>
 ```
 
-Track as follow-up; cite this section when fixing.
+Per §7, any future PR that touches `ShowMoreToggle` or one of its consumers must wire `aria-controls` in that PR — the gap is in-scope as soon as the diff puts that component under the reviewer's nose. Cite this section when fixing.
 
 ## 2. Magic numbers in production code
 
@@ -102,7 +102,7 @@ All four conditions held — `aria-expanded` was the newly-introduced contract t
 
 **Reviewers MUST flag duplication that meets all four §5 conditions and require it fixed in the PR introducing it. They MUST NOT defer it to a follow-up issue** — see §7 for the reviewer-scope contract this enforces.
 
-**Bad — defer to follow-up (flagged).**
+**Bad — defer to follow-up (flagged).** _(Reviewer comment, PR #417 thread.)_
 
 > "All four §5 conditions hold here, but I'd open a follow-up issue rather than block the PR if the team prefers to land the fixtures first."
 
@@ -153,7 +153,7 @@ Code review exists to fix issues at hand. "Defer to a follow-up issue" is a tool
 
 **Cross-link to §5.** When §5's four conditions hold for duplication that the PR introduces or extends, the fix is in-scope by definition — extract in-PR, do not defer.
 
-**Why this section exists.** PR #417 surfaced reviewers (including the reuse-review agent and the PR-author lead) deferring §5-eligible duplication via "follow-up issue" or "needs a third consumer" framing, even after concluding all four §5 conditions held. The §5 counterpoint existed but wasn't load-bearing. This section makes the contract explicit so reviewers and authors share the same default.
+**Why this section exists.** PR #417 surfaced reviewers deferring §5-eligible duplication via "follow-up issue" or "needs a third consumer" framing, even after concluding all four §5 conditions held. The §5 counterpoint existed but wasn't load-bearing. This section makes the contract explicit so reviewers and authors share the same default.
 
 ---
 
