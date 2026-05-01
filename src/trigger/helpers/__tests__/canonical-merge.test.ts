@@ -176,15 +176,14 @@ describe("mergeCanonicals", () => {
       {
         match: "FOR UPDATE",
         rows: [
-          { id: 3, status: "active", episode_count: 2 },
-          { id: 7, status: "active", episode_count: 5 },
+          { id: 3, status: "active" },
+          { id: 7, status: "active" },
         ],
       },
       { match: "DELETE FROM episode_canonical_topics", rows: [] },
       { match: "UPDATE episode_canonical_topics", rows: [{ episode_id: 10 }] },
       { match: "SET status = 'merged'", rows: [{ id: 3 }] },
       { match: "canonical_topic_aliases", rows: [] },
-      { match: "SET episode_count", rows: [{ episode_count: 6 }] },
       { match: "canonical_topic_admin_log", rows: [{ id: 1 }] },
     ]);
 
@@ -204,13 +203,13 @@ describe("mergeCanonicals", () => {
     expect(parsed[1]).toBe(7);
   });
 
-  it("(3) merge happy path — conflicts deleted, survivors updated, status flipped, aliases copied, episode_count recomputed, audit row written", async () => {
+  it("(3) merge happy path — conflicts deleted, survivors updated, status flipped, aliases copied, audit row written", async () => {
     setTxFixtures([
       {
         match: "FOR UPDATE",
         rows: [
-          { id: 1, status: "active", episode_count: 3 },
-          { id: 2, status: "active", episode_count: 4 },
+          { id: 1, status: "active" },
+          { id: 2, status: "active" },
         ],
       },
       {
@@ -220,7 +219,6 @@ describe("mergeCanonicals", () => {
       { match: "UPDATE episode_canonical_topics", rows: [{ episode_id: 12 }] },
       { match: "SET status = 'merged'", rows: [{ id: 1 }] },
       { match: "canonical_topic_aliases", rows: [] },
-      { match: "SET episode_count", rows: [{ episode_count: 5 }] },
       { match: "canonical_topic_admin_log", rows: [{ id: 99 }] },
     ]);
 
@@ -235,7 +233,6 @@ describe("mergeCanonicals", () => {
     expect(result.winnerId).toBe(2);
     expect(result.conflictsDropped).toBe(2);
     expect(result.episodesReassigned).toBe(1);
-    expect(result.newWinnerEpisodeCount).toBe(5);
 
     const calls = getTxCalls();
     expect(
@@ -250,15 +247,14 @@ describe("mergeCanonicals", () => {
       {
         match: "FOR UPDATE",
         rows: [
-          { id: 1, status: "active", episode_count: 0 },
-          { id: 2, status: "active", episode_count: 0 },
+          { id: 1, status: "active" },
+          { id: 2, status: "active" },
         ],
       },
       { match: "DELETE FROM episode_canonical_topics", rows: [] },
       { match: "UPDATE episode_canonical_topics", rows: [] },
       { match: "SET status = 'merged'", rows: [] },
       { match: "canonical_topic_aliases", rows: [] },
-      { match: "SET episode_count", rows: [{ episode_count: 0 }] },
       { match: "canonical_topic_admin_log", rows: [{ id: 2 }] },
     ]);
 
@@ -299,15 +295,14 @@ describe("mergeCanonicals", () => {
       {
         match: "FOR UPDATE",
         rows: [
-          { id: 10, status: "active", episode_count: 1 },
-          { id: 20, status: "active", episode_count: 2 },
+          { id: 10, status: "active" },
+          { id: 20, status: "active" },
         ],
       },
       { match: "DELETE FROM episode_canonical_topics", rows: [] },
       { match: "UPDATE episode_canonical_topics", rows: [{ episode_id: 5 }] },
       { match: "SET status = 'merged'", rows: [{ id: 10 }] },
       { match: "canonical_topic_aliases", rows: [] },
-      { match: "SET episode_count", rows: [{ episode_count: 3 }] },
       { match: "canonical_topic_admin_log", rows: [{ id: 3 }] },
     ]);
 
@@ -331,8 +326,8 @@ describe("mergeCanonicals", () => {
       {
         match: "FOR UPDATE",
         rows: [
-          { id: 1, status: "active", episode_count: 3 },
-          { id: 2, status: "active", episode_count: 5 },
+          { id: 1, status: "active" },
+          { id: 2, status: "active" },
         ],
       },
       {
@@ -342,7 +337,6 @@ describe("mergeCanonicals", () => {
       { match: "UPDATE episode_canonical_topics", rows: [{ episode_id: 43 }] },
       { match: "SET status = 'merged'", rows: [{ id: 1 }] },
       { match: "canonical_topic_aliases", rows: [] },
-      { match: "SET episode_count", rows: [{ episode_count: 6 }] },
       { match: "canonical_topic_admin_log", rows: [{ id: 5 }] },
     ]);
 
@@ -370,8 +364,8 @@ describe("mergeCanonicals", () => {
       {
         match: "FOR UPDATE",
         rows: [
-          { id: 1, status: "active", episode_count: 3 },
-          { id: 2, status: "active", episode_count: 5 },
+          { id: 1, status: "active" },
+          { id: 2, status: "active" },
         ],
       },
       {
@@ -384,7 +378,6 @@ describe("mergeCanonicals", () => {
       },
       { match: "SET status = 'merged'", rows: [{ id: 1 }] },
       { match: "canonical_topic_aliases", rows: [] },
-      { match: "SET episode_count", rows: [{ episode_count: 8 }] },
       { match: "canonical_topic_admin_log", rows: [{ id: 7 }] },
     ]);
 
@@ -410,8 +403,8 @@ describe("mergeCanonicals", () => {
       {
         match: "FOR UPDATE",
         rows: [
-          { id: 1, status: "merged", episode_count: 0 },
-          { id: 2, status: "active", episode_count: 5 },
+          { id: 1, status: "merged" },
+          { id: 2, status: "active" },
         ],
       },
     ]);
@@ -449,8 +442,6 @@ describe("unmergeCanonicals", () => {
       { match: "SET status = 'active'", rows: [{ id: 5 }] },
       { match: "INSERT INTO episode_canonical_topics", rows: [{ id: 100 }] },
       { match: "DELETE FROM episode_canonical_topics", rows: [{ id: 200 }] },
-      { match: "SET episode_count", rows: [{ episode_count: 1 }] },
-      { match: "SET episode_count", rows: [{ episode_count: 4 }] },
       { match: "canonical_topic_admin_log", rows: [{ id: 10 }] },
     ]);
 
@@ -483,8 +474,6 @@ describe("unmergeCanonicals", () => {
       },
       { match: "SET status = 'active'", rows: [{ id: 5 }] },
       { match: "INSERT INTO episode_canonical_topics", rows: [{ id: 100 }] },
-      { match: "SET episode_count", rows: [{ episode_count: 1 }] },
-      { match: "SET episode_count", rows: [{ episode_count: 4 }] },
       { match: "canonical_topic_admin_log", rows: [{ id: 11 }] },
     ]);
 
@@ -579,8 +568,6 @@ describe("unmergeCanonicals", () => {
       { match: "SET status = 'active'", rows: [{ id: 5 }] },
       { match: "INSERT INTO episode_canonical_topics", rows: [{ id: 100 }] },
       { match: "DELETE FROM episode_canonical_topics", rows: [] },
-      { match: "SET episode_count", rows: [{ episode_count: 1 }] },
-      { match: "SET episode_count", rows: [{ episode_count: 4 }] },
       { match: "canonical_topic_admin_log", rows: [{ id: 12 }] },
     ]);
 
@@ -627,8 +614,6 @@ describe("unmergeCanonicals", () => {
         rows: [{ id: 100 }, { id: 101 }],
       },
       { match: "DELETE FROM episode_canonical_topics", rows: [] },
-      { match: "SET episode_count", rows: [{ episode_count: 2 }] },
-      { match: "SET episode_count", rows: [{ episode_count: 3 }] },
       { match: "canonical_topic_admin_log", rows: [{ id: 13 }] },
     ]);
 
@@ -667,8 +652,6 @@ describe("unmergeCanonicals", () => {
         rows: [{ id: 200 }, { id: 201 }, { id: 202 }],
       },
       { match: "DELETE FROM episode_canonical_topics", rows: [] },
-      { match: "SET episode_count", rows: [{ episode_count: 3 }] },
-      { match: "SET episode_count", rows: [{ episode_count: 1 }] },
       { match: "canonical_topic_admin_log", rows: [{ id: 14 }] },
     ]);
 

@@ -1,12 +1,9 @@
 import { notFound, permanentRedirect } from "next/navigation";
-import { eq } from "drizzle-orm";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { db } from "@/db";
-import { canonicalTopics } from "@/db/schema";
 import {
   walkMergedChain,
-  TOPIC_DISPLAY_COLUMNS,
+  findTopicSummary,
 } from "@/app/(app)/topic/[id]/merge-walker";
 
 interface TopicPageProps {
@@ -25,10 +22,7 @@ export default async function TopicPage({ params }: TopicPageProps) {
     notFound();
   }
 
-  const topic = await db.query.canonicalTopics.findFirst({
-    columns: TOPIC_DISPLAY_COLUMNS,
-    where: eq(canonicalTopics.id, parsed),
-  });
+  const topic = await findTopicSummary(parsed);
 
   if (!topic) {
     notFound();

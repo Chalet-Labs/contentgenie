@@ -40,7 +40,6 @@ describe.skipIf(!process.env.DATABASE_URL)(
           summary: "__schema_test_summary",
           ongoing: false,
           relevance: 0.5,
-          episodeCount: 3,
           identityEmbedding: EMBEDDING,
           contextEmbedding: EMBEDDING,
         })
@@ -132,7 +131,6 @@ describe.skipIf(!process.env.DATABASE_URL)(
           summary: "__schema_test_summary",
           ongoing: false,
           relevance: 0.5,
-          episodeCount: 1,
           identityEmbedding: EMBEDDING,
           contextEmbedding: EMBEDDING,
         })

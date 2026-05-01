@@ -380,7 +380,6 @@ export type MergeCanonicalsResult = {
   episodesReassigned: number;
   conflictsDropped: number;
   aliasesCopied: number;
-  newWinnerEpisodeCount: number;
 };
 
 type UnmergeCanonicalsArgs = {
@@ -433,15 +432,13 @@ export function mergeCanonicals(
     const preflight = await tx.execute<{
       id: number;
       status: string;
-      episode_count: number;
     }>(
-      sql`SELECT id, status, episode_count FROM canonical_topics WHERE id IN (${loserId}, ${winnerId}) FOR UPDATE`,
+      sql`SELECT id, status FROM canonical_topics WHERE id IN (${loserId}, ${winnerId}) FOR UPDATE`,
     );
     const loserRow = preflight.rows.find((r) => r.id === loserId);
     const winnerRow = preflight.rows.find((r) => r.id === winnerId);
     if (!loserRow || !winnerRow) throw new Error("not-found");
     if (loserRow.status !== "active") throw new Error("not-active");
-    const loserEpisodeCount = loserRow.episode_count ?? 0;
 
     // 4a. DELETE conflicts — loser rows whose (episode, winner) pair already exists.
     //     Captures the dropped episode_ids for the audit metadata.
@@ -467,13 +464,11 @@ export function mergeCanonicals(
     );
     const episodesReassigned = updateJunctionResult.rows.length;
 
-    // 5. Atomic biconditional UPDATE: sets status='merged', merged_into_id=$winnerId,
-    //    and zeroes loser episode_count in one statement (junctions just moved away,
-    //    so the count is now zero by definition). Single statement satisfies the
-    //    ct_merged_biconditional CHECK.
+    // 5. Flip status='merged' + merged_into_id=$winnerId atomically. Pairing
+    //    them in one statement is what satisfies ct_merged_biconditional.
     await tx.execute(
       sql`UPDATE canonical_topics
-             SET status = 'merged', merged_into_id = ${winnerId}, episode_count = 0
+             SET status = 'merged', merged_into_id = ${winnerId}
            WHERE id = ${loserId} AND status = 'active'`,
     );
 
@@ -488,24 +483,11 @@ export function mergeCanonicals(
     );
     const aliasesCopied = aliasInsertResult.rows.length;
 
-    // 7. Recompute winner episode_count from live junction.
-    const countResult = await tx.execute<{ episode_count: number }>(
-      sql`UPDATE canonical_topics
-             SET episode_count = (
-               SELECT count(*) FROM episode_canonical_topics
-                WHERE canonical_topic_id = ${winnerId}
-             )
-           WHERE id = ${winnerId}
-         RETURNING episode_count`,
-    );
-    const newWinnerEpisodeCount = countResult.rows[0]?.episode_count ?? 0;
-
-    // 8. Audit log insert.
+    // 7. Audit log insert.
     const reassignedEpisodeIds = updateJunctionResult.rows.map(
       (r) => r.episode_id,
     );
     const metadata = JSON.stringify({
-      episode_count_loser: loserEpisodeCount,
       conflicts_dropped: conflictsDropped,
       conflict_episode_ids: conflictEpisodeIds,
       reassigned: reassignedEpisodeIds,
@@ -521,7 +503,6 @@ export function mergeCanonicals(
       episodesReassigned,
       conflictsDropped,
       aliasesCopied,
-      newWinnerEpisodeCount,
     };
   }, options);
 }
@@ -633,27 +614,7 @@ export function unmergeCanonicals(
       episodesRemovedFromWinner = deleteResult.rows.length;
     }
 
-    // 7. Recompute episode_count on both loser and winner from live junction.
-    await tx.execute(
-      sql`UPDATE canonical_topics
-             SET episode_count = (
-               SELECT count(*) FROM episode_canonical_topics
-                WHERE canonical_topic_id = ${loserId}
-             )
-           WHERE id = ${loserId}
-         RETURNING episode_count`,
-    );
-    await tx.execute(
-      sql`UPDATE canonical_topics
-             SET episode_count = (
-               SELECT count(*) FROM episode_canonical_topics
-                WHERE canonical_topic_id = ${previousWinnerId}
-             )
-           WHERE id = ${previousWinnerId}
-         RETURNING episode_count`,
-    );
-
-    // 8. Audit log.
+    // 7. Audit log.
     const metadata = JSON.stringify({
       episode_ids: episodeIdsToReassign,
       reassigned: episodesReassigned,

@@ -482,7 +482,6 @@ export const canonicalTopics = pgTable(
     summary: text("summary").notNull(),
     ongoing: boolean("ongoing").notNull().default(false),
     relevance: real("relevance").notNull(),
-    episodeCount: integer("episode_count").notNull().default(0),
     identityEmbedding: vector("identity_embedding", {
       dimensions: EMBEDDING_DIM,
     }).notNull(),
@@ -526,7 +525,6 @@ export const canonicalTopics = pgTable(
       "ct_relevance_range",
       sql`${table.relevance} >= 0 AND ${table.relevance} <= 1`,
     ),
-    check("ct_episode_count_gte_0", sql`${table.episodeCount} >= 0`),
     check("ct_label_not_blank", sql`length(btrim(${table.label})) > 0`),
     check(
       "ct_normalized_label_not_blank",
