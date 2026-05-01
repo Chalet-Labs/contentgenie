@@ -96,6 +96,10 @@ export function MergeDialog({ topic, open, onClose }: MergeDialogProps) {
       } else {
         toast.error(`Merge failed: ${result.error}`);
       }
+    } catch (err) {
+      toast.error(
+        `Merge failed: ${err instanceof Error ? err.message : "Unknown error"}`,
+      );
     } finally {
       setSubmitting(false);
     }
