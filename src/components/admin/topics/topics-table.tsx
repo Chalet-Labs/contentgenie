@@ -112,11 +112,7 @@ export function TopicsTable({
                   </TableCell>
                   <TableCell>
                     {topic.status === "active" && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setSelectedTopic(topic)}
-                      >
+                      <Button size="sm" onClick={() => setSelectedTopic(topic)}>
                         Merge
                       </Button>
                     )}

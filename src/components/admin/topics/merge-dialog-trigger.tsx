@@ -14,12 +14,7 @@ export function MergeDialogTrigger({ topic }: MergeDialogTriggerProps) {
 
   return (
     <>
-      <Button
-        variant="outline"
-        size="sm"
-        aria-expanded={open}
-        onClick={() => setOpen(true)}
-      >
+      <Button size="sm" aria-expanded={open} onClick={() => setOpen(true)}>
         Merge
       </Button>
       {open && (
