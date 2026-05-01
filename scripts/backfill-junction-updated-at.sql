@@ -37,15 +37,15 @@
 -- `WHERE updated_at > created_at` filter touches only legacy rows.
 
 -- ============================================================
--- DRY-RUN: count rows that will be touched
+-- DRY-RUN: count rows that will be touched (no WHERE clause so each
+-- conditional aggregate runs against the full table)
 -- ============================================================
 
 SELECT
-  count(*) AS rows_to_backfill,
+  count(*) FILTER (WHERE updated_at > created_at) AS rows_to_backfill,
   count(*) FILTER (WHERE updated_at = created_at) AS rows_already_aligned,
-  count(*) AS total_rows
-FROM episode_canonical_topics
-WHERE updated_at > created_at;
+  count(*)                                          AS total_rows
+FROM episode_canonical_topics;
 
 -- ============================================================
 -- Backfill (wrapped in a transaction)

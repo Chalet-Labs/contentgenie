@@ -296,8 +296,10 @@ export async function insertJunction(
   // recovery-path retry). On collision the latest resolution outcome wins
   // for the metric fields and `updated_at` advances to now() so the rolling-
   // window observability cards filter on the actual observation time, not
-  // the original first-write time. canonical_topic_id and episode_id are
-  // part of the PK so they cannot change (ADR-047).
+  // the original first-write time. (episode_id, canonical_topic_id) is the
+  // unique index `ect_episode_canonical_uidx` used as the ON CONFLICT target;
+  // those columns are not the PK (`id` is) but they cannot change on conflict
+  // because they are the conflict key (ADR-047).
   await tx.execute(
     sql`INSERT INTO episode_canonical_topics
          (episode_id, canonical_topic_id, match_method, similarity_to_top_match, coverage_score, version_token_forced_disambig)
