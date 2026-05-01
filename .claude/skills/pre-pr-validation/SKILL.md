@@ -93,7 +93,7 @@ Launch three reviews in parallel (one message, three independent tool calls). Ea
      run_in_background: true,
      prompt: `Run \`codex review --base main\` from <absolute repo path> via Bash. Return findings as file:line, issue, suggested fix. If the CLI errors (auth, network, missing binary), report the failure verbatim.
 
-   In addition to relaying Codex's findings, evaluate the diff against the supplementary code-review checklist below as a rubric. Cite the section number (e.g. \`[checklist §3]\`) for any rubric-derived finding. Do NOT suppress or filter Codex's own findings based on the rubric — both sources contribute. If no rubric block follows, skip this rubric pass and just relay Codex.
+   In addition to relaying Codex's findings, evaluate the diff against the supplementary code-review checklist below as a rubric. Cite the section number (e.g. \`[checklist §3]\`) for any rubric-derived finding. Do NOT suppress or filter Codex's own findings based on the rubric — both sources contribute. Reviewers MUST NOT defer duplication-extraction findings that meet all four §5 conditions to a follow-up issue — the fix is in-scope for this PR (see §7). If no rubric block follows, skip this rubric pass and just relay Codex.
 
    --- BEGIN RUBRIC: docs/code-review-checklist.md ---
    <full file content from Phase 2.0 here, or omit this block entirely if Phase 2.0 found the file missing>
@@ -103,11 +103,11 @@ Launch three reviews in parallel (one message, three independent tool calls). Ea
 
 2. `/pr-review-toolkit:review-pr all` — code-reviewer, pr-test-analyzer, silent-failure-hunter, type-design-analyzer, comment-analyzer, code-simplifier. **Immediately before** the Skill call, type the following directive into the conversation so it's salient when the slash command's spawned subagent prompts are constructed:
 
-   > Apply `docs/code-review-checklist.md` (loaded above in Phase 2.0) as a **supplementary rubric** for every reviewer subagent — in addition to each subagent's normal specialty (CLAUDE.md compliance, test coverage, silent failures, type design, comments, simplification). The rubric does not replace or narrow any existing review scope; both rubric-derived and specialty-derived findings should appear. Cite section numbers in rubric-derived findings (`[checklist §N]`).
+   > Apply `docs/code-review-checklist.md` (loaded above in Phase 2.0) as a **supplementary rubric** for every reviewer subagent — in addition to each subagent's normal specialty (CLAUDE.md compliance, test coverage, silent failures, type design, comments, simplification). The rubric does not replace or narrow any existing review scope; both rubric-derived and specialty-derived findings should appear. Cite section numbers in rubric-derived findings (`[checklist §N]`). Reviewers MUST NOT defer duplication-extraction findings that meet all four §5 conditions to a follow-up issue — the fix is in-scope for this PR (see §7).
 
 3. `/simplify` — reuse/quality/efficiency pass. **Immediately before** the Skill call, type:
 
-   > Apply `docs/code-review-checklist.md` as a **supplementary rubric** alongside the normal `/simplify` reuse/quality/efficiency pass — both contribute findings; the rubric does not narrow scope. Section 5 (consolidation conditions) is especially load-bearing for this layer — do not defer obvious extractions behind "rule of three" when all four conditions hold. Cite section numbers (`[checklist §N]`) in rubric-derived findings.
+   > Apply `docs/code-review-checklist.md` as a **supplementary rubric** alongside the normal `/simplify` reuse/quality/efficiency pass — both contribute findings; the rubric does not narrow scope. Section 5 (consolidation conditions) is especially load-bearing for this layer — do not defer obvious extractions behind "rule of three" when all four conditions hold, and MUST NOT defer such findings to a follow-up issue (the fix is in-scope for this PR; see §7). Cite section numbers (`[checklist §N]`) in rubric-derived findings.
 
 Launch all three in the same message. Don't enter Phase 3 until the Codex task callback arrives and both Skill calls have returned. Don't run `codex:setup` — it's one-time init, not part of the pipeline.
 
