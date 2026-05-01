@@ -34,7 +34,7 @@ const DEFAULT_BUCKET_SIZE = 0.05;
  * No-op stub in v1. The canonical write path is the resolver's `insertJunction`,
  * which already persists all dimensions to `episode_canonical_topics`.
  * This function exists as an extension point for B4 (#391) if a separate
- * metrics table is ever introduced. See ADR-046 §6.
+ * metrics table is ever introduced. See ADR-047 §6.
  */
 export async function recordResolutionMetric(
   _record: ResolutionMetricRecord,
@@ -48,7 +48,22 @@ export async function recordResolutionMetric(
  */
 export function windowFromKey(key: WindowKey): { start: Date; end: Date } {
   const now = new Date();
-  const days = key === "24h" ? 1 : key === "7d" ? 7 : 30;
+  let days: number;
+  switch (key) {
+    case "24h":
+      days = 1;
+      break;
+    case "7d":
+      days = 7;
+      break;
+    case "30d":
+      days = 30;
+      break;
+    default: {
+      const _exhaustive: never = key;
+      throw new Error(`Unhandled WindowKey: ${String(_exhaustive)}`);
+    }
+  }
   const start = new Date(now.getTime() - days * MS_PER_DAY);
   return { start, end: now };
 }

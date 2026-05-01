@@ -1,4 +1,4 @@
-# ADR-046: Resolution observability — junction-as-source, with one boolean column for version-token-forced disambig
+# ADR-047: Resolution observability — junction-as-source, with one boolean column for version-token-forced disambig
 
 **Status:** Accepted
 **Date:** 2026-04-30
