@@ -15,19 +15,16 @@ vi.mock("next/navigation", () => ({
   permanentRedirect: (url: string) => mockPermanentRedirect(url),
 }));
 
-// findTopicSummary calls `db.select(...).from(canonicalTopics).where(...).limit(1)`,
-// which we model as a thenable chain whose terminal `.limit()` resolves to an
-// array of zero or one row. mockFindFirst feeds the next "row" (or null/undefined)
-// to that array on each invocation — preserving the queue semantics the existing
-// tests rely on.
-const mockFindFirst = vi.fn();
+// Each `mockNextTopicRow.mockResolvedValueOnce(row)` feeds the next call's
+// `.limit()` result. `null`/`undefined` resolve to `[]` to model "not found".
+const mockNextTopicRow = vi.fn();
 
 function buildSelectChain() {
   const chain = {
     from: () => chain,
     where: () => chain,
     limit: async () => {
-      const row = await mockFindFirst();
+      const row = await mockNextTopicRow();
       return row == null ? [] : [row];
     },
   };
@@ -119,7 +116,7 @@ describe("TopicPage", () => {
   );
 
   it("calls notFound() when DB returns null", async () => {
-    mockFindFirst.mockResolvedValue(null);
+    mockNextTopicRow.mockResolvedValue(null);
     await expect(TopicPage({ params: { id: "1" } })).rejects.toThrow(
       "NEXT_NOT_FOUND",
     );
@@ -127,7 +124,7 @@ describe("TopicPage", () => {
   });
 
   it("renders label, kind, summary, episodeCount, and 'Coming soon' for active topic", async () => {
-    mockFindFirst.mockResolvedValueOnce(
+    mockNextTopicRow.mockResolvedValueOnce(
       makeTopic({ status: "active", mergedIntoId: null }),
     );
     const jsx = await TopicPage({ params: { id: "1" } });
@@ -144,7 +141,7 @@ describe("TopicPage", () => {
   });
 
   it("renders singular 'episode' when episodeCount === 1", async () => {
-    mockFindFirst.mockResolvedValueOnce(
+    mockNextTopicRow.mockResolvedValueOnce(
       makeTopic({ status: "active", mergedIntoId: null, episodeCount: 1 }),
     );
     const jsx = await TopicPage({ params: { id: "1" } });
@@ -153,7 +150,7 @@ describe("TopicPage", () => {
   });
 
   it("renders Dormant badge for dormant topic", async () => {
-    mockFindFirst.mockResolvedValueOnce(
+    mockNextTopicRow.mockResolvedValueOnce(
       makeTopic({ status: "dormant", label: "Old topic", mergedIntoId: null }),
     );
     const jsx = await TopicPage({ params: { id: "2" } });
@@ -165,7 +162,7 @@ describe("TopicPage", () => {
   });
 
   it("calls permanentRedirect to terminal id for merged depth-1", async () => {
-    mockFindFirst
+    mockNextTopicRow
       .mockResolvedValueOnce(
         makeTopic({ id: 10, status: "merged", mergedIntoId: 20 }),
       )
@@ -179,7 +176,7 @@ describe("TopicPage", () => {
   });
 
   it("walks a depth-3 merged chain and redirects to terminal", async () => {
-    mockFindFirst
+    mockNextTopicRow
       .mockResolvedValueOnce(
         makeTopic({ id: 1, status: "merged", mergedIntoId: 2 }),
       )
@@ -204,7 +201,7 @@ describe("TopicPage", () => {
     // instead of hitting `seen.has(current.id)`.
     const a = makeTopic({ id: 5, status: "merged", mergedIntoId: 6 });
     const b = makeTopic({ id: 6, status: "merged", mergedIntoId: 5 });
-    mockFindFirst
+    mockNextTopicRow
       .mockResolvedValueOnce(a)
       .mockResolvedValueOnce(b)
       .mockResolvedValueOnce(a);
@@ -215,7 +212,7 @@ describe("TopicPage", () => {
   });
 
   it("calls notFound() when chain target is missing (broken chain)", async () => {
-    mockFindFirst
+    mockNextTopicRow
       .mockResolvedValueOnce(
         makeTopic({ id: 7, status: "merged", mergedIntoId: 8 }),
       )
@@ -227,7 +224,7 @@ describe("TopicPage", () => {
   });
 
   it("calls notFound() when a merged row has null mergedIntoId (schema invariant violated)", async () => {
-    mockFindFirst.mockResolvedValueOnce(
+    mockNextTopicRow.mockResolvedValueOnce(
       makeTopic({
         id: 9,
         status: "merged",
@@ -244,11 +241,11 @@ describe("TopicPage", () => {
     // Page-level fetch (depth 0) + (MAX_MERGE_DEPTH - 1) merged hops + active terminal.
     const totalMergedHops = MAX_MERGE_DEPTH - 1;
     for (let i = 0; i < totalMergedHops; i++) {
-      mockFindFirst.mockResolvedValueOnce(
+      mockNextTopicRow.mockResolvedValueOnce(
         makeTopic({ id: 200 + i, status: "merged", mergedIntoId: 200 + i + 1 }),
       );
     }
-    mockFindFirst.mockResolvedValueOnce(
+    mockNextTopicRow.mockResolvedValueOnce(
       makeTopic({
         id: 200 + totalMergedHops,
         status: "active",
@@ -268,7 +265,7 @@ describe("TopicPage", () => {
     // trips at depth=MAX_MERGE_DEPTH at the start of the next loop iteration.
     const totalRows = MAX_MERGE_DEPTH + 1;
     for (let i = 0; i < totalRows; i++) {
-      mockFindFirst.mockResolvedValueOnce(
+      mockNextTopicRow.mockResolvedValueOnce(
         makeTopic({ id: 100 + i, status: "merged", mergedIntoId: 100 + i + 1 }),
       );
     }
@@ -279,7 +276,7 @@ describe("TopicPage", () => {
   });
 
   it("redirects to dormant terminal (merged → merged → dormant)", async () => {
-    mockFindFirst
+    mockNextTopicRow
       .mockResolvedValueOnce(
         makeTopic({ id: 30, status: "merged", mergedIntoId: 31 }),
       )

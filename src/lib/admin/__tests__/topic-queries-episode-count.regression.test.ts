@@ -1,10 +1,5 @@
 // @vitest-environment node
-// Regression test for issue #419: canonical_topics.episode_count counter is
-// never bumped by the resolver path (insertJunction). After inserting a
-// junction row the read-side query must return episodeCount === 1.
-//
-// Requires a live DATABASE_URL — skipped in CI (no DATABASE_URL set).
-// Run locally: doppler run -- bun run test src/lib/admin/__tests__/topic-queries-episode-count.regression.test.ts
+// Requires DATABASE_URL — skipped in CI. Locally: doppler run -- bun run test <this file>
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { sql } from "drizzle-orm";
@@ -18,69 +13,97 @@ import { EMBEDDING_DIMENSION } from "@/lib/ai/embed-constants";
 const EMBEDDING = Array.from({ length: EMBEDDING_DIMENSION }, () => 0.001);
 const LABEL_PREFIX = "__regression_419_";
 
-let fixtureEpisodeId: number;
-let fixtureTopicId: number;
+let fixtureEpisodeIds: number[] = [];
+let topicAId: number;
+let topicBId: number;
 
 describe.skipIf(!process.env.DATABASE_URL)(
   "issue #419 regression: episodeCount reflects actual junction rows",
   () => {
     beforeAll(async () => {
-      // Use the first episode that already exists in the DB.
       const rows = await db.execute<{ id: number }>(
-        sql`SELECT id FROM episodes LIMIT 1`,
+        sql`SELECT id FROM episodes ORDER BY id LIMIT 5`,
       );
-      if (rows.rows.length === 0) {
+      if (rows.rows.length < 5) {
         throw new Error(
-          "No episode rows in DB — seed at least one episode before running this test.",
+          "Need at least 5 episode rows in DB to seed regression fixtures.",
         );
       }
-      fixtureEpisodeId = rows.rows[0].id;
+      fixtureEpisodeIds = rows.rows.map((r) => r.id);
 
-      const [topic] = await db
+      const inserted = await db
         .insert(canonicalTopics)
-        .values({
-          label: `${LABEL_PREFIX}topic`,
-          normalizedLabel: `${LABEL_PREFIX}topic`,
-          kind: "concept",
-          summary: "Regression fixture for issue #419",
-          ongoing: false,
-          relevance: 0.5,
-          identityEmbedding: EMBEDDING,
-          contextEmbedding: EMBEDDING,
-        })
+        .values([
+          {
+            label: `${LABEL_PREFIX}topic_a`,
+            normalizedLabel: `${LABEL_PREFIX}topic_a`,
+            kind: "concept",
+            summary: "Regression fixture A for issue #419",
+            ongoing: false,
+            relevance: 0.5,
+            identityEmbedding: EMBEDDING,
+            contextEmbedding: EMBEDDING,
+          },
+          {
+            label: `${LABEL_PREFIX}topic_b`,
+            normalizedLabel: `${LABEL_PREFIX}topic_b`,
+            kind: "concept",
+            summary: "Regression fixture B for issue #419",
+            ongoing: false,
+            relevance: 0.5,
+            identityEmbedding: EMBEDDING,
+            contextEmbedding: EMBEDDING,
+          },
+        ])
         .returning({ id: canonicalTopics.id });
-      fixtureTopicId = topic.id;
+      topicAId = inserted[0].id;
+      topicBId = inserted[1].id;
     });
 
     afterAll(async () => {
       await db.execute(
-        sql`DELETE FROM episode_canonical_topics WHERE canonical_topic_id = ${fixtureTopicId}`,
+        sql`DELETE FROM episode_canonical_topics WHERE canonical_topic_id IN (${topicAId}, ${topicBId})`,
       );
       await db.execute(
         sql`DELETE FROM canonical_topics WHERE starts_with(label, ${LABEL_PREFIX})`,
       );
     });
 
-    it("episodeCount === 1 after insertJunction inserts one junction row", async () => {
-      // Call insertJunction via a real transaction — mirrors the resolver path.
+    it("episodeCount projection reflects actual junction rows per topic", async () => {
+      // Topic A → 2 junctions; topic B → 3. Different counts catch any
+      // regression where the correlated subquery loses outer-row correlation
+      // (e.g. dropping the `ect` alias would make every row return the same
+      // count).
       await transactional(async (tx) => {
-        await insertJunction(tx as never, {
-          episodeId: fixtureEpisodeId,
-          canonicalId: fixtureTopicId,
-          matchMethod: "auto",
-          similarity: 0.95,
-          coverageScore: 0.8,
-        });
+        for (const episodeId of fixtureEpisodeIds.slice(0, 2)) {
+          await insertJunction(tx as never, {
+            episodeId,
+            canonicalId: topicAId,
+            matchMethod: "auto",
+            similarity: 0.95,
+            coverageScore: 0.8,
+          });
+        }
+        for (const episodeId of fixtureEpisodeIds.slice(0, 3)) {
+          await insertJunction(tx as never, {
+            episodeId,
+            canonicalId: topicBId,
+            matchMethod: "auto",
+            similarity: 0.95,
+            coverageScore: 0.8,
+          });
+        }
       });
 
-      // Read back via the admin query selector that surfaces episodeCount to UI.
       const { rows } = await getCanonicalTopicsListQuery({ page: 1 });
-      const row = rows.find((r) => r.id === fixtureTopicId);
+      const rowA = rows.find((r) => r.id === topicAId);
+      const rowB = rows.find((r) => r.id === topicBId);
 
-      expect(row).toBeDefined();
-      // On current main this assertion FAILS: episodeCount is still 0 because
-      // insertJunction never bumps canonical_topics.episode_count.
-      expect(row!.episodeCount).toBe(1);
+      expect(rowA).toBeDefined();
+      expect(rowB).toBeDefined();
+      expect(typeof rowA!.episodeCount).toBe("number");
+      expect(rowA!.episodeCount).toBe(2);
+      expect(rowB!.episodeCount).toBe(3);
     });
   },
 );

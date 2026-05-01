@@ -5,12 +5,10 @@ import { canonicalTopicEpisodeCount } from "@/lib/admin/canonical-topic-episode-
 
 export const MAX_MERGE_DEPTH = 16;
 
-type BaseTopicColumns = Pick<
+export type CanonicalTopicSummary = Pick<
   typeof canonicalTopics.$inferSelect,
   "id" | "label" | "kind" | "status" | "summary" | "mergedIntoId"
->;
-
-export type CanonicalTopicSummary = BaseTopicColumns & {
+> & {
   episodeCount: number;
 };
 
