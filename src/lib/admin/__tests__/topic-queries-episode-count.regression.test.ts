@@ -95,7 +95,10 @@ describe.skipIf(!process.env.DATABASE_URL)(
         }
       });
 
-      const { rows } = await getCanonicalTopicsListQuery({ page: 1 });
+      const { rows } = await getCanonicalTopicsListQuery({
+        page: 1,
+        search: LABEL_PREFIX,
+      });
       const rowA = rows.find((r) => r.id === topicAId);
       const rowB = rows.find((r) => r.id === topicBId);
 

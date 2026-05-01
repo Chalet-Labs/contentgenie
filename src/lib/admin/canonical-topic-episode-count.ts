@@ -8,11 +8,14 @@ import { canonicalTopics, episodeCanonicalTopics } from "@/db/schema";
  *   db.select({ episodeCount: canonicalTopicEpisodeCount(), ... })
  *     .from(canonicalTopics)
  *
- * The `ect` alias is required: without it, Postgres resolves the subquery's
- * own `id` column (the junction PK) before correlating outward, silently
- * returning 0. Drizzle's `${canonicalTopics.id}` interpolates as bare `"id"`
- * with no table qualifier, so the outer reference is written explicitly as
+ * The outer reference must be fully qualified. Both `canonical_topics` and
+ * `episode_canonical_topics` have an `id` column, so a bare `id` inside the
+ * subquery would bind to the inner FROM (the junction PK) under Postgres's
+ * innermost-scope resolution — silently returning 0 instead of correlating
+ * to the outer row. Drizzle's `${canonicalTopics.id}` interpolates as bare
+ * `"id"` with no table qualifier, so we write it explicitly as
  * `${canonicalTopics}.${canonicalTopics.id}` → `"canonical_topics"."id"`.
+ * The `ect` alias is just a shorthand; safety comes from the qualification.
  */
 export function canonicalTopicEpisodeCount(): SQL<number> {
   return sql<number>`(SELECT count(*) FROM ${episodeCanonicalTopics} ect WHERE ect.canonical_topic_id = ${canonicalTopics}.${canonicalTopics.id})`.mapWith(
