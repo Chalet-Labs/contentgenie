@@ -11,7 +11,7 @@ vi.mock("@/lib/observability/resolution-metrics", () => ({
 
 vi.mock("@/lib/search-params/admin-topics-observability", () => ({
   loadAdminTopicsObservabilitySearchParams: vi.fn(),
-  WINDOW_KEYS: ["today", "7d", "30d"],
+  WINDOW_KEYS: ["24h", "7d", "30d"],
 }));
 
 vi.mock("server-only", () => ({}));
@@ -129,8 +129,8 @@ describe("ObservabilityPage", () => {
   it("inactive window links do not have aria-current", async () => {
     mockLoader.mockResolvedValue({ window: "7d" });
     await renderPage({ window: "7d" });
-    const todayLink = screen.getByRole("link", { name: "Today" });
-    expect(todayLink).not.toHaveAttribute("aria-current");
+    const inactiveLink = screen.getByRole("link", { name: "24 hours" });
+    expect(inactiveLink).not.toHaveAttribute("aria-current");
   });
 
   it("renders safely when all metric data is zeroed (empty-state safety)", async () => {

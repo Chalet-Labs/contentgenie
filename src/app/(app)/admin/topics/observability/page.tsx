@@ -17,7 +17,7 @@ import {
 import { MATCH_METHODS } from "@/lib/entity-resolution-constants";
 
 const WINDOW_LABELS: Record<(typeof WINDOW_KEYS)[number], string> = {
-  today: "Today",
+  "24h": "24 hours",
   "7d": "7 days",
   "30d": "30 days",
 };

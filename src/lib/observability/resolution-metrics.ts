@@ -43,19 +43,12 @@ export async function recordResolutionMetric(
 /**
  * Returns time window boundaries for a named key.
  *
- * - `"today"` is calendar-aligned: UTC midnight today → now.
- * - `"7d"` and `"30d"` are rolling windows: now − N×24h → now.
+ * All windows are rolling: `start = now − N×24h`, `end = now`.
+ * `24h` covers the last 24 hours; `7d` and `30d` cover the last 7 / 30 days.
  */
 export function windowFromKey(key: WindowKey): { start: Date; end: Date } {
   const now = new Date();
-  if (key === "today") {
-    const d = now;
-    const start = new Date(
-      Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()),
-    );
-    return { start, end: now };
-  }
-  const days = key === "7d" ? 7 : 30;
+  const days = key === "24h" ? 1 : key === "7d" ? 7 : 30;
   const start = new Date(now.getTime() - days * MS_PER_DAY);
   return { start, end: now };
 }

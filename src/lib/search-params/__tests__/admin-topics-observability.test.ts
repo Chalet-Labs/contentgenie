@@ -7,11 +7,11 @@ describe("loadAdminTopicsObservabilitySearchParams", () => {
     expect(result.window).toBe("7d");
   });
 
-  it("accepts 'today' literal", () => {
+  it("accepts '24h' literal", () => {
     const result = loadAdminTopicsObservabilitySearchParams({
-      window: "today",
+      window: "24h",
     });
-    expect(result.window).toBe("today");
+    expect(result.window).toBe("24h");
   });
 
   it("accepts '7d' literal", () => {

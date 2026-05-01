@@ -57,7 +57,7 @@ vi.mock("@/lib/entity-resolution-constants", () => ({
 }));
 
 vi.mock("@/lib/search-params/admin-topics-observability", () => ({
-  WINDOW_KEYS: ["today", "7d", "30d"],
+  WINDOW_KEYS: ["24h", "7d", "30d"],
 }));
 
 function makeChain(rows: unknown[]) {
@@ -248,24 +248,11 @@ describe("getDisambigForcedCount", () => {
 });
 
 describe("windowFromKey", () => {
-  it("'today' anchors start to UTC midnight, end is now", () => {
-    const before = Date.now();
-    const { start, end } = windowFromKey("today");
-    const after = Date.now();
-
-    expect(end.getTime()).toBeGreaterThanOrEqual(before);
-    expect(end.getTime()).toBeLessThanOrEqual(after + 1);
-
-    // start must be UTC midnight today
-    expect(start.getUTCHours()).toBe(0);
-    expect(start.getUTCMinutes()).toBe(0);
-    expect(start.getUTCSeconds()).toBe(0);
-    expect(start.getUTCMilliseconds()).toBe(0);
-
-    // start is today (same UTC date as end)
-    expect(start.getUTCFullYear()).toBe(end.getUTCFullYear());
-    expect(start.getUTCMonth()).toBe(end.getUTCMonth());
-    expect(start.getUTCDate()).toBe(end.getUTCDate());
+  it("returns 24-hour rolling window for '24h'", () => {
+    const { start, end } = windowFromKey("24h");
+    const diffMs = end.getTime() - start.getTime();
+    expect(diffMs).toBeGreaterThanOrEqual(24 * 60 * 60 * 1000 - 1000);
+    expect(diffMs).toBeLessThanOrEqual(24 * 60 * 60 * 1000 + 1000);
   });
 
   it("returns 7-day window for '7d'", () => {

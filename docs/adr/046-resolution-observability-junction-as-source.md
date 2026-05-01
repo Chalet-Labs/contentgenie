@@ -33,7 +33,7 @@ Adding a parallel `resolution_metrics` table would:
 - Force a retention/cleanup policy decision day one (junction rows live forever; metrics typically don't).
 - Add a second source of truth that can drift from the junction under merges (ADR-042 §"Path compression" mutates junction rows on merge).
 
-For v1 — `match_method` distribution + similarity histogram + version-token-forced count over today/7d/30d windows — junction-as-source is structurally simpler, has zero write amplification, and inherits whatever consistency the junction already has (including merge semantics).
+For v1 — `match_method` distribution + similarity histogram + version-token-forced count over 24h/7d/30d windows — junction-as-source is structurally simpler, has zero write amplification, and inherits whatever consistency the junction already has (including merge semantics).
 
 The "lite" qualifier in the issue title is the operative word: B4 (#391) ships trend-over-time, threshold drift detection, and reconciliation merge audit. If those layers ever need a dedicated metrics table (because the junction can't carry their dimensions, e.g. per-call LLM cost), the migration cost is bounded — we add the table then, not now.
 
@@ -56,7 +56,7 @@ The column is `NOT NULL DEFAULT false` because:
 
 ### 3. Time-window queries filter on `episode_canonical_topics.created_at`
 
-Three windows: `today` (last 24 hours via `NOW() - INTERVAL '1 day'`), `7d` (default), `30d`. Selector is server-rendered via nuqs `parseAsStringLiteral` per the existing `src/lib/search-params/admin-episodes.ts` pattern; the page re-renders on each link click, no client-side state.
+Three rolling windows: `24h` (last 24 hours), `7d` (default), `30d` — each computed as `start = now − N×24h, end = now`. Selector is server-rendered via nuqs `parseAsStringLiteral` per the existing `src/lib/search-params/admin-episodes.ts` pattern; the page re-renders on each link click, no client-side state.
 
 `created_at` not `episode.processedAt`: the junction's own timestamp is the resolution event we care about, and merges that reparent rows preserve `created_at` of the original resolution. Filtering on `episodes.processedAt` would entangle the metric with episode-summary scheduling.
 
