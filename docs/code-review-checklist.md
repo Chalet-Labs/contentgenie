@@ -27,7 +27,7 @@ Scope: general code-review concerns surfaced across recent PRs. Each entry cites
 <ul id="topic-list">…</ul>
 ```
 
-Per §7, any future PR that touches `ShowMoreToggle` or one of its consumers must wire `aria-controls` in that PR — the gap is in-scope as soon as the diff puts that component under the reviewer's nose. Cite this section when fixing.
+Per §7, any future PR whose diff includes a consumer of `ShowMoreToggle` must wire `aria-controls` for that consumer in the same PR — the wiring happens at the consumer site where the toggle and controlled list are paired, so consumers absent from the diff are deferrable per §7. Cite this section when fixing.
 
 ## 2. Magic numbers in production code
 
