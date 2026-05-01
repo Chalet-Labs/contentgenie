@@ -7,11 +7,8 @@ import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
 import { sql } from "drizzle-orm";
 import { db } from "@/db";
 import { canonicalTopics, canonicalTopicDigests } from "@/db/schema";
-import { EMBEDDING_DIMENSION } from "@/lib/ai/embed-constants";
 import { expectInsertRejects } from "@/db/__tests__/schema-test-helpers";
-
-// Stable fixture embedding — content irrelevant for constraint tests.
-const EMBEDDING = Array.from({ length: EMBEDDING_DIMENSION }, () => 0.001);
+import { STABLE_EMBEDDING as EMBEDDING } from "@/test/embeddings";
 
 // Base row that satisfies every constraint (happy path).
 const validDigest = {

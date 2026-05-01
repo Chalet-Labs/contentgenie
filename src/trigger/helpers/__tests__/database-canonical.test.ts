@@ -2,77 +2,22 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { EMBEDDING_DIMENSION } from "@/lib/ai/embed-constants";
 import type { ResolveTopicInput } from "@/lib/entity-resolution";
 import { EXACT_MATCH_SIMILARITY } from "@/lib/entity-resolution-constants";
+import {
+  type RecordedCall,
+  getTxLog,
+  resetTxState,
+  serializeSql,
+  setTxFixtures,
+  txCallLog,
+} from "@/test/sql-fixture-queue";
+import { buildEmbedding } from "@/test/embeddings";
 
-// ---- Transactional mock (mirrors entity-resolution.test.ts pattern) ----------
-
-const txFixturesQueue: TxFixtures[] = [];
-const txCallLog: RecordedCall[][] = [];
-
-interface TxFixtures {
-  rows: SqlFixture[];
-}
-
-interface SqlFixture {
-  match: string | RegExp;
-  rows: unknown[];
-}
-
-interface RecordedCall {
-  sql: string;
-  params: unknown[];
-}
-
-/** Register fixtures for the NEXT transactional() call. Call once per tx. */
-function setTxFixtures(rows: SqlFixture[]): void {
-  txFixturesQueue.push({ rows });
-}
-
-function getTxLog(index: number): RecordedCall[] {
-  return txCallLog[index] ?? [];
-}
-
-function serializeSql(sqlObj: unknown): { sqlText: string; params: unknown[] } {
-  const params: unknown[] = [];
-  const parts: string[] = [];
-  const visit = (chunk: unknown) => {
-    if (chunk == null) return;
-    if (Array.isArray(chunk)) {
-      chunk.forEach(visit);
-      return;
-    }
-    if (
-      typeof chunk === "string" ||
-      typeof chunk === "number" ||
-      typeof chunk === "boolean"
-    ) {
-      params.push(chunk);
-      parts.push("$");
-      return;
-    }
-    const obj = chunk as { value?: unknown; queryChunks?: unknown[] };
-    if (Array.isArray(obj.queryChunks)) {
-      obj.queryChunks.forEach(visit);
-      return;
-    }
-    if (Array.isArray(obj.value)) {
-      parts.push(obj.value.join(""));
-      return;
-    }
-    if (obj.value !== undefined) {
-      params.push(obj.value);
-      parts.push("$");
-      return;
-    }
-  };
-  visit(sqlObj);
-  return { sqlText: parts.join(" "), params };
-}
-
+// Test-file-local recording tx used by step-counter custom mocks (e.g. the
+// "recovery exact-lookup" case below). Pushes its recorded-call array into
+// the shared `txCallLog` so the test can introspect via `getTxLog(0)`.
 type ResolveRows = (sqlText: string, params: unknown[]) => unknown[];
-
 function createRecordingTx(resolveRows: ResolveRows): {
   execute: (sqlObj: unknown) => Promise<{ rows: unknown[] }>;
 } {
@@ -87,20 +32,13 @@ function createRecordingTx(resolveRows: ResolveRows): {
   };
 }
 
-vi.mock("@/db/pool", () => ({
-  transactional: vi.fn(async (fn: (tx: unknown) => Promise<unknown>) => {
-    const fixtures = txFixturesQueue.shift() ?? { rows: [] };
-    const tx = createRecordingTx((sqlText) => {
-      const fixture = fixtures.rows.find((f) =>
-        typeof f.match === "string"
-          ? sqlText.includes(f.match)
-          : f.match.test(sqlText),
-      );
-      return fixture?.rows ?? [];
-    });
-    return fn(tx);
-  }),
-}));
+// ---- Transactional mock (delegates to shared fixture-queue harness) ---------
+
+vi.mock("@/db/pool", async () => {
+  const { createTransactionalFixtureMock } =
+    await import("@/test/sql-fixture-queue");
+  return { transactional: createTransactionalFixtureMock() };
+});
 
 // These modules are not used by the new helpers but are imported transitively
 // through database.ts — stub them to prevent side-effect errors.
@@ -117,10 +55,6 @@ vi.mock("drizzle-orm", async (importOriginal) => {
 });
 
 // ---- Helpers -----------------------------------------------------------------
-
-function buildEmbedding(): number[] {
-  return Array.from({ length: EMBEDDING_DIMENSION }, () => 0.001);
-}
 
 function makeInput(
   overrides: Partial<ResolveTopicInput> = {},
@@ -147,13 +81,11 @@ function findCalls(haystack: RecordedCall[], needle: string): RecordedCall[] {
 // ---- Tests -------------------------------------------------------------------
 
 beforeEach(() => {
-  txFixturesQueue.length = 0;
-  txCallLog.length = 0;
+  resetTxState();
 });
 
 afterEach(() => {
-  txFixturesQueue.length = 0;
-  txCallLog.length = 0;
+  resetTxState();
   vi.restoreAllMocks();
 });
 

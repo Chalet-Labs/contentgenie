@@ -13,64 +13,22 @@ import {
 
 // ---- Mocks (must precede all production imports) ----------------------------
 
-// SQL-fixture-queue harness — mirrors entity-resolution.test.ts exactly.
-const txFixturesQueue: TxFixtures[] = [];
-const txCallLog: RecordedCall[][] = [];
-
-interface TxFixtures {
-  rows: SqlFixture[];
-}
-
-interface SqlFixture {
-  match: string | RegExp;
-  rows: unknown[];
-}
-
-interface RecordedCall {
-  sql: string;
-  params: unknown[];
-}
-
-function setTxFixtures(rows: SqlFixture[]): void {
-  txFixturesQueue.push({ rows });
-}
-
-function allRecordedCalls(): RecordedCall[] {
-  return txCallLog.flat();
-}
+// SQL-fixture-queue harness lives in `@/test/sql-fixture-queue` — see that
+// file's header for the Vitest hoisting constraint that forces the factory
+// body to dynamic-import the harness.
 
 // When the fixture queue is empty, fall through to the real `transactional`
 // so the real-DB sub-suite (concurrent-insert-race) hits Postgres normally.
 // Mocked sub-suites queue fixtures via `setTxFixtures` and the mock intercepts.
 vi.mock("@/db/pool", async () => {
   const actual = await vi.importActual<typeof import("@/db/pool")>("@/db/pool");
+  const { createTransactionalFixtureMockWithFallthrough } =
+    await import("@/test/sql-fixture-queue");
   return {
     ...actual,
-    transactional: vi.fn(async (fn: (tx: unknown) => Promise<unknown>) => {
-      if (txFixturesQueue.length === 0) {
-        return (
-          actual.transactional as unknown as (
-            cb: (tx: unknown) => Promise<unknown>,
-          ) => Promise<unknown>
-        )(fn);
-      }
-      const fixtures = txFixturesQueue.shift() ?? { rows: [] };
-      const recorded: RecordedCall[] = [];
-      txCallLog.push(recorded);
-      const tx = {
-        execute: async (sqlObj: unknown) => {
-          const { sqlText, params } = serializeSql(sqlObj);
-          recorded.push({ sql: sqlText, params });
-          const fixture = fixtures.rows.find((f) =>
-            typeof f.match === "string"
-              ? sqlText.includes(f.match)
-              : f.match.test(sqlText),
-          );
-          return { rows: fixture?.rows ?? [] };
-        },
-      };
-      return fn(tx);
-    }),
+    transactional: createTransactionalFixtureMockWithFallthrough(
+      actual.transactional,
+    ),
   };
 });
 
@@ -108,7 +66,6 @@ import { transactional } from "@/db/pool";
 import { generateEmbeddings } from "@/lib/ai/embed";
 import { db } from "@/db";
 import { sql } from "drizzle-orm";
-import { EMBEDDING_DIMENSION } from "@/lib/ai/embed-constants";
 import {
   hasVersionTokenMismatch,
   resolveTopic,
@@ -123,50 +80,18 @@ import {
 import { resolveAndPersistEpisodeTopics } from "@/trigger/helpers/resolve-topics";
 import { normalizeTopics } from "@/trigger/helpers/ai-summary";
 import type { TopicKind } from "@/lib/openrouter";
+import {
+  type SqlFixture,
+  allRecordedCalls,
+  resetTxState,
+  setTxFixtures,
+} from "@/test/sql-fixture-queue";
+import { STABLE_EMBEDDING } from "@/test/embeddings";
 
 // First runtime-allocated canonical id used by the mock harness.
 // Fixtures referencing newly-inserted canonicals (e.g. concept-clustering)
 // rely on this value to seed kNN candidates for subsequent inputs.
 const MOCK_NEW_CANONICAL_BASE_ID = 900;
-
-// ---- Serializer (verbatim from entity-resolution.test.ts) -------------------
-
-function serializeSql(sqlObj: unknown): { sqlText: string; params: unknown[] } {
-  const params: unknown[] = [];
-  const parts: string[] = [];
-  const visit = (chunk: unknown) => {
-    if (chunk == null) return;
-    if (Array.isArray(chunk)) {
-      chunk.forEach(visit);
-      return;
-    }
-    if (
-      typeof chunk === "string" ||
-      typeof chunk === "number" ||
-      typeof chunk === "boolean"
-    ) {
-      params.push(chunk);
-      parts.push("$");
-      return;
-    }
-    const obj = chunk as { value?: unknown; queryChunks?: unknown[] };
-    if (Array.isArray(obj.queryChunks)) {
-      obj.queryChunks.forEach(visit);
-      return;
-    }
-    if (Array.isArray(obj.value)) {
-      parts.push(obj.value.join(""));
-      return;
-    }
-    if (obj.value !== undefined) {
-      params.push(obj.value);
-      parts.push("$");
-      return;
-    }
-  };
-  visit(sqlObj);
-  return { sqlText: parts.join(" "), params };
-}
 
 // ---- Types ------------------------------------------------------------------
 
@@ -217,13 +142,6 @@ type ResolverGoldenFixture = {
   // Optional: used by philosophical-no-topic fixture
   aiRawOutput?: { topics: unknown[] };
 };
-
-// ---- Embedding helper -------------------------------------------------------
-
-const STABLE_EMBEDDING = Array.from(
-  { length: EMBEDDING_DIMENSION },
-  () => 0.001,
-);
 
 function buildInput(
   entry: ResolverGoldenFixture["inputs"][number],
@@ -469,16 +387,14 @@ async function runFixtureWithRealDb(
 // ---- Lifecycle --------------------------------------------------------------
 
 beforeEach(() => {
-  txFixturesQueue.length = 0;
-  txCallLog.length = 0;
+  resetTxState();
   generateCompletionMock.mockReset();
   vi.mocked(transactional).mockClear();
   vi.mocked(generateEmbeddings).mockClear();
 });
 
 afterEach(() => {
-  txFixturesQueue.length = 0;
-  txCallLog.length = 0;
+  resetTxState();
 });
 
 // ---- Fixtures (imported via resolveJsonModule) ------------------------------
