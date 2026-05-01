@@ -27,7 +27,7 @@ Scope: general code-review concerns surfaced across recent PRs. Each entry cites
 <ul id="topic-list">…</ul>
 ```
 
-Track as follow-up; cite this section when fixing.
+Per §7, any future PR whose diff includes a consumer of `ShowMoreToggle` must wire `aria-controls` for that consumer in the same PR — the wiring happens at the consumer site where the toggle and controlled list are paired, so consumers absent from the diff are deferrable per §7. Cite this section when fixing.
 
 ## 2. Magic numbers in production code
 
@@ -100,6 +100,18 @@ All four conditions held — `aria-expanded` was the newly-introduced contract t
 
 **Counterpoint.** "Rule of three" is a guard against premature abstraction of an _unknown_ shape. It is not a blanket license to defer obvious consolidation when the shape is clear from two call sites and a behavioral contract is at stake. Do not cite rule-of-three to punt on condition (3).
 
+**Reviewers MUST flag duplication that meets all four §5 conditions and require it fixed in the PR introducing or extending it. They MUST NOT defer it to a follow-up issue** — see §7 for the reviewer-scope contract this enforces.
+
+**Bad — defer to follow-up (flagged).** _(Reviewer comment, PR #417 thread.)_
+
+> "All four §5 conditions hold here, but I'd open a follow-up issue rather than block the PR if the team prefers to land the fixtures first."
+
+The "follow-up issue" is the punt §5 forbids. The duplication is in-scope by definition (the PR introduces it) and the fix is mechanical (§5 condition 4 = strong safety net). "Follow-up" here is a synonym for "permanent."
+
+**Good — extract in-PR (preferred).**
+
+> "Conditions 1–4 of §5 all hold (literal duplication, clear shape, shared contract, TS+tests cover the surface). Extracting in this PR — the fix is mechanical and in-scope."
+
 ---
 
 ## 6. Grep before writing a new helper
@@ -125,6 +137,23 @@ If a private helper (`function`, not `export function`) already exists in a sibl
 **Why this section exists.** PR #412 (canonical-topic resolver integration) shipped with six near-identical helper pairs — `forceUpsertAliases`/`upsertAliases`, `forceUpdateLastSeen`/`updateLastSeen`, `forceInsertCanonical`/`insertCanonical`, `forceExactLookup`/`exactLookup`, plus duplicated `formatVector` and `buildLockKey`. Root cause: the resolver's SQL helpers in `src/lib/entity-resolution.ts` were declared as private `function`s, so the orchestrator integration in `src/trigger/helpers/database.ts` recreated them with a `force` prefix instead of promoting the originals to exports. Pre-PR multi-tool review (Codex, `/pr-review-toolkit:review-pr all`, `/simplify`) missed all six because `/simplify`'s reuse pass is diff-scoped — it does not grep the wider codebase for similar SQL or helper patterns.
 
 **Diagnostic for reviewers.** When you see a new helper named `forceX` / `internalX` / `legacyX`, ask: "is this byte-identical to an existing `X`?" If yes, the right fix is a single `export` + import, not a parallel implementation.
+
+---
+
+## 7. Reviewer scope: fix-now vs. defer-to-follow-up
+
+Code review exists to fix issues at hand. "Defer to a follow-up issue" is a tool with a narrow legitimate use, not a default escape hatch.
+
+**In-scope by default.** Anything the PR introduces, modifies, or extends is in-scope for review and fix in that same PR. If a reviewer noticed it because it is visible in the diff (including context lines), the fix is considered in-scope by default, subject to the deferral criteria below. Duplication added or extended by the diff is in-scope. I noticed it = fix it here.
+
+**Legitimately deferrable.** A finding is deferrable to a follow-up issue only when **both** hold:
+
+1. The fix would touch files outside the PR's stated scope (e.g., an unrelated refactor in a sibling module the PR does not modify).
+2. The fix is not required by the change under review (the PR does not introduce, extend, or rely on the broken behavior).
+
+**Cross-link to §5.** When §5's four conditions hold for duplication that the PR introduces or extends, the fix is in-scope by definition — extract in-PR, do not defer.
+
+**Why this section exists.** PR #417 surfaced reviewers deferring §5-eligible duplication via "follow-up issue" or "needs a third consumer" framing, even after concluding all four §5 conditions held. The §5 counterpoint existed but wasn't load-bearing. This section makes the contract explicit so reviewers and authors share the same default.
 
 ---
 
