@@ -9,21 +9,16 @@ import { sql } from "drizzle-orm";
 
 import { db } from "@/db";
 import { canonicalTopics } from "@/db/schema";
-import { EMBEDDING_DIMENSION } from "@/lib/ai/embed-constants";
 import {
   EntityResolutionError,
   resolveTopic,
   type ResolveTopicInput,
 } from "@/lib/entity-resolution";
+import { STABLE_EMBEDDING } from "@/test/embeddings";
 
 vi.mock("@/lib/ai/generate", () => ({
   generateCompletion: vi.fn(),
 }));
-
-const STABLE_EMBEDDING = Array.from(
-  { length: EMBEDDING_DIMENSION },
-  () => 0.001,
-);
 
 // Same embedding as STABLE — when the seeded canonical's label differs only
 // by a version token (e.g. "Opus 4.6" vs "Opus 4.7") the version-gate forces

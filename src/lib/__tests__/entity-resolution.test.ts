@@ -9,125 +9,41 @@ import {
   resolveTopic,
   type ResolveTopicInput,
 } from "@/lib/entity-resolution";
-import { EMBEDDING_DIMENSION } from "@/lib/ai/embed-constants";
 import {
   AUTO_MATCH_SIMILARITY_THRESHOLD,
   DISAMBIGUATE_SIMILARITY_THRESHOLD,
 } from "@/lib/entity-resolution-constants";
+import {
+  type RecordedCall,
+  allRecordedCalls,
+  getTxLog,
+  resetTxState,
+  setTxFixtures,
+  txCallLog,
+  txFixturesQueue,
+  serializeSql,
+} from "@/test/sql-fixture-queue";
+import { buildEmbedding } from "@/test/embeddings";
 
 // ---- Mocks ------------------------------------------------------------------
 
 // Each call to `transactional(cb)` runs `cb(mockTx)` against a fresh MockTx
 // pre-loaded with fixtures keyed by SQL substring. Tests register fixtures
 // per-tx via `setTxFixtures(...)`.
-const txFixturesQueue: TxFixtures[] = [];
-const txCallLog: RecordedCall[][] = [];
+//
+// Note: `vi.mock` is hoisted above all imports, so the factory must dynamic-
+// import the harness — top-level imports aren't bound when the factory runs.
 
-interface TxFixtures {
-  rows: SqlFixture[];
-}
-
-interface SqlFixture {
-  match: string | RegExp;
-  rows: unknown[];
-}
-
-interface RecordedCall {
-  sql: string;
-  params: unknown[];
-}
-
-function setTxFixtures(rows: SqlFixture[]): void {
-  txFixturesQueue.push({ rows });
-}
-
-function getTxLog(index: number): RecordedCall[] {
-  return txCallLog[index] ?? [];
-}
-
-function allRecordedCalls(): RecordedCall[] {
-  return txCallLog.flat();
-}
-
-vi.mock("@/db/pool", () => ({
-  transactional: vi.fn(async (fn: (tx: unknown) => Promise<unknown>) => {
-    const fixtures = txFixturesQueue.shift() ?? { rows: [] };
-    const recorded: RecordedCall[] = [];
-    txCallLog.push(recorded);
-    const tx = {
-      execute: async (sqlObj: unknown) => {
-        const { sqlText, params } = serializeSql(sqlObj);
-        recorded.push({ sql: sqlText, params });
-        const fixture = fixtures.rows.find((f) =>
-          typeof f.match === "string"
-            ? sqlText.includes(f.match)
-            : f.match.test(sqlText),
-        );
-        return { rows: fixture?.rows ?? [] };
-      },
-    };
-    return fn(tx);
-  }),
-}));
+vi.mock("@/db/pool", async () => {
+  const { createTransactionalFixtureMock } =
+    await import("@/test/sql-fixture-queue");
+  return { transactional: createTransactionalFixtureMock() };
+});
 
 const generateCompletionMock = vi.fn();
 vi.mock("@/lib/ai/generate", () => ({
   generateCompletion: (...args: unknown[]) => generateCompletionMock(...args),
 }));
-
-// Walk a Drizzle SQL object and produce a stable serialized string + params
-// list. We don't need DB-correct rendering — we just need stable substrings
-// for fixture matching and parameter extraction for assertions.
-function serializeSql(sqlObj: unknown): {
-  sqlText: string;
-  params: unknown[];
-} {
-  const params: unknown[] = [];
-  const parts: string[] = [];
-  const visit = (chunk: unknown) => {
-    if (chunk == null) return;
-    if (Array.isArray(chunk)) {
-      chunk.forEach(visit);
-      return;
-    }
-    if (
-      typeof chunk === "string" ||
-      typeof chunk === "number" ||
-      typeof chunk === "boolean"
-    ) {
-      // Bare primitives at the top level of queryChunks are template-literal
-      // interpolations — drizzle treats them as bound params. Static SQL
-      // text comes through as StringChunk objects (handled below).
-      params.push(chunk);
-      parts.push("$");
-      return;
-    }
-    const obj = chunk as { value?: unknown; queryChunks?: unknown[] };
-    if (Array.isArray(obj.queryChunks)) {
-      obj.queryChunks.forEach(visit);
-      return;
-    }
-    // StringChunk: { value: string[] }
-    if (Array.isArray(obj.value)) {
-      parts.push(obj.value.join(""));
-      return;
-    }
-    // Param-like: any other object with `value` is treated as a bound param
-    if (obj.value !== undefined) {
-      params.push(obj.value);
-      parts.push("$");
-      return;
-    }
-  };
-  visit(sqlObj);
-  return { sqlText: parts.join(" "), params };
-}
-
-// ---- Helpers ----------------------------------------------------------------
-
-function buildEmbedding(): number[] {
-  return Array.from({ length: EMBEDDING_DIMENSION }, () => 0.001);
-}
 
 function makeInput(
   overrides: Partial<ResolveTopicInput> = {},
@@ -154,14 +70,12 @@ function findCalls(haystack: RecordedCall[], needle: string): RecordedCall[] {
 // ---- Tests ------------------------------------------------------------------
 
 beforeEach(() => {
-  txFixturesQueue.length = 0;
-  txCallLog.length = 0;
+  resetTxState();
   generateCompletionMock.mockReset();
 });
 
 afterEach(() => {
-  txFixturesQueue.length = 0;
-  txCallLog.length = 0;
+  resetTxState();
 });
 
 describe("normalizeLabel", () => {
@@ -447,8 +361,7 @@ describe("resolveTopic", () => {
       expect(knnIdx).toBeGreaterThan(setLocalIdx);
 
       // Sub-test B: exact-lookup hit — SET LOCAL is NOT emitted.
-      txCallLog.length = 0;
-      txFixturesQueue.length = 0;
+      resetTxState();
       setTxFixtures([
         {
           match: "lower(normalized_label)",
