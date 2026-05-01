@@ -47,26 +47,32 @@ export interface RecordedCall {
 export const txFixturesQueue: SqlFixture[][] = [];
 export const txCallLog: RecordedCall[][] = [];
 
+/** Register the next batch of SQL fixtures to be consumed by a single `transactional()` call. */
 export function setTxFixtures(rows: SqlFixture[]): void {
   txFixturesQueue.push(rows);
 }
 
+/** Return the list of SQL calls recorded during the nth transaction (0-indexed). */
 export function getTxLog(index: number): RecordedCall[] {
   return txCallLog[index] ?? [];
 }
 
+/** Return every SQL call recorded across all transactions, in execution order. */
 export function allRecordedCalls(): RecordedCall[] {
   return txCallLog.flat();
 }
 
+/** Clear the fixture queue and call log. Call in `beforeEach` or `afterEach` to isolate tests. */
 export function resetTxState(): void {
   txFixturesQueue.length = 0;
   txCallLog.length = 0;
 }
 
-// Walk a Drizzle SQL object and produce a stable serialized string + params
-// list. We don't need DB-correct rendering — just stable substrings for
-// fixture matching and parameter extraction for assertions.
+/**
+ * Walk a Drizzle SQL object and produce a stable `sqlText` + `params` pair.
+ * Rendering need not be DB-correct — only stable substrings for fixture matching
+ * and parameter extraction for assertions.
+ */
 export function serializeSql(sqlObj: unknown): {
   sqlText: string;
   params: unknown[];
