@@ -30,6 +30,7 @@ import {
   SUBSCRIPTION_SORTS,
   type SubscriptionSort,
 } from "@/db/subscription-sorts";
+import type { AdminLogAction } from "@/db/canonical-topic-admin-log-constants";
 
 export { DEFAULT_SUBSCRIPTION_SORT, SUBSCRIPTION_SORTS, type SubscriptionSort };
 
@@ -620,6 +621,32 @@ export const canonicalTopicDigests = pgTable(
     ),
   ],
 );
+
+// Admin audit log for canonical-topic merge/unmerge operations (ADR-046)
+// Intentionally no Drizzle relations — audit rows are queried with raw selects,
+// and actor is a Clerk userId (no FK, per ADR-046 §6).
+export const canonicalTopicAdminLog = pgTable(
+  "canonical_topic_admin_log",
+  {
+    id: serial("id").primaryKey(),
+    actor: text("actor").notNull(),
+    action: text("action").notNull().$type<AdminLogAction>(),
+    loserId: integer("loser_id").notNull(),
+    winnerId: integer("winner_id").notNull(),
+    metadata: jsonb("metadata"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("ctal_loser_id_idx").on(table.loserId),
+    index("ctal_winner_id_idx").on(table.winnerId),
+    index("ctal_created_at_idx").on(sql`${table.createdAt} DESC`),
+    check("ctal_action_enum", sql`${table.action} IN ('merge', 'unmerge')`),
+  ],
+);
+
+export type CanonicalTopicAdminLog = typeof canonicalTopicAdminLog.$inferSelect;
+export type NewCanonicalTopicAdminLog =
+  typeof canonicalTopicAdminLog.$inferInsert;
 
 // Relations
 export const usersRelations = relations(users, ({ many, one }) => ({

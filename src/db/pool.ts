@@ -53,9 +53,15 @@ export function getDbPool(): NeonDatabase<typeof schema> {
  * Run `fn` inside a Postgres transaction. Commits on resolve; rolls back
  * and re-throws on reject. Used by the entity resolver to scope an
  * advisory lock + read + write to a single connection.
+ *
+ * When `options.tx` is supplied the caller's transaction is reused directly
+ * (no nested BEGIN), which lets helpers be composed into an outer transaction
+ * by orchestrating callers (e.g. the B1 reconciliation task).
  */
 export function transactional<T>(
   fn: (tx: NeonDatabase<typeof schema>) => Promise<T>,
+  options?: { tx?: NeonDatabase<typeof schema> },
 ): Promise<T> {
+  if (options?.tx) return fn(options.tx);
   return getDbPool().transaction((tx) => fn(tx));
 }
