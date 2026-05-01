@@ -47,9 +47,9 @@ describe.skipIf(!process.env.DATABASE_URL)(
 
       const ct = await db.execute<{ id: number }>(
         sql`INSERT INTO canonical_topics
-              (label, normalized_label, kind, summary, ongoing, relevance, episode_count,
+              (label, normalized_label, kind, summary, ongoing, relevance,
                identity_embedding, context_embedding, embedding_model_version)
-            VALUES (${TEST_PREFIX + "a"}, ${TEST_PREFIX + "a"}, 'concept', 'test', false, 0.5, 0,
+            VALUES (${TEST_PREFIX + "a"}, ${TEST_PREFIX + "a"}, 'concept', 'test', false, 0.5,
                     ${`[${STABLE_EMBEDDING.join(",")}]`}::vector,
                     ${`[${STABLE_EMBEDDING.join(",")}]`}::vector,
                     ${EMBEDDING_MODEL})

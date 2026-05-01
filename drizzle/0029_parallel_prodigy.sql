@@ -1,0 +1,2 @@
+ALTER TABLE "episode_canonical_topics" ADD COLUMN "version_token_forced_disambig" boolean DEFAULT false NOT NULL;--> statement-breakpoint
+ALTER TABLE "episode_canonical_topics" ADD COLUMN "updated_at" timestamp DEFAULT now() NOT NULL;

@@ -2,7 +2,6 @@ import { notFound } from "next/navigation";
 import { eq, desc } from "drizzle-orm";
 import { db } from "@/db";
 import {
-  canonicalTopics,
   canonicalTopicAliases,
   episodeCanonicalTopics,
   episodes,
@@ -14,7 +13,7 @@ import {
 import { AuditLogList } from "@/components/admin/topics/audit-log-list";
 import {
   walkMergedChain,
-  TOPIC_DISPLAY_COLUMNS,
+  findTopicSummary,
 } from "@/app/(app)/topic/[id]/merge-walker";
 import { UnmergeDialogTrigger } from "@/components/admin/topics/unmerge-dialog-trigger";
 import { MergeDialogTrigger } from "@/components/admin/topics/merge-dialog-trigger";
@@ -27,10 +26,7 @@ export default async function AdminTopicDetailPage({
   if (!/^\d+$/.test(params.id)) notFound();
   const id = Number(params.id);
 
-  const topic = await db.query.canonicalTopics.findFirst({
-    columns: TOPIC_DISPLAY_COLUMNS,
-    where: eq(canonicalTopics.id, id),
-  });
+  const topic = await findTopicSummary(id);
 
   if (!topic) notFound();
 

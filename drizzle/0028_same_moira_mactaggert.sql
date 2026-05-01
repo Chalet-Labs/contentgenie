@@ -1,1 +1,0 @@
-ALTER TABLE "episode_canonical_topics" ADD COLUMN "version_token_forced_disambig" boolean DEFAULT false NOT NULL;

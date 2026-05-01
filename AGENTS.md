@@ -7,7 +7,7 @@ Podcast discovery, AI-powered summarization, and library management for busy pro
 - Before planning any work, always sync with `main` (`git fetch origin main && git rebase origin/main`). This works in worktrees and on feature branches with in-progress work.
 - Before editing any code, always create a new branch from an up-to-date `main`.
 - Push feature branches to `origin` and open PRs against `main`.
-- **Effort estimation.** Weigh refactors by risk, scope clarity, and safety net (TypeScript, tests) — not by file count or imagined human-coordination cost. Cross-file cleanups that touch 10–50 files are routine one-session work; "project-wide churn" is not a valid reason to defer a clean refactor. Use review bandwidth, not labor, as the legitimate ceiling.
+- **Effort estimation.** Weigh refactors by risk, scope clarity, and safety net (TypeScript, tests) — not by file count or imagined human-coordination cost. Cross-file cleanups that touch 10–50 files are routine one-session work; "project-wide churn" is not a valid reason to defer a clean refactor. Use review bandwidth, not labor, as the legitimate ceiling. See [`docs/code-review-checklist.md`](docs/code-review-checklist.md) §5 + §7 for the in-PR-fix-vs-defer rule.
 
 ## Dev environment tips
 

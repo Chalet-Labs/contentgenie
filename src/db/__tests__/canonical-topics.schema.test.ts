@@ -29,7 +29,6 @@ const validTopic = {
   summary: "__schema_test_summary",
   ongoing: false,
   relevance: 0.5,
-  episodeCount: 0,
   identityEmbedding: EMBEDDING,
   contextEmbedding: EMBEDDING,
   embeddingModelVersion: EMBEDDING_MODEL,
@@ -97,7 +96,7 @@ describe.skipIf(!process.env.DATABASE_URL)(
     // Happy path — guard against silent schema drift on the basic insert path,
     // including the column defaults that aren't explicitly set in `validTopic`.
     it("inserts a fully-valid canonical_topic row with expected defaults", async () => {
-      // Use a row that omits status / ongoing / episodeCount /
+      // Use a row that omits status / ongoing /
       // embeddingModelVersion so the DB defaults flow through.
       const [row] = await db
         .insert(canonicalTopics)
@@ -114,7 +113,6 @@ describe.skipIf(!process.env.DATABASE_URL)(
       expect(row.id).toBeTypeOf("number");
       expect(row.status).toBe("active");
       expect(row.ongoing).toBe(false);
-      expect(row.episodeCount).toBe(0);
       expect(row.embeddingModelVersion).toBe(EMBEDDING_MODEL);
     });
 
@@ -186,19 +184,6 @@ describe.skipIf(!process.env.DATABASE_URL)(
         }),
         "23514",
         "ct_relevance_range",
-      );
-    });
-
-    // 6. episode_count negative.
-    it("rejects episode_count = -1 (ct_episode_count_gte_0)", async () => {
-      await expectInsertRejects(
-        db.insert(canonicalTopics).values({
-          ...validTopic,
-          label: "__schema_test_count_neg",
-          episodeCount: -1,
-        }),
-        "23514",
-        "ct_episode_count_gte_0",
       );
     });
 

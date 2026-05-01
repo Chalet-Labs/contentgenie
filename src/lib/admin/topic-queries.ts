@@ -7,6 +7,7 @@ import {
   type CanonicalTopicKind,
   type CanonicalTopicStatus,
 } from "@/db/schema";
+import { canonicalTopicEpisodeCount } from "@/lib/admin/canonical-topic-episode-count";
 
 export const TOPICS_PAGE_SIZE = 50;
 export const AUDIT_LOG_PAGE_SIZE = 50;
@@ -72,7 +73,7 @@ export async function getCanonicalTopicsListQuery(
         label: canonicalTopics.label,
         kind: canonicalTopics.kind,
         status: canonicalTopics.status,
-        episodeCount: canonicalTopics.episodeCount,
+        episodeCount: canonicalTopicEpisodeCount(),
         lastSeen: canonicalTopics.lastSeen,
         mergedIntoId: canonicalTopics.mergedIntoId,
       })

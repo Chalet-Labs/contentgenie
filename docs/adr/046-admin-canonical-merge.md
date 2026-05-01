@@ -109,7 +109,7 @@ CREATE TABLE canonical_topic_admin_log (
   action       TEXT NOT NULL,             -- 'merge' | 'unmerge'
   loser_id     INTEGER NOT NULL,          -- always the row whose status flipped
   winner_id    INTEGER NOT NULL,          -- merge target (or original target on unmerge)
-  metadata     JSONB,                     -- merge: { episode_count_loser, conflicts_dropped, conflict_episode_ids[], reassigned[] }; unmerge: { episode_ids, reassigned, skipped, also_removed_from_winner }
+  metadata     JSONB,                     -- merge: { conflicts_dropped, conflict_episode_ids[], reassigned[] }; unmerge: { episode_ids, reassigned, skipped, also_removed_from_winner }
   created_at   TIMESTAMP NOT NULL DEFAULT NOW(),
   CHECK (action IN ('merge', 'unmerge'))
 );

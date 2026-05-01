@@ -1,5 +1,5 @@
 {
-  "id": "e200ec75-fd8b-4ceb-b23c-f7336b731a1f",
+  "id": "add57fef-91ce-43c2-b1ee-682775e934ff",
   "prevId": "46a31224-c271-44a5-aa04-acae23568bf8",
   "version": "7",
   "dialect": "postgresql",
@@ -492,13 +492,6 @@
           "primaryKey": false,
           "notNull": true
         },
-        "episode_count": {
-          "name": "episode_count",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 0
-        },
         "identity_embedding": {
           "name": "identity_embedding",
           "type": "vector(1024)",
@@ -646,10 +639,6 @@
         "ct_relevance_range": {
           "name": "ct_relevance_range",
           "value": "\"canonical_topics\".\"relevance\" >= 0 AND \"canonical_topics\".\"relevance\" <= 1"
-        },
-        "ct_episode_count_gte_0": {
-          "name": "ct_episode_count_gte_0",
-          "value": "\"canonical_topics\".\"episode_count\" >= 0"
         },
         "ct_label_not_blank": {
           "name": "ct_label_not_blank",
@@ -800,13 +789,6 @@
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
-        },
-        "version_token_forced_disambig": {
-          "name": "version_token_forced_disambig",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
         }
       },
       "indexes": {
