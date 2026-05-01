@@ -80,8 +80,10 @@ describe.skipIf(!process.env.DATABASE_URL)(
         similarity_to_top_match: number | null;
         coverage_score: number;
         version_token_forced_disambig: boolean;
+        created_at: string;
+        updated_at: string;
       }>(
-        sql`SELECT match_method, similarity_to_top_match, coverage_score, version_token_forced_disambig
+        sql`SELECT match_method, similarity_to_top_match, coverage_score, version_token_forced_disambig, created_at, updated_at
             FROM episode_canonical_topics
             WHERE episode_id = ${episodeId} AND canonical_topic_id = ${canonicalId}`,
       );
@@ -90,6 +92,11 @@ describe.skipIf(!process.env.DATABASE_URL)(
         version_token_forced_disambig: false,
       });
       expect(after1.rows[0].similarity_to_top_match).toBeCloseTo(0.42, 6);
+      const createdAt1 = new Date(after1.rows[0].created_at).getTime();
+      const updatedAt1 = new Date(after1.rows[0].updated_at).getTime();
+
+      // Wait briefly so the second now() is observably later than the first.
+      await new Promise((resolve) => setTimeout(resolve, 50));
 
       // Second write: 'llm_disambig' / forced=true / similarity=0.88
       await transactional<void>(async (tx) => {
@@ -108,8 +115,10 @@ describe.skipIf(!process.env.DATABASE_URL)(
         similarity_to_top_match: number | null;
         coverage_score: number;
         version_token_forced_disambig: boolean;
+        created_at: string;
+        updated_at: string;
       }>(
-        sql`SELECT match_method, similarity_to_top_match, coverage_score, version_token_forced_disambig
+        sql`SELECT match_method, similarity_to_top_match, coverage_score, version_token_forced_disambig, created_at, updated_at
             FROM episode_canonical_topics
             WHERE episode_id = ${episodeId} AND canonical_topic_id = ${canonicalId}`,
       );
@@ -121,6 +130,13 @@ describe.skipIf(!process.env.DATABASE_URL)(
       });
       expect(after2.rows[0].similarity_to_top_match).toBeCloseTo(0.88, 6);
       expect(Number(after2.rows[0].coverage_score)).toBeCloseTo(0.7, 6);
+
+      // created_at is preserved (PK/insert-only), updated_at advances on conflict
+      // — required so the rolling-window dashboard cards count re-resolutions.
+      const createdAt2 = new Date(after2.rows[0].created_at).getTime();
+      const updatedAt2 = new Date(after2.rows[0].updated_at).getTime();
+      expect(createdAt2).toBe(createdAt1);
+      expect(updatedAt2).toBeGreaterThan(updatedAt1);
 
       // Still exactly one row for (episode_id, canonical_topic_id).
       const count = await db.execute<{ count: string }>(

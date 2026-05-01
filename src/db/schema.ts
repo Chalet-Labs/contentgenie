@@ -576,6 +576,7 @@ export const episodeCanonicalTopics = pgTable(
       .notNull()
       .default(false),
     createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
   (table) => [
     uniqueIndex("ect_episode_canonical_uidx").on(

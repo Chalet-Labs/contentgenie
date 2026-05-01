@@ -54,11 +54,13 @@ The column is `NOT NULL DEFAULT false` because:
 - Allowing NULL would force dashboard queries to handle a third state ("unknown") that has no semantic meaning post-migration.
 - The default also covers the small population of pre-migration rows without an explicit backfill.
 
-### 3. Time-window queries filter on `episode_canonical_topics.created_at`
+### 3. Time-window queries filter on `episode_canonical_topics.updated_at` (advances on conflict)
 
 Three rolling windows: `24h` (last 24 hours), `7d` (default), `30d` — each computed as `start = now − N×24h, end = now`. Selector is server-rendered via nuqs `parseAsStringLiteral` per the existing `src/lib/search-params/admin-episodes.ts` pattern; the page re-renders on each link click, no client-side state.
 
-`created_at` not `episode.processedAt`: the junction's own timestamp is the resolution event we care about, and merges that reparent rows preserve `created_at` of the original resolution. Filtering on `episodes.processedAt` would entangle the metric with episode-summary scheduling.
+The junction is the metric source, but `insertJunction` uses `ON CONFLICT (episode_id, canonical_topic_id) DO UPDATE` so the latest resolution outcome wins for the metric fields on retries and recovery-path re-resolutions. To make those re-resolutions visible in the rolling-window cards, the junction carries an `updated_at` column that advances to `now()` on every conflict (alongside the `created_at` that records the first write). Time-window queries filter on `updated_at` — a row's metrics are counted in the window where they were last observed, not the window of the original write. Without this, a pair first inserted outside the window and re-resolved inside it would have its metric fields updated but the row filtered out by `created_at`.
+
+We use junction timestamps (not `episodes.processedAt`): the junction's own timestamps describe the resolution event we care about, and merges that reparent rows preserve them. Filtering on `episodes.processedAt` would entangle the metric with episode-summary scheduling.
 
 ### 4. Dashboard layer uses simple UI primitives + `<Progress>`, not Recharts
 
@@ -108,7 +110,7 @@ The query functions follow the `src/lib/admin/overview-queries.ts` pattern: `db.
 ### Trade-offs accepted
 
 - We do not persist `candidates_considered` to the junction in v1, even though ADR-045 §6 logs it. The dashboard surfaces only `match_method`, similarity, and `version_token_forced_disambig` — the three the issue explicitly asks for. If B4 wants a kNN-survivor-pool histogram, it adds the column then.
-- We do not add an index on `created_at` in v1. The junction is small (one row per resolved topic per episode, ~hundreds-to-thousands per day at steady state) and PostgreSQL's seq-scan over a date range under 30 days is sub-second at this scale. If/when the table crosses ~1M rows, B4 (or its follow-up) adds `CREATE INDEX ect_created_at_idx ON episode_canonical_topics (created_at)`.
+- We do not add an index on `updated_at` in v1. The junction is small (one row per resolved topic per episode, ~hundreds-to-thousands per day at steady state) and PostgreSQL's seq-scan over a date range under 30 days is sub-second at this scale. If/when the table crosses ~1M rows, B4 (or its follow-up) adds `CREATE INDEX ect_updated_at_idx ON episode_canonical_topics (updated_at)`.
 
 ## References
 

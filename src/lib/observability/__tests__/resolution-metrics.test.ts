@@ -18,6 +18,7 @@ vi.mock("@/db/schema", () => ({
     similarityToTopMatch: "similarity_to_top_match",
     versionTokenForcedDisambig: "version_token_forced_disambig",
     createdAt: "created_at",
+    updatedAt: "updated_at",
   },
 }));
 
@@ -116,13 +117,13 @@ describe("getMatchMethodHistogram", () => {
     expect(mockLte).not.toHaveBeenCalled();
   });
 
-  it("passes gte + lte on createdAt when window provided", async () => {
+  it("passes gte + lte on updatedAt when window provided", async () => {
     mockSelect.mockReturnValue(makeChain([]));
     const start = new Date("2026-01-01");
     const end = new Date("2026-01-07");
     await getMatchMethodHistogram({ start, end });
-    expect(mockGte).toHaveBeenCalledWith("created_at", start);
-    expect(mockLte).toHaveBeenCalledWith("created_at", end);
+    expect(mockGte).toHaveBeenCalledWith("updated_at", start);
+    expect(mockLte).toHaveBeenCalledWith("updated_at", end);
     expect(mockAnd).toHaveBeenCalled();
   });
 
@@ -229,13 +230,13 @@ describe("getDisambigForcedCount", () => {
     expect(result.versionTokenForced).toBe(0);
   });
 
-  it("passes gte + lte on createdAt when window provided", async () => {
+  it("passes gte + lte on updatedAt when window provided", async () => {
     mockSelect.mockReturnValue(makeChain([{ total: 5, forced: 2 }]));
     const start = new Date("2026-01-01");
     const end = new Date("2026-01-07");
     await getDisambigForcedCount({ start, end });
-    expect(mockGte).toHaveBeenCalledWith("created_at", start);
-    expect(mockLte).toHaveBeenCalledWith("created_at", end);
+    expect(mockGte).toHaveBeenCalledWith("updated_at", start);
+    expect(mockLte).toHaveBeenCalledWith("updated_at", end);
     expect(mockAnd).toHaveBeenCalled();
   });
 

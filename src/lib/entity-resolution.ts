@@ -294,9 +294,10 @@ export async function insertJunction(
   // same episode references the same canonical twice (e.g. two normalized
   // topics that resolve to the same canonical via different paths, or a
   // recovery-path retry). On collision the latest resolution outcome wins
-  // for the metric fields. canonical_topic_id and episode_id are part of
-  // the PK so they cannot change. Last-write-wins matches observability
-  // expectations for retries and recovery-path re-resolutions (ADR-047).
+  // for the metric fields and `updated_at` advances to now() so the rolling-
+  // window observability cards filter on the actual observation time, not
+  // the original first-write time. canonical_topic_id and episode_id are
+  // part of the PK so they cannot change (ADR-047).
   await tx.execute(
     sql`INSERT INTO episode_canonical_topics
          (episode_id, canonical_topic_id, match_method, similarity_to_top_match, coverage_score, version_token_forced_disambig)
@@ -305,7 +306,8 @@ export async function insertJunction(
          match_method                  = EXCLUDED.match_method,
          similarity_to_top_match       = EXCLUDED.similarity_to_top_match,
          coverage_score                = EXCLUDED.coverage_score,
-         version_token_forced_disambig = EXCLUDED.version_token_forced_disambig`,
+         version_token_forced_disambig = EXCLUDED.version_token_forced_disambig,
+         updated_at                    = now()`,
   );
 }
 

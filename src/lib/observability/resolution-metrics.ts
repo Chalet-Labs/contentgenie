@@ -70,9 +70,13 @@ export function windowFromKey(key: WindowKey): { start: Date; end: Date } {
 
 function buildTimeFilter(window?: { start: Date; end: Date }) {
   if (!window) return undefined;
+  // Filter on `updatedAt` (advances to now() on every ON CONFLICT DO UPDATE
+  // in `insertJunction`) so retries and recovery-path re-resolutions land
+  // in the window where they were observed, not the window of the first
+  // write — see ADR-047 §"Schema" and entity-resolution.ts insertJunction.
   return and(
-    gte(episodeCanonicalTopics.createdAt, window.start),
-    lte(episodeCanonicalTopics.createdAt, window.end),
+    gte(episodeCanonicalTopics.updatedAt, window.start),
+    lte(episodeCanonicalTopics.updatedAt, window.end),
   );
 }
 
