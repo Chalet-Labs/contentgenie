@@ -45,7 +45,6 @@ describe.skipIf(!process.env.DATABASE_URL)(
           summary: "Regression fixture for issue #419",
           ongoing: false,
           relevance: 0.5,
-          episodeCount: 0,
           identityEmbedding: EMBEDDING,
           contextEmbedding: EMBEDDING,
         })

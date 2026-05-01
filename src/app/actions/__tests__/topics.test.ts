@@ -81,7 +81,6 @@ describe("adminMergeCanonicals", () => {
       episodesReassigned: 3,
       conflictsDropped: 1,
       aliasesCopied: 2,
-      newWinnerEpisodeCount: 7,
     };
     mockMergeCanonicals.mockResolvedValue(mergeResult);
 

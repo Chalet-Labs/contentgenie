@@ -1,34 +1,46 @@
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { canonicalTopics } from "@/db/schema";
+import { canonicalTopics, episodeCanonicalTopics } from "@/db/schema";
 
 export const MAX_MERGE_DEPTH = 16;
 
-export type CanonicalTopicSummary = Pick<
+type BaseTopicColumns = Pick<
   typeof canonicalTopics.$inferSelect,
-  | "id"
-  | "label"
-  | "kind"
-  | "status"
-  | "summary"
-  | "episodeCount"
-  | "mergedIntoId"
+  "id" | "label" | "kind" | "status" | "summary" | "mergedIntoId"
 >;
+
+export type CanonicalTopicSummary = BaseTopicColumns & {
+  episodeCount: number;
+};
 
 export type WalkerError = "cycle" | "depth" | "null_pointer" | "broken_chain";
 export type WalkerResult =
   | { terminal: CanonicalTopicSummary }
   | { error: WalkerError };
 
-export const TOPIC_DISPLAY_COLUMNS = {
-  id: true,
-  label: true,
-  kind: true,
-  status: true,
-  summary: true,
-  episodeCount: true,
-  mergedIntoId: true,
+const topicSummarySelector = {
+  id: canonicalTopics.id,
+  label: canonicalTopics.label,
+  kind: canonicalTopics.kind,
+  status: canonicalTopics.status,
+  summary: canonicalTopics.summary,
+  episodeCount:
+    sql<number>`(SELECT COUNT(*)::int FROM ${episodeCanonicalTopics} ect WHERE ect.canonical_topic_id = ${canonicalTopics}.${canonicalTopics.id})`.as(
+      "episode_count",
+    ),
+  mergedIntoId: canonicalTopics.mergedIntoId,
 } as const;
+
+export async function findTopicSummary(
+  id: number,
+): Promise<CanonicalTopicSummary | null> {
+  const [row] = await db
+    .select(topicSummarySelector)
+    .from(canonicalTopics)
+    .where(eq(canonicalTopics.id, id))
+    .limit(1);
+  return row ?? null;
+}
 
 export async function walkMergedChain(
   start: CanonicalTopicSummary,
@@ -66,10 +78,7 @@ export async function walkMergedChain(
       return { error: "null_pointer" };
     }
 
-    const next = await db.query.canonicalTopics.findFirst({
-      columns: TOPIC_DISPLAY_COLUMNS,
-      where: eq(canonicalTopics.id, nextId),
-    });
+    const next = await findTopicSummary(nextId);
 
     if (!next) {
       console.error("[topic] merge chain broken — target not found", {

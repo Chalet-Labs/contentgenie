@@ -15,15 +15,28 @@ vi.mock("next/navigation", () => ({
   permanentRedirect: (url: string) => mockPermanentRedirect(url),
 }));
 
+// findTopicSummary calls `db.select(...).from(canonicalTopics).where(...).limit(1)`,
+// which we model as a thenable chain whose terminal `.limit()` resolves to an
+// array of zero or one row. mockFindFirst feeds the next "row" (or null/undefined)
+// to that array on each invocation — preserving the queue semantics the existing
+// tests rely on.
 const mockFindFirst = vi.fn();
+
+function buildSelectChain() {
+  const chain = {
+    from: () => chain,
+    where: () => chain,
+    limit: async () => {
+      const row = await mockFindFirst();
+      return row == null ? [] : [row];
+    },
+  };
+  return chain;
+}
 
 vi.mock("@/db", () => ({
   db: {
-    query: {
-      canonicalTopics: {
-        findFirst: (...args: unknown[]) => mockFindFirst(...args),
-      },
-    },
+    select: () => buildSelectChain(),
   },
 }));
 

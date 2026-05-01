@@ -3,6 +3,7 @@ import { db } from "@/db";
 import {
   canonicalTopics,
   canonicalTopicAdminLog,
+  episodeCanonicalTopics,
   episodes,
   type CanonicalTopicKind,
   type CanonicalTopicStatus,
@@ -72,7 +73,10 @@ export async function getCanonicalTopicsListQuery(
         label: canonicalTopics.label,
         kind: canonicalTopics.kind,
         status: canonicalTopics.status,
-        episodeCount: canonicalTopics.episodeCount,
+        episodeCount:
+          sql<number>`(SELECT COUNT(*)::int FROM ${episodeCanonicalTopics} ect WHERE ect.canonical_topic_id = ${canonicalTopics}.${canonicalTopics.id})`.as(
+            "episode_count",
+          ),
         lastSeen: canonicalTopics.lastSeen,
         mergedIntoId: canonicalTopics.mergedIntoId,
       })
