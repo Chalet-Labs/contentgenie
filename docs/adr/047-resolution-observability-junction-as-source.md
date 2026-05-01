@@ -24,7 +24,7 @@ Two structural questions for the dashboard layer:
 
 - `match_method` (`'auto' | 'llm_disambig' | 'new'`) — drives the match-method histogram.
 - `similarity_to_top_match` (real, nullable) — drives the similarity histogram.
-- `created_at` (timestamp) — drives the time-window filter.
+- `updated_at` (timestamp, advances on `ON CONFLICT DO UPDATE`) — drives the time-window filter so retries and recovery-path re-resolutions land in the window where they were observed. `created_at` is preserved as the first-write timestamp for audit. See §3 for the rollout/backfill details.
 
 Adding a parallel `resolution_metrics` table would:
 
