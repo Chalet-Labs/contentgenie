@@ -103,18 +103,19 @@ export async function getMatchMethodHistogram(window?: {
 
 /**
  * Returns the similarity-to-top-match histogram in buckets of `bucketSize`
- * (default 0.05), covering the range 0.00–0.95 (20 buckets).
- * Excludes rows where `similarity_to_top_match IS NULL` (those are
- * pure `match_method='new'` resolutions with no comparison performed).
- * Missing buckets are zero-filled so the dashboard always renders 20 bars.
- * Similarity = 1.0 (exact-lookup hits) is capped into the 0.95 bucket via `least()`.
+ * (default 0.05). Excludes rows where `similarity_to_top_match IS NULL` (those
+ * are pure `match_method='new'` resolutions with no comparison performed).
+ * Missing buckets are zero-filled so the dashboard always renders a full set.
+ * Similarity = 1.0 (exact-lookup hits) is capped into the last bucket via `least()`.
  */
 export async function getSimilarityHistogram(
   window?: { start: Date; end: Date },
   bucketSize: number = DEFAULT_BUCKET_SIZE,
 ): Promise<SimilarityBucket[]> {
   const col = episodeCanonicalTopics.similarityToTopMatch;
-  const bucketExpr = sql<number>`least(floor(${col} / ${bucketSize}) * ${bucketSize}, 0.95)`;
+  const numBuckets = Math.ceil(1 / bucketSize);
+  const maxBucket = (numBuckets - 1) * bucketSize;
+  const bucketExpr = sql<number>`least(floor(${col} / ${bucketSize}) * ${bucketSize}, ${maxBucket})`;
 
   const nullFilter = isNotNull(col);
   const timeFilter = buildTimeFilter(window);
@@ -127,12 +128,8 @@ export async function getSimilarityHistogram(
     })
     .from(episodeCanonicalTopics)
     .where(whereClause)
-    .groupBy(
-      sql<number>`least(floor(${col} / ${bucketSize}) * ${bucketSize}, 0.95)`,
-    )
-    .orderBy(
-      sql<number>`least(floor(${col} / ${bucketSize}) * ${bucketSize}, 0.95)`,
-    );
+    .groupBy(bucketExpr)
+    .orderBy(bucketExpr);
 
   const bucketMap = new Map<number, number>();
   for (const row of rows) {
@@ -140,7 +137,6 @@ export async function getSimilarityHistogram(
     bucketMap.set(key, Number(row.count));
   }
 
-  const numBuckets = Math.round(1 / bucketSize);
   const result: SimilarityBucket[] = [];
   for (let i = 0; i < numBuckets; i++) {
     const bucket = Math.round(i * bucketSize * 1000) / 1000;
@@ -159,16 +155,17 @@ export async function getDisambigForcedCount(window?: {
 }): Promise<DisambigForcedCount> {
   const timeFilter = buildTimeFilter(window);
 
-  const result = await db.execute(sql`
-    SELECT
-      count(*)::int AS total,
-      count(*) FILTER (WHERE version_token_forced_disambig)::int AS forced
-    FROM episode_canonical_topics
-    ${timeFilter ? sql`WHERE created_at >= ${window!.start} AND created_at <= ${window!.end}` : sql``}
-  `);
-  const { total, forced } = result.rows[0] as {
-    total: number;
-    forced: number;
-  };
-  return { total: Number(total), versionTokenForced: Number(forced) };
+  const result = await db
+    .select({
+      total: count().mapWith(Number),
+      forced:
+        sql<number>`count(*) FILTER (WHERE ${episodeCanonicalTopics.versionTokenForcedDisambig})`.mapWith(
+          Number,
+        ),
+    })
+    .from(episodeCanonicalTopics)
+    .where(timeFilter);
+
+  const row = result[0];
+  return { total: row?.total ?? 0, versionTokenForced: row?.forced ?? 0 };
 }

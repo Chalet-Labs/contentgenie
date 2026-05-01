@@ -26,7 +26,9 @@ const mockGte = vi.fn((col, val) => ({ gte: [col, val] }));
 const mockLte = vi.fn((col, val) => ({ lte: [col, val] }));
 const mockEq = vi.fn((col, val) => ({ eq: [col, val] }));
 const mockIsNotNull = vi.fn((col) => ({ isNotNull: col }));
-const mockCount = vi.fn(() => "COUNT(*)");
+const mockCount = vi.fn(() => ({
+  mapWith: (_fn: (v: unknown) => unknown) => "COUNT(*)",
+}));
 
 vi.mock("drizzle-orm", () => ({
   count: (...args: unknown[]) => mockCount(...(args as [])),
@@ -203,21 +205,35 @@ describe("getDisambigForcedCount", () => {
   });
 
   it("returns { versionTokenForced, total } from a single aggregate query", async () => {
-    mockExecute.mockResolvedValue({
-      rows: [{ total: 100, forced: 12 }],
-    });
+    mockSelect.mockReturnValue(makeChain([{ total: 100, forced: 12 }]));
     const result = await getDisambigForcedCount();
     expect(result.total).toBe(100);
     expect(result.versionTokenForced).toBe(12);
+    expect(mockSelect).toHaveBeenCalled();
   });
 
   it("returns zeros when no rows in the junction", async () => {
-    mockExecute.mockResolvedValue({
-      rows: [{ total: 0, forced: 0 }],
-    });
+    mockSelect.mockReturnValue(makeChain([{ total: 0, forced: 0 }]));
     const result = await getDisambigForcedCount();
     expect(result.total).toBe(0);
     expect(result.versionTokenForced).toBe(0);
+  });
+
+  it("passes gte + lte on createdAt when window provided", async () => {
+    mockSelect.mockReturnValue(makeChain([{ total: 5, forced: 2 }]));
+    const start = new Date("2026-01-01");
+    const end = new Date("2026-01-07");
+    await getDisambigForcedCount({ start, end });
+    expect(mockGte).toHaveBeenCalledWith("created_at", start);
+    expect(mockLte).toHaveBeenCalledWith("created_at", end);
+    expect(mockAnd).toHaveBeenCalled();
+  });
+
+  it("omits where clause when no window provided", async () => {
+    mockSelect.mockReturnValue(makeChain([{ total: 0, forced: 0 }]));
+    await getDisambigForcedCount();
+    expect(mockGte).not.toHaveBeenCalled();
+    expect(mockLte).not.toHaveBeenCalled();
   });
 });
 

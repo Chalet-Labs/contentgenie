@@ -53,7 +53,7 @@ export type ResolveTopicResult =
   | (ResolveTopicResultBase & {
       matchMethod: "auto";
       similarityToTopMatch: number;
-      versionTokenForcedDisambig: false;
+      versionTokenForcedDisambig: boolean;
     })
   | (ResolveTopicResultBase & {
       matchMethod: "llm_disambig";
@@ -557,14 +557,14 @@ async function runTx2(
       canonicalId: exact.id,
       matchMethod: "auto",
       similarity: EXACT_MATCH_SIMILARITY,
-      versionTokenForcedDisambig: false,
+      versionTokenForcedDisambig,
     });
     return {
       canonicalId: exact.id,
       matchMethod: "auto",
       similarityToTopMatch: EXACT_MATCH_SIMILARITY,
       aliasesAdded,
-      versionTokenForcedDisambig: false,
+      versionTokenForcedDisambig,
       candidatesConsidered: candidates.length,
     };
   }
@@ -625,14 +625,14 @@ async function runTx2(
     canonicalId: recovered.id,
     matchMethod: "auto",
     similarity: EXACT_MATCH_SIMILARITY,
-    versionTokenForcedDisambig: false,
+    versionTokenForcedDisambig,
   });
   return {
     canonicalId: recovered.id,
     matchMethod: "auto",
     similarityToTopMatch: EXACT_MATCH_SIMILARITY,
     aliasesAdded,
-    versionTokenForcedDisambig: false,
+    versionTokenForcedDisambig,
     candidatesConsidered: candidates.length,
   };
 }
