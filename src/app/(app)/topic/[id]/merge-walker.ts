@@ -1,6 +1,7 @@
-import { eq, sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { canonicalTopics, episodeCanonicalTopics } from "@/db/schema";
+import { canonicalTopics } from "@/db/schema";
+import { canonicalTopicEpisodeCount } from "@/lib/admin/canonical-topic-episode-count";
 
 export const MAX_MERGE_DEPTH = 16;
 
@@ -24,10 +25,7 @@ const topicSummarySelector = {
   kind: canonicalTopics.kind,
   status: canonicalTopics.status,
   summary: canonicalTopics.summary,
-  episodeCount:
-    sql<number>`(SELECT COUNT(*)::int FROM ${episodeCanonicalTopics} ect WHERE ect.canonical_topic_id = ${canonicalTopics}.${canonicalTopics.id})`.as(
-      "episode_count",
-    ),
+  episodeCount: canonicalTopicEpisodeCount(),
   mergedIntoId: canonicalTopics.mergedIntoId,
 } as const;
 

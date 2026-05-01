@@ -464,8 +464,8 @@ export function mergeCanonicals(
     );
     const episodesReassigned = updateJunctionResult.rows.length;
 
-    // 5. Atomic biconditional UPDATE: sets status='merged', merged_into_id=$winnerId
-    //    in one statement. Single statement satisfies the ct_merged_biconditional CHECK.
+    // 5. Flip status='merged' + merged_into_id=$winnerId atomically. Pairing
+    //    them in one statement is what satisfies ct_merged_biconditional.
     await tx.execute(
       sql`UPDATE canonical_topics
              SET status = 'merged', merged_into_id = ${winnerId}

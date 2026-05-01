@@ -3,11 +3,11 @@ import { db } from "@/db";
 import {
   canonicalTopics,
   canonicalTopicAdminLog,
-  episodeCanonicalTopics,
   episodes,
   type CanonicalTopicKind,
   type CanonicalTopicStatus,
 } from "@/db/schema";
+import { canonicalTopicEpisodeCount } from "@/lib/admin/canonical-topic-episode-count";
 
 export const TOPICS_PAGE_SIZE = 50;
 export const AUDIT_LOG_PAGE_SIZE = 50;
@@ -73,10 +73,7 @@ export async function getCanonicalTopicsListQuery(
         label: canonicalTopics.label,
         kind: canonicalTopics.kind,
         status: canonicalTopics.status,
-        episodeCount:
-          sql<number>`(SELECT COUNT(*)::int FROM ${episodeCanonicalTopics} ect WHERE ect.canonical_topic_id = ${canonicalTopics}.${canonicalTopics.id})`.as(
-            "episode_count",
-          ),
+        episodeCount: canonicalTopicEpisodeCount(),
         lastSeen: canonicalTopics.lastSeen,
         mergedIntoId: canonicalTopics.mergedIntoId,
       })
