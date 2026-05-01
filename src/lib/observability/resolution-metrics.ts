@@ -124,8 +124,8 @@ export async function getSimilarityHistogram(
     })
     .from(episodeCanonicalTopics)
     .where(whereClause)
-    .groupBy(bucketExpr)
-    .orderBy(bucketExpr);
+    .groupBy(sql`1`)
+    .orderBy(sql`1`);
 
   const bucketMap = new Map<number, number>();
   for (const row of rows) {
