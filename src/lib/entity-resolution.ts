@@ -290,14 +290,22 @@ export async function insertJunction(
     versionTokenForcedDisambig: boolean;
   },
 ): Promise<void> {
-  // ON CONFLICT DO NOTHING guards against duplicate-topic crashes when the
+  // ON CONFLICT DO UPDATE guards against duplicate-topic crashes when the
   // same episode references the same canonical twice (e.g. two normalized
-  // topics that resolve to the same canonical via different paths).
+  // topics that resolve to the same canonical via different paths, or a
+  // recovery-path retry). On collision the latest resolution outcome wins
+  // for the metric fields. canonical_topic_id and episode_id are part of
+  // the PK so they cannot change. Last-write-wins matches observability
+  // expectations for retries and recovery-path re-resolutions (ADR-047).
   await tx.execute(
     sql`INSERT INTO episode_canonical_topics
          (episode_id, canonical_topic_id, match_method, similarity_to_top_match, coverage_score, version_token_forced_disambig)
        VALUES (${args.episodeId}, ${args.canonicalId}, ${args.matchMethod}, ${args.similarity}, ${args.coverageScore}, ${args.versionTokenForcedDisambig})
-       ON CONFLICT (episode_id, canonical_topic_id) DO NOTHING`,
+       ON CONFLICT (episode_id, canonical_topic_id) DO UPDATE SET
+         match_method                  = EXCLUDED.match_method,
+         similarity_to_top_match       = EXCLUDED.similarity_to_top_match,
+         coverage_score                = EXCLUDED.coverage_score,
+         version_token_forced_disambig = EXCLUDED.version_token_forced_disambig`,
   );
 }
 
