@@ -14,8 +14,8 @@ import { canonicalTopics, episodeCanonicalTopics } from "@/db/schema";
  * with no table qualifier, so the outer reference is written explicitly as
  * `${canonicalTopics}.${canonicalTopics.id}` → `"canonical_topics"."id"`.
  */
-export function canonicalTopicEpisodeCount(): SQL.Aliased<number> {
-  return sql<number>`(SELECT COUNT(*)::int FROM ${episodeCanonicalTopics} ect WHERE ect.canonical_topic_id = ${canonicalTopics}.${canonicalTopics.id})`.as(
-    "episode_count",
+export function canonicalTopicEpisodeCount(): SQL<number> {
+  return sql<number>`(SELECT count(*) FROM ${episodeCanonicalTopics} ect WHERE ect.canonical_topic_id = ${canonicalTopics}.${canonicalTopics.id})`.mapWith(
+    Number,
   );
 }
