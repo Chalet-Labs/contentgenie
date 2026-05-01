@@ -60,12 +60,12 @@ Three rolling windows: `24h` (last 24 hours), `7d` (default), `30d` — each com
 
 `created_at` not `episode.processedAt`: the junction's own timestamp is the resolution event we care about, and merges that reparent rows preserve `created_at` of the original resolution. Filtering on `episodes.processedAt` would entangle the metric with episode-summary scheduling.
 
-### 4. Dashboard layer uses Tailwind primitives + `<Progress>`, not Recharts
+### 4. Dashboard layer uses simple UI primitives + `<Progress>`, not Recharts
 
-The existing repo has `src/components/ui/progress.tsx` but no `chart.tsx`. The "lite" scope of #387 — three cards with simple histograms — does not justify the Recharts bundle (~80KB gzipped) or the shadcn `chart` install. Implementation:
+The existing repo has `src/components/ui/progress.tsx` but no `chart.tsx`. The "lite" scope of #387 — three cards with simple histograms — does not justify the Recharts bundle (~80KB gzipped) or the shadcn `chart` install. Implementation sticks to existing UI primitives, with `<Progress>` used anywhere a bar visualization is needed:
 
 - Match-method card: three percentages with a `<Progress>` bar each (auto / llm_disambig / new).
-- Similarity histogram: 20 buckets (0.00–1.00 in 0.05 steps) rendered as a horizontal bar list with Tailwind `w-[<percent>%]` divs. Buckets with zero count render at `w-0`.
+- Similarity histogram: 20 buckets in 0.05 steps, displayed as a horizontal row list using the shared `<Progress>` component. Buckets are labeled by their start value (`0.00`, `0.05`, …, `0.95`), with exact `1.00` values folded into the `0.95` bucket.
 - Version-token-forced card: `forced / total` ratio rendered as a single percentage with a `<Progress>` bar.
 
 B4 (#391) brings trends-over-time and may justify Recharts then; this ADR is silent on B4.

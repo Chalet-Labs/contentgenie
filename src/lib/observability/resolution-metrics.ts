@@ -129,14 +129,14 @@ export async function getSimilarityHistogram(
 
   const bucketMap = new Map<number, number>();
   for (const row of rows) {
-    const key = Math.round(row.bucket * 1000) / 1000;
-    bucketMap.set(key, Number(row.count));
+    const idx = Math.round(row.bucket / bucketSize);
+    bucketMap.set(idx, Number(row.count));
   }
 
   const result: SimilarityBucket[] = [];
   for (let i = 0; i < numBuckets; i++) {
-    const bucket = Math.round(i * bucketSize * 1000) / 1000;
-    result.push({ bucket, count: bucketMap.get(bucket) ?? 0 });
+    const bucket = Math.round(i * bucketSize * 1e10) / 1e10;
+    result.push({ bucket, count: bucketMap.get(i) ?? 0 });
   }
   return result;
 }
