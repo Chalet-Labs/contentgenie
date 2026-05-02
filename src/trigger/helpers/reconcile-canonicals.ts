@@ -175,7 +175,7 @@ function coerceEmbedding(raw: unknown): number[] | null {
  *
  * Returns `RawCanonicalRow[]` where `embedding` is `null` for rows whose
  * `identity_embedding` failed the finite-value guard in `coerceEmbedding`.
- * Callers are responsible for filtering and incrementing `malformedEmbeddingCount`.
+ * Callers are responsible for calling `accum.malformedEmbeddingDropped()` for each null-embedding row.
  */
 async function fetchActiveCanonicals(
   database: ReconcileDeps["db"],
@@ -203,8 +203,9 @@ async function fetchActiveCanonicals(
 }
 
 /**
- * Phase 6 helper — count of episodes referencing a canonical topic via the
- * junction table. The same source of truth as the read-side `episode_count`
+ * Episode-count helper — count of episodes referencing a canonical topic via
+ * the junction table. Called from Phase 5 (pre-merge snapshot).
+ * Same source of truth as the read-side `episode_count`
  * everywhere else in the app (PR #424 / ADR-050 §4).
  */
 async function countEpisodesForCanonical(
@@ -272,11 +273,9 @@ async function pickWinner(
 }
 
 interface VerifyLosersResult {
-  verifiedLoserIds: number[];
+  verifiedLoserIds: readonly number[];
   pairwiseVerifyThrew: number;
   pairwiseVerifyRejected: number;
-  /** True iff ≥1 pair returned `same_entity=false`. Drives cluster-level rejection. */
-  hadModelReject: boolean;
 }
 
 /** Phase 4 — per-pair partial-accept verify (ADR-050 §2). Returns counts for the orchestrator to route. */
@@ -289,7 +288,6 @@ async function verifyLosers(
   const verifiedLoserIds: number[] = [];
   let pairwiseVerifyThrew = 0;
   let pairwiseVerifyRejected = 0;
-  let hadModelReject = false;
 
   for (const loserId of loserIds) {
     const loser = rowsById.get(loserId);
@@ -297,6 +295,10 @@ async function verifyLosers(
       // Defensive: cluster id has no fetched row (invariant violation).
       // Count on the throws side — it's an infra signal, not a model verdict.
       pairwiseVerifyThrew++;
+      deps.logger.warn("reconcile_pairwise_verify_loser_row_missing", {
+        winnerId: winner.id,
+        loserId,
+      });
       continue;
     }
     try {
@@ -312,7 +314,6 @@ async function verifyLosers(
       if (verifyParsed.same_entity) {
         verifiedLoserIds.push(loserId);
       } else {
-        hadModelReject = true;
         pairwiseVerifyRejected++;
       }
     } catch (err) {
@@ -326,12 +327,7 @@ async function verifyLosers(
     }
   }
 
-  return {
-    verifiedLoserIds,
-    pairwiseVerifyThrew,
-    pairwiseVerifyRejected,
-    hadModelReject,
-  };
+  return { verifiedLoserIds, pairwiseVerifyThrew, pairwiseVerifyRejected };
 }
 
 /** Mutable cross-cluster state owned by the orchestrator and threaded through per-cluster helpers. */
@@ -426,10 +422,10 @@ function membersOf(
 /**
  * Resolve-forward: if any verified loser was itself a winner in a prior
  * cluster, include its prior absorptions so we never produce chains
- * (e.g. 3→2→1 instead of direct 3→1 and 2→1).
+ * (e.g. direct 3→1 and 2→1, never the chain 3→2→1).
  */
 function resolveTransitiveLosers(
-  verifiedLosers: number[],
+  verifiedLosers: readonly number[],
   affectedWinners: Set<number>,
   winnerToAbsorbedLosers: Map<number, number[]>,
   mergedLoserIds: Set<number>,
@@ -477,14 +473,26 @@ async function runCluster(
     }
     clusterWinnerId = winnerId;
     const winner = rowsById.get(winnerId);
-    if (!winner) return;
+    if (!winner) {
+      // Invariant: pickWinner returned an id absent from rowsById — treat as failure.
+      accum.clusterFailed();
+      deps.logger.warn("reconcile_cluster_winner_row_missing", {
+        clusterIndex,
+        winnerId,
+        memberIds: cluster,
+      });
+      return;
+    }
 
     currentPhase = "pairwise_verify";
     const losers = cluster.filter((id) => id !== winnerId);
     const verify = await verifyLosers(deps, winner, losers, rowsById);
     accum.pairwiseVerifyThrew(verify.pairwiseVerifyThrew);
     accum.pairwiseVerifyRejected(verify.pairwiseVerifyRejected);
-    if (verify.hadModelReject && verify.verifiedLoserIds.length === 0) {
+    if (
+      verify.pairwiseVerifyRejected > 0 &&
+      verify.verifiedLoserIds.length === 0
+    ) {
       accum.clusterRejectedByPairwise();
     }
 

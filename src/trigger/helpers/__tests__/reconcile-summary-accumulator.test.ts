@@ -5,22 +5,27 @@ import { describe, expect, it } from "vitest";
 import type { ReconcileSummary } from "@/trigger/helpers/reconcile-canonicals";
 import { ReconcileSummaryAccumulator } from "@/trigger/helpers/reconcile-summary-accumulator";
 
-const EXPECTED_KEYS: Array<keyof ReconcileSummary> = [
-  "clustersSeen",
-  "clustersFailed",
-  "clustersDeferred",
-  "malformedEmbeddingCount",
-  "clustersSkippedWinnerAlreadyMerged",
-  "mergesExecuted",
-  "mergesFailed",
-  "mergesRejectedByPairwise",
-  "mergesSkippedAlreadyMerged",
-  "pairwiseVerifyThrew",
-  "pairwiseVerifyRejected",
-  "dormancyTransitions",
-  "episodeCountDrift",
-  "durationMs",
-];
+// Record<keyof ReconcileSummary, true> forces exhaustiveness at compile time:
+// adding a field to ReconcileSummary without updating this object is a TS error.
+const EXPECTED_KEYS_RECORD: Record<keyof ReconcileSummary, true> = {
+  clustersSeen: true,
+  clustersFailed: true,
+  clustersDeferred: true,
+  malformedEmbeddingCount: true,
+  clustersSkippedWinnerAlreadyMerged: true,
+  mergesExecuted: true,
+  mergesFailed: true,
+  mergesRejectedByPairwise: true,
+  mergesSkippedAlreadyMerged: true,
+  pairwiseVerifyThrew: true,
+  pairwiseVerifyRejected: true,
+  dormancyTransitions: true,
+  episodeCountDrift: true,
+  durationMs: true,
+};
+const EXPECTED_KEYS = Object.keys(EXPECTED_KEYS_RECORD) as Array<
+  keyof ReconcileSummary
+>;
 
 describe("ReconcileSummaryAccumulator", () => {
   it("freeze(0) returns all-zero shape with every ReconcileSummary key present", () => {
@@ -32,11 +37,7 @@ describe("ReconcileSummaryAccumulator", () => {
 
     // All counters are zero; durationMs matches the argument.
     for (const key of EXPECTED_KEYS) {
-      if (key === "durationMs") {
-        expect(result[key]).toBe(0);
-      } else {
-        expect(result[key], `expected ${key} === 0`).toBe(0);
-      }
+      expect(result[key], `expected ${key} === 0`).toBe(0);
     }
   });
 
@@ -73,42 +74,48 @@ describe("ReconcileSummaryAccumulator", () => {
     }
   });
 
-  it("clusterDeferred(N) adds N, not 1", () => {
+  it.each<
+    [
+      string,
+      keyof ReconcileSummary,
+      (a: ReconcileSummaryAccumulator, n: number) => void,
+      number[],
+    ]
+  >([
+    [
+      "clusterDeferred",
+      "clustersDeferred",
+      (a, n) => a.clusterDeferred(n),
+      [7, 3],
+    ],
+    [
+      "dormancyTransitioned",
+      "dormancyTransitions",
+      (a, n) => a.dormancyTransitioned(n),
+      [5, 2],
+    ],
+    [
+      "pairwiseVerifyThrew",
+      "pairwiseVerifyThrew",
+      (a, n) => a.pairwiseVerifyThrew(n),
+      [3, 2],
+    ],
+    [
+      "pairwiseVerifyRejected",
+      "pairwiseVerifyRejected",
+      (a, n) => a.pairwiseVerifyRejected(n),
+      [4],
+    ],
+    [
+      "episodeCountDriftAdded",
+      "episodeCountDrift",
+      (a, n) => a.episodeCountDriftAdded(n),
+      [1, 2],
+    ],
+  ])("%s(N) accumulates across calls", (_, field, call, args) => {
     const accum = new ReconcileSummaryAccumulator();
-    accum.clusterDeferred(7);
-    expect(accum.freeze(0).clustersDeferred).toBe(7);
-
-    accum.clusterDeferred(3);
-    expect(accum.freeze(0).clustersDeferred).toBe(10);
-  });
-
-  it("dormancyTransitioned(N) adds N across multiple calls", () => {
-    const accum = new ReconcileSummaryAccumulator();
-    accum.dormancyTransitioned(5);
-    accum.dormancyTransitioned(2);
-    expect(accum.freeze(0).dormancyTransitions).toBe(7);
-  });
-
-  it("episodeCountDriftAdded(delta) accumulates across calls", () => {
-    const accum = new ReconcileSummaryAccumulator();
-    accum.episodeCountDriftAdded(1);
-    accum.episodeCountDriftAdded(2);
-    expect(accum.freeze(0).episodeCountDrift).toBe(3);
-  });
-
-  it("pairwiseVerifyThrew(N) adds N (not 1)", () => {
-    const accum = new ReconcileSummaryAccumulator();
-    accum.pairwiseVerifyThrew(3);
-    expect(accum.freeze(0).pairwiseVerifyThrew).toBe(3);
-
-    accum.pairwiseVerifyThrew(2);
-    expect(accum.freeze(0).pairwiseVerifyThrew).toBe(5);
-  });
-
-  it("pairwiseVerifyRejected(N) adds N (not 1)", () => {
-    const accum = new ReconcileSummaryAccumulator();
-    accum.pairwiseVerifyRejected(4);
-    expect(accum.freeze(0).pairwiseVerifyRejected).toBe(4);
+    for (const n of args) call(accum, n);
+    expect(accum.freeze(0)[field]).toBe(args.reduce((a, b) => a + b, 0));
   });
 
   it("freeze(durationMs) passes through durationMs and does not mutate internal state", () => {
