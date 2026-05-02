@@ -24,10 +24,10 @@ interface AliasesPanelProps {
 
 export function AliasesPanel({ canonicalId, aliases }: AliasesPanelProps) {
   const router = useRouter();
-  const [pending, setPending] = useState<number | null>(null);
+  const [pending, setPending] = useState<Set<number>>(new Set());
 
   async function handleRemove(aliasId: number) {
-    setPending(aliasId);
+    setPending((prev) => new Set(prev).add(aliasId));
     try {
       const result = await removeAlias({ canonicalId, aliasId });
       if (result.success) {
@@ -41,7 +41,11 @@ export function AliasesPanel({ canonicalId, aliases }: AliasesPanelProps) {
         `Remove failed: ${err instanceof Error ? err.message : "Unknown error"}`,
       );
     } finally {
-      setPending(null);
+      setPending((prev) => {
+        const next = new Set(prev);
+        next.delete(aliasId);
+        return next;
+      });
     }
   }
 
@@ -59,10 +63,10 @@ export function AliasesPanel({ canonicalId, aliases }: AliasesPanelProps) {
               <Button
                 size="sm"
                 variant="destructive"
-                disabled={pending === a.id}
-                aria-disabled={pending === a.id}
+                disabled={pending.has(a.id)}
+                aria-disabled={pending.has(a.id)}
               >
-                {pending === a.id ? "Removing…" : "Remove"}
+                {pending.has(a.id) ? "Removing…" : "Remove"}
               </Button>
             </AlertDialogTrigger>
             <AlertDialogContent>

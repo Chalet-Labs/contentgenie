@@ -178,30 +178,36 @@ describe("getCanonicalTopicsListQuery — new filters", () => {
   it("passes ongoing=true filter through where conditions", async () => {
     setupDoubleChain([]);
     await getCanonicalTopicsListQuery({ page: 1, ongoing: true });
-    // The eq mock should have been called with the ongoing column and true
     const { eq } = await import("drizzle-orm");
     const calls = (eq as ReturnType<typeof vi.fn>).mock.calls;
     const ongoingCall = calls.find(
-      ([col]) => col === "ct.ongoing" || String(col).includes("ongoing"),
+      ([col, val]) =>
+        (col === "ct.ongoing" || String(col).includes("ongoing")) &&
+        val === true,
     );
     expect(ongoingCall).toBeDefined();
   });
 
   it("passes episodeCountMin filter through where conditions", async () => {
     setupDoubleChain([]);
-    const chain = makeQueryChain([]);
-    mockSelect.mockReturnValue(chain);
-    // Should not throw; where must be called
+    const { canonicalTopicEpisodeCount } =
+      await import("@/lib/admin/canonical-topic-episode-count");
+    const helperMock = canonicalTopicEpisodeCount as ReturnType<typeof vi.fn>;
+    await getCanonicalTopicsListQuery({ page: 1 });
+    const baseline = helperMock.mock.calls.length;
     await getCanonicalTopicsListQuery({ page: 1, episodeCountMin: 5 });
-    expect(chain.where as ReturnType<typeof vi.fn>).toHaveBeenCalled();
+    expect(helperMock.mock.calls.length).toBeGreaterThanOrEqual(baseline + 1);
   });
 
   it("passes episodeCountMax filter through where conditions", async () => {
     setupDoubleChain([]);
-    const chain = makeQueryChain([]);
-    mockSelect.mockReturnValue(chain);
+    const { canonicalTopicEpisodeCount } =
+      await import("@/lib/admin/canonical-topic-episode-count");
+    const helperMock = canonicalTopicEpisodeCount as ReturnType<typeof vi.fn>;
+    await getCanonicalTopicsListQuery({ page: 1 });
+    const baseline = helperMock.mock.calls.length;
     await getCanonicalTopicsListQuery({ page: 1, episodeCountMax: 10 });
-    expect(chain.where as ReturnType<typeof vi.fn>).toHaveBeenCalled();
+    expect(helperMock.mock.calls.length).toBeGreaterThanOrEqual(baseline + 1);
   });
 
   it("both min and max compose correctly without throwing", async () => {
@@ -247,10 +253,15 @@ describe("getCanonicalTopicsListQuery — new filters", () => {
 
   it("ongoing=false is passed correctly", async () => {
     setupDoubleChain([]);
-    // Should not throw
-    await expect(
-      getCanonicalTopicsListQuery({ page: 1, ongoing: false }),
-    ).resolves.toBeDefined();
+    await getCanonicalTopicsListQuery({ page: 1, ongoing: false });
+    const { eq } = await import("drizzle-orm");
+    const calls = (eq as ReturnType<typeof vi.fn>).mock.calls;
+    const ongoingFalseCall = calls.find(
+      ([col, val]) =>
+        (col === "ct.ongoing" || String(col).includes("ongoing")) &&
+        val === false,
+    );
+    expect(ongoingFalseCall).toBeDefined();
   });
 });
 
@@ -304,6 +315,7 @@ describe("getLinkedEpisodesForTopicQuery", () => {
     mockSelect.mockReturnValue(chain);
     await getLinkedEpisodesForTopicQuery(5);
     expect(chain.from as ReturnType<typeof vi.fn>).toHaveBeenCalled();
+    expect(chain.innerJoin as ReturnType<typeof vi.fn>).toHaveBeenCalled();
     expect(chain.where as ReturnType<typeof vi.fn>).toHaveBeenCalled();
     expect(chain.orderBy as ReturnType<typeof vi.fn>).toHaveBeenCalled();
     expect(chain.limit as ReturnType<typeof vi.fn>).toHaveBeenCalled();

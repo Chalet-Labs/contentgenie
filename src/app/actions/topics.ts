@@ -52,7 +52,7 @@ const unmergeSchema = z.object({
 
 const topicsListSchema = z
   .object({
-    search: z.string().optional(),
+    search: z.string().trim().max(200).optional(),
     status: z.enum(canonicalTopicStatusEnum.enumValues).optional(),
     kind: z.enum(canonicalTopicKindEnum.enumValues).optional(),
     // T4: tri-state filter. "yes" | "no" | null → boolean in query layer.
@@ -61,6 +61,7 @@ const topicsListSchema = z
     episodeCountMax: z.number().int().min(0).optional(),
     page: z.number().int().min(1),
   })
+  .strict()
   .refine(
     (d) =>
       d.episodeCountMin === undefined ||
@@ -78,10 +79,12 @@ const unmergeSuggestionsSchema = z.object({
   loserId: z.number().int().positive(),
 });
 
-const removeAliasSchema = z.object({
-  canonicalId: z.number().int().positive(),
-  aliasId: z.number().int().positive(),
-});
+const removeAliasSchema = z
+  .object({
+    canonicalId: z.number().int().positive(),
+    aliasId: z.number().int().positive(),
+  })
+  .strict();
 
 const bulkMergeSchema = z
   .object({
@@ -91,6 +94,7 @@ const bulkMergeSchema = z
       .max(50, "Maximum 50 losers per bulk-merge call"),
     winnerId: z.number().int().positive(),
   })
+  .strict()
   .refine((d) => !d.loserIds.includes(d.winnerId), {
     message: "winnerId must not be in loserIds",
   })
@@ -98,9 +102,11 @@ const bulkMergeSchema = z
     message: "loserIds must not contain duplicates",
   });
 
-const fullResummarizeSchema = z.object({
-  episodeId: z.number().int().positive(),
-});
+const fullResummarizeSchema = z
+  .object({
+    episodeId: z.number().int().positive(),
+  })
+  .strict();
 
 // ---------------------------------------------------------------------------
 // Shared domain-error set
