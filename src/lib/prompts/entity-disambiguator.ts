@@ -11,7 +11,7 @@
  */
 
 import type { TopicKind } from "@/lib/openrouter";
-import { escapeXml } from "@/lib/prompts";
+import { escapeXml } from "@/lib/prompts/xml-escape";
 
 interface DisambiguatorInput {
   label: string;
