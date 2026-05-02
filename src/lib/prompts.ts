@@ -27,15 +27,7 @@ export function getSummarizationPrompt(
   categoryBanlist: readonly string[],
 ): string {
   const durationMinutes = duration > 0 ? Math.round(duration / 60) : null;
-  // Banlist entries are sourced from `episode_topics.topic`, which itself is
-  // derived from prior LLM output — i.e., untrusted. Filter through the same
-  // structural validator used for outgoing labels so a poisoned legacy entry
-  // (control chars, instruction-shaped text) can't be reflected back into the
-  // prompt and undo the prompt-injection defenses on new writes.
-  const sanitizedBanlist = categoryBanlist.filter(
-    (entry) => validateTopicLabel(entry, []).ok,
-  );
-  const banlistJson = JSON.stringify(sanitizedBanlist);
+  const banlistJson = sanitizeBanlistForPrompt(categoryBanlist);
 
   return `Analyze this podcast episode and provide a structured summary:
 
@@ -208,13 +200,30 @@ Rules:
 export const TOPIC_RANKING_SYSTEM_PROMPT =
   "You are comparing two podcast episode summaries to determine which one provides better coverage of a specific topic. Focus on depth, insight quality, and practical value — not overall episode quality.\n\nAlways respond in valid JSON format.";
 
-function escapeXml(s: string): string {
-  return s
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&apos;");
+// XML-escape for prompt payloads — server-side string interpolation into an
+// XML-shaped LLM prompt, NOT HTML/DOM output. Used to data-fence untrusted
+// input (transcripts, summaries, candidate labels) inside <tag>...</tag>
+// blocks so the LLM treats it as data rather than prompt instructions.
+const XML_ESCAPES: Record<string, string> = {
+  "&": "&amp;",
+  "<": "&lt;",
+  ">": "&gt;",
+  '"': "&quot;",
+  "'": "&apos;",
+};
+export function escapeXml(s: string): string {
+  return s.replace(/[&<>"']/g, (ch) => XML_ESCAPES[ch] ?? ch);
+}
+
+// Sanitises a banlist of forbidden topic labels and returns a JSON-stringified
+// array suitable for direct interpolation into a prompt template. Banlist
+// entries are LLM-derived (sourced from `episode_topics.topic`) and therefore
+// untrusted — `validateTopicLabel` rejects control-char or instruction-shaped
+// entries before they round-trip into a new prompt.
+export function sanitizeBanlistForPrompt(banlist: readonly string[]): string {
+  return JSON.stringify(
+    banlist.filter((entry) => validateTopicLabel(entry, []).ok),
+  );
 }
 
 export function getTopicComparisonPrompt(
