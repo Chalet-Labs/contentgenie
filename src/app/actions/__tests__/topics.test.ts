@@ -457,8 +457,15 @@ function makeSelectChain(rows: unknown[]) {
   return chain;
 }
 
-function makeUpdateChain() {
-  return { set: vi.fn(() => ({ where: vi.fn(() => Promise.resolve()) })) };
+function makeUpdateChain(returnedRows: unknown[] = [{ id: 1 }]) {
+  const whereResult = {
+    returning: vi.fn(() => Promise.resolve(returnedRows)),
+  };
+  return {
+    set: vi.fn(() => ({
+      where: vi.fn(() => whereResult),
+    })),
+  };
 }
 
 describe("triggerFullResummarize", () => {

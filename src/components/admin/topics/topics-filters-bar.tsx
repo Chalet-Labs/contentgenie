@@ -58,10 +58,15 @@ export function TopicsFiltersBar() {
 
   // Resync local state when the URL changes externally (back/forward navigation
   // or other router pushes that update episodeCountMin/Max without user input).
+  // Use value deps (strings) not the searchParams object — the object reference
+  // changes every render in some environments, which would reset user-typed
+  // values before the debounce fires.
+  const minParam = searchParams.get("episodeCountMin") ?? "";
+  const maxParam = searchParams.get("episodeCountMax") ?? "";
   useEffect(() => {
-    setMinEpisodes(searchParams.get("episodeCountMin") ?? "");
-    setMaxEpisodes(searchParams.get("episodeCountMax") ?? "");
-  }, [searchParams]);
+    setMinEpisodes(minParam);
+    setMaxEpisodes(maxParam);
+  }, [minParam, maxParam]);
 
   const update = useCallback<UpdateFn>(
     (key, value) => {
