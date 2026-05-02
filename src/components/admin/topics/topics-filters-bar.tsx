@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
-import { useCallback } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -20,6 +20,13 @@ export function TopicsFiltersBar() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
+  const [minEpisodes, setMinEpisodes] = useState(
+    searchParams.get("episodeCountMin") ?? "",
+  );
+  const [maxEpisodes, setMaxEpisodes] = useState(
+    searchParams.get("episodeCountMax") ?? "",
+  );
+
   const update = useCallback(
     (key: string, value: string | null) => {
       const params = new URLSearchParams(searchParams.toString());
@@ -33,6 +40,36 @@ export function TopicsFiltersBar() {
     },
     [router, pathname, searchParams],
   );
+
+  // Keep a stable ref so debounced effects always see the latest `update`.
+  const updateRef = useRef(update);
+  updateRef.current = update;
+
+  // Debounce min episodes (skip the initial mount trigger).
+  const minMounted = useRef(false);
+  useEffect(() => {
+    if (!minMounted.current) {
+      minMounted.current = true;
+      return;
+    }
+    const timer = setTimeout(() => {
+      updateRef.current("episodeCountMin", minEpisodes || null);
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [minEpisodes]);
+
+  // Debounce max episodes.
+  const maxMounted = useRef(false);
+  useEffect(() => {
+    if (!maxMounted.current) {
+      maxMounted.current = true;
+      return;
+    }
+    const timer = setTimeout(() => {
+      updateRef.current("episodeCountMax", maxEpisodes || null);
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [maxEpisodes]);
 
   return (
     <div className="flex flex-wrap gap-2">
@@ -77,6 +114,41 @@ export function TopicsFiltersBar() {
           ))}
         </SelectContent>
       </Select>
+
+      {/* T9: Ongoing tri-state filter */}
+      <Select
+        value={searchParams.get("ongoing") ?? ""}
+        onValueChange={(v) => update("ongoing", v === "any" ? null : v)}
+      >
+        <SelectTrigger className="w-32" aria-label="Filter by ongoing status">
+          <SelectValue placeholder="Any" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="any">Any</SelectItem>
+          <SelectItem value="yes">Yes</SelectItem>
+          <SelectItem value="no">No</SelectItem>
+        </SelectContent>
+      </Select>
+
+      {/* T9: Episode-count range inputs (debounced 250 ms) */}
+      <Input
+        type="number"
+        min={0}
+        placeholder="Min episodes"
+        className="w-32"
+        aria-label="Min episodes"
+        value={minEpisodes}
+        onChange={(e) => setMinEpisodes(e.target.value)}
+      />
+      <Input
+        type="number"
+        min={0}
+        placeholder="Max episodes"
+        className="w-32"
+        aria-label="Max episodes"
+        value={maxEpisodes}
+        onChange={(e) => setMaxEpisodes(e.target.value)}
+      />
     </div>
   );
 }

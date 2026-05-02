@@ -3,6 +3,7 @@ import { db } from "@/db";
 import {
   canonicalTopics,
   canonicalTopicAdminLog,
+  episodeCanonicalTopics,
   episodes,
   type CanonicalTopicKind,
   type CanonicalTopicStatus,
@@ -36,6 +37,9 @@ interface TopicsListFilters {
   search?: string | null;
   status?: string | null;
   kind?: string | null;
+  ongoing?: boolean;
+  episodeCountMin?: number;
+  episodeCountMax?: number;
   page: number;
 }
 
@@ -61,6 +65,25 @@ export async function getCanonicalTopicsListQuery(
     conditions.push(
       eq(canonicalTopics.kind, filters.kind as CanonicalTopicKind),
     );
+  }
+  if (filters.ongoing !== undefined) {
+    conditions.push(eq(canonicalTopics.ongoing, filters.ongoing));
+  }
+  if (
+    filters.episodeCountMin !== undefined ||
+    filters.episodeCountMax !== undefined
+  ) {
+    const min = filters.episodeCountMin ?? 0;
+    const max = filters.episodeCountMax;
+    if (max !== undefined) {
+      conditions.push(
+        sql`(SELECT count(*) FROM ${episodeCanonicalTopics} ect WHERE ect.canonical_topic_id = ${canonicalTopics.id}) BETWEEN ${min} AND ${max}`,
+      );
+    } else {
+      conditions.push(
+        sql`(SELECT count(*) FROM ${episodeCanonicalTopics} ect WHERE ect.canonical_topic_id = ${canonicalTopics.id}) >= ${min}`,
+      );
+    }
   }
 
   const where = conditions.length > 0 ? and(...conditions) : undefined;
@@ -156,4 +179,84 @@ export async function getAdminAuditLogQuery(
     rows,
     totalCount: countRows[0]?.total ?? 0,
   };
+}
+
+// ---------------------------------------------------------------------------
+// T1: Merge-cleanup drift query (ADR-049 §1)
+//
+// Returns merged canonicals that still have junction rows in
+// episode_canonical_topics. Per ADR-046 §3 (path-compression invariant), a
+// successful merge transaction leaves the loser with zero junction rows.
+// Any merged canonical with COUNT > 0 indicates a partial/failed merge.
+// The server action keeps the issue-tracing name `getCanonicalEpisodeCountDrift`.
+// ---------------------------------------------------------------------------
+
+export interface DriftRow {
+  id: number;
+  label: string;
+  status: CanonicalTopicStatus;
+  mergedIntoId: number | null;
+  junctionRowCount: number;
+}
+
+export async function getCanonicalMergeCleanupDriftQuery(): Promise<
+  DriftRow[]
+> {
+  return db
+    .select({
+      id: canonicalTopics.id,
+      label: canonicalTopics.label,
+      status: canonicalTopics.status,
+      mergedIntoId: canonicalTopics.mergedIntoId,
+      junctionRowCount:
+        sql<number>`count(${episodeCanonicalTopics.id})`.mapWith(Number),
+    })
+    .from(canonicalTopics)
+    .leftJoin(
+      episodeCanonicalTopics,
+      eq(episodeCanonicalTopics.canonicalTopicId, canonicalTopics.id),
+    )
+    .where(eq(canonicalTopics.status, "merged"))
+    .groupBy(canonicalTopics.id)
+    .having(sql`count(${episodeCanonicalTopics.id}) > 0`)
+    .orderBy(desc(sql`count(${episodeCanonicalTopics.id})`))
+    .limit(200);
+}
+
+// ---------------------------------------------------------------------------
+// T3: Linked episodes for a canonical topic
+// Used by the LinkedEpisodesPanel component to show status and drive the
+// "Full re-summarize" button's enabled state.
+// ---------------------------------------------------------------------------
+
+export interface LinkedEpisodeRow {
+  episodeId: number;
+  podcastIndexId: string;
+  title: string;
+  transcriptStatus: string | null;
+  summaryStatus: string | null;
+  matchMethod: string;
+  similarityToTopMatch: number | null;
+}
+
+export async function getLinkedEpisodesForTopicQuery(
+  canonicalId: number,
+  options: { limit?: number } = {},
+): Promise<LinkedEpisodeRow[]> {
+  const { limit = 100 } = options;
+  return db
+    .select({
+      episodeId: episodes.id,
+      podcastIndexId: episodes.podcastIndexId,
+      title: episodes.title,
+      transcriptStatus: episodes.transcriptStatus,
+      summaryStatus: episodes.summaryStatus,
+      matchMethod: episodeCanonicalTopics.matchMethod,
+      similarityToTopMatch: episodeCanonicalTopics.similarityToTopMatch,
+    })
+    .from(episodeCanonicalTopics)
+    .innerJoin(episodes, eq(episodes.id, episodeCanonicalTopics.episodeId))
+    .where(eq(episodeCanonicalTopics.canonicalTopicId, canonicalId))
+    .orderBy(desc(episodeCanonicalTopics.createdAt))
+    .limit(limit);
 }

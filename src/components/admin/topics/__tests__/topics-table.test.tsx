@@ -1,9 +1,9 @@
 import { describe, it, expect, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { CanonicalTopicRow } from "@/lib/admin/topic-queries";
 
-// Mock the dialog so we can assert it opens.
+// Mock dialogs so we can assert open state without needing Radix pointer events.
 vi.mock("@/components/admin/topics/merge-dialog", () => ({
   MergeDialog: ({
     topic,
@@ -15,6 +15,27 @@ vi.mock("@/components/admin/topics/merge-dialog", () => ({
     onClose: () => void;
   }) => (
     <div data-testid="merge-dialog" data-open={open} data-topic-id={topic.id}>
+      <button onClick={onClose}>Close</button>
+    </div>
+  ),
+}));
+
+vi.mock("@/components/admin/topics/bulk-merge-dialog", () => ({
+  BulkMergeDialog: ({
+    selectedTopics,
+    open,
+    onClose,
+  }: {
+    selectedTopics: CanonicalTopicRow[];
+    open: boolean;
+    onClose: () => void;
+  }) => (
+    <div
+      data-testid="bulk-merge-dialog"
+      data-open={open}
+      data-count={selectedTopics.length}
+      data-ids={selectedTopics.map((t) => t.id).join(",")}
+    >
       <button onClick={onClose}>Close</button>
     </div>
   ),
@@ -88,7 +109,7 @@ describe("TopicsTable", () => {
       />,
     );
 
-    const mergeBtn = screen.getByRole("button", { name: /merge/i });
+    const mergeBtn = screen.getByRole("button", { name: /^merge$/i });
     await user.click(mergeBtn);
 
     const dialog = screen.getByTestId("merge-dialog");
@@ -106,5 +127,97 @@ describe("TopicsTable", () => {
       />,
     );
     expect(screen.getByText(/no topics found/i)).toBeInTheDocument();
+  });
+
+  // ===========================================================================
+  // Row selection + bulk-action bar (T11)
+  // ===========================================================================
+
+  it("renders a checkbox for each row", () => {
+    const rows = [
+      makeRow({ id: 1, label: "A" }),
+      makeRow({ id: 2, label: "B" }),
+    ];
+    render(
+      <TopicsTable
+        rows={rows}
+        totalCount={2}
+        currentPage={1}
+        searchParams={{}}
+      />,
+    );
+    // Header checkbox + 2 row checkboxes
+    const checkboxes = screen.getAllByRole("checkbox");
+    expect(checkboxes.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it("checkbox is disabled for non-active rows", () => {
+    const rows = [makeRow({ id: 1, status: "merged", mergedIntoId: 99 })];
+    render(
+      <TopicsTable
+        rows={rows}
+        totalCount={1}
+        currentPage={1}
+        searchParams={{}}
+      />,
+    );
+    const rowCheckbox = screen.getByRole("checkbox", {
+      name: /select TypeScript 5\.5/i,
+    });
+    expect(rowCheckbox).toBeDisabled();
+  });
+
+  it("bulk-action bar appears when a row is selected", () => {
+    const rows = [makeRow({ id: 1, label: "TS", status: "active" })];
+    render(
+      <TopicsTable
+        rows={rows}
+        totalCount={1}
+        currentPage={1}
+        searchParams={{}}
+      />,
+    );
+
+    const rowCheckbox = screen.getByRole("checkbox", { name: /select TS/i });
+    act(() => {
+      fireEvent.click(rowCheckbox);
+    });
+
+    expect(
+      screen.getByRole("button", { name: /merge selected/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /clear selection/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("'Merge selected' opens bulk-merge dialog with selected topics", () => {
+    const rows = [
+      makeRow({ id: 10, label: "Alpha", status: "active" }),
+      makeRow({ id: 11, label: "Beta", status: "active" }),
+    ];
+    render(
+      <TopicsTable
+        rows={rows}
+        totalCount={2}
+        currentPage={1}
+        searchParams={{}}
+      />,
+    );
+
+    // Select both rows
+    act(() => {
+      fireEvent.click(screen.getByRole("checkbox", { name: /select Alpha/i }));
+      fireEvent.click(screen.getByRole("checkbox", { name: /select Beta/i }));
+    });
+
+    act(() => {
+      fireEvent.click(screen.getByRole("button", { name: /merge selected/i }));
+    });
+
+    const dialog = screen.getByTestId("bulk-merge-dialog");
+    expect(dialog).toHaveAttribute("data-open", "true");
+    expect(dialog).toHaveAttribute("data-count", "2");
+    expect(dialog).toHaveAttribute("data-ids", "10,11");
   });
 });
