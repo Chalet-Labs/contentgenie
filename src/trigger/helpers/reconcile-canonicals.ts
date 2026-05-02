@@ -1,6 +1,7 @@
 /**
  * Pipeline orchestration for the nightly canonical-topic reconciliation
- * Trigger.dev task (issue #389). Implements Phases 1–7 inline; the top-level
+ * Trigger.dev task (issue #389). Implements Phases 1–7 via a thin
+ * `runReconciliation` orchestrator + private phase helpers; the top-level
  * `schedules.task` (T5, `src/trigger/reconcile-canonicals.ts`) wires concrete
  * dependencies into `runReconciliation` and emits the structured
  * `reconcile_summary` log (Phase 8).
@@ -45,6 +46,7 @@ import {
   RECONCILE_DECAY_KINDS,
   RECONCILE_LOOKBACK_DAYS,
 } from "@/lib/reconcile-constants";
+import { ReconcileSummaryAccumulator } from "./reconcile-summary-accumulator";
 
 /** Minimal logger shape — compatible with `@trigger.dev/sdk`'s `logger` and a vi.fn() fake. */
 export interface ReconcileLogger {
@@ -123,23 +125,6 @@ interface RawCanonicalRow {
   summary: string;
   embedding: number[] | null;
 }
-
-const EMPTY_SUMMARY = (durationMs: number): ReconcileSummary => ({
-  clustersSeen: 0,
-  clustersFailed: 0,
-  clustersDeferred: 0,
-  malformedEmbeddingCount: 0,
-  clustersSkippedWinnerAlreadyMerged: 0,
-  mergesExecuted: 0,
-  mergesFailed: 0,
-  mergesRejectedByPairwise: 0,
-  mergesSkippedAlreadyMerged: 0,
-  pairwiseVerifyThrew: 0,
-  pairwiseVerifyRejected: 0,
-  dormancyTransitions: 0,
-  episodeCountDrift: 0,
-  durationMs,
-});
 
 /**
  * Best-effort coerce of the `identity_embedding` column the DB driver returns.
@@ -264,6 +249,267 @@ async function decayStaleCanonicals(
   return result.rows.length;
 }
 
+// ─── Phase helpers ────────────────────────────────────────────────────────────
+
+type PickWinnerResult = { kind: "ok"; winnerId: number } | { kind: "skip" };
+
+/** Phase 3 — call the LLM to select a winner from pre-built members. Pure of counter side-effects. */
+async function pickWinner(
+  deps: Pick<ReconcileDeps, "generateCompletion">,
+  cluster: number[],
+  members: ReconcileMember[],
+): Promise<PickWinnerResult> {
+  const raw = await deps.generateCompletion([
+    { role: "user", content: getReconcileWinnerPickPrompt(members) },
+  ]);
+  const parsed = reconcileWinnerPickSchema.parse(parseJsonResponse(raw));
+  const { winner_id: winnerId } = parsed;
+
+  if (winnerId === null || !cluster.includes(winnerId)) {
+    return { kind: "skip" };
+  }
+  return { kind: "ok", winnerId };
+}
+
+interface VerifyLosersResult {
+  verifiedLoserIds: number[];
+  pairwiseVerifyThrew: number;
+  pairwiseVerifyRejected: number;
+  /** True iff ≥1 pair returned `same_entity=false`. Drives cluster-level rejection. */
+  hadModelReject: boolean;
+}
+
+/** Phase 4 — per-pair partial-accept verify (ADR-050 §2). Returns counts for the orchestrator to route. */
+async function verifyLosers(
+  deps: Pick<ReconcileDeps, "generateCompletion" | "logger">,
+  winner: CanonicalRow,
+  loserIds: number[],
+  rowsById: Map<number, CanonicalRow>,
+): Promise<VerifyLosersResult> {
+  const verifiedLoserIds: number[] = [];
+  let pairwiseVerifyThrew = 0;
+  let pairwiseVerifyRejected = 0;
+  let hadModelReject = false;
+
+  for (const loserId of loserIds) {
+    const loser = rowsById.get(loserId);
+    if (!loser) {
+      // Defensive: cluster id has no fetched row (invariant violation).
+      // Count on the throws side — it's an infra signal, not a model verdict.
+      pairwiseVerifyThrew++;
+      continue;
+    }
+    try {
+      const verifyRaw = await deps.generateCompletion([
+        {
+          role: "user",
+          content: getReconcilePairwiseVerifyPrompt(winner, loser),
+        },
+      ]);
+      const verifyParsed = reconcilePairwiseVerifySchema.parse(
+        parseJsonResponse(verifyRaw),
+      );
+      if (verifyParsed.same_entity) {
+        verifiedLoserIds.push(loserId);
+      } else {
+        hadModelReject = true;
+        pairwiseVerifyRejected++;
+      }
+    } catch (err) {
+      // Treat failure as "no" (ADR-050 §3) — preserves R3 over-merge guard.
+      pairwiseVerifyThrew++;
+      deps.logger.warn("reconcile_pairwise_verify_failed", {
+        winnerId: winner.id,
+        loserId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  return {
+    verifiedLoserIds,
+    pairwiseVerifyThrew,
+    pairwiseVerifyRejected,
+    hadModelReject,
+  };
+}
+
+/** Mutable cross-cluster state owned by the orchestrator and threaded through per-cluster helpers. */
+interface ClusterState {
+  mergedLoserIds: Set<number>;
+  preMergeCounts: Map<number, number>;
+  affectedWinners: Set<number>;
+  winnerToAbsorbedLosers: Map<number, number[]>;
+}
+
+/** Phase 5 — merge each verified loser. Mutates the shared cross-cluster state + accumulator. */
+async function mergeVerifiedLosers(
+  deps: Pick<ReconcileDeps, "db" | "mergeCanonicals" | "logger">,
+  winnerId: number,
+  verifiedLoserIds: number[],
+  state: ClusterState,
+  accum: ReconcileSummaryAccumulator,
+): Promise<void> {
+  const {
+    mergedLoserIds,
+    preMergeCounts,
+    affectedWinners,
+    winnerToAbsorbedLosers,
+  } = state;
+
+  for (const loserId of verifiedLoserIds) {
+    if (mergedLoserIds.has(loserId)) {
+      // Cross-cluster overlap guard (ADR-050 §7).
+      accum.mergeSkippedAlreadyMerged();
+      continue;
+    }
+    if (!preMergeCounts.has(winnerId)) {
+      preMergeCounts.set(
+        winnerId,
+        await countEpisodesForCanonical(deps.db, winnerId),
+      );
+    }
+    try {
+      await deps.mergeCanonicals({
+        loserId,
+        winnerId,
+        actor: "reconcile-canonicals",
+      });
+      mergedLoserIds.add(loserId);
+      affectedWinners.add(winnerId);
+      accum.mergeSucceeded();
+      const absorbed = winnerToAbsorbedLosers.get(winnerId) ?? [];
+      absorbed.push(loserId);
+      winnerToAbsorbedLosers.set(winnerId, absorbed);
+    } catch (err) {
+      accum.mergeFailed();
+      deps.logger.warn("reconcile_merge_failed", {
+        winnerId,
+        loserId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+}
+
+/** Phase 6 — compute true episode-count delta (post − pre) across affected winners. */
+async function computeEpisodeDrift(
+  database: ReconcileDeps["db"],
+  affectedWinners: Set<number>,
+  preMergeCounts: Map<number, number>,
+): Promise<number> {
+  let delta = 0;
+  for (const winnerId of Array.from(affectedWinners)) {
+    const post = await countEpisodesForCanonical(database, winnerId);
+    const pre = preMergeCounts.get(winnerId) ?? 0;
+    delta += post - pre;
+  }
+  return delta;
+}
+
+/** Build the `ReconcileMember[]` list for a cluster, filtering ids with no fetched row. */
+function membersOf(
+  cluster: number[],
+  rowsById: Map<number, CanonicalRow>,
+): ReconcileMember[] {
+  return cluster
+    .map((id) => rowsById.get(id))
+    .filter((r): r is CanonicalRow => r !== undefined)
+    .map((r) => ({
+      id: r.id,
+      label: r.label,
+      kind: r.kind,
+      summary: r.summary,
+    }));
+}
+
+/**
+ * Resolve-forward: if any verified loser was itself a winner in a prior
+ * cluster, include its prior absorptions so we never produce chains
+ * (e.g. 3→2→1 instead of direct 3→1 and 2→1).
+ */
+function resolveTransitiveLosers(
+  verifiedLosers: number[],
+  affectedWinners: Set<number>,
+  winnerToAbsorbedLosers: Map<number, number[]>,
+  mergedLoserIds: Set<number>,
+): number[] {
+  const losersToMergeSet = new Set(verifiedLosers);
+  for (const loserId of verifiedLosers) {
+    if (affectedWinners.has(loserId)) {
+      for (const priorId of winnerToAbsorbedLosers.get(loserId) ?? []) {
+        if (!mergedLoserIds.has(priorId)) {
+          losersToMergeSet.add(priorId);
+        }
+      }
+    }
+  }
+  return Array.from(losersToMergeSet);
+}
+
+/**
+ * Execute phases 3–5 for a single cluster. Contains the per-cluster try/catch
+ * so a winner-pick or verify throw never aborts the entire pipeline.
+ * `clusterSeen()` is called by the orchestrator before this function.
+ */
+async function runCluster(
+  deps: ReconcileDeps,
+  cluster: number[],
+  clusterIndex: number,
+  rowsById: Map<number, CanonicalRow>,
+  state: ClusterState,
+  accum: ReconcileSummaryAccumulator,
+): Promise<void> {
+  let currentPhase: "winner_pick" | "pairwise_verify" | "merge" = "winner_pick";
+  let clusterWinnerId: number | null = null;
+
+  try {
+    const members = membersOf(cluster, rowsById);
+    if (members.length < 2) return;
+
+    const pick = await pickWinner(deps, cluster, members);
+    if (pick.kind === "skip") return;
+    const { winnerId } = pick;
+
+    if (state.mergedLoserIds.has(winnerId)) {
+      accum.clusterSkippedWinnerAlreadyMerged();
+      return;
+    }
+    clusterWinnerId = winnerId;
+    const winner = rowsById.get(winnerId);
+    if (!winner) return;
+
+    currentPhase = "pairwise_verify";
+    const losers = cluster.filter((id) => id !== winnerId);
+    const verify = await verifyLosers(deps, winner, losers, rowsById);
+    accum.pairwiseVerifyThrew(verify.pairwiseVerifyThrew);
+    accum.pairwiseVerifyRejected(verify.pairwiseVerifyRejected);
+    if (verify.hadModelReject && verify.verifiedLoserIds.length === 0) {
+      accum.clusterRejectedByPairwise();
+    }
+
+    currentPhase = "merge";
+    const losersToMerge = resolveTransitiveLosers(
+      verify.verifiedLoserIds,
+      state.affectedWinners,
+      state.winnerToAbsorbedLosers,
+      state.mergedLoserIds,
+    );
+    await mergeVerifiedLosers(deps, winnerId, losersToMerge, state, accum);
+  } catch (err) {
+    accum.clusterFailed();
+    deps.logger.warn("reconcile_cluster_failed", {
+      clusterIndex,
+      phase: currentPhase,
+      memberIds: cluster,
+      winnerId: clusterWinnerId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
+
+// ─── Orchestrator ─────────────────────────────────────────────────────────────
+
 /**
  * Run the full reconciliation pipeline (Phases 1–7). The top-level Trigger.dev
  * task (T5) wraps this with structured `reconcile_start` + `reconcile_summary`
@@ -272,67 +518,39 @@ async function decayStaleCanonicals(
 export async function runReconciliation(
   deps: ReconcileDeps,
 ): Promise<ReconcileSummary> {
-  const { db, mergeCanonicals, generateCompletion, logger, now } = deps;
+  const { db, logger, now } = deps;
   const startMs = now().getTime();
+  const accum = new ReconcileSummaryAccumulator();
 
-  // ───────── Phase 1 — fetch active canonicals ─────────
+  // Phase 1 — fetch + filter malformed embeddings
   const rawRows = await fetchActiveCanonicals(db);
-
-  // Drop rows whose identity_embedding produced NaN/non-finite values.
-  let malformedEmbeddingCount = 0;
   const rows: CanonicalRow[] = [];
   for (const r of rawRows) {
-    if (r.embedding === null) {
-      malformedEmbeddingCount++;
-    } else {
-      rows.push(r as CanonicalRow);
-    }
+    if (r.embedding === null) accum.malformedEmbeddingDropped();
+    else rows.push(r as CanonicalRow);
   }
 
   if (rows.length === 0) {
     logger.info("reconcile_phase1_empty", { rowCount: 0 });
-    // Skip Phases 2–6 (no clusters → no merges), but Phase 7 (decay) is
-    // logically independent: old event-type canonicals may still need to be
-    // marked dormant even on quiet days with no recent canonical activity.
     const dormancyTransitions = await decayStaleCanonicals(db);
     logger.info("reconcile_phase7_decay", {
       event: "reconcile_phase7_decay",
       dormancyTransitions,
       phase1Empty: true,
     });
-    return {
-      ...EMPTY_SUMMARY(now().getTime() - startMs),
-      malformedEmbeddingCount,
-      dormancyTransitions,
-    };
+    accum.dormancyTransitioned(dormancyTransitions);
+    return accum.freeze(now().getTime() - startMs);
   }
 
-  // ───────── Phase 2 — cluster ─────────
-  const clusterInput: ClusterRow[] = rows.map((r) => ({
-    id: r.id,
-    embedding: r.embedding,
-  }));
-  const { clusters } = deps.clusterByIdentityEmbedding(clusterInput, {
-    eps: RECONCILE_DBSCAN_EPS,
-    minPoints: RECONCILE_DBSCAN_MIN_POINTS,
-  });
-
+  // Phase 2 — cluster
+  const { clusters } = deps.clusterByIdentityEmbedding(
+    rows.map((r): ClusterRow => ({ id: r.id, embedding: r.embedding })),
+    { eps: RECONCILE_DBSCAN_EPS, minPoints: RECONCILE_DBSCAN_MIN_POINTS },
+  );
   const rowsById = new Map<number, CanonicalRow>();
   for (const r of rows) rowsById.set(r.id, r);
 
-  // Counters
-  let clustersSeen = 0;
-  let clustersFailed = 0;
-  let clustersDeferred = 0;
-  // malformedEmbeddingCount already accumulated in Phase 1 filter above.
-  let clustersSkippedWinnerAlreadyMerged = 0;
-  let mergesExecuted = 0;
-  let mergesFailed = 0;
-  let mergesRejectedByPairwise = 0;
-  let mergesSkippedAlreadyMerged = 0;
-  let pairwiseVerifyThrew = 0;
-  let pairwiseVerifyRejected = 0;
-
+  // Cross-cluster state owned by the orchestrator (ADR-050 §7)
   const mergedLoserIds = new Set<number>();
   const preMergeCounts = new Map<number, number>();
   const affectedWinners = new Set<number>();
@@ -341,12 +559,18 @@ export async function runReconciliation(
   // A→B→C chains when mergeCanonicals only rewrites the direct loser.
   const winnerToAbsorbedLosers = new Map<number, number[]>();
 
-  // ───────── Phases 3–5 — per-cluster orchestration ─────────
+  // Phases 3–5 — per-cluster orchestration
+  const state: ClusterState = {
+    mergedLoserIds,
+    preMergeCounts,
+    affectedWinners,
+    winnerToAbsorbedLosers,
+  };
   for (let i = 0; i < clusters.length; i++) {
     // Phase 6 budget guard (ADR-050 §6) — top of every cluster iteration.
     if (now().getTime() - startMs > RECONCILE_BUDGET_MS) {
       const remaining = clusters.length - i;
-      clustersDeferred += remaining;
+      accum.clusterDeferred(remaining);
       logger.warn("reconcile_budget_exhausted", {
         processed: i,
         deferred: remaining,
@@ -354,195 +578,23 @@ export async function runReconciliation(
       break;
     }
 
-    const cluster = clusters[i];
-    clustersSeen++;
-
-    let currentPhase: "winner_pick" | "pairwise_verify" | "merge" =
-      "winner_pick";
-    let clusterWinnerId: number | null = null;
-
-    try {
-      // ───────── Phase 3 — winner pick ─────────
-      const members: ReconcileMember[] = cluster
-        .map((id) => rowsById.get(id))
-        .filter((r): r is CanonicalRow => r !== undefined)
-        .map((r) => ({
-          id: r.id,
-          label: r.label,
-          kind: r.kind,
-          summary: r.summary,
-        }));
-
-      if (members.length < 2) {
-        // Defensive: a cluster whose ids no longer resolve to fetched rows.
-        continue;
-      }
-
-      const winnerPickPrompt = getReconcileWinnerPickPrompt(members);
-      const winnerRaw = await generateCompletion([
-        { role: "user", content: winnerPickPrompt },
-      ]);
-      const winnerParsed = reconcileWinnerPickSchema.parse(
-        parseJsonResponse(winnerRaw),
-      );
-      const { winner_id: winnerId } = winnerParsed;
-
-      if (winnerId === null || !cluster.includes(winnerId)) {
-        // null = no-confidence; not-in-cluster = model hallucination guard.
-        continue;
-      }
-
-      if (mergedLoserIds.has(winnerId)) {
-        // Winner was already merged as a loser in a prior cluster — DBSCAN
-        // can produce overlapping clusters with custom distance fns
-        // (ADR-050 §7). Merging onto an already-merged canonical would cause
-        // corruption + chains; skip the cluster entirely.
-        clustersSkippedWinnerAlreadyMerged++;
-        continue;
-      }
-
-      clusterWinnerId = winnerId;
-
-      const winner = rowsById.get(winnerId);
-      if (!winner) continue;
-
-      // ───────── Phase 4 — pairwise verify (per-pair partial-accept) ─────────
-      currentPhase = "pairwise_verify";
-      const losers = cluster.filter((id) => id !== winnerId);
-      const verifiedLosers: number[] = [];
-      let clusterHadModelReject = false;
-
-      for (const loserId of losers) {
-        const loser = rowsById.get(loserId);
-        if (!loser) {
-          // Defensive: cluster id has no fetched row (invariant violation).
-          // Count on the throws side — it's an infra signal, not a model
-          // verdict.
-          pairwiseVerifyThrew++;
-          continue;
-        }
-        try {
-          const verifyPrompt = getReconcilePairwiseVerifyPrompt(winner, loser);
-          const verifyRaw = await generateCompletion([
-            { role: "user", content: verifyPrompt },
-          ]);
-          const verifyParsed = reconcilePairwiseVerifySchema.parse(
-            parseJsonResponse(verifyRaw),
-          );
-          if (verifyParsed.same_entity) {
-            verifiedLosers.push(loserId);
-          } else {
-            clusterHadModelReject = true;
-            pairwiseVerifyRejected++;
-          }
-        } catch (err) {
-          // Treat failure as "no" (ADR-050 §3) — preserves R3 over-merge guard.
-          pairwiseVerifyThrew++;
-          logger.warn("reconcile_pairwise_verify_failed", {
-            winnerId,
-            loserId,
-            error: err instanceof Error ? err.message : String(err),
-          });
-        }
-      }
-
-      if (clusterHadModelReject && verifiedLosers.length === 0) {
-        mergesRejectedByPairwise++;
-      }
-
-      // ───────── Phase 5 — merge per verified loser ─────────
-      currentPhase = "merge";
-
-      // Resolve-forward: if any verified loser was itself a winner in a prior
-      // cluster, include its prior absorptions in this batch so we never
-      // produce chains (e.g. 3→2→1 instead of direct 3→1 and 2→1).
-      const losersToMergeSet = new Set(verifiedLosers);
-      for (const loserId of verifiedLosers) {
-        if (affectedWinners.has(loserId)) {
-          for (const priorId of winnerToAbsorbedLosers.get(loserId) ?? []) {
-            if (!mergedLoserIds.has(priorId)) {
-              losersToMergeSet.add(priorId);
-            }
-          }
-        }
-      }
-
-      for (const loserId of Array.from(losersToMergeSet)) {
-        if (mergedLoserIds.has(loserId)) {
-          // Cross-cluster overlap guard (ADR-050 §7).
-          mergesSkippedAlreadyMerged++;
-          continue;
-        }
-        if (!preMergeCounts.has(winnerId)) {
-          preMergeCounts.set(
-            winnerId,
-            await countEpisodesForCanonical(db, winnerId),
-          );
-        }
-        try {
-          await mergeCanonicals({
-            loserId,
-            winnerId,
-            actor: "reconcile-canonicals",
-          });
-          mergedLoserIds.add(loserId);
-          affectedWinners.add(winnerId);
-          mergesExecuted++;
-          const absorbed = winnerToAbsorbedLosers.get(winnerId) ?? [];
-          absorbed.push(loserId);
-          winnerToAbsorbedLosers.set(winnerId, absorbed);
-        } catch (err) {
-          mergesFailed++;
-          logger.warn("reconcile_merge_failed", {
-            winnerId,
-            loserId,
-            error: err instanceof Error ? err.message : String(err),
-          });
-        }
-      }
-    } catch (err) {
-      clustersFailed++;
-      logger.warn("reconcile_cluster_failed", {
-        clusterIndex: i,
-        phase: currentPhase,
-        memberIds: cluster,
-        winnerId: clusterWinnerId,
-        error: err instanceof Error ? err.message : String(err),
-      });
-    }
+    accum.clusterSeen();
+    await runCluster(deps, clusters[i], i, rowsById, state, accum);
   }
 
-  // ───────── Phase 6 — drift compute (true delta) ─────────
-  let episodeCountDrift = 0;
-  const affectedWinnerIds = Array.from(affectedWinners);
-  for (const winnerId of affectedWinnerIds) {
-    const post = await countEpisodesForCanonical(db, winnerId);
-    const pre = preMergeCounts.get(winnerId) ?? 0;
-    episodeCountDrift += post - pre;
-  }
+  // Phase 6 — episode-count drift (ADR-050 §4)
+  accum.episodeCountDriftAdded(
+    await computeEpisodeDrift(db, affectedWinners, preMergeCounts),
+  );
 
-  // ───────── Phase 7 — decay stale event-type canonicals ─────────
+  // Phase 7 — decay stale event-type canonicals
   const dormancyTransitions = await decayStaleCanonicals(db);
   logger.info("reconcile_phase7_decay", {
     event: "reconcile_phase7_decay",
     dormancyTransitions,
     phase1Empty: false,
   });
+  accum.dormancyTransitioned(dormancyTransitions);
 
-  return {
-    clustersSeen,
-    clustersFailed,
-    clustersDeferred,
-    malformedEmbeddingCount,
-    clustersSkippedWinnerAlreadyMerged,
-    mergesExecuted,
-    mergesFailed,
-    mergesRejectedByPairwise,
-    mergesSkippedAlreadyMerged,
-    pairwiseVerifyThrew,
-    pairwiseVerifyRejected,
-    dormancyTransitions,
-    episodeCountDrift,
-    durationMs: now().getTime() - startMs,
-  };
+  return accum.freeze(now().getTime() - startMs);
 }
