@@ -19,13 +19,26 @@ export default async function AdminTopicsPage({
         ? false
         : undefined;
 
+  // The server action's Zod refine (min ≤ max) only fires through the
+  // action; this page calls the query directly. Clamp the URL inputs at the
+  // boundary so a hand-crafted `?episodeCountMin=99&episodeCountMax=1`
+  // can't sneak past as an empty range.
+  const episodeCountMin =
+    parsed.episodeCountMin !== null
+      ? Math.max(0, parsed.episodeCountMin)
+      : undefined;
+  const episodeCountMax =
+    parsed.episodeCountMax !== null
+      ? Math.max(episodeCountMin ?? 0, parsed.episodeCountMax)
+      : undefined;
+
   const { rows, totalCount } = await getCanonicalTopicsListQuery({
     search: parsed.search ?? undefined,
     status: parsed.status ?? undefined,
     kind: parsed.kind ?? undefined,
     ongoing: ongoingFilter,
-    episodeCountMin: parsed.episodeCountMin ?? undefined,
-    episodeCountMax: parsed.episodeCountMax ?? undefined,
+    episodeCountMin,
+    episodeCountMax,
     page: parsed.page > 0 ? parsed.page : 1,
   });
 

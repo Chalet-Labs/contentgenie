@@ -15,6 +15,35 @@ import { canonicalTopicStatusEnum, canonicalTopicKindEnum } from "@/db/schema";
 const STATUS_OPTIONS = canonicalTopicStatusEnum.enumValues;
 const KIND_OPTIONS = canonicalTopicKindEnum.enumValues;
 
+type UpdateFn = (key: string, value: string | null) => void;
+
+/**
+ * Mirrors a controlled input value into a search-param after `delay` ms,
+ * skipping the initial mount so we don't push a duplicate of the URL state
+ * back into the URL. Holds `update` behind a ref so a stale closure can't
+ * win over a fresh value.
+ */
+function useDebouncedSearchParam(
+  value: string,
+  paramKey: string,
+  update: UpdateFn,
+  delay = 250,
+) {
+  const updateRef = useRef(update);
+  updateRef.current = update;
+  const mounted = useRef(false);
+  useEffect(() => {
+    if (!mounted.current) {
+      mounted.current = true;
+      return;
+    }
+    const timer = setTimeout(() => {
+      updateRef.current(paramKey, value || null);
+    }, delay);
+    return () => clearTimeout(timer);
+  }, [value, paramKey, delay]);
+}
+
 export function TopicsFiltersBar() {
   const router = useRouter();
   const pathname = usePathname();
@@ -27,8 +56,8 @@ export function TopicsFiltersBar() {
     searchParams.get("episodeCountMax") ?? "",
   );
 
-  const update = useCallback(
-    (key: string, value: string | null) => {
+  const update = useCallback<UpdateFn>(
+    (key, value) => {
       const params = new URLSearchParams(searchParams.toString());
       if (value) {
         params.set(key, value);
@@ -41,35 +70,8 @@ export function TopicsFiltersBar() {
     [router, pathname, searchParams],
   );
 
-  // Keep a stable ref so debounced effects always see the latest `update`.
-  const updateRef = useRef(update);
-  updateRef.current = update;
-
-  // Debounce min episodes (skip the initial mount trigger).
-  const minMounted = useRef(false);
-  useEffect(() => {
-    if (!minMounted.current) {
-      minMounted.current = true;
-      return;
-    }
-    const timer = setTimeout(() => {
-      updateRef.current("episodeCountMin", minEpisodes || null);
-    }, 250);
-    return () => clearTimeout(timer);
-  }, [minEpisodes]);
-
-  // Debounce max episodes.
-  const maxMounted = useRef(false);
-  useEffect(() => {
-    if (!maxMounted.current) {
-      maxMounted.current = true;
-      return;
-    }
-    const timer = setTimeout(() => {
-      updateRef.current("episodeCountMax", maxEpisodes || null);
-    }, 250);
-    return () => clearTimeout(timer);
-  }, [maxEpisodes]);
+  useDebouncedSearchParam(minEpisodes, "episodeCountMin", update);
+  useDebouncedSearchParam(maxEpisodes, "episodeCountMax", update);
 
   return (
     <div className="flex flex-wrap gap-2">
