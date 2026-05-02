@@ -15,8 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { triggerFullResummarize } from "@/app/actions/topics";
 import type { LinkedEpisodeRow } from "@/lib/admin/topic-queries";
-
-const BUSY_STATUSES = new Set(["queued", "running", "summarizing"]);
+import { IN_PROGRESS_STATUSES } from "@/db/schema";
 
 interface LinkedEpisodesPanelProps {
   episodes: LinkedEpisodeRow[];
@@ -63,7 +62,8 @@ export function LinkedEpisodesPanel({ episodes }: LinkedEpisodesPanelProps) {
           {episodes.map((ep) => {
             const canResummarize = ep.transcriptStatus === "available";
             const isBusy =
-              ep.summaryStatus !== null && BUSY_STATUSES.has(ep.summaryStatus);
+              ep.summaryStatus !== null &&
+              IN_PROGRESS_STATUSES.includes(ep.summaryStatus);
             const disabled =
               !canResummarize || isBusy || pending === ep.episodeId;
 
