@@ -126,8 +126,11 @@ const EMPTY_SUMMARY = (durationMs: number): ReconcileSummary => ({
  * (`"[1,2,3]"`), or `Float32Array`. The clustering helper expects `number[]`.
  */
 function coerceEmbedding(raw: unknown): number[] {
-  if (Array.isArray(raw)) return raw.map((v) => Number(v));
-  if (raw instanceof Float32Array) return Array.from(raw);
+  const ensureFinite = (vals: number[]): number[] =>
+    vals.every(Number.isFinite) ? vals : [];
+
+  if (Array.isArray(raw)) return ensureFinite(raw.map((v) => Number(v)));
+  if (raw instanceof Float32Array) return ensureFinite(Array.from(raw));
   if (typeof raw === "string") {
     const trimmed = raw.trim();
     if (
@@ -137,7 +140,13 @@ function coerceEmbedding(raw: unknown): number[] {
     ) {
       const inner = trimmed.slice(1, -1).trim();
       if (inner.length === 0) return [];
-      return inner.split(",").map((s) => Number(s.trim()));
+      return ensureFinite(
+        inner
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean)
+          .map(Number),
+      );
     }
   }
   return [];
