@@ -32,53 +32,7 @@ import {
   RECONCILE_DECAY_DAYS,
   RECONCILE_DECAY_KINDS,
 } from "@/lib/reconcile-constants";
-
-// ─── SQL inspection helper ─────────────────────────────────────────────────
-
-/**
- * Walk a Drizzle `sql` template-literal object and extract the raw SQL text
- * fragments (with bind params replaced by `$`) and the bound parameter values.
- *
- * This mirrors the same helper in `database-canonical.test.ts`. It is
- * duplicated here rather than imported to keep test files self-contained and
- * avoid coupling to another test module's internals.
- */
-function serializeSql(sqlObj: unknown): { sqlText: string; params: unknown[] } {
-  const params: unknown[] = [];
-  const parts: string[] = [];
-  const visit = (chunk: unknown) => {
-    if (chunk == null) return;
-    if (Array.isArray(chunk)) {
-      chunk.forEach(visit);
-      return;
-    }
-    if (
-      typeof chunk === "string" ||
-      typeof chunk === "number" ||
-      typeof chunk === "boolean"
-    ) {
-      params.push(chunk);
-      parts.push("$");
-      return;
-    }
-    const obj = chunk as { value?: unknown; queryChunks?: unknown[] };
-    if (Array.isArray(obj.queryChunks)) {
-      obj.queryChunks.forEach(visit);
-      return;
-    }
-    if (Array.isArray(obj.value)) {
-      parts.push(obj.value.join(""));
-      return;
-    }
-    if (obj.value !== undefined) {
-      params.push(obj.value);
-      parts.push("$");
-      return;
-    }
-  };
-  visit(sqlObj);
-  return { sqlText: parts.join(" "), params };
-}
+import { serializeSql } from "@/test/sql-fixture-queue";
 
 // ─── Test scaffolding ──────────────────────────────────────────────────────
 
