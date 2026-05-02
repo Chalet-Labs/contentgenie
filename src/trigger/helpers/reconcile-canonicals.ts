@@ -140,9 +140,9 @@ const EMPTY_SUMMARY = (durationMs: number): ReconcileSummary => ({
  * Postgres `vector` may surface as `number[]` (pg JSON path), `string`
  * (`"[1,2,3]"`), or `Float32Array`. The clustering helper expects `number[]`.
  *
- * Returns `null` when any element is NaN or non-finite (malformed input that
- * would silently corrupt DBSCAN distances). Returns `[]` only for empty
- * vectors from recognised shapes; `null` for entirely unrecognised shapes.
+ * Returns `null` when the input is malformed: any NaN/non-finite element,
+ * empty vector, zero-norm vector (would produce NaN in cosineDistance), or
+ * unrecognised shape.
  */
 function coerceEmbedding(raw: unknown): number[] | null {
   let arr: number[];
@@ -158,8 +158,11 @@ function coerceEmbedding(raw: unknown): number[] | null {
       trimmed.endsWith("]")
     ) {
       const inner = trimmed.slice(1, -1).trim();
-      if (inner.length === 0) return [];
-      arr = inner.split(",").map((s) => Number(s.trim()));
+      if (inner.length === 0) return null;
+      arr = inner
+        .split(",")
+        .filter(Boolean)
+        .map((s) => Number(s.trim()));
     } else {
       return null;
     }
@@ -168,6 +171,10 @@ function coerceEmbedding(raw: unknown): number[] | null {
   }
   // Guard: any NaN or ±Infinity element taints the whole vector.
   if (arr.some((x) => !Number.isFinite(x))) return null;
+  // Guard: empty or zero-norm vectors produce NaN in cosineDistance.
+  if (arr.length === 0) return null;
+  const squaredNorm = arr.reduce((sum, x) => sum + x * x, 0);
+  if (squaredNorm === 0) return null;
   return arr;
 }
 
@@ -393,7 +400,7 @@ export async function runReconciliation(
       currentPhase = "pairwise_verify";
       const losers = cluster.filter((id) => id !== winnerId);
       const verifiedLosers: number[] = [];
-      let clusterHadRejection = false;
+      let clusterHadModelReject = false;
 
       for (const loserId of losers) {
         const loser = rowsById.get(loserId);
@@ -401,7 +408,6 @@ export async function runReconciliation(
           // Defensive: cluster id has no fetched row (invariant violation).
           // Count on the throws side — it's an infra signal, not a model
           // verdict.
-          clusterHadRejection = true;
           pairwiseVerifyThrew++;
           continue;
         }
@@ -416,12 +422,11 @@ export async function runReconciliation(
           if (verifyParsed.same_entity) {
             verifiedLosers.push(loserId);
           } else {
-            clusterHadRejection = true;
+            clusterHadModelReject = true;
             pairwiseVerifyRejected++;
           }
         } catch (err) {
           // Treat failure as "no" (ADR-048 §3) — preserves R3 over-merge guard.
-          clusterHadRejection = true;
           pairwiseVerifyThrew++;
           logger.warn("reconcile_pairwise_verify_failed", {
             winnerId,
@@ -431,7 +436,7 @@ export async function runReconciliation(
         }
       }
 
-      if (clusterHadRejection && verifiedLosers.length === 0) {
+      if (clusterHadModelReject && verifiedLosers.length === 0) {
         mergesRejectedByPairwise++;
       }
 
