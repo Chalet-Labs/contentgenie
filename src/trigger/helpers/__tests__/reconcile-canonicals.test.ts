@@ -199,7 +199,8 @@ describe("runReconciliation", () => {
       mergesFailed: 0,
       mergesRejectedByPairwise: 0,
       mergesSkippedAlreadyMerged: 0,
-      pairwiseVerifyFailed: 0,
+      pairwiseVerifyThrew: 0,
+      pairwiseVerifyRejected: 0,
       episodeCountDrift: 0,
     });
     // Phase 7 ran and returned 3 dormancy transitions.
@@ -278,7 +279,8 @@ describe("runReconciliation", () => {
     expect(summary.clustersSeen).toBe(1);
     expect(summary.mergesExecuted).toBe(0);
     expect(summary.mergesRejectedByPairwise).toBe(0);
-    expect(summary.pairwiseVerifyFailed).toBe(0);
+    expect(summary.pairwiseVerifyThrew).toBe(0);
+    expect(summary.pairwiseVerifyRejected).toBe(0);
     expect(mergeCanonicalsMock).not.toHaveBeenCalled();
     // Only the winner-pick LLM call should have fired (no Stage B).
     expect(generateCompletion).toHaveBeenCalledTimes(1);
@@ -329,7 +331,10 @@ describe("runReconciliation", () => {
     expect(summary.clustersSeen).toBe(1);
     expect(summary.mergesExecuted).toBe(1);
     expect(summary.mergesRejectedByPairwise).toBe(0);
-    expect(summary.pairwiseVerifyFailed).toBe(1);
+    // loser=3 produced a `same_entity=false` verdict — model verdict, not a
+    // throw. pairwiseVerifyRejected=1, pairwiseVerifyThrew=0.
+    expect(summary.pairwiseVerifyRejected).toBe(1);
+    expect(summary.pairwiseVerifyThrew).toBe(0);
     expect(summary.episodeCountDrift).toBe(1);
     expect(mergeCanonicalsMock).toHaveBeenCalledTimes(1);
     expect(mergeCanonicalsMock).toHaveBeenCalledWith({
@@ -359,7 +364,10 @@ describe("runReconciliation", () => {
     expect(summary.clustersSeen).toBe(1);
     expect(summary.mergesExecuted).toBe(0);
     expect(summary.mergesRejectedByPairwise).toBe(1);
-    expect(summary.pairwiseVerifyFailed).toBe(2);
+    // Both losers produced `same_entity=false` verdicts — pure model verdicts,
+    // not throws. pairwiseVerifyRejected=2, pairwiseVerifyThrew=0.
+    expect(summary.pairwiseVerifyRejected).toBe(2);
+    expect(summary.pairwiseVerifyThrew).toBe(0);
     expect(summary.episodeCountDrift).toBe(0);
     expect(mergeCanonicalsMock).not.toHaveBeenCalled();
   });
@@ -385,7 +393,10 @@ describe("runReconciliation", () => {
 
     const summary = await runReconciliation(deps);
     expect(summary.mergesExecuted).toBe(1);
-    expect(summary.pairwiseVerifyFailed).toBe(1);
+    // loser=3's verify call THREW (not a model "no" verdict). The throw is an
+    // infra signal — pairwiseVerifyThrew=1, pairwiseVerifyRejected=0.
+    expect(summary.pairwiseVerifyThrew).toBe(1);
+    expect(summary.pairwiseVerifyRejected).toBe(0);
     // verifiedLosers contained loser=2 → the cluster partially accepted, not
     // outright-rejected; mergesRejectedByPairwise must stay 0.
     expect(summary.mergesRejectedByPairwise).toBe(0);

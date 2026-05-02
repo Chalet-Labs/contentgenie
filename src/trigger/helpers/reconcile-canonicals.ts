@@ -82,8 +82,10 @@ export interface ReconcileSummary {
    */
   mergesRejectedByPairwise: number;
   mergesSkippedAlreadyMerged: number;
-  /** Per-pair count of verify-throws or `same_entity=false` verdicts. */
-  pairwiseVerifyFailed: number;
+  /** Per-pair count of verify-call throws (network/parse/Zod). Healthy = 0. */
+  pairwiseVerifyThrew: number;
+  /** Per-pair count of `same_entity=false` verdicts. Healthy R3 behavior. */
+  pairwiseVerifyRejected: number;
   dormancyTransitions: number;
   /** Sum of `(postCount - preCount)` across affected winners. ADR-048 §4. */
   episodeCountDrift: number;
@@ -111,7 +113,8 @@ const EMPTY_SUMMARY = (durationMs: number): ReconcileSummary => ({
   mergesFailed: 0,
   mergesRejectedByPairwise: 0,
   mergesSkippedAlreadyMerged: 0,
-  pairwiseVerifyFailed: 0,
+  pairwiseVerifyThrew: 0,
+  pairwiseVerifyRejected: 0,
   dormancyTransitions: 0,
   episodeCountDrift: 0,
   durationMs,
@@ -263,7 +266,8 @@ export async function runReconciliation(
   let mergesFailed = 0;
   let mergesRejectedByPairwise = 0;
   let mergesSkippedAlreadyMerged = 0;
-  let pairwiseVerifyFailed = 0;
+  let pairwiseVerifyThrew = 0;
+  let pairwiseVerifyRejected = 0;
 
   const mergedLoserIds = new Set<number>();
   const preMergeCounts = new Map<number, number>();
@@ -336,8 +340,11 @@ export async function runReconciliation(
       for (const loserId of losers) {
         const loser = rowsById.get(loserId);
         if (!loser) {
+          // Defensive: cluster id has no fetched row (invariant violation).
+          // Count on the throws side — it's an infra signal, not a model
+          // verdict.
           clusterHadRejection = true;
-          pairwiseVerifyFailed++;
+          pairwiseVerifyThrew++;
           continue;
         }
         try {
@@ -352,12 +359,12 @@ export async function runReconciliation(
             verifiedLosers.push(loserId);
           } else {
             clusterHadRejection = true;
-            pairwiseVerifyFailed++;
+            pairwiseVerifyRejected++;
           }
         } catch (err) {
           // Treat failure as "no" (ADR-048 §3) — preserves R3 over-merge guard.
           clusterHadRejection = true;
-          pairwiseVerifyFailed++;
+          pairwiseVerifyThrew++;
           logger.warn("reconcile_pairwise_verify_failed", {
             winnerId,
             loserId,
@@ -431,7 +438,8 @@ export async function runReconciliation(
     mergesFailed,
     mergesRejectedByPairwise,
     mergesSkippedAlreadyMerged,
-    pairwiseVerifyFailed,
+    pairwiseVerifyThrew,
+    pairwiseVerifyRejected,
     dormancyTransitions,
     episodeCountDrift,
     durationMs: now().getTime() - startMs,
