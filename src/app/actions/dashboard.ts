@@ -749,9 +749,8 @@ export async function getCanonicalTopicOverlaps(
 
       // Guard 1: no DB rows found → all inputs map to null
       if (episodeRows.length === 0) {
-        const data = Object.fromEntries(
-          sanitizedIds.map((id) => [id, null]),
-        ) as Record<PodcastIndexEpisodeId, null>;
+        const data = Object.create(null) as Record<PodcastIndexEpisodeId, null>;
+        for (const id of sanitizedIds) data[id] = null;
         return { success: true, data };
       }
 
@@ -819,7 +818,7 @@ export async function getCanonicalTopicOverlaps(
                   episodeCanonicalTopics.canonicalTopicId,
                   allCanonicalIds,
                 ),
-                inArray(episodeCanonicalTopics.episodeId, Array.from(consumed)),
+                inArray(episodeCanonicalTopics.episodeId, consumedIds),
               ),
             )
             .groupBy(episodeCanonicalTopics.canonicalTopicId);
@@ -836,7 +835,7 @@ export async function getCanonicalTopicOverlaps(
         podcastIndexToDbId.set(row.podcastIndexId, row.id);
       }
 
-      const data = {} as Record<
+      const data = Object.create(null) as Record<
         PodcastIndexEpisodeId,
         CanonicalOverlapResult | null
       >;
