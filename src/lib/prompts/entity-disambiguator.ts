@@ -11,6 +11,7 @@
  */
 
 import type { TopicKind } from "@/lib/openrouter";
+import { escapeXml } from "@/lib/prompts";
 
 interface DisambiguatorInput {
   label: string;
@@ -23,20 +24,6 @@ interface DisambiguatorCandidate {
   label: string;
   kind: TopicKind;
   summary: string;
-}
-
-// XML-escape for prompt payload (server-side string interpolation into an
-// XML-shaped LLM prompt — not HTML/DOM output). Kept local so this module
-// stays dependency-free.
-const XML_ESCAPES: Record<string, string> = {
-  "&": "&amp;",
-  "<": "&lt;",
-  ">": "&gt;",
-  '"': "&quot;",
-  "'": "&apos;",
-};
-function escapeXml(s: string): string {
-  return s.replace(/[&<>"']/g, (ch) => XML_ESCAPES[ch] ?? ch);
 }
 
 export function getEntityDisambiguatorPrompt(

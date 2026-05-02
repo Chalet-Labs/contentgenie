@@ -7,6 +7,7 @@ const mockMetadataSet = vi.fn();
 const mockMetadataIncrement = vi.fn();
 const mockLoggerInfo = vi.fn();
 const mockLoggerWarn = vi.fn();
+const mockLoggerError = vi.fn();
 
 vi.mock("@trigger.dev/sdk", () =>
   createTriggerSdkMock({
@@ -17,6 +18,7 @@ vi.mock("@trigger.dev/sdk", () =>
     logger: {
       info: (...args: unknown[]) => mockLoggerInfo(...args),
       warn: (...args: unknown[]) => mockLoggerWarn(...args),
+      error: (...args: unknown[]) => mockLoggerError(...args),
     },
   }),
 );
@@ -55,9 +57,12 @@ vi.mock("drizzle-orm", () => ({
   })),
   eq: vi.fn((col: unknown, val: unknown) => ({ type: "eq", col, val })),
   desc: vi.fn((col: unknown) => ({ type: "desc", col })),
-  sql: vi.fn((...args: unknown[]) => ({
+  // Capture the full template + interpolated values so tests can pin the
+  // numeric `>= 100` floor, not just the type tag.
+  sql: vi.fn((strings: TemplateStringsArray, ...values: unknown[]) => ({
     type: "sql",
-    template: (args[0] as TemplateStringsArray)?.[0] ?? args[0],
+    template: Array.isArray(strings) ? Array.from(strings) : strings,
+    values,
   })),
 }));
 
@@ -117,17 +122,21 @@ vi.mock("@/trigger/helpers/resolve-topics", () => ({
 
 // ─── Import task after all mocks ──────────────────────────────────────────────
 
-import { backfillCanonicalTopics } from "@/trigger/backfill-canonical-topics";
-import type { BackfillPayload } from "@/trigger/backfill-canonical-topics";
+import {
+  backfillCanonicalTopics,
+  BACKFILL_DEFAULT_BATCH_SIZE,
+  BACKFILL_INTER_EPISODE_DELAY_MS,
+  BACKFILL_MAX_OUTPUT_TOKENS,
+  BACKFILL_MIN_SUMMARY_LENGTH,
+  BACKFILL_TEMPERATURE,
+} from "@/trigger/backfill-canonical-topics";
+import type {
+  BackfillPayload,
+  BackfillResult,
+} from "@/trigger/backfill-canonical-topics";
 
 const taskConfig = backfillCanonicalTopics as unknown as {
-  run: (payload: BackfillPayload) => Promise<{
-    processed: number;
-    resolved: number;
-    failed: number;
-    skippedShortSummary: number;
-    dryRun: boolean;
-  }>;
+  run: (payload: BackfillPayload) => Promise<BackfillResult>;
   queue: { name: string; concurrencyLimit: number };
   maxDuration: number;
   retry: { maxAttempts: number };
@@ -139,26 +148,25 @@ type EpisodeRow = { id: number; summary: string };
 
 /**
  * Sets up the main-path query mock (LEFT JOIN branch).
- * Returns captured WHERE arguments for structural inspection.
+ * Returns captured WHERE arguments for structural inspection plus the
+ * `.limit()` invocation so tests can assert on the batchSize argument.
  */
 function setupMainPathMock(
   rows: EpisodeRow[],
   captureWhere?: (w: unknown) => void,
 ) {
+  const limitImpl = vi.fn().mockResolvedValue(rows);
+  const orderByImpl = vi.fn().mockReturnValue({ limit: limitImpl });
   const whereImpl = vi.fn().mockImplementation((whereArg: unknown) => {
     captureWhere?.(whereArg);
-    return {
-      orderBy: vi.fn().mockReturnValue({
-        limit: vi.fn().mockResolvedValue(rows),
-      }),
-    };
+    return { orderBy: orderByImpl };
   });
   mockDbSelect.mockReturnValue({
     from: vi.fn().mockReturnValue({
       leftJoin: vi.fn().mockReturnValue({ where: whereImpl }),
     }),
   });
-  return { whereImpl };
+  return { whereImpl, limitImpl };
 }
 
 /**
@@ -183,6 +191,7 @@ function setupEpisodeIdsPathMock(
 
 describe("backfill-canonical-topics task", () => {
   beforeEach(() => {
+    vi.useFakeTimers();
     vi.clearAllMocks();
     mockGetCategoryBanlist.mockResolvedValue([]);
     mockGenerateCompletion.mockResolvedValue('{"topics":[]}');
@@ -210,9 +219,21 @@ describe("backfill-canonical-topics task", () => {
   });
 
   afterEach(() => {
-    vi.restoreAllMocks();
     vi.useRealTimers();
+    vi.restoreAllMocks();
   });
+
+  // Helper: run the task with fake timers, advancing through every
+  // inter-episode delay so the loop completes synchronously from the
+  // test's point of view.
+  async function runTask(payload: BackfillPayload, episodeCount: number) {
+    const promise = taskConfig.run(payload);
+    // (n - 1) inter-episode delays for n episodes — the tail delay is now skipped.
+    const totalAdvanceMs =
+      Math.max(episodeCount - 1, 0) * BACKFILL_INTER_EPISODE_DELAY_MS + 50;
+    await vi.advanceTimersByTimeAsync(totalAdvanceMs);
+    return promise;
+  }
 
   // ── Case 1: per-episode happy path ──────────────────────────────────────────
 
@@ -220,7 +241,7 @@ describe("backfill-canonical-topics task", () => {
     const episode = { id: 7, summary: "A summary about AI releases." };
     setupMainPathMock([episode]);
 
-    const result = await taskConfig.run({});
+    const result = await runTask({}, 1);
 
     expect(mockResolveAndPersistEpisodeTopics).toHaveBeenCalledOnce();
     expect(mockResolveAndPersistEpisodeTopics).toHaveBeenCalledWith(
@@ -232,7 +253,6 @@ describe("backfill-canonical-topics task", () => {
     expect(result.processed).toBe(1);
     expect(result.resolved).toBe(1);
     expect(result.failed).toBe(0);
-    expect(result.dryRun).toBe(false);
   });
 
   // ── Case 2: batch of 5 ───────────────────────────────────────────────────────
@@ -244,7 +264,7 @@ describe("backfill-canonical-topics task", () => {
     }));
     setupMainPathMock(episodes);
 
-    const result = await taskConfig.run({});
+    const result = await runTask({}, 5);
 
     expect(mockResolveAndPersistEpisodeTopics).toHaveBeenCalledTimes(5);
     expect(result.processed).toBe(5);
@@ -257,7 +277,7 @@ describe("backfill-canonical-topics task", () => {
   it("case 3 — idempotent re-run: empty SELECT returns processed: 0", async () => {
     setupMainPathMock([]);
 
-    const result = await taskConfig.run({});
+    const result = await runTask({}, 0);
 
     expect(mockResolveAndPersistEpisodeTopics).not.toHaveBeenCalled();
     expect(result.processed).toBe(0);
@@ -274,11 +294,12 @@ describe("backfill-canonical-topics task", () => {
     ];
     setupMainPathMock(episodes);
 
-    const result = await taskConfig.run({ dryRun: true });
+    const result = await runTask({ dryRun: true }, 2);
 
     expect(mockResolveAndPersistEpisodeTopics).not.toHaveBeenCalled();
     expect(result.processed).toBe(2);
-    expect(result.dryRun).toBe(true);
+    // Result type no longer carries `dryRun` — caller already has it on the payload.
+    expect(result).not.toHaveProperty("dryRun");
   });
 
   // ── Case 5: per-episode failure isolation ─────────────────────────────────
@@ -296,17 +317,46 @@ describe("backfill-canonical-topics task", () => {
       .mockRejectedValueOnce(new Error("OpenRouter timeout"))
       .mockResolvedValueOnce('{"topics":[]}');
 
-    const result = await taskConfig.run({});
+    const result = await runTask({}, 3);
 
     expect(mockResolveAndPersistEpisodeTopics).toHaveBeenCalledTimes(2);
     expect(result.processed).toBe(3);
     expect(result.failed).toBe(1);
     expect(result.resolved).toBe(2); // episodes 1 & 3
+    // Failure was logged at warn (not info); a single failure does not
+    // escalate to error severity.
+    expect(mockLoggerWarn).toHaveBeenCalledWith(
+      "[backfill] per-episode failure",
+      expect.objectContaining({ episodeId: 2 }),
+    );
+  });
+
+  // ── Case 5b: resolver-level partial failures roll into aggregate `failed` ──
+
+  it("case 5b — resolver returns partial failures: aggregate failed counter includes resolver-level failures", async () => {
+    const episodes = [{ id: 50, summary: "Episode summary text." }];
+    setupMainPathMock(episodes);
+
+    mockResolveAndPersistEpisodeTopics.mockResolvedValueOnce({
+      resolved: 1,
+      failed: 2,
+      matchMethodDistribution: { auto: 1, llm_disambig: 0, new: 0 },
+      versionTokenForcedDisambig: 0,
+      candidatesConsidered: { p50: 0, max: 0 },
+      budgetExhausted: false,
+      topicCount: 3,
+    });
+
+    const result = await runTask({}, 1);
+
+    expect(result.processed).toBe(1);
+    expect(result.resolved).toBe(1);
+    expect(result.failed).toBe(2);
   });
 
   // ── Case 6: episodeIds payload — inArray path with null/length floor guards ─
 
-  it("case 6 — episodeIds path: inArray query with isNotNull + length floor asserted in WHERE", async () => {
+  it("case 6 — episodeIds path: inArray query with isNotNull + length floor (pinned to 100) asserted in WHERE", async () => {
     const episodes = [
       { id: 42, summary: "Episode 42 summary text that is long enough." },
       { id: 43, summary: "Episode 43 summary text that is long enough." },
@@ -317,15 +367,19 @@ describe("backfill-canonical-topics task", () => {
       capturedWhere = w;
     });
 
-    const result = await taskConfig.run({ episodeIds: [42, 43] });
+    const result = await runTask({ episodeIds: [42, 43] }, 2);
 
-    // WHERE clause must include inArray, isNotNull, and sql length guard
+    // WHERE clause must include inArray, isNotNull, and the length-floor sql
+    // guard with the pinned value of BACKFILL_MIN_SUMMARY_LENGTH (100).
     expect(capturedWhere).toMatchObject({
       type: "and",
       conditions: expect.arrayContaining([
         { type: "inArray", col: "episodes.id", vals: [42, 43] },
         { type: "isNotNull", col: "episodes.summary" },
-        expect.objectContaining({ type: "sql" }), // length >= 100 guard
+        expect.objectContaining({
+          type: "sql",
+          values: expect.arrayContaining([BACKFILL_MIN_SUMMARY_LENGTH]),
+        }),
       ]),
     });
 
@@ -335,10 +389,22 @@ describe("backfill-canonical-topics task", () => {
     expect(result.failed).toBe(0);
   });
 
+  // ── Case 6b: empty episodeIds is an explicit no-op (does NOT fall through) ─
+
+  it("case 6b — episodeIds: [] returns processed: 0 without hitting the main path", async () => {
+    // No db.select mock set up — if the code falls through to the main path,
+    // db.select would be called with no return value and the test would crash.
+    const result = await runTask({ episodeIds: [] }, 0);
+
+    expect(mockDbSelect).not.toHaveBeenCalled();
+    expect(mockResolveAndPersistEpisodeTopics).not.toHaveBeenCalled();
+    expect(result).toEqual({ processed: 0, resolved: 0, failed: 0 });
+  });
+
   // ── Case 7: inter-episode delay ────────────────────────────────────────────
 
-  it("case 7 — inter-episode delay: 500ms setTimeout fires between episodes", async () => {
-    vi.useFakeTimers();
+  it("case 7 — inter-episode delay: setTimeout invoked with BACKFILL_INTER_EPISODE_DELAY_MS between episodes", async () => {
+    const setTimeoutSpy = vi.spyOn(globalThis, "setTimeout");
 
     const episodes = [
       { id: 20, summary: "First timer-test episode summary." },
@@ -346,40 +412,134 @@ describe("backfill-canonical-topics task", () => {
     ];
     setupMainPathMock(episodes);
 
-    // Start the run but don't await — the loop will block on setTimeout
-    const runPromise = taskConfig.run({});
-
-    // Advance past both inter-episode delays (2 episodes = 1 delay between them + 1 after)
-    await vi.advanceTimersByTimeAsync(1100);
-    const result = await runPromise;
+    const result = await runTask({}, 2);
 
     expect(result.processed).toBe(2);
+    // Exactly one inter-episode delay between two episodes — the tail delay
+    // after the final episode is skipped.
+    const inter = setTimeoutSpy.mock.calls.filter(
+      ([, ms]) => ms === BACKFILL_INTER_EPISODE_DELAY_MS,
+    );
+    expect(inter).toHaveLength(1);
   });
 
   // ── Case 8: NULL/empty summary skip (main path WHERE structure) ────────────
 
-  it("case 8 — NULL/empty summary skip: main-path WHERE has isNull(ect) + isNotNull(summary) + length sql guard", async () => {
+  it("case 8 — NULL/empty summary skip: main-path WHERE has isNull(ect) + isNotNull(summary) + length floor pinned to 100", async () => {
     let capturedWhere: unknown;
     setupMainPathMock([], (w) => {
       capturedWhere = w;
     });
 
-    const result = await taskConfig.run({});
+    const result = await runTask({}, 0);
 
-    // The WHERE clause for the main LEFT JOIN path must compose all three guards
+    // The WHERE clause for the main LEFT JOIN path must compose all three
+    // guards, and the length floor must be pinned to BACKFILL_MIN_SUMMARY_LENGTH.
     expect(capturedWhere).toMatchObject({
       type: "and",
       conditions: expect.arrayContaining([
         { type: "isNull", col: "ect.episodeId" },
         { type: "isNotNull", col: "episodes.summary" },
-        expect.objectContaining({ type: "sql" }), // length(summary) >= 100
+        expect.objectContaining({
+          type: "sql",
+          values: expect.arrayContaining([BACKFILL_MIN_SUMMARY_LENGTH]),
+        }),
       ]),
     });
 
-    // Zero rows returned → task reports processed: 0
     expect(result.processed).toBe(0);
     expect(result.resolved).toBe(0);
     expect(result.failed).toBe(0);
+  });
+
+  // ── Case 9: batchSize override propagates to .limit() ──────────────────────
+
+  it("case 9 — batchSize override: .limit() invoked with the payload value, not the default", async () => {
+    const { limitImpl } = setupMainPathMock([]);
+
+    await runTask({ batchSize: 10 }, 0);
+
+    expect(limitImpl).toHaveBeenCalledWith(10);
+    // Sanity: ensure the default isn't being used silently.
+    expect(limitImpl).not.toHaveBeenCalledWith(BACKFILL_DEFAULT_BATCH_SIZE);
+  });
+
+  // ── Case 10: generateCompletion is called with bounded LLM options ────────
+
+  it("case 10 — generateCompletion options: maxTokens + temperature passed per ADR-048 §2", async () => {
+    const episode = { id: 80, summary: "Episode summary for option check." };
+    setupMainPathMock([episode]);
+
+    await runTask({}, 1);
+
+    expect(mockGenerateCompletion).toHaveBeenCalledWith(
+      expect.any(Array),
+      expect.objectContaining({
+        maxTokens: BACKFILL_MAX_OUTPUT_TOKENS,
+        temperature: BACKFILL_TEMPERATURE,
+      }),
+    );
+  });
+
+  // ── Case 11: malformed LLM JSON (non-array topics) coerces to []  ──────────
+
+  it("case 11 — malformed LLM output (topics is a non-array): coerced to [] before normalizeTopics", async () => {
+    const episode = { id: 90, summary: "Episode summary for shape guard." };
+    setupMainPathMock([episode]);
+    mockParseJsonResponse.mockReturnValueOnce({ topics: "not-an-array" });
+
+    const result = await runTask({}, 1);
+
+    expect(mockNormalizeTopics).toHaveBeenCalledWith([], expect.any(Array));
+    expect(result.processed).toBe(1);
+    expect(result.failed).toBe(0);
+  });
+
+  // ── Case 12: all-failed run escalates final log severity to error ──────────
+
+  it("case 12 — log severity: all-failed run logs at error level", async () => {
+    const episodes = [
+      { id: 1, summary: "First will fail." },
+      { id: 2, summary: "Second will fail." },
+    ];
+    setupMainPathMock(episodes);
+    mockGenerateCompletion.mockRejectedValue(new Error("OpenRouter outage"));
+
+    const result = await runTask({}, 2);
+
+    expect(result.failed).toBe(2);
+    expect(mockLoggerError).toHaveBeenCalledWith(
+      "[backfill] complete — all episodes failed",
+      result,
+    );
+    expect(mockLoggerInfo).not.toHaveBeenCalledWith(
+      "[backfill] complete",
+      expect.anything(),
+    );
+  });
+
+  // ── Case 13: progress metadata is re-set every iteration ──────────────────
+
+  it("case 13 — progress metadata: metadata.set is called per-iteration with full progress shape", async () => {
+    const episodes = [
+      { id: 1, summary: "First episode summary." },
+      { id: 2, summary: "Second episode summary." },
+    ];
+    setupMainPathMock(episodes);
+
+    await runTask({}, 2);
+
+    // Initial set + one set per processed episode = 3 calls minimum.
+    expect(mockMetadataSet).toHaveBeenCalledWith(
+      "progress",
+      expect.objectContaining({ total: 2, processed: 0 }),
+    );
+    expect(mockMetadataSet).toHaveBeenCalledWith(
+      "progress",
+      expect.objectContaining({ total: 2, processed: 2, resolved: 2 }),
+    );
+    // The buggy increment-on-top-level-key path should not be exercised.
+    expect(mockMetadataIncrement).not.toHaveBeenCalled();
   });
 
   // ── Task config assertions ────────────────────────────────────────────────

@@ -15,37 +15,25 @@
  * from summary-only input vs ~100× lower cost vs full re-summarization).
  */
 
-import { validateTopicLabel } from "@/lib/topic-label-validator";
+import { escapeXml, sanitizeBanlistForPrompt } from "@/lib/prompts";
 
 export const TOPIC_REEXTRACT_SYSTEM_PROMPT =
   "You are a canonical-topic extractor. Given a short podcast episode summary, identify the specific named things (events, releases, concepts, deals, incidents, works) that the episode discusses. Return only valid JSON. Be conservative — return an empty topics array if no specific named entities appear.";
-
-function escapeXml(s: string): string {
-  return s
-    .replaceAll("&", "&amp;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("'", "&apos;");
-}
 
 /**
  * Builds the user-turn prompt for topic re-extraction from a stored summary.
  *
  * @param summary - The stored episode summary text.
  * @param banlist - Category labels that must NOT appear as topic labels.
- *   Entries are sanitised via `validateTopicLabel` before injection (mirrors
- *   the defence in `getSummarizationPrompt` — banlist entries are sourced
- *   from prior LLM output and are therefore untrusted).
+ *   Sanitised via `sanitizeBanlistForPrompt` (validates each entry through
+ *   `validateTopicLabel` before injection — banlist entries are sourced from
+ *   prior LLM output and therefore untrusted).
  */
 export function getTopicReextractPrompt(
   summary: string,
   banlist: readonly string[],
 ): string {
-  const sanitizedBanlist = banlist.filter(
-    (entry) => validateTopicLabel(entry, []).ok,
-  );
-  const banlistJson = JSON.stringify(sanitizedBanlist);
+  const banlistJson = sanitizeBanlistForPrompt(banlist);
 
   return `Extract the canonical topics discussed in this podcast episode summary.
 
