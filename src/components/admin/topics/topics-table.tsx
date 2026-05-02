@@ -70,6 +70,7 @@ export function TopicsTable({
   const eligibleRows = rows.filter((r) => r.status === "active");
   const allEligibleSelected =
     eligibleRows.length > 0 && eligibleRows.every((r) => selectedIds.has(r.id));
+  const someEligibleSelected = eligibleRows.some((r) => selectedIds.has(r.id));
 
   function toggleAll() {
     if (allEligibleSelected) {
@@ -139,7 +140,13 @@ export function TopicsTable({
               <TableRow>
                 <TableHead className="w-10">
                   <Checkbox
-                    checked={allEligibleSelected}
+                    checked={
+                      allEligibleSelected
+                        ? true
+                        : someEligibleSelected
+                          ? "indeterminate"
+                          : false
+                    }
                     onCheckedChange={toggleAll}
                     aria-label="Select all active topics"
                   />
@@ -190,7 +197,10 @@ export function TopicsTable({
                     <TableCell className="text-sm">
                       {topic.episodeCount}
                     </TableCell>
-                    <TableCell className="text-sm text-muted-foreground">
+                    <TableCell
+                      className="text-sm text-muted-foreground"
+                      suppressHydrationWarning
+                    >
                       {topic.lastSeen.toLocaleDateString()}
                     </TableCell>
                     <TableCell>

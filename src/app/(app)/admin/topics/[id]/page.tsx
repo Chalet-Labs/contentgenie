@@ -58,7 +58,7 @@ export default async function AdminTopicDetailPage({
       .select({ n: count() })
       .from(episodeCanonicalTopics)
       .where(eq(episodeCanonicalTopics.canonicalTopicId, id));
-    orphanedJunctionCount = n;
+    orphanedJunctionCount = Number(n);
   }
 
   return (

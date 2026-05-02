@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
 import {
@@ -22,6 +23,7 @@ interface LinkedEpisodesPanelProps {
 }
 
 export function LinkedEpisodesPanel({ episodes }: LinkedEpisodesPanelProps) {
+  const router = useRouter();
   const [pending, setPending] = useState<number | null>(null);
 
   async function handleResummarize(episodeId: number) {
@@ -30,6 +32,7 @@ export function LinkedEpisodesPanel({ episodes }: LinkedEpisodesPanelProps) {
       const result = await triggerFullResummarize({ episodeId });
       if (result.success) {
         toast.success(`Re-summarize queued (run ${result.data.runId}).`);
+        router.refresh();
       } else {
         toast.error(`Re-summarize failed: ${result.error}`);
       }

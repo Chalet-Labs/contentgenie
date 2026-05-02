@@ -127,6 +127,7 @@ describe("BulkMergeDialog", () => {
     expect(mockToast.success).toHaveBeenCalledWith(
       expect.stringContaining("2 topic(s) merged"),
     );
+    expect(mockRefresh).toHaveBeenCalledTimes(1);
   });
 
   it("shows error toast on partial failure", async () => {

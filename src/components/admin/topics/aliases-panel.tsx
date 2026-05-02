@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
   AlertDialog,
@@ -22,6 +23,7 @@ interface AliasesPanelProps {
 }
 
 export function AliasesPanel({ canonicalId, aliases }: AliasesPanelProps) {
+  const router = useRouter();
   const [pending, setPending] = useState<number | null>(null);
 
   async function handleRemove(aliasId: number) {
@@ -30,6 +32,7 @@ export function AliasesPanel({ canonicalId, aliases }: AliasesPanelProps) {
       const result = await removeAlias({ canonicalId, aliasId });
       if (result.success) {
         toast.success("Alias removed.");
+        router.refresh();
       } else {
         toast.error(`Remove failed: ${result.error}`);
       }

@@ -225,10 +225,16 @@ describe("getCanonicalTopicsListQuery — new filters", () => {
     const { canonicalTopicEpisodeCount } =
       await import("@/lib/admin/canonical-topic-episode-count");
     const helperMock = canonicalTopicEpisodeCount as ReturnType<typeof vi.fn>;
-    const baselineCalls = helperMock.mock.calls.length;
+
+    // Establish a true select-only baseline: no episode-count filter, so any
+    // helper calls come only from the SELECT column — not from a WHERE clause.
+    await getCanonicalTopicsListQuery({ page: 1 });
+    const selectOnlyBaseline = helperMock.mock.calls.length;
 
     await getCanonicalTopicsListQuery({ page: 1, episodeCountMin: 1 });
-    expect(helperMock.mock.calls.length).toBeGreaterThan(baselineCalls);
+    expect(helperMock.mock.calls.length).toBeGreaterThanOrEqual(
+      selectOnlyBaseline + 1,
+    );
 
     const callsAfterMin = helperMock.mock.calls.length;
     await getCanonicalTopicsListQuery({

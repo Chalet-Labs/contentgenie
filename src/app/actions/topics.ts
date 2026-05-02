@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { and, eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { tasks } from "@trigger.dev/sdk";
 
 import { withAdminAction } from "@/lib/auth-wrapper";
@@ -400,10 +400,27 @@ export async function triggerFullResummarize(input: {
       return { success: false, error: "non-numeric-podcast-index-id" };
     }
 
-    await db
+    const prior = episode.summaryStatus;
+
+    // Atomic CAS: only flip to "queued" if summaryStatus hasn't changed since
+    // we read it — prevents two concurrent requests from both passing the
+    // IN_PROGRESS check and enqueuing duplicate runs.
+    const updated = await db
       .update(episodes)
       .set({ summaryStatus: "queued", updatedAt: new Date() })
-      .where(eq(episodes.id, episodeId));
+      .where(
+        and(
+          eq(episodes.id, episodeId),
+          prior === null
+            ? isNull(episodes.summaryStatus)
+            : eq(episodes.summaryStatus, prior),
+        ),
+      )
+      .returning({ id: episodes.id });
+
+    if (updated.length === 0) {
+      return { success: false, error: "already-busy" };
+    }
 
     try {
       const run = await tasks.trigger<typeof summarizeEpisode>(
@@ -419,7 +436,7 @@ export async function triggerFullResummarize(input: {
       try {
         await db
           .update(episodes)
-          .set({ summaryStatus: null, updatedAt: new Date() })
+          .set({ summaryStatus: prior, updatedAt: new Date() })
           .where(eq(episodes.id, episodeId));
       } catch (revertErr) {
         console.error("[triggerFullResummarize] revert also failed:", {
