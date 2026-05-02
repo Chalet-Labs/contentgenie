@@ -26,6 +26,8 @@ import {
   canonicalTopicKindEnum,
   canonicalTopicAliases,
   episodes,
+  IN_PROGRESS_STATUSES,
+  type SummaryStatus,
 } from "@/db/schema";
 import { db } from "@/db";
 import type { ActionResult } from "@/types/action-result";
@@ -91,6 +93,9 @@ const bulkMergeSchema = z
   })
   .refine((d) => !d.loserIds.includes(d.winnerId), {
     message: "winnerId must not be in loserIds",
+  })
+  .refine((d) => new Set(d.loserIds).size === d.loserIds.length, {
+    message: "loserIds must not contain duplicates",
   });
 
 const fullResummarizeSchema = z.object({
@@ -272,6 +277,12 @@ export async function removeAlias(input: {
         ),
       )
       .returning({ id: canonicalTopicAliases.id });
+    if (deleted.length === 0) {
+      // Either the alias does not exist or the canonical/alias pair did not
+      // match (defends against IDOR — we never reveal which). The consumer
+      // gets a clean negative signal so the success toast does not lie.
+      return { success: false, error: "not-found" };
+    }
     revalidatePath(`/admin/topics/${canonicalId}`);
     return { success: true, data: { removed: deleted.length } };
   });
@@ -296,12 +307,11 @@ export async function bulkMergeCanonicals(input: {
         error: parsed.error.issues[0]?.message ?? "Invalid input",
       };
     }
-    const { winnerId } = parsed.data;
-    // Dedup while preserving order; validation already rejected winner-in-losers.
-    const uniqueLoserIds = Array.from(new Set(parsed.data.loserIds));
+    const { winnerId, loserIds } = parsed.data;
+    // Validation already rejected winner-in-losers AND duplicate loserIds.
 
     const results: BulkMergeResultEntry[] = [];
-    for (const loserId of uniqueLoserIds) {
+    for (const loserId of loserIds) {
       try {
         const data = await mergeCanonicals({
           loserId,
@@ -312,6 +322,15 @@ export async function bulkMergeCanonicals(input: {
         revalidatePath(`/admin/topics/${loserId}`);
       } catch (e) {
         const error = e instanceof Error ? e.message : "unknown-error";
+        // Per-loser isolation continues the loop, but log unexpected errors so
+        // ops sees them — domain errors are expected and stay quiet.
+        if (!(e instanceof Error) || !MERGE_DOMAIN_ERRORS.has(e.message)) {
+          console.error("[bulkMergeCanonicals] unexpected per-loser failure:", {
+            loserId,
+            winnerId,
+            error: e,
+          });
+        }
         results.push({ loserId, ok: false, error });
       }
     }
@@ -367,11 +386,18 @@ export async function triggerFullResummarize(input: {
     }
     // Defence-in-depth: reject if already queued/running (matches batch-resummarize route).
     if (
-      episode.summaryStatus === "queued" ||
-      episode.summaryStatus === "running" ||
-      episode.summaryStatus === "summarizing"
+      episode.summaryStatus !== null &&
+      IN_PROGRESS_STATUSES.includes(episode.summaryStatus as SummaryStatus)
     ) {
       return { success: false, error: "already-busy" };
+    }
+    // Synthetic/RSS feeds use non-numeric podcastIndexIds (e.g. "rss-abc"),
+    // and `Number("rss-abc")` is NaN. Mirror the batch-resummarize route's
+    // guard before flipping summaryStatus → "queued" so we don't strand the
+    // row on an impossible trigger payload.
+    const numericPodcastIndexId = Number(episode.podcastIndexId);
+    if (!Number.isFinite(numericPodcastIndexId) || numericPodcastIndexId <= 0) {
+      return { success: false, error: "non-numeric-podcast-index-id" };
     }
 
     await db
@@ -382,20 +408,25 @@ export async function triggerFullResummarize(input: {
     try {
       const run = await tasks.trigger<typeof summarizeEpisode>(
         "summarize-episode",
-        { episodeId: Number(episode.podcastIndexId) },
+        { episodeId: numericPodcastIndexId },
       );
       return { success: true, data: { runId: run.id, episodeId } };
     } catch (e) {
+      console.error("[triggerFullResummarize] trigger failed:", {
+        episodeId,
+        error: e,
+      });
       try {
         await db
           .update(episodes)
           .set({ summaryStatus: null, updatedAt: new Date() })
           .where(eq(episodes.id, episodeId));
       } catch (revertErr) {
-        console.error(
-          "Failed to revert summaryStatus after trigger failure:",
-          revertErr,
-        );
+        console.error("[triggerFullResummarize] revert also failed:", {
+          episodeId,
+          triggerError: e,
+          revertError: revertErr,
+        });
       }
       return {
         success: false,
@@ -410,7 +441,8 @@ export async function triggerFullResummarize(input: {
 //
 // Name kept as `getCanonicalEpisodeCountDrift` for issue-traceability (#391).
 // The underlying semantics: merged canonicals with orphaned junction rows
-// (merge-pipeline bug per ADR-046 §3 path-compression invariant).
+// (merge-pipeline bug per the path-compression invariant from ADR-042
+// and the DELETE-then-UPDATE mechanic in ADR-046 §2).
 // ---------------------------------------------------------------------------
 
 export async function getCanonicalEpisodeCountDrift(): Promise<

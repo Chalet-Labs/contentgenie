@@ -344,14 +344,15 @@ describe("removeAlias", () => {
     expect(mockRevalidatePath).toHaveBeenCalledWith("/admin/topics/10");
   });
 
-  it("admin with mismatched FK pair — delete finds no rows, returns { removed: 0 }", async () => {
+  it("admin with mismatched FK pair — delete finds no rows, returns { success: false, error: 'not-found' }", async () => {
     mockAuth.mockResolvedValue(makeAdminAuth());
     mockDbDelete.mockReturnValue(makeDeleteChain([]));
 
     const result = await removeAlias({ canonicalId: 10, aliasId: 999 });
 
-    expect(result).toEqual({ success: true, data: { removed: 0 } });
-    expect(mockRevalidatePath).toHaveBeenCalledWith("/admin/topics/10");
+    expect(result).toEqual({ success: false, error: "not-found" });
+    // No revalidate when nothing actually changed.
+    expect(mockRevalidatePath).not.toHaveBeenCalled();
   });
 });
 
@@ -381,6 +382,16 @@ describe("bulkMergeCanonicals", () => {
   it("Zod: rejects when winnerId is in loserIds", async () => {
     mockAuth.mockResolvedValue(makeAdminAuth());
     const result = await bulkMergeCanonicals({ loserIds: [2, 3], winnerId: 2 });
+    expect(result).toMatchObject({ success: false });
+    expect(mockMergeCanonicals).not.toHaveBeenCalled();
+  });
+
+  it("Zod: rejects duplicate loserIds (dedup-or-fail → fail)", async () => {
+    mockAuth.mockResolvedValue(makeAdminAuth());
+    const result = await bulkMergeCanonicals({
+      loserIds: [1, 1, 2],
+      winnerId: 5,
+    });
     expect(result).toMatchObject({ success: false });
     expect(mockMergeCanonicals).not.toHaveBeenCalled();
   });
