@@ -17,29 +17,13 @@
 import { z } from "zod";
 
 import type { CanonicalTopicKind } from "@/db/schema";
+import { escapeXml } from "@/lib/prompts/xml-escape";
 
 export interface ReconcileMember {
   id: number;
   label: string;
   kind: CanonicalTopicKind;
   summary: string;
-}
-
-const XML_ESCAPES: Record<string, string> = {
-  "&": "&amp;",
-  "<": "&lt;",
-  ">": "&gt;",
-  '"': "&quot;",
-  "'": "&apos;",
-};
-
-/**
- * XML-escape for prompt payload. Server-side string interpolation into an
- * XML-shaped LLM prompt — not HTML/DOM output. Kept local so this module
- * stays dependency-free.
- */
-function escapeXml(s: string): string {
-  return s.replace(/[&<>"']/g, (ch) => XML_ESCAPES[ch] ?? ch);
 }
 
 export function getReconcileWinnerPickPrompt(
