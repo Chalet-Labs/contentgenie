@@ -215,6 +215,30 @@ describe("getCanonicalTopicsListQuery — new filters", () => {
     expect(result).toHaveProperty("totalCount");
   });
 
+  // Regression: the episode-count range predicate must route through the
+  // canonicalTopicEpisodeCount() helper — that helper is the only place that
+  // qualifies the outer canonical_topics.id. An earlier inline-SQL version
+  // used a bare ${canonicalTopics.id} which Postgres bound to the inner
+  // junction PK, making the predicate effectively always-false.
+  it("episode-count filter uses canonicalTopicEpisodeCount() (qualified outer id)", async () => {
+    setupDoubleChain([]);
+    const { canonicalTopicEpisodeCount } =
+      await import("@/lib/admin/canonical-topic-episode-count");
+    const helperMock = canonicalTopicEpisodeCount as ReturnType<typeof vi.fn>;
+    const baselineCalls = helperMock.mock.calls.length;
+
+    await getCanonicalTopicsListQuery({ page: 1, episodeCountMin: 1 });
+    expect(helperMock.mock.calls.length).toBeGreaterThan(baselineCalls);
+
+    const callsAfterMin = helperMock.mock.calls.length;
+    await getCanonicalTopicsListQuery({
+      page: 1,
+      episodeCountMin: 1,
+      episodeCountMax: 10,
+    });
+    expect(helperMock.mock.calls.length).toBeGreaterThan(callsAfterMin);
+  });
+
   it("ongoing=false is passed correctly", async () => {
     setupDoubleChain([]);
     // Should not throw

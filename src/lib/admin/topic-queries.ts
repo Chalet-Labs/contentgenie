@@ -7,6 +7,8 @@ import {
   episodes,
   type CanonicalTopicKind,
   type CanonicalTopicStatus,
+  type SummaryStatus,
+  type TranscriptStatus,
 } from "@/db/schema";
 import { canonicalTopicEpisodeCount } from "@/lib/admin/canonical-topic-episode-count";
 
@@ -73,16 +75,16 @@ export async function getCanonicalTopicsListQuery(
     filters.episodeCountMin !== undefined ||
     filters.episodeCountMax !== undefined
   ) {
-    const min = filters.episodeCountMin ?? 0;
-    const max = filters.episodeCountMax;
-    if (max !== undefined) {
-      conditions.push(
-        sql`(SELECT count(*) FROM ${episodeCanonicalTopics} ect WHERE ect.canonical_topic_id = ${canonicalTopics.id}) BETWEEN ${min} AND ${max}`,
-      );
+    // Reuse the helper that fully qualifies the outer canonical_topics.id —
+    // a bare `id` here resolves to the inner junction PK under Postgres's
+    // innermost-scope rule and silently makes the predicate always-false.
+    const ec = canonicalTopicEpisodeCount();
+    const min = Math.max(0, filters.episodeCountMin ?? 0);
+    if (filters.episodeCountMax !== undefined) {
+      const max = Math.max(min, filters.episodeCountMax);
+      conditions.push(sql`${ec} BETWEEN ${min} AND ${max}`);
     } else {
-      conditions.push(
-        sql`(SELECT count(*) FROM ${episodeCanonicalTopics} ect WHERE ect.canonical_topic_id = ${canonicalTopics.id}) >= ${min}`,
-      );
+      conditions.push(sql`${ec} >= ${min}`);
     }
   }
 
@@ -185,10 +187,11 @@ export async function getAdminAuditLogQuery(
 // T1: Merge-cleanup drift query (ADR-049 §1)
 //
 // Returns merged canonicals that still have junction rows in
-// episode_canonical_topics. Per ADR-046 §3 (path-compression invariant), a
-// successful merge transaction leaves the loser with zero junction rows.
-// Any merged canonical with COUNT > 0 indicates a partial/failed merge.
-// The server action keeps the issue-tracing name `getCanonicalEpisodeCountDrift`.
+// episode_canonical_topics. Per the path-compression invariant from ADR-042
+// (and the DELETE-then-UPDATE mechanic in ADR-046 §2), a successful merge
+// transaction leaves the loser with zero junction rows. Any merged canonical
+// with COUNT > 0 indicates a partial/failed merge. The server action keeps
+// the issue-tracing name `getCanonicalEpisodeCountDrift`.
 // ---------------------------------------------------------------------------
 
 export interface DriftRow {
@@ -233,8 +236,8 @@ export interface LinkedEpisodeRow {
   episodeId: number;
   podcastIndexId: string;
   title: string;
-  transcriptStatus: string | null;
-  summaryStatus: string | null;
+  transcriptStatus: TranscriptStatus | null;
+  summaryStatus: SummaryStatus | null;
   matchMethod: string;
   similarityToTopMatch: number | null;
 }

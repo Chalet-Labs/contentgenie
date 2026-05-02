@@ -64,20 +64,23 @@ describe("LinkedEpisodesPanel", () => {
   });
 
   it("re-summarize button is disabled when no transcript", () => {
-    const ep = makeEpisode({ transcriptStatus: "pending" });
+    const ep = makeEpisode({ transcriptStatus: "missing" });
     render(<LinkedEpisodesPanel episodes={[ep]} />);
     expect(
       screen.getByRole("button", { name: /re-summarize/i }),
     ).toBeDisabled();
   });
 
-  it("re-summarize button is disabled when summary is busy", () => {
-    const ep = makeEpisode({ summaryStatus: "queued" });
-    render(<LinkedEpisodesPanel episodes={[ep]} />);
-    expect(
-      screen.getByRole("button", { name: /re-summarize/i }),
-    ).toBeDisabled();
-  });
+  it.each(["queued", "running", "summarizing"] as const)(
+    "re-summarize button is disabled when summary status is %s",
+    (busyStatus) => {
+      const ep = makeEpisode({ summaryStatus: busyStatus });
+      render(<LinkedEpisodesPanel episodes={[ep]} />);
+      expect(
+        screen.getByRole("button", { name: /re-summarize/i }),
+      ).toBeDisabled();
+    },
+  );
 
   it("clicking re-summarize calls triggerFullResummarize and shows success toast", async () => {
     mockTriggerFullResummarize.mockResolvedValue({
