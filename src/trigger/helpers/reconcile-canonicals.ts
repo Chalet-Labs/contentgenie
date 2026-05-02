@@ -335,23 +335,17 @@ interface ClusterState {
   mergedLoserIds: Set<number>;
   preMergeCounts: Map<number, number>;
   affectedWinners: Set<number>;
-  winnerToAbsorbedLosers: Map<number, number[]>;
 }
 
 /** Phase 5 — merge each verified loser. Mutates the shared cross-cluster state + accumulator. */
 async function mergeVerifiedLosers(
   deps: Pick<ReconcileDeps, "db" | "mergeCanonicals" | "logger">,
   winnerId: number,
-  verifiedLoserIds: number[],
+  verifiedLoserIds: readonly number[],
   state: ClusterState,
   accum: ReconcileSummaryAccumulator,
 ): Promise<void> {
-  const {
-    mergedLoserIds,
-    preMergeCounts,
-    affectedWinners,
-    winnerToAbsorbedLosers,
-  } = state;
+  const { mergedLoserIds, preMergeCounts, affectedWinners } = state;
 
   for (const loserId of verifiedLoserIds) {
     if (mergedLoserIds.has(loserId)) {
@@ -374,9 +368,6 @@ async function mergeVerifiedLosers(
       mergedLoserIds.add(loserId);
       affectedWinners.add(winnerId);
       accum.mergeSucceeded();
-      const absorbed = winnerToAbsorbedLosers.get(winnerId) ?? [];
-      absorbed.push(loserId);
-      winnerToAbsorbedLosers.set(winnerId, absorbed);
     } catch (err) {
       accum.mergeFailed();
       deps.logger.warn("reconcile_merge_failed", {
@@ -442,30 +433,6 @@ function membersOf(
 }
 
 /**
- * Resolve-forward: if any verified loser was itself a winner in a prior
- * cluster, include its prior absorptions so we never produce chains
- * (e.g. direct 3→1 and 2→1, never the chain 3→2→1).
- */
-function resolveTransitiveLosers(
-  verifiedLosers: readonly number[],
-  affectedWinners: Set<number>,
-  winnerToAbsorbedLosers: Map<number, number[]>,
-  mergedLoserIds: Set<number>,
-): number[] {
-  const losersToMergeSet = new Set(verifiedLosers);
-  for (const loserId of verifiedLosers) {
-    if (affectedWinners.has(loserId)) {
-      for (const priorId of winnerToAbsorbedLosers.get(loserId) ?? []) {
-        if (!mergedLoserIds.has(priorId)) {
-          losersToMergeSet.add(priorId);
-        }
-      }
-    }
-  }
-  return Array.from(losersToMergeSet);
-}
-
-/**
  * Execute phases 3–5 for a single cluster. Contains the per-cluster try/catch
  * so a winner-pick or verify throw never aborts the entire pipeline.
  * `clusterSeen()` is called by the orchestrator before this function.
@@ -519,13 +486,13 @@ async function runCluster(
     }
 
     currentPhase = "merge";
-    const losersToMerge = resolveTransitiveLosers(
+    await mergeVerifiedLosers(
+      deps,
+      winnerId,
       verify.verifiedLoserIds,
-      state.affectedWinners,
-      state.winnerToAbsorbedLosers,
-      state.mergedLoserIds,
+      state,
+      accum,
     );
-    await mergeVerifiedLosers(deps, winnerId, losersToMerge, state, accum);
   } catch (err) {
     accum.clusterFailed();
     deps.logger.warn("reconcile_cluster_failed", {
@@ -580,21 +547,21 @@ export async function runReconciliation(
   const rowsById = new Map<number, CanonicalRow>();
   for (const r of rows) rowsById.set(r.id, r);
 
-  // Cross-cluster state owned by the orchestrator (ADR-050 §7)
+  // Cross-cluster state owned by the orchestrator (ADR-050 §7).
+  // Merge chains in the database (A→B→C) are walked at read time by
+  // walkMergedChain() in src/app/(app)/topic/[id]/merge-walker.ts, so the
+  // orchestrator does not flatten them — `mergeCanonicals` rejects already-
+  // merged rows (`not-active`), which makes a redirect rewrite from this layer
+  // structurally impossible without a separate DB helper.
   const mergedLoserIds = new Set<number>();
   const preMergeCounts = new Map<number, number>();
   const affectedWinners = new Set<number>();
-  // Maps each winner to every entity it has absorbed (directly or via chain
-  // resolution) so later clusters can re-point transitive losers and avoid
-  // A→B→C chains when mergeCanonicals only rewrites the direct loser.
-  const winnerToAbsorbedLosers = new Map<number, number[]>();
 
   // Phases 3–5 — per-cluster orchestration
   const state: ClusterState = {
     mergedLoserIds,
     preMergeCounts,
     affectedWinners,
-    winnerToAbsorbedLosers,
   };
   for (let i = 0; i < clusters.length; i++) {
     // Phase 6 budget guard (ADR-050 §6) — top of every cluster iteration.

@@ -654,6 +654,61 @@ describe("runReconciliation", () => {
     expect(summary.episodeCountDrift).toBe(2);
   });
 
+  // (k3) Multi-step merge chain — cluster A merges 3→2, cluster B merges 2→1.
+  // Both merges fire: 2 is a fresh loser in cluster B (only ID 3 is in
+  // mergedLoserIds after cluster A), so the cross-cluster overlap guard does
+  // not block it. Database-side chain resolution is handled at read time by
+  // walkMergedChain (src/app/(app)/topic/[id]/merge-walker.ts), which is why
+  // this orchestrator does not attempt to flatten chains itself.
+  it("(k3) merge chain 3→2 then 2→1 — both mergeCanonicals calls fire, no skips", async () => {
+    const generateCompletion = vi
+      .fn()
+      // Cluster A — winner=2, verify loser=3
+      .mockResolvedValueOnce(JSON.stringify({ winner_id: 2 }))
+      .mockResolvedValueOnce(JSON.stringify({ same_entity: true }))
+      // Cluster B — winner=1, verify loser=2
+      .mockResolvedValueOnce(JSON.stringify({ winner_id: 1 }))
+      .mockResolvedValueOnce(JSON.stringify({ same_entity: true }));
+
+    const { deps, mergeCanonicalsMock } = buildDeps({
+      rows: [row(1), row(2), row(3)],
+      clusters: [
+        [3, 2],
+        [2, 1],
+      ],
+      generateCompletion,
+      // Pre-merge counts captured JIT in merge order: pre(2), pre(1).
+      preCountQueue: [4, 10],
+      // Phase 6 batch query returns one row per affected winner.
+      postBatchRows: [
+        { id: 2, count: 4 },
+        { id: 1, count: 12 },
+      ],
+      decayRows: [],
+    });
+
+    const summary = await runReconciliation(deps);
+
+    expect(summary.clustersSeen).toBe(2);
+    expect(summary.clustersFailed).toBe(0);
+    expect(summary.mergesExecuted).toBe(2);
+    expect(summary.mergesSkippedAlreadyMerged).toBe(0);
+    expect(summary.mergesFailed).toBe(0);
+    expect(mergeCanonicalsMock).toHaveBeenCalledTimes(2);
+    expect(mergeCanonicalsMock).toHaveBeenNthCalledWith(1, {
+      loserId: 3,
+      winnerId: 2,
+      actor: "reconcile-canonicals",
+    });
+    expect(mergeCanonicalsMock).toHaveBeenNthCalledWith(2, {
+      loserId: 2,
+      winnerId: 1,
+      actor: "reconcile-canonicals",
+    });
+    // Drift = (post(2)-pre(2)) + (post(1)-pre(1)) = 0 + 2 = 2.
+    expect(summary.episodeCountDrift).toBe(2);
+  });
+
   // Fix 8: Phase 3 winner-pick throw → clustersFailed isolation
   it("isolates Phase 3 winner-pick throws to clustersFailed and continues", async () => {
     // Two clusters. Cluster A's winner-pick throws (LLM 500); cluster B
