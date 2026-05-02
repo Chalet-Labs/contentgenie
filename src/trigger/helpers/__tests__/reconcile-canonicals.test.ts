@@ -226,13 +226,16 @@ describe("runReconciliation", () => {
     vi.clearAllMocks();
   });
 
-  // (a) empty Phase 1
-  it("(a) returns all-zero summary when Phase 1 yields no rows", async () => {
-    const { deps, mergeCanonicalsMock, clusterMock } = buildDeps({
-      rows: [],
-    });
+  // (a) empty Phase 1 — clustering/merging skipped, but Phase 7 decay still runs
+  it("(a) skips clustering/merging but runs Phase 7 decay when Phase 1 yields no rows", async () => {
+    const { deps, mergeCanonicalsMock, clusterMock, generateCompletionMock } =
+      buildDeps({
+        rows: [],
+        decayRows: [{ id: 10 }, { id: 11 }, { id: 12 }],
+      });
     const summary = await runReconciliation(deps);
 
+    // All cluster/merge counters must be zero.
     expect(summary).toMatchObject({
       clustersSeen: 0,
       clustersFailed: 0,
@@ -242,12 +245,15 @@ describe("runReconciliation", () => {
       mergesRejectedByPairwise: 0,
       mergesSkippedAlreadyMerged: 0,
       pairwiseVerifyFailed: 0,
-      dormancyTransitions: 0,
       episodeCountDrift: 0,
     });
+    // Phase 7 ran and returned 3 dormancy transitions.
+    expect(summary.dormancyTransitions).toBe(3);
     expect(typeof summary.durationMs).toBe("number");
+    // No LLM calls, no merges, no clustering.
     expect(clusterMock).not.toHaveBeenCalled();
     expect(mergeCanonicalsMock).not.toHaveBeenCalled();
+    expect(generateCompletionMock).not.toHaveBeenCalled();
   });
 
   // (b) two clusters, all verified true

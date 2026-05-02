@@ -215,7 +215,14 @@ export async function runReconciliation(
   const rows = await fetchActiveCanonicals(db);
   if (rows.length === 0) {
     logger.info("reconcile_phase1_empty", { rowCount: 0 });
-    return EMPTY_SUMMARY(now().getTime() - startMs);
+    // Skip Phases 2–6 (no clusters → no merges), but Phase 7 (decay) is
+    // logically independent: old event-type canonicals may still need to be
+    // marked dormant even on quiet days with no recent canonical activity.
+    const dormancyTransitions = await decayStaleCanonicals(db);
+    return {
+      ...EMPTY_SUMMARY(now().getTime() - startMs),
+      dormancyTransitions,
+    };
   }
 
   // ───────── Phase 2 — cluster ─────────
