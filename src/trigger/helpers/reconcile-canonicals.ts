@@ -66,6 +66,8 @@ export interface ReconcileSummary {
   clustersSeen: number;
   clustersFailed: number;
   clustersDeferred: number;
+  /** Rows dropped from Phase 1 because their `identity_embedding` contained NaN or non-finite values. */
+  malformedEmbeddingCount: number;
   /**
    * Cluster-level: incremented when a winner_id returned by Phase 3 was
    * already merged as a loser in a prior cluster. DBSCAN with custom distance
@@ -104,10 +106,23 @@ interface CanonicalRow {
   embedding: number[];
 }
 
+/**
+ * Raw row as returned by the Phase 1 SELECT before embedding coercion.
+ * `embedding` is `null` when `coerceEmbedding` detected a malformed vector.
+ */
+interface RawCanonicalRow {
+  id: number;
+  label: string;
+  kind: ReconcileMember["kind"];
+  summary: string;
+  embedding: number[] | null;
+}
+
 const EMPTY_SUMMARY = (durationMs: number): ReconcileSummary => ({
   clustersSeen: 0,
   clustersFailed: 0,
   clustersDeferred: 0,
+  malformedEmbeddingCount: 0,
   clustersSkippedWinnerAlreadyMerged: 0,
   mergesExecuted: 0,
   mergesFailed: 0,
@@ -124,14 +139,18 @@ const EMPTY_SUMMARY = (durationMs: number): ReconcileSummary => ({
  * Best-effort coerce of the `identity_embedding` column the DB driver returns.
  * Postgres `vector` may surface as `number[]` (pg JSON path), `string`
  * (`"[1,2,3]"`), or `Float32Array`. The clustering helper expects `number[]`.
+ *
+ * Returns `null` when any element is NaN or non-finite (malformed input that
+ * would silently corrupt DBSCAN distances). Returns `[]` only for empty
+ * vectors from recognised shapes; `null` for entirely unrecognised shapes.
  */
-function coerceEmbedding(raw: unknown): number[] {
-  const ensureFinite = (vals: number[]): number[] =>
-    vals.every(Number.isFinite) ? vals : [];
-
-  if (Array.isArray(raw)) return ensureFinite(raw.map((v) => Number(v)));
-  if (raw instanceof Float32Array) return ensureFinite(Array.from(raw));
-  if (typeof raw === "string") {
+function coerceEmbedding(raw: unknown): number[] | null {
+  let arr: number[];
+  if (Array.isArray(raw)) {
+    arr = raw.map((v) => Number(v));
+  } else if (raw instanceof Float32Array) {
+    arr = Array.from(raw);
+  } else if (typeof raw === "string") {
     const trimmed = raw.trim();
     if (
       trimmed.length >= 2 &&
@@ -140,25 +159,29 @@ function coerceEmbedding(raw: unknown): number[] {
     ) {
       const inner = trimmed.slice(1, -1).trim();
       if (inner.length === 0) return [];
-      return ensureFinite(
-        inner
-          .split(",")
-          .map((s) => s.trim())
-          .filter(Boolean)
-          .map(Number),
-      );
+      arr = inner.split(",").map((s) => Number(s.trim()));
+    } else {
+      return null;
     }
+  } else {
+    return null;
   }
-  return [];
+  // Guard: any NaN or ±Infinity element taints the whole vector.
+  if (arr.some((x) => !Number.isFinite(x))) return null;
+  return arr;
 }
 
 /**
  * Phase 1 — fetch active canonicals seen in the last `RECONCILE_LOOKBACK_DAYS`
  * with their identity embeddings.
+ *
+ * Returns `RawCanonicalRow[]` where `embedding` is `null` for rows whose
+ * `identity_embedding` failed the finite-value guard in `coerceEmbedding`.
+ * Callers are responsible for filtering and incrementing `malformedEmbeddingCount`.
  */
 async function fetchActiveCanonicals(
   database: ReconcileDeps["db"],
-): Promise<CanonicalRow[]> {
+): Promise<RawCanonicalRow[]> {
   const result = await database.execute<{
     id: number;
     label: string;
@@ -240,7 +263,19 @@ export async function runReconciliation(
   const startMs = now().getTime();
 
   // ───────── Phase 1 — fetch active canonicals ─────────
-  const rows = await fetchActiveCanonicals(db);
+  const rawRows = await fetchActiveCanonicals(db);
+
+  // Drop rows whose identity_embedding produced NaN/non-finite values.
+  let malformedEmbeddingCount = 0;
+  const rows: CanonicalRow[] = [];
+  for (const r of rawRows) {
+    if (r.embedding === null) {
+      malformedEmbeddingCount++;
+    } else {
+      rows.push(r as CanonicalRow);
+    }
+  }
+
   if (rows.length === 0) {
     logger.info("reconcile_phase1_empty", { rowCount: 0 });
     // Skip Phases 2–6 (no clusters → no merges), but Phase 7 (decay) is
@@ -254,6 +289,7 @@ export async function runReconciliation(
     });
     return {
       ...EMPTY_SUMMARY(now().getTime() - startMs),
+      malformedEmbeddingCount,
       dormancyTransitions,
     };
   }
@@ -275,6 +311,7 @@ export async function runReconciliation(
   let clustersSeen = 0;
   let clustersFailed = 0;
   let clustersDeferred = 0;
+  // malformedEmbeddingCount already accumulated in Phase 1 filter above.
   let clustersSkippedWinnerAlreadyMerged = 0;
   let mergesExecuted = 0;
   let mergesFailed = 0;
@@ -302,6 +339,10 @@ export async function runReconciliation(
 
     const cluster = clusters[i];
     clustersSeen++;
+
+    let currentPhase: "winner_pick" | "pairwise_verify" | "merge" =
+      "winner_pick";
+    let clusterWinnerId: number | null = null;
 
     try {
       // ───────── Phase 3 — winner pick ─────────
@@ -343,10 +384,13 @@ export async function runReconciliation(
         continue;
       }
 
+      clusterWinnerId = winnerId;
+
       const winner = rowsById.get(winnerId);
       if (!winner) continue;
 
       // ───────── Phase 4 — pairwise verify (per-pair partial-accept) ─────────
+      currentPhase = "pairwise_verify";
       const losers = cluster.filter((id) => id !== winnerId);
       const verifiedLosers: number[] = [];
       let clusterHadRejection = false;
@@ -392,6 +436,7 @@ export async function runReconciliation(
       }
 
       // ───────── Phase 5 — merge per verified loser ─────────
+      currentPhase = "merge";
       for (const loserId of verifiedLosers) {
         if (mergedLoserIds.has(loserId)) {
           // Cross-cluster overlap guard (ADR-048 §7).
@@ -426,6 +471,9 @@ export async function runReconciliation(
       clustersFailed++;
       logger.warn("reconcile_cluster_failed", {
         clusterIndex: i,
+        phase: currentPhase,
+        memberIds: cluster,
+        winnerId: clusterWinnerId,
         error: err instanceof Error ? err.message : String(err),
       });
     }
@@ -452,6 +500,7 @@ export async function runReconciliation(
     clustersSeen,
     clustersFailed,
     clustersDeferred,
+    malformedEmbeddingCount,
     clustersSkippedWinnerAlreadyMerged,
     mergesExecuted,
     mergesFailed,

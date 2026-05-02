@@ -653,7 +653,7 @@ describe("runReconciliation", () => {
       .mockResolvedValueOnce(JSON.stringify({ winner_id: 3 }))
       .mockResolvedValueOnce(JSON.stringify({ same_entity: true }));
 
-    const { deps, mergeCanonicalsMock } = buildDeps({
+    const { deps, mergeCanonicalsMock, logger } = buildDeps({
       rows: [row(1), row(2), row(3), row(4)],
       clusters: [
         [1, 2],
@@ -679,6 +679,99 @@ describe("runReconciliation", () => {
     });
     // Cluster B drift: post(3)=7 − pre(3)=5 = 2.
     expect(summary.episodeCountDrift).toBe(2);
+
+    // F3: cluster-failure warn payload must carry phase, memberIds, winnerId.
+    const warnCalls = (logger.warn as ReturnType<typeof vi.fn>).mock.calls;
+    const clusterFailedCall = warnCalls.find(
+      ([msg]) => msg === "reconcile_cluster_failed",
+    );
+    expect(clusterFailedCall).toBeDefined();
+    const payload = clusterFailedCall![1] as Record<string, unknown>;
+    // Winner-pick threw before Phase 3 completed → phase="winner_pick", winnerId=null.
+    expect(payload.phase).toBe("winner_pick");
+    expect(payload.memberIds).toEqual([1, 2]);
+    expect(payload.winnerId).toBeNull();
+    expect(typeof payload.error).toBe("string");
+  });
+
+  // F2: malformed embedding rows are dropped, malformedEmbeddingCount increments
+  it("(F2) drops rows with NaN-producing string embeddings and increments malformedEmbeddingCount", async () => {
+    // Row 1 has a valid embedding; row 2 has a malformed string embedding
+    // "[1, abc, 3]" that produces [1, NaN, 3]. Row 2 must be dropped.
+    const validRow = row(1, "topic-1", [1, 0, 0]);
+    const malformedRow = {
+      id: 2,
+      label: "topic-2",
+      kind: "release" as const,
+      summary: "summary-2",
+      identity_embedding: "[1, abc, 3]",
+    };
+
+    const generateCompletion = vi.fn();
+    const { deps, mergeCanonicalsMock, clusterMock } = buildDeps({
+      rows: [validRow, malformedRow],
+      clusters: [], // no clusters — we only test Phase 1 filtering here
+      generateCompletion,
+      countQueue: [],
+      decayRows: [],
+    });
+
+    const summary = await runReconciliation(deps);
+
+    // malformedRow must have been dropped.
+    expect(summary.malformedEmbeddingCount).toBe(1);
+    // The clustering input must only contain the valid row (id=1).
+    expect(clusterMock).toHaveBeenCalledOnce();
+    const clusterInput = clusterMock.mock.calls[0][0] as Array<{
+      id: number;
+      embedding: number[];
+    }>;
+    expect(clusterInput).toHaveLength(1);
+    expect(clusterInput[0].id).toBe(1);
+    // No merges should have occurred.
+    expect(mergeCanonicalsMock).not.toHaveBeenCalled();
+  });
+
+  // F2: valid embedding formats pass through with malformedEmbeddingCount=0
+  it("(F2) Float32Array, number[], and well-formed string embeddings pass through with malformedEmbeddingCount=0", async () => {
+    const float32Row = {
+      id: 1,
+      label: "topic-1",
+      kind: "release" as const,
+      summary: "summary-1",
+      identity_embedding: new Float32Array([1, 0, 0]),
+    };
+    const arrayRow = {
+      id: 2,
+      label: "topic-2",
+      kind: "release" as const,
+      summary: "summary-2",
+      identity_embedding: [0, 1, 0],
+    };
+    const stringRow = {
+      id: 3,
+      label: "topic-3",
+      kind: "release" as const,
+      summary: "summary-3",
+      identity_embedding: "[0,0,1]",
+    };
+
+    const { deps, clusterMock } = buildDeps({
+      rows: [float32Row, arrayRow, stringRow],
+      clusters: [],
+      countQueue: [],
+      decayRows: [],
+    });
+
+    const summary = await runReconciliation(deps);
+
+    expect(summary.malformedEmbeddingCount).toBe(0);
+    const clusterInput = clusterMock.mock.calls[0][0] as Array<{
+      id: number;
+      embedding: number[];
+    }>;
+    expect(clusterInput).toHaveLength(3);
+    expect(clusterInput.map((r) => r.id)).toEqual([1, 2, 3]);
   });
 });
 

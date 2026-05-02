@@ -59,6 +59,7 @@ const FULL_SUMMARY = {
   clustersSeen: 3,
   clustersFailed: 0,
   clustersDeferred: 0,
+  malformedEmbeddingCount: 0,
   clustersSkippedWinnerAlreadyMerged: 0,
   mergesExecuted: 2,
   mergesFailed: 0,
