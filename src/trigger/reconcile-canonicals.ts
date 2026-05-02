@@ -1,6 +1,6 @@
 /**
  * Nightly canonical-topic reconciliation Trigger.dev scheduled task
- * (issue #389, ADR-048).
+ * (issue #389, ADR-050).
  *
  * Wires real dependencies into `runReconciliation` and emits the structured
  * `reconcile_summary` log (Phase 8). Per-merge transactional isolation,

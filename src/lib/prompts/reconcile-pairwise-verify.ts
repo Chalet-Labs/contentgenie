@@ -1,6 +1,6 @@
 /**
  * Prompt builder + Zod schema for the nightly reconciliation task's
- * Stage B "pairwise verify" LLM call (issue #389, ADR-048 §2).
+ * Stage B "pairwise verify" LLM call (issue #389, ADR-050 §2).
  *
  * Given the cluster's chosen winner and one specific loser, ask the model
  * a single yes/no question: "Is this loser the same real-world entity as
@@ -8,7 +8,7 @@
  * accept rule means an affirmative pair merges even if a sibling pair in
  * the same cluster is rejected. R3 over-merge prevention is satisfied at
  * the pair level: a failed pair is never merged regardless of cluster-mate
- * outcomes (ADR-048 §2).
+ * outcomes (ADR-050 §2).
  *
  * Pure module: no IO, no SDK calls, no runtime deps. Mirrors the structural
  * shape of `@/lib/prompts/entity-disambiguator.ts` and

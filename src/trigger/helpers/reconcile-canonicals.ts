@@ -6,13 +6,13 @@
  * `reconcile_summary` log (Phase 8).
  *
  * Architectural anchors:
- *   - ADR-048 §2 — per-pair partial-accept on Phase 4 (NOT cluster-strict-reject).
- *   - ADR-048 §3 — per-merge transactions, per-cluster try/catch isolation.
- *   - ADR-048 §4 — `episodeCountDrift` is a true delta (post − pre), captured
+ *   - ADR-050 §2 — per-pair partial-accept on Phase 4 (NOT cluster-strict-reject).
+ *   - ADR-050 §3 — per-merge transactions, per-cluster try/catch isolation.
+ *   - ADR-050 §4 — `episodeCountDrift` is a true delta (post − pre), captured
  *     lazily at first merge to each winner. NOT a DB write.
- *   - ADR-048 §6 — `RECONCILE_BUDGET_MS` time-budget guard at the top of every
+ *   - ADR-050 §6 — `RECONCILE_BUDGET_MS` time-budget guard at the top of every
  *     cluster iteration so `reconcile_summary` always emits.
- *   - ADR-048 §7 — `mergedLoserIds: Set<number>` cross-cluster overlap guard.
+ *   - ADR-050 §7 — `mergedLoserIds: Set<number>` cross-cluster overlap guard.
  *
  * Pure-ish module: all IO (DB, LLM, merge) flows through injected dependencies
  * for testability. The top-level task supplies the real implementations.
@@ -78,7 +78,7 @@ export interface ReconcileSummary {
    * Cluster-level: incremented when a winner_id returned by Phase 3 was
    * already merged as a loser in a prior cluster. DBSCAN with custom distance
    * fns can produce overlapping clusters; this guard prevents merging onto an
-   * already-merged canonical (corruption + chain risk). ADR-048 §7.
+   * already-merged canonical (corruption + chain risk). ADR-050 §7.
    */
   clustersSkippedWinnerAlreadyMerged: number;
   mergesExecuted: number;
@@ -86,7 +86,7 @@ export interface ReconcileSummary {
   /**
    * Cluster-level: incremented at most once per cluster, and only when the
    * cluster ended with ≥1 rejected pair AND zero verified losers (the
-   * cluster's grouping claim was rejected outright). ADR-048 §2.
+   * cluster's grouping claim was rejected outright). ADR-050 §2.
    */
   mergesRejectedByPairwise: number;
   mergesSkippedAlreadyMerged: number;
@@ -95,7 +95,7 @@ export interface ReconcileSummary {
   /** Per-pair count of `same_entity=false` verdicts. Healthy R3 behavior. */
   pairwiseVerifyRejected: number;
   dormancyTransitions: number;
-  /** Sum of `(postCount - preCount)` across affected winners. ADR-048 §4. */
+  /** Sum of `(postCount - preCount)` across affected winners. ADR-050 §4. */
   episodeCountDrift: number;
   durationMs: number;
 }
@@ -220,7 +220,7 @@ async function fetchActiveCanonicals(
 /**
  * Phase 6 helper — count of episodes referencing a canonical topic via the
  * junction table. The same source of truth as the read-side `episode_count`
- * everywhere else in the app (PR #424 / ADR-048 §4).
+ * everywhere else in the app (PR #424 / ADR-050 §4).
  */
 async function countEpisodesForCanonical(
   database: ReconcileDeps["db"],
@@ -343,7 +343,7 @@ export async function runReconciliation(
 
   // ───────── Phases 3–5 — per-cluster orchestration ─────────
   for (let i = 0; i < clusters.length; i++) {
-    // Phase 6 budget guard (ADR-048 §6) — top of every cluster iteration.
+    // Phase 6 budget guard (ADR-050 §6) — top of every cluster iteration.
     if (now().getTime() - startMs > RECONCILE_BUDGET_MS) {
       const remaining = clusters.length - i;
       clustersDeferred += remaining;
@@ -395,7 +395,7 @@ export async function runReconciliation(
       if (mergedLoserIds.has(winnerId)) {
         // Winner was already merged as a loser in a prior cluster — DBSCAN
         // can produce overlapping clusters with custom distance fns
-        // (ADR-048 §7). Merging onto an already-merged canonical would cause
+        // (ADR-050 §7). Merging onto an already-merged canonical would cause
         // corruption + chains; skip the cluster entirely.
         clustersSkippedWinnerAlreadyMerged++;
         continue;
@@ -436,7 +436,7 @@ export async function runReconciliation(
             pairwiseVerifyRejected++;
           }
         } catch (err) {
-          // Treat failure as "no" (ADR-048 §3) — preserves R3 over-merge guard.
+          // Treat failure as "no" (ADR-050 §3) — preserves R3 over-merge guard.
           pairwiseVerifyThrew++;
           logger.warn("reconcile_pairwise_verify_failed", {
             winnerId,
@@ -469,7 +469,7 @@ export async function runReconciliation(
 
       for (const loserId of Array.from(losersToMergeSet)) {
         if (mergedLoserIds.has(loserId)) {
-          // Cross-cluster overlap guard (ADR-048 §7).
+          // Cross-cluster overlap guard (ADR-050 §7).
           mergesSkippedAlreadyMerged++;
           continue;
         }
