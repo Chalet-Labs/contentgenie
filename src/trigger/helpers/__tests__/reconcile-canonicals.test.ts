@@ -31,6 +31,7 @@ import {
   RECONCILE_BUDGET_MS,
   RECONCILE_DECAY_DAYS,
   RECONCILE_DECAY_KINDS,
+  RECONCILE_LOOKBACK_DAYS,
 } from "@/lib/reconcile-constants";
 import { serializeSql } from "@/test/sql-fixture-queue";
 
@@ -637,6 +638,87 @@ describe("runReconciliation", () => {
     // pairwise verify).
     expect(generateCompletion).toHaveBeenCalledTimes(3);
     expect(summary.episodeCountDrift).toBe(2);
+  });
+
+  // Fix 8: Phase 3 winner-pick throw → clustersFailed isolation
+  it("isolates Phase 3 winner-pick throws to clustersFailed and continues", async () => {
+    // Two clusters. Cluster A's winner-pick throws (LLM 500); cluster B
+    // succeeds end-to-end. Expected: clustersSeen=2, clustersFailed=1,
+    // mergesExecuted=1 (from cluster B), no exception escapes.
+    const generateCompletion = vi
+      .fn()
+      // Cluster A — winner-pick throws
+      .mockRejectedValueOnce(new Error("LLM 500"))
+      // Cluster B — winner pick + verify
+      .mockResolvedValueOnce(JSON.stringify({ winner_id: 3 }))
+      .mockResolvedValueOnce(JSON.stringify({ same_entity: true }));
+
+    const { deps, mergeCanonicalsMock } = buildDeps({
+      rows: [row(1), row(2), row(3), row(4)],
+      clusters: [
+        [1, 2],
+        [3, 4],
+      ],
+      generateCompletion,
+      // Only cluster B produces affectedWinners → pre(3), post(3).
+      countQueue: [5, 7],
+      decayRows: [],
+    });
+
+    const summary = await runReconciliation(deps);
+
+    expect(summary.clustersSeen).toBe(2);
+    expect(summary.clustersFailed).toBe(1);
+    expect(summary.mergesExecuted).toBe(1);
+    expect(summary.mergesFailed).toBe(0);
+    expect(mergeCanonicalsMock).toHaveBeenCalledTimes(1);
+    expect(mergeCanonicalsMock).toHaveBeenCalledWith({
+      loserId: 4,
+      winnerId: 3,
+      actor: "reconcile-canonicals",
+    });
+    // Cluster B drift: post(3)=7 − pre(3)=5 = 2.
+    expect(summary.episodeCountDrift).toBe(2);
+  });
+});
+
+// ─── Phase 1 — fetch SQL ───────────────────────────────────────────────────
+
+/**
+ * Fix 7: lock the Phase 1 SELECT shape so a future refactor that drops
+ * `WHERE status='active'`, switches `>` to `>=`, hardcodes the lookback days,
+ * or omits `identity_embedding` from the SELECT list fails the suite. Mirrors
+ * the SQL-text + bound-param assertion style from the Phase 7 decay matrix.
+ */
+describe("Phase 1 — fetch SQL", () => {
+  it("SELECTs id/label/kind/summary/identity_embedding with the active+lookback predicate", async () => {
+    // Empty rows → orchestrator hits the early-return path. We only need to
+    // capture call[0], the Phase 1 SELECT.
+    const { deps, db } = buildDeps({
+      rows: [],
+      decayRows: [],
+    });
+
+    await runReconciliation(deps);
+
+    const { sqlText, params } = serializeSql(db.calls[0]);
+
+    // SELECT list must include every column the orchestrator consumes.
+    expect(sqlText).toMatch(/SELECT/i);
+    expect(sqlText).toMatch(/\bid\b/);
+    expect(sqlText).toMatch(/\blabel\b/);
+    expect(sqlText).toMatch(/\bkind\b/);
+    expect(sqlText).toMatch(/\bsummary\b/);
+    expect(sqlText).toMatch(/identity_embedding/);
+    // FROM the canonical_topics table.
+    expect(sqlText).toMatch(/FROM\s+canonical_topics/i);
+    // WHERE clause guards: status='active' AND last_seen > now() - lookback.
+    expect(sqlText).toMatch(/WHERE/i);
+    expect(sqlText).toMatch(/status\s*=\s*'active'/i);
+    expect(sqlText).toMatch(/last_seen\s*>/);
+    expect(sqlText).toMatch(/now\s*\(\s*\)/i);
+    // Lookback days bound as a parameter (NOT inlined as a literal).
+    expect(params).toContain(RECONCILE_LOOKBACK_DAYS);
   });
 });
 
