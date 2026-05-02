@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   Table,
@@ -46,6 +46,22 @@ export function TopicsTable({
   );
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [bulkDialogOpen, setBulkDialogOpen] = useState(false);
+
+  // Stable change-detection key for the URL filters — the parent passes a
+  // fresh object on every render, so identity alone would never compare equal.
+  const filtersKey = useMemo(() => {
+    const sorted = Object.entries(searchParams)
+      .filter(([k]) => k !== "page")
+      .map(([k, v]) => [k, Array.isArray(v) ? v.join(",") : (v ?? "")] as const)
+      .sort(([a], [b]) => a.localeCompare(b));
+    return JSON.stringify(sorted);
+  }, [searchParams]);
+
+  // Drop selections when the user paginates or changes filters — otherwise
+  // ghost selections from a previous page accumulate in the bulk dialog.
+  useEffect(() => {
+    setSelectedIds(new Set());
+  }, [currentPage, filtersKey]);
 
   const totalPages = Math.ceil(totalCount / TOPICS_PAGE_SIZE);
   const hasPrev = currentPage > 1;

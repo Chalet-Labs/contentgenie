@@ -220,4 +220,68 @@ describe("TopicsTable", () => {
     expect(dialog).toHaveAttribute("data-count", "2");
     expect(dialog).toHaveAttribute("data-ids", "10,11");
   });
+
+  it("clears selection when the page changes", () => {
+    const rows = [makeRow({ id: 1, label: "Alpha", status: "active" })];
+    const { rerender } = render(
+      <TopicsTable
+        rows={rows}
+        totalCount={5}
+        currentPage={1}
+        searchParams={{}}
+      />,
+    );
+
+    act(() => {
+      fireEvent.click(screen.getByRole("checkbox", { name: /select Alpha/i }));
+    });
+    expect(
+      screen.getByRole("button", { name: /merge selected/i }),
+    ).toBeInTheDocument();
+
+    rerender(
+      <TopicsTable
+        rows={rows}
+        totalCount={5}
+        currentPage={2}
+        searchParams={{}}
+      />,
+    );
+
+    expect(
+      screen.queryByRole("button", { name: /merge selected/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("clears selection when filters change", () => {
+    const rows = [makeRow({ id: 1, label: "Alpha", status: "active" })];
+    const { rerender } = render(
+      <TopicsTable
+        rows={rows}
+        totalCount={1}
+        currentPage={1}
+        searchParams={{ status: "active" }}
+      />,
+    );
+
+    act(() => {
+      fireEvent.click(screen.getByRole("checkbox", { name: /select Alpha/i }));
+    });
+    expect(
+      screen.getByRole("button", { name: /merge selected/i }),
+    ).toBeInTheDocument();
+
+    rerender(
+      <TopicsTable
+        rows={rows}
+        totalCount={1}
+        currentPage={1}
+        searchParams={{ status: "merged" }}
+      />,
+    );
+
+    expect(
+      screen.queryByRole("button", { name: /merge selected/i }),
+    ).not.toBeInTheDocument();
+  });
 });
