@@ -234,12 +234,9 @@ export const backfillCanonicalTopics = task({
           // does not use it today — context embeddings are derived from each
           // topic's own NormalizedTopic.summary field. Passing it keeps the
           // call site forward-compatible (ADR-048 §5).
-          const result = await resolveAndPersistEpisodeTopics(
-            episodeId,
-            topics,
-            summary,
-            { skipResolution: false },
-          );
+          await resolveAndPersistEpisodeTopics(episodeId, topics, summary, {
+            skipResolution: false,
+          });
           resolved++; // one episode succeeded; topic-level metrics logged by resolver
         }
       } catch (err) {
