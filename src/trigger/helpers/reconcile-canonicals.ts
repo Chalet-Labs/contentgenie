@@ -53,6 +53,12 @@ export interface ReconcileLogger {
   error: (message: string, meta?: Record<string, unknown>) => void;
 }
 
+/**
+ * Injectable dependencies for `runReconciliation`. All IO flows through here
+ * so tests can supply fakes without a live DB or LLM. `now` is a clock
+ * abstraction — tests freeze it to drive the budget-guard and decay-window
+ * logic deterministically.
+ */
 export interface ReconcileDeps {
   db: typeof RealDb;
   mergeCanonicals: typeof RealMergeCanonicals;
@@ -330,6 +336,10 @@ export async function runReconciliation(
   const mergedLoserIds = new Set<number>();
   const preMergeCounts = new Map<number, number>();
   const affectedWinners = new Set<number>();
+  // Maps each winner to every entity it has absorbed (directly or via chain
+  // resolution) so later clusters can re-point transitive losers and avoid
+  // A→B→C chains when mergeCanonicals only rewrites the direct loser.
+  const winnerToAbsorbedLosers = new Map<number, number[]>();
 
   // ───────── Phases 3–5 — per-cluster orchestration ─────────
   for (let i = 0; i < clusters.length; i++) {
@@ -442,7 +452,22 @@ export async function runReconciliation(
 
       // ───────── Phase 5 — merge per verified loser ─────────
       currentPhase = "merge";
+
+      // Resolve-forward: if any verified loser was itself a winner in a prior
+      // cluster, include its prior absorptions in this batch so we never
+      // produce chains (e.g. 3→2→1 instead of direct 3→1 and 2→1).
+      const losersToMergeSet = new Set(verifiedLosers);
       for (const loserId of verifiedLosers) {
+        if (affectedWinners.has(loserId)) {
+          for (const priorId of winnerToAbsorbedLosers.get(loserId) ?? []) {
+            if (!mergedLoserIds.has(priorId)) {
+              losersToMergeSet.add(priorId);
+            }
+          }
+        }
+      }
+
+      for (const loserId of Array.from(losersToMergeSet)) {
         if (mergedLoserIds.has(loserId)) {
           // Cross-cluster overlap guard (ADR-048 §7).
           mergesSkippedAlreadyMerged++;
@@ -463,6 +488,9 @@ export async function runReconciliation(
           mergedLoserIds.add(loserId);
           affectedWinners.add(winnerId);
           mergesExecuted++;
+          const absorbed = winnerToAbsorbedLosers.get(winnerId) ?? [];
+          absorbed.push(loserId);
+          winnerToAbsorbedLosers.set(winnerId, absorbed);
         } catch (err) {
           mergesFailed++;
           logger.warn("reconcile_merge_failed", {
