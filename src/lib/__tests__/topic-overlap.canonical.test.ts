@@ -121,6 +121,40 @@ describe("computeCanonicalTopicOverlap", () => {
     });
   });
 
+  describe("max count beats higher coverage_score on a zero-count canonical", () => {
+    it("low-coverage canonical with max count beats high-coverage canonical with zero count", () => {
+      // Locks down ADR-042's "max count wins" rule: count is the primary
+      // discriminator, coverage_score only breaks ties within the max-count set.
+      // Without this test, swapping the comparison order silently passes the
+      // existing repeat-path tests where max-count and max-coverage coincide.
+      const targets: CanonicalOverlapTargetRow[] = [
+        {
+          canonicalTopicId: 1,
+          topicLabel: "Niche but heard",
+          coverageScore: 0.3,
+        },
+        {
+          canonicalTopicId: 2,
+          topicLabel: "Headline new",
+          coverageScore: 0.95,
+        },
+      ];
+      const result = computeCanonicalTopicOverlap(
+        targets,
+        new Map([
+          [1, 5],
+          [2, 0],
+        ]),
+      );
+      expect(result).toEqual({
+        kind: "repeat",
+        count: 5,
+        topicLabel: "Niche but heard",
+        topicId: 1,
+      });
+    });
+  });
+
   describe("tie on max count → highest coverage_score wins", () => {
     it("selects the canonical with highest coverageScore when counts are tied", () => {
       const targets: CanonicalOverlapTargetRow[] = [
