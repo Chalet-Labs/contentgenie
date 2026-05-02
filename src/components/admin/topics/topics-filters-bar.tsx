@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
-import { useCallback } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -15,13 +15,61 @@ import { canonicalTopicStatusEnum, canonicalTopicKindEnum } from "@/db/schema";
 const STATUS_OPTIONS = canonicalTopicStatusEnum.enumValues;
 const KIND_OPTIONS = canonicalTopicKindEnum.enumValues;
 
+type UpdateFn = (key: string, value: string | null) => void;
+
+/**
+ * Mirrors a controlled input value into a search-param after `delay` ms,
+ * skipping the initial mount so we don't push a duplicate of the URL state
+ * back into the URL. Holds `update` behind a ref so a stale closure can't
+ * win over a fresh value.
+ */
+function useDebouncedSearchParam(
+  value: string,
+  paramKey: string,
+  update: UpdateFn,
+  delay = 250,
+) {
+  const updateRef = useRef(update);
+  updateRef.current = update;
+  const mounted = useRef(false);
+  useEffect(() => {
+    if (!mounted.current) {
+      mounted.current = true;
+      return;
+    }
+    const timer = setTimeout(() => {
+      updateRef.current(paramKey, value || null);
+    }, delay);
+    return () => clearTimeout(timer);
+  }, [value, paramKey, delay]);
+}
+
 export function TopicsFiltersBar() {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  const update = useCallback(
-    (key: string, value: string | null) => {
+  const [minEpisodes, setMinEpisodes] = useState(
+    searchParams.get("episodeCountMin") ?? "",
+  );
+  const [maxEpisodes, setMaxEpisodes] = useState(
+    searchParams.get("episodeCountMax") ?? "",
+  );
+
+  // Resync local state when the URL changes externally (back/forward navigation
+  // or other router pushes that update episodeCountMin/Max without user input).
+  // Use value deps (strings) not the searchParams object — the object reference
+  // changes every render in some environments, which would reset user-typed
+  // values before the debounce fires.
+  const minParam = searchParams.get("episodeCountMin") ?? "";
+  const maxParam = searchParams.get("episodeCountMax") ?? "";
+  useEffect(() => {
+    setMinEpisodes(minParam);
+    setMaxEpisodes(maxParam);
+  }, [minParam, maxParam]);
+
+  const update = useCallback<UpdateFn>(
+    (key, value) => {
       const params = new URLSearchParams(searchParams.toString());
       if (value) {
         params.set(key, value);
@@ -33,6 +81,9 @@ export function TopicsFiltersBar() {
     },
     [router, pathname, searchParams],
   );
+
+  useDebouncedSearchParam(minEpisodes, "episodeCountMin", update);
+  useDebouncedSearchParam(maxEpisodes, "episodeCountMax", update);
 
   return (
     <div className="flex flex-wrap gap-2">
@@ -77,6 +128,41 @@ export function TopicsFiltersBar() {
           ))}
         </SelectContent>
       </Select>
+
+      {/* T9: Ongoing tri-state filter */}
+      <Select
+        value={searchParams.get("ongoing") ?? ""}
+        onValueChange={(v) => update("ongoing", v === "any" ? null : v)}
+      >
+        <SelectTrigger className="w-32" aria-label="Filter by ongoing status">
+          <SelectValue placeholder="Any" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="any">Any</SelectItem>
+          <SelectItem value="yes">Yes</SelectItem>
+          <SelectItem value="no">No</SelectItem>
+        </SelectContent>
+      </Select>
+
+      {/* T9: Episode-count range inputs (debounced 250 ms) */}
+      <Input
+        type="number"
+        min={0}
+        placeholder="Min episodes"
+        className="w-32"
+        aria-label="Min episodes"
+        value={minEpisodes}
+        onChange={(e) => setMinEpisodes(e.target.value)}
+      />
+      <Input
+        type="number"
+        min={0}
+        placeholder="Max episodes"
+        className="w-32"
+        aria-label="Max episodes"
+        value={maxEpisodes}
+        onChange={(e) => setMaxEpisodes(e.target.value)}
+      />
     </div>
   );
 }

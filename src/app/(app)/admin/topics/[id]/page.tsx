@@ -1,16 +1,16 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
-import { eq, desc } from "drizzle-orm";
+import { eq, count } from "drizzle-orm";
 import { db } from "@/db";
-import {
-  canonicalTopicAliases,
-  episodeCanonicalTopics,
-  episodes,
-} from "@/db/schema";
+import { canonicalTopicAliases, episodeCanonicalTopics } from "@/db/schema";
 import {
   getAdminAuditLogQuery,
   getUnmergeSuggestionsQuery,
+  getLinkedEpisodesForTopicQuery,
 } from "@/lib/admin/topic-queries";
 import { AuditLogList } from "@/components/admin/topics/audit-log-list";
+import { AliasesPanel } from "@/components/admin/topics/aliases-panel";
+import { LinkedEpisodesPanel } from "@/components/admin/topics/linked-episodes-panel";
 import {
   walkMergedChain,
   findTopicSummary,
@@ -30,7 +30,7 @@ export default async function AdminTopicDetailPage({
 
   if (!topic) notFound();
 
-  const [aliases, recentJunctions, auditData] = await Promise.all([
+  const [aliases, linkedEpisodes, auditData] = await Promise.all([
     db
       .select({
         id: canonicalTopicAliases.id,
@@ -39,16 +39,7 @@ export default async function AdminTopicDetailPage({
       .from(canonicalTopicAliases)
       .where(eq(canonicalTopicAliases.canonicalTopicId, id))
       .orderBy(canonicalTopicAliases.alias),
-    db
-      .select({
-        episodeId: episodeCanonicalTopics.episodeId,
-        episodeTitle: episodes.title,
-      })
-      .from(episodeCanonicalTopics)
-      .innerJoin(episodes, eq(episodeCanonicalTopics.episodeId, episodes.id))
-      .where(eq(episodeCanonicalTopics.canonicalTopicId, id))
-      .orderBy(desc(episodes.publishDate))
-      .limit(20),
+    getLinkedEpisodesForTopicQuery(id, { limit: 100 }),
     getAdminAuditLogQuery({ canonicalId: id, page: 1 }),
   ]);
 
@@ -58,6 +49,17 @@ export default async function AdminTopicDetailPage({
 
   const suggestedEpisodes =
     topic.status === "merged" ? await getUnmergeSuggestionsQuery(id) : [];
+
+  // Per ADR-049 §1 + PM note 3: only query orphan count for merged topics.
+  // Zero-cost for active/dormant — skip the query entirely.
+  let orphanedJunctionCount = 0;
+  if (topic.status === "merged") {
+    const [{ n }] = await db
+      .select({ n: count() })
+      .from(episodeCanonicalTopics)
+      .where(eq(episodeCanonicalTopics.canonicalTopicId, id));
+    orphanedJunctionCount = Number(n);
+  }
 
   return (
     <div className="space-y-6">
@@ -89,6 +91,18 @@ export default async function AdminTopicDetailPage({
         </div>
       )}
 
+      {topic.status === "merged" && orphanedJunctionCount > 0 && (
+        <div className="rounded-md border border-destructive/50 bg-destructive/10 p-4">
+          <p className="text-sm text-destructive">
+            Merge cleanup incomplete: {orphanedJunctionCount} orphaned junction
+            row(s).{" "}
+            <Link href="/admin/topics/drift" className="underline">
+              See drift page.
+            </Link>
+          </p>
+        </div>
+      )}
+
       {topic.status === "active" && (
         <MergeDialogTrigger
           topic={{
@@ -112,30 +126,12 @@ export default async function AdminTopicDetailPage({
 
       <section>
         <h3 className="mb-2 font-medium">Aliases</h3>
-        {aliases.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No aliases.</p>
-        ) : (
-          <ul className="list-disc space-y-1 pl-4 text-sm">
-            {aliases.map((a) => (
-              <li key={a.id}>{a.alias}</li>
-            ))}
-          </ul>
-        )}
+        <AliasesPanel canonicalId={id} aliases={aliases} />
       </section>
 
       <section>
-        <h3 className="mb-2 font-medium">Recent Episodes (last 20)</h3>
-        {recentJunctions.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No episodes.</p>
-        ) : (
-          <ul className="space-y-1 text-sm">
-            {recentJunctions.map((j) => (
-              <li key={j.episodeId} className="text-muted-foreground">
-                #{j.episodeId} — {j.episodeTitle}
-              </li>
-            ))}
-          </ul>
-        )}
+        <h3 className="mb-2 font-medium">Linked Episodes (up to 100)</h3>
+        <LinkedEpisodesPanel episodes={linkedEpisodes} />
       </section>
 
       <section>
