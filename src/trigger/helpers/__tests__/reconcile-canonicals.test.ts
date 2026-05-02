@@ -240,6 +240,7 @@ describe("runReconciliation", () => {
       clustersSeen: 0,
       clustersFailed: 0,
       clustersDeferred: 0,
+      clustersSkippedWinnerAlreadyMerged: 0,
       mergesExecuted: 0,
       mergesFailed: 0,
       mergesRejectedByPairwise: 0,
@@ -626,6 +627,50 @@ describe("runReconciliation", () => {
       actor: "reconcile-canonicals",
     });
     // Cluster A drift: post(1)=6 − pre(1)=4 = 2. Cluster B contributed nothing.
+    expect(summary.episodeCountDrift).toBe(2);
+  });
+
+  // (k2) winner was already merged as a loser in a prior cluster — skip cluster
+  it("(k2) winner was already merged as a loser in a prior cluster — skip cluster", async () => {
+    // Cluster A: [1, 2] — winner=1 verifies loser=2 → merge (mergedLoserIds={2}).
+    // Cluster B: [2, 3] — Phase 3 picks winner=2, which is now already merged.
+    // Expected: cluster B is skipped entirely; mergeCanonicals called only
+    // once (for cluster A's merge); clustersSkippedWinnerAlreadyMerged=1.
+    const generateCompletion = vi
+      .fn()
+      // Cluster A
+      .mockResolvedValueOnce(JSON.stringify({ winner_id: 1 }))
+      .mockResolvedValueOnce(JSON.stringify({ same_entity: true }))
+      // Cluster B — winner=2 (already merged as loser in cluster A)
+      .mockResolvedValueOnce(JSON.stringify({ winner_id: 2 }));
+
+    const { deps, mergeCanonicalsMock } = buildDeps({
+      rows: [row(1), row(2), row(3)],
+      clusters: [
+        [1, 2],
+        [2, 3],
+      ],
+      generateCompletion,
+      // Only cluster A merges → only winner=1 captured. Phase 6 reads post(1).
+      countQueue: [4, 6],
+      decayRows: [],
+    });
+
+    const summary = await runReconciliation(deps);
+
+    expect(summary.clustersSeen).toBe(2);
+    expect(summary.clustersSkippedWinnerAlreadyMerged).toBe(1);
+    expect(summary.mergesExecuted).toBe(1);
+    expect(summary.mergesSkippedAlreadyMerged).toBe(0);
+    expect(mergeCanonicalsMock).toHaveBeenCalledTimes(1);
+    expect(mergeCanonicalsMock).toHaveBeenCalledWith({
+      loserId: 2,
+      winnerId: 1,
+      actor: "reconcile-canonicals",
+    });
+    // No Stage B verify call should have fired for cluster B (skipped before
+    // pairwise verify).
+    expect(generateCompletion).toHaveBeenCalledTimes(3);
     expect(summary.episodeCountDrift).toBe(2);
   });
 });

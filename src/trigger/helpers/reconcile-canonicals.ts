@@ -66,6 +66,13 @@ export interface ReconcileSummary {
   clustersSeen: number;
   clustersFailed: number;
   clustersDeferred: number;
+  /**
+   * Cluster-level: incremented when a winner_id returned by Phase 3 was
+   * already merged as a loser in a prior cluster. DBSCAN with custom distance
+   * fns can produce overlapping clusters; this guard prevents merging onto an
+   * already-merged canonical (corruption + chain risk). ADR-048 §7.
+   */
+  clustersSkippedWinnerAlreadyMerged: number;
   mergesExecuted: number;
   mergesFailed: number;
   /**
@@ -99,6 +106,7 @@ const EMPTY_SUMMARY = (durationMs: number): ReconcileSummary => ({
   clustersSeen: 0,
   clustersFailed: 0,
   clustersDeferred: 0,
+  clustersSkippedWinnerAlreadyMerged: 0,
   mergesExecuted: 0,
   mergesFailed: 0,
   mergesRejectedByPairwise: 0,
@@ -187,13 +195,21 @@ async function countEpisodesForCanonical(
 async function decayStaleCanonicals(
   database: ReconcileDeps["db"],
 ): Promise<number> {
-  const kinds = [...RECONCILE_DECAY_KINDS];
+  // Drizzle does not serialize a JS array as a Postgres array when passed as a
+  // bound param — `${kinds}::canonical_topic_kind[]` produces
+  // `($1, $2, ...)::canonical_topic_kind[]` (a record cast), which Postgres
+  // rejects at runtime. Build the array literal explicitly with `sql.join`,
+  // mirroring the pattern at `src/trigger/helpers/database.ts:611`.
+  const kinds = RECONCILE_DECAY_KINDS;
   const result = await database.execute<{ id: number }>(
     sql`UPDATE canonical_topics
         SET status = 'dormant'
         WHERE status = 'active'
           AND ongoing = false
-          AND kind = ANY(${kinds}::canonical_topic_kind[])
+          AND kind = ANY(ARRAY[${sql.join(
+            kinds.map((k) => sql`${k}`),
+            sql`, `,
+          )}]::canonical_topic_kind[])
           AND last_seen < now() - (${RECONCILE_DECAY_DAYS}::int * INTERVAL '1 day')
         RETURNING id`,
   );
@@ -242,6 +258,7 @@ export async function runReconciliation(
   let clustersSeen = 0;
   let clustersFailed = 0;
   let clustersDeferred = 0;
+  let clustersSkippedWinnerAlreadyMerged = 0;
   let mergesExecuted = 0;
   let mergesFailed = 0;
   let mergesRejectedByPairwise = 0;
@@ -296,6 +313,15 @@ export async function runReconciliation(
 
       if (winnerId === null || !cluster.includes(winnerId)) {
         // null = no-confidence; not-in-cluster = model hallucination guard.
+        continue;
+      }
+
+      if (mergedLoserIds.has(winnerId)) {
+        // Winner was already merged as a loser in a prior cluster — DBSCAN
+        // can produce overlapping clusters with custom distance fns
+        // (ADR-048 §7). Merging onto an already-merged canonical would cause
+        // corruption + chains; skip the cluster entirely.
+        clustersSkippedWinnerAlreadyMerged++;
         continue;
       }
 
@@ -400,6 +426,7 @@ export async function runReconciliation(
     clustersSeen,
     clustersFailed,
     clustersDeferred,
+    clustersSkippedWinnerAlreadyMerged,
     mergesExecuted,
     mergesFailed,
     mergesRejectedByPairwise,
