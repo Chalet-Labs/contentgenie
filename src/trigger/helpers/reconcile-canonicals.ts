@@ -238,6 +238,11 @@ export async function runReconciliation(
     // logically independent: old event-type canonicals may still need to be
     // marked dormant even on quiet days with no recent canonical activity.
     const dormancyTransitions = await decayStaleCanonicals(db);
+    logger.info("reconcile_phase7_decay", {
+      event: "reconcile_phase7_decay",
+      dormancyTransitions,
+      phase1Empty: true,
+    });
     return {
       ...EMPTY_SUMMARY(now().getTime() - startMs),
       dormancyTransitions,
@@ -428,6 +433,11 @@ export async function runReconciliation(
 
   // ───────── Phase 7 — decay stale event-type canonicals ─────────
   const dormancyTransitions = await decayStaleCanonicals(db);
+  logger.info("reconcile_phase7_decay", {
+    event: "reconcile_phase7_decay",
+    dormancyTransitions,
+    phase1Empty: false,
+  });
 
   return {
     clustersSeen,
