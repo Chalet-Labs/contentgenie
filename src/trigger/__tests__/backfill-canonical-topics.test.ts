@@ -331,9 +331,9 @@ describe("backfill-canonical-topics task", () => {
     );
   });
 
-  // ── Case 5b: resolver-level partial failures roll into aggregate `failed` ──
+  // ── Case 5b: resolver-level topic failures do NOT roll into episode-level `failed` ──
 
-  it("case 5b — resolver returns partial failures: aggregate failed counter includes resolver-level failures", async () => {
+  it("case 5b — resolver returns partial topic failures: episode counted as resolved, not failed", async () => {
     const episodes = [{ id: 50, summary: "Episode summary text." }];
     setupMainPathMock(episodes);
 
@@ -349,9 +349,12 @@ describe("backfill-canonical-topics task", () => {
 
     const result = await runTask({}, 1);
 
+    // The episode did not throw, so it counts as one resolved episode.
+    // Topic-level resolver failures are logged by the resolver itself and
+    // are not surfaced in BackfillResult.failed (ADR-048 §5).
     expect(result.processed).toBe(1);
     expect(result.resolved).toBe(1);
-    expect(result.failed).toBe(2);
+    expect(result.failed).toBe(0);
   });
 
   // ── Case 6: episodeIds payload — inArray path with null/length floor guards ─

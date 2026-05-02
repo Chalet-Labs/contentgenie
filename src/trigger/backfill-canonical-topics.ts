@@ -170,8 +170,8 @@ export const backfillCanonicalTopics = task({
 
     const total = rows.length;
     let processed = 0;
-    let resolved = 0;
-    let failed = 0;
+    let resolved = 0; // Successful episodes
+    let failed = 0; // Failed episodes
 
     // Re-emit the full progress object after every episode so the
     // Trigger.dev dashboard reflects mid-run state (matches the pattern in
@@ -188,10 +188,17 @@ export const backfillCanonicalTopics = task({
     for (let idx = 0; idx < rows.length; idx++) {
       const row = rows[idx];
       const episodeId = row.id;
-      // summary is guaranteed non-null and length >= MIN by the WHERE clause,
-      // but narrow defensively rather than asserting via `as string` so a
-      // future query refactor that drops the `isNotNull` guard fails loudly.
-      if (row.summary == null) continue;
+      // summary is guaranteed non-null by the WHERE clause; log a warning if
+      // the invariant fires so query regressions surface rather than silently skip.
+      if (row.summary == null) {
+        logger.warn(
+          "[backfill] invariant violation: null summary after SQL guard",
+          {
+            episodeId,
+          },
+        );
+        continue;
+      }
       const summary = row.summary;
 
       try {
@@ -233,8 +240,7 @@ export const backfillCanonicalTopics = task({
             summary,
             { skipResolution: false },
           );
-          resolved += result.resolved;
-          failed += result.failed;
+          resolved++; // one episode succeeded; topic-level metrics logged by resolver
         }
       } catch (err) {
         const errorMessage =
