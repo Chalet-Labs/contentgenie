@@ -1,6 +1,6 @@
 # ADR-049: Admin canonical-topics polish — drift semantics & re-summarize wrapper
 
-**Status:** Proposed (2026-05-02)
+**Status:** Accepted (2026-05-02)
 
 **Related:** [ADR-042](042-canonical-topics-foundation.md), [ADR-046](046-admin-canonical-merge.md), [ADR-048](048-backfill-canonical-topics-cheap-reextract.md), spec `.dev/pm/specs/2026-04-25-canonical-topics-foundation.md`, issue #391, PR #424 (column drop).
 
@@ -24,7 +24,7 @@ We need a coherent set of decisions before implementing #391 so that the polish 
 
 > A canonical with `status = 'merged'` MUST have zero rows in `episode_canonical_topics`.
 
-This is the **path-compression invariant** from ADR-046 §3: the merge transaction relocates every junction row from loser to winner inside a single transaction with an advisory lock, and on success the loser is left with no episode references. Any merged canonical with `COUNT(episode_canonical_topics) > 0` is a real merge-pipeline bug worth investigating.
+This is the **path-compression invariant** from ADR-042 (and the DELETE-then-UPDATE mechanic in ADR-046 §2): the merge transaction relocates every junction row from loser to winner inside a single transaction with an advisory lock, and on success the loser is left with no episode references. Any merged canonical with `COUNT(episode_canonical_topics) > 0` is a real merge-pipeline bug worth investigating.
 
 The query helper is named `getCanonicalMergeCleanupDriftQuery()` in `src/lib/admin/topic-queries.ts` and returns rows of `{ id, label, status, mergedIntoId, junctionRowCount }` where `status='merged' AND junctionRowCount > 0`, ordered by `junctionRowCount DESC`. The wrapping server action `getCanonicalEpisodeCountDrift()` keeps the issue's name to preserve audit-log/issue traceability.
 
