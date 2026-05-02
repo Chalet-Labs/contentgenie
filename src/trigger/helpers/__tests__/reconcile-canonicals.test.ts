@@ -111,7 +111,10 @@ function steppingNow(startMs: number, advanceMs: number): () => Date {
 interface BuildDepsArgs {
   rows?: unknown[];
   clusters?: number[][];
-  countQueue?: number[];
+  /** Per-winner pre-merge counts — one entry per winner, in merge order. */
+  preCountQueue?: number[];
+  /** Phase 6 batch post-merge counts — one entry per affected winner. */
+  postBatchRows?: Array<{ id: number; count: number }>;
   decayRows?: Array<{ id: number }>;
   generateCompletion?: ReconcileDeps["generateCompletion"];
   mergeCanonicals?: ReconcileDeps["mergeCanonicals"];
@@ -127,13 +130,21 @@ function buildDeps(args: BuildDepsArgs = {}): {
   logger: ReconcileDeps["logger"];
 } {
   const phase1 = { rows: args.rows ?? [] };
-  // The execute queue is: Phase 1, then alternating count(*) calls (pre/post),
-  // then Phase 7 decay UPDATE. Tests provide the count queue and decay rows.
-  const countPayloads = (args.countQueue ?? []).map((c) => ({
+  // Execute queue: Phase 1 → per-winner pre-merge counts → Phase 6 batch
+  // post-merge count (one call for all affected winners) → Phase 7 decay.
+  const preCountPayloads = (args.preCountQueue ?? []).map((c) => ({
     rows: [{ count: c }],
   }));
+  const postBatchPayload = args.postBatchRows
+    ? { rows: args.postBatchRows }
+    : null;
   const decayPayload = { rows: args.decayRows ?? [] };
-  const db = makeDbStub([phase1, ...countPayloads, decayPayload]);
+  const db = makeDbStub([
+    phase1,
+    ...preCountPayloads,
+    ...(postBatchPayload ? [postBatchPayload] : []),
+    decayPayload,
+  ]);
 
   const generateCompletionMock =
     (args.generateCompletion as ReturnType<typeof vi.fn>) ??
@@ -235,9 +246,11 @@ describe("runReconciliation", () => {
         [3, 4],
       ],
       generateCompletion,
-      // Order: pre(winner=1), pre(winner=3), post(1), post(3), decay.
-      // The decay payload comes from `decayRows`, not the count queue.
-      countQueue: [1, 2, 2, 4],
+      preCountQueue: [1, 2], // pre(winner=1)=1, pre(winner=3)=2
+      postBatchRows: [
+        { id: 1, count: 2 },
+        { id: 3, count: 4 },
+      ], // post(1)=2, post(3)=4
       decayRows: [],
     });
 
@@ -272,7 +285,6 @@ describe("runReconciliation", () => {
       rows: [row(1), row(2)],
       clusters: [[1, 2]],
       generateCompletion,
-      countQueue: [],
       decayRows: [],
     });
 
@@ -297,7 +309,6 @@ describe("runReconciliation", () => {
       rows: [row(1), row(2)],
       clusters: [[1, 2]],
       generateCompletion,
-      countQueue: [],
       decayRows: [],
     });
 
@@ -323,7 +334,8 @@ describe("runReconciliation", () => {
       rows: [row(1), row(2), row(3)],
       clusters: [[1, 2, 3]],
       generateCompletion,
-      countQueue: [5, 6], // pre(1)=5, post(1)=6
+      preCountQueue: [5], // pre(winner=1)=5
+      postBatchRows: [{ id: 1, count: 6 }], // post(1)=6
       decayRows: [],
     });
 
@@ -357,7 +369,6 @@ describe("runReconciliation", () => {
       rows: [row(1), row(2), row(3)],
       clusters: [[1, 2, 3]],
       generateCompletion,
-      countQueue: [],
       decayRows: [],
     });
 
@@ -388,7 +399,8 @@ describe("runReconciliation", () => {
       rows: [row(1), row(2), row(3)],
       clusters: [[1, 2, 3]],
       generateCompletion,
-      countQueue: [3, 4],
+      preCountQueue: [3], // pre(winner=1)=3
+      postBatchRows: [{ id: 1, count: 4 }], // post(1)=4
       decayRows: [],
     });
 
@@ -439,12 +451,11 @@ describe("runReconciliation", () => {
       ],
       generateCompletion,
       mergeCanonicals,
-      // pre(1)=2 captured before cluster A merge attempt (pre is captured
-      // BEFORE the call, so even on failure the count was read);
-      // pre(3)=5 before cluster B merge; post(3)=7 after cluster B.
-      // Cluster A's failed merge does NOT add winner=1 to affectedWinners,
-      // so post(1) is never queried.
-      countQueue: [2, 5, 7],
+      // pre(1)=2 captured before cluster A merge attempt; pre(3)=5 before
+      // cluster B merge. Cluster A's failed merge does NOT add winner=1 to
+      // affectedWinners, so only winner=3 appears in the Phase 6 batch.
+      preCountQueue: [2, 5],
+      postBatchRows: [{ id: 3, count: 7 }], // post(3)=7
       decayRows: [],
     });
 
@@ -469,7 +480,8 @@ describe("runReconciliation", () => {
       generateCompletion,
       // Winner 1 has 2 episodes pre-merge, gains 2 from loser → post=4.
       // Drift must be 4 − 2 = 2, not 4.
-      countQueue: [2, 4],
+      preCountQueue: [2],
+      postBatchRows: [{ id: 1, count: 4 }],
       decayRows: [],
     });
 
@@ -483,7 +495,6 @@ describe("runReconciliation", () => {
     const { deps, mergeCanonicalsMock, generateCompletionMock } = buildDeps({
       rows: [row(1)],
       clusters: [], // Singletons drop, only winner remains active.
-      countQueue: [],
       decayRows: [],
     });
 
@@ -536,8 +547,9 @@ describe("runReconciliation", () => {
       ],
       generateCompletion,
       // Cluster #1 captures pre(1) and contributes to affectedWinners.
-      // Phase 6 reads post(1). Then Phase 7 returns 1 dormancy row.
-      countQueue: [3, 5],
+      // Phase 6 batch reads post(1). Then Phase 7 returns 1 dormancy row.
+      preCountQueue: [3],
+      postBatchRows: [{ id: 1, count: 5 }],
       decayRows: [{ id: 99 }],
       now,
     });
@@ -576,8 +588,9 @@ describe("runReconciliation", () => {
       generateCompletion,
       // Only cluster A actually merges → only winner=1 in affectedWinners.
       // Cluster B's pre-count for winner=3 is NOT captured (skip happens
-      // before pre-count read). Phase 6 reads post(1) only.
-      countQueue: [4, 6],
+      // before pre-count read). Phase 6 batch reads post(1) only.
+      preCountQueue: [4],
+      postBatchRows: [{ id: 1, count: 6 }],
       decayRows: [],
     });
 
@@ -617,8 +630,9 @@ describe("runReconciliation", () => {
         [2, 3],
       ],
       generateCompletion,
-      // Only cluster A merges → only winner=1 captured. Phase 6 reads post(1).
-      countQueue: [4, 6],
+      // Only cluster A merges → only winner=1 captured. Phase 6 batch reads post(1).
+      preCountQueue: [4],
+      postBatchRows: [{ id: 1, count: 6 }],
       decayRows: [],
     });
 
@@ -660,8 +674,9 @@ describe("runReconciliation", () => {
         [3, 4],
       ],
       generateCompletion,
-      // Only cluster B produces affectedWinners → pre(3), post(3).
-      countQueue: [5, 7],
+      // Only cluster B produces affectedWinners → pre(3); Phase 6 batch post(3).
+      preCountQueue: [5],
+      postBatchRows: [{ id: 3, count: 7 }],
       decayRows: [],
     });
 
@@ -712,7 +727,6 @@ describe("runReconciliation", () => {
       rows: [validRow, malformedRow],
       clusters: [], // no clusters — we only test Phase 1 filtering here
       generateCompletion,
-      countQueue: [],
       decayRows: [],
     });
 
@@ -759,7 +773,6 @@ describe("runReconciliation", () => {
     const { deps, clusterMock } = buildDeps({
       rows: [float32Row, arrayRow, stringRow],
       clusters: [],
-      countQueue: [],
       decayRows: [],
     });
 
@@ -865,7 +878,7 @@ describe("Phase 7 — decay matrix", () => {
       // One row in Phase 1 so the early-return branch is NOT taken.
       rows: [row(1)],
       clusters: [], // No clusters → phases 3–5 are skipped entirely.
-      countQueue: [], // No merges → no count queries.
+      // No merges → no pre-count or Phase 6 batch queries.
       decayRows,
     });
 

@@ -1,4 +1,4 @@
-import type { ReconcileSummary } from "./reconcile-canonicals";
+import type { ReconcileSummary } from "@/trigger/helpers/reconcile-canonicals";
 
 type State = Omit<ReconcileSummary, "durationMs">;
 

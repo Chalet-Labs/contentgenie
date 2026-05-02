@@ -46,7 +46,7 @@ import {
   RECONCILE_DECAY_KINDS,
   RECONCILE_LOOKBACK_DAYS,
 } from "@/lib/reconcile-constants";
-import { ReconcileSummaryAccumulator } from "./reconcile-summary-accumulator";
+import { ReconcileSummaryAccumulator } from "@/trigger/helpers/reconcile-summary-accumulator";
 
 /** Minimal logger shape — compatible with `@trigger.dev/sdk`'s `logger` and a vi.fn() fake. */
 export interface ReconcileLogger {
@@ -394,9 +394,31 @@ async function computeEpisodeDrift(
   affectedWinners: Set<number>,
   preMergeCounts: Map<number, number>,
 ): Promise<number> {
+  const winnerIds = Array.from(affectedWinners);
+  if (winnerIds.length === 0) return 0;
+
+  // Single batch query instead of N per-winner queries (N+1 pattern).
+  // Uses sql.join for the array literal — same pattern as decayStaleCanonicals.
+  const result = await database.execute<{ id: number; count: number | string }>(
+    sql`SELECT canonical_topic_id AS id, count(*)::int AS count
+        FROM episode_canonical_topics
+        WHERE canonical_topic_id = ANY(ARRAY[${sql.join(
+          winnerIds.map((id) => sql`${id}`),
+          sql`, `,
+        )}]::int[])
+        GROUP BY canonical_topic_id`,
+  );
+
+  const postCounts = new Map(
+    result.rows.map((r) => [
+      r.id,
+      typeof r.count === "number" ? r.count : Number(r.count),
+    ]),
+  );
+
   let delta = 0;
-  for (const winnerId of Array.from(affectedWinners)) {
-    const post = await countEpisodesForCanonical(database, winnerId);
+  for (const winnerId of winnerIds) {
+    const post = postCounts.get(winnerId) ?? 0;
     const pre = preMergeCounts.get(winnerId) ?? 0;
     delta += post - pre;
   }
