@@ -5,7 +5,7 @@
  * Only the DBSCAN surface used by `@/lib/reconcile-clustering` is declared.
  * KMEANS, OPTICS, and PriorityQueue are not used by the codebase.
  *
- * See ADR-048 for why DBSCAN (not HDBSCAN) is used.
+ * See ADR-050 for why DBSCAN (not HDBSCAN) is used.
  */
 declare module "density-clustering" {
   export type DistanceFunction = (a: number[], b: number[]) => number;

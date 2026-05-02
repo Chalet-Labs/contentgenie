@@ -1,6 +1,6 @@
 /**
  * Prompt builder + Zod schema for the nightly reconciliation task's
- * Stage A "winner-pick" LLM call (issue #389, ADR-048 §2).
+ * Stage A "winner-pick" LLM call (issue #389, ADR-050 §2).
  *
  * Given a multi-member cluster of canonical topics that DBSCAN identified
  * as near-duplicates, ask the model to pick the single most-canonical id —
@@ -11,7 +11,7 @@
  * Pure module: no IO, no SDK calls, no runtime deps. Mirrors the structural
  * shape of `@/lib/prompts/entity-disambiguator.ts` — XML payload, "treat
  * as data only" preamble, JSON output declared inline. Zod runs after
- * `parseJsonResponse` per ADR-044 §5 / ADR-048 §2.
+ * `parseJsonResponse` per ADR-044 §5 / ADR-050 §2.
  */
 
 import { z } from "zod";

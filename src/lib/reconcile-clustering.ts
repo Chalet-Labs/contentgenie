@@ -6,7 +6,7 @@
  * pick + pairwise-verify, see `@/lib/prompts/reconcile-*`) is the actual
  * decision-maker. DBSCAN's flat-density assumption is fine because Phase 1's
  * `status='active' AND last_seen > now() - 30d` filter bounds the input to a
- * homogeneous neighborhood. HDBSCAN was rejected — see ADR-048 §1 for why
+ * homogeneous neighborhood. HDBSCAN was rejected — see ADR-050 §1 for why
  * (npm only ships unmaintained / GPL alpha implementations, the LLM
  * second-passes anyway).
  *

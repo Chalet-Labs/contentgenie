@@ -1,4 +1,4 @@
-# ADR-048: Canonical-Topic Reconciliation — Clustering, Pairwise Verification, Per-Merge Transactions
+# ADR-050: Canonical-Topic Reconciliation — Clustering, Pairwise Verification, Per-Merge Transactions
 
 **Status:** Proposed
 **Date:** 2026-05-02
