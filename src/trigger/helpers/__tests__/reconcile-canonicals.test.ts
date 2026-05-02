@@ -27,7 +27,58 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ReconcileDeps } from "@/trigger/helpers/reconcile-canonicals";
 import { runReconciliation } from "@/trigger/helpers/reconcile-canonicals";
-import { RECONCILE_BUDGET_MS } from "@/lib/reconcile-constants";
+import {
+  RECONCILE_BUDGET_MS,
+  RECONCILE_DECAY_DAYS,
+  RECONCILE_DECAY_KINDS,
+} from "@/lib/reconcile-constants";
+
+// ─── SQL inspection helper ─────────────────────────────────────────────────
+
+/**
+ * Walk a Drizzle `sql` template-literal object and extract the raw SQL text
+ * fragments (with bind params replaced by `$`) and the bound parameter values.
+ *
+ * This mirrors the same helper in `database-canonical.test.ts`. It is
+ * duplicated here rather than imported to keep test files self-contained and
+ * avoid coupling to another test module's internals.
+ */
+function serializeSql(sqlObj: unknown): { sqlText: string; params: unknown[] } {
+  const params: unknown[] = [];
+  const parts: string[] = [];
+  const visit = (chunk: unknown) => {
+    if (chunk == null) return;
+    if (Array.isArray(chunk)) {
+      chunk.forEach(visit);
+      return;
+    }
+    if (
+      typeof chunk === "string" ||
+      typeof chunk === "number" ||
+      typeof chunk === "boolean"
+    ) {
+      params.push(chunk);
+      parts.push("$");
+      return;
+    }
+    const obj = chunk as { value?: unknown; queryChunks?: unknown[] };
+    if (Array.isArray(obj.queryChunks)) {
+      obj.queryChunks.forEach(visit);
+      return;
+    }
+    if (Array.isArray(obj.value)) {
+      parts.push(obj.value.join(""));
+      return;
+    }
+    if (obj.value !== undefined) {
+      params.push(obj.value);
+      parts.push("$");
+      return;
+    }
+  };
+  visit(sqlObj);
+  return { sqlText: parts.join(" "), params };
+}
 
 // ─── Test scaffolding ──────────────────────────────────────────────────────
 
@@ -570,5 +621,221 @@ describe("runReconciliation", () => {
     });
     // Cluster A drift: post(1)=6 − pre(1)=4 = 2. Cluster B contributed nothing.
     expect(summary.episodeCountDrift).toBe(2);
+  });
+});
+
+// ─── Phase 7 — decay matrix ────────────────────────────────────────────────
+
+/**
+ * T6 decay-matrix tests (issue #389).
+ *
+ * These tests validate the SQL predicate that Phase 7 issues via
+ * `db.execute`. Because the helper uses dependency-injected `db`, we capture
+ * every `execute` call and inspect the serialized SQL text + parameters to
+ * assert that:
+ *   - `status = 'active'` guards the WHERE clause (status='merged' rows are
+ *     excluded by the filter, not the kind list).
+ *   - `ongoing = false` is part of the predicate (ongoing=true rows exempt).
+ *   - The kind filter is `kind = ANY(...)` using the RECONCILE_DECAY_KINDS
+ *     whitelist, which includes `event`/`release` etc. but excludes
+ *     `concept` and `work`.
+ *   - `last_seen < now() - (180::int * INTERVAL '1 day')` uses
+ *     RECONCILE_DECAY_DAYS = 180.
+ *
+ * We cannot run a real SQL engine in unit scope, so the "concept stays active"
+ * behavioral guarantee is expressed as a static-analysis assertion:
+ * the SQL predicate provably excludes `concept` because it is absent from
+ * `RECONCILE_DECAY_KINDS`. Each `it.each` row documents which predicate
+ * operand is responsible for the exclusion.
+ *
+ * Deviation from plan T6 note "extends T5's file": the SQL is issued inside
+ * `decayStaleCanonicals` in the helper (`src/trigger/helpers/reconcile-canonicals.ts`),
+ * not in the task wrapper. Testing SQL predicates at the task layer would only
+ * be possible if we un-mocked `runReconciliation` — the helper test file is
+ * the correct home for SQL-level assertions.
+ */
+describe("Phase 7 — decay matrix", () => {
+  /**
+   * Run a minimal reconciliation (empty Phase 1 so no cluster/merge work) and
+   * return the serialized Phase 7 UPDATE SQL + params that `db.execute` was
+   * called with.
+   *
+   * `db.execute` receives exactly two calls when Phase 1 returns no rows:
+   *   call 0 → Phase 1 SELECT (empty → early-return path is skipped because
+   *             we use a non-empty rows array to force Phase 7 to always run)
+   *   call N-1 → Phase 7 UPDATE
+   *
+   * To guarantee Phase 7 runs we supply at least one Phase 1 row but zero
+   * clusters (DBSCAN returns nothing). The execute queue is:
+   *   [0] Phase 1 payload, [1] Phase 7 decay payload.
+   */
+  async function runAndCaptureDecaySql(decayRows: Array<{ id: number }> = []) {
+    const { deps, db } = buildDeps({
+      // One row in Phase 1 so the early-return branch is NOT taken.
+      rows: [row(1)],
+      clusters: [], // No clusters → phases 3–5 are skipped entirely.
+      countQueue: [], // No merges → no count queries.
+      decayRows,
+    });
+
+    await runReconciliation(deps);
+
+    // The last execute call is always the Phase 7 UPDATE.
+    const lastCall = db.calls[db.calls.length - 1];
+    return serializeSql(lastCall);
+  }
+
+  // Shared SQL structure assertions re-used across every row in the matrix.
+  function assertPhase7SqlStructure(sqlText: string, params: unknown[]): void {
+    // UPDATE target
+    expect(sqlText).toMatch(/UPDATE\s+canonical_topics/i);
+    // SET clause flips to dormant
+    expect(sqlText).toMatch(/SET\s+status\s*=\s*'dormant'/i);
+    // Status guard: only active rows are candidates
+    expect(sqlText).toMatch(/WHERE\s+status\s*=\s*'active'/i);
+    // Ongoing guard: ongoing=true rows are exempt
+    expect(sqlText).toMatch(/ongoing\s*=\s*false/i);
+    // Kind filter uses ANY(...)
+    expect(sqlText).toMatch(/kind\s*=\s*ANY\s*\(/i);
+    // Decay threshold uses RECONCILE_DECAY_DAYS param
+    expect(sqlText).toMatch(/last_seen\s*</i);
+    expect(params).toContain(RECONCILE_DECAY_DAYS);
+    // RETURNING clause (used by decayStaleCanonicals to count rows)
+    expect(sqlText).toMatch(/RETURNING\s+id/i);
+  }
+
+  it("Phase 7 SQL includes `status='active'`, `ongoing=false`, kind=ANY whitelist, and 180-day threshold", async () => {
+    const { sqlText, params } = await runAndCaptureDecaySql([]);
+    assertPhase7SqlStructure(sqlText, params);
+  });
+
+  it("RECONCILE_DECAY_KINDS whitelist includes `event` and `release`", () => {
+    // Static assertion: confirms that scenario (1) [event] and (4) [release]
+    // would be matched by the kind predicate.
+    expect(RECONCILE_DECAY_KINDS).toContain("event");
+    expect(RECONCILE_DECAY_KINDS).toContain("release");
+  });
+
+  it("RECONCILE_DECAY_KINDS whitelist excludes `concept` and `work`", () => {
+    // Static assertion: scenario (2) [concept stays active].
+    // `concept` is not in the whitelist, so the SQL predicate's ANY() clause
+    // will never match a concept-kind row → concept canonicals never decay.
+    expect(RECONCILE_DECAY_KINDS).not.toContain("concept");
+    expect(RECONCILE_DECAY_KINDS).not.toContain("work");
+  });
+
+  it("RECONCILE_DECAY_DAYS is 180, enforcing the 181-day flip / 179-day boundary semantics", () => {
+    // Static assertion: scenario (1) [181d → dormant] passes the < 180d
+    // threshold; scenario (4) [179d → stays active] does not.
+    expect(RECONCILE_DECAY_DAYS).toBe(180);
+  });
+
+  // Table-driven matrix: five decay scenarios from plan T6 + issue VERIFY.
+  //
+  // Columns:
+  //   label      — human-readable scenario name
+  //   kind       — canonical_topic kind value
+  //   daysOld    — how many days ago `last_seen` was set
+  //   ongoing    — value of the `ongoing` column
+  //   status     — row's current status
+  //   predicateExcludes — which predicate operand prevents the decay
+  //   expectedDecayable — whether the row *would* satisfy the WHERE predicate
+  //                       (true = flips to dormant; false = stays unchanged)
+  //
+  // Note: because we assert the SQL predicate composition rather than executing
+  // real SQL, `expectedDecayable` is documented as a comment rather than a
+  // runtime assertion — it records the behavioral expectation for the record.
+  it.each([
+    {
+      label:
+        "event kind, 181d old, ongoing=false → satisfies all predicates (would flip to dormant)",
+      kind: "event",
+      daysOld: 181,
+      ongoing: false,
+      status: "active",
+      predicateExcludes: null, // nothing excludes it — it decays
+      expectedDecayable: true,
+    },
+    {
+      label:
+        "concept kind, 181d old, ongoing=false → excluded by kind whitelist (stays active)",
+      kind: "concept",
+      daysOld: 181,
+      ongoing: false,
+      status: "active",
+      predicateExcludes: "kind whitelist",
+      expectedDecayable: false,
+    },
+    {
+      label:
+        "event kind, 181d old, ongoing=true → excluded by ongoing=false predicate (stays active)",
+      kind: "event",
+      daysOld: 181,
+      ongoing: true,
+      status: "active",
+      predicateExcludes: "ongoing=false predicate",
+      expectedDecayable: false,
+    },
+    {
+      label:
+        "release kind, 179d old, ongoing=false → excluded by < 180d threshold (stays active)",
+      kind: "release",
+      daysOld: 179,
+      ongoing: false,
+      status: "active",
+      predicateExcludes: "180-day threshold (179d < threshold not satisfied)",
+      expectedDecayable: false,
+    },
+    {
+      label:
+        "merged status row, old last_seen → excluded by status='active' guard (stays merged)",
+      kind: "event",
+      daysOld: 365,
+      ongoing: false,
+      status: "merged",
+      predicateExcludes: "status='active' guard",
+      expectedDecayable: false,
+    },
+  ])("$label", async ({ kind, expectedDecayable, predicateExcludes }) => {
+    const { sqlText, params } = await runAndCaptureDecaySql([]);
+
+    // Every scenario goes through the same Phase 7 SQL; the predicate
+    // composition is what we're testing.
+    assertPhase7SqlStructure(sqlText, params);
+
+    // Scenario-specific structural assertion:
+    // The Drizzle sql`` template flattens the kinds array into individual
+    // positional params (one string per kind) rather than an array param.
+    // See serializeSql: `Array.isArray(chunk) → chunk.forEach(visit)`.
+    const kindParams = params.filter((p) => typeof p === "string") as string[];
+
+    if (!expectedDecayable) {
+      if (predicateExcludes === "kind whitelist") {
+        // `concept` and `work` must be absent from the bound kind params.
+        expect(kindParams).not.toContain(kind);
+        // At least one whitelisted kind must be present (e.g. 'event').
+        expect(
+          kindParams.some((k) => RECONCILE_DECAY_KINDS.includes(k as never)),
+        ).toBe(true);
+      } else if (predicateExcludes === "ongoing=false predicate") {
+        // SQL must contain `ongoing = false` so ongoing=true rows are skipped.
+        expect(sqlText).toMatch(/ongoing\s*=\s*false/i);
+      } else if (
+        predicateExcludes ===
+        "180-day threshold (179d < threshold not satisfied)"
+      ) {
+        // RECONCILE_DECAY_DAYS must be 180 — 179 days does not cross it.
+        expect(RECONCILE_DECAY_DAYS).toBe(180);
+        expect(params).toContain(180);
+      } else if (predicateExcludes === "status='active' guard") {
+        // SQL must begin the WHERE clause with `status = 'active'`.
+        expect(sqlText).toMatch(/WHERE\s+status\s*=\s*'active'/i);
+      }
+    } else {
+      // Scenario (1): event, 181d old, ongoing=false — all predicates must
+      // be satisfiable. `event` must be in the bound kind params.
+      expect(kindParams).toContain(kind);
+      expect(RECONCILE_DECAY_DAYS).toBe(180);
+    }
   });
 });
