@@ -164,3 +164,110 @@ export function computeTopicOverlap(
     labelKind: null,
   };
 }
+
+// ---------------------------------------------------------------------------
+// Canonical-topic overlap (ADR-042 / ADR-034 analogue)
+// ---------------------------------------------------------------------------
+
+/** A canonical topic linked to a target episode (pre-fetched server-side). */
+export interface CanonicalOverlapTargetRow {
+  canonicalTopicId: number;
+  topicLabel: string;
+  coverageScore: number;
+}
+
+/**
+ * Overlap indicator for a single episode at the canonical-topic level.
+ *
+ * - `new`    — episode has canonicals but none appear in the user's history.
+ * - `repeat` — at least one canonical was already heard; `count` = how many
+ *              other episodes the user consumed that share the top canonical.
+ */
+export type CanonicalOverlapResult =
+  | { kind: "new"; topicLabel: string; topicId: number }
+  | { kind: "repeat"; count: number; topicLabel: string; topicId: number };
+
+/**
+ * Pick the overlap indicator for a single target episode given its active
+ * canonical topics and per-canonical user-overlap counts (already excluding
+ * the target itself — see `getCanonicalTopicOverlaps` for the subtraction).
+ *
+ * Returns `null` when `targetCanonicals` is empty; the caller falls back to
+ * ADR-034 category overlap per ADR-042 §"Feature 1 — Dedup awareness".
+ *
+ * Tie-breakers (applied in order):
+ *  1. Highest overlap count (→ `repeat`) or any positive count (→ `repeat`).
+ *  2. Highest `coverageScore` among candidates at the max count.
+ *  3. Lowest `canonicalTopicId` when coverageScore is also tied.
+ *  (Same convention as `canonical-topics.ts` row_number ORDER BY.)
+ *
+ * No MIN_CONSUMED gate (intentional divergence from ADR-034). Canonical
+ * topics are entity-resolved — "I've heard 1 other Opus 4.7 episode" is a
+ * meaningful signal even with a small history. The noise that justifies
+ * ADR-034's MIN_CONSUMED gate (broad categories) does not apply here.
+ * See plan §"Decisions deviating from issue spec" #5 and ADR-042.
+ */
+export function computeCanonicalTopicOverlap(
+  targetCanonicals: CanonicalOverlapTargetRow[],
+  userOverlapCounts: ReadonlyMap<number, number>,
+): CanonicalOverlapResult | null {
+  if (targetCanonicals.length === 0) return null;
+
+  // Find the max per-canonical overlap count across all of this episode's canonicals.
+  let maxCount = 0;
+  for (const { canonicalTopicId } of targetCanonicals) {
+    const count = userOverlapCounts.get(canonicalTopicId) ?? 0;
+    if (count > maxCount) maxCount = count;
+  }
+
+  if (maxCount > 0) {
+    // Repeat path: pick the canonical at maxCount, tie-breaking by coverageScore desc,
+    // then canonicalTopicId asc.
+    let best = targetCanonicals[0];
+    let bestCount = userOverlapCounts.get(best.canonicalTopicId) ?? 0;
+    for (let i = 1; i < targetCanonicals.length; i++) {
+      const row = targetCanonicals[i];
+      const count = userOverlapCounts.get(row.canonicalTopicId) ?? 0;
+      if (count < maxCount) continue;
+      if (bestCount < maxCount) {
+        // best hasn't yet been set to a max-count row
+        best = row;
+        bestCount = count;
+        continue;
+      }
+      if (
+        row.coverageScore > best.coverageScore ||
+        (row.coverageScore === best.coverageScore &&
+          row.canonicalTopicId < best.canonicalTopicId)
+      ) {
+        best = row;
+        bestCount = count;
+      }
+    }
+    return {
+      kind: "repeat",
+      count: maxCount,
+      topicLabel: best.topicLabel,
+      topicId: best.canonicalTopicId,
+    };
+  }
+
+  // New path: all counts are 0; pick canonical with highest coverageScore,
+  // tie-breaking by lowest canonicalTopicId.
+  let best = targetCanonicals[0];
+  for (let i = 1; i < targetCanonicals.length; i++) {
+    const row = targetCanonicals[i];
+    if (
+      row.coverageScore > best.coverageScore ||
+      (row.coverageScore === best.coverageScore &&
+        row.canonicalTopicId < best.canonicalTopicId)
+    ) {
+      best = row;
+    }
+  }
+  return {
+    kind: "new",
+    topicLabel: best.topicLabel,
+    topicId: best.canonicalTopicId,
+  };
+}

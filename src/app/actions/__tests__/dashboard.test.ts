@@ -120,6 +120,16 @@ vi.mock("@/db/schema", () => ({
     rankedAt: "ranked_at",
     relevance: "relevance",
   },
+  canonicalTopics: {
+    id: "id",
+    label: "label",
+    status: "status",
+  },
+  episodeCanonicalTopics: {
+    episodeId: "episode_id",
+    canonicalTopicId: "canonical_topic_id",
+    coverageScore: "coverage_score",
+  },
   userActivity: {},
 }));
 
@@ -145,6 +155,7 @@ vi.mock("drizzle-orm", () => ({
 // Mock topic-overlap — keeps dashboard tests focused on wiring, not overlap logic
 const mockComputeTopicOverlap = vi.fn();
 const mockBuildUserTopicProfile = vi.fn();
+const mockComputeCanonicalTopicOverlap = vi.fn();
 vi.mock("@/lib/topic-overlap", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/lib/topic-overlap")>();
   return {
@@ -153,6 +164,8 @@ vi.mock("@/lib/topic-overlap", async (importOriginal) => {
       mockComputeTopicOverlap(...args),
     buildUserTopicProfile: (...args: unknown[]) =>
       mockBuildUserTopicProfile(...args),
+    computeCanonicalTopicOverlap: (...args: unknown[]) =>
+      mockComputeCanonicalTopicOverlap(...args),
   };
 });
 
@@ -1349,5 +1362,367 @@ describe("getTrendingTopicBySlug", () => {
       ),
     );
     expect(loggedSlug).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getCanonicalTopicOverlaps (batch) tests
+// ---------------------------------------------------------------------------
+
+describe("getCanonicalTopicOverlaps", () => {
+  const EP1 = asPodcastIndexEpisodeId("ep-1");
+  const EP2 = asPodcastIndexEpisodeId("ep-2");
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockAuth.mockResolvedValue({ userId: "user_123" });
+    mockWhere.mockResolvedValue([]);
+    mockUnion.mockResolvedValue([]);
+    mockGroupBy.mockResolvedValue([]);
+    mockComputeCanonicalTopicOverlap.mockReturnValue(null);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+    vi.resetModules();
+  });
+
+  it("returns Unauthorized when not authenticated", async () => {
+    mockAuth.mockResolvedValue({ userId: null });
+
+    const { getCanonicalTopicOverlaps } =
+      await import("@/app/actions/dashboard");
+    const result = await getCanonicalTopicOverlaps([EP1]);
+
+    expect(result).toEqual({ success: false, error: "Unauthorized" });
+    expect(mockSelect).not.toHaveBeenCalled();
+  });
+
+  it("returns empty data object for empty episodeIds", async () => {
+    const { getCanonicalTopicOverlaps } =
+      await import("@/app/actions/dashboard");
+    const result = await getCanonicalTopicOverlaps([]);
+
+    expect(result).toEqual({ success: true, data: {} });
+    expect(mockSelect).not.toHaveBeenCalled();
+  });
+
+  it("returns all-null map when no episode ids are found in DB (guard 1: inArray empty)", async () => {
+    // Q1 returns empty — all input ids unknown
+    mockWhere.mockResolvedValueOnce([]); // Q1
+
+    const { getCanonicalTopicOverlaps } =
+      await import("@/app/actions/dashboard");
+    const result = await getCanonicalTopicOverlaps([EP1, EP2]);
+
+    expect(result).toEqual({
+      success: true,
+      data: { [EP1]: null, [EP2]: null },
+    });
+    // Q2 and Q3 must NOT have been called (guarded)
+    expect(mockInnerJoin).not.toHaveBeenCalled();
+    expect(mockUnion).not.toHaveBeenCalled();
+  });
+
+  it("returns null for episode not found in DB (partial batch)", async () => {
+    // Q1: only EP1 found, EP2 unknown
+    mockWhere
+      .mockResolvedValueOnce([{ id: 100, podcastIndexId: EP1 }]) // Q1
+      .mockResolvedValueOnce([]); // Q2 (no canonicals for EP1)
+
+    const { getCanonicalTopicOverlaps } =
+      await import("@/app/actions/dashboard");
+    const result = await getCanonicalTopicOverlaps([EP1, EP2]);
+
+    expect(result.success).toBe(true);
+    if (!result.success) throw new Error("expected success");
+    expect(result.data[EP1]).toBeNull(); // no canonicals → null
+    expect(result.data[EP2]).toBeNull(); // not in DB → null
+  });
+
+  it("returns null when target has no active canonicals (guard 2: inArray empty)", async () => {
+    mockWhere
+      .mockResolvedValueOnce([{ id: 100, podcastIndexId: EP1 }]) // Q1
+      .mockResolvedValueOnce([]); // Q2: no canonicals
+    mockComputeCanonicalTopicOverlap.mockReturnValue(null);
+
+    const { getCanonicalTopicOverlaps } =
+      await import("@/app/actions/dashboard");
+    const result = await getCanonicalTopicOverlaps([EP1]);
+
+    expect(result).toEqual({ success: true, data: { [EP1]: null } });
+    // Q3 must NOT have been called (guarded on empty canonicals)
+    expect(mockUnion).not.toHaveBeenCalled();
+  });
+
+  it("returns 'new' when user has zero consumed episodes (guard 3: inArray empty on Q3b)", async () => {
+    mockWhere
+      .mockResolvedValueOnce([{ id: 100, podcastIndexId: EP1 }]) // Q1
+      .mockResolvedValueOnce([
+        {
+          episodeId: 100,
+          canonicalTopicId: 10,
+          topicLabel: "AI Safety",
+          coverageScore: 0.9,
+        },
+      ]); // Q2
+    mockUnion.mockResolvedValue([]); // Q3a: no consumed episodes
+    mockComputeCanonicalTopicOverlap.mockReturnValue({
+      kind: "new",
+      topicLabel: "AI Safety",
+      topicId: 10,
+    });
+
+    const { getCanonicalTopicOverlaps } =
+      await import("@/app/actions/dashboard");
+    const result = await getCanonicalTopicOverlaps([EP1]);
+
+    expect(result.success).toBe(true);
+    if (!result.success) throw new Error("expected success");
+    expect(result.data[EP1]).toEqual({
+      kind: "new",
+      topicLabel: "AI Safety",
+      topicId: 10,
+    });
+    // Q3b must NOT have been called (no consumed → skip groupBy)
+    expect(mockGroupBy).not.toHaveBeenCalled();
+    // computeCanonicalTopicOverlap called with empty Map (no counts)
+    expect(mockComputeCanonicalTopicOverlap).toHaveBeenCalledWith(
+      [{ canonicalTopicId: 10, topicLabel: "AI Safety", coverageScore: 0.9 }],
+      new Map(),
+    );
+  });
+
+  it("returns 'repeat' when user has consumed episodes with positive count", async () => {
+    mockWhere
+      .mockResolvedValueOnce([{ id: 100, podcastIndexId: EP1 }]) // Q1
+      .mockResolvedValueOnce([
+        {
+          episodeId: 100,
+          canonicalTopicId: 10,
+          topicLabel: "AI Safety",
+          coverageScore: 0.9,
+        },
+      ]); // Q2
+    mockUnion.mockResolvedValue([{ episodeId: 200 }]); // Q3a: ep200 consumed
+    mockGroupBy.mockResolvedValue([{ canonicalTopicId: 10, count: 2 }]); // Q3b
+    mockComputeCanonicalTopicOverlap.mockReturnValue({
+      kind: "repeat",
+      count: 2,
+      topicLabel: "AI Safety",
+      topicId: 10,
+    });
+
+    const { getCanonicalTopicOverlaps } =
+      await import("@/app/actions/dashboard");
+    const result = await getCanonicalTopicOverlaps([EP1]);
+
+    expect(result.success).toBe(true);
+    if (!result.success) throw new Error("expected success");
+    expect(result.data[EP1]).toEqual({
+      kind: "repeat",
+      count: 2,
+      topicLabel: "AI Safety",
+      topicId: 10,
+    });
+    // EP1 (id=100) is NOT consumed → no self-subtraction; counts passed as-is
+    expect(mockComputeCanonicalTopicOverlap).toHaveBeenCalledWith(
+      [{ canonicalTopicId: 10, topicLabel: "AI Safety", coverageScore: 0.9 }],
+      new Map([[10, 2]]),
+    );
+  });
+
+  it("verifies Q2 applies status='active' filter so merged/dormant canonicals are excluded", async () => {
+    mockWhere
+      .mockResolvedValueOnce([{ id: 100, podcastIndexId: EP1 }]) // Q1
+      .mockResolvedValueOnce([
+        {
+          episodeId: 100,
+          canonicalTopicId: 10,
+          topicLabel: "AI Safety",
+          coverageScore: 0.9,
+        },
+      ]); // Q2
+    mockUnion.mockResolvedValue([]);
+    mockComputeCanonicalTopicOverlap.mockReturnValue({
+      kind: "new",
+      topicLabel: "AI Safety",
+      topicId: 10,
+    });
+
+    const { getCanonicalTopicOverlaps } =
+      await import("@/app/actions/dashboard");
+    const { canonicalTopics: ctSchema } = await import("@/db/schema");
+    await getCanonicalTopicOverlaps([EP1]);
+
+    // Q2 is the second mockWhere call (index 1), after Q1's where (index 0).
+    // Its argument must be an `and(...)` that includes eq(canonicalTopics.status, 'active'),
+    // so that merged and dormant canonicals are filtered out even when they have junction rows.
+    const q2WhereArg = mockWhere.mock.calls[1]?.[0];
+    expect(q2WhereArg).toEqual({
+      _op: "and",
+      args: expect.arrayContaining([
+        { _op: "eq", args: [ctSchema.status, "active"] },
+      ]),
+    });
+  });
+
+  it("subtracts target's own contribution when target is in user history", async () => {
+    // EP1 (id=100) is in the user's consumed history
+    mockWhere
+      .mockResolvedValueOnce([{ id: 100, podcastIndexId: EP1 }]) // Q1
+      .mockResolvedValueOnce([
+        {
+          episodeId: 100,
+          canonicalTopicId: 10,
+          topicLabel: "AI Safety",
+          coverageScore: 0.9,
+        },
+      ]); // Q2
+    // Q3a: EP1 (id=100) AND ep200 are consumed
+    mockUnion.mockResolvedValue([{ episodeId: 100 }, { episodeId: 200 }]);
+    // Q3b: global count for C10 = 3 (EP1 + ep200 + ep300)
+    mockGroupBy.mockResolvedValue([{ canonicalTopicId: 10, count: 3 }]);
+    mockComputeCanonicalTopicOverlap.mockReturnValue({
+      kind: "repeat",
+      count: 2,
+      topicLabel: "AI Safety",
+      topicId: 10,
+    });
+
+    const { getCanonicalTopicOverlaps } =
+      await import("@/app/actions/dashboard");
+    const result = await getCanonicalTopicOverlaps([EP1]);
+
+    expect(result.success).toBe(true);
+    // EP1 is consumed → subtract 1: 3 - 1 = 2
+    expect(mockComputeCanonicalTopicOverlap).toHaveBeenCalledWith(
+      [{ canonicalTopicId: 10, topicLabel: "AI Safety", coverageScore: 0.9 }],
+      new Map([[10, 2]]),
+    );
+  });
+
+  it("handles batch with mixed states correctly", async () => {
+    // EP1: found, has canonicals, overlap count 1
+    // EP2: not found in DB → null
+    mockWhere
+      .mockResolvedValueOnce([{ id: 100, podcastIndexId: EP1 }]) // Q1: only EP1 found
+      .mockResolvedValueOnce([
+        {
+          episodeId: 100,
+          canonicalTopicId: 10,
+          topicLabel: "AI Safety",
+          coverageScore: 0.9,
+        },
+      ]); // Q2
+    mockUnion.mockResolvedValue([{ episodeId: 200 }]); // Q3a
+    mockGroupBy.mockResolvedValue([{ canonicalTopicId: 10, count: 1 }]); // Q3b
+    mockComputeCanonicalTopicOverlap.mockReturnValue({
+      kind: "repeat",
+      count: 1,
+      topicLabel: "AI Safety",
+      topicId: 10,
+    });
+
+    const { getCanonicalTopicOverlaps } =
+      await import("@/app/actions/dashboard");
+    const result = await getCanonicalTopicOverlaps([EP1, EP2]);
+
+    expect(result.success).toBe(true);
+    if (!result.success) throw new Error("expected success");
+    expect(result.data[EP1]).toEqual({
+      kind: "repeat",
+      count: 1,
+      topicLabel: "AI Safety",
+      topicId: 10,
+    });
+    expect(result.data[EP2]).toBeNull(); // not in DB
+  });
+
+  it("returns { success: false, error } on DB error", async () => {
+    mockWhere.mockRejectedValue(new Error("DB connection lost"));
+
+    const { getCanonicalTopicOverlaps } =
+      await import("@/app/actions/dashboard");
+    const result = await getCanonicalTopicOverlaps([EP1]);
+
+    expect(result).toEqual({
+      success: false,
+      error: "Failed to compute canonical topic overlap",
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getCanonicalTopicOverlap (single) tests
+// ---------------------------------------------------------------------------
+
+describe("getCanonicalTopicOverlap", () => {
+  const EP1 = asPodcastIndexEpisodeId("ep-42");
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockAuth.mockResolvedValue({ userId: "user_123" });
+    mockWhere.mockResolvedValue([]);
+    mockUnion.mockResolvedValue([]);
+    mockGroupBy.mockResolvedValue([]);
+    mockComputeCanonicalTopicOverlap.mockReturnValue(null);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+    vi.resetModules();
+  });
+
+  it("returns Unauthorized when not authenticated", async () => {
+    mockAuth.mockResolvedValue({ userId: null });
+
+    const { getCanonicalTopicOverlap } =
+      await import("@/app/actions/dashboard");
+    const result = await getCanonicalTopicOverlap(EP1);
+
+    expect(result).toEqual({ success: false, error: "Unauthorized" });
+  });
+
+  it("delegates to batch and returns data for the given id", async () => {
+    mockWhere
+      .mockResolvedValueOnce([{ id: 42, podcastIndexId: EP1 }]) // Q1
+      .mockResolvedValueOnce([
+        {
+          episodeId: 42,
+          canonicalTopicId: 5,
+          topicLabel: "Model Releases",
+          coverageScore: 0.85,
+        },
+      ]); // Q2
+    mockUnion.mockResolvedValue([]);
+    mockComputeCanonicalTopicOverlap.mockReturnValue({
+      kind: "new",
+      topicLabel: "Model Releases",
+      topicId: 5,
+    });
+
+    const { getCanonicalTopicOverlap } =
+      await import("@/app/actions/dashboard");
+    const result = await getCanonicalTopicOverlap(EP1);
+
+    expect(result).toEqual({
+      success: true,
+      data: { kind: "new", topicLabel: "Model Releases", topicId: 5 },
+    });
+  });
+
+  it("returns { success: true, data: null } when episode is not found in DB", async () => {
+    mockWhere.mockResolvedValueOnce([]); // Q1: not found
+
+    const { getCanonicalTopicOverlap } =
+      await import("@/app/actions/dashboard");
+    const result = await getCanonicalTopicOverlap(EP1);
+
+    expect(result).toEqual({ success: true, data: null });
   });
 });
