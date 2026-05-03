@@ -1958,6 +1958,28 @@ describe("getCanonicalTopicOverlap", () => {
     });
   });
 
+  it("returns Unauthorized for unauthenticated callers even with unusable input (auth-first)", async () => {
+    // Auth contract must hold uniformly — sanitization happens INSIDE
+    // withAuthAction so unauthenticated callers never get a success-shaped
+    // null for invalid input.
+    mockAuth.mockResolvedValue({ userId: null });
+
+    const { getCanonicalTopicOverlap } =
+      await import("@/app/actions/dashboard");
+    expect(
+      await getCanonicalTopicOverlap("   " as PodcastIndexEpisodeId),
+    ).toEqual({
+      success: false,
+      error: "Unauthorized",
+    });
+    expect(
+      await getCanonicalTopicOverlap("__proto__" as PodcastIndexEpisodeId),
+    ).toEqual({
+      success: false,
+      error: "Unauthorized",
+    });
+  });
+
   it("returns { success: true, data: null } for unusable input (whitespace-only, non-string, forbidden key)", async () => {
     const { getCanonicalTopicOverlap } =
       await import("@/app/actions/dashboard");

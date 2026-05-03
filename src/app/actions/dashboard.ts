@@ -83,7 +83,9 @@ function sanitizeOverlapId(id: unknown): PodcastIndexEpisodeId | null {
   ) {
     return null;
   }
-  return trimmed as PodcastIndexEpisodeId;
+  // Use the codebase-standard branded-id constructor — makes it clear this is
+  // an intentional post-validation cast, not an arbitrary `as` assertion.
+  return asPodcastIndexEpisodeId(trimmed);
 }
 
 /**
@@ -939,17 +941,21 @@ export async function getCanonicalTopicOverlaps(
 /**
  * Single-episode convenience wrapper — delegates to the batch variant.
  *
- * Normalizes the input via `sanitizeOverlapId` BEFORE both delegating and
- * indexing the result. Otherwise a caller passing a recoverable variant like
- * `" ep-42 "` would have the batch compute overlap under the trimmed key
- * (`"ep-42"`) while this wrapper read the raw key and returned `null`.
+ * Wrapped in `withAuthAction` so the auth contract is enforced for every
+ * input (including unusable ones); without this, an unauthenticated caller
+ * passing whitespace-only ids would receive a success-shaped `null` instead
+ * of `Unauthorized`. Normalizes input via `sanitizeOverlapId` before both
+ * delegating and indexing the result so a caller passing a recoverable
+ * variant like `" ep-42 "` doesn't read a raw key the batch never computed.
  */
 export async function getCanonicalTopicOverlap(
   podcastIndexEpisodeId: PodcastIndexEpisodeId,
 ): Promise<ActionResult<CanonicalOverlapResult | null>> {
-  const normalized = sanitizeOverlapId(podcastIndexEpisodeId);
-  if (normalized === null) return { success: true, data: null };
-  const result = await getCanonicalTopicOverlaps([normalized]);
-  if (!result.success) return result;
-  return { success: true, data: result.data[normalized] ?? null };
+  return withAuthAction(async () => {
+    const normalized = sanitizeOverlapId(podcastIndexEpisodeId);
+    if (normalized === null) return { success: true, data: null };
+    const result = await getCanonicalTopicOverlaps([normalized]);
+    if (!result.success) return result;
+    return { success: true, data: result.data[normalized] ?? null };
+  });
 }
