@@ -1841,6 +1841,31 @@ describe("getCanonicalTopicOverlaps", () => {
     expect(typeof countsMap.get(10)).toBe("number");
     expect(countsMap.get(10)).toBe(3);
   });
+
+  it("caps the input via single-pass iteration before allocation (DoS guard)", async () => {
+    // Build a 600-element input. The 500-cap should kick in mid-iteration
+    // — the remaining 100 elements must never be sanitized or queried.
+    // We mark the post-cap slots with sentinel ids that would FAIL DB lookup
+    // if they ever reached the SQL `IN` predicate, but the cap should
+    // prevent that.
+    const huge: PodcastIndexEpisodeId[] = [];
+    for (let i = 0; i < 500; i++) huge.push(`ep-${i}` as PodcastIndexEpisodeId);
+    for (let i = 500; i < 600; i++)
+      huge.push(`SHOULD_NOT_REACH_${i}` as PodcastIndexEpisodeId);
+
+    mockWhere.mockResolvedValueOnce([]); // Q1 returns no matches → guard 1
+
+    const { getCanonicalTopicOverlaps } =
+      await import("@/app/actions/dashboard");
+    const result = await getCanonicalTopicOverlaps(huge);
+
+    expect(result.success).toBe(true);
+    if (!result.success) throw new Error("expected success");
+    // Capped at 500 — exactly that many keys, none of the post-cap sentinels.
+    expect(Object.keys(result.data)).toHaveLength(500);
+    expect(result.data).not.toHaveProperty("SHOULD_NOT_REACH_500");
+    expect(result.data).not.toHaveProperty("SHOULD_NOT_REACH_599");
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -1876,7 +1901,7 @@ describe("getCanonicalTopicOverlap", () => {
     expect(result).toEqual({ success: false, error: "Unauthorized" });
   });
 
-  it("delegates to batch and returns data for the given id", async () => {
+  it("delegates to batch and returns data for the given id (single auth() per request)", async () => {
     mockWhere
       .mockResolvedValueOnce([{ id: 42, podcastIndexId: EP1 }]) // Q1
       .mockResolvedValueOnce([
@@ -1902,6 +1927,9 @@ describe("getCanonicalTopicOverlap", () => {
       success: true,
       data: { kind: "new", topicLabel: "Model Releases", topicId: 5 },
     });
+    // Wrapper calls runCanonicalTopicOverlapBatch directly, NOT
+    // getCanonicalTopicOverlaps — auth() runs exactly once per request.
+    expect(mockAuth).toHaveBeenCalledTimes(1);
   });
 
   it("returns { success: true, data: null } when episode is not found in DB", async () => {

@@ -88,6 +88,24 @@ function sanitizeOverlapId(id: unknown): PodcastIndexEpisodeId | null {
   return asPodcastIndexEpisodeId(trimmed);
 }
 
+// Single-pass batch sanitizer with early exit at MAX_OVERLAP_LOOKUP_IDS.
+// Stopping mid-iteration bounds CPU/memory regardless of input length —
+// applying `.slice(MAX, ...)` only AFTER `.map().filter().Set` would still
+// process the full untrusted client array, which is a DoS surface.
+function sanitizeOverlapIdBatch(input: unknown): PodcastIndexEpisodeId[] {
+  if (!Array.isArray(input)) return [];
+  const seen = new Set<string>();
+  const out: PodcastIndexEpisodeId[] = [];
+  for (const raw of input) {
+    if (out.length >= MAX_OVERLAP_LOOKUP_IDS) break;
+    const id = sanitizeOverlapId(raw);
+    if (id === null || seen.has(id)) continue;
+    seen.add(id);
+    out.push(id);
+  }
+  return out;
+}
+
 /**
  * Fetch the user's consumed episode IDs (listen_history ∪ user_library).
  *
@@ -726,7 +744,11 @@ export type RecentEpisode = PodcastIndexEpisode & {
 };
 
 /**
- * Batch canonical-topic overlap for a list of episodes.
+ * Internal impl: runs the canonical-overlap queries with an already-sanitized
+ * id list and a resolved `userId`. Both `getCanonicalTopicOverlaps` (batch)
+ * and `getCanonicalTopicOverlap` (single) call this directly so the auth
+ * check happens exactly once per request — wrapping a wrapper-in-wrapper
+ * triggers two `auth()` calls per single-episode request.
  *
  * Issues up to 4 queries regardless of batch size (Q3a/Q3b are skipped when
  * earlier guards fire):
@@ -742,219 +764,216 @@ export type RecentEpisode = PodcastIndexEpisode & {
  *   1. Empty dbIds      → all inputs → null (skip Q2/Q3).
  *   2. Empty canonicals → all inputs → null (skip Q3a/Q3b).
  *   3. Empty consumed   → pass empty Map to helper (skip Q3b).
+ */
+async function runCanonicalTopicOverlapBatch(
+  userId: string,
+  sanitizedIds: PodcastIndexEpisodeId[],
+): Promise<
+  ActionResult<Record<PodcastIndexEpisodeId, CanonicalOverlapResult | null>>
+> {
+  try {
+    if (sanitizedIds.length === 0) {
+      return {
+        success: true,
+        data: {} as Record<
+          PodcastIndexEpisodeId,
+          CanonicalOverlapResult | null
+        >,
+      };
+    }
+
+    // Q1: resolve PodcastIndexEpisodeId → DB id
+    const episodeRows = await db
+      .select({ id: episodes.id, podcastIndexId: episodes.podcastIndexId })
+      .from(episodes)
+      .where(inArray(episodes.podcastIndexId, sanitizedIds));
+
+    // Guard 1: no DB rows found → all inputs map to null.
+    // Plain `{}` (not Object.create(null)) — Next.js server-action
+    // serialization rejects null-prototype objects at the network boundary
+    // ("Only plain objects... null prototypes are not supported"). Untrusted
+    // keys are filtered upstream via FORBIDDEN_OVERLAP_KEYS.
+    if (episodeRows.length === 0) {
+      const data: Record<PodcastIndexEpisodeId, null> = {} as Record<
+        PodcastIndexEpisodeId,
+        null
+      >;
+      for (const id of sanitizedIds) data[id] = null;
+      return { success: true, data };
+    }
+
+    const dbIds = episodeRows.map((r) => r.id);
+
+    // Q2: active canonical topics for all target episodes
+    const canonicalRows = await db
+      .select({
+        episodeId: episodeCanonicalTopics.episodeId,
+        canonicalTopicId: episodeCanonicalTopics.canonicalTopicId,
+        topicLabel: canonicalTopics.label,
+        coverageScore: episodeCanonicalTopics.coverageScore,
+      })
+      .from(episodeCanonicalTopics)
+      .innerJoin(
+        canonicalTopics,
+        eq(episodeCanonicalTopics.canonicalTopicId, canonicalTopics.id),
+      )
+      .where(
+        and(
+          inArray(episodeCanonicalTopics.episodeId, dbIds),
+          eq(canonicalTopics.status, "active"),
+        ),
+      );
+
+    // Group canonicals by episode DB id
+    const canonicalsByEpisode = new Map<number, CanonicalOverlapTargetRow[]>();
+    const allCanonicalIdSet = new Set<number>();
+    for (const row of canonicalRows) {
+      const list = canonicalsByEpisode.get(row.episodeId) ?? [];
+      list.push({
+        canonicalTopicId: row.canonicalTopicId,
+        topicLabel: row.topicLabel,
+        coverageScore: row.coverageScore,
+      });
+      canonicalsByEpisode.set(row.episodeId, list);
+      allCanonicalIdSet.add(row.canonicalTopicId);
+    }
+
+    const allCanonicalIds = Array.from(allCanonicalIdSet);
+    const globalCounts = new Map<number, number>();
+    const consumed = new Set<number>();
+
+    // Guard 2: no canonicals found → skip Q3a/Q3b entirely
+    if (allCanonicalIds.length > 0) {
+      // Q3a: user-consumed episode IDs (listen_history UNION user_library)
+      const consumedIds = await fetchConsumedEpisodeIds(userId);
+      for (const id of consumedIds) consumed.add(id);
+
+      // Guard 3: no consumed episodes → skip Q3b (pass empty Map to helper)
+      if (consumed.size > 0) {
+        // Q3b: global per-canonical overlap counts
+        const countRows = await db
+          .select({
+            canonicalTopicId: episodeCanonicalTopics.canonicalTopicId,
+            count:
+              sql<number>`COUNT(DISTINCT ${episodeCanonicalTopics.episodeId})::integer`.mapWith(
+                Number,
+              ),
+          })
+          .from(episodeCanonicalTopics)
+          .where(
+            and(
+              inArray(episodeCanonicalTopics.canonicalTopicId, allCanonicalIds),
+              inArray(episodeCanonicalTopics.episodeId, consumedIds),
+            ),
+          )
+          .groupBy(episodeCanonicalTopics.canonicalTopicId);
+
+        for (const row of countRows) {
+          globalCounts.set(row.canonicalTopicId, row.count);
+        }
+      }
+    }
+
+    // Build result: per input episode, subtract self-contribution and call helper
+    const podcastIndexToDbId = new Map<PodcastIndexEpisodeId, number>();
+    for (const row of episodeRows) {
+      podcastIndexToDbId.set(row.podcastIndexId, row.id);
+    }
+
+    // Plain `{}` — see Guard 1 comment above. Server-action serialization
+    // rejects null-prototype objects; untrusted keys are filtered upstream.
+    const data: Record<PodcastIndexEpisodeId, CanonicalOverlapResult | null> =
+      {} as Record<PodcastIndexEpisodeId, CanonicalOverlapResult | null>;
+    for (const podcastIndexId of sanitizedIds) {
+      const dbId = podcastIndexToDbId.get(podcastIndexId);
+      if (dbId === undefined) {
+        data[podcastIndexId] = null;
+        continue;
+      }
+
+      const targetCanonicals = canonicalsByEpisode.get(dbId) ?? [];
+      const isConsumed = consumed.has(dbId);
+
+      // Self-exclusion: when target ∈ consumed, the target's own row contributes
+      // to globalCounts and must be subtracted so "count" means "other episodes."
+      // Otherwise reuse globalCounts directly — avoids an unnecessary Map copy.
+      // Math.max(0, …) clamps stray negatives that could arise if the global
+      // count is missing (e.g. concurrent reconcile-canonicals flipping status
+      // between Q2 and Q3b) — silently degrading to "new" is preferable to
+      // surfacing a -1 to the helper.
+      let perTargetCounts: ReadonlyMap<number, number>;
+      if (isConsumed) {
+        const adjusted = new Map<number, number>();
+        for (const { canonicalTopicId } of targetCanonicals) {
+          adjusted.set(
+            canonicalTopicId,
+            Math.max(0, (globalCounts.get(canonicalTopicId) ?? 0) - 1),
+          );
+        }
+        perTargetCounts = adjusted;
+      } else {
+        perTargetCounts = globalCounts;
+      }
+
+      data[podcastIndexId] = computeCanonicalTopicOverlap(
+        targetCanonicals,
+        perTargetCounts,
+      );
+    }
+
+    return { success: true, data };
+  } catch (error) {
+    console.error("Failed to compute canonical topic overlap", {
+      userId,
+      inputCount: sanitizedIds.length,
+      error,
+    });
+    return {
+      success: false,
+      error: "Failed to compute canonical topic overlap",
+    };
+  }
+}
+
+/**
+ * Batch canonical-topic overlap for a list of episodes.
  *
  * Input is trimmed, deduped, length-capped per id (MAX_OVERLAP_ID_LENGTH),
  * filtered against forbidden prototype keys, and capped at MAX_OVERLAP_LOOKUP_IDS
- * to bound the SQL `IN` predicate against an untrusted client array.
+ * — the cap is enforced via single-pass iteration with early exit, so a huge
+ * untrusted client array never gets fully iterated.
  */
 export async function getCanonicalTopicOverlaps(
   podcastIndexEpisodeIds: PodcastIndexEpisodeId[],
 ): Promise<
   ActionResult<Record<PodcastIndexEpisodeId, CanonicalOverlapResult | null>>
 > {
-  return withAuthAction(async (userId) => {
-    try {
-      const sanitizedIds: PodcastIndexEpisodeId[] = Array.isArray(
-        podcastIndexEpisodeIds,
-      )
-        ? Array.from(
-            new Set(
-              podcastIndexEpisodeIds
-                .map((id) => sanitizeOverlapId(id))
-                .filter((id): id is PodcastIndexEpisodeId => id !== null),
-            ),
-          ).slice(0, MAX_OVERLAP_LOOKUP_IDS)
-        : [];
-
-      if (sanitizedIds.length === 0) {
-        return {
-          success: true,
-          data: {} as Record<
-            PodcastIndexEpisodeId,
-            CanonicalOverlapResult | null
-          >,
-        };
-      }
-
-      // Q1: resolve PodcastIndexEpisodeId → DB id
-      const episodeRows = await db
-        .select({ id: episodes.id, podcastIndexId: episodes.podcastIndexId })
-        .from(episodes)
-        .where(inArray(episodes.podcastIndexId, sanitizedIds));
-
-      // Guard 1: no DB rows found → all inputs map to null.
-      // Plain `{}` (not Object.create(null)) — Next.js server-action
-      // serialization rejects null-prototype objects at the network boundary
-      // ("Only plain objects... null prototypes are not supported"). Untrusted
-      // keys are filtered upstream via FORBIDDEN_OVERLAP_KEYS.
-      if (episodeRows.length === 0) {
-        const data: Record<PodcastIndexEpisodeId, null> = {} as Record<
-          PodcastIndexEpisodeId,
-          null
-        >;
-        for (const id of sanitizedIds) data[id] = null;
-        return { success: true, data };
-      }
-
-      const dbIds = episodeRows.map((r) => r.id);
-
-      // Q2: active canonical topics for all target episodes
-      const canonicalRows = await db
-        .select({
-          episodeId: episodeCanonicalTopics.episodeId,
-          canonicalTopicId: episodeCanonicalTopics.canonicalTopicId,
-          topicLabel: canonicalTopics.label,
-          coverageScore: episodeCanonicalTopics.coverageScore,
-        })
-        .from(episodeCanonicalTopics)
-        .innerJoin(
-          canonicalTopics,
-          eq(episodeCanonicalTopics.canonicalTopicId, canonicalTopics.id),
-        )
-        .where(
-          and(
-            inArray(episodeCanonicalTopics.episodeId, dbIds),
-            eq(canonicalTopics.status, "active"),
-          ),
-        );
-
-      // Group canonicals by episode DB id
-      const canonicalsByEpisode = new Map<
-        number,
-        CanonicalOverlapTargetRow[]
-      >();
-      const allCanonicalIdSet = new Set<number>();
-      for (const row of canonicalRows) {
-        const list = canonicalsByEpisode.get(row.episodeId) ?? [];
-        list.push({
-          canonicalTopicId: row.canonicalTopicId,
-          topicLabel: row.topicLabel,
-          coverageScore: row.coverageScore,
-        });
-        canonicalsByEpisode.set(row.episodeId, list);
-        allCanonicalIdSet.add(row.canonicalTopicId);
-      }
-
-      const allCanonicalIds = Array.from(allCanonicalIdSet);
-      const globalCounts = new Map<number, number>();
-      const consumed = new Set<number>();
-
-      // Guard 2: no canonicals found → skip Q3a/Q3b entirely
-      if (allCanonicalIds.length > 0) {
-        // Q3a: user-consumed episode IDs (listen_history UNION user_library)
-        const consumedIds = await fetchConsumedEpisodeIds(userId);
-        for (const id of consumedIds) consumed.add(id);
-
-        // Guard 3: no consumed episodes → skip Q3b (pass empty Map to helper)
-        if (consumed.size > 0) {
-          // Q3b: global per-canonical overlap counts
-          const countRows = await db
-            .select({
-              canonicalTopicId: episodeCanonicalTopics.canonicalTopicId,
-              count:
-                sql<number>`COUNT(DISTINCT ${episodeCanonicalTopics.episodeId})::integer`.mapWith(
-                  Number,
-                ),
-            })
-            .from(episodeCanonicalTopics)
-            .where(
-              and(
-                inArray(
-                  episodeCanonicalTopics.canonicalTopicId,
-                  allCanonicalIds,
-                ),
-                inArray(episodeCanonicalTopics.episodeId, consumedIds),
-              ),
-            )
-            .groupBy(episodeCanonicalTopics.canonicalTopicId);
-
-          for (const row of countRows) {
-            globalCounts.set(row.canonicalTopicId, row.count);
-          }
-        }
-      }
-
-      // Build result: per input episode, subtract self-contribution and call helper
-      const podcastIndexToDbId = new Map<PodcastIndexEpisodeId, number>();
-      for (const row of episodeRows) {
-        podcastIndexToDbId.set(row.podcastIndexId, row.id);
-      }
-
-      // Plain `{}` — see Guard 1 comment above. Server-action serialization
-      // rejects null-prototype objects; untrusted keys are filtered upstream.
-      const data: Record<PodcastIndexEpisodeId, CanonicalOverlapResult | null> =
-        {} as Record<PodcastIndexEpisodeId, CanonicalOverlapResult | null>;
-      for (const podcastIndexId of sanitizedIds) {
-        const dbId = podcastIndexToDbId.get(podcastIndexId);
-        if (dbId === undefined) {
-          data[podcastIndexId] = null;
-          continue;
-        }
-
-        const targetCanonicals = canonicalsByEpisode.get(dbId) ?? [];
-        const isConsumed = consumed.has(dbId);
-
-        // Self-exclusion: when target ∈ consumed, the target's own row contributes
-        // to globalCounts and must be subtracted so "count" means "other episodes."
-        // Otherwise reuse globalCounts directly — avoids an unnecessary Map copy.
-        // Math.max(0, …) clamps stray negatives that could arise if the global
-        // count is missing (e.g. concurrent reconcile-canonicals flipping status
-        // between Q2 and Q3b) — silently degrading to "new" is preferable to
-        // surfacing a -1 to the helper.
-        let perTargetCounts: ReadonlyMap<number, number>;
-        if (isConsumed) {
-          const adjusted = new Map<number, number>();
-          for (const { canonicalTopicId } of targetCanonicals) {
-            adjusted.set(
-              canonicalTopicId,
-              Math.max(0, (globalCounts.get(canonicalTopicId) ?? 0) - 1),
-            );
-          }
-          perTargetCounts = adjusted;
-        } else {
-          perTargetCounts = globalCounts;
-        }
-
-        data[podcastIndexId] = computeCanonicalTopicOverlap(
-          targetCanonicals,
-          perTargetCounts,
-        );
-      }
-
-      return { success: true, data };
-    } catch (error) {
-      console.error("Failed to compute canonical topic overlap", {
-        userId,
-        inputCount: Array.isArray(podcastIndexEpisodeIds)
-          ? podcastIndexEpisodeIds.length
-          : 0,
-        error,
-      });
-      return {
-        success: false,
-        error: "Failed to compute canonical topic overlap",
-      };
-    }
-  });
+  return withAuthAction((userId) =>
+    runCanonicalTopicOverlapBatch(
+      userId,
+      sanitizeOverlapIdBatch(podcastIndexEpisodeIds),
+    ),
+  );
 }
 
 /**
- * Single-episode convenience wrapper — delegates to the batch variant.
+ * Single-episode convenience wrapper.
  *
  * Wrapped in `withAuthAction` so the auth contract is enforced for every
- * input (including unusable ones); without this, an unauthenticated caller
- * passing whitespace-only ids would receive a success-shaped `null` instead
- * of `Unauthorized`. Normalizes input via `sanitizeOverlapId` before both
- * delegating and indexing the result so a caller passing a recoverable
- * variant like `" ep-42 "` doesn't read a raw key the batch never computed.
+ * input (including unusable ones). Calls `runCanonicalTopicOverlapBatch`
+ * directly — NOT `getCanonicalTopicOverlaps` — so `auth()` runs exactly
+ * once per request instead of twice. Normalizes input via `sanitizeOverlapId`
+ * before both delegating and indexing the result so a caller passing a
+ * recoverable variant like `" ep-42 "` doesn't read a raw key the impl never
+ * computed.
  */
 export async function getCanonicalTopicOverlap(
   podcastIndexEpisodeId: PodcastIndexEpisodeId,
 ): Promise<ActionResult<CanonicalOverlapResult | null>> {
-  return withAuthAction(async () => {
+  return withAuthAction(async (userId) => {
     const normalized = sanitizeOverlapId(podcastIndexEpisodeId);
     if (normalized === null) return { success: true, data: null };
-    const result = await getCanonicalTopicOverlaps([normalized]);
+    const result = await runCanonicalTopicOverlapBatch(userId, [normalized]);
     if (!result.success) return result;
     return { success: true, data: result.data[normalized] ?? null };
   });
