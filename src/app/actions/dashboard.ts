@@ -43,6 +43,7 @@ import {
   HIGH_OVERLAP_THRESHOLD,
   type CanonicalOverlapResult,
   type CanonicalOverlapTargetRow,
+  type TopicOverlapResult,
 } from "@/lib/topic-overlap";
 import { withAuthAction } from "@/lib/auth-wrapper";
 import { type ActionResult } from "@/types/action-result";
@@ -525,52 +526,64 @@ export async function getRecommendedEpisodes(
 // Get topic overlap for a single episode — used by the episode detail page.
 export async function getEpisodeTopicOverlap(
   podcastIndexEpisodeId: PodcastIndexEpisodeId,
-) {
-  if (!podcastIndexEpisodeId) return EMPTY_OVERLAP_RESULT;
+): Promise<ActionResult<TopicOverlapResult>> {
+  return withAuthAction(async (userId) => {
+    if (!podcastIndexEpisodeId)
+      return { success: true, data: EMPTY_OVERLAP_RESULT };
 
-  const { userId } = await auth();
-  if (!userId) return EMPTY_OVERLAP_RESULT;
+    try {
+      // Parallelize: episode lookup and user profile construction are independent
+      const [episodeRow, profileResult] = await Promise.all([
+        db
+          .select({ id: episodes.id })
+          .from(episodes)
+          .where(eq(episodes.podcastIndexId, podcastIndexEpisodeId))
+          .limit(1),
+        fetchUserTopicProfile(userId),
+      ]);
 
-  try {
-    // Parallelize: episode lookup and user profile construction are independent
-    const [episodeRow, profileResult] = await Promise.all([
-      db
-        .select({ id: episodes.id })
-        .from(episodes)
-        .where(eq(episodes.podcastIndexId, podcastIndexEpisodeId))
-        .limit(1),
-      fetchUserTopicProfile(userId),
-    ]);
+      if (episodeRow.length === 0)
+        return { success: true, data: EMPTY_OVERLAP_RESULT };
+      const episodeDbId = episodeRow[0].id;
+      const { profile: userProfile, totalConsumed } = profileResult;
 
-    if (episodeRow.length === 0) return EMPTY_OVERLAP_RESULT;
-    const episodeDbId = episodeRow[0].id;
-    const { profile: userProfile, totalConsumed } = profileResult;
+      const epTopicRows = await db
+        .select({
+          topic: episodeTopics.topic,
+          relevance: episodeTopics.relevance,
+          topicRank: episodeTopics.topicRank,
+        })
+        .from(episodeTopics)
+        .where(eq(episodeTopics.episodeId, episodeDbId))
+        .orderBy(desc(episodeTopics.relevance));
 
-    const epTopicRows = await db
-      .select({
-        topic: episodeTopics.topic,
-        relevance: episodeTopics.relevance,
-        topicRank: episodeTopics.topicRank,
-      })
-      .from(episodeTopics)
-      .where(eq(episodeTopics.episodeId, episodeDbId))
-      .orderBy(desc(episodeTopics.relevance));
+      const epTopics = epTopicRows.map((r) => ({
+        topic: r.topic,
+        relevance: r.relevance,
+      }));
+      const bestRank = epTopicRows.reduce<number | null>((best, r) => {
+        if (r.topicRank === null) return best;
+        if (best === null) return r.topicRank;
+        return Math.min(best, r.topicRank);
+      }, null);
 
-    const epTopics = epTopicRows.map((r) => ({
-      topic: r.topic,
-      relevance: r.relevance,
-    }));
-    const bestRank = epTopicRows.reduce<number | null>((best, r) => {
-      if (r.topicRank === null) return best;
-      if (best === null) return r.topicRank;
-      return Math.min(best, r.topicRank);
-    }, null);
-
-    return computeTopicOverlap(userProfile, epTopics, totalConsumed, bestRank);
-  } catch (err) {
-    console.error("Failed to compute episode topic overlap:", err);
-    return EMPTY_OVERLAP_RESULT;
-  }
+      return {
+        success: true,
+        data: computeTopicOverlap(
+          userProfile,
+          epTopics,
+          totalConsumed,
+          bestRank,
+        ),
+      };
+    } catch (err) {
+      console.error("Failed to compute episode topic overlap:", err);
+      return {
+        success: false,
+        error: "Failed to compute episode topic overlap",
+      };
+    }
+  });
 }
 
 // Get stats for the dashboard

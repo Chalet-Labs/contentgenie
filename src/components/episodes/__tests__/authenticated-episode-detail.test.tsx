@@ -174,8 +174,8 @@ describe("AuthenticatedEpisodeDetail", () => {
     vi.clearAllMocks();
     mocks.isEpisodeSaved.mockResolvedValue(false);
     mocks.getEpisodeTopicOverlap.mockResolvedValue({
-      label: null,
-      labelKind: null,
+      success: true,
+      data: { label: null, labelKind: null },
     });
     mocks.getCachedEpisode.mockResolvedValue(undefined);
     stubEpisodeFetch();

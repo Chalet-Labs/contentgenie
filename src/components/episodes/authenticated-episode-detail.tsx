@@ -302,10 +302,10 @@ export function AuthenticatedEpisodeDetail({
     let ignore = false;
     getEpisodeTopicOverlap(episodeIdBranded)
       .then((result) => {
-        if (!ignore)
+        if (!ignore && result.success)
           setOverlapResult({
-            label: result.label,
-            labelKind: result.labelKind,
+            label: result.data.label,
+            labelKind: result.data.labelKind,
           });
       })
       .catch(() => {
