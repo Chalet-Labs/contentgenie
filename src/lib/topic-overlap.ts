@@ -164,3 +164,112 @@ export function computeTopicOverlap(
     labelKind: null,
   };
 }
+
+// ---------------------------------------------------------------------------
+// Canonical-topic overlap (ADR-042 / ADR-034 analogue)
+// ---------------------------------------------------------------------------
+
+/** A canonical topic linked to a target episode (pre-fetched server-side). */
+export interface CanonicalOverlapTargetRow {
+  canonicalTopicId: number;
+  topicLabel: string;
+  coverageScore: number;
+}
+
+/**
+ * Overlap indicator for a single episode at the canonical-topic level.
+ *
+ * - `new`    — episode has canonicals but none appear in the user's history.
+ * - `repeat` — at least one canonical was already heard; `count` = how many
+ *              other episodes the user consumed that share the top canonical.
+ */
+export type CanonicalOverlapResult =
+  | { kind: "new"; topicLabel: string; topicId: number }
+  | { kind: "repeat"; count: number; topicLabel: string; topicId: number };
+
+/**
+ * Pick the overlap indicator for a single target episode given its active
+ * canonical topics and per-canonical counts of OTHER consumed episodes that
+ * share each canonical with the target. The caller is responsible for the
+ * self-exclusion subtraction when the target is itself in consumption history.
+ *
+ * Returns `null` when `targetCanonicals` is empty; the caller falls back to
+ * ADR-034 category overlap per ADR-042 §"Feature 1 — Dedup awareness".
+ *
+ * Result kind:
+ *   - any canonical has count > 0  → `repeat` (with count = max count)
+ *   - all counts are 0             → `new`
+ *
+ * Tie-breakers within the chosen kind (in order):
+ *   1. Highest `coverageScore`.
+ *   2. Lowest `canonicalTopicId`.
+ *
+ * (Same convention as the row_number ORDER BY in
+ * `src/app/(app)/podcast/[id]/canonical-topics.ts`.)
+ *
+ * No MIN_CONSUMED gate (intentional divergence from ADR-034). Canonical
+ * topics are entity-resolved — "I've heard 1 other Opus 4.7 episode" is a
+ * meaningful signal even with a small history. The noise that justifies
+ * ADR-034's MIN_CONSUMED gate (broad categories) does not apply here.
+ * See ADR-042.
+ */
+export function computeCanonicalTopicOverlap(
+  targetCanonicals: CanonicalOverlapTargetRow[],
+  userOverlapCounts: ReadonlyMap<number, number>,
+): CanonicalOverlapResult | null {
+  if (targetCanonicals.length === 0) return null;
+
+  let maxCount = 0;
+  for (const { canonicalTopicId } of targetCanonicals) {
+    const count = userOverlapCounts.get(canonicalTopicId) ?? 0;
+    if (count > maxCount) maxCount = count;
+  }
+
+  if (maxCount > 0) {
+    let best = targetCanonicals[0];
+    // bestCount tracks whether `best` has been promoted to a max-count row;
+    // the initial seed at index 0 may be below maxCount.
+    let bestCount = userOverlapCounts.get(best.canonicalTopicId) ?? 0;
+    for (let i = 1; i < targetCanonicals.length; i++) {
+      const row = targetCanonicals[i];
+      const count = userOverlapCounts.get(row.canonicalTopicId) ?? 0;
+      if (count < maxCount) continue;
+      if (bestCount < maxCount) {
+        best = row;
+        bestCount = count;
+        continue;
+      }
+      if (
+        row.coverageScore > best.coverageScore ||
+        (row.coverageScore === best.coverageScore &&
+          row.canonicalTopicId < best.canonicalTopicId)
+      ) {
+        best = row;
+        bestCount = count;
+      }
+    }
+    return {
+      kind: "repeat",
+      count: maxCount,
+      topicLabel: best.topicLabel,
+      topicId: best.canonicalTopicId,
+    };
+  }
+
+  let best = targetCanonicals[0];
+  for (let i = 1; i < targetCanonicals.length; i++) {
+    const row = targetCanonicals[i];
+    if (
+      row.coverageScore > best.coverageScore ||
+      (row.coverageScore === best.coverageScore &&
+        row.canonicalTopicId < best.canonicalTopicId)
+    ) {
+      best = row;
+    }
+  }
+  return {
+    kind: "new",
+    topicLabel: best.topicLabel,
+    topicId: best.canonicalTopicId,
+  };
+}
