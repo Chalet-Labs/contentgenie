@@ -75,11 +75,14 @@ vi.mock("@/components/episodes/episode-transcript-fetch-button", () => ({
 vi.mock("@/components/episodes/summary-display", () => ({
   SummaryDisplay: ({
     onGenerateSummary,
+    overlapLabel,
   }: {
     onGenerateSummary?: () => void;
+    overlapLabel?: string | null;
   }) => (
     <div data-testid="summary-display">
       can-generate:{String(Boolean(onGenerateSummary))}
+      {overlapLabel && <span data-testid="overlap-label">{overlapLabel}</span>}
     </div>
   ),
 }));
@@ -204,6 +207,44 @@ describe("AuthenticatedEpisodeDetail", () => {
       expect(mocks.getEpisodeTopicOverlap).toHaveBeenCalled(),
     );
     // Component renders without errors; overlap label stays absent
+  });
+
+  it("clears overlap label when getEpisodeTopicOverlap transitions from success to { success: false }", async () => {
+    mocks.getEpisodeTopicOverlap
+      .mockResolvedValueOnce({
+        success: true,
+        data: { label: "Strong Match", labelKind: "match" },
+      })
+      .mockResolvedValueOnce({ success: false, error: "Unauthorized" });
+
+    const { rerender } = render(
+      <AuthenticatedEpisodeDetail
+        episodeId="rss-abc"
+        userId="user-1"
+        isAdmin={false}
+      />,
+    );
+
+    await screen.findByRole("heading", { name: "RSS Episode" });
+    await waitFor(() =>
+      expect(screen.getByTestId("overlap-label")).toHaveTextContent(
+        "Strong Match",
+      ),
+    );
+
+    // Swap to a new episodeId so the overlap effect re-runs with the failure mock
+    stubEpisodeFetch({ id: "rss-xyz" });
+    rerender(
+      <AuthenticatedEpisodeDetail
+        episodeId="rss-xyz"
+        userId="user-1"
+        isAdmin={false}
+      />,
+    );
+
+    await waitFor(() =>
+      expect(screen.queryByTestId("overlap-label")).not.toBeInTheDocument(),
+    );
   });
 
   it("hides numeric-only processing actions for rss episodes", async () => {
