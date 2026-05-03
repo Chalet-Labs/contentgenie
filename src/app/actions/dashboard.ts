@@ -138,7 +138,10 @@ async function fetchUserTopicProfile(userId: string) {
     topicCountRows = await db
       .select({
         topic: episodeTopics.topic,
-        count: sql<number>`COUNT(DISTINCT ${episodeTopics.episodeId})::integer`,
+        count:
+          sql<number>`COUNT(DISTINCT ${episodeTopics.episodeId})::integer`.mapWith(
+            Number,
+          ),
       })
       .from(episodeTopics)
       .where(inArray(episodeTopics.episodeId, consumedIds))

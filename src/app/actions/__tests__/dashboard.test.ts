@@ -2030,7 +2030,10 @@ describe("getCanonicalTopicOverlap", () => {
       success: true,
       data: null,
     });
-    // None of these should hit the auth/DB layers.
+    // Auth runs (the wrapper is auth-first per the test above), but the
+    // sanitizer short-circuits before any DB query — sanitization happens
+    // inside the withAuthAction callback, after auth() resolves.
     expect(mockSelect).not.toHaveBeenCalled();
+    expect(mockAuth).toHaveBeenCalled();
   });
 });
