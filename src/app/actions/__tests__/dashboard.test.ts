@@ -4,6 +4,7 @@ import {
   asPodcastIndexEpisodeId,
   type PodcastIndexEpisodeId,
 } from "@/types/ids";
+import { EMPTY_OVERLAP_RESULT } from "@/lib/topic-overlap";
 
 // Mock Clerk auth
 const mockAuth = vi.fn();
@@ -886,6 +887,22 @@ describe("getEpisodeTopicOverlap", () => {
     expect(result).toEqual({ success: false, error: "Unauthorized" });
   });
 
+  it("returns Unauthorized for unauthenticated callers even with falsy input (auth-first)", async () => {
+    mockAuth.mockResolvedValue({ userId: null });
+
+    const { getEpisodeTopicOverlap } = await import("@/app/actions/dashboard");
+    const result = await getEpisodeTopicOverlap("" as PodcastIndexEpisodeId);
+
+    expect(result).toEqual({ success: false, error: "Unauthorized" });
+  });
+
+  it("returns empty overlap for falsy podcastIndexEpisodeId", async () => {
+    const { getEpisodeTopicOverlap } = await import("@/app/actions/dashboard");
+    const result = await getEpisodeTopicOverlap("" as PodcastIndexEpisodeId);
+
+    expect(result).toEqual({ success: true, data: EMPTY_OVERLAP_RESULT });
+  });
+
   it("returns empty overlap when episode is not found in DB", async () => {
     // limit returns empty — episode not in DB
     mockLimit.mockResolvedValue([]);
@@ -895,7 +912,7 @@ describe("getEpisodeTopicOverlap", () => {
       asPodcastIndexEpisodeId("ep-999"),
     );
 
-    expect(result).toMatchObject({ success: true, data: { label: null } });
+    expect(result).toEqual({ success: true, data: EMPTY_OVERLAP_RESULT });
   });
 
   it("returns computed overlap for a found episode", async () => {
@@ -947,20 +964,14 @@ describe("getEpisodeTopicOverlap", () => {
     mockBuildUserTopicProfile.mockReturnValue(new Map());
     // No topics for this episode
     mockWhere.mockResolvedValue([]);
-    mockComputeTopicOverlap.mockReturnValue({
-      overlapCount: 0,
-      topOverlapTopic: null,
-      isNewTopic: false,
-      label: null,
-      labelKind: null,
-    });
+    mockComputeTopicOverlap.mockReturnValue(EMPTY_OVERLAP_RESULT);
 
     const { getEpisodeTopicOverlap } = await import("@/app/actions/dashboard");
     const result = await getEpisodeTopicOverlap(
       asPodcastIndexEpisodeId("ep-42"),
     );
 
-    expect(result).toMatchObject({ success: true, data: { label: null } });
+    expect(result).toEqual({ success: true, data: EMPTY_OVERLAP_RESULT });
   });
 
   it("returns error result on DB error", async () => {

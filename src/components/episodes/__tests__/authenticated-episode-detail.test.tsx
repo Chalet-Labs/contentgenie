@@ -185,6 +185,27 @@ describe("AuthenticatedEpisodeDetail", () => {
     vi.unstubAllGlobals();
   });
 
+  it("handles getEpisodeTopicOverlap returning { success: false } gracefully", async () => {
+    mocks.getEpisodeTopicOverlap.mockResolvedValue({
+      success: false,
+      error: "Unauthorized",
+    });
+
+    render(
+      <AuthenticatedEpisodeDetail
+        episodeId="rss-abc"
+        userId="user-1"
+        isAdmin={false}
+      />,
+    );
+
+    await screen.findByRole("heading", { name: "RSS Episode" });
+    await waitFor(() =>
+      expect(mocks.getEpisodeTopicOverlap).toHaveBeenCalled(),
+    );
+    // Component renders without errors; overlap label stays absent
+  });
+
   it("hides numeric-only processing actions for rss episodes", async () => {
     render(
       <AuthenticatedEpisodeDetail
