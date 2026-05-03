@@ -1,8 +1,8 @@
 /**
  * Repository-style SQL helpers for the nightly canonical-topic reconciliation
- * pipeline. Each helper takes a `db` argument typed as `typeof RealDb` so
- * callers can inject a fake (or the real Drizzle client) without depending on
- * the orchestrator's `ReconcileDeps` bag.
+ * pipeline. Helpers accept a minimal `DbExecutor` (just `execute`) so fakes
+ * type-check without `as unknown as` casts and the helpers don't depend on
+ * the full Drizzle client surface or the orchestrator's `ReconcileDeps` bag.
  */
 
 import { sql } from "drizzle-orm";
@@ -15,6 +15,8 @@ import {
   RECONCILE_LOOKBACK_DAYS,
 } from "@/lib/reconcile-constants";
 import type { ReconcileMember } from "@/lib/prompts/reconcile-winner-pick";
+
+export type DbExecutor = Pick<typeof RealDb, "execute">;
 
 /**
  * `embedding === null` indicates the row failed `coerceEmbedding`'s finite-value
@@ -35,7 +37,7 @@ export interface RawCanonicalRow {
  * with their identity embeddings.
  */
 export async function fetchActiveCanonicals(
-  database: typeof RealDb,
+  database: DbExecutor,
 ): Promise<RawCanonicalRow[]> {
   const result = await database.execute<{
     id: number;
@@ -65,7 +67,7 @@ export async function fetchActiveCanonicals(
  * pre-merge snapshot.
  */
 export async function countEpisodesForCanonical(
-  database: typeof RealDb,
+  database: DbExecutor,
   canonicalId: number,
 ): Promise<number> {
   const result = await database.execute<{ count: number | string }>(
@@ -83,7 +85,7 @@ export async function countEpisodesForCanonical(
  * excluded by the kind filter; `ongoing=true` is exempt by predicate.
  */
 export async function decayStaleCanonicals(
-  database: typeof RealDb,
+  database: DbExecutor,
 ): Promise<number> {
   // Drizzle does not serialize a JS array as a Postgres array when passed as a
   // bound param — `${kinds}::canonical_topic_kind[]` produces

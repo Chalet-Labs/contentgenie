@@ -1,10 +1,10 @@
-import type { db as RealDb } from "@/db";
+import type { DbExecutor } from "@/trigger/helpers/reconcile-canonicals-db";
 
 export type DbExecuteCall = (sqlObj: unknown) => Promise<{ rows: unknown[] }>;
 
 export interface DbExecuteStub {
-  /** Cast Drizzle-shaped wrapper so callers can pass it directly as `database` to helper functions. */
-  db: typeof RealDb;
+  /** Minimal Drizzle-shaped wrapper — `DbExecutor` exposes only `execute`, so callers pass it directly to helpers without unsafe casts. */
+  db: DbExecutor;
   /** Bare `execute` callable — useful when the consumer wires it into a richer dep bag (e.g. `ReconcileDeps`). */
   execute: DbExecuteCall;
   /** Drizzle SQL objects captured in call order; pass to `serializeSql` for shape assertions. */
@@ -34,8 +34,13 @@ export function makeDbExecuteStub(
     }
     return Promise.resolve(next);
   };
+  // Drizzle's `execute` is a generic returning `PgRaw<NeonHttpQueryResult<TRow>>`
+  // — a richer surface than tests need. Casting through `unknown` is unavoidable
+  // at the seam between the simple stub callable and the full driver type, but
+  // narrowing the target to `DbExecutor` (= `Pick<typeof RealDb, "execute">`)
+  // keeps the cast scoped to the smallest possible surface.
   return {
-    db: { execute } as unknown as typeof RealDb,
+    db: { execute } as unknown as DbExecutor,
     execute,
     calls,
     remaining: () => queue.length,

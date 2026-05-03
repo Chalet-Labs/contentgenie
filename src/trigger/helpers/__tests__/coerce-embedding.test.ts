@@ -64,12 +64,16 @@ describe("coerceEmbedding", () => {
       expect(coerceEmbedding("][")).toBeNull();
     });
 
-    // Pre-existing behavior: `.split(",").filter(Boolean)` drops the empty
-    // trailing token, so `"[1,2,]"` parses to `[1,2]` rather than rejecting.
-    // Pinning so a future stricter parser can't change orchestrator-input
-    // counts unnoticed.
+    // The trim-then-filter-empties parser silently drops empty/whitespace-only
+    // tokens, so `"[1,2,]"` parses to `[1,2]` and `"[1, ,2]"` parses to
+    // `[1,2]` (uniform across pure-empty and whitespace-only). Pinning so a
+    // future stricter parser can't change orchestrator-input counts unnoticed.
     it("silently drops a trailing empty token after a comma (current behavior)", () => {
       expect(coerceEmbedding("[1,2,]")).toEqual([1, 2]);
+    });
+
+    it("silently drops a whitespace-only middle token (current behavior, was [1,0,2] under old filter(Boolean) parser)", () => {
+      expect(coerceEmbedding("[1, ,2]")).toEqual([1, 2]);
     });
   });
 
