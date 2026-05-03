@@ -24,8 +24,9 @@ export function coerceEmbedding(raw: unknown): number[] | null {
       if (inner.length === 0) return null;
       arr = inner
         .split(",")
-        .filter(Boolean)
-        .map((s) => Number(s.trim()));
+        .map((s) => s.trim())
+        .filter((s) => s.length > 0)
+        .map((s) => Number(s));
     } else {
       return null;
     }
