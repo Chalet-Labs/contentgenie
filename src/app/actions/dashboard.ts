@@ -69,6 +69,23 @@ const FORBIDDEN_OVERLAP_KEYS: ReadonlySet<string> = new Set([
   "prototype",
 ]);
 
+// Per-id normalization shared by the batch action and the single-item wrapper.
+// Returning `null` means the input is unusable; both layers must use the same
+// normalized key when reading from the result map, or the wrapper would miss
+// values that the batch successfully computed under the trimmed key.
+function sanitizeOverlapId(id: unknown): PodcastIndexEpisodeId | null {
+  if (typeof id !== "string") return null;
+  const trimmed = id.trim();
+  if (
+    trimmed.length === 0 ||
+    trimmed.length > MAX_OVERLAP_ID_LENGTH ||
+    FORBIDDEN_OVERLAP_KEYS.has(trimmed)
+  ) {
+    return null;
+  }
+  return trimmed as PodcastIndexEpisodeId;
+}
+
 /**
  * Fetch the user's consumed episode IDs (listen_history ∪ user_library).
  *
@@ -741,13 +758,8 @@ export async function getCanonicalTopicOverlaps(
         ? Array.from(
             new Set(
               podcastIndexEpisodeIds
-                .map((id) => (typeof id === "string" ? id.trim() : ""))
-                .filter(
-                  (id): id is PodcastIndexEpisodeId =>
-                    id.length > 0 &&
-                    id.length <= MAX_OVERLAP_ID_LENGTH &&
-                    !FORBIDDEN_OVERLAP_KEYS.has(id),
-                ),
+                .map((id) => sanitizeOverlapId(id))
+                .filter((id): id is PodcastIndexEpisodeId => id !== null),
             ),
           ).slice(0, MAX_OVERLAP_LOOKUP_IDS)
         : [];
@@ -837,7 +849,10 @@ export async function getCanonicalTopicOverlaps(
           const countRows = await db
             .select({
               canonicalTopicId: episodeCanonicalTopics.canonicalTopicId,
-              count: sql<number>`COUNT(DISTINCT ${episodeCanonicalTopics.episodeId})::integer`,
+              count:
+                sql<number>`COUNT(DISTINCT ${episodeCanonicalTopics.episodeId})::integer`.mapWith(
+                  Number,
+                ),
             })
             .from(episodeCanonicalTopics)
             .where(
@@ -921,11 +936,20 @@ export async function getCanonicalTopicOverlaps(
   });
 }
 
-/** Single-episode convenience wrapper — delegates to the batch variant. */
+/**
+ * Single-episode convenience wrapper — delegates to the batch variant.
+ *
+ * Normalizes the input via `sanitizeOverlapId` BEFORE both delegating and
+ * indexing the result. Otherwise a caller passing a recoverable variant like
+ * `" ep-42 "` would have the batch compute overlap under the trimmed key
+ * (`"ep-42"`) while this wrapper read the raw key and returned `null`.
+ */
 export async function getCanonicalTopicOverlap(
   podcastIndexEpisodeId: PodcastIndexEpisodeId,
 ): Promise<ActionResult<CanonicalOverlapResult | null>> {
-  const result = await getCanonicalTopicOverlaps([podcastIndexEpisodeId]);
+  const normalized = sanitizeOverlapId(podcastIndexEpisodeId);
+  if (normalized === null) return { success: true, data: null };
+  const result = await getCanonicalTopicOverlaps([normalized]);
   if (!result.success) return result;
-  return { success: true, data: result.data[podcastIndexEpisodeId] ?? null };
+  return { success: true, data: result.data[normalized] ?? null };
 }

@@ -145,14 +145,26 @@ vi.mock("drizzle-orm", () => ({
   isNotNull: vi.fn((...args: unknown[]) => ({ _op: "isNotNull", args })),
   notInArray: vi.fn((...args: unknown[]) => ({ _op: "notInArray", args })),
   inArray: vi.fn((...args: unknown[]) => ({ _op: "inArray", args })),
-  sql: vi.fn((strings: TemplateStringsArray, ...values: unknown[]) => ({
-    _op: "sql",
-    // Join the raw template parts so tests can assert the generated SQL text
-    // (e.g. `DESC NULLS LAST` can't be derived from Drizzle's desc() helper).
-    // Placeholder `$_` avoids collisions with literal `?` characters in templates.
-    raw: Array.from(strings).join("$_"),
-    values,
-  })),
+  sql: vi.fn((strings: TemplateStringsArray, ...values: unknown[]) => {
+    // Self-referential .mapWith returns the same fragment so production code
+    // can chain `sql\`...\`.mapWith(Number)` without breaking the mock —
+    // runtime coercion is a Drizzle responsibility we don't simulate here.
+    const fragment: {
+      _op: string;
+      raw: string;
+      values: unknown[];
+      mapWith: (fn: unknown) => unknown;
+    } = {
+      _op: "sql",
+      // Join the raw template parts so tests can assert the generated SQL text
+      // (e.g. `DESC NULLS LAST` can't be derived from Drizzle's desc() helper).
+      // Placeholder `$_` avoids collisions with literal `?` characters in templates.
+      raw: Array.from(strings).join("$_"),
+      values,
+      mapWith: () => fragment,
+    };
+    return fragment;
+  }),
 }));
 
 // Mock topic-overlap — keeps dashboard tests focused on wiring, not overlap logic
@@ -1790,6 +1802,45 @@ describe("getCanonicalTopicOverlaps", () => {
     if (!result.success) throw new Error("expected success");
     expect(Object.getPrototypeOf(result.data)).toBe(Object.prototype);
   });
+
+  it("coerces string aggregate counts from the driver into numbers (Q3b)", async () => {
+    // Neon HTTP can return COUNT(...) aggregates as strings even when the SQL
+    // is `::integer` — verify .mapWith(Number) keeps the count typed correctly
+    // by passing the helper a real number, not a string.
+    mockWhere
+      .mockResolvedValueOnce([{ id: 100, podcastIndexId: EP1 }]) // Q1
+      .mockResolvedValueOnce([
+        {
+          episodeId: 100,
+          canonicalTopicId: 10,
+          topicLabel: "AI Safety",
+          coverageScore: 0.9,
+        },
+      ]); // Q2
+    mockUnion.mockResolvedValue([{ episodeId: 200 }]); // Q3a
+    // Even though the driver might hand us "3" (string), the action stores
+    // numbers in globalCounts. Mock returns a number to mirror what
+    // .mapWith(Number) coerces to.
+    mockGroupBy.mockResolvedValue([{ canonicalTopicId: 10, count: 3 }]);
+    mockComputeCanonicalTopicOverlap.mockReturnValue({
+      kind: "repeat",
+      topicLabel: "AI Safety",
+      topicId: 10,
+      count: 3,
+    });
+
+    const { getCanonicalTopicOverlaps } =
+      await import("@/app/actions/dashboard");
+    const result = await getCanonicalTopicOverlaps([EP1]);
+
+    expect(result.success).toBe(true);
+    if (!result.success) throw new Error("expected success");
+    // Helper received numeric counts (not strings) — assert on the Map values.
+    const callArgs = mockComputeCanonicalTopicOverlap.mock.calls[0];
+    const countsMap = callArgs[1] as Map<number, number>;
+    expect(typeof countsMap.get(10)).toBe("number");
+    expect(countsMap.get(10)).toBe(3);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -1874,5 +1925,62 @@ describe("getCanonicalTopicOverlap", () => {
       success: false,
       error: "Failed to compute canonical topic overlap",
     });
+  });
+
+  it("normalizes the input id so whitespace-padded ids hit the same key as the batch", async () => {
+    // The batch trims " ep-42 " → "ep-42" and indexes data["ep-42"]. Without
+    // matching normalization in the wrapper, the raw key would miss the value.
+    const padded = "  ep-42  " as PodcastIndexEpisodeId;
+    mockWhere
+      .mockResolvedValueOnce([{ id: 42, podcastIndexId: EP1 }]) // Q1 (DB returns trimmed branded id)
+      .mockResolvedValueOnce([
+        {
+          episodeId: 42,
+          canonicalTopicId: 5,
+          topicLabel: "Model Releases",
+          coverageScore: 0.85,
+        },
+      ]); // Q2
+    mockUnion.mockResolvedValue([]);
+    mockComputeCanonicalTopicOverlap.mockReturnValue({
+      kind: "new",
+      topicLabel: "Model Releases",
+      topicId: 5,
+    });
+
+    const { getCanonicalTopicOverlap } =
+      await import("@/app/actions/dashboard");
+    const result = await getCanonicalTopicOverlap(padded);
+
+    expect(result).toEqual({
+      success: true,
+      data: { kind: "new", topicLabel: "Model Releases", topicId: 5 },
+    });
+  });
+
+  it("returns { success: true, data: null } for unusable input (whitespace-only, non-string, forbidden key)", async () => {
+    const { getCanonicalTopicOverlap } =
+      await import("@/app/actions/dashboard");
+
+    expect(
+      await getCanonicalTopicOverlap("   " as PodcastIndexEpisodeId),
+    ).toEqual({
+      success: true,
+      data: null,
+    });
+    expect(
+      await getCanonicalTopicOverlap("__proto__" as PodcastIndexEpisodeId),
+    ).toEqual({
+      success: true,
+      data: null,
+    });
+    expect(
+      await getCanonicalTopicOverlap(null as unknown as PodcastIndexEpisodeId),
+    ).toEqual({
+      success: true,
+      data: null,
+    });
+    // None of these should hit the auth/DB layers.
+    expect(mockSelect).not.toHaveBeenCalled();
   });
 });
