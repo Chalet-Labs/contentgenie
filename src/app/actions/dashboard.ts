@@ -55,6 +55,20 @@ const MAX_EPISODES_PER_PODCAST = 3;
 // SQL `IN` predicate. Mirrors the precedent in listen-history.ts.
 const MAX_OVERLAP_LOOKUP_IDS = 500;
 
+// Per-id length cap. PodcastIndex GUIDs are typically <128 chars; anything
+// longer is almost certainly bogus and would waste DB work.
+const MAX_OVERLAP_ID_LENGTH = 256;
+
+// Reject these keys upstream so they never become object property accessors
+// in `data`. `__proto__` is the only real prototype-pollution vector via
+// bracket assignment on a plain object; `constructor`/`prototype` are added
+// for defense-in-depth.
+const FORBIDDEN_OVERLAP_KEYS: ReadonlySet<string> = new Set([
+  "__proto__",
+  "constructor",
+  "prototype",
+]);
+
 /**
  * Fetch the user's consumed episode IDs (listen_history ∪ user_library).
  *
@@ -710,8 +724,9 @@ export type RecentEpisode = PodcastIndexEpisode & {
  *   2. Empty canonicals → all inputs → null (skip Q3a/Q3b).
  *   3. Empty consumed   → pass empty Map to helper (skip Q3b).
  *
- * Input is deduped and capped at MAX_OVERLAP_LOOKUP_IDS to bound the SQL `IN`
- * predicate against an untrusted client array.
+ * Input is trimmed, deduped, length-capped per id (MAX_OVERLAP_ID_LENGTH),
+ * filtered against forbidden prototype keys, and capped at MAX_OVERLAP_LOOKUP_IDS
+ * to bound the SQL `IN` predicate against an untrusted client array.
  */
 export async function getCanonicalTopicOverlaps(
   podcastIndexEpisodeIds: PodcastIndexEpisodeId[],
@@ -720,13 +735,19 @@ export async function getCanonicalTopicOverlaps(
 > {
   return withAuthAction(async (userId) => {
     try {
-      const sanitizedIds = Array.isArray(podcastIndexEpisodeIds)
+      const sanitizedIds: PodcastIndexEpisodeId[] = Array.isArray(
+        podcastIndexEpisodeIds,
+      )
         ? Array.from(
             new Set(
-              podcastIndexEpisodeIds.filter(
-                (id): id is PodcastIndexEpisodeId =>
-                  typeof id === "string" && id.length > 0,
-              ),
+              podcastIndexEpisodeIds
+                .map((id) => (typeof id === "string" ? id.trim() : ""))
+                .filter(
+                  (id): id is PodcastIndexEpisodeId =>
+                    id.length > 0 &&
+                    id.length <= MAX_OVERLAP_ID_LENGTH &&
+                    !FORBIDDEN_OVERLAP_KEYS.has(id),
+                ),
             ),
           ).slice(0, MAX_OVERLAP_LOOKUP_IDS)
         : [];
@@ -747,9 +768,16 @@ export async function getCanonicalTopicOverlaps(
         .from(episodes)
         .where(inArray(episodes.podcastIndexId, sanitizedIds));
 
-      // Guard 1: no DB rows found → all inputs map to null
+      // Guard 1: no DB rows found → all inputs map to null.
+      // Plain `{}` (not Object.create(null)) — Next.js server-action
+      // serialization rejects null-prototype objects at the network boundary
+      // ("Only plain objects... null prototypes are not supported"). Untrusted
+      // keys are filtered upstream via FORBIDDEN_OVERLAP_KEYS.
       if (episodeRows.length === 0) {
-        const data = Object.create(null) as Record<PodcastIndexEpisodeId, null>;
+        const data: Record<PodcastIndexEpisodeId, null> = {} as Record<
+          PodcastIndexEpisodeId,
+          null
+        >;
         for (const id of sanitizedIds) data[id] = null;
         return { success: true, data };
       }
@@ -835,10 +863,10 @@ export async function getCanonicalTopicOverlaps(
         podcastIndexToDbId.set(row.podcastIndexId, row.id);
       }
 
-      const data = Object.create(null) as Record<
-        PodcastIndexEpisodeId,
-        CanonicalOverlapResult | null
-      >;
+      // Plain `{}` — see Guard 1 comment above. Server-action serialization
+      // rejects null-prototype objects; untrusted keys are filtered upstream.
+      const data: Record<PodcastIndexEpisodeId, CanonicalOverlapResult | null> =
+        {} as Record<PodcastIndexEpisodeId, CanonicalOverlapResult | null>;
       for (const podcastIndexId of sanitizedIds) {
         const dbId = podcastIndexToDbId.get(podcastIndexId);
         if (dbId === undefined) {

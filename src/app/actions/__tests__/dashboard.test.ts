@@ -1731,6 +1731,65 @@ describe("getCanonicalTopicOverlaps", () => {
 
     expect(result).toEqual({ success: true, data: {} });
   });
+
+  it("trims whitespace from ids and drops empty-after-trim entries", async () => {
+    // Whitespace-only input → all dropped → empty sanitized → no DB calls,
+    // returns empty data (matches the empty-array short-circuit).
+    const { getCanonicalTopicOverlaps } =
+      await import("@/app/actions/dashboard");
+    const result = await getCanonicalTopicOverlaps([
+      "   " as PodcastIndexEpisodeId,
+      "\n\t" as PodcastIndexEpisodeId,
+      "" as PodcastIndexEpisodeId,
+    ]);
+
+    expect(result).toEqual({ success: true, data: {} });
+    expect(mockSelect).not.toHaveBeenCalled();
+  });
+
+  it("rejects ids exceeding the per-id length cap", async () => {
+    // 257-char id (one over MAX_OVERLAP_ID_LENGTH) is dropped.
+    const tooLong = "a".repeat(257) as PodcastIndexEpisodeId;
+    mockWhere.mockResolvedValueOnce([]); // Q1 — only EP1 reaches DB
+
+    const { getCanonicalTopicOverlaps } =
+      await import("@/app/actions/dashboard");
+    const result = await getCanonicalTopicOverlaps([EP1, tooLong]);
+
+    // Only EP1 in result; tooLong was filtered before Q1.
+    expect(result).toEqual({
+      success: true,
+      data: { [EP1]: null },
+    });
+  });
+
+  it("rejects forbidden prototype keys (__proto__, constructor, prototype)", async () => {
+    const { getCanonicalTopicOverlaps } =
+      await import("@/app/actions/dashboard");
+    const result = await getCanonicalTopicOverlaps([
+      "__proto__" as PodcastIndexEpisodeId,
+      "constructor" as PodcastIndexEpisodeId,
+      "prototype" as PodcastIndexEpisodeId,
+    ]);
+
+    expect(result).toEqual({ success: true, data: {} });
+    expect(mockSelect).not.toHaveBeenCalled();
+  });
+
+  it("returns a plain-object data map (Next server-action serialization compatible)", async () => {
+    // Guard 1 path returns a {[id]: null} map; verify it has Object.prototype
+    // so React Flight serialization across the network boundary doesn't fail
+    // with "Only plain objects... null prototypes are not supported".
+    mockWhere.mockResolvedValueOnce([]); // Q1: no rows → guard 1 path
+
+    const { getCanonicalTopicOverlaps } =
+      await import("@/app/actions/dashboard");
+    const result = await getCanonicalTopicOverlaps([EP1]);
+
+    expect(result.success).toBe(true);
+    if (!result.success) throw new Error("expected success");
+    expect(Object.getPrototypeOf(result.data)).toBe(Object.prototype);
+  });
 });
 
 // ---------------------------------------------------------------------------
