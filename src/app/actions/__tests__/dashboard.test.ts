@@ -1866,6 +1866,25 @@ describe("getCanonicalTopicOverlaps", () => {
     expect(result.data).not.toHaveProperty("SHOULD_NOT_REACH_500");
     expect(result.data).not.toHaveProperty("SHOULD_NOT_REACH_599");
   });
+
+  it("caps raw inspection so all-invalid mega-inputs don't walk the full payload (DoS guard 2)", async () => {
+    // 10000 whitespace-only inputs — every one sanitizes to null, so the
+    // unique-id cap (500) never fires. Without an inspection cap, the loop
+    // would walk all 10000. The MAX_OVERLAP_INSPECT_IDS cap (4x = 2000)
+    // bounds the work; result is still empty, which is the correct outcome
+    // for a no-valid-id input.
+    const garbage: PodcastIndexEpisodeId[] = [];
+    for (let i = 0; i < 10000; i++)
+      garbage.push("   " as PodcastIndexEpisodeId);
+
+    const { getCanonicalTopicOverlaps } =
+      await import("@/app/actions/dashboard");
+    const result = await getCanonicalTopicOverlaps(garbage);
+
+    expect(result).toEqual({ success: true, data: {} });
+    // No DB hops — sanitizer drained to empty before reaching Q1.
+    expect(mockSelect).not.toHaveBeenCalled();
+  });
 });
 
 // ---------------------------------------------------------------------------

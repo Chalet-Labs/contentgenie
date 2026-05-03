@@ -55,6 +55,14 @@ const MAX_EPISODES_PER_PODCAST = 3;
 // SQL `IN` predicate. Mirrors the precedent in listen-history.ts.
 const MAX_OVERLAP_LOOKUP_IDS = 500;
 
+// Hard cap on raw inputs inspected per request, separate from the unique-id
+// cap. Without this, a caller sending millions of duplicates or invalid
+// entries would force the sanitizer to walk the entire payload — the
+// unique-id cap only fires once 500 distinct *valid* ids are collected.
+// 4x the unique cap leaves generous headroom for legitimate duplicate input
+// while still bounding CPU work.
+const MAX_OVERLAP_INSPECT_IDS = MAX_OVERLAP_LOOKUP_IDS * 4;
+
 // Per-id length cap. PodcastIndex GUIDs are typically <128 chars; anything
 // longer is almost certainly bogus and would waste DB work.
 const MAX_OVERLAP_ID_LENGTH = 256;
@@ -88,17 +96,20 @@ function sanitizeOverlapId(id: unknown): PodcastIndexEpisodeId | null {
   return asPodcastIndexEpisodeId(trimmed);
 }
 
-// Single-pass batch sanitizer with early exit at MAX_OVERLAP_LOOKUP_IDS.
-// Stopping mid-iteration bounds CPU/memory regardless of input length —
-// applying `.slice(MAX, ...)` only AFTER `.map().filter().Set` would still
-// process the full untrusted client array, which is a DoS surface.
+// Single-pass batch sanitizer with two stop conditions:
+//   1. `out.length >= MAX_OVERLAP_LOOKUP_IDS` — collected enough valid ids.
+//   2. `i >= MAX_OVERLAP_INSPECT_IDS` — inspected enough raw inputs.
+// Without the second cap, an attacker could send millions of duplicates or
+// invalid strings; the unique-id cap (1) would never fire because no new
+// unique values come in, so the loop would walk the full payload.
 function sanitizeOverlapIdBatch(input: unknown): PodcastIndexEpisodeId[] {
   if (!Array.isArray(input)) return [];
   const seen = new Set<string>();
   const out: PodcastIndexEpisodeId[] = [];
-  for (const raw of input) {
+  const rawCap = Math.min(input.length, MAX_OVERLAP_INSPECT_IDS);
+  for (let i = 0; i < rawCap; i++) {
     if (out.length >= MAX_OVERLAP_LOOKUP_IDS) break;
-    const id = sanitizeOverlapId(raw);
+    const id = sanitizeOverlapId(input[i]);
     if (id === null || seen.has(id)) continue;
     seen.add(id);
     out.push(id);
