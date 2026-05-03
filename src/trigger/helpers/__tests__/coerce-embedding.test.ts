@@ -1,15 +1,5 @@
 // @vitest-environment node
 
-/**
- * Direct unit tests for `coerceEmbedding` (issue #435).
- *
- * The function normalises the three driver-side surface shapes of the Postgres
- * `vector` column (`number[]`, `Float32Array`, `"[1,2,3]"` string) into a
- * `number[]` and applies four rejection guards (non-finite, empty, zero-norm,
- * unrecognised shape). Coverage matrix mirrors the seven paths called out in
- * the issue plus the explicit zero-norm guard.
- */
-
 import { describe, expect, it } from "vitest";
 
 import { coerceEmbedding } from "@/trigger/helpers/coerce-embedding";
@@ -60,6 +50,26 @@ describe("coerceEmbedding", () => {
 
     it("returns null for a single-bracket string", () => {
       expect(coerceEmbedding("[")).toBeNull();
+    });
+
+    it("returns null for an empty string", () => {
+      expect(coerceEmbedding("")).toBeNull();
+    });
+
+    it("returns null for a whitespace-only string", () => {
+      expect(coerceEmbedding("   ")).toBeNull();
+    });
+
+    it("returns null when brackets are mismatched (']['→ no leading '[')", () => {
+      expect(coerceEmbedding("][")).toBeNull();
+    });
+
+    // Pre-existing behavior: `.split(",").filter(Boolean)` drops the empty
+    // trailing token, so `"[1,2,]"` parses to `[1,2]` rather than rejecting.
+    // Pinning so a future stricter parser can't change orchestrator-input
+    // counts unnoticed.
+    it("silently drops a trailing empty token after a comma (current behavior)", () => {
+      expect(coerceEmbedding("[1,2,]")).toEqual([1, 2]);
     });
   });
 

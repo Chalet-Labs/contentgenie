@@ -32,10 +32,9 @@ export function coerceEmbedding(raw: unknown): number[] | null {
   } else {
     return null;
   }
-  // Guard: any NaN or ±Infinity element taints the whole vector.
   if (arr.some((x) => !Number.isFinite(x))) return null;
-  // Guard: empty or zero-norm vectors produce NaN in cosineDistance.
   if (arr.length === 0) return null;
+  // Zero-norm vectors would produce NaN in cosineDistance downstream.
   const squaredNorm = arr.reduce((sum, x) => sum + x * x, 0);
   if (squaredNorm === 0) return null;
   return arr;

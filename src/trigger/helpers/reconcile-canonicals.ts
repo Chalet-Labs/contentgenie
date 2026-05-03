@@ -15,8 +15,10 @@
  *     cluster iteration so `reconcile_summary` always emits.
  *   - ADR-050 §7 — `mergedLoserIds: Set<number>` cross-cluster overlap guard.
  *
- * Pure-ish module: all IO (DB, LLM, merge) flows through injected dependencies
- * for testability. The top-level task supplies the real implementations.
+ * All IO flows through injected `deps`; SQL bodies live in
+ * `./reconcile-canonicals-db.ts` and are reachable only through the injected
+ * `db` (see helpers imported below). The top-level task supplies the real
+ * implementations.
  */
 
 import { sql } from "drizzle-orm";
@@ -105,8 +107,9 @@ export interface ReconcileSummary {
 }
 
 /**
- * Internal: row shape returned by Phase 1's SELECT. `embedding` is the
- * `identity_embedding` column flattened to a `number[]` for clustering.
+ * Phase-1 row after the orchestrator drops malformed embeddings; the non-null
+ * `embedding` invariant is enforced at the call site that narrows from
+ * `RawCanonicalRow`.
  */
 interface CanonicalRow {
   id: number;
@@ -255,7 +258,6 @@ async function computeEpisodeDrift(
   if (winnerIds.length === 0) return 0;
 
   // Single batch query instead of N per-winner queries (N+1 pattern).
-  // Uses sql.join for the array literal — same pattern as decayStaleCanonicals.
   const result = await database.execute<{ id: number; count: number | string }>(
     sql`SELECT canonical_topic_id AS id, count(*)::int AS count
         FROM episode_canonical_topics

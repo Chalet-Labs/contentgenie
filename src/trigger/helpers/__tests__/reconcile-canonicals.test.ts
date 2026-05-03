@@ -33,45 +33,14 @@ import {
   RECONCILE_DECAY_KINDS,
   RECONCILE_LOOKBACK_DAYS,
 } from "@/lib/reconcile-constants";
+import { makeDbExecuteStub } from "@/test/db-execute-stub";
 import { serializeSql } from "@/test/sql-fixture-queue";
 
 // ─── Test scaffolding ──────────────────────────────────────────────────────
 
-type DbExecuteCall = (sqlObj: unknown) => Promise<{ rows: unknown[] }>;
-
-/**
- * Build a queue-driven `db.execute` stub. The orchestrator calls execute in a
- * deterministic order: (1) Phase 1 SELECT, (n) per-winner pre-merge counts,
- * (n) per-winner post-merge counts, (1) Phase 7 decay UPDATE.
- *
- * The queue holds `{ rows }` payloads; each execute call pops one. Callers
- * configure the queue per-test to match the orchestrator's call sequence.
- */
-function makeDbStub(payloads: Array<{ rows: unknown[] }>): {
-  execute: DbExecuteCall;
-  remaining: () => number;
-  calls: unknown[];
-} {
-  const queue = [...payloads];
-  const calls: unknown[] = [];
-  const execute: DbExecuteCall = (sqlObj: unknown) => {
-    calls.push(sqlObj);
-    const next = queue.shift();
-    if (!next) {
-      throw new Error(
-        `db.execute called more times than payloads provided (call #${
-          calls.length
-        })`,
-      );
-    }
-    return Promise.resolve(next);
-  };
-  return {
-    execute,
-    remaining: () => queue.length,
-    calls,
-  };
-}
+// The orchestrator calls execute in a deterministic order: Phase 1 SELECT,
+// per-winner pre-merge counts, per-winner post-merge counts, Phase 7 decay
+// UPDATE. Each test seeds the queue accordingly.
 
 function makeLogger(): ReconcileDeps["logger"] {
   return {
@@ -123,7 +92,7 @@ interface BuildDepsArgs {
 
 function buildDeps(args: BuildDepsArgs = {}): {
   deps: ReconcileDeps;
-  db: ReturnType<typeof makeDbStub>;
+  db: ReturnType<typeof makeDbExecuteStub>;
   mergeCanonicalsMock: ReturnType<typeof vi.fn>;
   generateCompletionMock: ReturnType<typeof vi.fn>;
   clusterMock: ReturnType<typeof vi.fn>;
@@ -139,7 +108,7 @@ function buildDeps(args: BuildDepsArgs = {}): {
     ? { rows: args.postBatchRows }
     : null;
   const decayPayload = { rows: args.decayRows ?? [] };
-  const db = makeDbStub([
+  const db = makeDbExecuteStub([
     phase1,
     ...preCountPayloads,
     ...(postBatchPayload ? [postBatchPayload] : []),
@@ -908,7 +877,7 @@ describe("Phase 1 — fetch SQL", () => {
  * operand is responsible for the exclusion.
  *
  * Deviation from plan T6 note "extends T5's file": the SQL is issued inside
- * `decayStaleCanonicals` in the helper (`src/trigger/helpers/reconcile-canonicals.ts`),
+ * `decayStaleCanonicals` in the DB helper module (`src/trigger/helpers/reconcile-canonicals-db.ts`),
  * not in the task wrapper. Testing SQL predicates at the task layer would only
  * be possible if we un-mocked `runReconciliation` — the helper test file is
  * the correct home for SQL-level assertions.

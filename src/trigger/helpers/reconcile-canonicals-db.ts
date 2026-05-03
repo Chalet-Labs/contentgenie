@@ -1,11 +1,8 @@
 /**
  * Repository-style SQL helpers for the nightly canonical-topic reconciliation
- * pipeline (issue #389). Extracted from `reconcile-canonicals.ts` (issue #435)
- * so the orchestrator reads as pure orchestration over named layers.
- *
- * All helpers take a `db` argument typed as `typeof RealDb` so callers can
- * inject a fake (or the real Drizzle client) without depending on the
- * orchestrator's `ReconcileDeps` bag.
+ * pipeline. Each helper takes a `db` argument typed as `typeof RealDb` so
+ * callers can inject a fake (or the real Drizzle client) without depending on
+ * the orchestrator's `ReconcileDeps` bag.
  */
 
 import { sql } from "drizzle-orm";
@@ -20,8 +17,10 @@ import {
 import type { ReconcileMember } from "@/lib/prompts/reconcile-winner-pick";
 
 /**
- * Raw row as returned by the Phase 1 SELECT before embedding coercion.
- * `embedding` is `null` when `coerceEmbedding` detected a malformed vector.
+ * `embedding === null` indicates the row failed `coerceEmbedding`'s finite-value
+ * guard (NaN / non-finite / empty / zero-norm / unrecognised driver shape).
+ * Callers that care about the dropped count must surface it themselves — this
+ * helper does not filter the rows.
  */
 export interface RawCanonicalRow {
   id: number;
@@ -34,10 +33,6 @@ export interface RawCanonicalRow {
 /**
  * Phase 1 — fetch active canonicals seen in the last `RECONCILE_LOOKBACK_DAYS`
  * with their identity embeddings.
- *
- * Returns `RawCanonicalRow[]` where `embedding` is `null` for rows whose
- * `identity_embedding` failed the finite-value guard in `coerceEmbedding`.
- * Callers are responsible for calling `accum.malformedEmbeddingDropped()` for each null-embedding row.
  */
 export async function fetchActiveCanonicals(
   database: typeof RealDb,
@@ -65,10 +60,9 @@ export async function fetchActiveCanonicals(
 }
 
 /**
- * Episode-count helper — count of episodes referencing a canonical topic via
- * the junction table. Called from Phase 5 (pre-merge snapshot).
- * Same source of truth as the read-side `episode_count`
- * everywhere else in the app (PR #424 / ADR-050 §4).
+ * Same source of truth as the read-side `episode_count` derivation everywhere
+ * else in the app (PR #424 / ADR-050 §4). Called from Phase 5 for the
+ * pre-merge snapshot.
  */
 export async function countEpisodesForCanonical(
   database: typeof RealDb,
@@ -95,7 +89,7 @@ export async function decayStaleCanonicals(
   // bound param — `${kinds}::canonical_topic_kind[]` produces
   // `($1, $2, ...)::canonical_topic_kind[]` (a record cast), which Postgres
   // rejects at runtime. Build the array literal explicitly with `sql.join`,
-  // mirroring the pattern at `src/trigger/helpers/database.ts:611`.
+  // mirroring the pattern in `mergeCanonicals` (src/trigger/helpers/database.ts).
   const kinds = RECONCILE_DECAY_KINDS;
   const result = await database.execute<{ id: number }>(
     sql`UPDATE canonical_topics
