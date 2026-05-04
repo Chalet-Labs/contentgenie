@@ -25,6 +25,8 @@ import {
   canonicalTopicStatusEnum,
   canonicalTopicKindEnum,
   canonicalTopicAliases,
+  canonicalTopics,
+  canonicalTopicDigests,
   episodes,
   IN_PROGRESS_STATUSES,
   type SummaryStatus,
@@ -32,6 +34,13 @@ import {
 import { db } from "@/db";
 import type { ActionResult } from "@/types/action-result";
 import type { summarizeEpisode } from "@/trigger/summarize-episode";
+import type { generateTopicDigest } from "@/trigger/generate-topic-digest";
+import { withAuthAction } from "@/lib/auth-wrapper";
+import { canonicalTopicEpisodeCount } from "@/lib/admin/canonical-topic-episode-count";
+import {
+  MIN_DERIVED_COUNT_FOR_DIGEST,
+  STALENESS_GROWTH_THRESHOLD,
+} from "@/lib/topic-digest-thresholds";
 
 // ---------------------------------------------------------------------------
 // Input schemas
@@ -474,5 +483,97 @@ export async function getCanonicalEpisodeCountDrift(): Promise<
   return withAdminAction(async () => {
     const data = await getCanonicalMergeCleanupDriftQuery();
     return { success: true, data };
+  });
+}
+
+// ---------------------------------------------------------------------------
+// triggerTopicDigestGeneration — user-facing digest trigger (ADR-051)
+// ---------------------------------------------------------------------------
+
+const topicDigestSchema = z
+  .object({ canonicalTopicId: z.number().int().positive() })
+  .strict();
+
+export async function triggerTopicDigestGeneration(input: {
+  canonicalTopicId: number;
+}): Promise<
+  ActionResult<{
+    status: "queued" | "cached" | "ineligible";
+    digestId?: number;
+    runId?: string;
+  }>
+> {
+  return withAuthAction(async () => {
+    const parsed = topicDigestSchema.safeParse(input);
+    if (!parsed.success) {
+      return {
+        success: false,
+        error: parsed.error.issues[0]?.message ?? "Invalid input",
+      };
+    }
+    const { canonicalTopicId } = parsed.data;
+
+    // Read canonical + derived episode count
+    const canonicalRows = await db
+      .select({
+        id: canonicalTopics.id,
+        status: canonicalTopics.status,
+        episodeCount: canonicalTopicEpisodeCount(),
+      })
+      .from(canonicalTopics)
+      .where(eq(canonicalTopics.id, canonicalTopicId));
+
+    const canonical = canonicalRows[0];
+    if (!canonical || canonical.status !== "active") {
+      return { success: false, error: "not-found" };
+    }
+
+    const derivedCount = canonical.episodeCount;
+
+    // Read existing digest
+    const digestRows = await db
+      .select({
+        id: canonicalTopicDigests.id,
+        episodeCountAtGeneration:
+          canonicalTopicDigests.episodeCountAtGeneration,
+      })
+      .from(canonicalTopicDigests)
+      .where(eq(canonicalTopicDigests.canonicalTopicId, canonicalTopicId));
+
+    const existing = digestRows[0] ?? null;
+
+    // Ineligible: not enough episodes
+    if (derivedCount < MIN_DERIVED_COUNT_FOR_DIGEST) {
+      return {
+        success: true,
+        data: { status: "ineligible", digestId: existing?.id },
+      };
+    }
+
+    // Cached: growth since last generation is below threshold
+    if (
+      existing &&
+      derivedCount - existing.episodeCountAtGeneration <
+        STALENESS_GROWTH_THRESHOLD
+    ) {
+      return {
+        success: true,
+        data: { status: "cached", digestId: existing.id },
+      };
+    }
+
+    // Enqueue generation
+    try {
+      const handle = await tasks.trigger<typeof generateTopicDigest>(
+        "generate-topic-digest",
+        { canonicalTopicId },
+      );
+      return {
+        success: true,
+        data: { status: "queued", digestId: existing?.id, runId: handle.id },
+      };
+    } catch {
+      return { success: false, error: "trigger-failed" };
+    }
   });
 }
