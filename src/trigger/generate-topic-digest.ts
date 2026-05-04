@@ -144,16 +144,21 @@ export const generateTopicDigest = task({
       )
       .limit(MAX_EPISODE_INPUT);
 
-    if (episodeRows.length < MIN_DERIVED_COUNT_FOR_DIGEST) {
+    const validEpisodeRows = episodeRows.filter(
+      (ep): ep is typeof ep & { summary: string } =>
+        typeof ep.summary === "string" && ep.summary.trim().length > 0,
+    );
+
+    if (validEpisodeRows.length < MIN_DERIVED_COUNT_FOR_DIGEST) {
       metadata.root.increment("digests.insufficient_summaries", 1);
       throw new AbortTaskRunError("INSUFFICIENT_VALID_SUMMARIES");
     }
 
-    const episodeIds = episodeRows.map((ep) => ep.id);
-    const episodeSummaries = episodeRows.map((ep) => ({
+    const episodeIds = validEpisodeRows.map((ep) => ep.id);
+    const episodeSummaries = validEpisodeRows.map((ep) => ({
       id: ep.id,
       title: ep.title,
-      summary: ep.summary as string,
+      summary: ep.summary,
     }));
 
     // ── Step 4–5: LLM call + parse + validate ───────────────────────────────

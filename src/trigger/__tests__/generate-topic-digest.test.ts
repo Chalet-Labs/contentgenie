@@ -510,7 +510,7 @@ describe("generate-topic-digest task", () => {
   // ── Case 9: Episode read order + limit pinning ─────────────────────────────
 
   it("case 9 — episode query: uses desc(coverageScore), desc(createdAt), limit(30)", async () => {
-    const { desc } = await import("drizzle-orm");
+    const { desc, eq } = await import("drizzle-orm");
 
     // Wire a mock chain where we can spy on `.limit`.
     const limitMock = vi.fn().mockResolvedValue(VALID_EPISODES);
@@ -566,6 +566,12 @@ describe("generate-topic-digest task", () => {
 
     // limit(30) is the read cap — verify the magic number is wired.
     expect(limitMock).toHaveBeenCalledWith(30);
+
+    // summaryStatus = "completed" filter must be in the episode query.
+    const eqCalls = (eq as ReturnType<typeof vi.fn>).mock.calls;
+    expect(eqCalls).toEqual(
+      expect.arrayContaining([["ep.summaryStatus", "completed"]]),
+    );
   });
 
   // ── Case 10: Task config ────────────────────────────────────────────────────

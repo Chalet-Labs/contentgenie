@@ -64,7 +64,7 @@ const taskConfig = generateTopicDigest as unknown as {
   ) => Promise<GenerateTopicDigestResult>;
 };
 
-const LABEL_PREFIX = "__digest_int_test_";
+const LABEL_PREFIX = `__digest_int_test_${Date.now()}_${Math.random().toString(36).slice(2)}_`;
 
 let fixtureCanonicalId: number;
 let fixtureEpisodeIds: number[] = [];

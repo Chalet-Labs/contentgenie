@@ -44,7 +44,15 @@ export function setupDbSelectSequence(
     const fromObj: Record<string, unknown> = {};
 
     if (chainMethods.includes("where")) {
-      fromObj.where = vi.fn().mockResolvedValue(result);
+      if (chainMethods.includes("orderBy") && chainMethods.includes("limit")) {
+        fromObj.where = vi.fn().mockReturnValue({
+          orderBy: vi.fn().mockReturnValue({
+            limit: vi.fn().mockResolvedValue(result),
+          }),
+        });
+      } else {
+        fromObj.where = vi.fn().mockResolvedValue(result);
+      }
     }
 
     if (chainMethods.includes("innerJoin")) {

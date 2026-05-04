@@ -549,7 +549,7 @@ export async function triggerTopicDigestGeneration(input: {
 
     if (
       existing &&
-      derivedCount - existing.episodeCountAtGeneration <
+      Math.abs(derivedCount - existing.episodeCountAtGeneration) <
         STALENESS_GROWTH_THRESHOLD
     ) {
       return {

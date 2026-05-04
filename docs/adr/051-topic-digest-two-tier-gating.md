@@ -58,7 +58,7 @@ Distinct gates with distinct purposes, evaluated at distinct layers:
 | Gate       | Layer         | Purpose                   | Predicate                                          |
 | ---------- | ------------- | ------------------------- | -------------------------------------------------- |
 | Staleness  | Server action | Content correctness       | `derived_count - episode_count_at_generation >= 3` |
-| Rate guard | Trigger task  | Click-storm / concurrency | `generated_at < now - 1h`                          |
+| Rate guard | Trigger task  | Click-storm / concurrency | `generated_at >= now - 1h`                         |
 
 - **Pro:** Each gate has one job. Click storms collapse to a single LLM call;
   staleness logic is co-located with the cached-vs-queued decision the action
