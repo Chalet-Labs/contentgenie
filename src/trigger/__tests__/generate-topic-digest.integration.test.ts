@@ -4,6 +4,7 @@
 // Run locally: doppler run -- bun run test src/trigger/__tests__/generate-topic-digest.integration.test.ts
 
 import { describe, it, expect, vi, beforeAll, afterAll } from "vitest";
+import { randomUUID } from "node:crypto";
 import { sql } from "drizzle-orm";
 import { createTriggerSdkMock } from "@/test/mocks/trigger-sdk";
 
@@ -64,7 +65,7 @@ const taskConfig = generateTopicDigest as unknown as {
   ) => Promise<GenerateTopicDigestResult>;
 };
 
-const LABEL_PREFIX = `__digest_int_test_${Date.now()}_${Math.random().toString(36).slice(2)}_`;
+const LABEL_PREFIX = `__digest_int_test_${randomUUID()}_`;
 
 let fixtureCanonicalId: number;
 let fixtureEpisodeIds: number[] = [];
