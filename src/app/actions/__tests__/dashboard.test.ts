@@ -4,6 +4,7 @@ import {
   asPodcastIndexEpisodeId,
   type PodcastIndexEpisodeId,
 } from "@/types/ids";
+import { EMPTY_OVERLAP_RESULT } from "@/lib/topic-overlap";
 
 // Mock Clerk auth
 const mockAuth = vi.fn();
@@ -875,7 +876,7 @@ describe("getEpisodeTopicOverlap", () => {
     vi.resetModules();
   });
 
-  it("returns null result when not authenticated", async () => {
+  it("returns Unauthorized when not authenticated", async () => {
     mockAuth.mockResolvedValue({ userId: null });
 
     const { getEpisodeTopicOverlap } = await import("@/app/actions/dashboard");
@@ -883,11 +884,26 @@ describe("getEpisodeTopicOverlap", () => {
       asPodcastIndexEpisodeId("ep-123"),
     );
 
-    expect(result.label).toBeNull();
-    expect(result.overlapCount).toBe(0);
+    expect(result).toEqual({ success: false, error: "Unauthorized" });
   });
 
-  it("returns null result when episode is not found in DB", async () => {
+  it("returns Unauthorized for unauthenticated callers even with falsy input (auth-first)", async () => {
+    mockAuth.mockResolvedValue({ userId: null });
+
+    const { getEpisodeTopicOverlap } = await import("@/app/actions/dashboard");
+    const result = await getEpisodeTopicOverlap("" as PodcastIndexEpisodeId);
+
+    expect(result).toEqual({ success: false, error: "Unauthorized" });
+  });
+
+  it("returns empty overlap for falsy podcastIndexEpisodeId", async () => {
+    const { getEpisodeTopicOverlap } = await import("@/app/actions/dashboard");
+    const result = await getEpisodeTopicOverlap("" as PodcastIndexEpisodeId);
+
+    expect(result).toEqual({ success: true, data: EMPTY_OVERLAP_RESULT });
+  });
+
+  it("returns empty overlap when episode is not found in DB", async () => {
     // limit returns empty — episode not in DB
     mockLimit.mockResolvedValue([]);
 
@@ -896,7 +912,7 @@ describe("getEpisodeTopicOverlap", () => {
       asPodcastIndexEpisodeId("ep-999"),
     );
 
-    expect(result.label).toBeNull();
+    expect(result).toEqual({ success: true, data: EMPTY_OVERLAP_RESULT });
   });
 
   it("returns computed overlap for a found episode", async () => {
@@ -928,12 +944,17 @@ describe("getEpisodeTopicOverlap", () => {
       asPodcastIndexEpisodeId("ep-42"),
     );
 
-    expect(result.label).toBe("You've heard 4 similar episodes");
-    expect(result.overlapCount).toBe(4);
-    expect(result.topOverlapTopic).toBe("Leadership");
+    expect(result).toMatchObject({
+      success: true,
+      data: {
+        label: "You've heard 4 similar episodes",
+        overlapCount: 4,
+        topOverlapTopic: "Leadership",
+      },
+    });
   });
 
-  it("returns null result when episode has no topic tags", async () => {
+  it("returns empty overlap when episode has no topic tags", async () => {
     mockLimit.mockResolvedValue([{ id: 42 }]);
     mockUnion.mockResolvedValue([
       { episodeId: 1 },
@@ -943,23 +964,17 @@ describe("getEpisodeTopicOverlap", () => {
     mockBuildUserTopicProfile.mockReturnValue(new Map());
     // No topics for this episode
     mockWhere.mockResolvedValue([]);
-    mockComputeTopicOverlap.mockReturnValue({
-      overlapCount: 0,
-      topOverlapTopic: null,
-      isNewTopic: false,
-      label: null,
-      labelKind: null,
-    });
+    mockComputeTopicOverlap.mockReturnValue(EMPTY_OVERLAP_RESULT);
 
     const { getEpisodeTopicOverlap } = await import("@/app/actions/dashboard");
     const result = await getEpisodeTopicOverlap(
       asPodcastIndexEpisodeId("ep-42"),
     );
 
-    expect(result.label).toBeNull();
+    expect(result).toEqual({ success: true, data: EMPTY_OVERLAP_RESULT });
   });
 
-  it("returns null result on DB error (graceful fallback)", async () => {
+  it("returns error result on DB error", async () => {
     mockLimit.mockRejectedValue(new Error("DB failure"));
 
     const { getEpisodeTopicOverlap } = await import("@/app/actions/dashboard");
@@ -967,8 +982,10 @@ describe("getEpisodeTopicOverlap", () => {
       asPodcastIndexEpisodeId("ep-42"),
     );
 
-    expect(result.label).toBeNull();
-    expect(result.overlapCount).toBe(0);
+    expect(result).toEqual({
+      success: false,
+      error: "Failed to compute episode topic overlap",
+    });
   });
 });
 

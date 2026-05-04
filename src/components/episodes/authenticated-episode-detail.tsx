@@ -302,11 +302,16 @@ export function AuthenticatedEpisodeDetail({
     let ignore = false;
     getEpisodeTopicOverlap(episodeIdBranded)
       .then((result) => {
-        if (!ignore)
-          setOverlapResult({
-            label: result.label,
-            labelKind: result.labelKind,
-          });
+        if (!ignore) {
+          if (result.success) {
+            setOverlapResult({
+              label: result.data.label,
+              labelKind: result.data.labelKind,
+            });
+          } else {
+            setOverlapResult({ label: null, labelKind: null });
+          }
+        }
       })
       .catch(() => {
         // Non-critical: overlap label is a presentation-only enhancement
