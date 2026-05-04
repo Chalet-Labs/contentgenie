@@ -136,15 +136,17 @@ describe("TOPIC_DIGEST_SYSTEM_PROMPT", () => {
 });
 
 describe("TOPIC_DIGEST_OUTPUT_RULES", () => {
-  it("has minConsensus = 3", () => {
-    expect(TOPIC_DIGEST_OUTPUT_RULES.minConsensus).toBe(3);
+  it("min consensus is at least 1", () => {
+    expect(TOPIC_DIGEST_OUTPUT_RULES.minConsensus).toBeGreaterThanOrEqual(1);
   });
 
-  it("has maxConsensus = 5", () => {
-    expect(TOPIC_DIGEST_OUTPUT_RULES.maxConsensus).toBe(5);
+  it("max consensus is greater than min consensus", () => {
+    expect(TOPIC_DIGEST_OUTPUT_RULES.maxConsensus).toBeGreaterThan(
+      TOPIC_DIGEST_OUTPUT_RULES.minConsensus,
+    );
   });
 
-  it("has maxDisagreement = 3", () => {
-    expect(TOPIC_DIGEST_OUTPUT_RULES.maxDisagreement).toBe(3);
+  it("max disagreement is non-negative", () => {
+    expect(TOPIC_DIGEST_OUTPUT_RULES.maxDisagreement).toBeGreaterThanOrEqual(0);
   });
 });

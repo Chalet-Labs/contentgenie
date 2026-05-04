@@ -1,10 +1,29 @@
-import { escapeXml } from "@/lib/prompts";
+import { z } from "zod";
+import { escapeXml } from "@/lib/prompts/xml-escape";
 
 export const TOPIC_DIGEST_OUTPUT_RULES = {
   minConsensus: 3,
   maxConsensus: 5,
   maxDisagreement: 3,
 } as const;
+
+export const topicDigestSchema = z.object({
+  consensus_points: z
+    .array(z.string().min(1))
+    .min(TOPIC_DIGEST_OUTPUT_RULES.minConsensus)
+    .max(TOPIC_DIGEST_OUTPUT_RULES.maxConsensus),
+  disagreement_points: z
+    .array(z.string().min(1))
+    .max(TOPIC_DIGEST_OUTPUT_RULES.maxDisagreement),
+  digest_markdown: z
+    .string()
+    .min(1)
+    .refine((s) => s.trim().length > 0, {
+      message: "digest_markdown must not be blank",
+    }),
+});
+
+export type TopicDigestPayload = z.infer<typeof topicDigestSchema>;
 
 export const TOPIC_DIGEST_SYSTEM_PROMPT =
   "You are a podcast-topic synthesis expert. Given a canonical topic and a set of episode summaries, identify the points of consensus (what all or most episodes agree on) and disagreement (where episodes take different positions or present conflicting data). Return only valid JSON matching the specified schema. Be specific and precise — avoid generic statements.";

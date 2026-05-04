@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { createTriggerSdkMock } from "@/test/mocks/trigger-sdk";
+import { setupDbSelectSequence } from "@/test/db-select-sequence";
 
 // ─── Trigger.dev SDK mock ─────────────────────────────────────────────────────
 
@@ -21,12 +22,6 @@ vi.mock("@trigger.dev/sdk", () =>
       info: (...args: unknown[]) => mockLoggerInfo(...args),
       warn: (...args: unknown[]) => mockLoggerWarn(...args),
       error: (...args: unknown[]) => mockLoggerError(...args),
-    },
-    AbortTaskRunError: class AbortTaskRunError extends Error {
-      constructor(message?: string) {
-        super(message);
-        this.name = "AbortTaskRunError";
-      }
     },
   }),
 );
@@ -60,6 +55,7 @@ vi.mock("@/db/schema", () => ({
     id: "ep.id",
     title: "ep.title",
     summary: "ep.summary",
+    summaryStatus: "ep.summaryStatus",
   },
   canonicalTopicDigests: {
     id: "ctd.id",
@@ -101,18 +97,25 @@ vi.mock("@/lib/openrouter", () => ({
 }));
 
 // ─── Prompt mocks ─────────────────────────────────────────────────────────────
+//
+// We mock `getTopicDigestPrompt` + system prompt constants but pass the REAL
+// `topicDigestSchema` (zod) and `TOPIC_DIGEST_OUTPUT_RULES` through, so the
+// task's `topicDigestSchema.parse(...)` runs the real validator. The real
+// constants module isn't mocked anywhere — we re-export from the source file
+// inside the factory so test-time evaluation picks up the actual schema.
 
 const mockGetTopicDigestPrompt = vi.fn().mockReturnValue("mock-digest-prompt");
-vi.mock("@/lib/prompts/topic-digest", () => ({
-  getTopicDigestPrompt: (...args: unknown[]) =>
-    mockGetTopicDigestPrompt(...args),
-  TOPIC_DIGEST_SYSTEM_PROMPT: "mock-system-prompt",
-  TOPIC_DIGEST_OUTPUT_RULES: {
-    minConsensus: 3,
-    maxConsensus: 5,
-    maxDisagreement: 3,
-  },
-}));
+vi.mock("@/lib/prompts/topic-digest", async () => {
+  const actual = await vi.importActual<
+    typeof import("@/lib/prompts/topic-digest")
+  >("@/lib/prompts/topic-digest");
+  return {
+    ...actual,
+    getTopicDigestPrompt: (...args: unknown[]) =>
+      mockGetTopicDigestPrompt(...args),
+    TOPIC_DIGEST_SYSTEM_PROMPT: "mock-system-prompt",
+  };
+});
 
 // ─── AI config mock ───────────────────────────────────────────────────────────
 
@@ -138,6 +141,7 @@ import {
   type GenerateTopicDigestPayload,
   type GenerateTopicDigestResult,
 } from "@/trigger/generate-topic-digest";
+import { MIN_DERIVED_COUNT_FOR_DIGEST } from "@/lib/topic-digest-thresholds";
 
 const taskConfig = generateTopicDigest as unknown as {
   run: (
@@ -173,37 +177,10 @@ const VALID_PARSED = {
 };
 
 /**
- * Sets up DB select chain for a given sequence of resolved query results.
- * Each call to mockDbSelect returns a fresh builder that resolves to the next fixture.
- */
-function setupDbSelectSequence(results: unknown[]) {
-  let callIndex = 0;
-  mockDbSelect.mockImplementation(() => {
-    const result = results[callIndex++] ?? [];
-    return {
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockResolvedValue(result),
-        innerJoin: vi.fn().mockReturnValue({
-          where: vi.fn().mockReturnValue({
-            orderBy: vi.fn().mockReturnValue({
-              limit: vi.fn().mockResolvedValue(result),
-            }),
-          }),
-        }),
-        leftJoin: vi.fn().mockReturnValue({
-          where: vi.fn().mockReturnValue({
-            orderBy: vi.fn().mockReturnValue({
-              limit: vi.fn().mockResolvedValue(result),
-            }),
-          }),
-        }),
-      }),
-    };
-  });
-}
-
-/**
  * Full happy-path mock chain: canonical → existing digest → episodes.
+ *
+ * canonical + digest reads use `.where`; episode read uses
+ * `.innerJoin().where().orderBy().limit()`.
  */
 function setupHappyPath(opts: {
   derivedCount?: number;
@@ -231,7 +208,11 @@ function setupHappyPath(opts: {
     },
   ];
   const digestRows = existingDigest ? [existingDigest] : [];
-  setupDbSelectSequence([canonicalRows, digestRows, episodes]);
+  setupDbSelectSequence(
+    mockDbSelect,
+    [canonicalRows, digestRows, episodes],
+    ["where", "innerJoin"],
+  );
 
   const upsertResult = [{ id: 99 }];
   const mockValues = vi.fn().mockReturnValue({
@@ -285,51 +266,58 @@ describe("generate-topic-digest task", () => {
     );
   });
 
-  // ── Case 2: Ineligible — derived count < 3 ───────────────────────────────────
+  // ── Case 2: Ineligible — derived count below MIN_DERIVED_COUNT_FOR_DIGEST ──
 
-  it("case 2 — ineligible (derived count < 3): aborted counter incremented BEFORE throw", async () => {
-    setupDbSelectSequence([
+  it("case 2 — ineligible (derived count below MIN): aborted counter incremented, throw aborts further work", async () => {
+    setupDbSelectSequence(
+      mockDbSelect,
       [
-        {
-          id: CANONICAL_ID,
-          label: "Test",
-          summary: "S",
-          status: "active",
-          episodeCount: 2,
-        },
+        [
+          {
+            id: CANONICAL_ID,
+            label: "Test",
+            summary: "S",
+            status: "active",
+            episodeCount: MIN_DERIVED_COUNT_FOR_DIGEST - 1,
+          },
+        ],
       ],
-    ]);
+      ["where", "innerJoin"],
+    );
 
     await expect(
       taskConfig.run({ canonicalTopicId: CANONICAL_ID }),
     ).rejects.toThrow();
 
-    // Counter must be incremented before the throw — verify invocation order
-    const incrementOrder = mockMetadataIncrement.mock.invocationCallOrder[0];
+    // Counter was called before the throw — if the throw came first this would be missing.
     expect(mockMetadataIncrement).toHaveBeenCalledWith("digests.aborted", 1);
-    // The throw terminates the function — UPSERT must NOT have been called
+    // No further work happened after the throw.
     expect(mockDbInsert).not.toHaveBeenCalled();
-    expect(incrementOrder).toBeDefined();
+    expect(mockGenerateCompletion).not.toHaveBeenCalled();
   });
 
   // ── Case 3: Ineligible — non-active status ───────────────────────────────────
 
-  it("case 3 — ineligible (status !== active): aborted counter incremented BEFORE throw", async () => {
-    setupDbSelectSequence([
+  it("case 3 — ineligible (status !== active): aborted counter incremented, throw aborts further work", async () => {
+    setupDbSelectSequence(
+      mockDbSelect,
       [
-        {
-          id: CANONICAL_ID,
-          label: "Test",
-          summary: "S",
-          status: "merged",
-          episodeCount: 10,
-        },
+        [
+          {
+            id: CANONICAL_ID,
+            label: "Test",
+            summary: "S",
+            status: "merged",
+            episodeCount: 10,
+          },
+        ],
       ],
-    ]);
+      ["where", "innerJoin"],
+    );
 
     await expect(
       taskConfig.run({ canonicalTopicId: CANONICAL_ID }),
-    ).rejects.toThrow();
+    ).rejects.toThrow(/CANONICAL_NOT_ACTIVE/);
 
     expect(mockMetadataIncrement).toHaveBeenCalledWith("digests.aborted", 1);
     expect(mockDbInsert).not.toHaveBeenCalled();
@@ -382,24 +370,28 @@ describe("generate-topic-digest task", () => {
 
   // ── Case 6: Insufficient valid summaries ─────────────────────────────────────
 
-  it("case 6 — insufficient valid summaries (<3): throws AbortTaskRunError, counter incremented", async () => {
+  it("case 6 — insufficient valid summaries (<MIN): throws AbortTaskRunError, counter incremented, no LLM/UPSERT", async () => {
     const onlyTwoEpisodes = [
       { id: 1, title: "E1", summary: "S1", coverageScore: 0.9 },
       { id: 2, title: "E2", summary: "S2", coverageScore: 0.8 },
     ];
-    setupDbSelectSequence([
+    setupDbSelectSequence(
+      mockDbSelect,
       [
-        {
-          id: CANONICAL_ID,
-          label: "T",
-          summary: "S",
-          status: "active",
-          episodeCount: 10,
-        },
+        [
+          {
+            id: CANONICAL_ID,
+            label: "T",
+            summary: "S",
+            status: "active",
+            episodeCount: 10,
+          },
+        ],
+        [], // no existing digest
+        onlyTwoEpisodes,
       ],
-      [], // no existing digest
-      onlyTwoEpisodes,
-    ]);
+      ["where", "innerJoin"],
+    );
 
     await expect(
       taskConfig.run({ canonicalTopicId: CANONICAL_ID }),
@@ -413,9 +405,9 @@ describe("generate-topic-digest task", () => {
     expect(mockGenerateCompletion).not.toHaveBeenCalled();
   });
 
-  // ── Case 7: LLM failure — counter incremented BEFORE rethrow ────────────────
+  // ── Case 7: LLM failure — counter incremented AFTER LLM call, BEFORE rethrow
 
-  it("case 7 — LLM failure: digests.llm_failed incremented BEFORE throw; UPSERT not called", async () => {
+  it("case 7 — LLM failure: digests.llm_failed incremented in catch (after LLM call); UPSERT not called", async () => {
     setupHappyPath({ derivedCount: 5 });
     mockGenerateCompletion.mockRejectedValue(new Error("OpenRouter timeout"));
 
@@ -426,17 +418,21 @@ describe("generate-topic-digest task", () => {
     expect(mockMetadataIncrement).toHaveBeenCalledWith("digests.llm_failed", 1);
     expect(mockDbInsert).not.toHaveBeenCalled();
 
-    // Verify counter incremented before throw (counter call order < throw)
+    // Real ordering pin: counter was called AFTER the LLM call, proving it ran in catch (not pre-emptively).
+    const completionOrder = mockGenerateCompletion.mock.invocationCallOrder[0];
     const incrementCalls = mockMetadataIncrement.mock.calls;
-    const llmFailedCall = incrementCalls.findIndex(
-      ([key]) => key === "digests.llm_failed",
+    const llmFailedCallIdx = incrementCalls.findIndex(
+      (c) => c[0] === "digests.llm_failed",
     );
-    expect(llmFailedCall).toBeGreaterThanOrEqual(0);
+    expect(llmFailedCallIdx).toBeGreaterThanOrEqual(0);
+    const llmFailedCallOrder =
+      mockMetadataIncrement.mock.invocationCallOrder[llmFailedCallIdx];
+    expect(llmFailedCallOrder).toBeGreaterThan(completionOrder);
   });
 
   // ── Case 8: Parse failure — counter incremented BEFORE throw ─────────────────
 
-  it("case 8 — parse failure: llm_failed counter incremented; UPSERT not called", async () => {
+  it("case 8 — parse failure: llm_failed counter incremented after LLM call; UPSERT not called", async () => {
     setupHappyPath({ derivedCount: 5 });
     mockParseJsonResponse.mockImplementation(() => {
       throw new Error("Invalid JSON");
@@ -448,13 +444,117 @@ describe("generate-topic-digest task", () => {
 
     expect(mockMetadataIncrement).toHaveBeenCalledWith("digests.llm_failed", 1);
     expect(mockDbInsert).not.toHaveBeenCalled();
+
+    // Counter ran AFTER the LLM completed (proving catch path, not pre-emptive).
+    const completionOrder = mockGenerateCompletion.mock.invocationCallOrder[0];
+    const incrementCalls = mockMetadataIncrement.mock.calls;
+    const llmFailedCallIdx = incrementCalls.findIndex(
+      (c) => c[0] === "digests.llm_failed",
+    );
+    expect(llmFailedCallIdx).toBeGreaterThanOrEqual(0);
+    const llmFailedCallOrder =
+      mockMetadataIncrement.mock.invocationCallOrder[llmFailedCallIdx];
+    expect(llmFailedCallOrder).toBeGreaterThan(completionOrder);
   });
 
-  // ── Case 9: Episode read order ─────────────────────────────────────────────
+  // ── Case 8b–8d: Zod schema rejection branches ─────────────────────────────
+
+  it("case 8b — schema reject (empty consensus_points): llm_failed counter; no UPSERT", async () => {
+    setupHappyPath({ derivedCount: 5 });
+    mockParseJsonResponse.mockReturnValue({
+      consensus_points: [],
+      disagreement_points: [],
+      digest_markdown: "Some markdown.",
+    });
+
+    await expect(
+      taskConfig.run({ canonicalTopicId: CANONICAL_ID }),
+    ).rejects.toThrow();
+
+    expect(mockMetadataIncrement).toHaveBeenCalledWith("digests.llm_failed", 1);
+    expect(mockDbInsert).not.toHaveBeenCalled();
+  });
+
+  it("case 8c — schema reject (blank digest_markdown): llm_failed counter; no UPSERT", async () => {
+    setupHappyPath({ derivedCount: 5 });
+    mockParseJsonResponse.mockReturnValue({
+      consensus_points: ["A", "B", "C"],
+      disagreement_points: [],
+      digest_markdown: "",
+    });
+
+    await expect(
+      taskConfig.run({ canonicalTopicId: CANONICAL_ID }),
+    ).rejects.toThrow();
+
+    expect(mockMetadataIncrement).toHaveBeenCalledWith("digests.llm_failed", 1);
+    expect(mockDbInsert).not.toHaveBeenCalled();
+  });
+
+  it("case 8d — schema reject (over-max consensus_points length 6): llm_failed counter; no UPSERT", async () => {
+    setupHappyPath({ derivedCount: 5 });
+    mockParseJsonResponse.mockReturnValue({
+      consensus_points: ["A", "B", "C", "D", "E", "F"],
+      disagreement_points: [],
+      digest_markdown: "Some markdown.",
+    });
+
+    await expect(
+      taskConfig.run({ canonicalTopicId: CANONICAL_ID }),
+    ).rejects.toThrow();
+
+    expect(mockMetadataIncrement).toHaveBeenCalledWith("digests.llm_failed", 1);
+    expect(mockDbInsert).not.toHaveBeenCalled();
+  });
+
+  // ── Case 9: Episode read order + limit pinning ─────────────────────────────
 
   it("case 9 — episode query: uses desc(coverageScore), desc(createdAt), limit(30)", async () => {
     const { desc } = await import("drizzle-orm");
-    setupHappyPath({ derivedCount: 5 });
+
+    // Wire a mock chain where we can spy on `.limit`.
+    const limitMock = vi.fn().mockResolvedValue(VALID_EPISODES);
+    const orderByMock = vi.fn().mockReturnValue({ limit: limitMock });
+    const whereInnerMock = vi.fn().mockReturnValue({ orderBy: orderByMock });
+    const innerJoinMock = vi.fn().mockReturnValue({ where: whereInnerMock });
+
+    let callIndex = 0;
+    const fixtureSequence: unknown[] = [
+      [
+        {
+          id: CANONICAL_ID,
+          label: "Test Topic",
+          summary: "A topic summary.",
+          status: "active",
+          episodeCount: 5,
+        },
+      ],
+      [], // no existing digest
+      VALID_EPISODES,
+    ];
+
+    mockDbSelect.mockImplementation(() => {
+      const result = fixtureSequence[callIndex++] ?? [];
+      const isEpisodeRead = callIndex === 3;
+      return {
+        from: vi.fn().mockReturnValue(
+          isEpisodeRead
+            ? { innerJoin: innerJoinMock }
+            : {
+                where: vi.fn().mockResolvedValue(result),
+              },
+        ),
+      };
+    });
+
+    const upsertResult = [{ id: 99 }];
+    mockDbInsert.mockReturnValue({
+      values: vi.fn().mockReturnValue({
+        onConflictDoUpdate: vi.fn().mockReturnValue({
+          returning: vi.fn().mockResolvedValue(upsertResult),
+        }),
+      }),
+    });
 
     await taskConfig.run({ canonicalTopicId: CANONICAL_ID });
 
@@ -463,6 +563,9 @@ describe("generate-topic-digest task", () => {
     const descCols = descCalls.map(([col]) => col);
     expect(descCols).toContain("ect.coverageScore");
     expect(descCols).toContain("ect.createdAt");
+
+    // limit(30) is the read cap — verify the magic number is wired.
+    expect(limitMock).toHaveBeenCalledWith(30);
   });
 
   // ── Case 10: Task config ────────────────────────────────────────────────────

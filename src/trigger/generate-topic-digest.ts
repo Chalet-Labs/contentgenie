@@ -13,8 +13,9 @@ import { getActiveAiConfig } from "@/lib/ai/config";
 import { parseJsonResponse } from "@/lib/openrouter";
 import {
   getTopicDigestPrompt,
-  TOPIC_DIGEST_OUTPUT_RULES,
+  topicDigestSchema,
   TOPIC_DIGEST_SYSTEM_PROMPT,
+  type TopicDigestPayload,
 } from "@/lib/prompts/topic-digest";
 import { canonicalTopicEpisodeCount } from "@/lib/admin/canonical-topic-episode-count";
 import { MIN_DERIVED_COUNT_FOR_DIGEST } from "@/lib/topic-digest-thresholds";
@@ -35,36 +36,6 @@ export type GenerateTopicDigestResult = {
   episodeCount?: number;
   durationMs?: number;
 };
-
-type DigestShape = {
-  consensus_points: string[];
-  disagreement_points: string[];
-  digest_markdown: string;
-};
-
-function isValidDigestShape(value: unknown): value is DigestShape {
-  if (!value || typeof value !== "object") return false;
-  const v = value as Record<string, unknown>;
-  if (
-    !Array.isArray(v.consensus_points) ||
-    !Array.isArray(v.disagreement_points)
-  )
-    return false;
-  if (
-    typeof v.digest_markdown !== "string" ||
-    v.digest_markdown.trim().length === 0
-  )
-    return false;
-  if (!v.consensus_points.every((p) => typeof p === "string")) return false;
-  if (!v.disagreement_points.every((p) => typeof p === "string")) return false;
-  if (v.consensus_points.length < TOPIC_DIGEST_OUTPUT_RULES.minConsensus)
-    return false;
-  if (v.consensus_points.length > TOPIC_DIGEST_OUTPUT_RULES.maxConsensus)
-    return false;
-  if (v.disagreement_points.length > TOPIC_DIGEST_OUTPUT_RULES.maxDisagreement)
-    return false;
-  return true;
-}
 
 export const generateTopicDigest = task({
   id: "generate-topic-digest",
@@ -164,6 +135,7 @@ export const generateTopicDigest = task({
         and(
           eq(episodeCanonicalTopics.canonicalTopicId, canonicalTopicId),
           isNotNull(episodes.summary),
+          eq(episodes.summaryStatus, "completed"),
         ),
       )
       .orderBy(
@@ -172,27 +144,23 @@ export const generateTopicDigest = task({
       )
       .limit(MAX_EPISODE_INPUT);
 
-    const validEpisodes = episodeRows.filter(
-      (ep): ep is typeof ep & { summary: string } => ep.summary !== null,
-    );
-
-    if (validEpisodes.length < MIN_DERIVED_COUNT_FOR_DIGEST) {
+    if (episodeRows.length < MIN_DERIVED_COUNT_FOR_DIGEST) {
       metadata.root.increment("digests.insufficient_summaries", 1);
       throw new AbortTaskRunError("INSUFFICIENT_VALID_SUMMARIES");
     }
 
-    const episodeSummaries = validEpisodes.map((ep) => ({
+    const episodeIds = episodeRows.map((ep) => ep.id);
+    const episodeSummaries = episodeRows.map((ep) => ({
       id: ep.id,
       title: ep.title,
-      summary: ep.summary,
+      summary: ep.summary as string,
     }));
-    const episodeIds = validEpisodes.map((ep) => ep.id);
 
     // ── Step 4–5: LLM call + parse + validate ───────────────────────────────
     const aiConfig = await getActiveAiConfig();
     const modelUsed = aiConfig.model;
 
-    let parsed: DigestShape;
+    let parsed: TopicDigestPayload;
     try {
       const completion = await generateCompletion(
         [
@@ -210,13 +178,7 @@ export const generateTopicDigest = task({
       );
 
       const raw: unknown = parseJsonResponse<unknown>(completion);
-      if (!isValidDigestShape(raw)) {
-        const r = raw as Record<string, unknown> | null | undefined;
-        throw new Error(
-          `Digest shape validation failed: consensus=${JSON.stringify(r?.consensus_points)}, markdown="${r?.digest_markdown}"`,
-        );
-      }
-      parsed = raw;
+      parsed = topicDigestSchema.parse(raw);
     } catch (err) {
       metadata.root.increment("digests.llm_failed", 1);
       throw err;

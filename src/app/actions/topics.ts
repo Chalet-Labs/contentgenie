@@ -513,15 +513,24 @@ export async function triggerTopicDigestGeneration(input: {
     }
     const { canonicalTopicId } = parsed.data;
 
-    // Read canonical + derived episode count
-    const canonicalRows = await db
-      .select({
-        id: canonicalTopics.id,
-        status: canonicalTopics.status,
-        episodeCount: canonicalTopicEpisodeCount(),
-      })
-      .from(canonicalTopics)
-      .where(eq(canonicalTopics.id, canonicalTopicId));
+    const [canonicalRows, digestRows] = await Promise.all([
+      db
+        .select({
+          id: canonicalTopics.id,
+          status: canonicalTopics.status,
+          episodeCount: canonicalTopicEpisodeCount(),
+        })
+        .from(canonicalTopics)
+        .where(eq(canonicalTopics.id, canonicalTopicId)),
+      db
+        .select({
+          id: canonicalTopicDigests.id,
+          episodeCountAtGeneration:
+            canonicalTopicDigests.episodeCountAtGeneration,
+        })
+        .from(canonicalTopicDigests)
+        .where(eq(canonicalTopicDigests.canonicalTopicId, canonicalTopicId)),
+    ]);
 
     const canonical = canonicalRows[0];
     if (!canonical || canonical.status !== "active") {
@@ -529,20 +538,8 @@ export async function triggerTopicDigestGeneration(input: {
     }
 
     const derivedCount = canonical.episodeCount;
-
-    // Read existing digest
-    const digestRows = await db
-      .select({
-        id: canonicalTopicDigests.id,
-        episodeCountAtGeneration:
-          canonicalTopicDigests.episodeCountAtGeneration,
-      })
-      .from(canonicalTopicDigests)
-      .where(eq(canonicalTopicDigests.canonicalTopicId, canonicalTopicId));
-
     const existing = digestRows[0] ?? null;
 
-    // Ineligible: not enough episodes
     if (derivedCount < MIN_DERIVED_COUNT_FOR_DIGEST) {
       return {
         success: true,
@@ -550,7 +547,6 @@ export async function triggerTopicDigestGeneration(input: {
       };
     }
 
-    // Cached: growth since last generation is below threshold
     if (
       existing &&
       derivedCount - existing.episodeCountAtGeneration <
@@ -562,18 +558,28 @@ export async function triggerTopicDigestGeneration(input: {
       };
     }
 
-    // Enqueue generation
     try {
       const handle = await tasks.trigger<typeof generateTopicDigest>(
         "generate-topic-digest",
         { canonicalTopicId },
+        {
+          idempotencyKey: `generate-topic-digest-${canonicalTopicId}`,
+          idempotencyKeyTTL: "10m",
+        },
       );
       return {
         success: true,
         data: { status: "queued", digestId: existing?.id, runId: handle.id },
       };
-    } catch {
-      return { success: false, error: "trigger-failed" };
+    } catch (e) {
+      console.error("[triggerTopicDigestGeneration] trigger failed:", {
+        canonicalTopicId,
+        error: e,
+      });
+      return {
+        success: false,
+        error: e instanceof Error ? e.message : "trigger-failed",
+      };
     }
   });
 }

@@ -5,20 +5,17 @@
 
 import { describe, it, expect, vi, beforeAll, afterAll } from "vitest";
 import { sql } from "drizzle-orm";
+import { createTriggerSdkMock } from "@/test/mocks/trigger-sdk";
 
 // Mock Trigger.dev SDK so task() echoes config (gives us .run) while keeping
-// real DB access. AbortTaskRunError must be a real class since the task throws it.
-vi.mock("@trigger.dev/sdk", () => ({
-  task: vi.fn((config: unknown) => config),
-  AbortTaskRunError: class AbortTaskRunError extends Error {
-    constructor(message?: string) {
-      super(message);
-      this.name = "AbortTaskRunError";
-    }
-  },
-  metadata: { root: { increment: vi.fn() }, set: vi.fn() },
-  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
-}));
+// real DB access. AbortTaskRunError comes from the shared factory — it's a real
+// class since the task throws it.
+vi.mock("@trigger.dev/sdk", () =>
+  createTriggerSdkMock({
+    metadata: { root: { increment: vi.fn() }, set: vi.fn() },
+    logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+  }),
+);
 
 // Mock LLM (no API cost in integration tests)
 const mockGenerateCompletion = vi.fn().mockResolvedValue(
@@ -44,6 +41,7 @@ vi.mock("@/lib/ai/config", () => ({
     .mockResolvedValue({ model: "test-model-integration" }),
 }));
 
+import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import {
   canonicalTopics,
@@ -76,11 +74,12 @@ describe.skipIf(!process.env.DATABASE_URL)(
   "generate-topic-digest integration",
   () => {
     beforeAll(async () => {
-      // Seed a podcast (required FK for episodes)
+      // Seed a podcast (required FK for episodes). `podcasts.podcastIndexId`
+      // is plain text — no brand cast needed.
       const [podcast] = await db
         .insert(podcasts)
         .values({
-          podcastIndexId: asPodcastIndexEpisodeId(`${LABEL_PREFIX}podcast_001`),
+          podcastIndexId: `${LABEL_PREFIX}podcast_001`,
           title: `${LABEL_PREFIX}Test Podcast`,
         })
         .returning({ id: podcasts.id });
@@ -103,12 +102,15 @@ describe.skipIf(!process.env.DATABASE_URL)(
         .returning({ id: canonicalTopics.id });
       fixtureCanonicalId = canonical.id;
 
-      // Seed 5 episodes with summaries and varying coverage scores
+      // Seed 5 episodes with summaries and varying coverage scores. The task
+      // filters by `summaryStatus = 'completed'` (added to defend against
+      // mid-resummarize digests reading stale text), so seed that explicitly.
       const episodeValues = Array.from({ length: 5 }, (_, i) => ({
         podcastId: fixturePodcastId,
         podcastIndexId: asPodcastIndexEpisodeId(`${LABEL_PREFIX}ep_${i + 1}`),
         title: `${LABEL_PREFIX}Episode ${i + 1}`,
         summary: `Integration test summary for episode ${i + 1}. Creatine is discussed here with detail ${i}.`,
+        summaryStatus: "completed" as const,
       }));
 
       const insertedEpisodes = await db
@@ -174,8 +176,31 @@ describe.skipIf(!process.env.DATABASE_URL)(
       expect(row.generatedAt).toBeInstanceOf(Date);
     });
 
-    it("UPSERT on re-run: updates existing row without creating duplicates", async () => {
-      // Run again — should update the existing row, not insert a new one
+    it("rate guard prevents duplicate write within 1h window", async () => {
+      // Re-running immediately should be caught by the task-layer rate guard
+      // (generated_at < 1h). No UPSERT, no new LLM call consumed.
+      const result = await taskConfig.run({
+        canonicalTopicId: fixtureCanonicalId,
+      });
+
+      expect(result.status).toBe("rate_guarded");
+
+      // Confirm still exactly one row.
+      const rows = await db.execute<{ count: number }>(
+        sql`SELECT COUNT(*)::int AS count FROM canonical_topic_digests WHERE canonical_topic_id = ${fixtureCanonicalId}`,
+      );
+      expect(rows.rows[0].count).toBe(1);
+    });
+
+    it("UPSERT on re-run after rate-guard window: updates existing row without creating duplicates", async () => {
+      // Push the existing digest's generatedAt back >1h so the rate guard
+      // releases. Now a re-run should hit UPSERT and overwrite, not insert.
+      const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
+      await db
+        .update(canonicalTopicDigests)
+        .set({ generatedAt: twoHoursAgo })
+        .where(eq(canonicalTopicDigests.canonicalTopicId, fixtureCanonicalId));
+
       mockGenerateCompletion.mockResolvedValueOnce(
         JSON.stringify({
           consensus_points: ["Updated A", "Updated B", "Updated C"],
@@ -184,21 +209,32 @@ describe.skipIf(!process.env.DATABASE_URL)(
         }),
       );
 
-      // Wait 1ms so generatedAt changes
-      await new Promise((resolve) => setTimeout(resolve, 1));
       const result = await taskConfig.run({
         canonicalTopicId: fixtureCanonicalId,
       });
 
-      // Rate guard window is 1h — this second call will be rate-guarded in task layer
-      // The task was just run above, so generatedAt is < 1h ago
-      expect(result.status).toBe("rate_guarded");
+      expect(result.status).toBe("generated");
 
-      // Confirm still exactly one row
-      const rows = await db.execute<{ count: number }>(
+      // Persisted row reflects the new mocked output AND there's still only one.
+      const rows = await db
+        .select()
+        .from(canonicalTopicDigests)
+        .where(sql`canonical_topic_id = ${fixtureCanonicalId}`);
+
+      expect(rows).toHaveLength(1);
+      expect(rows[0].consensusPoints).toEqual([
+        "Updated A",
+        "Updated B",
+        "Updated C",
+      ]);
+      expect(rows[0].digestMarkdown).toBe(
+        "Updated digest markdown for re-run test.",
+      );
+
+      const countRows = await db.execute<{ count: number }>(
         sql`SELECT COUNT(*)::int AS count FROM canonical_topic_digests WHERE canonical_topic_id = ${fixtureCanonicalId}`,
       );
-      expect(rows.rows[0].count).toBe(1);
+      expect(countRows.rows[0].count).toBe(1);
     });
   },
 );

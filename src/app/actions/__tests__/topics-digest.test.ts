@@ -73,12 +73,8 @@ vi.mock("@/lib/admin/canonical-topic-episode-count", () => ({
   })),
 }));
 
-// ─── Threshold constants mock ─────────────────────────────────────────────────
-
-vi.mock("@/lib/topic-digest-thresholds", () => ({
-  MIN_DERIVED_COUNT_FOR_DIGEST: 3,
-  STALENESS_GROWTH_THRESHOLD: 3,
-}));
+// Note: `@/lib/topic-digest-thresholds` is intentionally NOT mocked — tests
+// import the real constants and compute boundary values from them.
 
 // ─── No-op mocks for topics.ts imports not under test ────────────────────────
 
@@ -99,9 +95,14 @@ vi.mock("@/trigger/generate-topic-digest", () => ({
 }));
 vi.mock("@/trigger/summarize-episode", () => ({ summarizeEpisode: {} }));
 
-// ─── Import action under test ─────────────────────────────────────────────────
+// ─── Import action under test (real thresholds module) ──────────────────────
 
 import { triggerTopicDigestGeneration } from "@/app/actions/topics";
+import {
+  MIN_DERIVED_COUNT_FOR_DIGEST,
+  STALENESS_GROWTH_THRESHOLD,
+} from "@/lib/topic-digest-thresholds";
+import { setupDbSelectSequence } from "@/test/db-select-sequence";
 
 // ─── Auth helpers ─────────────────────────────────────────────────────────────
 
@@ -110,24 +111,6 @@ function makeAuth(userId = "user_1") {
 }
 function makeAnonAuth() {
   return { userId: null, has: vi.fn() };
-}
-
-// ─── DB query helpers ─────────────────────────────────────────────────────────
-
-/**
- * Sets up the DB select chain for a sequence of resolved results.
- * Each mockDbSelect call gets the next result in order.
- */
-function setupDbSelectSequence(results: unknown[]) {
-  let callIndex = 0;
-  mockDbSelect.mockImplementation(() => {
-    const result = results[callIndex++] ?? [];
-    return {
-      from: vi.fn().mockReturnValue({
-        where: vi.fn().mockResolvedValue(result),
-      }),
-    };
-  });
 }
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
@@ -159,10 +142,24 @@ describe("triggerTopicDigestGeneration", () => {
     expect(mockTasksTrigger).not.toHaveBeenCalled();
   });
 
+  // ── Case 2b: Unknown extra key (.strict) ────────────────────────────────────
+
+  it("case 2b — unknown extra key: .strict rejects", async () => {
+    const result = await triggerTopicDigestGeneration({
+      canonicalTopicId: 5,
+      // @ts-expect-error — verifying runtime .strict() rejection
+      extra: 1,
+    });
+    expect(result).toEqual(expect.objectContaining({ success: false }));
+    expect(typeof (result as { error: string }).error).toBe("string");
+    expect(mockDbSelect).not.toHaveBeenCalled();
+    expect(mockTasksTrigger).not.toHaveBeenCalled();
+  });
+
   // ── Case 3: Canonical not found ──────────────────────────────────────────────
 
   it("case 3 — canonical not found: returns not-found error", async () => {
-    setupDbSelectSequence([[]]);
+    setupDbSelectSequence(mockDbSelect, [[], []]);
     const result = await triggerTopicDigestGeneration({ canonicalTopicId: 99 });
     expect(result).toEqual({ success: false, error: "not-found" });
     expect(mockTasksTrigger).not.toHaveBeenCalled();
@@ -171,7 +168,7 @@ describe("triggerTopicDigestGeneration", () => {
   // ── Case 4: Canonical non-active (status !== active) ─────────────────────────
 
   it("case 4 — canonical non-active (merged): returns not-found (don't expose internal status)", async () => {
-    setupDbSelectSequence([
+    setupDbSelectSequence(mockDbSelect, [
       [
         {
           id: 5,
@@ -181,26 +178,27 @@ describe("triggerTopicDigestGeneration", () => {
           episodeCount: 10,
         },
       ],
+      [],
     ]);
     const result = await triggerTopicDigestGeneration({ canonicalTopicId: 5 });
     expect(result).toEqual({ success: false, error: "not-found" });
     expect(mockTasksTrigger).not.toHaveBeenCalled();
   });
 
-  // ── Case 5: Ineligible (episode count < 3) ───────────────────────────────────
+  // ── Case 5: Ineligible (episode count < MIN_DERIVED_COUNT_FOR_DIGEST) ───────
 
-  it("case 5 — ineligible (count < 3): returns ineligible status; tasks.trigger NOT called", async () => {
-    setupDbSelectSequence([
+  it("case 5 — ineligible (count below MIN_DERIVED_COUNT_FOR_DIGEST): returns ineligible status; tasks.trigger NOT called", async () => {
+    setupDbSelectSequence(mockDbSelect, [
       [
         {
           id: 5,
           label: "Topic",
           summary: "S",
           status: "active",
-          episodeCount: 2,
+          episodeCount: MIN_DERIVED_COUNT_FOR_DIGEST - 1,
         },
       ],
-      [], // no existing digest
+      [],
     ]);
     const result = await triggerTopicDigestGeneration({ canonicalTopicId: 5 });
     expect(result).toEqual({
@@ -210,20 +208,21 @@ describe("triggerTopicDigestGeneration", () => {
     expect(mockTasksTrigger).not.toHaveBeenCalled();
   });
 
-  // ── Case 6: Cached (existing fresh, growth < 3) ──────────────────────────────
+  // ── Case 6: Cached (existing fresh, growth < STALENESS_GROWTH_THRESHOLD) ────
 
-  it("case 6 — cached (growth < 3): returns cached status; tasks.trigger NOT called", async () => {
-    setupDbSelectSequence([
+  it("case 6 — cached (growth below STALENESS_GROWTH_THRESHOLD): returns cached status; tasks.trigger NOT called", async () => {
+    const baseCount = MIN_DERIVED_COUNT_FOR_DIGEST + 2;
+    setupDbSelectSequence(mockDbSelect, [
       [
         {
           id: 5,
           label: "Topic",
           summary: "S",
           status: "active",
-          episodeCount: 7,
+          episodeCount: baseCount + (STALENESS_GROWTH_THRESHOLD - 1),
         },
       ],
-      [{ id: 22, episodeCountAtGeneration: 5 }], // growth = 2 < 3
+      [{ id: 22, episodeCountAtGeneration: baseCount }],
     ]);
     const result = await triggerTopicDigestGeneration({ canonicalTopicId: 5 });
     expect(result).toEqual({
@@ -235,18 +234,18 @@ describe("triggerTopicDigestGeneration", () => {
 
   // ── Case 7: Queued first-time (no existing digest) ───────────────────────────
 
-  it("case 7 — queued first-time: tasks.trigger called; returns queued + runId", async () => {
-    setupDbSelectSequence([
+  it("case 7 — queued first-time: tasks.trigger called with idempotencyKey; returns queued + runId", async () => {
+    setupDbSelectSequence(mockDbSelect, [
       [
         {
           id: 5,
           label: "Topic",
           summary: "S",
           status: "active",
-          episodeCount: 4,
+          episodeCount: MIN_DERIVED_COUNT_FOR_DIGEST + 1,
         },
       ],
-      [], // no existing digest
+      [],
     ]);
     mockTasksTrigger.mockResolvedValue({ id: "run_abc123" });
 
@@ -256,25 +255,31 @@ describe("triggerTopicDigestGeneration", () => {
       success: true,
       data: { status: "queued", digestId: undefined, runId: "run_abc123" },
     });
-    expect(mockTasksTrigger).toHaveBeenCalledWith("generate-topic-digest", {
-      canonicalTopicId: 5,
-    });
+    expect(mockTasksTrigger).toHaveBeenCalledWith(
+      "generate-topic-digest",
+      { canonicalTopicId: 5 },
+      expect.objectContaining({
+        idempotencyKey: "generate-topic-digest-5",
+        idempotencyKeyTTL: "10m",
+      }),
+    );
   });
 
-  // ── Case 8: Queued stale (growth >= 3) ──────────────────────────────────────
+  // ── Case 8: Queued stale (growth >= STALENESS_GROWTH_THRESHOLD) ─────────────
 
-  it("case 8 — queued stale (growth >= 3): tasks.trigger called with canonical id", async () => {
-    setupDbSelectSequence([
+  it("case 8 — queued stale (growth at or above STALENESS_GROWTH_THRESHOLD): tasks.trigger called with canonical id", async () => {
+    const baseCount = MIN_DERIVED_COUNT_FOR_DIGEST;
+    setupDbSelectSequence(mockDbSelect, [
       [
         {
           id: 5,
           label: "Topic",
           summary: "S",
           status: "active",
-          episodeCount: 6,
+          episodeCount: baseCount + STALENESS_GROWTH_THRESHOLD,
         },
       ],
-      [{ id: 22, episodeCountAtGeneration: 3 }], // growth = 3 >= 3 → stale
+      [{ id: 22, episodeCountAtGeneration: baseCount }],
     ]);
     mockTasksTrigger.mockResolvedValue({ id: "run_xyz" });
 
@@ -284,22 +289,26 @@ describe("triggerTopicDigestGeneration", () => {
       success: true,
       data: { status: "queued", digestId: 22, runId: "run_xyz" },
     });
-    expect(mockTasksTrigger).toHaveBeenCalledWith("generate-topic-digest", {
-      canonicalTopicId: 5,
-    });
+    expect(mockTasksTrigger).toHaveBeenCalledWith(
+      "generate-topic-digest",
+      { canonicalTopicId: 5 },
+      expect.objectContaining({
+        idempotencyKey: "generate-topic-digest-5",
+      }),
+    );
   });
 
   // ── Case 9: tasks.trigger outage ─────────────────────────────────────────────
 
-  it("case 9 — tasks.trigger outage: returns trigger-failed error; no DB writes", async () => {
-    setupDbSelectSequence([
+  it("case 9 — tasks.trigger outage: returns trigger error message; no DB writes", async () => {
+    setupDbSelectSequence(mockDbSelect, [
       [
         {
           id: 5,
           label: "Topic",
           summary: "S",
           status: "active",
-          episodeCount: 4,
+          episodeCount: MIN_DERIVED_COUNT_FOR_DIGEST + 1,
         },
       ],
       [],
@@ -308,7 +317,11 @@ describe("triggerTopicDigestGeneration", () => {
 
     const result = await triggerTopicDigestGeneration({ canonicalTopicId: 5 });
 
-    expect(result).toEqual({ success: false, error: "trigger-failed" });
+    // Action now surfaces the underlying error message instead of swallowing it.
+    expect(result).toEqual({
+      success: false,
+      error: "Trigger.dev unavailable",
+    });
     expect(mockTasksTrigger).toHaveBeenCalledOnce();
   });
 });

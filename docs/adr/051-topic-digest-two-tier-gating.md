@@ -29,7 +29,7 @@ that gains 3 new episodes within an hour stays stale.
 Related ADRs: [ADR-022](022-trending-topics-snapshot.md) (snapshot pattern,
 empty-on-failure), [ADR-042](042-canonical-topics-foundation.md) §"Digest
 staleness" (the +3 threshold itself), [ADR-027](027-summarize-episode-pure-consumer.md)
-(consumer-side dedupe via summaryStatus CAS).
+(precedent for consumer-side guards on summaryStatus).
 
 ## Options Considered
 
