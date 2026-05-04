@@ -1,5 +1,5 @@
 import { sql, type SQL } from "drizzle-orm";
-import { canonicalTopics, episodeCanonicalTopics } from "@/db/schema";
+import { canonicalTopics, episodeCanonicalTopics, episodes } from "@/db/schema";
 
 /**
  * Correlated subquery that returns the live junction-row count for the
@@ -19,6 +19,23 @@ import { canonicalTopics, episodeCanonicalTopics } from "@/db/schema";
  */
 export function canonicalTopicEpisodeCount(): SQL<number> {
   return sql<number>`(SELECT count(*) FROM ${episodeCanonicalTopics} ect WHERE ect.canonical_topic_id = ${canonicalTopics}.${canonicalTopics.id})`.mapWith(
+    Number,
+  );
+}
+
+/**
+ * Correlated subquery that returns the count of *digestable* linked episodes
+ * for the outer `canonical_topics` row — i.e. links whose joined episode has
+ * `summary_status = 'completed'` and a non-null summary. Mirrors the predicate
+ * used by `generate-topic-digest`'s episode read step so the action's
+ * eligibility / staleness logic can compare apples-to-apples (issue #444 fix).
+ *
+ * Same outer-id qualification rule as `canonicalTopicEpisodeCount` — see that
+ * function's docstring for why the fully qualified `${canonicalTopics}.id` is
+ * required.
+ */
+export function canonicalTopicCompletedSummaryCount(): SQL<number> {
+  return sql<number>`(SELECT count(*) FROM ${episodeCanonicalTopics} ect INNER JOIN ${episodes} ep ON ect.episode_id = ep.id WHERE ect.canonical_topic_id = ${canonicalTopics}.${canonicalTopics.id} AND ep.summary_status = 'completed' AND ep.summary IS NOT NULL)`.mapWith(
     Number,
   );
 }

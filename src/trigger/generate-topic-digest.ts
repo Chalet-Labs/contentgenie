@@ -190,6 +190,11 @@ export const generateTopicDigest = task({
     }
 
     // ── Step 6: UPSERT ──────────────────────────────────────────────────────
+    // `episodeCountAtGeneration` records the count of episodes whose summaries
+    // were actually fed into the LLM, NOT the raw linked count — otherwise
+    // newly-completed summaries (linked but not yet summarized at generation
+    // time) would never trigger a regeneration via the action's staleness gate.
+    const includedEpisodeCount = episodeRows.length;
     const now = new Date();
     const [upserted] = await db
       .insert(canonicalTopicDigests)
@@ -199,7 +204,7 @@ export const generateTopicDigest = task({
         consensusPoints: parsed.consensus_points,
         disagreementPoints: parsed.disagreement_points,
         episodeIds,
-        episodeCountAtGeneration: derivedCount,
+        episodeCountAtGeneration: includedEpisodeCount,
         modelUsed,
         generatedAt: now,
       })
@@ -210,7 +215,7 @@ export const generateTopicDigest = task({
           consensusPoints: parsed.consensus_points,
           disagreementPoints: parsed.disagreement_points,
           episodeIds,
-          episodeCountAtGeneration: derivedCount,
+          episodeCountAtGeneration: includedEpisodeCount,
           modelUsed,
           generatedAt: now,
         },
@@ -221,14 +226,14 @@ export const generateTopicDigest = task({
     metadata.root.increment("digests.generated", 1);
     metadata.set("progress", {
       canonicalId: canonicalTopicId,
-      episodeCount: derivedCount,
+      episodeCount: includedEpisodeCount,
       modelUsed,
     });
 
     logger.info("[generate-topic-digest] digest generated", {
       canonicalTopicId,
       digestId: upserted.id,
-      episodeCount: derivedCount,
+      episodeCount: includedEpisodeCount,
       modelUsed,
     });
 
@@ -236,7 +241,7 @@ export const generateTopicDigest = task({
       status: "generated",
       digestId: upserted.id,
       modelUsed,
-      episodeCount: derivedCount,
+      episodeCount: includedEpisodeCount,
       durationMs: Date.now() - startMs,
     };
   },

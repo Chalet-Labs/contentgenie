@@ -252,11 +252,14 @@ describe("generate-topic-digest task", () => {
     expect(result.episodeCount).toBe(5);
     expect(result.modelUsed).toBe("mock-model");
 
-    // UPSERT must include correct episodeCountAtGeneration (derived count = 5, NOT episode read length)
+    // UPSERT records the count of episodes whose summaries were actually fed
+    // into the LLM (episodeRows.length), NOT the linked-episode count. Linked
+    // episodes whose summaries are still in flight are correctly excluded so
+    // that the action's staleness gate can detect when they later complete.
     expect(mockDbInsert).toHaveBeenCalledOnce();
     const upsertArg = mockValues.mock.calls[0][0];
-    expect(upsertArg.episodeCountAtGeneration).toBe(5);
-    expect(upsertArg.episodeIds).toHaveLength(5);
+    expect(upsertArg.episodeCountAtGeneration).toBe(VALID_EPISODES.length);
+    expect(upsertArg.episodeIds).toHaveLength(VALID_EPISODES.length);
     expect(upsertArg.modelUsed).toBe("mock-model");
 
     expect(mockMetadataIncrement).toHaveBeenCalledWith("digests.generated", 1);
@@ -365,7 +368,11 @@ describe("generate-topic-digest task", () => {
     expect(result.status).toBe("generated");
     expect(mockGenerateCompletion).toHaveBeenCalledOnce();
     const upsertArg = mockValues.mock.calls[0][0];
-    expect(upsertArg.episodeCountAtGeneration).toBe(6); // derived count, not read length
+    // Stored count = episodes actually digested (episodeRows.length), not the
+    // raw linked count. With a derived count of 6 but only the 5 fixture
+    // summaries returned, the persisted count is 5 — staleness gates downstream
+    // will only treat further completions as new growth.
+    expect(upsertArg.episodeCountAtGeneration).toBe(VALID_EPISODES.length);
   });
 
   // ── Case 6: Insufficient valid summaries ─────────────────────────────────────

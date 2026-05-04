@@ -36,7 +36,7 @@ import type { ActionResult } from "@/types/action-result";
 import type { summarizeEpisode } from "@/trigger/summarize-episode";
 import type { generateTopicDigest } from "@/trigger/generate-topic-digest";
 import { withAuthAction } from "@/lib/auth-wrapper";
-import { canonicalTopicEpisodeCount } from "@/lib/admin/canonical-topic-episode-count";
+import { canonicalTopicCompletedSummaryCount } from "@/lib/admin/canonical-topic-episode-count";
 import {
   MIN_DERIVED_COUNT_FOR_DIGEST,
   STALENESS_GROWTH_THRESHOLD,
@@ -518,7 +518,7 @@ export async function triggerTopicDigestGeneration(input: {
         .select({
           id: canonicalTopics.id,
           status: canonicalTopics.status,
-          episodeCount: canonicalTopicEpisodeCount(),
+          completedSummaryCount: canonicalTopicCompletedSummaryCount(),
         })
         .from(canonicalTopics)
         .where(eq(canonicalTopics.id, canonicalTopicId)),
@@ -537,10 +537,15 @@ export async function triggerTopicDigestGeneration(input: {
       return { success: false, error: "not-found" };
     }
 
-    const derivedCount = canonical.episodeCount;
+    // Both eligibility and staleness operate on completed-summary count to
+    // align with the task's `summaryStatus = 'completed'` predicate. Using the
+    // raw linked-episode count would let the action queue runs that the task
+    // then aborts (false-positive 'queued') and miss regenerations when new
+    // summaries complete without new links being added.
+    const completedSummaryCount = canonical.completedSummaryCount;
     const existing = digestRows[0] ?? null;
 
-    if (derivedCount < MIN_DERIVED_COUNT_FOR_DIGEST) {
+    if (completedSummaryCount < MIN_DERIVED_COUNT_FOR_DIGEST) {
       return {
         success: true,
         data: { status: "ineligible", digestId: existing?.id },
@@ -549,7 +554,7 @@ export async function triggerTopicDigestGeneration(input: {
 
     if (
       existing &&
-      Math.abs(derivedCount - existing.episodeCountAtGeneration) <
+      Math.abs(completedSummaryCount - existing.episodeCountAtGeneration) <
         STALENESS_GROWTH_THRESHOLD
     ) {
       return {
