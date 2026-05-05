@@ -1,6 +1,19 @@
 const rtf = new Intl.RelativeTimeFormat("en", { numeric: "auto" });
 
 /**
+ * Formats a Date as a short UTC date string (e.g. "Apr 5"). Used by trend
+ * charts where the bucket key is a UTC midnight boundary and rendering it in
+ * local time would shift the label off the underlying bucket.
+ */
+export function formatUtcShortDate(date: Date): string {
+  return date.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    timeZone: "UTC",
+  });
+}
+
+/**
  * Formats a Date as a human-readable relative time string (e.g. "5 minutes ago").
  * Covers minutes, hours, days, months, and years.
  */

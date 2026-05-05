@@ -242,6 +242,11 @@ describe("runReconciliation", () => {
       actor: "reconcile-canonicals",
     });
     expect(db.remaining()).toBe(0);
+    // F12: both clusters fully merged → outcome="merged" for each.
+    expect(summary.clusterAudits.map((a) => a.outcome)).toEqual([
+      "merged",
+      "merged",
+    ]);
   });
 
   // (c) winner_id null → cluster skipped
@@ -266,6 +271,9 @@ describe("runReconciliation", () => {
     expect(mergeCanonicalsMock).not.toHaveBeenCalled();
     // Only the winner-pick LLM call should have fired (no Stage B).
     expect(generateCompletion).toHaveBeenCalledTimes(1);
+    // F12: pickWinner returned skip (null) → outcome="skipped".
+    expect(summary.clusterAudits).toHaveLength(1);
+    expect(summary.clusterAudits[0].outcome).toBe("skipped");
   });
 
   // (d) winner_id not in cluster (model hallucination guard)
@@ -286,6 +294,9 @@ describe("runReconciliation", () => {
     expect(summary.mergesExecuted).toBe(0);
     expect(mergeCanonicalsMock).not.toHaveBeenCalled();
     expect(generateCompletion).toHaveBeenCalledTimes(1);
+    // F12: winnerId not a member → pickWinner returned skip → outcome="skipped".
+    expect(summary.clusterAudits).toHaveLength(1);
+    expect(summary.clusterAudits[0].outcome).toBe("skipped");
   });
 
   // (e) partial-accept: loser1 yes, loser2 no
@@ -324,6 +335,9 @@ describe("runReconciliation", () => {
       winnerId: 1,
       actor: "reconcile-canonicals",
     });
+    // F12: 1 verified merged + 1 model-rejected → outcome="partial".
+    expect(summary.clusterAudits).toHaveLength(1);
+    expect(summary.clusterAudits[0].outcome).toBe("partial");
   });
 
   // (e2) full reject: both losers no
@@ -351,6 +365,40 @@ describe("runReconciliation", () => {
     expect(summary.pairwiseVerifyThrew).toBe(0);
     expect(summary.episodeCountDrift).toBe(0);
     expect(mergeCanonicalsMock).not.toHaveBeenCalled();
+    // F12: all losers model-rejected, none verified → outcome="rejected".
+    expect(summary.clusterAudits).toHaveLength(1);
+    expect(summary.clusterAudits[0].outcome).toBe("rejected");
+  });
+
+  // F7+F12: All-throws case → outcome="rejected" (was "partial" before fix).
+  it("(F7) all verify-throws with no verified losers → outcome=rejected", async () => {
+    // Cluster of 3 — pick winner=1; both verify calls throw. With F7, the
+    // outcome must be "rejected" (throws act as rejection signal). Previously
+    // the condition gated only on `pairwiseVerifyRejected > 0`, so this case
+    // fell through to "partial".
+    const generateCompletion = vi
+      .fn()
+      .mockResolvedValueOnce(JSON.stringify({ winner_id: 1 }))
+      .mockRejectedValueOnce(new Error("openrouter blip 1"))
+      .mockRejectedValueOnce(new Error("openrouter blip 2"));
+
+    const { deps, mergeCanonicalsMock } = buildDeps({
+      rows: [row(1), row(2), row(3)],
+      clusters: [[1, 2, 3]],
+      generateCompletion,
+      decayRows: [],
+    });
+
+    const summary = await runReconciliation(deps);
+
+    expect(summary.pairwiseVerifyThrew).toBe(2);
+    expect(summary.pairwiseVerifyRejected).toBe(0);
+    expect(summary.mergesExecuted).toBe(0);
+    expect(mergeCanonicalsMock).not.toHaveBeenCalled();
+    // F7: throws + no verified losers → cluster counts as rejected.
+    expect(summary.mergesRejectedByPairwise).toBe(1);
+    expect(summary.clusterAudits).toHaveLength(1);
+    expect(summary.clusterAudits[0].outcome).toBe("rejected");
   });
 
   // (f) verify throws on one loser, sibling verified loser still merges
@@ -434,6 +482,12 @@ describe("runReconciliation", () => {
     expect(summary.mergesFailed).toBe(1);
     // Only winner=3 is in affectedWinners; drift = 7 - 5 = 2.
     expect(summary.episodeCountDrift).toBe(2);
+    // F12: cluster A — verify yes but merge throws → mergesExecuted=0 against
+    // verifiedLoserIds.length=1 → outcome="partial". Cluster B fully merged.
+    expect(summary.clusterAudits.map((a) => a.outcome)).toEqual([
+      "partial",
+      "merged",
+    ]);
   });
 
   // (h) drift delta value
@@ -621,6 +675,11 @@ describe("runReconciliation", () => {
     // pairwise verify).
     expect(generateCompletion).toHaveBeenCalledTimes(3);
     expect(summary.episodeCountDrift).toBe(2);
+    // F12: cluster A merged, cluster B skipped (winner already merged).
+    expect(summary.clusterAudits.map((a) => a.outcome)).toEqual([
+      "merged",
+      "skipped",
+    ]);
   });
 
   // (k3) Multi-step merge chain — cluster A merges 3→2, cluster B merges 2→1.
@@ -678,6 +737,87 @@ describe("runReconciliation", () => {
     expect(summary.episodeCountDrift).toBe(2);
   });
 
+  // F12: catch path — generic phase throw produces outcome="failed".
+  // Covered by the existing "winner-pick throw" test below; verify outcome
+  // there. Also verify outcome="failed" for the winner-pick throw cluster.
+
+  // F12: members.length < 2 → outcome="skipped"
+  it("(F12) cluster with fewer than 2 fetchable members → outcome=skipped", async () => {
+    // Single-ID cluster (DBSCAN typically wouldn't emit this, but the fail-safe
+    // exists; the orchestrator still records an audit row).
+    const generateCompletion = vi.fn();
+    const { deps, mergeCanonicalsMock } = buildDeps({
+      rows: [row(1)],
+      clusters: [[1]],
+      generateCompletion,
+      decayRows: [],
+    });
+
+    const summary = await runReconciliation(deps);
+
+    expect(generateCompletion).not.toHaveBeenCalled();
+    expect(mergeCanonicalsMock).not.toHaveBeenCalled();
+    expect(summary.clusterAudits).toHaveLength(1);
+    expect(summary.clusterAudits[0].outcome).toBe("skipped");
+    expect(summary.clusterAudits[0].clusterSize).toBe(1);
+  });
+
+  // F12: pickWinner returns a winner id present in cluster but absent from
+  // rowsById → "winner row missing" branch → outcome="failed".
+  it("(F12) winner row missing from rowsById after pickWinner → outcome=failed", async () => {
+    // rowsById has id=1 only; cluster carries [1, 2, 3]; pickWinner returns
+    // winner=2 (in cluster, but no fetched row). membersOf yields a 1-member
+    // list (only id=1 has a row), which would normally be < 2 and skip — so
+    // we keep cluster with 2 fetched ids [1, 99] and have pickWinner return
+    // 99. Both ids are in cluster; only id=1 is in rowsById. members.length=1
+    // → < 2 → "skipped". To exercise the "winner row missing" branch we need
+    // members.length >= 2 with a winnerId not in rowsById.
+    //
+    // Phase 1 returns 3 rows (1, 2, 3); cluster references [1, 2, 99]. So
+    // members built from rowsById has 2 entries (1, 2) → length>=2. pickWinner
+    // returns winner=99 which IS in cluster — passes inclusion check — but
+    // rowsById.get(99) is undefined → "failed".
+    const generateCompletion = vi
+      .fn()
+      .mockResolvedValueOnce(JSON.stringify({ winner_id: 99 }));
+
+    const { deps, mergeCanonicalsMock } = buildDeps({
+      rows: [row(1), row(2), row(3)],
+      clusters: [[1, 2, 99]],
+      generateCompletion,
+      decayRows: [],
+    });
+
+    const summary = await runReconciliation(deps);
+
+    expect(mergeCanonicalsMock).not.toHaveBeenCalled();
+    expect(summary.clustersFailed).toBe(1);
+    expect(summary.clusterAudits).toHaveLength(1);
+    expect(summary.clusterAudits[0].outcome).toBe("failed");
+    expect(summary.clusterAudits[0].winnerId).toBe(99);
+  });
+
+  // F12: members.length < 2 (cluster ids missing from rowsById) → outcome="skipped"
+  it("(F12) cluster ids absent from fetched rows → membersOf yields <2 → outcome=skipped", async () => {
+    // The cluster references ids 99 and 100, but only id=1 was fetched in
+    // Phase 1. membersOf filters out ids without a row, leaving 0 members
+    // → members.length < 2 → "skipped".
+    const generateCompletion = vi.fn();
+    const { deps, mergeCanonicalsMock } = buildDeps({
+      rows: [row(1)],
+      clusters: [[99, 100]],
+      generateCompletion,
+      decayRows: [],
+    });
+
+    const summary = await runReconciliation(deps);
+
+    expect(generateCompletion).not.toHaveBeenCalled();
+    expect(mergeCanonicalsMock).not.toHaveBeenCalled();
+    expect(summary.clusterAudits).toHaveLength(1);
+    expect(summary.clusterAudits[0].outcome).toBe("skipped");
+  });
+
   // Fix 8: Phase 3 winner-pick throw → clustersFailed isolation
   it("isolates Phase 3 winner-pick throws to clustersFailed and continues", async () => {
     // Two clusters. Cluster A's winner-pick throws (LLM 500); cluster B
@@ -731,6 +871,13 @@ describe("runReconciliation", () => {
     expect(payload.memberIds).toEqual([1, 2]);
     expect(payload.winnerId).toBeNull();
     expect(typeof payload.error).toBe("string");
+
+    // F12: cluster A took the catch path → outcome="failed".
+    // Cluster B fully merged → outcome="merged".
+    expect(summary.clusterAudits.map((a) => a.outcome)).toEqual([
+      "failed",
+      "merged",
+    ]);
   });
 
   // F2: malformed embedding rows are dropped, malformedEmbeddingCount increments

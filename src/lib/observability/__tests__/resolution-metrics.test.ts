@@ -500,127 +500,117 @@ describe("detectThresholdDrift", () => {
     vi.clearAllMocks();
   });
 
-  it("returns status=ok when auto rate exceeds warn threshold and disambig rate is below warn threshold", async () => {
+  it("returns status=ok when auto rate exceeds warn threshold and disambig rate is below warn threshold", () => {
     // auto=60/100=0.60 >= WARN(0.55), disambig=20/100=0.20 <= WARN(0.30)
-    mockSelect.mockReturnValue(
-      makeChain([
-        { matchMethod: "auto", count: 60 },
-        { matchMethod: "llm_disambig", count: 20 },
-        { matchMethod: "new", count: 20 },
-      ]),
-    );
-    const window = {
-      start: new Date("2026-01-01"),
-      end: new Date("2026-01-07"),
-    };
-    const result = await detectThresholdDrift(window);
+    const result = detectThresholdDrift({
+      auto: 60,
+      llm_disambig: 20,
+      new: 20,
+    });
     expect(result.status).toBe("ok");
     expect(result).toHaveProperty("reason");
     expect(result).toHaveProperty("rates");
     expect(result.rates.total).toBe(100);
   });
 
-  it("returns status=warn when auto rate is between floor and warn threshold", async () => {
+  it("returns status=warn when auto rate is between floor and warn threshold", () => {
     // auto=45/100=0.45 — below warn (0.55) but above floor (0.40) → warn
-    mockSelect.mockReturnValue(
-      makeChain([
-        { matchMethod: "auto", count: 45 },
-        { matchMethod: "llm_disambig", count: 25 },
-        { matchMethod: "new", count: 30 },
-      ]),
-    );
-    const window = {
-      start: new Date("2026-01-01"),
-      end: new Date("2026-01-07"),
-    };
-    const result = await detectThresholdDrift(window);
+    const result = detectThresholdDrift({
+      auto: 45,
+      llm_disambig: 25,
+      new: 30,
+    });
     expect(result.status).toBe("warn");
     expect(result.reason).toMatch(/auto/i);
   });
 
-  it("returns status=warn when disambig rate is between warn and ceiling threshold", async () => {
+  it("returns status=warn when disambig rate is between warn and ceiling threshold", () => {
     // disambig=35/100=0.35 — above warn (0.30) but below ceiling (0.40) → warn
-    mockSelect.mockReturnValue(
-      makeChain([
-        { matchMethod: "auto", count: 60 },
-        { matchMethod: "llm_disambig", count: 35 },
-        { matchMethod: "new", count: 5 },
-      ]),
-    );
-    const window = {
-      start: new Date("2026-01-01"),
-      end: new Date("2026-01-07"),
-    };
-    const result = await detectThresholdDrift(window);
+    const result = detectThresholdDrift({
+      auto: 60,
+      llm_disambig: 35,
+      new: 5,
+    });
     expect(result.status).toBe("warn");
     expect(result.reason).toMatch(/disambig/i);
   });
 
-  it("returns status=alert when auto rate drops below the alert floor", async () => {
+  it("returns status=alert when auto rate drops below the alert floor", () => {
     // auto=30/100=0.30 < floor (0.40) → alert
-    mockSelect.mockReturnValue(
-      makeChain([
-        { matchMethod: "auto", count: 30 },
-        { matchMethod: "llm_disambig", count: 40 },
-        { matchMethod: "new", count: 30 },
-      ]),
-    );
-    const window = {
-      start: new Date("2026-01-01"),
-      end: new Date("2026-01-07"),
-    };
-    const result = await detectThresholdDrift(window);
+    const result = detectThresholdDrift({
+      auto: 30,
+      llm_disambig: 40,
+      new: 30,
+    });
     expect(result.status).toBe("alert");
     expect(result.reason).toMatch(/auto/i);
     expect(result.reason).toMatch(/0\.3/);
   });
 
-  it("returns status=alert when disambig rate exceeds the ceiling threshold", async () => {
+  it("returns status=alert when disambig rate exceeds the ceiling threshold", () => {
     // disambig=45/100=0.45 > ceiling (0.40) → alert
-    mockSelect.mockReturnValue(
-      makeChain([
-        { matchMethod: "auto", count: 55 },
-        { matchMethod: "llm_disambig", count: 45 },
-        { matchMethod: "new", count: 0 },
-      ]),
-    );
-    const window = {
-      start: new Date("2026-01-01"),
-      end: new Date("2026-01-07"),
-    };
-    const result = await detectThresholdDrift(window);
+    const result = detectThresholdDrift({
+      auto: 55,
+      llm_disambig: 45,
+      new: 0,
+    });
     expect(result.status).toBe("alert");
     expect(result.reason).toMatch(/disambig/i);
     expect(result.reason).toMatch(/0\.45/);
   });
 
-  it("returns status=ok with total=0 when window has no resolutions (divide-by-zero guard)", async () => {
-    mockSelect.mockReturnValue(makeChain([]));
-    const window = {
-      start: new Date("2026-01-01"),
-      end: new Date("2026-01-07"),
-    };
-    const result = await detectThresholdDrift(window);
+  it("returns status=ok with total=0 when histogram is empty (divide-by-zero guard)", () => {
+    const result = detectThresholdDrift({ auto: 0, llm_disambig: 0, new: 0 });
     expect(result.status).toBe("ok");
     expect(result.rates.total).toBe(0);
     expect(result.rates.auto).toBe(0);
     expect(result.rates.disambig).toBe(0);
   });
 
-  it("alert wins over warn when both auto and disambig are in violation", async () => {
+  it("alert wins over warn when both auto and disambig are in violation", () => {
     // auto=25/100=0.25 < floor (0.40) AND disambig=45/100=0.45 > ceiling (0.40)
-    mockSelect.mockReturnValue(
-      makeChain([
-        { matchMethod: "auto", count: 25 },
-        { matchMethod: "llm_disambig", count: 45 },
-        { matchMethod: "new", count: 30 },
-      ]),
-    );
-    const window = {
-      start: new Date("2026-01-01"),
-      end: new Date("2026-01-07"),
-    };
-    const result = await detectThresholdDrift(window);
+    const result = detectThresholdDrift({
+      auto: 25,
+      llm_disambig: 45,
+      new: 30,
+    });
     expect(result.status).toBe("alert");
+  });
+
+  // F10 — boundary cases for `<` vs `<=` regressions.
+  it.each<
+    [
+      string,
+      Parameters<typeof detectThresholdDrift>[0],
+      "ok" | "warn" | "alert",
+    ]
+  >([
+    // autoRate === FLOOR (0.4) → warn (NOT alert). `< FLOOR` is strict.
+    [
+      "autoRate === FLOOR(0.4) → warn",
+      { auto: 40, llm_disambig: 30, new: 30 },
+      "warn",
+    ],
+    // autoRate === WARN (0.55) → ok (NOT warn). `< WARN` is strict.
+    [
+      "autoRate === WARN(0.55) → ok",
+      { auto: 55, llm_disambig: 25, new: 20 },
+      "ok",
+    ],
+    // disambigRate === CEILING (0.4) → warn (NOT alert). `> CEILING` is strict.
+    // auto=60 keeps autoRate healthy so the disambig branch is the one tested.
+    [
+      "disambigRate === CEILING(0.4) → warn",
+      { auto: 60, llm_disambig: 40, new: 0 },
+      "warn",
+    ],
+    // disambigRate === WARN (0.3) → ok (NOT warn). `> WARN` is strict.
+    [
+      "disambigRate === WARN(0.3) → ok",
+      { auto: 60, llm_disambig: 30, new: 10 },
+      "ok",
+    ],
+  ])("boundary %s", (_label, histogram, expected) => {
+    expect(detectThresholdDrift(histogram).status).toBe(expected);
   });
 });

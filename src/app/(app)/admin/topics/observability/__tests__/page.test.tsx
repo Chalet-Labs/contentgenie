@@ -92,7 +92,7 @@ function setupDefaultMocks() {
   });
   mockGetMatchMethodTrend.mockResolvedValue([]);
   mockGetSimilarityTrend.mockResolvedValue([]);
-  mockDetectThresholdDrift.mockResolvedValue({
+  mockDetectThresholdDrift.mockReturnValue({
     status: "ok",
     reason: "All metrics within healthy bounds",
     rates: { auto: 0.5, disambig: 0.3, new: 0.2, total: 100 },

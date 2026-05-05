@@ -60,7 +60,6 @@ export default async function ObservabilityPage({
     disambigForced,
     matchMethodTrend,
     similarityTrend,
-    driftResult,
     auditLog,
   ] = await Promise.all([
     getMatchMethodHistogram(window),
@@ -68,9 +67,12 @@ export default async function ObservabilityPage({
     getDisambigForcedCount(window),
     getMatchMethodTrend(window, granularity),
     getSimilarityTrend(window, granularity),
-    detectThresholdDrift(window),
     getReconciliationAuditLog(window),
   ]);
+
+  // Drift derives from the same match-method histogram already fetched above —
+  // pass it in instead of issuing a duplicate query.
+  const driftResult = detectThresholdDrift(matchMethod);
 
   const matchMethodTotal = MATCH_METHODS.reduce(
     (sum, m) => sum + matchMethod[m],

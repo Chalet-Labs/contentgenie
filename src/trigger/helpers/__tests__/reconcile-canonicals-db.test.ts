@@ -6,7 +6,7 @@
  * `reconcile-canonicals.test.ts` covers the same SQL through `runReconciliation`.
  */
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   RECONCILE_DECAY_DAYS,
@@ -17,7 +17,10 @@ import {
   countEpisodesForCanonical,
   decayStaleCanonicals,
   fetchActiveCanonicals,
+  insertReconciliationAuditRows,
+  type DbInserter,
 } from "@/trigger/helpers/reconcile-canonicals-db";
+import type { ClusterAuditRow } from "@/trigger/helpers/reconcile-summary-accumulator";
 import { makeDbExecuteStub } from "@/test/db-execute-stub";
 import { serializeSql } from "@/test/sql-fixture-queue";
 
@@ -180,5 +183,67 @@ describe("decayStaleCanonicals", () => {
   it("returns 0 when no rows decay", async () => {
     const { db } = makeDbExecuteStub([{ rows: [] }]);
     expect(await decayStaleCanonicals(db)).toBe(0);
+  });
+});
+
+describe("insertReconciliationAuditRows", () => {
+  function makeInserter() {
+    const valuesSpy = vi.fn().mockResolvedValue(undefined);
+    const insertSpy = vi.fn(() => ({ values: valuesSpy }));
+    const db = { insert: insertSpy } as unknown as DbInserter;
+    return { db, insertSpy, valuesSpy };
+  }
+
+  function makeAudit(
+    overrides: Partial<ClusterAuditRow> = {},
+  ): ClusterAuditRow {
+    return {
+      clusterIndex: 0,
+      clusterSize: 2,
+      winnerId: 1,
+      loserIds: [2],
+      verifiedLoserIds: [2],
+      rejectedLoserIds: [],
+      mergesExecuted: 1,
+      mergesRejected: 0,
+      pairwiseVerifyThrew: 0,
+      outcome: "merged",
+      ...overrides,
+    };
+  }
+
+  it("no-ops when audits is empty (insert is never called)", async () => {
+    const { db, insertSpy, valuesSpy } = makeInserter();
+    await insertReconciliationAuditRows(db, "run-123", []);
+    expect(insertSpy).not.toHaveBeenCalled();
+    expect(valuesSpy).not.toHaveBeenCalled();
+  });
+
+  it("applies the runId to every row in the batch", async () => {
+    const { db, insertSpy, valuesSpy } = makeInserter();
+    const audits = [
+      makeAudit({ clusterIndex: 0, outcome: "merged" }),
+      makeAudit({ clusterIndex: 1, outcome: "partial" }),
+      makeAudit({ clusterIndex: 2, outcome: "rejected" }),
+    ];
+    await insertReconciliationAuditRows(db, "run-xyz", audits);
+
+    expect(insertSpy).toHaveBeenCalledTimes(1);
+    expect(valuesSpy).toHaveBeenCalledTimes(1);
+
+    const passed = valuesSpy.mock.calls[0][0] as Array<
+      ClusterAuditRow & { runId: string }
+    >;
+    expect(passed).toHaveLength(3);
+    for (const row of passed) {
+      expect(row.runId).toBe("run-xyz");
+    }
+    // Audit fields are preserved verbatim alongside the injected runId.
+    expect(passed.map((r) => r.clusterIndex)).toEqual([0, 1, 2]);
+    expect(passed.map((r) => r.outcome)).toEqual([
+      "merged",
+      "partial",
+      "rejected",
+    ]);
   });
 });
