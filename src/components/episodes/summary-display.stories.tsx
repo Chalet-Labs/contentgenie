@@ -138,7 +138,7 @@ export const WithCanonicalOverlapNew: Story = {
   },
 };
 
-export const WithCanonicalNullEmptyState: Story = {
+export const WithCategoryFallback: Story = {
   args: {
     ...FullSummary.args,
     canonicalOverlap: null,

@@ -282,8 +282,7 @@ describe("SummaryDisplay", () => {
           overlapLabelKind={null}
         />,
       );
-      // category block doesn't render when overlapLabel is null — the existing behavior
-      expect(screen.queryByText(/heard.*similar|New:/)).not.toBeInTheDocument();
+      expect(screen.queryByTestId("overlap-indicator")).not.toBeInTheDocument();
     });
   });
 });

@@ -189,7 +189,7 @@ export const WithCanonicalOverlapNew: Story = {
   },
 };
 
-export const WithCanonicalNullEmptyState: Story = {
+export const WithCategoryFallback: Story = {
   args: {
     episodes: sampleEpisodes.map((e) => ({ ...e, canonicalOverlap: null })),
   },
