@@ -13,9 +13,12 @@ export async function fetchCanonicalOverlapsBatched(
   ids: PodcastIndexEpisodeId[],
 ): Promise<Record<PodcastIndexEpisodeId, CanonicalOverlapResult | null>> {
   if (ids.length === 0)
-    return {} as Record<PodcastIndexEpisodeId, CanonicalOverlapResult | null>;
+    return Object.create(null) as Record<
+      PodcastIndexEpisodeId,
+      CanonicalOverlapResult | null
+    >;
 
-  const merged = {} as Record<
+  const merged = Object.create(null) as Record<
     PodcastIndexEpisodeId,
     CanonicalOverlapResult | null
   >;

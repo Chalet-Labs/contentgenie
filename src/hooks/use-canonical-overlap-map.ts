@@ -17,7 +17,7 @@ export function useCanonicalOverlapMap(
 ): CanonicalOverlapMap {
   const { enabled = true } = options;
   const [map, setMap] = useState<CanonicalOverlapMap>({});
-  const idsKey = ids.join(",");
+  const idsKey = JSON.stringify(ids);
   const seqRef = useRef(0);
 
   useEffect(() => {
