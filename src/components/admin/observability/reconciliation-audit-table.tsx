@@ -48,34 +48,6 @@ function OutcomeBadge({ outcome }: { outcome: Outcome }) {
 export function ReconciliationAuditTable({
   entries,
 }: ReconciliationAuditTableProps) {
-  if (entries.length === 0) {
-    return (
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Timestamp</TableHead>
-            <TableHead>Cluster</TableHead>
-            <TableHead>Size</TableHead>
-            <TableHead>Winner</TableHead>
-            <TableHead>Verified / Rejected</TableHead>
-            <TableHead>Merges</TableHead>
-            <TableHead>Outcome</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          <TableRow>
-            <TableCell
-              colSpan={7}
-              className="text-center text-sm text-muted-foreground"
-            >
-              No reconciliation activity in this window.
-            </TableCell>
-          </TableRow>
-        </TableBody>
-      </Table>
-    );
-  }
-
   return (
     <Table>
       <TableHeader>
@@ -90,39 +62,50 @@ export function ReconciliationAuditTable({
         </TableRow>
       </TableHeader>
       <TableBody>
-        {entries.map((entry) => (
-          <TableRow key={entry.id}>
-            <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
-              {relativeTime(entry.createdAt)}
-            </TableCell>
-            <TableCell className="text-sm">#{entry.clusterIndex}</TableCell>
-            <TableCell className="text-sm">{entry.clusterSize}</TableCell>
-            <TableCell className="text-sm">
-              {entry.winnerId !== null ? entry.winnerId : "—"}
-            </TableCell>
-            <TableCell className="text-sm">
-              <span className="text-emerald-700">
-                {entry.verifiedLoserIds.length}
-              </span>
-              {" / "}
-              <span
-                className={
-                  entry.rejectedLoserIds.length > 0
-                    ? "text-destructive"
-                    : "text-muted-foreground"
-                }
-              >
-                {entry.rejectedLoserIds.length}
-              </span>
-            </TableCell>
-            <TableCell className="text-sm">
-              {entry.mergesExecuted} / {entry.mergesRejected}
-            </TableCell>
-            <TableCell>
-              <OutcomeBadge outcome={entry.outcome} />
+        {entries.length === 0 ? (
+          <TableRow>
+            <TableCell
+              colSpan={7}
+              className="text-center text-sm text-muted-foreground"
+            >
+              No reconciliation activity in this window.
             </TableCell>
           </TableRow>
-        ))}
+        ) : (
+          entries.map((entry) => (
+            <TableRow key={entry.id}>
+              <TableCell className="whitespace-nowrap text-sm text-muted-foreground">
+                {relativeTime(entry.createdAt)}
+              </TableCell>
+              <TableCell className="text-sm">#{entry.clusterIndex}</TableCell>
+              <TableCell className="text-sm">{entry.clusterSize}</TableCell>
+              <TableCell className="text-sm">
+                {entry.winnerId !== null ? entry.winnerId : "—"}
+              </TableCell>
+              <TableCell className="text-sm">
+                <span className="text-emerald-700">
+                  {entry.verifiedLoserIds.length}
+                </span>
+                {" / "}
+                <span
+                  className={
+                    entry.rejectedLoserIds.length > 0
+                      ? "text-destructive"
+                      : "text-muted-foreground"
+                  }
+                >
+                  {entry.rejectedLoserIds.length}
+                </span>
+              </TableCell>
+              <TableCell className="text-sm">
+                {entry.mergesExecuted} / {entry.mergesRejected}
+              </TableCell>
+              <TableCell>
+                <OutcomeBadge outcome={entry.outcome} />
+              </TableCell>
+            </TableRow>
+          ))
+        )}
       </TableBody>
     </Table>
   );

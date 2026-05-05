@@ -1,4 +1,5 @@
 import { cn } from "@/lib/utils";
+import { formatUtcShortDate } from "@/lib/admin/format-utils";
 import type { SimilarityTrendEntry } from "@/lib/observability/resolution-metrics";
 
 interface SimilarityTrendHeatmapProps {
@@ -7,6 +8,13 @@ interface SimilarityTrendHeatmapProps {
 
 const NUM_BUCKETS = 20;
 const BUCKET_STEP = 0.05;
+// X-axis tick positions: render labels only at the start, midpoint, and end of
+// the bucket range so adjacent labels don't visually collide.
+const TICK_INDICES: readonly number[] = [
+  0,
+  Math.floor(NUM_BUCKETS / 2),
+  NUM_BUCKETS - 1,
+];
 
 type Quartile = 0 | 1 | 2 | 3 | 4;
 
@@ -28,14 +36,6 @@ const BG_CLASS: Record<Quartile, string> = {
   3: "bg-indigo-600/80",
   4: "bg-indigo-600",
 };
-
-function shortDate(d: Date): string {
-  return d.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    timeZone: "UTC",
-  });
-}
 
 /** Ensure each entry carries exactly NUM_BUCKETS similarity buckets. */
 function normalizeBuckets(entry: SimilarityTrendEntry): number[] {
@@ -76,7 +76,7 @@ export function SimilarityTrendHeatmap({
               key={i}
               className="w-5 shrink-0 text-center text-[9px] leading-none text-muted-foreground"
             >
-              {i === 0 || i === 10 || i === 19 ? label : ""}
+              {TICK_INDICES.includes(i) ? label : ""}
             </span>
           ))}
         </div>
@@ -88,7 +88,7 @@ export function SimilarityTrendHeatmap({
             data-testid="heatmap-row"
           >
             <span className="w-16 shrink-0 text-right text-xs text-muted-foreground">
-              {shortDate(row.bucket)}
+              {formatUtcShortDate(row.bucket)}
             </span>
             {row.counts.map((count, colIdx) => {
               const q = toQuartile(count, globalMax);

@@ -3,8 +3,9 @@ import "server-only";
 import { db } from "@/db";
 import { reconciliationLog } from "@/db/schema";
 import { sql, gte, lte, and } from "drizzle-orm";
-import type { WindowKey } from "@/lib/search-params/admin-topics-observability";
 import type { ReconciliationLog } from "@/db/schema";
+
+export type { WindowKey } from "@/lib/search-params/admin-topics-observability";
 
 export type ReconciliationAuditEntry = ReconciliationLog;
 
@@ -38,10 +39,3 @@ export async function getReconciliationAuditLog(
 
   return timeFilter ? query.where(timeFilter) : query;
 }
-
-/**
- * Convenience wrapper that builds the window from a named `WindowKey` before
- * calling `getReconciliationAuditLog`. Mirrors the helper in resolution-metrics
- * so page server components can call this without importing `windowFromKey`.
- */
-export type { WindowKey };

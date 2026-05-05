@@ -180,7 +180,7 @@ export async function getDisambigForcedCount(window?: {
 }): Promise<DisambigForcedCount> {
   const timeFilter = buildTimeFilter(window);
 
-  const result = await db
+  const query = db
     .select({
       total: count().mapWith(Number),
       forced:
@@ -188,8 +188,9 @@ export async function getDisambigForcedCount(window?: {
           Number,
         ),
     })
-    .from(episodeCanonicalTopics)
-    .where(timeFilter);
+    .from(episodeCanonicalTopics);
+
+  const result = await (timeFilter ? query.where(timeFilter) : query);
 
   const row = result[0];
   return { total: row?.total ?? 0, versionTokenForced: row?.forced ?? 0 };
@@ -355,44 +356,60 @@ export async function getSimilarityTrend(
     .groupBy(sql`1`, sql`2`);
 
   // Group by time bucket, collecting similarity bucket counts
-  const byBucket = new Map<
-    string,
-    { date: Date; buckets: Map<number, number> }
-  >();
+  const byBucket = new Map<string, Map<number, number>>();
   for (const row of rows) {
     const bucket =
       row.bucket instanceof Date ? row.bucket : new Date(row.bucket as string);
     const key = bucket.toISOString();
-    if (!byBucket.has(key)) {
-      byBucket.set(key, { date: bucket, buckets: new Map() });
+    let counts = byBucket.get(key);
+    if (!counts) {
+      counts = new Map();
+      byBucket.set(key, counts);
     }
-    const entry = byBucket.get(key)!;
     const simIdx = Math.round(Number(row.similarityBucket) / bucketSize);
-    entry.buckets.set(simIdx, Number(row.count));
+    counts.set(simIdx, Number(row.count));
   }
 
-  // Reshape each time bucket into a full SimilarityBucket[]
-  return Array.from(byBucket.values()).map(({ date, buckets }) => {
-    const bucketArray: SimilarityBucket[] = [];
+  // Zero-fill every bucket in the window range so consumers always get the
+  // full time-bucket grid. Mirrors `getMatchMethodTrend`'s behavior — without
+  // this, the heatmap silently drops empty days/weeks and misaligns the X axis.
+  const emptyBuckets = (): SimilarityBucket[] => {
+    const arr: SimilarityBucket[] = [];
     for (let i = 0; i < numBuckets; i++) {
       const bucket = Math.round(i * bucketSize * 1e10) / 1e10;
-      bucketArray.push({ bucket, count: buckets.get(i) ?? 0 });
+      arr.push({ bucket, count: 0 });
     }
-    return { bucket: date, buckets: bucketArray };
+    return arr;
+  };
+
+  return generateBucketRange(window, granularity).map((bucket) => {
+    const key = bucket.toISOString();
+    const counts = byBucket.get(key);
+    if (!counts) {
+      return { bucket, buckets: emptyBuckets() };
+    }
+    const bucketArray: SimilarityBucket[] = [];
+    for (let i = 0; i < numBuckets; i++) {
+      const sim = Math.round(i * bucketSize * 1e10) / 1e10;
+      bucketArray.push({ bucket: sim, count: counts.get(i) ?? 0 });
+    }
+    return { bucket, buckets: bucketArray };
   });
 }
 
 /**
- * Derives the current drift status from the match-method histogram.
+ * Derives the current drift status from a match-method histogram.
  * Alert wins over warn when multiple thresholds are violated simultaneously.
  * Returns `status: "ok"` with `total === 0` to guard against divide-by-zero
  * on empty windows (ADR-053 §5).
+ *
+ * Pure of IO — pass the histogram in. The page server component fetches it
+ * once via `getMatchMethodHistogram(window)` and feeds the same value to both
+ * the distribution panel and this drift check, avoiding a redundant query.
  */
-export async function detectThresholdDrift(window?: {
-  start: Date;
-  end: Date;
-}): Promise<DriftResult> {
-  const histogram = await getMatchMethodHistogram(window);
+export function detectThresholdDrift(
+  histogram: MatchMethodHistogram,
+): DriftResult {
   const total = histogram.auto + histogram.llm_disambig + histogram.new;
 
   if (total === 0) {

@@ -94,8 +94,10 @@ export interface ReconcileSummary {
   mergesFailed: number;
   /**
    * Cluster-level: incremented at most once per cluster, and only when the
-   * cluster ended with ≥1 rejected pair AND zero verified losers (the
-   * cluster's grouping claim was rejected outright). ADR-050 §2.
+   * cluster ended with ≥1 verify signal (model `same_entity=false` OR an infra
+   * throw) AND zero verified losers (the cluster's grouping claim was rejected
+   * outright, even if rejection came from infra throws rather than the model).
+   * ADR-050 §2.
    */
   mergesRejectedByPairwise: number;
   mergesSkippedAlreadyMerged: number;
@@ -421,10 +423,15 @@ async function runCluster(
     perClusterPairwiseThrew = verify.pairwiseVerifyThrew;
     perClusterMergesRejected = verify.pairwiseVerifyRejected;
 
-    if (
-      verify.pairwiseVerifyRejected > 0 &&
-      verify.verifiedLoserIds.length === 0
-    ) {
+    // ADR-050 §2 + ADR-053 §1: a cluster is "rejected" when at least one
+    // verify call gave a verdict (model `same_entity=false` OR an infra throw)
+    // AND none of the losers passed verify. Throws are an infra signal that
+    // still preserves the R3 over-merge guard, so they count toward rejection.
+    const wasRejectedByPairwise =
+      verify.pairwiseVerifyRejected + verify.pairwiseVerifyThrew > 0 &&
+      verify.verifiedLoserIds.length === 0;
+
+    if (wasRejectedByPairwise) {
       accum.clusterRejectedByPairwise();
     }
 
@@ -443,10 +450,7 @@ async function runCluster(
 
     // Derive per-cluster outcome (ADR-053 §1)
     let outcome: ClusterAuditRow["outcome"];
-    if (
-      verify.pairwiseVerifyRejected > 0 &&
-      verify.verifiedLoserIds.length === 0
-    ) {
+    if (wasRejectedByPairwise) {
       outcome = "rejected";
     } else if (
       perClusterMergesExecuted === perClusterVerifiedLosers.length &&

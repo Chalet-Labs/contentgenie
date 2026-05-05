@@ -79,7 +79,8 @@ describe.skipIf(!process.env.DATABASE_URL)(
     });
 
     it("detectThresholdDrift returns a valid DriftResult", async () => {
-      const result = await detectThresholdDrift(window7d);
+      const histogram = await getMatchMethodHistogram(window7d);
+      const result = detectThresholdDrift(histogram);
       expect(["ok", "warn", "alert"]).toContain(result.status);
       expect(typeof result.reason).toBe("string");
       expect(result.reason.length).toBeGreaterThan(0);
@@ -97,7 +98,8 @@ describe.skipIf(!process.env.DATABASE_URL)(
         start: new Date("2000-01-01T00:00:00Z"),
         end: new Date("2000-01-01T00:00:01Z"),
       };
-      const result = await detectThresholdDrift(emptyWindow);
+      const histogram = await getMatchMethodHistogram(emptyWindow);
+      const result = detectThresholdDrift(histogram);
       expect(result.status).toBe("ok");
       expect(result.rates.total).toBe(0);
     });

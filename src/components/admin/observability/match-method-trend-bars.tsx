@@ -1,15 +1,8 @@
 import type { MatchMethodTrendEntry } from "@/lib/observability/resolution-metrics";
+import { formatUtcShortDate } from "@/lib/admin/format-utils";
 
 interface MatchMethodTrendBarsProps {
   entries: MatchMethodTrendEntry[];
-}
-
-function shortDate(d: Date): string {
-  return d.toLocaleDateString("en-US", {
-    month: "short",
-    day: "numeric",
-    timeZone: "UTC",
-  });
 }
 
 export function MatchMethodTrendBars({ entries }: MatchMethodTrendBarsProps) {
@@ -51,7 +44,7 @@ export function MatchMethodTrendBars({ entries }: MatchMethodTrendBarsProps) {
             data-testid="trend-row"
           >
             <span className="w-16 shrink-0 text-right text-xs text-muted-foreground">
-              {shortDate(entry.bucket)}
+              {formatUtcShortDate(entry.bucket)}
             </span>
             <div
               className="flex h-4 flex-1 overflow-hidden rounded-full bg-muted"
