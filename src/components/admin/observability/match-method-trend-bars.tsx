@@ -48,19 +48,23 @@ export function MatchMethodTrendBars({ entries }: MatchMethodTrendBarsProps) {
             </span>
             <div
               className="flex h-4 flex-1 overflow-hidden rounded-full bg-muted"
+              role="img"
               aria-label={`auto: ${entry.auto}, llm_disambig: ${entry.llm_disambig}, new: ${entry.new}`}
             >
               <div
                 className="h-full bg-blue-500"
                 style={{ width: `${autoPct}%` }}
+                aria-hidden="true"
               />
               <div
                 className="h-full bg-amber-400"
                 style={{ width: `${disambPct}%` }}
+                aria-hidden="true"
               />
               <div
                 className="h-full bg-emerald-500"
                 style={{ width: `${newPct}%` }}
+                aria-hidden="true"
               />
             </div>
             <span className="w-8 shrink-0 text-right text-xs tabular-nums text-muted-foreground">

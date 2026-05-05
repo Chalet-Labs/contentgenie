@@ -417,6 +417,12 @@ async function runCluster(
     accum.pairwiseVerifyRejected(verify.pairwiseVerifyRejected);
 
     perClusterVerifiedLosers = [...verify.verifiedLoserIds];
+    // perClusterRejectedLosers = losers \ verifiedLoserIds: includes both
+    // model-verdict rejections AND infra throws (a thrown loser never reaches
+    // verifiedLoserIds). perClusterMergesRejected = pairwiseVerifyRejected:
+    // only model-verdict rejections, not throws. So a loser that threw appears
+    // in rejectedLoserIds but NOT in mergesRejected (it surfaces in
+    // pairwiseVerifyThrew instead).
     perClusterRejectedLosers = losers.filter(
       (id) => !(verify.verifiedLoserIds as number[]).includes(id),
     );

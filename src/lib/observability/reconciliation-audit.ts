@@ -2,7 +2,7 @@ import "server-only";
 
 import { db } from "@/db";
 import { reconciliationLog } from "@/db/schema";
-import { sql, gte, lte, and } from "drizzle-orm";
+import { desc, gte, lte, and } from "drizzle-orm";
 import type { ReconciliationLog } from "@/db/schema";
 
 export type { WindowKey } from "@/lib/search-params/admin-topics-observability";
@@ -31,11 +31,9 @@ export async function getReconciliationAuditLog(
 ): Promise<ReconciliationAuditEntry[]> {
   const timeFilter = buildAuditTimeFilter(window);
 
-  const query = db
-    .select()
-    .from(reconciliationLog)
-    .orderBy(sql`${reconciliationLog.createdAt} DESC`)
+  const base = db.select().from(reconciliationLog);
+  const filtered = timeFilter ? base.where(timeFilter) : base;
+  return filtered
+    .orderBy(desc(reconciliationLog.createdAt), desc(reconciliationLog.id))
     .limit(limit);
-
-  return timeFilter ? query.where(timeFilter) : query;
 }

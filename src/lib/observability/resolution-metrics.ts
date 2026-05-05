@@ -38,6 +38,7 @@ export interface DisambigForcedCount {
 }
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
+const MS_PER_WEEK = 7 * MS_PER_DAY;
 const DEFAULT_BUCKET_SIZE = 0.05;
 
 /**
@@ -243,7 +244,7 @@ function generateBucketRange(
     const daysFromMonday = (current.getUTCDay() + 6) % 7;
     current = new Date(current.getTime() - daysFromMonday * MS_PER_DAY);
   }
-  const stepMs = granularity === "week" ? 7 * MS_PER_DAY : MS_PER_DAY;
+  const stepMs = granularity === "week" ? MS_PER_WEEK : MS_PER_DAY;
   const dates: Date[] = [];
   while (current.getTime() <= window.end.getTime()) {
     dates.push(current);
@@ -265,10 +266,9 @@ export async function getMatchMethodTrend(
   granularity: GranularityKey,
 ): Promise<MatchMethodTrendEntry[]> {
   const timeFilter = buildTimeFilter(window);
-  const gran = sql.raw(granularity === "week" ? "'week'" : "'day'");
   const col = episodeCanonicalTopics.updatedAt;
 
-  const bucketExpr = sql<Date>`date_trunc(${gran}, ${col})`;
+  const bucketExpr = sql<Date>`date_trunc(${granularity}, ${col})`;
 
   const query = db
     .select({
@@ -331,7 +331,6 @@ export async function getSimilarityTrend(
   granularity: GranularityKey,
 ): Promise<SimilarityTrendEntry[]> {
   const timeFilter = buildTimeFilter(window);
-  const gran = sql.raw(granularity === "week" ? "'week'" : "'day'");
   const col = episodeCanonicalTopics.updatedAt;
   const simCol = episodeCanonicalTopics.similarityToTopMatch;
 
@@ -339,7 +338,7 @@ export async function getSimilarityTrend(
   const numBuckets = Math.ceil(1 / bucketSize);
   const maxBucket = (numBuckets - 1) * bucketSize;
 
-  const bucketExpr = sql<Date>`date_trunc(${gran}, ${col})`;
+  const bucketExpr = sql<Date>`date_trunc(${granularity}, ${col})`;
   const simBucketExpr = sql<number>`least(floor(${simCol} / ${bucketSize}) * ${bucketSize}, ${maxBucket})`;
 
   const nullFilter = isNotNull(simCol);
