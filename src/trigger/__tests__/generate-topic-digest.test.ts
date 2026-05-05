@@ -132,6 +132,11 @@ vi.mock("@/lib/admin/canonical-topic-episode-count", () => ({
     template: ["(SELECT count(*)...)"],
     values: [],
   })),
+  canonicalTopicCompletedSummaryCount: vi.fn(() => ({
+    type: "sql",
+    template: ["(SELECT count(*) ... non-blank summary ...)"],
+    values: [],
+  })),
 }));
 
 // ─── Import task AFTER mocks ──────────────────────────────────────────────────
@@ -205,6 +210,7 @@ function setupHappyPath(opts: {
       summary: "A topic summary.",
       status: "active",
       episodeCount: derivedCount,
+      completedSummaryCount: derivedCount,
     },
   ];
   const digestRows = existingDigest ? [existingDigest] : [];
@@ -252,13 +258,14 @@ describe("generate-topic-digest task", () => {
     expect(result.episodeCount).toBe(5);
     expect(result.modelUsed).toBe("mock-model");
 
-    // UPSERT records the count of episodes whose summaries were actually fed
-    // into the LLM (episodeRows.length), NOT the linked-episode count. Linked
-    // episodes whose summaries are still in flight are correctly excluded so
-    // that the action's staleness gate can detect when they later complete.
+    // UPSERT records the uncapped completed-summary count from the canonical
+    // projection (`canonicalTopicCompletedSummaryCount`). Storing
+    // `episodeRows.length` would saturate at MAX_EPISODE_INPUT and make the
+    // action's staleness gate misfire on topics with more digestable summaries
+    // than the cap.
     expect(mockDbInsert).toHaveBeenCalledOnce();
     const upsertArg = mockValues.mock.calls[0][0];
-    expect(upsertArg.episodeCountAtGeneration).toBe(VALID_EPISODES.length);
+    expect(upsertArg.episodeCountAtGeneration).toBe(5);
     expect(upsertArg.episodeIds).toHaveLength(VALID_EPISODES.length);
     expect(upsertArg.modelUsed).toBe("mock-model");
 
@@ -368,11 +375,10 @@ describe("generate-topic-digest task", () => {
     expect(result.status).toBe("generated");
     expect(mockGenerateCompletion).toHaveBeenCalledOnce();
     const upsertArg = mockValues.mock.calls[0][0];
-    // Stored count = episodes actually digested (episodeRows.length), not the
-    // raw linked count. With a derived count of 6 but only the 5 fixture
-    // summaries returned, the persisted count is 5 — staleness gates downstream
-    // will only treat further completions as new growth.
-    expect(upsertArg.episodeCountAtGeneration).toBe(VALID_EPISODES.length);
+    // Stored count = uncapped completedSummaryCount from the canonical
+    // projection. The fixture sets that to derivedCount (6), so the staleness
+    // gate downstream sees the same value the action will read at trigger time.
+    expect(upsertArg.episodeCountAtGeneration).toBe(6);
   });
 
   // ── Case 6: Insufficient valid summaries ─────────────────────────────────────
@@ -534,6 +540,7 @@ describe("generate-topic-digest task", () => {
           summary: "A topic summary.",
           status: "active",
           episodeCount: 5,
+          completedSummaryCount: 5,
         },
       ],
       [], // no existing digest

@@ -26,16 +26,18 @@ export function canonicalTopicEpisodeCount(): SQL<number> {
 /**
  * Correlated subquery that returns the count of *digestable* linked episodes
  * for the outer `canonical_topics` row — i.e. links whose joined episode has
- * `summary_status = 'completed'` and a non-null summary. Mirrors the predicate
- * used by `generate-topic-digest`'s episode read step so the action's
- * eligibility / staleness logic can compare apples-to-apples (issue #444 fix).
+ * `summary_status = 'completed'` and a non-blank summary. Mirrors the full
+ * predicate used by `generate-topic-digest`'s `validEpisodeRows` filter
+ * (`summary IS NOT NULL` AND `summary.trim().length > 0`) so the action's
+ * eligibility / staleness logic compares apples-to-apples with what the task
+ * actually feeds the LLM.
  *
  * Same outer-id qualification rule as `canonicalTopicEpisodeCount` — see that
  * function's docstring for why the fully qualified `${canonicalTopics}.id` is
  * required.
  */
 export function canonicalTopicCompletedSummaryCount(): SQL<number> {
-  return sql<number>`(SELECT count(*) FROM ${episodeCanonicalTopics} ect INNER JOIN ${episodes} ep ON ect.episode_id = ep.id WHERE ect.canonical_topic_id = ${canonicalTopics}.${canonicalTopics.id} AND ep.summary_status = 'completed' AND ep.summary IS NOT NULL)`.mapWith(
+  return sql<number>`(SELECT count(*) FROM ${episodeCanonicalTopics} ect INNER JOIN ${episodes} ep ON ect.episode_id = ep.id WHERE ect.canonical_topic_id = ${canonicalTopics}.${canonicalTopics.id} AND ep.summary_status = 'completed' AND ep.summary IS NOT NULL AND length(btrim(ep.summary)) > 0)`.mapWith(
     Number,
   );
 }

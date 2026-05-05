@@ -17,7 +17,10 @@ import {
   TOPIC_DIGEST_SYSTEM_PROMPT,
   type TopicDigestPayload,
 } from "@/lib/prompts/topic-digest";
-import { canonicalTopicEpisodeCount } from "@/lib/admin/canonical-topic-episode-count";
+import {
+  canonicalTopicEpisodeCount,
+  canonicalTopicCompletedSummaryCount,
+} from "@/lib/admin/canonical-topic-episode-count";
 import { MIN_DERIVED_COUNT_FOR_DIGEST } from "@/lib/topic-digest-thresholds";
 
 const RATE_GUARD_WINDOW_MS = 60 * 60 * 1000; // 1 hour
@@ -62,6 +65,7 @@ export const generateTopicDigest = task({
         summary: canonicalTopics.summary,
         status: canonicalTopics.status,
         episodeCount: canonicalTopicEpisodeCount(),
+        completedSummaryCount: canonicalTopicCompletedSummaryCount(),
       })
       .from(canonicalTopics)
       .where(eq(canonicalTopics.id, canonicalTopicId));
@@ -190,11 +194,14 @@ export const generateTopicDigest = task({
     }
 
     // ── Step 6: UPSERT ──────────────────────────────────────────────────────
-    // `episodeCountAtGeneration` records the count of episodes whose summaries
-    // were actually fed into the LLM, NOT the raw linked count — otherwise
-    // newly-completed summaries (linked but not yet summarized at generation
-    // time) would never trigger a regeneration via the action's staleness gate.
-    const includedEpisodeCount = episodeRows.length;
+    // `episodeCountAtGeneration` records the uncapped count of digestable
+    // episodes (the same value `canonicalTopicCompletedSummaryCount` returns to
+    // the action's staleness gate) so the two saturate identically. Storing
+    // `episodeRows.length` here would cap at MAX_EPISODE_INPUT and leave any
+    // topic with more completed summaries permanently above the threshold —
+    // perpetually re-queued after each cooldown even when the input set is
+    // unchanged.
+    const includedEpisodeCount = canonical.completedSummaryCount;
     const now = new Date();
     const [upserted] = await db
       .insert(canonicalTopicDigests)
