@@ -47,14 +47,10 @@ import {
 } from "@/lib/topic-overlap";
 import { withAuthAction } from "@/lib/auth-wrapper";
 import { type ActionResult } from "@/types/action-result";
+import { MAX_OVERLAP_LOOKUP_IDS } from "@/lib/canonical-overlap-config";
 
 // Maximum episodes to include per podcast for variety in the dashboard feed
 const MAX_EPISODES_PER_PODCAST = 3;
-
-// Cap untrusted batch lookups for the canonical-overlap action — server actions
-// are reachable from the network and an unbounded array would expand into the
-// SQL `IN` predicate. Mirrors the precedent in listen-history.ts.
-export const MAX_OVERLAP_LOOKUP_IDS = 500;
 
 // Hard cap on raw inputs inspected per request, separate from the unique-id
 // cap. Without this, a caller sending millions of duplicates or invalid

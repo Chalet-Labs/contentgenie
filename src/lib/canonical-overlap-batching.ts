@@ -1,7 +1,5 @@
-import {
-  getCanonicalTopicOverlaps,
-  MAX_OVERLAP_LOOKUP_IDS,
-} from "@/app/actions/dashboard";
+import { getCanonicalTopicOverlaps } from "@/app/actions/dashboard";
+import { MAX_OVERLAP_LOOKUP_IDS } from "@/lib/canonical-overlap-config";
 import type { CanonicalOverlapResult } from "@/lib/topic-overlap";
 import type { PodcastIndexEpisodeId } from "@/types/ids";
 

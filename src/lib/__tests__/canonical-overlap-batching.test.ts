@@ -4,7 +4,6 @@ import type { CanonicalOverlapResult } from "@/lib/topic-overlap";
 
 vi.mock("@/app/actions/dashboard", () => ({
   getCanonicalTopicOverlaps: vi.fn(),
-  MAX_OVERLAP_LOOKUP_IDS: 500,
 }));
 
 const makeId = (n: number) => `ep-${n}` as PodcastIndexEpisodeId;
