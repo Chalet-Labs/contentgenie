@@ -340,11 +340,12 @@ export function AuthenticatedEpisodeDetail({
         else setCanonicalOverlap(null);
       })
       .catch((err) => {
-        // Non-critical: indicator is presentation-only; silent fall-back to category.
+        // Non-critical: indicator is presentation-only; reset so category fallback shows.
         console.warn(
           "[canonical-overlap] getCanonicalTopicOverlap failed",
           err,
         );
+        if (!ignore) setCanonicalOverlap(null);
       });
     return () => {
       ignore = true;

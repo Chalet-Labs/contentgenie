@@ -35,6 +35,7 @@ export function useCanonicalOverlapMap(
         })
         .catch((err) => {
           console.warn("[canonical-overlap] batched fetch threw", err);
+          if (!ignore && seq === seqRef.current) setMap({});
         });
     };
 
