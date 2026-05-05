@@ -278,7 +278,7 @@ describe("generate-topic-digest task", () => {
 
   // ── Case 2: Ineligible — derived count below MIN_DERIVED_COUNT_FOR_DIGEST ──
 
-  it("case 2 — ineligible (derived count below MIN): aborted counter incremented, throw aborts further work", async () => {
+  it("case 2 — ineligible (completed-summary count below MIN): aborted counter incremented, throw aborts further work", async () => {
     setupDbSelectSequence(
       mockDbSelect,
       [
@@ -288,7 +288,8 @@ describe("generate-topic-digest task", () => {
             label: "Test",
             summary: "S",
             status: "active",
-            episodeCount: MIN_DERIVED_COUNT_FOR_DIGEST - 1,
+            episodeCount: 5,
+            completedSummaryCount: MIN_DERIVED_COUNT_FOR_DIGEST - 1,
           },
         ],
       ],
@@ -398,6 +399,7 @@ describe("generate-topic-digest task", () => {
             summary: "S",
             status: "active",
             episodeCount: 10,
+            completedSummaryCount: 10,
           },
         ],
         [], // no existing digest

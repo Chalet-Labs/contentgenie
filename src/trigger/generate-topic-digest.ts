@@ -75,13 +75,13 @@ export const generateTopicDigest = task({
     if (
       !canonical ||
       canonical.status !== "active" ||
-      canonical.episodeCount < MIN_DERIVED_COUNT_FOR_DIGEST
+      canonical.completedSummaryCount < MIN_DERIVED_COUNT_FOR_DIGEST
     ) {
       metadata.root.increment("digests.aborted", 1);
       throw new AbortTaskRunError(
         canonical?.status !== "active"
           ? "CANONICAL_NOT_ACTIVE"
-          : "INSUFFICIENT_EPISODE_COUNT",
+          : "INSUFFICIENT_COMPLETED_SUMMARIES",
       );
     }
 

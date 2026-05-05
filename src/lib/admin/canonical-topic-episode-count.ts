@@ -32,12 +32,19 @@ export function canonicalTopicEpisodeCount(): SQL<number> {
  * eligibility / staleness logic compares apples-to-apples with what the task
  * actually feeds the LLM.
  *
+ * The whitespace check uses Postgres's POSIX character class
+ * `[^[:space:]]` rather than `length(btrim(...))`, because `btrim` only
+ * strips space/tab by default whereas JavaScript `String.prototype.trim()`
+ * strips the full ECMA whitespace set (including `\n`, `\r`, `\v`, `\f`).
+ * `~ '[^[:space:]]'` is true exactly when the summary contains at least
+ * one non-whitespace character — equivalent to `summary.trim().length > 0`.
+ *
  * Same outer-id qualification rule as `canonicalTopicEpisodeCount` — see that
  * function's docstring for why the fully qualified `${canonicalTopics}.id` is
  * required.
  */
 export function canonicalTopicCompletedSummaryCount(): SQL<number> {
-  return sql<number>`(SELECT count(*) FROM ${episodeCanonicalTopics} ect INNER JOIN ${episodes} ep ON ect.episode_id = ep.id WHERE ect.canonical_topic_id = ${canonicalTopics}.${canonicalTopics.id} AND ep.summary_status = 'completed' AND ep.summary IS NOT NULL AND length(btrim(ep.summary)) > 0)`.mapWith(
+  return sql<number>`(SELECT count(*) FROM ${episodeCanonicalTopics} ect INNER JOIN ${episodes} ep ON ect.episode_id = ep.id WHERE ect.canonical_topic_id = ${canonicalTopics}.${canonicalTopics.id} AND ep.summary_status = 'completed' AND ep.summary IS NOT NULL AND ep.summary ~ '[^[:space:]]')`.mapWith(
     Number,
   );
 }
