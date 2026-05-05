@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { fetchCanonicalOverlapsBatched } from "@/lib/canonical-overlap-batching";
 import { LISTEN_STATE_CHANGED_EVENT } from "@/lib/events";
 import type { CanonicalOverlapResult } from "@/lib/topic-overlap";
@@ -18,6 +18,7 @@ export function useCanonicalOverlapMap(
   const { enabled = true } = options;
   const [map, setMap] = useState<CanonicalOverlapMap>({});
   const idsKey = ids.join(",");
+  const seqRef = useRef(0);
 
   useEffect(() => {
     if (!enabled || ids.length === 0) {
@@ -27,9 +28,10 @@ export function useCanonicalOverlapMap(
     let ignore = false;
 
     const fetchOverlaps = () => {
+      const seq = ++seqRef.current;
       fetchCanonicalOverlapsBatched(ids)
         .then((result) => {
-          if (!ignore) setMap(result);
+          if (!ignore && seq === seqRef.current) setMap(result);
         })
         .catch((err) => {
           console.warn("[canonical-overlap] batched fetch threw", err);
