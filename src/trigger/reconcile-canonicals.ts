@@ -25,6 +25,7 @@ import { generateCompletion } from "@/lib/ai/generate";
 import { clusterByIdentityEmbedding } from "@/lib/reconcile-clustering";
 import { mergeCanonicals } from "@/trigger/helpers/database";
 import { runReconciliation } from "@/trigger/helpers/reconcile-canonicals";
+import { insertReconciliationAuditRows } from "@/trigger/helpers/reconcile-canonicals-db";
 
 export const reconcileCanonicals = schedules.task({
   id: "reconcile-canonicals",
@@ -35,7 +36,8 @@ export const reconcileCanonicals = schedules.task({
   machine: "medium-1x",
   run: async () => {
     const startMs = Date.now();
-    logger.info("reconcile_start", { event: "reconcile_start" });
+    const runId = crypto.randomUUID();
+    logger.info("reconcile_start", { event: "reconcile_start", runId });
     try {
       const summary = await runReconciliation({
         db,
@@ -45,15 +47,37 @@ export const reconcileCanonicals = schedules.task({
         logger,
         now: () => new Date(),
       });
+
+      const { clusterAudits, ...summaryForLog } = summary;
+
+      // Persist per-cluster audit rows BEFORE emitting the success log.
+      // reconcile_summary is the durable success signal — it must only fire
+      // after the DB write succeeds so operators can trust its meaning.
+      try {
+        await insertReconciliationAuditRows(db, runId, clusterAudits);
+      } catch (err) {
+        logger.error("reconcile_audit_persist_failed", {
+          event: "reconcile_audit_persist_failed",
+          message: err instanceof Error ? err.message : String(err),
+          runId,
+          rowCount: clusterAudits.length,
+        });
+        throw err;
+      }
+
+      // Audit rows persisted — safe to mark the run as successful.
       logger.info("reconcile_summary", {
         event: "reconcile_summary",
-        ...summary,
+        runId,
+        ...summaryForLog,
       });
+
       return summary;
     } catch (err) {
       logger.error("reconcile_failed", {
         event: "reconcile_failed",
         message: err instanceof Error ? err.message : String(err),
+        runId,
         durationMs: Date.now() - startMs,
       });
       throw err;

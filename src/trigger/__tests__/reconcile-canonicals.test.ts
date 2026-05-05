@@ -21,6 +21,13 @@ vi.mock("@/trigger/helpers/reconcile-canonicals", () => ({
   runReconciliation: (...args: unknown[]) => runReconciliationMock(...args),
 }));
 
+// Stub insertReconciliationAuditRows so tests control its success/failure.
+const insertReconciliationAuditRowsMock = vi.fn();
+vi.mock("@/trigger/helpers/reconcile-canonicals-db", () => ({
+  insertReconciliationAuditRows: (...args: unknown[]) =>
+    insertReconciliationAuditRowsMock(...args),
+}));
+
 // Stub the wired-in deps so we can assert identity equality on the deps object
 // passed to runReconciliation.
 vi.mock("@/db", () => ({
@@ -70,11 +77,14 @@ const FULL_SUMMARY = {
   dormancyTransitions: 5,
   episodeCountDrift: 7,
   durationMs: 1234,
+  clusterAudits: [],
 };
 
 describe("reconcile-canonicals task", () => {
   beforeEach(() => {
     runReconciliationMock.mockReset();
+    insertReconciliationAuditRowsMock.mockReset();
+    insertReconciliationAuditRowsMock.mockResolvedValue(undefined);
     (triggerSdk.logger.info as ReturnType<typeof vi.fn>).mockClear();
     (triggerSdk.logger.warn as ReturnType<typeof vi.fn>).mockClear();
     (triggerSdk.logger.error as ReturnType<typeof vi.fn>).mockClear();
@@ -143,16 +153,23 @@ describe("reconcile-canonicals task", () => {
 
       const result = await taskConfig.run();
 
+      // The task returns the full summary (including clusterAudits) to the caller.
       expect(result).toEqual(FULL_SUMMARY);
 
       const summaryCall = (
         triggerSdk.logger.info as ReturnType<typeof vi.fn>
       ).mock.calls.find(([msg]) => msg === "reconcile_summary");
       expect(summaryCall).toBeDefined();
-      expect(summaryCall![1]).toEqual({
+
+      // clusterAudits is stripped from the log payload (written to DB instead).
+      // runId is injected by the task shell.
+      const { clusterAudits: _omitted, ...summaryFields } = FULL_SUMMARY;
+      expect(summaryCall![1]).toMatchObject({
         event: "reconcile_summary",
-        ...FULL_SUMMARY,
+        runId: expect.any(String),
+        ...summaryFields,
       });
+      expect(summaryCall![1]).not.toHaveProperty("clusterAudits");
     });
 
     it("logs reconcile_failed and rethrows when runReconciliation throws", async () => {
@@ -189,6 +206,75 @@ describe("reconcile-canonicals task", () => {
       expect(failedCall).toBeDefined();
       expect((failedCall![1] as Record<string, unknown>).message).toBe(
         "plain string error",
+      );
+    });
+
+    // ─── Audit insert ordering (B2 regression) ──────────────────────────────
+
+    it("calls insertReconciliationAuditRows with runId + clusterAudits before emitting reconcile_summary", async () => {
+      const clusterAudits = [
+        {
+          clusterIndex: 0,
+          clusterSize: 2,
+          winnerId: 1,
+          loserIds: [2],
+          verifiedLoserIds: [2],
+          rejectedLoserIds: [],
+          outcome: "merged" as const,
+        },
+      ];
+      runReconciliationMock.mockResolvedValueOnce({
+        ...FULL_SUMMARY,
+        clusterAudits,
+      });
+
+      const callOrder: string[] = [];
+      insertReconciliationAuditRowsMock.mockImplementationOnce(async () => {
+        callOrder.push("insertAudit");
+      });
+      (triggerSdk.logger.info as ReturnType<typeof vi.fn>).mockImplementation(
+        (message: string) => {
+          callOrder.push(`info:${message}`);
+        },
+      );
+
+      await taskConfig.run();
+
+      // insertAudit must precede reconcile_summary
+      const insertIdx = callOrder.indexOf("insertAudit");
+      const summaryIdx = callOrder.indexOf("info:reconcile_summary");
+      expect(insertIdx).toBeGreaterThanOrEqual(0);
+      expect(summaryIdx).toBeGreaterThan(insertIdx);
+
+      // Called with the correct runId + clusterAudits
+      expect(insertReconciliationAuditRowsMock).toHaveBeenCalledTimes(1);
+      const [, passedRunId, passedAudits] =
+        insertReconciliationAuditRowsMock.mock.calls[0];
+      expect(typeof passedRunId).toBe("string");
+      expect(passedRunId).toHaveLength(36); // UUID format
+      expect(passedAudits).toStrictEqual(clusterAudits);
+    });
+
+    it("does NOT emit reconcile_summary when audit insert fails, logs reconcile_audit_persist_failed, and rethrows", async () => {
+      const insertErr = new Error("DB write failed");
+      runReconciliationMock.mockResolvedValueOnce(FULL_SUMMARY);
+      insertReconciliationAuditRowsMock.mockRejectedValueOnce(insertErr);
+
+      await expect(taskConfig.run()).rejects.toBe(insertErr);
+
+      // reconcile_summary must NOT be in info calls
+      const summaryCall = (
+        triggerSdk.logger.info as ReturnType<typeof vi.fn>
+      ).mock.calls.find(([msg]) => msg === "reconcile_summary");
+      expect(summaryCall).toBeUndefined();
+
+      // reconcile_audit_persist_failed must be logged
+      const auditFailCall = (
+        triggerSdk.logger.error as ReturnType<typeof vi.fn>
+      ).mock.calls.find(([msg]) => msg === "reconcile_audit_persist_failed");
+      expect(auditFailCall).toBeDefined();
+      expect((auditFailCall![1] as Record<string, unknown>).message).toBe(
+        "DB write failed",
       );
     });
   });

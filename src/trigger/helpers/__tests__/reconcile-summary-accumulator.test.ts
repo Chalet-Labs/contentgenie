@@ -3,7 +3,10 @@
 import { describe, expect, it } from "vitest";
 
 import type { ReconcileSummary } from "@/trigger/helpers/reconcile-canonicals";
-import { ReconcileSummaryAccumulator } from "@/trigger/helpers/reconcile-summary-accumulator";
+import {
+  ReconcileSummaryAccumulator,
+  type ClusterAuditRow,
+} from "@/trigger/helpers/reconcile-summary-accumulator";
 
 // Record<keyof ReconcileSummary, true> forces exhaustiveness at compile time:
 // adding a field to ReconcileSummary without updating this object is a TS error.
@@ -22,6 +25,7 @@ const EXPECTED_KEYS_RECORD: Record<keyof ReconcileSummary, true> = {
   dormancyTransitions: true,
   episodeCountDrift: true,
   durationMs: true,
+  clusterAudits: true,
 };
 const EXPECTED_KEYS = Object.keys(EXPECTED_KEYS_RECORD) as Array<
   keyof ReconcileSummary
@@ -35,9 +39,13 @@ describe("ReconcileSummaryAccumulator", () => {
     // Structural check: exactly the expected keys, no extras or missing.
     expect(Object.keys(result).sort()).toEqual([...EXPECTED_KEYS].sort());
 
-    // All counters are zero; durationMs matches the argument.
+    // Numeric counters are zero; durationMs matches the argument; clusterAudits is empty.
     for (const key of EXPECTED_KEYS) {
-      expect(result[key], `expected ${key} === 0`).toBe(0);
+      if (key === "clusterAudits") {
+        expect(result[key], "clusterAudits should start empty").toEqual([]);
+      } else {
+        expect(result[key], `expected ${key} === 0`).toBe(0);
+      }
     }
   });
 
@@ -64,7 +72,7 @@ describe("ReconcileSummaryAccumulator", () => {
       const result = accum.freeze(0);
 
       for (const key of EXPECTED_KEYS) {
-        if (key === "durationMs") continue;
+        if (key === "durationMs" || key === "clusterAudits") continue;
         const expected = key === field ? 1 : 0;
         expect(
           result[key],
@@ -133,5 +141,68 @@ describe("ReconcileSummaryAccumulator", () => {
 
     // First result is not mutated by the second freeze call.
     expect(first.durationMs).toBe(100);
+  });
+
+  // ─── recordClusterAudit / clusterAudits ────────────────────────────────────
+
+  function makeAudit(
+    overrides: Partial<ClusterAuditRow> = {},
+  ): ClusterAuditRow {
+    return {
+      clusterIndex: 0,
+      clusterSize: 3,
+      winnerId: 1,
+      loserIds: [2, 3],
+      verifiedLoserIds: [2],
+      rejectedLoserIds: [3],
+      mergesExecuted: 1,
+      mergesRejected: 1,
+      pairwiseVerifyThrew: 0,
+      outcome: "partial",
+      ...overrides,
+    };
+  }
+
+  it("freeze includes clusterAudits with all recorded rows", () => {
+    const accum = new ReconcileSummaryAccumulator();
+    const row1 = makeAudit({ clusterIndex: 0, outcome: "merged" });
+    const row2 = makeAudit({
+      clusterIndex: 1,
+      outcome: "skipped",
+      winnerId: null,
+    });
+    accum.recordClusterAudit(row1);
+    accum.recordClusterAudit(row2);
+
+    const result = accum.freeze(50);
+    expect(result.clusterAudits).toHaveLength(2);
+    expect(result.clusterAudits[0]).toEqual(row1);
+    expect(result.clusterAudits[1]).toEqual(row2);
+  });
+
+  it("clusterAudits.length matches number of recordClusterAudit calls", () => {
+    const accum = new ReconcileSummaryAccumulator();
+    for (let i = 0; i < 5; i++) {
+      accum.recordClusterAudit(makeAudit({ clusterIndex: i }));
+    }
+    expect(accum.freeze(0).clusterAudits).toHaveLength(5);
+  });
+
+  it.each<[ClusterAuditRow["outcome"]]>([
+    ["merged"],
+    ["partial"],
+    ["rejected"],
+    ["skipped"],
+    ["failed"],
+  ])("recordClusterAudit records outcome=%s faithfully", (outcome) => {
+    const accum = new ReconcileSummaryAccumulator();
+    accum.recordClusterAudit(makeAudit({ outcome }));
+    expect(accum.freeze(0).clusterAudits[0].outcome).toBe(outcome);
+  });
+
+  it("freeze with no recorded audits returns clusterAudits=[]", () => {
+    const accum = new ReconcileSummaryAccumulator();
+    accum.clusterSeen();
+    expect(accum.freeze(0).clusterAudits).toEqual([]);
   });
 });
