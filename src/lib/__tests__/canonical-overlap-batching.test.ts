@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { PodcastIndexEpisodeId } from "@/types/ids";
 import type { CanonicalOverlapResult } from "@/lib/topic-overlap";
+import { MAX_OVERLAP_LOOKUP_IDS } from "@/lib/canonical-overlap-config";
 
 vi.mock("@/app/actions/dashboard", () => ({
   getCanonicalTopicOverlaps: vi.fn(),
@@ -33,8 +34,10 @@ describe("fetchCanonicalOverlapsBatched", () => {
     expect(getCanonicalTopicOverlaps).not.toHaveBeenCalled();
   });
 
-  it("makes a single call for ≤500 ids", async () => {
-    const ids = Array.from({ length: 300 }, (_, i) => makeId(i));
+  it(`makes a single call for ≤${MAX_OVERLAP_LOOKUP_IDS} ids`, async () => {
+    const ids = Array.from({ length: MAX_OVERLAP_LOOKUP_IDS - 200 }, (_, i) =>
+      makeId(i),
+    );
     const data: Record<PodcastIndexEpisodeId, CanonicalOverlapResult | null> =
       {};
     ids.forEach((id) => (data[id] = makeRepeat(1)));
@@ -46,11 +49,15 @@ describe("fetchCanonicalOverlapsBatched", () => {
 
     expect(getCanonicalTopicOverlaps).toHaveBeenCalledTimes(1);
     expect(getCanonicalTopicOverlaps).toHaveBeenCalledWith(ids);
-    expect(Object.keys(result).length).toBe(300);
+    expect(Object.keys(result).length).toBe(ids.length);
   });
 
-  it("splits 1100 ids into 3 calls (500+500+100) and merges results", async () => {
-    const ids = Array.from({ length: 1100 }, (_, i) => makeId(i));
+  it("splits oversized input into chunks of MAX_OVERLAP_LOOKUP_IDS and merges results", async () => {
+    const remainder = 100;
+    const ids = Array.from(
+      { length: MAX_OVERLAP_LOOKUP_IDS * 2 + remainder },
+      (_, i) => makeId(i),
+    );
 
     getCanonicalTopicOverlaps.mockImplementation(
       async (chunk: PodcastIndexEpisodeId[]) => {
@@ -71,13 +78,19 @@ describe("fetchCanonicalOverlapsBatched", () => {
     const callLengths = getCanonicalTopicOverlaps.mock.calls.map(
       (c: unknown[]) => (c[0] as PodcastIndexEpisodeId[]).length,
     );
-    expect(callLengths).toEqual([500, 500, 100]);
-    expect(Object.keys(result).length).toBe(1100);
+    expect(callLengths).toEqual([
+      MAX_OVERLAP_LOOKUP_IDS,
+      MAX_OVERLAP_LOOKUP_IDS,
+      remainder,
+    ]);
+    expect(Object.keys(result).length).toBe(ids.length);
   });
 
   it("returns successfully-fetched chunks when one chunk fails", async () => {
-    const ids = Array.from({ length: 600 }, (_, i) => makeId(i));
-    const firstChunk = ids.slice(0, 500);
+    const ids = Array.from({ length: MAX_OVERLAP_LOOKUP_IDS + 100 }, (_, i) =>
+      makeId(i),
+    );
+    const firstChunk = ids.slice(0, MAX_OVERLAP_LOOKUP_IDS);
 
     getCanonicalTopicOverlaps
       .mockResolvedValueOnce({
@@ -92,7 +105,7 @@ describe("fetchCanonicalOverlapsBatched", () => {
       await import("@/lib/canonical-overlap-batching");
     const result = await fetchCanonicalOverlapsBatched(ids);
 
-    expect(Object.keys(result).length).toBe(500);
+    expect(Object.keys(result).length).toBe(MAX_OVERLAP_LOOKUP_IDS);
     firstChunk.forEach((id) => {
       expect(result[id]).toEqual(makeRepeat(1));
     });

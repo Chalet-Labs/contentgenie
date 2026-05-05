@@ -26,7 +26,7 @@ import type {
   CanonicalOverlapResult,
   OverlapLabelKind,
 } from "@/lib/topic-overlap";
-import { CanonicalOverlapIndicator } from "@/components/episodes/canonical-overlap-indicator";
+import { OverlapIndicator } from "@/components/episodes/overlap-indicator";
 
 export type { SummarizationStep } from "@/trigger/types";
 
@@ -316,25 +316,12 @@ export function SummaryDisplay({
                 <span>10</span>
               </div>
             </div>
-            {canonicalOverlap ? (
-              <div className="mt-3">
-                <CanonicalOverlapIndicator
-                  overlap={canonicalOverlap}
-                  className="text-sm font-medium"
-                />
-              </div>
-            ) : overlapLabel ? (
-              <p
-                data-testid="overlap-indicator"
-                className={`mt-3 text-sm font-medium ${
-                  overlapLabelKind === "high-overlap"
-                    ? "text-status-warning-text"
-                    : "text-status-success-text"
-                }`}
-              >
-                {overlapLabel}
-              </p>
-            ) : null}
+            <OverlapIndicator
+              canonical={canonicalOverlap}
+              categoryLabel={overlapLabel}
+              categoryLabelKind={overlapLabelKind}
+              className="mt-3 text-sm"
+            />
             {isSignalFormat && worthItDimensions.kind === "signals" && (
               <div className="mt-4 space-y-2 border-t pt-4">
                 <p className="text-sm font-medium text-foreground">

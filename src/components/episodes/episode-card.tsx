@@ -18,7 +18,7 @@ import type {
   CanonicalOverlapResult,
   OverlapLabelKind,
 } from "@/lib/topic-overlap";
-import { CanonicalOverlapIndicator } from "@/components/episodes/canonical-overlap-indicator";
+import { OverlapIndicator } from "@/components/episodes/overlap-indicator";
 
 export interface EpisodeCardProps {
   /** Podcast artwork URL. When omitted, no artwork tile is rendered. */
@@ -69,7 +69,7 @@ export interface EpisodeCardProps {
    * etc., without swapping the nav target.
    */
   onTitleClick?: () => void;
-  /** Canonical-topic overlap result. When set, renders canonical indicator (takes precedence over categoryOverlap). */
+  /** When set, takes precedence over categoryOverlap and renders the canonical indicator. */
   canonicalOverlap?: CanonicalOverlapResult | null;
   /** Category-level overlap fallback (ADR-034). Rendered only when canonicalOverlap is null/undefined. */
   categoryOverlap?: {
@@ -248,24 +248,12 @@ export function EpisodeCard({
               </div>
             )}
 
-            {canonicalOverlap ? (
-              <CanonicalOverlapIndicator
-                overlap={canonicalOverlap}
-                className="mt-1.5"
-              />
-            ) : categoryOverlap?.label ? (
-              <p
-                data-testid="overlap-indicator"
-                className={cn(
-                  "mt-1.5 text-xs font-medium",
-                  categoryOverlap.labelKind === "high-overlap"
-                    ? "text-status-warning-text"
-                    : "text-status-success-text",
-                )}
-              >
-                {categoryOverlap.label}
-              </p>
-            ) : null}
+            <OverlapIndicator
+              canonical={canonicalOverlap}
+              categoryLabel={categoryOverlap?.label}
+              categoryLabelKind={categoryOverlap?.labelKind}
+              className="mt-1.5"
+            />
 
             <div className="mt-3 border-t pt-3">
               <div className="flex items-center justify-between gap-2">

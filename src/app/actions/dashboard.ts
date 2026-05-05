@@ -497,9 +497,9 @@ export async function getRecommendedEpisodes(
       });
 
       // Hydrate canonical-topic overlap. We call runCanonicalTopicOverlapBatch
-      // directly (not getCanonicalTopicOverlaps) because we already have a
-      // resolved userId from withAuthAction — going through the public action
-      // would re-run auth(), breaking the "exactly once per request" contract.
+      // directly (not getCanonicalTopicOverlaps) because this action already
+      // resolved userId via auth() above — invoking the public wrapper would
+      // re-run auth() and break the "exactly once per request" contract.
       let canonicalMap: Record<
         PodcastIndexEpisodeId,
         CanonicalOverlapResult | null
@@ -511,8 +511,12 @@ export async function getRecommendedEpisodes(
           ids,
         );
         if (canonicalResult.success) canonicalMap = canonicalResult.data;
-      } catch {
+      } catch (err) {
         // Non-critical: recommendations still render category-only on failure.
+        console.error(
+          "Failed to hydrate canonical overlap on recommendations; falling back to category-only:",
+          err,
+        );
       }
 
       const withCanonical = withOverlap.map((r) => ({

@@ -98,9 +98,7 @@ async function loadRssPodcast(podcastIndexId: string) {
   });
 
   const { statusMap, scoreMap } = buildSummaryMaps(dbEpisodes);
-  const rssEpisodeIds = dbEpisodes.map(
-    (ep) => ep.podcastIndexId as PodcastIndexEpisodeId,
-  );
+  const rssEpisodeIds = dbEpisodes.map((ep) => ep.podcastIndexId);
   const [
     listenedInternalIds,
     topicsByPodcastIndexId,

@@ -10,9 +10,11 @@ import { WorthItBadge } from "@/components/episodes/worth-it-badge";
 import { formatDate, formatDuration, stripHtml } from "@/lib/utils";
 import { useExpandable } from "@/hooks/use-expandable";
 import type { RecommendedEpisodeDTO } from "@/db/library-columns";
-import { CanonicalOverlapIndicator } from "@/components/episodes/canonical-overlap-indicator";
+import { OverlapIndicator } from "@/components/episodes/overlap-indicator";
 
 export const EPISODES_INITIAL = 3;
+
+const RECOMMENDATIONS_LIST_ID = "episode-recommendations-list";
 
 export function EpisodeRecommendationsLoading() {
   return (
@@ -97,7 +99,10 @@ export function EpisodeRecommendations({
         </Link>
       </CardHeader>
       <CardContent>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        <div
+          id={RECOMMENDATIONS_LIST_ID}
+          className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3"
+        >
           {visible.map((episode) => (
             <Link
               key={episode.id}
@@ -146,23 +151,12 @@ export function EpisodeRecommendations({
                     )}
                   </span>
                 </div>
-                {episode.canonicalOverlap ? (
-                  <CanonicalOverlapIndicator
-                    overlap={episode.canonicalOverlap}
-                    className="mt-1"
-                  />
-                ) : episode.overlapLabel ? (
-                  <p
-                    data-testid="overlap-indicator"
-                    className={`mt-1 text-xs font-medium ${
-                      episode.overlapLabelKind === "high-overlap"
-                        ? "text-status-warning-text"
-                        : "text-status-success-text"
-                    }`}
-                  >
-                    {episode.overlapLabel}
-                  </p>
-                ) : null}
+                <OverlapIndicator
+                  canonical={episode.canonicalOverlap}
+                  categoryLabel={episode.overlapLabel}
+                  categoryLabelKind={episode.overlapLabelKind}
+                  className="mt-1"
+                />
               </div>
             </Link>
           ))}
@@ -172,6 +166,7 @@ export function EpisodeRecommendations({
             expanded={expanded}
             hiddenCount={hiddenCount}
             onToggle={toggle}
+            ariaControls={RECOMMENDATIONS_LIST_ID}
           />
         )}
       </CardContent>

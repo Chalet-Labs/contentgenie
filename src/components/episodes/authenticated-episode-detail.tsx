@@ -321,8 +321,9 @@ export function AuthenticatedEpisodeDetail({
           }
         }
       })
-      .catch(() => {
+      .catch((err) => {
         // Non-critical: overlap label is a presentation-only enhancement
+        console.warn("[overlap-label] getEpisodeTopicOverlap failed", err);
       });
     return () => {
       ignore = true;
@@ -338,8 +339,12 @@ export function AuthenticatedEpisodeDetail({
         if (result.success) setCanonicalOverlap(result.data);
         else setCanonicalOverlap(null);
       })
-      .catch(() => {
+      .catch((err) => {
         // Non-critical: indicator is presentation-only; silent fall-back to category.
+        console.warn(
+          "[canonical-overlap] getCanonicalTopicOverlap failed",
+          err,
+        );
       });
     return () => {
       ignore = true;

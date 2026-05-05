@@ -25,7 +25,6 @@ interface EpisodeCardProps {
   topics?: string[];
   /** Canonical topic chips forwarded to the primitive. */
   canonicalTopics?: CanonicalTopicChip[];
-  /** Canonical-topic overlap result forwarded to the primitive. */
   canonicalOverlap?: CanonicalOverlapResult | null;
 }
 

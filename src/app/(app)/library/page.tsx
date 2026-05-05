@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { useAuth } from "@clerk/nextjs";
 import {
@@ -33,9 +33,8 @@ import { useOnlineStatus } from "@/hooks/use-online-status";
 import { OfflineBanner } from "@/components/ui/offline-banner";
 import { cacheLibrary, getCachedLibrary } from "@/lib/offline-cache";
 import { LISTEN_STATE_CHANGED_EVENT } from "@/lib/events";
-import { fetchCanonicalOverlapsBatched } from "@/lib/canonical-overlap-batching";
+import { useCanonicalOverlapMap } from "@/hooks/use-canonical-overlap-map";
 import type { SavedItemDTO } from "@/db/library-columns";
-import type { CanonicalOverlapResult } from "@/lib/topic-overlap";
 import type { PodcastIndexEpisodeId } from "@/types/ids";
 
 export default function LibraryPage() {
@@ -49,9 +48,14 @@ export default function LibraryPage() {
   const [sortBy, setSortBy] = useState<LibrarySortOption>("savedAt");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [isFromCache, setIsFromCache] = useState(false);
-  const [canonicalOverlapMap, setCanonicalOverlapMap] = useState<
-    Record<PodcastIndexEpisodeId, CanonicalOverlapResult | null>
-  >({});
+
+  const canonicalOverlapIds = useMemo<PodcastIndexEpisodeId[]>(
+    () => items.map((i) => i.episode.podcastIndexId),
+    [items],
+  );
+  const canonicalOverlapMap = useCanonicalOverlapMap(canonicalOverlapIds, {
+    enabled: isOnline,
+  });
 
   const loadLibrary = useCallback(async () => {
     setIsLoading(true);
@@ -130,22 +134,6 @@ export default function LibraryPage() {
     window.addEventListener(LISTEN_STATE_CHANGED_EVENT, refresh);
     return () =>
       window.removeEventListener(LISTEN_STATE_CHANGED_EVENT, refresh);
-  }, [isOnline, items]);
-
-  useEffect(() => {
-    if (!isOnline || items.length === 0) return;
-    let ignore = false;
-    const ids = items.map(
-      (i) => i.episode.podcastIndexId as PodcastIndexEpisodeId,
-    );
-    fetchCanonicalOverlapsBatched(ids)
-      .then((map) => {
-        if (!ignore) setCanonicalOverlapMap(map);
-      })
-      .catch(() => {});
-    return () => {
-      ignore = true;
-    };
   }, [isOnline, items]);
 
   const handleRemoved = () => {
@@ -317,9 +305,7 @@ export default function LibraryPage() {
               isOffline={!isOnline}
               isListened={listenedSet.has(item.episode.id)}
               canonicalOverlap={
-                canonicalOverlapMap[
-                  item.episode.podcastIndexId as PodcastIndexEpisodeId
-                ] ?? null
+                canonicalOverlapMap[item.episode.podcastIndexId] ?? null
               }
             />
           ))}

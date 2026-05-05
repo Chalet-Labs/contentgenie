@@ -2058,9 +2058,8 @@ describe("getCanonicalTopicOverlap", () => {
 
   it("propagates { success: false, error } when the underlying batch fails", async () => {
     // Sync throw from mockImplementation avoids the Vitest unhandled-rejection
-    // false-positive. runCanonicalTopicOverlapBatch is async, so a sync throw
-    // at line 840 (.where()) is caught by its own try/catch and converted to
-    // { success: false, error: "..." } — the result the test asserts.
+    // false-positive. runCanonicalTopicOverlapBatch's outer try/catch converts
+    // the sync throw inside the Drizzle query chain into { success: false }.
     mockWhere.mockImplementation(() => {
       throw new Error("DB connection lost");
     });

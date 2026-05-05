@@ -41,7 +41,6 @@ interface EpisodeListProps {
     PodcastIndexEpisodeId,
     CanonicalTopicChip[]
   >;
-  /** Canonical-topic overlap results per episode, keyed by PodcastIndex id. */
   canonicalOverlapByPodcastIndexId?: Record<
     PodcastIndexEpisodeId,
     CanonicalOverlapResult | null
