@@ -72,7 +72,7 @@ export const reconcileCanonicals = schedules.task({
         ...summaryForLog,
       });
 
-      return summary;
+      return summaryForLog;
     } catch (err) {
       logger.error("reconcile_failed", {
         event: "reconcile_failed",

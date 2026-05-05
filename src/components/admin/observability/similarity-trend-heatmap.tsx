@@ -95,6 +95,8 @@ export function SimilarityTrendHeatmap({
               return (
                 <div
                   key={colIdx}
+                  role="img"
+                  aria-label={`sim=${bucketLabels[colIdx]}: ${count}`}
                   className={cn("h-5 w-5 shrink-0 rounded-sm", BG_CLASS[q])}
                   data-testid={`heatmap-cell-${row.bucket.toISOString()}-${colIdx}`}
                   data-quartile={q}

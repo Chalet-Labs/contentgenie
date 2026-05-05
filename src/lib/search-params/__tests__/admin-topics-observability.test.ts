@@ -38,3 +38,38 @@ describe("loadAdminTopicsObservabilitySearchParams", () => {
     expect(result.window).toBe("7d");
   });
 });
+
+describe("loadAdminTopicsObservabilitySearchParams — granularity", () => {
+  it("defaults granularity to 'day' when not provided", () => {
+    const result = loadAdminTopicsObservabilitySearchParams({});
+    expect(result.granularity).toBe("day");
+  });
+
+  it("accepts 'day' literal", () => {
+    const result = loadAdminTopicsObservabilitySearchParams({
+      granularity: "day",
+    });
+    expect(result.granularity).toBe("day");
+  });
+
+  it("accepts 'week' literal", () => {
+    const result = loadAdminTopicsObservabilitySearchParams({
+      granularity: "week",
+    });
+    expect(result.granularity).toBe("week");
+  });
+
+  it("falls back to default 'day' for unknown granularity values", () => {
+    const result = loadAdminTopicsObservabilitySearchParams({
+      granularity: "month",
+    });
+    expect(result.granularity).toBe("day");
+  });
+
+  it("falls back to default 'day' when granularity is missing", () => {
+    const result = loadAdminTopicsObservabilitySearchParams({
+      window: "7d",
+    });
+    expect(result.granularity).toBe("day");
+  });
+});
