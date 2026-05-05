@@ -51,8 +51,11 @@ vi.mock("@/db", () => ({
       mockSelect(...args);
       const whereNode = (...wArgs: unknown[]) => {
         const result = mockWhere(...wArgs);
-        // Return an object that is both a Promise (for direct await) and has chained methods
-        const thenable = Promise.resolve(result).then((v) => v);
+        // new Promise(...) avoids a dangling intermediate promise that triggers
+        // Vitest's unhandled-rejection detector when mockWhere returns Promise.reject.
+        const thenable = new Promise<unknown>((resolve, reject) => {
+          Promise.resolve(result).then(resolve, reject);
+        });
         return Object.assign(thenable, {
           orderBy: (...oArgs: unknown[]) => {
             const orderResult = mockOrderBy(...oArgs);
@@ -843,6 +846,81 @@ describe("getRecommendedEpisodes", () => {
     expect(result.error).toBeNull();
     expect(result.episodes).toHaveLength(1);
     expect(result.episodes[0].title).toBe("AI Deep Dive");
+  });
+
+  it("attaches canonicalOverlap to DTO when canonical batch resolves with data", async () => {
+    const EP_A = asPodcastIndexEpisodeId("ep-a");
+    const mockEpisodes = [
+      {
+        id: 1,
+        podcastIndexId: EP_A,
+        title: "Ep A",
+        description: null,
+        audioUrl: null,
+        duration: null,
+        publishDate: null,
+        worthItScore: "7.00",
+        podcastTitle: "Pod",
+        podcastImageUrl: null,
+      },
+    ];
+    mockLimit.mockResolvedValue(mockEpisodes);
+    // Canonical batch: Q1 resolves DB id, Q2 canonical row, Q3a consumed IDs, Q3b count row
+    mockWhere
+      .mockResolvedValueOnce([]) // union sub-select (consumed history)
+      .mockResolvedValueOnce([]) // topic count (groupBy)
+      .mockResolvedValueOnce([]) // candidate topics
+      .mockResolvedValueOnce([{ id: 1, podcastIndexId: EP_A }]) // Q1: episode lookup
+      .mockResolvedValueOnce([]); // Q2: no canonicals → null via guard 2
+    mockUnion.mockResolvedValue([{ episodeId: 99 }]); // listen history union
+    mockGroupBy
+      .mockResolvedValueOnce([]) // topic profile groupBy
+      .mockResolvedValueOnce([]); // Q3b count groupBy
+
+    const { getRecommendedEpisodes } = await import("@/app/actions/dashboard");
+    const result = await getRecommendedEpisodes();
+
+    expect(result.error).toBeNull();
+    expect(result.episodes).toHaveLength(1);
+    // Guard 2 fires (no canonicals) → canonicalOverlap is null
+    expect(result.episodes[0].canonicalOverlap).toBeNull();
+  });
+
+  it("sets canonicalOverlap to null for all episodes when canonical batch throws", async () => {
+    const mockEpisodes = [
+      {
+        id: 1,
+        podcastIndexId: "ep-x",
+        title: "Ep X",
+        description: null,
+        audioUrl: null,
+        duration: null,
+        publishDate: null,
+        worthItScore: "6.00",
+        podcastTitle: "Pod",
+        podcastImageUrl: null,
+      },
+    ];
+    mockLimit.mockResolvedValue(mockEpisodes);
+    // runCanonicalTopicOverlapBatch Q1 is the 9th where() call in the flow
+    // (3 sub-selects + main + topicRank + fetchConsumedEpisodeIds×2 + candidateTopics).
+    // Fail only that call via a countdown to avoid polluting earlier queries.
+    let whereCallCount = 0;
+    mockWhere.mockImplementation(() => {
+      whereCallCount++;
+      if (whereCallCount === 9) {
+        return Promise.reject(new Error("DB timeout"));
+      }
+      return Promise.resolve([]);
+    });
+
+    const { getRecommendedEpisodes } = await import("@/app/actions/dashboard");
+    const result = await getRecommendedEpisodes();
+
+    // Episodes still returned, canonicalOverlap is null (graceful degradation)
+    expect(result.error).toBeNull();
+    expect(result.episodes).toHaveLength(1);
+    expect(result.episodes[0].canonicalOverlap).toBeNull();
   });
 });
 
@@ -1979,7 +2057,13 @@ describe("getCanonicalTopicOverlap", () => {
   });
 
   it("propagates { success: false, error } when the underlying batch fails", async () => {
-    mockWhere.mockRejectedValue(new Error("DB connection lost"));
+    // Sync throw from mockImplementation avoids the Vitest unhandled-rejection
+    // false-positive. runCanonicalTopicOverlapBatch is async, so a sync throw
+    // at line 840 (.where()) is caught by its own try/catch and converted to
+    // { success: false, error: "..." } — the result the test asserts.
+    mockWhere.mockImplementation(() => {
+      throw new Error("DB connection lost");
+    });
 
     const { getCanonicalTopicOverlap } =
       await import("@/app/actions/dashboard");

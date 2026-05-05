@@ -31,8 +31,11 @@ import {
 import { getCollection, deleteCollection } from "@/app/actions/collections";
 import { getListenedEpisodeIds } from "@/app/actions/listen-history";
 import { LISTEN_STATE_CHANGED_EVENT } from "@/lib/events";
+import { fetchCanonicalOverlapsBatched } from "@/lib/canonical-overlap-batching";
 import type { SavedItemDTO } from "@/db/library-columns";
 import type { Collection } from "@/db/schema";
+import type { CanonicalOverlapResult } from "@/lib/topic-overlap";
+import type { PodcastIndexEpisodeId } from "@/types/ids";
 
 export default function CollectionDetailPage() {
   const params = useParams();
@@ -45,6 +48,9 @@ export default function CollectionDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [canonicalOverlapMap, setCanonicalOverlapMap] = useState<
+    Record<PodcastIndexEpisodeId, CanonicalOverlapResult | null>
+  >({});
 
   const loadCollection = useCallback(async () => {
     if (isNaN(collectionId)) {
@@ -88,6 +94,22 @@ export default function CollectionDetailPage() {
     window.addEventListener(LISTEN_STATE_CHANGED_EVENT, refresh);
     return () =>
       window.removeEventListener(LISTEN_STATE_CHANGED_EVENT, refresh);
+  }, [items]);
+
+  useEffect(() => {
+    if (items.length === 0) return;
+    let ignore = false;
+    const ids = items.map(
+      (i) => i.episode.podcastIndexId as PodcastIndexEpisodeId,
+    );
+    fetchCanonicalOverlapsBatched(ids)
+      .then((map) => {
+        if (!ignore) setCanonicalOverlapMap(map);
+      })
+      .catch(() => {});
+    return () => {
+      ignore = true;
+    };
   }, [items]);
 
   const handleRemoved = () => {
@@ -272,6 +294,11 @@ export default function CollectionDetailPage() {
               onRemoved={handleRemoved}
               onCollectionChanged={handleCollectionChanged}
               isListened={listenedSet.has(item.episode.id)}
+              canonicalOverlap={
+                canonicalOverlapMap[
+                  item.episode.podcastIndexId as PodcastIndexEpisodeId
+                ] ?? null
+              }
             />
           ))}
         </div>

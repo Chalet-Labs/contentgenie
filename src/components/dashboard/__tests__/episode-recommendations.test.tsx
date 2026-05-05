@@ -8,6 +8,7 @@ import {
 } from "@/components/dashboard/episode-recommendations";
 import type { RecommendedEpisodeDTO } from "@/db/library-columns";
 import { asPodcastIndexEpisodeId } from "@/types/ids";
+import type { CanonicalOverlapResult } from "@/lib/topic-overlap";
 
 // ---------------------------------------------------------------------------
 // Factory
@@ -151,6 +152,83 @@ describe("EpisodeRecommendations", () => {
     expect(
       screen.queryByRole("button", { name: /show/i }),
     ).not.toBeInTheDocument();
+  });
+
+  describe("overlap indicator", () => {
+    const repeatOverlap: CanonicalOverlapResult = {
+      kind: "repeat",
+      count: 4,
+      topicLabel: "gut health",
+      topicId: 10,
+    };
+
+    it("renders canonical repeat indicator when canonicalOverlap is set", () => {
+      render(
+        <EpisodeRecommendations
+          episodes={[makeEpisode({ canonicalOverlap: repeatOverlap })]}
+        />,
+      );
+      const indicator = screen.getByTestId("overlap-indicator");
+      expect(indicator).toHaveTextContent(
+        "You've heard 4 episodes on gut health",
+      );
+      expect(indicator).toHaveAttribute(
+        "data-canonical-overlap-kind",
+        "repeat",
+      );
+    });
+
+    it("renders category fallback when canonicalOverlap is null and overlapLabel is set", () => {
+      render(
+        <EpisodeRecommendations
+          episodes={[
+            makeEpisode({
+              canonicalOverlap: null,
+              overlapLabel: "You've heard 3 similar episodes",
+              overlapLabelKind: "high-overlap",
+            }),
+          ]}
+        />,
+      );
+      const indicator = screen.getByTestId("overlap-indicator");
+      expect(indicator).toHaveTextContent("You've heard 3 similar episodes");
+      expect(indicator).not.toHaveAttribute("data-canonical-overlap-kind");
+    });
+
+    it("renders no indicator when both canonicalOverlap and overlapLabel are null", () => {
+      render(
+        <EpisodeRecommendations
+          episodes={[
+            makeEpisode({
+              canonicalOverlap: null,
+              overlapLabel: null,
+              overlapLabelKind: null,
+            }),
+          ]}
+        />,
+      );
+      expect(screen.queryByTestId("overlap-indicator")).not.toBeInTheDocument();
+    });
+
+    it("renders only canonical indicator when both are set (canonical precedence)", () => {
+      render(
+        <EpisodeRecommendations
+          episodes={[
+            makeEpisode({
+              canonicalOverlap: repeatOverlap,
+              overlapLabel: "You've heard 3 similar episodes",
+              overlapLabelKind: "high-overlap",
+            }),
+          ]}
+        />,
+      );
+      const indicators = screen.getAllByTestId("overlap-indicator");
+      expect(indicators).toHaveLength(1);
+      expect(indicators[0]).toHaveAttribute(
+        "data-canonical-overlap-kind",
+        "repeat",
+      );
+    });
   });
 });
 

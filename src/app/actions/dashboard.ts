@@ -54,7 +54,7 @@ const MAX_EPISODES_PER_PODCAST = 3;
 // Cap untrusted batch lookups for the canonical-overlap action — server actions
 // are reachable from the network and an unbounded array would expand into the
 // SQL `IN` predicate. Mirrors the precedent in listen-history.ts.
-const MAX_OVERLAP_LOOKUP_IDS = 500;
+export const MAX_OVERLAP_LOOKUP_IDS = 500;
 
 // Hard cap on raw inputs inspected per request, separate from the unique-id
 // cap. Without this, a caller sending millions of duplicates or invalid
@@ -500,12 +500,36 @@ export async function getRecommendedEpisodes(
         };
       });
 
+      // Hydrate canonical-topic overlap. We call runCanonicalTopicOverlapBatch
+      // directly (not getCanonicalTopicOverlaps) because we already have a
+      // resolved userId from withAuthAction — going through the public action
+      // would re-run auth(), breaking the "exactly once per request" contract.
+      let canonicalMap: Record<
+        PodcastIndexEpisodeId,
+        CanonicalOverlapResult | null
+      > = {};
+      try {
+        const ids = withOverlap.map((r) => r.podcastIndexId);
+        const canonicalResult = await runCanonicalTopicOverlapBatch(
+          userId,
+          ids,
+        );
+        if (canonicalResult.success) canonicalMap = canonicalResult.data;
+      } catch {
+        // Non-critical: recommendations still render category-only on failure.
+      }
+
+      const withCanonical = withOverlap.map((r) => ({
+        ...r,
+        canonicalOverlap: canonicalMap[r.podcastIndexId] ?? null,
+      }));
+
       // Stable partition sort: non-overlapping (overlapCount < 3) first, overlapping last.
       // Within each partition, original order (worthItScore DESC) is preserved.
-      const nonOverlapping = withOverlap.filter(
+      const nonOverlapping = withCanonical.filter(
         (r) => (r.overlapCount ?? 0) < HIGH_OVERLAP_THRESHOLD,
       );
-      const overlapping = withOverlap.filter(
+      const overlapping = withCanonical.filter(
         (r) => (r.overlapCount ?? 0) >= HIGH_OVERLAP_THRESHOLD,
       );
       overlapEnriched = [...nonOverlapping, ...overlapping];

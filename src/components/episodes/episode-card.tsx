@@ -14,6 +14,11 @@ import {
 import type { SummaryStatus } from "@/db/schema";
 import type { CanonicalTopicChip } from "@/db/library-columns";
 import { TopicChip } from "@/components/episodes/topic-chip";
+import type {
+  CanonicalOverlapResult,
+  OverlapLabelKind,
+} from "@/lib/topic-overlap";
+import { CanonicalOverlapIndicator } from "@/components/episodes/canonical-overlap-indicator";
 
 export interface EpisodeCardProps {
   /** Podcast artwork URL. When omitted, no artwork tile is rendered. */
@@ -64,6 +69,13 @@ export interface EpisodeCardProps {
    * etc., without swapping the nav target.
    */
   onTitleClick?: () => void;
+  /** Canonical-topic overlap result. When set, renders canonical indicator (takes precedence over categoryOverlap). */
+  canonicalOverlap?: CanonicalOverlapResult | null;
+  /** Category-level overlap fallback (ADR-034). Rendered only when canonicalOverlap is null/undefined. */
+  categoryOverlap?: {
+    label: string | null;
+    labelKind: OverlapLabelKind | null;
+  };
 }
 
 function ArtworkTile({
@@ -145,6 +157,8 @@ export function EpisodeCard({
   secondaryActions,
   isListened = false,
   onTitleClick,
+  canonicalOverlap,
+  categoryOverlap,
 }: EpisodeCardProps) {
   const parsedScore =
     score != null && score !== "" ? parseScoreOrNull(score) : null;
@@ -233,6 +247,25 @@ export function EpisodeCard({
                   ))}
               </div>
             )}
+
+            {canonicalOverlap ? (
+              <CanonicalOverlapIndicator
+                overlap={canonicalOverlap}
+                className="mt-1.5"
+              />
+            ) : categoryOverlap?.label ? (
+              <p
+                data-testid="overlap-indicator"
+                className={cn(
+                  "mt-1.5 text-xs font-medium",
+                  categoryOverlap.labelKind === "high-overlap"
+                    ? "text-status-warning-text"
+                    : "text-status-success-text",
+                )}
+              >
+                {categoryOverlap.label}
+              </p>
+            ) : null}
 
             <div className="mt-3 border-t pt-3">
               <div className="flex items-center justify-between gap-2">

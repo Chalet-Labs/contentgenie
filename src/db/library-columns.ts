@@ -1,7 +1,10 @@
 /** Shared column selections and DTO types for library/episode/podcast queries. */
 
 import type { PodcastIndexEpisodeId } from "@/types/ids";
-import { type OverlapLabelKind } from "@/lib/topic-overlap";
+import {
+  type CanonicalOverlapResult,
+  type OverlapLabelKind,
+} from "@/lib/topic-overlap";
 import type { CanonicalTopicKind, CanonicalTopicStatus } from "@/db/schema";
 
 export type { CanonicalTopicKind, CanonicalTopicStatus };
@@ -100,4 +103,5 @@ export interface RecommendedEpisodeDTO extends EpisodeListDTO {
   overlapTopic?: string | null;
   overlapLabel?: string | null;
   overlapLabelKind?: OverlapLabelKind | null;
+  canonicalOverlap?: CanonicalOverlapResult | null;
 }

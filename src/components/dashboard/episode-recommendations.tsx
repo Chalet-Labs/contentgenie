@@ -10,6 +10,7 @@ import { WorthItBadge } from "@/components/episodes/worth-it-badge";
 import { formatDate, formatDuration, stripHtml } from "@/lib/utils";
 import { useExpandable } from "@/hooks/use-expandable";
 import type { RecommendedEpisodeDTO } from "@/db/library-columns";
+import { CanonicalOverlapIndicator } from "@/components/episodes/canonical-overlap-indicator";
 
 export const EPISODES_INITIAL = 3;
 
@@ -145,8 +146,14 @@ export function EpisodeRecommendations({
                     )}
                   </span>
                 </div>
-                {episode.overlapLabel && (
+                {episode.canonicalOverlap ? (
+                  <CanonicalOverlapIndicator
+                    overlap={episode.canonicalOverlap}
+                    className="mt-1"
+                  />
+                ) : episode.overlapLabel ? (
                   <p
+                    data-testid="overlap-indicator"
                     className={`mt-1 text-xs font-medium ${
                       episode.overlapLabelKind === "high-overlap"
                         ? "text-status-warning-text"
@@ -155,7 +162,7 @@ export function EpisodeRecommendations({
                   >
                     {episode.overlapLabel}
                   </p>
-                )}
+                ) : null}
               </div>
             </Link>
           ))}

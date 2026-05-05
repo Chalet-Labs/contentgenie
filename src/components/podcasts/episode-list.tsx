@@ -12,6 +12,7 @@ import {
   asPodcastIndexEpisodeId,
   type PodcastIndexEpisodeId,
 } from "@/types/ids";
+import type { CanonicalOverlapResult } from "@/lib/topic-overlap";
 
 interface EpisodeListProps {
   episodes: PodcastIndexEpisode[];
@@ -40,6 +41,11 @@ interface EpisodeListProps {
     PodcastIndexEpisodeId,
     CanonicalTopicChip[]
   >;
+  /** Canonical-topic overlap results per episode, keyed by PodcastIndex id. */
+  canonicalOverlapByPodcastIndexId?: Record<
+    PodcastIndexEpisodeId,
+    CanonicalOverlapResult | null
+  >;
 }
 
 export function EpisodeList({
@@ -52,6 +58,7 @@ export function EpisodeList({
   knownIds,
   topicsByPodcastIndexId,
   canonicalTopicsByPodcastIndexId,
+  canonicalOverlapByPodcastIndexId,
 }: EpisodeListProps) {
   const [query, setQuery] = useState("");
   const trimmedQuery = query.trim();
@@ -133,6 +140,7 @@ export function EpisodeList({
               canMarkListened={knownSet ? knownSet.has(piId) : true}
               topics={topicsByPodcastIndexId?.[piId]}
               canonicalTopics={canonicalTopicsByPodcastIndexId?.[piId]}
+              canonicalOverlap={canonicalOverlapByPodcastIndexId?.[piId]}
             />
           );
         })
