@@ -25,6 +25,8 @@ import {
   canonicalTopicStatusEnum,
   canonicalTopicKindEnum,
   canonicalTopicAliases,
+  canonicalTopics,
+  canonicalTopicDigests,
   episodes,
   IN_PROGRESS_STATUSES,
   type SummaryStatus,
@@ -32,6 +34,13 @@ import {
 import { db } from "@/db";
 import type { ActionResult } from "@/types/action-result";
 import type { summarizeEpisode } from "@/trigger/summarize-episode";
+import type { generateTopicDigest } from "@/trigger/generate-topic-digest";
+import { withAuthAction } from "@/lib/auth-wrapper";
+import { canonicalTopicCompletedSummaryCount } from "@/lib/admin/canonical-topic-episode-count";
+import {
+  MIN_DERIVED_COUNT_FOR_DIGEST,
+  STALENESS_GROWTH_THRESHOLD,
+} from "@/lib/topic-digest-thresholds";
 
 // ---------------------------------------------------------------------------
 // Input schemas
@@ -474,5 +483,108 @@ export async function getCanonicalEpisodeCountDrift(): Promise<
   return withAdminAction(async () => {
     const data = await getCanonicalMergeCleanupDriftQuery();
     return { success: true, data };
+  });
+}
+
+// ---------------------------------------------------------------------------
+// triggerTopicDigestGeneration — user-facing digest trigger (ADR-051)
+// ---------------------------------------------------------------------------
+
+const topicDigestSchema = z
+  .object({ canonicalTopicId: z.number().int().positive() })
+  .strict();
+
+export async function triggerTopicDigestGeneration(input: {
+  canonicalTopicId: number;
+}): Promise<
+  ActionResult<{
+    status: "queued" | "cached" | "ineligible";
+    digestId?: number;
+    runId?: string;
+  }>
+> {
+  return withAuthAction(async () => {
+    const parsed = topicDigestSchema.safeParse(input);
+    if (!parsed.success) {
+      return {
+        success: false,
+        error: parsed.error.issues[0]?.message ?? "Invalid input",
+      };
+    }
+    const { canonicalTopicId } = parsed.data;
+
+    const [canonicalRows, digestRows] = await Promise.all([
+      db
+        .select({
+          id: canonicalTopics.id,
+          status: canonicalTopics.status,
+          completedSummaryCount: canonicalTopicCompletedSummaryCount(),
+        })
+        .from(canonicalTopics)
+        .where(eq(canonicalTopics.id, canonicalTopicId)),
+      db
+        .select({
+          id: canonicalTopicDigests.id,
+          episodeCountAtGeneration:
+            canonicalTopicDigests.episodeCountAtGeneration,
+        })
+        .from(canonicalTopicDigests)
+        .where(eq(canonicalTopicDigests.canonicalTopicId, canonicalTopicId)),
+    ]);
+
+    const canonical = canonicalRows[0];
+    if (!canonical || canonical.status !== "active") {
+      return { success: false, error: "not-found" };
+    }
+
+    // Both eligibility and staleness operate on completed-summary count to
+    // align with the task's `summaryStatus = 'completed'` predicate. Using the
+    // raw linked-episode count would let the action queue runs that the task
+    // then aborts (false-positive 'queued') and miss regenerations when new
+    // summaries complete without new links being added.
+    const completedSummaryCount = canonical.completedSummaryCount;
+    const existing = digestRows[0] ?? null;
+
+    if (completedSummaryCount < MIN_DERIVED_COUNT_FOR_DIGEST) {
+      return {
+        success: true,
+        data: { status: "ineligible", digestId: existing?.id },
+      };
+    }
+
+    if (
+      existing &&
+      Math.abs(completedSummaryCount - existing.episodeCountAtGeneration) <
+        STALENESS_GROWTH_THRESHOLD
+    ) {
+      return {
+        success: true,
+        data: { status: "cached", digestId: existing.id },
+      };
+    }
+
+    try {
+      const handle = await tasks.trigger<typeof generateTopicDigest>(
+        "generate-topic-digest",
+        { canonicalTopicId },
+        {
+          idempotencyKey: `generate-topic-digest-${canonicalTopicId}`,
+          idempotencyKeyTTL: "10m",
+        },
+      );
+      return {
+        success: true,
+        data: { status: "queued", digestId: existing?.id, runId: handle.id },
+      };
+    } catch (e) {
+      console.error("[triggerTopicDigestGeneration] trigger failed:", {
+        canonicalTopicId,
+        error: e,
+      });
+      return {
+        success: false,
+        error: e instanceof Error ? e.message : "trigger-failed",
+      };
+    }
   });
 }

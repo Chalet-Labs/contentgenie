@@ -1,5 +1,5 @@
 import { sql, type SQL } from "drizzle-orm";
-import { canonicalTopics, episodeCanonicalTopics } from "@/db/schema";
+import { canonicalTopics, episodeCanonicalTopics, episodes } from "@/db/schema";
 
 /**
  * Correlated subquery that returns the live junction-row count for the
@@ -19,6 +19,32 @@ import { canonicalTopics, episodeCanonicalTopics } from "@/db/schema";
  */
 export function canonicalTopicEpisodeCount(): SQL<number> {
   return sql<number>`(SELECT count(*) FROM ${episodeCanonicalTopics} ect WHERE ect.canonical_topic_id = ${canonicalTopics}.${canonicalTopics.id})`.mapWith(
+    Number,
+  );
+}
+
+/**
+ * Correlated subquery that returns the count of *digestable* linked episodes
+ * for the outer `canonical_topics` row — i.e. links whose joined episode has
+ * `summary_status = 'completed'` and a non-blank summary. Mirrors the full
+ * predicate used by `generate-topic-digest`'s `validEpisodeRows` filter
+ * (`summary IS NOT NULL` AND `summary.trim().length > 0`) so the action's
+ * eligibility / staleness logic compares apples-to-apples with what the task
+ * actually feeds the LLM.
+ *
+ * The whitespace check uses Postgres's POSIX character class
+ * `[^[:space:]]` rather than `length(btrim(...))`, because `btrim` only
+ * strips space/tab by default whereas JavaScript `String.prototype.trim()`
+ * strips the full ECMA whitespace set (including `\n`, `\r`, `\v`, `\f`).
+ * `~ '[^[:space:]]'` is true exactly when the summary contains at least
+ * one non-whitespace character — equivalent to `summary.trim().length > 0`.
+ *
+ * Same outer-id qualification rule as `canonicalTopicEpisodeCount` — see that
+ * function's docstring for why the fully qualified `${canonicalTopics}.id` is
+ * required.
+ */
+export function canonicalTopicCompletedSummaryCount(): SQL<number> {
+  return sql<number>`(SELECT count(*) FROM ${episodeCanonicalTopics} ect INNER JOIN ${episodes} ep ON ect.episode_id = ep.id WHERE ect.canonical_topic_id = ${canonicalTopics}.${canonicalTopics.id} AND ep.summary_status = 'completed' AND ep.summary IS NOT NULL AND ep.summary ~ '[^[:space:]]')`.mapWith(
     Number,
   );
 }
