@@ -7,7 +7,17 @@ import {
   MATCH_METHODS,
   type MatchMethod,
 } from "@/lib/entity-resolution-constants";
-import { type WindowKey } from "@/lib/search-params/admin-topics-observability";
+import {
+  type WindowKey,
+  type GranularityKey,
+} from "@/lib/search-params/admin-topics-observability";
+import {
+  DRIFT_AUTO_RATE_FLOOR,
+  DRIFT_AUTO_RATE_WARN,
+  DRIFT_DISAMBIG_RATE_CEILING,
+  DRIFT_DISAMBIG_RATE_WARN,
+  type DriftStatus,
+} from "@/lib/observability/drift-thresholds";
 
 export interface ResolutionMetricRecord {
   matchMethod: MatchMethod;
@@ -183,4 +193,256 @@ export async function getDisambigForcedCount(window?: {
 
   const row = result[0];
   return { total: row?.total ?? 0, versionTokenForced: row?.forced ?? 0 };
+}
+
+// ─── Trend types (T5/T6, ADR-053) ────────────────────────────────────────────
+
+export interface MatchMethodTrendEntry {
+  bucket: Date;
+  auto: number;
+  llm_disambig: number;
+  new: number;
+  total: number;
+}
+
+export interface SimilarityTrendEntry {
+  bucket: Date;
+  buckets: SimilarityBucket[];
+}
+
+export interface DriftResult {
+  status: DriftStatus;
+  reason: string;
+  rates: {
+    auto: number;
+    disambig: number;
+    new: number;
+    total: number;
+  };
+}
+
+// ─── Bucket range generator ───────────────────────────────────────────────────
+
+/** Generate UTC-midnight date boundaries from window start to end, stepping by granularity. */
+function generateBucketRange(
+  window: { start: Date; end: Date },
+  granularity: GranularityKey,
+): Date[] {
+  let current = new Date(
+    Date.UTC(
+      window.start.getUTCFullYear(),
+      window.start.getUTCMonth(),
+      window.start.getUTCDate(),
+    ),
+  );
+  if (granularity === "week") {
+    // Postgres date_trunc('week', t) returns ISO-week Monday boundaries.
+    // Snap to the preceding Monday so generated keys align with DB keys.
+    // (dow + 6) % 7 maps Sun→6, Mon→0, Tue→1, ..., Sat→5 (days since Monday).
+    const daysFromMonday = (current.getUTCDay() + 6) % 7;
+    current = new Date(current.getTime() - daysFromMonday * MS_PER_DAY);
+  }
+  const stepMs = granularity === "week" ? 7 * MS_PER_DAY : MS_PER_DAY;
+  const dates: Date[] = [];
+  while (current.getTime() <= window.end.getTime()) {
+    dates.push(current);
+    current = new Date(current.getTime() + stepMs);
+  }
+  return dates;
+}
+
+// ─── Trend query functions ────────────────────────────────────────────────────
+
+/**
+ * Returns the match-method distribution as a time series bucketed by
+ * `date_trunc(granularity, updated_at)`. Each entry is zero-filled for any
+ * bucket in the window with no resolutions. Filters on `updatedAt` per
+ * ADR-047 §3.
+ */
+export async function getMatchMethodTrend(
+  window: { start: Date; end: Date },
+  granularity: GranularityKey,
+): Promise<MatchMethodTrendEntry[]> {
+  const timeFilter = buildTimeFilter(window);
+  const gran = sql.raw(granularity === "week" ? "'week'" : "'day'");
+  const col = episodeCanonicalTopics.updatedAt;
+
+  const bucketExpr = sql<Date>`date_trunc(${gran}, ${col})`;
+
+  const query = db
+    .select({
+      bucket: bucketExpr,
+      matchMethod: episodeCanonicalTopics.matchMethod,
+      count: count(),
+    })
+    .from(episodeCanonicalTopics)
+    .groupBy(sql`1`, episodeCanonicalTopics.matchMethod);
+
+  const rows = await (timeFilter ? query.where(timeFilter) : query);
+
+  // Aggregate DB rows by bucket key
+  const byBucket = new Map<string, MatchMethodTrendEntry>();
+  for (const row of rows) {
+    const bucket =
+      row.bucket instanceof Date ? row.bucket : new Date(row.bucket as string);
+    const key = bucket.toISOString();
+    if (!byBucket.has(key)) {
+      byBucket.set(key, {
+        bucket,
+        auto: 0,
+        llm_disambig: 0,
+        new: 0,
+        total: 0,
+      });
+    }
+    const entry = byBucket.get(key)!;
+    const n = Number(row.count);
+    const method = row.matchMethod as MatchMethod;
+    if (method === "auto") entry.auto += n;
+    else if (method === "llm_disambig") entry.llm_disambig += n;
+    else if (method === "new") entry.new += n;
+    entry.total += n;
+  }
+
+  // Zero-fill every bucket in the window range
+  return generateBucketRange(window, granularity).map((bucket) => {
+    const key = bucket.toISOString();
+    return (
+      byBucket.get(key) ?? {
+        bucket,
+        auto: 0,
+        llm_disambig: 0,
+        new: 0,
+        total: 0,
+      }
+    );
+  });
+}
+
+/**
+ * Returns similarity-bucket counts as a time series bucketed by
+ * `date_trunc(granularity, updated_at)`. Each time-bucket entry carries a
+ * full `SimilarityBucket[]` (same shape as `getSimilarityHistogram`).
+ * Filters on `updatedAt` per ADR-047 §3.
+ */
+export async function getSimilarityTrend(
+  window: { start: Date; end: Date },
+  granularity: GranularityKey,
+): Promise<SimilarityTrendEntry[]> {
+  const timeFilter = buildTimeFilter(window);
+  const gran = sql.raw(granularity === "week" ? "'week'" : "'day'");
+  const col = episodeCanonicalTopics.updatedAt;
+  const simCol = episodeCanonicalTopics.similarityToTopMatch;
+
+  const bucketSize = DEFAULT_BUCKET_SIZE;
+  const numBuckets = Math.ceil(1 / bucketSize);
+  const maxBucket = (numBuckets - 1) * bucketSize;
+
+  const bucketExpr = sql<Date>`date_trunc(${gran}, ${col})`;
+  const simBucketExpr = sql<number>`least(floor(${simCol} / ${bucketSize}) * ${bucketSize}, ${maxBucket})`;
+
+  const nullFilter = isNotNull(simCol);
+  const whereClause = timeFilter ? and(nullFilter, timeFilter) : nullFilter;
+
+  const rows = await db
+    .select({
+      bucket: bucketExpr,
+      similarityBucket: simBucketExpr,
+      count: count(),
+    })
+    .from(episodeCanonicalTopics)
+    .where(whereClause)
+    .groupBy(sql`1`, sql`2`);
+
+  // Group by time bucket, collecting similarity bucket counts
+  const byBucket = new Map<
+    string,
+    { date: Date; buckets: Map<number, number> }
+  >();
+  for (const row of rows) {
+    const bucket =
+      row.bucket instanceof Date ? row.bucket : new Date(row.bucket as string);
+    const key = bucket.toISOString();
+    if (!byBucket.has(key)) {
+      byBucket.set(key, { date: bucket, buckets: new Map() });
+    }
+    const entry = byBucket.get(key)!;
+    const simIdx = Math.round(Number(row.similarityBucket) / bucketSize);
+    entry.buckets.set(simIdx, Number(row.count));
+  }
+
+  // Reshape each time bucket into a full SimilarityBucket[]
+  return Array.from(byBucket.values()).map(({ date, buckets }) => {
+    const bucketArray: SimilarityBucket[] = [];
+    for (let i = 0; i < numBuckets; i++) {
+      const bucket = Math.round(i * bucketSize * 1e10) / 1e10;
+      bucketArray.push({ bucket, count: buckets.get(i) ?? 0 });
+    }
+    return { bucket: date, buckets: bucketArray };
+  });
+}
+
+/**
+ * Derives the current drift status from the match-method histogram.
+ * Alert wins over warn when multiple thresholds are violated simultaneously.
+ * Returns `status: "ok"` with `total === 0` to guard against divide-by-zero
+ * on empty windows (ADR-053 §5).
+ */
+export async function detectThresholdDrift(window?: {
+  start: Date;
+  end: Date;
+}): Promise<DriftResult> {
+  const histogram = await getMatchMethodHistogram(window);
+  const total = histogram.auto + histogram.llm_disambig + histogram.new;
+
+  if (total === 0) {
+    return {
+      status: "ok",
+      reason: "No resolutions in window",
+      rates: { auto: 0, disambig: 0, new: 0, total: 0 },
+    };
+  }
+
+  const autoRate = histogram.auto / total;
+  const disambigRate = histogram.llm_disambig / total;
+  const newRate = histogram.new / total;
+  const rates = { auto: autoRate, disambig: disambigRate, new: newRate, total };
+
+  // Alert check first — alert wins over warn (ADR-053 §5)
+  if (autoRate < DRIFT_AUTO_RATE_FLOOR) {
+    return {
+      status: "alert",
+      reason: `auto-match rate ${autoRate.toFixed(2)} below alert floor ${DRIFT_AUTO_RATE_FLOOR}`,
+      rates,
+    };
+  }
+  if (disambigRate > DRIFT_DISAMBIG_RATE_CEILING) {
+    return {
+      status: "alert",
+      reason: `llm_disambig rate ${disambigRate.toFixed(2)} above alert ceiling ${DRIFT_DISAMBIG_RATE_CEILING}`,
+      rates,
+    };
+  }
+
+  // Warn check
+  if (autoRate < DRIFT_AUTO_RATE_WARN) {
+    return {
+      status: "warn",
+      reason: `auto-match rate ${autoRate.toFixed(2)} below warn threshold ${DRIFT_AUTO_RATE_WARN}`,
+      rates,
+    };
+  }
+  if (disambigRate > DRIFT_DISAMBIG_RATE_WARN) {
+    return {
+      status: "warn",
+      reason: `llm_disambig rate ${disambigRate.toFixed(2)} above warn threshold ${DRIFT_DISAMBIG_RATE_WARN}`,
+      rates,
+    };
+  }
+
+  return {
+    status: "ok",
+    reason: "All metrics within healthy bounds",
+    rates,
+  };
 }

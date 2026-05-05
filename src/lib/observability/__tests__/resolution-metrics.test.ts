@@ -59,6 +59,15 @@ vi.mock("@/lib/entity-resolution-constants", () => ({
 
 vi.mock("@/lib/search-params/admin-topics-observability", () => ({
   WINDOW_KEYS: ["24h", "7d", "30d"],
+  GRANULARITY_KEYS: ["day", "week"],
+}));
+
+// Mocked constants so drift tests pin behavior independent of operator tuning
+vi.mock("@/lib/observability/drift-thresholds", () => ({
+  DRIFT_AUTO_RATE_FLOOR: 0.4,
+  DRIFT_AUTO_RATE_WARN: 0.55,
+  DRIFT_DISAMBIG_RATE_CEILING: 0.4,
+  DRIFT_DISAMBIG_RATE_WARN: 0.3,
 }));
 
 function makeChain(rows: unknown[]) {
@@ -78,6 +87,9 @@ import {
   getSimilarityHistogram,
   getDisambigForcedCount,
   windowFromKey,
+  getMatchMethodTrend,
+  getSimilarityTrend,
+  detectThresholdDrift,
 } from "@/lib/observability/resolution-metrics";
 
 describe("recordResolutionMetric", () => {
@@ -268,5 +280,347 @@ describe("windowFromKey", () => {
     const diffMs = end.getTime() - start.getTime();
     expect(diffMs).toBeGreaterThanOrEqual(30 * 24 * 60 * 60 * 1000 - 1000);
     expect(diffMs).toBeLessThanOrEqual(30 * 24 * 60 * 60 * 1000 + 1000);
+  });
+});
+
+describe("getMatchMethodTrend", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("returns one entry per day bucket with auto/llm_disambig/new/total fields", async () => {
+    mockSelect.mockReturnValue(
+      makeChain([
+        { bucket: new Date("2026-01-01"), matchMethod: "auto", count: 8 },
+        {
+          bucket: new Date("2026-01-01"),
+          matchMethod: "llm_disambig",
+          count: 2,
+        },
+        { bucket: new Date("2026-01-02"), matchMethod: "auto", count: 5 },
+      ]),
+    );
+    const window = {
+      start: new Date("2026-01-01"),
+      end: new Date("2026-01-02"),
+    };
+    const result = await getMatchMethodTrend(window, "day");
+    expect(Array.isArray(result)).toBe(true);
+    const jan1 = result.find((r) =>
+      r.bucket.toISOString().startsWith("2026-01-01"),
+    );
+    expect(jan1).toBeDefined();
+    expect(jan1?.auto).toBe(8);
+    expect(jan1?.llm_disambig).toBe(2);
+    expect(jan1?.total).toBe(10);
+  });
+
+  it("zero-fills missing day buckets within the window", async () => {
+    mockSelect.mockReturnValue(
+      makeChain([
+        { bucket: new Date("2026-01-01"), matchMethod: "auto", count: 3 },
+      ]),
+    );
+    const window = {
+      start: new Date("2026-01-01"),
+      end: new Date("2026-01-03"),
+    };
+    const result = await getMatchMethodTrend(window, "day");
+    expect(Array.isArray(result)).toBe(true);
+    // All entries must have numeric fields
+    result.forEach((entry) => {
+      expect(typeof entry.auto).toBe("number");
+      expect(typeof entry.llm_disambig).toBe("number");
+      expect(typeof entry.new).toBe("number");
+      expect(typeof entry.total).toBe("number");
+    });
+    // A zero-filled bucket has total = 0
+    const zeroBuckets = result.filter((r) => r.total === 0);
+    expect(zeroBuckets.length).toBeGreaterThan(0);
+  });
+
+  it("returns week-granularity buckets for granularity=week", async () => {
+    mockSelect.mockReturnValue(
+      makeChain([
+        { bucket: new Date("2025-12-29"), matchMethod: "auto", count: 20 },
+        { bucket: new Date("2026-01-05"), matchMethod: "auto", count: 15 },
+      ]),
+    );
+    const window = {
+      start: new Date("2025-12-29"),
+      end: new Date("2026-01-11"),
+    };
+    const result = await getMatchMethodTrend(window, "week");
+    expect(Array.isArray(result)).toBe(true);
+    result.forEach((entry) => {
+      expect(entry).toHaveProperty("bucket");
+      expect(entry).toHaveProperty("auto");
+      expect(entry).toHaveProperty("llm_disambig");
+      expect(entry).toHaveProperty("new");
+      expect(entry).toHaveProperty("total");
+    });
+  });
+
+  it("aligns week buckets to Monday even when window.start is not a Monday (B1 regression)", async () => {
+    // 2026-04-05 is a Sunday. Postgres date_trunc('week') returns the preceding
+    // Monday 2026-04-06. Without the Monday-snap fix, generateBucketRange would
+    // produce Sunday keys that never match the DB's Monday keys → all-zero output.
+    const mondayKey = new Date("2026-04-06T00:00:00.000Z");
+    mockSelect.mockReturnValue(
+      makeChain([
+        { bucket: mondayKey, matchMethod: "auto", count: 7 },
+        { bucket: mondayKey, matchMethod: "llm_disambig", count: 3 },
+      ]),
+    );
+    const window = {
+      start: new Date("2026-04-05"), // Sunday — intentionally not Monday
+      end: new Date("2026-04-12"),
+    };
+    const result = await getMatchMethodTrend(window, "week");
+
+    // The entry whose bucket aligns to Monday 2026-04-06 must carry the DB counts.
+    const mondayEntry = result.find(
+      (r) => r.bucket.toISOString() === mondayKey.toISOString(),
+    );
+    expect(mondayEntry).toBeDefined();
+    expect(mondayEntry!.auto).toBe(7);
+    expect(mondayEntry!.llm_disambig).toBe(3);
+    expect(mondayEntry!.total).toBe(10);
+    // No entry should be a Sunday — all buckets must be Mondays (getUTCDay() === 1)
+    result.forEach((entry) => {
+      expect(entry.bucket.getUTCDay()).toBe(1);
+    });
+  });
+
+  it("passes gte + lte on updatedAt when window provided", async () => {
+    mockSelect.mockReturnValue(makeChain([]));
+    const start = new Date("2026-01-01");
+    const end = new Date("2026-01-07");
+    await getMatchMethodTrend({ start, end }, "day");
+    expect(mockGte).toHaveBeenCalledWith("updated_at", start);
+    expect(mockLte).toHaveBeenCalledWith("updated_at", end);
+    expect(mockAnd).toHaveBeenCalled();
+  });
+
+  it("returns an array (possibly empty or zero-filled) when no data in window", async () => {
+    mockSelect.mockReturnValue(makeChain([]));
+    const window = {
+      start: new Date("2026-01-01"),
+      end: new Date("2026-01-01"),
+    };
+    const result = await getMatchMethodTrend(window, "day");
+    expect(Array.isArray(result)).toBe(true);
+  });
+});
+
+describe("getSimilarityTrend", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("returns one entry per time bucket, each with a buckets array", async () => {
+    mockSelect.mockReturnValue(
+      makeChain([
+        { bucket: new Date("2026-01-01"), similarityBucket: 0.85, count: 4 },
+        { bucket: new Date("2026-01-01"), similarityBucket: 0.95, count: 2 },
+        { bucket: new Date("2026-01-02"), similarityBucket: 0.75, count: 6 },
+      ]),
+    );
+    const window = {
+      start: new Date("2026-01-01"),
+      end: new Date("2026-01-02"),
+    };
+    const result = await getSimilarityTrend(window, "day");
+    expect(Array.isArray(result)).toBe(true);
+    const jan1 = result.find((r) =>
+      r.bucket.toISOString().startsWith("2026-01-01"),
+    );
+    expect(jan1).toBeDefined();
+    expect(Array.isArray(jan1?.buckets)).toBe(true);
+  });
+
+  it("each entry's buckets array has { bucket, count } shape with numeric values", async () => {
+    mockSelect.mockReturnValue(
+      makeChain([
+        { bucket: new Date("2026-01-05"), similarityBucket: 0.5, count: 3 },
+      ]),
+    );
+    const window = {
+      start: new Date("2026-01-05"),
+      end: new Date("2026-01-05"),
+    };
+    const result = await getSimilarityTrend(window, "day");
+    if (result.length > 0) {
+      result[0].buckets.forEach((b) => {
+        expect(b).toHaveProperty("bucket");
+        expect(b).toHaveProperty("count");
+        expect(typeof b.bucket).toBe("number");
+        expect(typeof b.count).toBe("number");
+      });
+    }
+  });
+
+  it("returns an array (possibly empty) when no data in window", async () => {
+    mockSelect.mockReturnValue(makeChain([]));
+    const window = {
+      start: new Date("2026-01-01"),
+      end: new Date("2026-01-01"),
+    };
+    const result = await getSimilarityTrend(window, "day");
+    expect(Array.isArray(result)).toBe(true);
+  });
+
+  it("passes gte + lte on updatedAt when window provided", async () => {
+    mockSelect.mockReturnValue(makeChain([]));
+    const start = new Date("2026-01-01");
+    const end = new Date("2026-01-07");
+    await getSimilarityTrend({ start, end }, "day");
+    expect(mockGte).toHaveBeenCalledWith("updated_at", start);
+    expect(mockLte).toHaveBeenCalledWith("updated_at", end);
+    expect(mockAnd).toHaveBeenCalled();
+  });
+
+  it("accepts week granularity and returns array result", async () => {
+    mockSelect.mockReturnValue(
+      makeChain([
+        { bucket: new Date("2025-12-29"), similarityBucket: 0.9, count: 10 },
+      ]),
+    );
+    const window = {
+      start: new Date("2025-12-29"),
+      end: new Date("2026-01-11"),
+    };
+    const result = await getSimilarityTrend(window, "week");
+    expect(Array.isArray(result)).toBe(true);
+  });
+});
+
+describe("detectThresholdDrift", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("returns status=ok when auto rate exceeds warn threshold and disambig rate is below warn threshold", async () => {
+    // auto=60/100=0.60 >= WARN(0.55), disambig=20/100=0.20 <= WARN(0.30)
+    mockSelect.mockReturnValue(
+      makeChain([
+        { matchMethod: "auto", count: 60 },
+        { matchMethod: "llm_disambig", count: 20 },
+        { matchMethod: "new", count: 20 },
+      ]),
+    );
+    const window = {
+      start: new Date("2026-01-01"),
+      end: new Date("2026-01-07"),
+    };
+    const result = await detectThresholdDrift(window);
+    expect(result.status).toBe("ok");
+    expect(result).toHaveProperty("reason");
+    expect(result).toHaveProperty("rates");
+    expect(result.rates.total).toBe(100);
+  });
+
+  it("returns status=warn when auto rate is between floor and warn threshold", async () => {
+    // auto=45/100=0.45 — below warn (0.55) but above floor (0.40) → warn
+    mockSelect.mockReturnValue(
+      makeChain([
+        { matchMethod: "auto", count: 45 },
+        { matchMethod: "llm_disambig", count: 25 },
+        { matchMethod: "new", count: 30 },
+      ]),
+    );
+    const window = {
+      start: new Date("2026-01-01"),
+      end: new Date("2026-01-07"),
+    };
+    const result = await detectThresholdDrift(window);
+    expect(result.status).toBe("warn");
+    expect(result.reason).toMatch(/auto/i);
+  });
+
+  it("returns status=warn when disambig rate is between warn and ceiling threshold", async () => {
+    // disambig=35/100=0.35 — above warn (0.30) but below ceiling (0.40) → warn
+    mockSelect.mockReturnValue(
+      makeChain([
+        { matchMethod: "auto", count: 60 },
+        { matchMethod: "llm_disambig", count: 35 },
+        { matchMethod: "new", count: 5 },
+      ]),
+    );
+    const window = {
+      start: new Date("2026-01-01"),
+      end: new Date("2026-01-07"),
+    };
+    const result = await detectThresholdDrift(window);
+    expect(result.status).toBe("warn");
+    expect(result.reason).toMatch(/disambig/i);
+  });
+
+  it("returns status=alert when auto rate drops below the alert floor", async () => {
+    // auto=30/100=0.30 < floor (0.40) → alert
+    mockSelect.mockReturnValue(
+      makeChain([
+        { matchMethod: "auto", count: 30 },
+        { matchMethod: "llm_disambig", count: 40 },
+        { matchMethod: "new", count: 30 },
+      ]),
+    );
+    const window = {
+      start: new Date("2026-01-01"),
+      end: new Date("2026-01-07"),
+    };
+    const result = await detectThresholdDrift(window);
+    expect(result.status).toBe("alert");
+    expect(result.reason).toMatch(/auto/i);
+    expect(result.reason).toMatch(/0\.3/);
+  });
+
+  it("returns status=alert when disambig rate exceeds the ceiling threshold", async () => {
+    // disambig=45/100=0.45 > ceiling (0.40) → alert
+    mockSelect.mockReturnValue(
+      makeChain([
+        { matchMethod: "auto", count: 55 },
+        { matchMethod: "llm_disambig", count: 45 },
+        { matchMethod: "new", count: 0 },
+      ]),
+    );
+    const window = {
+      start: new Date("2026-01-01"),
+      end: new Date("2026-01-07"),
+    };
+    const result = await detectThresholdDrift(window);
+    expect(result.status).toBe("alert");
+    expect(result.reason).toMatch(/disambig/i);
+    expect(result.reason).toMatch(/0\.45/);
+  });
+
+  it("returns status=ok with total=0 when window has no resolutions (divide-by-zero guard)", async () => {
+    mockSelect.mockReturnValue(makeChain([]));
+    const window = {
+      start: new Date("2026-01-01"),
+      end: new Date("2026-01-07"),
+    };
+    const result = await detectThresholdDrift(window);
+    expect(result.status).toBe("ok");
+    expect(result.rates.total).toBe(0);
+    expect(result.rates.auto).toBe(0);
+    expect(result.rates.disambig).toBe(0);
+  });
+
+  it("alert wins over warn when both auto and disambig are in violation", async () => {
+    // auto=25/100=0.25 < floor (0.40) AND disambig=45/100=0.45 > ceiling (0.40)
+    mockSelect.mockReturnValue(
+      makeChain([
+        { matchMethod: "auto", count: 25 },
+        { matchMethod: "llm_disambig", count: 45 },
+        { matchMethod: "new", count: 30 },
+      ]),
+    );
+    const window = {
+      start: new Date("2026-01-01"),
+      end: new Date("2026-01-07"),
+    };
+    const result = await detectThresholdDrift(window);
+    expect(result.status).toBe("alert");
   });
 });

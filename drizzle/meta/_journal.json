@@ -211,6 +211,13 @@
       "when": 1777671064386,
       "tag": "0029_parallel_prodigy",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1777935731506,
+      "tag": "0030_mute_shooting_star",
+      "breakpoints": true
     }
   ]
 }
