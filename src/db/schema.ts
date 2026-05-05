@@ -650,6 +650,42 @@ export type CanonicalTopicAdminLog = typeof canonicalTopicAdminLog.$inferSelect;
 export type NewCanonicalTopicAdminLog =
   typeof canonicalTopicAdminLog.$inferInsert;
 
+// Per-cluster audit log for the nightly reconciliation pipeline (ADR-053 §1).
+// One row per cluster the orchestrator touched (including skipped/failed).
+// Intentionally no FK on winnerId/loserIds — audit rows must survive canonical deletion.
+export const reconciliationLog = pgTable(
+  "reconciliation_log",
+  {
+    id: serial("id").primaryKey(),
+    runId: text("run_id").notNull(),
+    clusterIndex: integer("cluster_index").notNull(),
+    clusterSize: integer("cluster_size").notNull(),
+    winnerId: integer("winner_id"),
+    loserIds: integer("loser_ids").array().notNull(),
+    verifiedLoserIds: integer("verified_loser_ids").array().notNull(),
+    rejectedLoserIds: integer("rejected_loser_ids").array().notNull(),
+    mergesExecuted: integer("merges_executed").notNull(),
+    mergesRejected: integer("merges_rejected").notNull(),
+    pairwiseVerifyThrew: integer("pairwise_verify_threw").notNull(),
+    outcome: text("outcome")
+      .$type<"merged" | "partial" | "rejected" | "skipped" | "failed">()
+      .notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("rl_run_id_idx").on(table.runId),
+    index("rl_winner_id_idx").on(table.winnerId),
+    index("rl_created_at_idx").on(sql`${table.createdAt} DESC`),
+    check(
+      "rl_outcome_enum",
+      sql`${table.outcome} IN ('merged', 'partial', 'rejected', 'skipped', 'failed')`,
+    ),
+  ],
+);
+
+export type ReconciliationLog = typeof reconciliationLog.$inferSelect;
+export type NewReconciliationLog = typeof reconciliationLog.$inferInsert;
+
 // Relations
 export const usersRelations = relations(users, ({ many, one }) => ({
   subscriptions: many(userSubscriptions),

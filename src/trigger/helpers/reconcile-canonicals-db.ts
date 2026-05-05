@@ -8,6 +8,7 @@
 import { sql } from "drizzle-orm";
 
 import type { db as RealDb } from "@/db";
+import { reconciliationLog } from "@/db/schema";
 import { coerceEmbedding } from "@/trigger/helpers/coerce-embedding";
 import {
   RECONCILE_DECAY_DAYS,
@@ -15,8 +16,10 @@ import {
   RECONCILE_LOOKBACK_DAYS,
 } from "@/lib/reconcile-constants";
 import type { ReconcileMember } from "@/lib/prompts/reconcile-winner-pick";
+import type { ClusterAuditRow } from "@/trigger/helpers/reconcile-summary-accumulator";
 
 export type DbExecutor = Pick<typeof RealDb, "execute">;
+export type DbInserter = Pick<typeof RealDb, "insert">;
 
 /**
  * `embedding === null` indicates the row failed `coerceEmbedding`'s finite-value
@@ -106,4 +109,20 @@ export async function decayStaleCanonicals(
         RETURNING id`,
   );
   return result.rows.length;
+}
+
+/**
+ * Phase 8 — persist per-cluster audit rows to `reconciliation_log`.
+ * All rows for a single run are bulk-inserted with the same `runId`.
+ * No-ops when `audits` is empty so callers don't need to guard.
+ */
+export async function insertReconciliationAuditRows(
+  database: DbInserter,
+  runId: string,
+  audits: ClusterAuditRow[],
+): Promise<void> {
+  if (audits.length === 0) return;
+  await database
+    .insert(reconciliationLog)
+    .values(audits.map((a) => ({ ...a, runId })));
 }
