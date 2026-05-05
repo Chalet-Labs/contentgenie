@@ -1,5 +1,5 @@
 import { task, logger, metadata, AbortTaskRunError } from "@trigger.dev/sdk";
-import { and, desc, eq, isNotNull } from "drizzle-orm";
+import { and, desc, eq, isNotNull, sql } from "drizzle-orm";
 
 import { db } from "@/db";
 import {
@@ -140,6 +140,13 @@ export const generateTopicDigest = task({
           eq(episodeCanonicalTopics.canonicalTopicId, canonicalTopicId),
           isNotNull(episodes.summary),
           eq(episodes.summaryStatus, "completed"),
+          // Drop whitespace-only summaries inside SQL so the LIMIT applies to
+          // digestable rows. Without this, blank summaries sorted near the top
+          // by coverageScore could occupy the MAX_EPISODE_INPUT window and
+          // push valid summaries out, causing INSUFFICIENT_VALID_SUMMARIES even
+          // when the topic has enough digestable summaries overall. Mirrors
+          // the predicate in `canonicalTopicCompletedSummaryCount`.
+          sql`${episodes.summary} ~ '[^[:space:]]'`,
         ),
       )
       .orderBy(
