@@ -348,6 +348,19 @@ describe("EpisodeCard", () => {
       topicId: 1,
     };
 
+    it("renders canonical new indicator when canonicalOverlap kind is new", () => {
+      const newOverlap: CanonicalOverlapResult = {
+        kind: "new",
+        topicLabel: "creatine",
+        topicId: 1,
+      };
+      render(<EpisodeCard {...baseProps} canonicalOverlap={newOverlap} />);
+      const indicator = screen.getByTestId("overlap-indicator");
+      expect(indicator).toBeInTheDocument();
+      expect(indicator).toHaveTextContent("New: creatine");
+      expect(indicator).toHaveAttribute("data-canonical-overlap-kind", "new");
+    });
+
     it("renders canonical repeat indicator when canonicalOverlap is set", () => {
       render(<EpisodeCard {...baseProps} canonicalOverlap={repeatOverlap} />);
       const indicator = screen.getByTestId("overlap-indicator");

@@ -505,7 +505,9 @@ export async function getRecommendedEpisodes(
         CanonicalOverlapResult | null
       > = {};
       try {
-        const ids = withOverlap.map((r) => r.podcastIndexId);
+        const ids = sanitizeOverlapIdBatch(
+          withOverlap.map((r) => r.podcastIndexId),
+        );
         const canonicalResult = await runCanonicalTopicOverlapBatch(
           userId,
           ids,
@@ -519,10 +521,14 @@ export async function getRecommendedEpisodes(
         );
       }
 
-      const withCanonical = withOverlap.map((r) => ({
-        ...r,
-        canonicalOverlap: canonicalMap[r.podcastIndexId] ?? null,
-      }));
+      const withCanonical = withOverlap.map((r) => {
+        const normalizedId = sanitizeOverlapId(r.podcastIndexId);
+        return {
+          ...r,
+          canonicalOverlap:
+            normalizedId === null ? null : (canonicalMap[normalizedId] ?? null),
+        };
+      });
 
       // Stable partition sort: non-overlapping (overlapCount < 3) first, overlapping last.
       // Within each partition, original order (worthItScore DESC) is preserved.

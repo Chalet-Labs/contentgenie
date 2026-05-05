@@ -22,17 +22,26 @@ export async function fetchCanonicalOverlapsBatched(
 
   for (let offset = 0; offset < ids.length; offset += MAX_OVERLAP_LOOKUP_IDS) {
     const chunk = ids.slice(offset, offset + MAX_OVERLAP_LOOKUP_IDS);
-    const result = await getCanonicalTopicOverlaps(chunk);
-    if (!result.success) {
-      console.warn("[canonical-overlap] chunk fetch failed; skipping", {
+    try {
+      const result = await getCanonicalTopicOverlaps(chunk);
+      if (!result.success) {
+        console.error("[canonical-overlap] chunk fetch failed; skipping", {
+          offset,
+          chunkSize: chunk.length,
+          totalIds: ids.length,
+          error: result.error,
+        });
+        continue;
+      }
+      Object.assign(merged, result.data);
+    } catch (error) {
+      console.error("[canonical-overlap] chunk fetch threw; skipping", {
         offset,
         chunkSize: chunk.length,
         totalIds: ids.length,
-        error: result.error,
+        error,
       });
-      continue;
     }
-    Object.assign(merged, result.data);
   }
 
   return merged;

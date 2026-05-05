@@ -12,7 +12,7 @@ export function CanonicalOverlapIndicator({
 }: CanonicalOverlapIndicatorProps) {
   const copy =
     overlap.kind === "repeat"
-      ? `You've heard ${overlap.count} episodes on ${overlap.topicLabel}`
+      ? `You've heard ${overlap.count} ${overlap.count === 1 ? "episode" : "episodes"} on ${overlap.topicLabel}`
       : `New: ${overlap.topicLabel}`;
 
   return (

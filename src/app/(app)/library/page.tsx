@@ -50,7 +50,10 @@ export default function LibraryPage() {
   const [isFromCache, setIsFromCache] = useState(false);
 
   const canonicalOverlapIds = useMemo<PodcastIndexEpisodeId[]>(
-    () => items.map((i) => i.episode.podcastIndexId),
+    () =>
+      Array.from(
+        new Set(items.map((i) => i.episode.podcastIndexId)),
+      ).sort() as PodcastIndexEpisodeId[],
     [items],
   );
   const canonicalOverlapMap = useCanonicalOverlapMap(canonicalOverlapIds, {

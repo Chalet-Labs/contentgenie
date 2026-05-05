@@ -162,6 +162,22 @@ describe("EpisodeRecommendations", () => {
       topicId: 10,
     };
 
+    it("renders canonical new indicator when canonicalOverlap kind is new", () => {
+      const newOverlap: CanonicalOverlapResult = {
+        kind: "new",
+        topicLabel: "gut health",
+        topicId: 10,
+      };
+      render(
+        <EpisodeRecommendations
+          episodes={[makeEpisode({ canonicalOverlap: newOverlap })]}
+        />,
+      );
+      const indicator = screen.getByTestId("overlap-indicator");
+      expect(indicator).toHaveTextContent("New: gut health");
+      expect(indicator).toHaveAttribute("data-canonical-overlap-kind", "new");
+    });
+
     it("renders canonical repeat indicator when canonicalOverlap is set", () => {
       render(
         <EpisodeRecommendations

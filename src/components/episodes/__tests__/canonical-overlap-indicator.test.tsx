@@ -37,6 +37,9 @@ describe("CanonicalOverlapIndicator", () => {
     const { rerender } = render(
       <CanonicalOverlapIndicator overlap={repeatOverlap} />,
     );
+    expect(
+      screen.getByText("You've heard 1 episode on nutrition"),
+    ).toBeInTheDocument();
     expect(screen.getByTestId("overlap-indicator")).toHaveAttribute(
       "data-canonical-overlap-kind",
       "repeat",
