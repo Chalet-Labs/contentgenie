@@ -5,12 +5,6 @@ description: Use before any `gh pr create` — invoke as soon as the user asks t
 
 # Pre-PR Validation
 
-## How this is enforced
-
-A PreToolUse hook guards `gh pr create` until `.claude/.pr-validated` contains the current branch + HEAD SHA. The sentinel invalidates on any HEAD change, so any commit after running the skill forces a re-run.
-
-Invoke proactively the moment a PR is discussed — don't wait for the hook to reject.
-
 ## Run inline — do not wrap the pipeline in a subagent
 
 Run inline in the calling session. Phase 2.1 dispatches a background `Task` for Codex and `/pr-review-toolkit:review-pr all` spawns further `Task` calls for each specialist. Subagents can't spawn further subagents, so wrapping this skill in an outer Task blocks Codex and may break the toolkit reviewers.
@@ -29,8 +23,6 @@ Exceptions (the only times you stop):
 "This feels like a lot of changes" is not an exception.
 
 ## The Pipeline
-
-Run phases in order.
 
 ### Phase 0 — Sync with origin/main
 
@@ -125,8 +117,6 @@ type: Description
 
 Types: `feat`, `fix`, `chore`, `docs`, `test`, `refactor`, `style`.
 
-Per user memory, commit messages should not mention Claude, AI, or automated generation — focus on the technical change and business value.
-
 #### Phase 4a — Mechanical fixes (Sonnet subagent)
 
 When the mechanical bucket has ≥3 findings, dispatch a foreground Sonnet subagent to apply them. Below 3, just do them inline — the prompt overhead isn't worth it.
@@ -211,9 +201,8 @@ Title: `type: Description`, under 70 characters, same convention as commits. Use
 
 ## Non-obvious rules
 
-- **Verification is fresh-only.** Re-run `bun run build` in this session — previous runs don't count. The sentinel is a completion claim.
+- **Verification is fresh-only.** Re-run `bun run build` in this session — previous runs don't count.
 - **Rubric propagation is hybrid.** Codex inlines the rubric in its `Task` prompt (background subagent has no shared context). The two slash commands rely on conversation salience. Smoke-test: look for `[checklist §N]` citations in Phase 3 — if absent, propagation regressed.
-- **Phase 4a is bounded.** Mechanical edits only, foreground, no nested subagents, no commit. If a finding needs judgment, the subagent skips it and 4b picks it up — that's the intended path, not a bug.
 
 ## Failure modes
 
