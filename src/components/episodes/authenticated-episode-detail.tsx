@@ -306,7 +306,10 @@ export function AuthenticatedEpisodeDetail({
 
   const episodeLoaded = episode !== null;
   useEffect(() => {
-    if (!isOnline || !episodeLoaded) return;
+    if (!isOnline || !episodeLoaded) {
+      setOverlapResult({ label: null, labelKind: null });
+      return;
+    }
     let ignore = false;
     getEpisodeTopicOverlap(episodeIdBranded)
       .then((result) => {
@@ -324,6 +327,7 @@ export function AuthenticatedEpisodeDetail({
       .catch((err) => {
         // Non-critical: overlap label is a presentation-only enhancement
         console.warn("[overlap-label] getEpisodeTopicOverlap failed", err);
+        if (!ignore) setOverlapResult({ label: null, labelKind: null });
       });
     return () => {
       ignore = true;
@@ -331,7 +335,10 @@ export function AuthenticatedEpisodeDetail({
   }, [isOnline, episodeLoaded, episodeIdBranded]);
 
   useEffect(() => {
-    if (!isOnline || !episodeLoaded) return;
+    if (!isOnline || !episodeLoaded) {
+      setCanonicalOverlap(null);
+      return;
+    }
     let ignore = false;
     getCanonicalTopicOverlap(episodeIdBranded)
       .then((result) => {

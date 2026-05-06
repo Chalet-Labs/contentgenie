@@ -13,12 +13,17 @@ export type CanonicalOverlapMap = Record<
 
 export function useCanonicalOverlapMap(
   ids: PodcastIndexEpisodeId[],
-  options: { enabled?: boolean } = {},
+  options: { enabled?: boolean; initialMap?: CanonicalOverlapMap } = {},
 ): CanonicalOverlapMap {
-  const { enabled = true } = options;
-  const [map, setMap] = useState<CanonicalOverlapMap>({});
+  const { enabled = true, initialMap } = options;
+  const [map, setMap] = useState<CanonicalOverlapMap>(initialMap ?? {});
   const idsKey = JSON.stringify(ids);
   const seqRef = useRef(0);
+  // When the caller supplies initialMap, the server already returned fresh
+  // overlap data for these ids — skip the eager mount fetch (a redundant RTT
+  // that can also clobber initialMap on transient client-side failures) and
+  // refresh only when listen state actually changes.
+  const skipInitialFetchRef = useRef(initialMap !== undefined);
 
   useEffect(() => {
     if (!enabled || ids.length === 0) {
@@ -39,7 +44,11 @@ export function useCanonicalOverlapMap(
         });
     };
 
-    fetchOverlaps();
+    if (skipInitialFetchRef.current) {
+      skipInitialFetchRef.current = false;
+    } else {
+      fetchOverlaps();
+    }
     // Canonical overlap counts depend on listen history; refresh when any
     // ListenedButton fires so stale "You've heard N episodes on X" labels
     // don't outlive the underlying state.

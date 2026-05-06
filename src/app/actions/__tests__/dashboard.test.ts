@@ -848,7 +848,7 @@ describe("getRecommendedEpisodes", () => {
     expect(result.episodes[0].title).toBe("AI Deep Dive");
   });
 
-  it("attaches canonicalOverlap to DTO when canonical batch resolves with data", async () => {
+  it("sets canonicalOverlap to null when canonical batch finds no candidate canonicals", async () => {
     const EP_A = asPodcastIndexEpisodeId("ep-a");
     const mockEpisodes = [
       {
