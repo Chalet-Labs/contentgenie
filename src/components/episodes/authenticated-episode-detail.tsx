@@ -50,8 +50,14 @@ import { WorthItBadge } from "@/components/episodes/worth-it-badge";
 import { EpisodeTranscriptFetchButton } from "@/components/episodes/episode-transcript-fetch-button";
 import { CommunityRating } from "@/components/episodes/community-rating";
 import { isEpisodeSaved, revalidatePodcastPage } from "@/app/actions/library";
-import { getEpisodeTopicOverlap } from "@/app/actions/dashboard";
-import type { OverlapLabelKind } from "@/lib/topic-overlap";
+import {
+  getEpisodeTopicOverlap,
+  getCanonicalTopicOverlap,
+} from "@/app/actions/dashboard";
+import type {
+  CanonicalOverlapResult,
+  OverlapLabelKind,
+} from "@/lib/topic-overlap";
 import { useOnlineStatus } from "@/hooks/use-online-status";
 import { OfflineBanner } from "@/components/ui/offline-banner";
 import { cacheEpisode, getCachedEpisode } from "@/lib/offline-cache";
@@ -107,6 +113,8 @@ export function AuthenticatedEpisodeDetail({
     label: string | null;
     labelKind: OverlapLabelKind | null;
   }>({ label: null, labelKind: null });
+  const [canonicalOverlap, setCanonicalOverlap] =
+    useState<CanonicalOverlapResult | null>(null);
   const canRunEpisodeProcessing = supportsEpisodeProcessing(episodeId);
   // Route param (URL segment) → branded string. Reused for downstream calls
   // that key off the PodcastIndex episode-id namespace.
@@ -313,8 +321,31 @@ export function AuthenticatedEpisodeDetail({
           }
         }
       })
-      .catch(() => {
+      .catch((err) => {
         // Non-critical: overlap label is a presentation-only enhancement
+        console.warn("[overlap-label] getEpisodeTopicOverlap failed", err);
+      });
+    return () => {
+      ignore = true;
+    };
+  }, [isOnline, episodeLoaded, episodeIdBranded]);
+
+  useEffect(() => {
+    if (!isOnline || !episodeLoaded) return;
+    let ignore = false;
+    getCanonicalTopicOverlap(episodeIdBranded)
+      .then((result) => {
+        if (ignore) return;
+        if (result.success) setCanonicalOverlap(result.data);
+        else setCanonicalOverlap(null);
+      })
+      .catch((err) => {
+        // Non-critical: indicator is presentation-only; reset so category fallback shows.
+        console.warn(
+          "[canonical-overlap] getCanonicalTopicOverlap failed",
+          err,
+        );
+        if (!ignore) setCanonicalOverlap(null);
       });
     return () => {
       ignore = true;
@@ -756,6 +787,7 @@ export function AuthenticatedEpisodeDetail({
             }
             overlapLabel={overlapResult.label}
             overlapLabelKind={overlapResult.labelKind}
+            canonicalOverlap={canonicalOverlap}
           />
         </EpisodeTabsContent>
 

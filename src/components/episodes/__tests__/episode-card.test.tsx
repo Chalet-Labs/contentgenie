@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { EpisodeCard } from "@/components/episodes/episode-card";
+import type { CanonicalOverlapResult } from "@/lib/topic-overlap";
 
 vi.mock("next/image", () => ({
   default: ({ src, alt }: { src: string; alt: string }) => (
@@ -337,5 +338,86 @@ describe("EpisodeCard", () => {
     );
     expect(artworkLink).not.toBeNull();
     expect(artworkLink).toHaveAttribute("tabindex", "-1");
+  });
+
+  describe("overlap indicator", () => {
+    const repeatOverlap: CanonicalOverlapResult = {
+      kind: "repeat",
+      count: 3,
+      topicLabel: "creatine",
+      topicId: 1,
+    };
+
+    it("renders canonical new indicator when canonicalOverlap kind is new", () => {
+      const newOverlap: CanonicalOverlapResult = {
+        kind: "new",
+        topicLabel: "creatine",
+        topicId: 1,
+      };
+      render(<EpisodeCard {...baseProps} canonicalOverlap={newOverlap} />);
+      const indicator = screen.getByTestId("overlap-indicator");
+      expect(indicator).toBeInTheDocument();
+      expect(indicator).toHaveTextContent("New: creatine");
+      expect(indicator).toHaveAttribute("data-canonical-overlap-kind", "new");
+    });
+
+    it("renders canonical repeat indicator when canonicalOverlap is set", () => {
+      render(<EpisodeCard {...baseProps} canonicalOverlap={repeatOverlap} />);
+      const indicator = screen.getByTestId("overlap-indicator");
+      expect(indicator).toBeInTheDocument();
+      expect(indicator).toHaveTextContent(
+        "You've heard 3 episodes on creatine",
+      );
+      expect(indicator).toHaveAttribute(
+        "data-canonical-overlap-kind",
+        "repeat",
+      );
+    });
+
+    it("renders category fallback when canonicalOverlap is null and categoryOverlap has a label", () => {
+      render(
+        <EpisodeCard
+          {...baseProps}
+          canonicalOverlap={null}
+          categoryOverlap={{
+            label: "You've heard 5 similar episodes",
+            labelKind: "high-overlap",
+          }}
+        />,
+      );
+      const indicator = screen.getByTestId("overlap-indicator");
+      expect(indicator).toHaveTextContent("You've heard 5 similar episodes");
+      expect(indicator).not.toHaveAttribute("data-canonical-overlap-kind");
+    });
+
+    it("renders no indicator when canonicalOverlap is null and categoryOverlap label is null", () => {
+      render(
+        <EpisodeCard
+          {...baseProps}
+          canonicalOverlap={null}
+          categoryOverlap={{ label: null, labelKind: null }}
+        />,
+      );
+      expect(screen.queryByTestId("overlap-indicator")).not.toBeInTheDocument();
+    });
+
+    it("renders only canonical indicator when both canonicalOverlap and categoryOverlap are set (canonical precedence)", () => {
+      render(
+        <EpisodeCard
+          {...baseProps}
+          canonicalOverlap={repeatOverlap}
+          categoryOverlap={{
+            label: "You've heard 5 similar episodes",
+            labelKind: "high-overlap",
+          }}
+        />,
+      );
+      const indicators = screen.getAllByTestId("overlap-indicator");
+      expect(indicators).toHaveLength(1);
+      expect(indicators[0]).toHaveAttribute(
+        "data-canonical-overlap-kind",
+        "repeat",
+      );
+    });
   });
 });

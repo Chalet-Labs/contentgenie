@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -31,8 +31,10 @@ import {
 import { getCollection, deleteCollection } from "@/app/actions/collections";
 import { getListenedEpisodeIds } from "@/app/actions/listen-history";
 import { LISTEN_STATE_CHANGED_EVENT } from "@/lib/events";
+import { useCanonicalOverlapMap } from "@/hooks/use-canonical-overlap-map";
 import type { SavedItemDTO } from "@/db/library-columns";
 import type { Collection } from "@/db/schema";
+import type { PodcastIndexEpisodeId } from "@/types/ids";
 
 export default function CollectionDetailPage() {
   const params = useParams();
@@ -45,6 +47,12 @@ export default function CollectionDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  const canonicalOverlapIds = useMemo<PodcastIndexEpisodeId[]>(
+    () => items.map((i) => i.episode.podcastIndexId),
+    [items],
+  );
+  const canonicalOverlapMap = useCanonicalOverlapMap(canonicalOverlapIds);
 
   const loadCollection = useCallback(async () => {
     if (isNaN(collectionId)) {
@@ -272,6 +280,9 @@ export default function CollectionDetailPage() {
               onRemoved={handleRemoved}
               onCollectionChanged={handleCollectionChanged}
               isListened={listenedSet.has(item.episode.id)}
+              canonicalOverlap={
+                canonicalOverlapMap[item.episode.podcastIndexId] ?? null
+              }
             />
           ))}
         </div>

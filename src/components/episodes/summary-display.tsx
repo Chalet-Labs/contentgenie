@@ -22,7 +22,11 @@ import {
   type WorthItDimensionsData,
 } from "@/lib/openrouter";
 import type { SummarizationStep } from "@/trigger/types";
-import type { OverlapLabelKind } from "@/lib/topic-overlap";
+import type {
+  CanonicalOverlapResult,
+  OverlapLabelKind,
+} from "@/lib/topic-overlap";
+import { OverlapIndicator } from "@/components/episodes/overlap-indicator";
 
 export type { SummarizationStep } from "@/trigger/types";
 
@@ -38,6 +42,7 @@ interface SummaryDisplayProps {
   onGenerateSummary?: () => void;
   overlapLabel?: string | null;
   overlapLabelKind?: OverlapLabelKind | null;
+  canonicalOverlap?: CanonicalOverlapResult | null;
 }
 
 const STEP_LABELS: Record<SummarizationStep, string> = {
@@ -122,6 +127,7 @@ export function SummaryDisplay({
   onGenerateSummary,
   overlapLabel,
   overlapLabelKind,
+  canonicalOverlap,
 }: SummaryDisplayProps) {
   const [showFullSummary, setShowFullSummary] = useState(false);
 
@@ -310,17 +316,12 @@ export function SummaryDisplay({
                 <span>10</span>
               </div>
             </div>
-            {overlapLabel && (
-              <p
-                className={`mt-3 text-sm font-medium ${
-                  overlapLabelKind === "high-overlap"
-                    ? "text-status-warning-text"
-                    : "text-status-success-text"
-                }`}
-              >
-                {overlapLabel}
-              </p>
-            )}
+            <OverlapIndicator
+              canonical={canonicalOverlap}
+              categoryLabel={overlapLabel}
+              categoryLabelKind={overlapLabelKind}
+              className="mt-3 text-sm"
+            />
             {isSignalFormat && worthItDimensions.kind === "signals" && (
               <div className="mt-4 space-y-2 border-t pt-4">
                 <p className="text-sm font-medium text-foreground">

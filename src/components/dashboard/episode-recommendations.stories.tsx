@@ -147,3 +147,50 @@ export const Empty: Story = {
 export const Loading: StoryObj<typeof EpisodeRecommendationsLoading> = {
   render: () => <EpisodeRecommendationsLoading />,
 };
+
+export const WithCanonicalOverlapRepeat: Story = {
+  args: {
+    episodes: [
+      makeEpisode(
+        1,
+        "How AI is Changing Software Engineering",
+        "Software Unscripted",
+        {
+          canonicalOverlap: {
+            kind: "repeat",
+            count: 5,
+            topicLabel: "creatine",
+            topicId: 1,
+          },
+        },
+      ),
+      ...sampleEpisodes.slice(1),
+    ],
+  },
+};
+
+export const WithCanonicalOverlapNew: Story = {
+  args: {
+    episodes: [
+      makeEpisode(
+        1,
+        "How AI is Changing Software Engineering",
+        "Software Unscripted",
+        {
+          canonicalOverlap: {
+            kind: "new",
+            topicLabel: "OpenAI o4 preview",
+            topicId: 2,
+          },
+        },
+      ),
+      ...sampleEpisodes.slice(1),
+    ],
+  },
+};
+
+export const WithCategoryFallback: Story = {
+  args: {
+    episodes: sampleEpisodes.map((e) => ({ ...e, canonicalOverlap: null })),
+  },
+};

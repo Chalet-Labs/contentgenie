@@ -26,6 +26,9 @@ import type { SummaryStatus } from "@/db/schema";
 import { getBackNavigation } from "@/app/(app)/podcast/[id]/back-navigation";
 import { getTopicsByPodcastIndexId } from "@/app/(app)/podcast/[id]/topics";
 import { getCanonicalTopicsByPodcastIndexId } from "@/app/(app)/podcast/[id]/canonical-topics";
+import { getCanonicalTopicOverlaps } from "@/app/actions/dashboard";
+import type { CanonicalOverlapResult } from "@/lib/topic-overlap";
+import type { PodcastIndexEpisodeId } from "@/types/ids";
 
 const PODCAST_PAGE_EPISODE_LIMIT = 200;
 
@@ -95,15 +98,22 @@ async function loadRssPodcast(podcastIndexId: string) {
   });
 
   const { statusMap, scoreMap } = buildSummaryMaps(dbEpisodes);
+  const rssEpisodeIds = dbEpisodes.map((ep) => ep.podcastIndexId);
   const [
     listenedInternalIds,
     topicsByPodcastIndexId,
     canonicalTopicsByPodcastIndexId,
+    canonicalOverlapResult,
   ] = await Promise.all([
     getListenedEpisodeIds(dbEpisodes.map((ep) => ep.id)),
     getTopicsByPodcastIndexId(dbEpisodes),
     getCanonicalTopicsByPodcastIndexId(dbEpisodes),
+    getCanonicalTopicOverlaps(rssEpisodeIds),
   ]);
+  const canonicalOverlapByPodcastIndexId: Record<
+    PodcastIndexEpisodeId,
+    CanonicalOverlapResult | null
+  > = canonicalOverlapResult.success ? canonicalOverlapResult.data : {};
   const listenedInternalIdSet = new Set(listenedInternalIds);
   const listenedIds = dbEpisodes
     .filter((ep) => listenedInternalIdSet.has(ep.id))
@@ -159,6 +169,7 @@ async function loadRssPodcast(podcastIndexId: string) {
     listenedIds,
     topicsByPodcastIndexId,
     canonicalTopicsByPodcastIndexId,
+    canonicalOverlapByPodcastIndexId,
   };
 }
 
@@ -187,6 +198,7 @@ export default async function PodcastPage({
       listenedIds,
       topicsByPodcastIndexId,
       canonicalTopicsByPodcastIndexId,
+      canonicalOverlapByPodcastIndexId,
     } = data;
     const subscribed = await isSubscribedToPodcast(podcast.podcastIndexId);
     const categories = (podcast.categories as string[]) ?? [];
@@ -303,6 +315,7 @@ export default async function PodcastPage({
             listenedIds={listenedIds}
             topicsByPodcastIndexId={topicsByPodcastIndexId}
             canonicalTopicsByPodcastIndexId={canonicalTopicsByPodcastIndexId}
+            canonicalOverlapByPodcastIndexId={canonicalOverlapByPodcastIndexId}
           />
         </div>
       </div>
@@ -348,11 +361,17 @@ export default async function PodcastPage({
       listenedInternalIds,
       topicsByPodcastIndexId,
       canonicalTopicsByPodcastIndexId,
+      piCanonicalOverlapResult,
     ] = await Promise.all([
       getListenedEpisodeIds(dbEpisodeData.map((e) => e.id)),
       getTopicsByPodcastIndexId(dbEpisodeData),
       getCanonicalTopicsByPodcastIndexId(dbEpisodeData),
+      getCanonicalTopicOverlaps(episodeStringIds),
     ]);
+    const piCanonicalOverlapByPodcastIndexId: Record<
+      PodcastIndexEpisodeId,
+      CanonicalOverlapResult | null
+    > = piCanonicalOverlapResult.success ? piCanonicalOverlapResult.data : {};
     const listenedInternalIdSet = new Set(listenedInternalIds);
     const piListenedIds = dbEpisodeData
       .filter((e) => listenedInternalIdSet.has(e.id))
@@ -503,6 +522,9 @@ export default async function PodcastPage({
             knownIds={piKnownIds}
             topicsByPodcastIndexId={topicsByPodcastIndexId}
             canonicalTopicsByPodcastIndexId={canonicalTopicsByPodcastIndexId}
+            canonicalOverlapByPodcastIndexId={
+              piCanonicalOverlapByPodcastIndexId
+            }
           />
         </div>
       </div>

@@ -1,33 +1,21 @@
 ---
 name: pre-pr-validation
-description: Use before any `gh pr create` — invoke this skill as soon as the user asks to open, create, submit, or file a pull request, without waiting for the hook to bounce the command. Runs the full pre-PR pipeline: rebase onto main, build check (tsc/lint/test are enforced per commit by the husky hook), loads `docs/code-review-checklist.md` as a supplementary rubric (graceful skip if missing), parallel multi-tool review (Codex review via `codex review --base main`, `/pr-review-toolkit:review-pr all`, `/simplify`), validates every finding, auto-fixes all valid ones without pausing for approval, re-verifies, pushes, writes the sentinel that unblocks PR creation, then opens the PR. A PreToolUse hook guards `gh pr create` until a fresh sentinel exists, so triggering this skill proactively whenever PRs are mentioned is the path of least friction.
+description: Use before any `gh pr create` — invoke as soon as the user asks to open, create, submit, or file a pull request. Runs the full pre-PR pipeline: rebase onto main, build, parallel multi-tool review, auto-fix every valid finding, re-verify, push, then open the PR. A PreToolUse hook blocks `gh pr create` until this skill writes a fresh validation sentinel, so triggering proactively whenever PRs are mentioned avoids the bounce.
 ---
 
 # Pre-PR Validation
 
 ## How this is enforced
 
-A PreToolUse hook guards `gh pr create` until `.claude/.pr-validated` contains the current branch + HEAD SHA. The sentinel invalidates on any HEAD change (new commit, amend, rebase, branch rename/switch), so any commit made after running the skill forces a re-run before the PR.
+A PreToolUse hook guards `gh pr create` until `.claude/.pr-validated` contains the current branch + HEAD SHA. The sentinel invalidates on any HEAD change, so any commit after running the skill forces a re-run.
 
-The hook is a best-effort guardrail — not a security boundary. A sufficiently crafted invocation (backticks, `eval`, `command gh`, aliases) can bypass it. Its job is to stop the model from forgetting to run the skill, not to stop a human who has already decided to skip validation.
+Invoke proactively the moment a PR is discussed — don't wait for the hook to reject.
 
-You should invoke this skill proactively the moment a PR is discussed — don't wait for the hook to reject `gh pr create`.
+## Run inline — do not wrap the pipeline in a subagent
 
-## Run inline — do not dispatch to a subagent
+Run inline in the calling session. Phase 2.1 dispatches a background `Task` for Codex and `/pr-review-toolkit:review-pr all` spawns further `Task` calls for each specialist. Subagents can't spawn further subagents, so wrapping this skill in an outer Task blocks Codex and may break the toolkit reviewers.
 
-Run this pipeline inline in the calling session. Don't wrap it in a `Task` subagent.
-
-Phase 2.1 itself dispatches a background `Task({run_in_background: true})` for the Codex review, and `/pr-review-toolkit:review-pr all` dispatches further `Task` calls for each specialist reviewer. Subagents can't spawn further subagents — so wrapping this skill in an outer Task blocks the Codex step entirely, and may prevent `/pr-review-toolkit:review-pr all` from launching its specialists. Net result: weaker review coverage, no context win (the heavy work was already going to happen in a fresh context; you'd just be stacking one more).
-
-If the caller's context is cluttered, the cost is mildly worse triage in Phase 3 — not broken reviews. That trade-off goes in favour of running inline.
-
-## Core principle
-
-Borrowed from `superpowers:verification-before-completion`:
-
-> NO COMPLETION CLAIMS WITHOUT FRESH VERIFICATION EVIDENCE
-
-The sentinel is a completion claim. Don't write it until Phase 5 has produced green evidence *in this session, this turn, with these commands* and Phase 6 has pushed the branch. Previous runs don't count.
+**Phase 4a is an explicit scoped sub-delegation** (not a violation): foreground Sonnet for mechanical fixes only, synchronous, no nested subagents. See Phase 4a.
 
 ## Unattended execution policy (read before Phase 3)
 
@@ -38,7 +26,7 @@ Exceptions (the only times you stop):
 - Two reviewers propose opposite changes and project conventions don't resolve it.
 - The fix would touch code outside the PR's stated scope in a way that surprises the caller.
 
-"This feels like a lot of changes" is not an exception. Agent labor is cheap; the reviewers were called because their recommendations are worth applying.
+"This feels like a lot of changes" is not an exception.
 
 ## The Pipeline
 
@@ -65,7 +53,7 @@ bun run build
 
 Must exit 0. If it fails, fix the root cause (not a suppression, not a workaround) and re-run. Don't enter Phase 2 with a red build — reviewers waste cycles on broken code.
 
-**Why only build?** Husky's pre-commit runs `tsc --noEmit`, `bun run lint`, and `bun run test` on every *new* commit, so in the common case the only remaining gap is `bun run build` (Next.js page-export restrictions surface only here). However, `git rebase` reapplies commits **without** firing pre-commit — same for any prior `--no-verify` / `HUSKY=0` commits. If Phase 0 rewrote history (compare `git rev-parse HEAD` before and after, or just check `HEAD@{1}` ≠ `HEAD`), run `bun run lint` and `bun run test` here before the build.
+Build only — Husky pre-commit covers tsc/lint/test on new commits, leaving page-export errors as the gap. If Phase 0 rebased (history rewrote, `HEAD@{1}` ≠ `HEAD`), pre-commit didn't fire on those reapplied commits — also run `bun run lint` and `bun run test` here.
 
 ### Phase 2 — Multi-Tool Review
 
@@ -76,9 +64,9 @@ Read `docs/code-review-checklist.md` from the repo root via the Read tool **befo
 If the file does not exist:
 
 - Print a one-line warning: `WARNING: docs/code-review-checklist.md not found — proceeding without rubric injection`.
-- Continue to Phase 2.1 with no rubric loaded. Do **not** fail the pipeline — the gate stays forward-compatible with branches/repos that haven't adopted the checklist.
+- Continue to Phase 2.1 with no rubric loaded. Do **not** fail the pipeline.
 
-The rubric is **additive, not a replacement.** Every reviewer keeps its existing scope and specialty (Codex's heuristics, code-reviewer's CLAUDE.md compliance pass, pr-test-analyzer's coverage analysis, silent-failure-hunter, type-design-analyzer, comment-analyzer, code-simplifier, `/simplify`'s reuse/quality/efficiency pass). The rubric runs as a supplementary pass on top — both rubric-derived and specialty-derived findings should appear in Phase 3.
+The rubric is **additive**: every reviewer keeps its existing specialty; the rubric runs as a supplementary pass on top. Both rubric-derived and specialty-derived findings should appear in Phase 3.
 
 #### Phase 2.1 — Launch reviewers in parallel
 
@@ -118,12 +106,18 @@ For every finding from every tool:
 1. **Verify the claim.** Read the cited file and line. Does the problem actually exist as described? Reject hallucinations, stale line numbers, and refs to code that no longer exists.
 2. **Check for conflicts.** If two tools propose opposite changes, apply project conventions (AGENTS.md, CLAUDE.md, user memory) to pick one. Record the decision in the finding.
 3. **Mark valid or invalid.** A finding is valid if the claim is technically correct on the current code. Severity (critical/important/suggestion) does *not* affect validity — all valid findings get fixed.
+4. **Classify each valid finding as `mechanical` or `judgment`** so Phase 4 can route it correctly:
+   - **Mechanical:** the fix is a fully-specified `file:line → exact replacement` edit with no design decisions. Examples: comment text fixes, `console.warn` additions, hardcoded constant → import, brand-cast removals, doc-comment additions, line-number rot, deleting a WHAT-only comment, importing an existing helper instead of duplicating it.
+   - **Judgment:** the fix requires reviewer-context to land well. Examples: extracting a new component or hook (props/signature design), tightening a type to forbid illegal states, choosing a test seam, reconciling conflicting reviewer suggestions, anything where the reviewer wrote "consider" or "options:" rather than a single concrete patch.
+   - When in doubt, classify as `judgment`. Mis-routing mechanical work as judgment costs nothing; mis-routing judgment work as mechanical produces a wrong fix.
 
 Don't skip a finding because it seems minor. Per the unattended execution policy above, every valid finding goes straight to Phase 4 without an approval pause.
 
 ### Phase 4 — Apply Fixes
 
-Implement every valid finding. Group related fixes into logical commits following the project commit convention:
+Findings split by classification (Phase 3 step 4): mechanical → Phase 4a (Sonnet subagent), judgment → Phase 4b (inline). The orchestrator decides ordering — typically run 4a first to clear noise, then 4b inline.
+
+Group related fixes into logical commits following the project commit convention:
 
 ```
 type: Description
@@ -132,6 +126,39 @@ type: Description
 Types: `feat`, `fix`, `chore`, `docs`, `test`, `refactor`, `style`.
 
 Per user memory, commit messages should not mention Claude, AI, or automated generation — focus on the technical change and business value.
+
+#### Phase 4a — Mechanical fixes (Sonnet subagent)
+
+When the mechanical bucket has ≥3 findings, dispatch a foreground Sonnet subagent to apply them. Below 3, just do them inline — the prompt overhead isn't worth it.
+
+```
+Task({
+  subagent_type: "general-purpose",
+  description: "Apply mechanical PR-review fixes",
+  model: "sonnet",
+  prompt: `Apply the following mechanical edits in <absolute repo path>. Each one is a fully-specified replacement — do NOT redesign, do NOT pick between alternatives, do NOT expand scope. If any edit looks ambiguous or the cited file:line no longer matches, STOP and report which finding(s) you skipped and why — the orchestrator will handle them in Phase 4b.
+
+Edits to apply (file:line | why | exact change):
+1. <file>:<line> | <one-line rationale tying to the reviewer/checklist citation> | <unambiguous instruction, e.g. "replace 'foo' with 'bar'", "add line X after line Y", "delete the JSDoc on lines N-M">
+2. ...
+
+After all edits:
+- Run \`bun run lint\` once. If it fails, attempt minimal lint fixes (auto-import, semicolons). Do NOT silence rules.
+- Do NOT run tsc, tests, or build — the orchestrator owns Phase 5 verification.
+- Do NOT commit. Leave changes unstaged for the orchestrator to commit alongside Phase 4b work.
+- Return a short summary: which edits applied cleanly, which were skipped (with reason), any lint follow-ups you did. No need to quote the diff — the orchestrator will inspect it.`
+})
+```
+
+Foreground (not background) so 4b can plan around the diff. After the subagent returns, spot-check `git diff` for the affected files, then proceed to Phase 4b.
+
+#### Phase 4b — Judgment fixes (inline)
+
+Apply the remaining findings inline. The orchestrator has the full review context (Phase 2 reports, plan §Risks, project memory) and can make the design calls without re-passing all of it as a subagent prompt.
+
+Typical Phase 4b work: API-shape refactors, new component or hook design, type tightenings that change call-site shape, conflict resolution between reviewers.
+
+After Phase 4b, stage all changes (subagent + orchestrator), run `bun run format` if Prettier flagged anything during the pre-commit dry-run, commit, and proceed to Phase 5.
 
 ### Phase 5 — Re-Verify
 
@@ -166,9 +193,7 @@ mkdir -p "$repo_root/.claude"
 printf '%s %s\n' "$branch" "$sha" > "$sentinel.tmp" && mv "$sentinel.tmp" "$sentinel"
 ```
 
-The hook compares this against the live state on the next `gh pr create` attempt. `.claude/.pr-validated` is not in the `.gitignore` whitelist, so it stays local (the committed entries are `settings.json`, `mcp.json`, `skills/`).
-
-Write it last — it's the final filesystem mutation before PR creation. Any commit made after this point changes HEAD and invalidates the sentinel, and the hook re-blocks. The skill's own fix-commits (Phase 4) happen before Phase 7, so they never cause a retrigger.
+`.claude/.pr-validated` is gitignored. Write it last — any commit after this invalidates it.
 
 ### Phase 8 — Create the PR
 
@@ -184,19 +209,11 @@ Now `gh pr create` is allowed. Use the project's standard PR template:
 
 Title: `type: Description`, under 70 characters, same convention as commits. Use `--repo Chalet-Labs/contentgenie` per user memory.
 
-## Critical rules
+## Non-obvious rules
 
-- Sentinel timing matters: write it last, after Phase 5 is green and Phase 6 has pushed. Any commit afterwards invalidates it.
-- Own commits don't retrigger. Phase 4 fix-commits run before Phase 7 writes the sentinel, so the sentinel records the post-fix HEAD. Safe.
-- No partial verification. "Tests looked fine earlier" is not evidence. Re-run in this session.
-- No skipping the review phase, even for docs-only changes. The hook doesn't know what's in the diff.
-- Do not run `codex:setup` — it's one-time init, not part of the pipeline.
-- An unpushed branch never gets a sentinel. Phase 6 is not optional.
-- Unattended means unattended. Phase 3 → Phase 4 runs without an approval pause.
-- Rubric load is graceful: missing `docs/code-review-checklist.md` warns and proceeds; never fails the pipeline.
-- Rubric is a rubric, not a passive read: every reviewer layer must be told to **apply** and **cite** the checklist (`[checklist §N]`), not just have it loaded.
-- Rubric is additive: every reviewer keeps its existing scope; the rubric is a supplementary pass. Do not narrow Codex / `/pr-review-toolkit:review-pr all` / `/simplify` to rubric-only.
-- Rubric propagation is hybrid by design: Codex inlines the rubric directly into its `Task` prompt (a backgrounded subagent has no shared conversation context — inlining is the only reliable channel). The two slash commands rely on conversation salience for their spawned subagents to inherit the directive. If a future version of `/pr-review-toolkit:review-pr` or `/simplify` isolates its subagent prompts from upstream conversation, the rubric framing on those layers will silently fall through; the smoke-test convention of looking for `[checklist §N]` citations in Phase 3 is what catches that regression.
+- **Verification is fresh-only.** Re-run `bun run build` in this session — previous runs don't count. The sentinel is a completion claim.
+- **Rubric propagation is hybrid.** Codex inlines the rubric in its `Task` prompt (background subagent has no shared context). The two slash commands rely on conversation salience. Smoke-test: look for `[checklist §N]` citations in Phase 3 — if absent, propagation regressed.
+- **Phase 4a is bounded.** Mechanical edits only, foreground, no nested subagents, no commit. If a finding needs judgment, the subagent skips it and 4b picks it up — that's the intended path, not a bug.
 
 ## Failure modes
 
@@ -210,4 +227,6 @@ Title: `type: Description`, under 70 characters, same convention as commits. Use
 | Phase 5 fails after fixes | Retry up to 2×. Then surface with the specific failure. |
 | Phase 6 push rejected (non-fast-forward) | Rebase onto current `origin/<branch>`, re-run Phase 5, retry push. No default force-push. |
 | `/simplify` or `/pr-review-toolkit:review-pr` unavailable | Log it, continue with the remaining reviewers. Not fatal. |
+| Phase 4a subagent reports skipped edits | Pull the skipped edits into Phase 4b and apply inline with full reviewer context. The subagent's "skip" is a feature, not a failure — it's how the boundary stays honest. |
+| Phase 4a subagent makes a wrong edit (caught at Phase 5 build) | Inspect the diff, revert the bad edit, and re-apply inline as judgment work. Investigate whether the finding was misclassified at Phase 3 step 4 — the cause is almost always "mechanical-looking but actually needed context." |
 | Hook fires on a legitimate command mentioning `gh pr create` | Known limitation — the regex is best-effort. Work around by invoking the real `gh pr create` after the skill completes normally, or adjust the command to not embed the literal phrase. |

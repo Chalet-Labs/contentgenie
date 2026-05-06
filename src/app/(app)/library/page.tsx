@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { useAuth } from "@clerk/nextjs";
 import {
@@ -33,7 +33,9 @@ import { useOnlineStatus } from "@/hooks/use-online-status";
 import { OfflineBanner } from "@/components/ui/offline-banner";
 import { cacheLibrary, getCachedLibrary } from "@/lib/offline-cache";
 import { LISTEN_STATE_CHANGED_EVENT } from "@/lib/events";
+import { useCanonicalOverlapMap } from "@/hooks/use-canonical-overlap-map";
 import type { SavedItemDTO } from "@/db/library-columns";
+import type { PodcastIndexEpisodeId } from "@/types/ids";
 
 export default function LibraryPage() {
   const { userId } = useAuth();
@@ -46,6 +48,17 @@ export default function LibraryPage() {
   const [sortBy, setSortBy] = useState<LibrarySortOption>("savedAt");
   const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
   const [isFromCache, setIsFromCache] = useState(false);
+
+  const canonicalOverlapIds = useMemo<PodcastIndexEpisodeId[]>(
+    () =>
+      Array.from(
+        new Set(items.map((i) => i.episode.podcastIndexId)),
+      ).sort() as PodcastIndexEpisodeId[],
+    [items],
+  );
+  const canonicalOverlapMap = useCanonicalOverlapMap(canonicalOverlapIds, {
+    enabled: isOnline,
+  });
 
   const loadLibrary = useCallback(async () => {
     setIsLoading(true);
@@ -294,6 +307,9 @@ export default function LibraryPage() {
               }
               isOffline={!isOnline}
               isListened={listenedSet.has(item.episode.id)}
+              canonicalOverlap={
+                canonicalOverlapMap[item.episode.podcastIndexId] ?? null
+              }
             />
           ))}
         </div>

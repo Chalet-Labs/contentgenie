@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { EpisodeCard } from "@/components/podcasts/episode-card";
 import type { PodcastIndexEpisode } from "@/lib/podcastindex";
+import type { CanonicalOverlapResult } from "@/lib/topic-overlap";
 
 vi.mock("next/image", () => ({
   default: ({ src, alt }: { src: string; alt: string }) => (
@@ -199,5 +200,45 @@ describe("EpisodeCard (podcasts wrapper)", () => {
     expect(
       screen.queryByRole("link", { name: /Topic:/i }),
     ).not.toBeInTheDocument();
+  });
+
+  describe("overlap indicator", () => {
+    const repeatOverlap: CanonicalOverlapResult = {
+      kind: "repeat",
+      count: 4,
+      topicLabel: "sleep",
+      topicId: 10,
+    };
+    const newOverlap: CanonicalOverlapResult = {
+      kind: "new",
+      topicLabel: "mitochondria",
+      topicId: 11,
+    };
+
+    it("renders canonical repeat indicator when canonicalOverlap is set", () => {
+      render(
+        <EpisodeCard episode={mockEpisode} canonicalOverlap={repeatOverlap} />,
+      );
+      const indicator = screen.getByTestId("overlap-indicator");
+      expect(indicator).toHaveTextContent("You've heard 4 episodes on sleep");
+      expect(indicator).toHaveAttribute(
+        "data-canonical-overlap-kind",
+        "repeat",
+      );
+    });
+
+    it("renders canonical new indicator when canonicalOverlap kind is new", () => {
+      render(
+        <EpisodeCard episode={mockEpisode} canonicalOverlap={newOverlap} />,
+      );
+      const indicator = screen.getByTestId("overlap-indicator");
+      expect(indicator).toHaveTextContent("New: mitochondria");
+      expect(indicator).toHaveAttribute("data-canonical-overlap-kind", "new");
+    });
+
+    it("renders no indicator when canonicalOverlap is null (no category data on this surface)", () => {
+      render(<EpisodeCard episode={mockEpisode} canonicalOverlap={null} />);
+      expect(screen.queryByTestId("overlap-indicator")).not.toBeInTheDocument();
+    });
   });
 });

@@ -2,6 +2,7 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { SummaryDisplay } from "@/components/episodes/summary-display";
+import type { CanonicalOverlapResult } from "@/lib/topic-overlap";
 
 describe("SummaryDisplay", () => {
   afterEach(() => {
@@ -217,5 +218,71 @@ describe("SummaryDisplay", () => {
     expect(screen.getByText("Uniqueness")).toBeInTheDocument();
     expect(screen.queryByText("Actionability")).not.toBeInTheDocument();
     expect(screen.getByText("Time Value")).toBeInTheDocument();
+  });
+
+  describe("overlap indicator", () => {
+    const scoreProps = {
+      summary: "Short summary.",
+      keyTakeaways: [],
+      worthItScore: 7,
+    };
+
+    const repeatOverlap: CanonicalOverlapResult = {
+      kind: "repeat",
+      count: 3,
+      topicLabel: "gut health",
+      topicId: 5,
+    };
+
+    it("renders canonical repeat indicator when canonicalOverlap is set", () => {
+      render(
+        <SummaryDisplay
+          {...scoreProps}
+          canonicalOverlap={repeatOverlap}
+          overlapLabel="You've heard 5 similar episodes"
+          overlapLabelKind="high-overlap"
+        />,
+      );
+      const indicator = screen.getByTestId("overlap-indicator");
+      expect(indicator).toHaveTextContent(
+        "You've heard 3 episodes on gut health",
+      );
+      expect(indicator).toHaveAttribute(
+        "data-canonical-overlap-kind",
+        "repeat",
+      );
+      expect(
+        screen.queryByText("You've heard 5 similar episodes"),
+      ).not.toBeInTheDocument();
+    });
+
+    it("renders category fallback when canonicalOverlap is null and overlapLabel is set", () => {
+      render(
+        <SummaryDisplay
+          {...scoreProps}
+          canonicalOverlap={null}
+          overlapLabel="You've heard 5 similar episodes"
+          overlapLabelKind="high-overlap"
+        />,
+      );
+      expect(
+        screen.getByText("You've heard 5 similar episodes"),
+      ).toBeInTheDocument();
+      expect(screen.queryByTestId("overlap-indicator")).not.toHaveAttribute(
+        "data-canonical-overlap-kind",
+      );
+    });
+
+    it("renders no indicator when canonicalOverlap is null and overlapLabel is null", () => {
+      render(
+        <SummaryDisplay
+          {...scoreProps}
+          canonicalOverlap={null}
+          overlapLabel={null}
+          overlapLabelKind={null}
+        />,
+      );
+      expect(screen.queryByTestId("overlap-indicator")).not.toBeInTheDocument();
+    });
   });
 });

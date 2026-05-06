@@ -2,21 +2,26 @@ import { describe, it, expect, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { EpisodeList } from "@/components/podcasts/episode-list";
 import type { PodcastIndexEpisode } from "@/lib/podcastindex";
+import type { CanonicalOverlapResult } from "@/lib/topic-overlap";
+import { asPodcastIndexEpisodeId } from "@/types/ids";
 
 vi.mock("@/components/podcasts/episode-card", () => ({
   EpisodeCard: ({
     episode,
     summaryStatus,
     worthItScore,
+    canonicalOverlap,
   }: {
     episode: { id: string | number; title: string };
     summaryStatus?: string;
     worthItScore?: string;
+    canonicalOverlap?: CanonicalOverlapResult | null;
   }) => (
     <div
       data-testid="episode-card"
       data-status={summaryStatus ?? ""}
       data-score={worthItScore ?? ""}
+      data-overlap-kind={canonicalOverlap?.kind ?? ""}
     >
       {episode.title}
     </div>
@@ -164,5 +169,31 @@ describe("EpisodeList", () => {
       fireEvent.change(input, { target: { value: "rust" } }),
     ).not.toThrow();
     expect(screen.getAllByTestId("episode-card")).toHaveLength(1);
+  });
+
+  it("forwards canonicalOverlapByPodcastIndexId to the matching episode card", () => {
+    const ep1Id = asPodcastIndexEpisodeId("1");
+    const overlapMap = {
+      [ep1Id]: {
+        kind: "new" as const,
+        topicLabel: "sleep",
+        topicId: 99,
+      },
+    };
+    render(
+      <EpisodeList
+        episodes={fixtures}
+        canonicalOverlapByPodcastIndexId={overlapMap}
+      />,
+    );
+    const cards = screen.getAllByTestId("episode-card");
+    // Episode 1 (id=1) should have its overlap kind forwarded
+    const ep1Card = cards.find((c) => c.textContent === "Intro to TypeScript");
+    expect(ep1Card).toHaveAttribute("data-overlap-kind", "new");
+    // Episode 2 (id=2) has no entry → kind is empty string
+    const ep2Card = cards.find(
+      (c) => c.textContent === "Advanced React Patterns",
+    );
+    expect(ep2Card).toHaveAttribute("data-overlap-kind", "");
   });
 });

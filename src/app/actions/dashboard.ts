@@ -47,14 +47,10 @@ import {
 } from "@/lib/topic-overlap";
 import { withAuthAction } from "@/lib/auth-wrapper";
 import { type ActionResult } from "@/types/action-result";
+import { MAX_OVERLAP_LOOKUP_IDS } from "@/lib/canonical-overlap-config";
 
 // Maximum episodes to include per podcast for variety in the dashboard feed
 const MAX_EPISODES_PER_PODCAST = 3;
-
-// Cap untrusted batch lookups for the canonical-overlap action — server actions
-// are reachable from the network and an unbounded array would expand into the
-// SQL `IN` predicate. Mirrors the precedent in listen-history.ts.
-const MAX_OVERLAP_LOOKUP_IDS = 500;
 
 // Hard cap on raw inputs inspected per request, separate from the unique-id
 // cap. Without this, a caller sending millions of duplicates or invalid
@@ -500,12 +496,46 @@ export async function getRecommendedEpisodes(
         };
       });
 
+      // Hydrate canonical-topic overlap. We call runCanonicalTopicOverlapBatch
+      // directly (not getCanonicalTopicOverlaps) because this action already
+      // resolved userId via auth() above — invoking the public wrapper would
+      // re-run auth() and break the "exactly once per request" contract.
+      let canonicalMap: Record<
+        PodcastIndexEpisodeId,
+        CanonicalOverlapResult | null
+      > = {};
+      try {
+        const ids = sanitizeOverlapIdBatch(
+          withOverlap.map((r) => r.podcastIndexId),
+        );
+        const canonicalResult = await runCanonicalTopicOverlapBatch(
+          userId,
+          ids,
+        );
+        if (canonicalResult.success) canonicalMap = canonicalResult.data;
+      } catch (err) {
+        // Non-critical: recommendations still render category-only on failure.
+        console.error(
+          "Failed to hydrate canonical overlap on recommendations; falling back to category-only:",
+          err,
+        );
+      }
+
+      const withCanonical = withOverlap.map((r) => {
+        const normalizedId = sanitizeOverlapId(r.podcastIndexId);
+        return {
+          ...r,
+          canonicalOverlap:
+            normalizedId === null ? null : (canonicalMap[normalizedId] ?? null),
+        };
+      });
+
       // Stable partition sort: non-overlapping (overlapCount < 3) first, overlapping last.
       // Within each partition, original order (worthItScore DESC) is preserved.
-      const nonOverlapping = withOverlap.filter(
+      const nonOverlapping = withCanonical.filter(
         (r) => (r.overlapCount ?? 0) < HIGH_OVERLAP_THRESHOLD,
       );
-      const overlapping = withOverlap.filter(
+      const overlapping = withCanonical.filter(
         (r) => (r.overlapCount ?? 0) >= HIGH_OVERLAP_THRESHOLD,
       );
       overlapEnriched = [...nonOverlapping, ...overlapping];
