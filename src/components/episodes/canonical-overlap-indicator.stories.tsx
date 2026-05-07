@@ -15,7 +15,6 @@ export const RepeatHigh: Story = {
   },
 };
 
-// count=1 intentionally renders "You've heard 1 episodes on X" — pluralization deferred to follow-up (v1 copy freeze).
 export const RepeatSingleton: Story = {
   args: {
     overlap: {

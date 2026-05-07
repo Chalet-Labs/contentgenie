@@ -150,7 +150,7 @@ Apply the remaining findings inline. The orchestrator has the full review contex
 
 Typical Phase 4b work: API-shape refactors, new component or hook design, type tightenings that change call-site shape, conflict resolution between reviewers.
 
-After Phase 4b, stage all changes (subagent + orchestrator), run `bun run format` if Prettier flagged anything during the pre-commit dry-run, commit, and proceed to Phase 5.
+After finishing Phase 4 work — including cases where Phase 4b has zero findings — stage all changes (subagent + orchestrator), run `bun run format` if Prettier flagged anything during the pre-commit dry-run, commit, and proceed to Phase 5. Skipping the commit when 4b is empty leaves Phase 4a edits unstaged and breaks Phase 5's assumption that the pre-commit hook already ran.
 
 ### Phase 5 — Re-Verify
 

@@ -49,7 +49,10 @@ export default function CollectionDetailPage() {
   const [isDeleting, setIsDeleting] = useState(false);
 
   const canonicalOverlapIds = useMemo<PodcastIndexEpisodeId[]>(
-    () => items.map((i) => i.episode.podcastIndexId),
+    () =>
+      Array.from(
+        new Set(items.map((i) => i.episode.podcastIndexId)),
+      ).sort() as PodcastIndexEpisodeId[],
     [items],
   );
   const canonicalOverlapMap = useCanonicalOverlapMap(canonicalOverlapIds);

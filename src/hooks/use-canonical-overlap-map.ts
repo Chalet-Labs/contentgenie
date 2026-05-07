@@ -19,11 +19,15 @@ export function useCanonicalOverlapMap(
   const [map, setMap] = useState<CanonicalOverlapMap>(initialMap ?? {});
   const idsKey = JSON.stringify(ids);
   const seqRef = useRef(0);
-  // When the caller supplies initialMap, the server already returned fresh
-  // overlap data for these ids — skip the eager mount fetch (a redundant RTT
-  // that can also clobber initialMap on transient client-side failures) and
-  // refresh only when listen state actually changes.
-  const skipInitialFetchRef = useRef(initialMap !== undefined);
+  // When the caller supplies a populated initialMap, the server already
+  // returned fresh overlap data — skip the eager mount fetch (a redundant
+  // RTT that can also clobber initialMap on transient client-side failures)
+  // and refresh only when listen state actually changes. An empty `{}` is
+  // upstream's failure marker (server fetch threw); fall through to a
+  // client-side fetch so indicators don't stay blank indefinitely.
+  const skipInitialFetchRef = useRef(
+    initialMap !== undefined && Object.keys(initialMap).length > 0,
+  );
 
   useEffect(() => {
     if (!enabled || ids.length === 0) {
