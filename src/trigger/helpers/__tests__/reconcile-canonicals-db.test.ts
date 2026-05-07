@@ -246,4 +246,32 @@ describe("insertReconciliationAuditRows", () => {
       "rejected",
     ]);
   });
+
+  it("chunks the insert into batches of 500 to stay under Postgres's bind-param cap", async () => {
+    const { db, insertSpy, valuesSpy } = makeInserter();
+    // 1,250 audits → ceil(1250 / 500) = 3 statements (500, 500, 250).
+    const audits = Array.from({ length: 1250 }, (_, i) =>
+      makeAudit({ clusterIndex: i }),
+    );
+    await insertReconciliationAuditRows(db, "run-large", audits);
+
+    expect(insertSpy).toHaveBeenCalledTimes(3);
+    expect(valuesSpy).toHaveBeenCalledTimes(3);
+
+    const batchSizes = valuesSpy.mock.calls.map(
+      (c) => (c[0] as unknown[]).length,
+    );
+    expect(batchSizes).toEqual([500, 500, 250]);
+
+    // The runId is preserved on every row across every chunk, and the
+    // clusterIndex sequence stays continuous (no rows lost or duplicated).
+    const allRows = valuesSpy.mock.calls.flatMap(
+      (c) => c[0] as Array<ClusterAuditRow & { runId: string }>,
+    );
+    expect(allRows).toHaveLength(1250);
+    expect(allRows.every((r) => r.runId === "run-large")).toBe(true);
+    expect(allRows.map((r) => r.clusterIndex)).toEqual(
+      Array.from({ length: 1250 }, (_, i) => i),
+    );
+  });
 });

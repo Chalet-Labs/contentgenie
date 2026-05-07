@@ -117,9 +117,29 @@ export async function decayStaleCanonicals(
 }
 
 /**
+ * Maximum rows per `INSERT ... VALUES (...)` statement for the audit log.
+ *
+ * `reconciliation_log` has 11 bind-positional columns per row at insert time
+ * (run_id + 10 audit fields), and Postgres caps a single statement at 65,535
+ * bind parameters. 500 rows × 11 cols = 5,500 binds — well under the limit
+ * even before integer-array serialization expands the count further. A large
+ * reconciliation run touching thousands of clusters would otherwise overflow
+ * a single statement and abort the task *after* the merges have already
+ * committed, leaving zero audit rows persisted.
+ */
+const AUDIT_INSERT_BATCH_SIZE = 500;
+
+/**
  * Phase 8 — persist per-cluster audit rows to `reconciliation_log`.
- * All rows for a single run are bulk-inserted with the same `runId`.
- * No-ops when `audits` is empty so callers don't need to guard.
+ * All rows for a single run share the same `runId`. The insert is chunked
+ * into batches of `AUDIT_INSERT_BATCH_SIZE` so a large run (thousands of
+ * clusters) doesn't blow Postgres's bind-parameter limit. No-ops when
+ * `audits` is empty so callers don't need to guard.
+ *
+ * Note: chunks are not transactionally grouped. If a later chunk fails, the
+ * earlier chunks remain persisted. This is intentional — partial audit data
+ * is more useful than none, and the previous single-statement form already
+ * lacked transactional grouping with the merges themselves.
  */
 export async function insertReconciliationAuditRows(
   database: DbInserter,
@@ -127,7 +147,10 @@ export async function insertReconciliationAuditRows(
   audits: ClusterAuditRow[],
 ): Promise<void> {
   if (audits.length === 0) return;
-  await database
-    .insert(reconciliationLog)
-    .values(audits.map((a) => ({ ...a, runId })));
+  for (let i = 0; i < audits.length; i += AUDIT_INSERT_BATCH_SIZE) {
+    const batch = audits.slice(i, i + AUDIT_INSERT_BATCH_SIZE);
+    await database
+      .insert(reconciliationLog)
+      .values(batch.map((a) => ({ ...a, runId })));
+  }
 }
