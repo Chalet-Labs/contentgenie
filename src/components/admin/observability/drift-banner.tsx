@@ -20,6 +20,15 @@ type StatusConfig = {
   iconClass: string;
 };
 
+// Map drift status → ARIA role so screen-readers announce warn/alert as live
+// alerts and ok as a passive status. `aria-live` is paired with the role.
+type AriaRole = "alert" | "status";
+const STATUS_ROLE: Record<DriftStatus, AriaRole> = {
+  ok: "status",
+  warn: "alert",
+  alert: "alert",
+};
+
 const STATUS_CONFIG = {
   ok: {
     icon: CheckCircle2,
@@ -56,6 +65,8 @@ export function DriftBanner({ result }: DriftBannerProps) {
         container,
       )}
       data-status={result.status}
+      role={STATUS_ROLE[result.status]}
+      aria-live={result.status === "ok" ? "polite" : "assertive"}
     >
       <Icon className={iconClass} size={16} aria-hidden />
       <div className="flex flex-col gap-0.5">

@@ -121,7 +121,7 @@ if (audits.length > 0) {
 logger.info("reconcile_summary", { event: "reconcile_summary", ...summary });
 ```
 
-The `runId` is generated in the top-level task (e.g. `crypto.randomUUID()`), passed into `runReconciliation` for inclusion on each row. `insertReconciliationAuditRows` is a single `db.insert(reconciliationLog).values(rows)` — bulk insert, no per-row round-trips. If the insert throws, we log `reconcile_audit_persist_failed` and re-throw — losing audit rows is not a correctness defect for the resolver, but it is a regression from the day-1 contract this ADR introduces, so the operator must see it.
+The `runId` is generated in the top-level task (e.g. `crypto.randomUUID()`) and applied to each audit row inside `insertReconciliationAuditRows(db, runId, audits)` — the in-memory `ClusterAuditRow` shape itself does not carry `runId`; the helper attaches it when the rows are bulk-inserted into `reconciliation_log`. `insertReconciliationAuditRows` is a single `db.insert(reconciliationLog).values(rows)` — bulk insert, no per-row round-trips. If the insert throws, we log `reconcile_audit_persist_failed` and re-throw — losing audit rows is not a correctness defect for the resolver, but it is a regression from the day-1 contract this ADR introduces, so the operator must see it.
 
 **Why extend, not introduce a parallel `ClusterAuditCollector`?** Two collectors mean two state objects threaded through `runCluster`, doubling the closure surface. The accumulator is already the single place per-run state lives — adding cluster audits to it keeps the contract minimal.
 
@@ -147,7 +147,10 @@ type DriftStatus = "ok" | "warn" | "alert";
 interface DriftResult {
   status: DriftStatus;
   reason: string;
-  rates: { auto: number; disambig: number; new: number; total: number };
+  // `total` is a raw count, not a unit-fraction like the other rates, so it
+  // sits at the top level rather than inside `rates`.
+  total: number;
+  rates: { auto: number; disambig: number; new: number };
 }
 ```
 
@@ -156,13 +159,13 @@ Empty window (`total === 0`) returns `{ status: "ok", reason: "No resolutions in
 ### 6. `date_trunc` is the trend-bucketing helper — first instance in the codebase
 
 ```ts
-const granularitySql = sql.raw(granularity === "day" ? "'day'" : "'week'");
-const bucket = sql<string>`date_trunc(${granularitySql}, ${col})`.mapWith(
-  (v) => new Date(String(v)),
-);
+const bucketExpr = sql<Date>`date_trunc(${granularity}, ${col})`;
+// In the row aggregation loop, callers normalize bucket → Date defensively
+// (drivers sometimes hand back a string when the column is timestamp without
+// time zone), then key the per-bucket map on `bucket.toISOString()`.
 ```
 
-`granularity` is constrained at the call site (`parseAsStringLiteral(["day", "week"])` extension to the existing search-params loader) so `sql.raw` interpolation is safe — there is no user-supplied SQL fragment in scope. `date_trunc` is idiomatic Postgres, and the bucket boundaries it produces (00:00 UTC of the day) align with the rolling-window math in `windowFromKey` (boundaries are computed UTC-side in `Date.getTime()` arithmetic). Zero-fill on the application side mirrors `getFailureTrend`'s pattern: walk the expected day/week boundaries, look up the count from a `Map`, default to `0`.
+`granularity` is constrained at the call site (`parseAsStringLiteral(["day", "week"])` extension to the existing search-params loader) so the literal value flowing into `date_trunc` is safe — there is no user-supplied SQL fragment in scope. `date_trunc` is idiomatic Postgres, and the bucket boundaries it produces (00:00 UTC of the day) align with the rolling-window math in `windowFromKey` (boundaries are computed UTC-side in `Date.getTime()` arithmetic). Zero-fill on the application side mirrors `getFailureTrend`'s pattern: walk the expected day/week boundaries, look up the count from a `Map`, default to `0`.
 
 **Why not `DATE(...)`?** `DATE(updated_at)` casts to `date` (no time component); `date_trunc('day', updated_at)` casts to `timestamp` (00:00:00 of the day). For `granularity: "week"` we need the latter — `date_trunc('week', ...)` is Postgres's ISO-week-Monday boundary, no JS-side equivalent of `DATE()` exists. Standardizing on `date_trunc` for both day and week keeps the helper uniform.
 

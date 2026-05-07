@@ -423,9 +423,8 @@ async function runCluster(
     // only model-verdict rejections, not throws. So a loser that threw appears
     // in rejectedLoserIds but NOT in mergesRejected (it surfaces in
     // pairwiseVerifyThrew instead).
-    perClusterRejectedLosers = losers.filter(
-      (id) => !(verify.verifiedLoserIds as number[]).includes(id),
-    );
+    const verifiedSet = new Set(verify.verifiedLoserIds);
+    perClusterRejectedLosers = losers.filter((id) => !verifiedSet.has(id));
     perClusterPairwiseThrew = verify.pairwiseVerifyThrew;
     perClusterMergesRejected = verify.pairwiseVerifyRejected;
 
