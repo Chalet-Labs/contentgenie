@@ -63,11 +63,11 @@ export function DriftBanner({ result }: DriftBannerProps) {
           <span className="font-semibold">{label}:&nbsp;</span>
           {result.reason}
         </p>
-        {result.rates.total > 0 && (
+        {result.total > 0 && (
           <p className="text-xs opacity-80">
             auto {(result.rates.auto * 100).toFixed(0)}% · llm_disambig{" "}
             {(result.rates.disambig * 100).toFixed(0)}% · new{" "}
-            {(result.rates.new * 100).toFixed(0)}% · n={result.rates.total}
+            {(result.rates.new * 100).toFixed(0)}% · n={result.total}
           </p>
         )}
       </div>

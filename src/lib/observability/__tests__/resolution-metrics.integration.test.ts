@@ -84,8 +84,8 @@ describe.skipIf(!process.env.DATABASE_URL)(
       expect(["ok", "warn", "alert"]).toContain(result.status);
       expect(typeof result.reason).toBe("string");
       expect(result.reason.length).toBeGreaterThan(0);
-      expect(result.rates.total).toBeGreaterThanOrEqual(0);
-      if (result.rates.total > 0) {
+      expect(result.total).toBeGreaterThanOrEqual(0);
+      if (result.total > 0) {
         const sumRates =
           result.rates.auto + result.rates.disambig + result.rates.new;
         expect(sumRates).toBeCloseTo(1, 5);
@@ -101,7 +101,7 @@ describe.skipIf(!process.env.DATABASE_URL)(
       const histogram = await getMatchMethodHistogram(emptyWindow);
       const result = detectThresholdDrift(histogram);
       expect(result.status).toBe("ok");
-      expect(result.rates.total).toBe(0);
+      expect(result.total).toBe(0);
     });
   },
 );

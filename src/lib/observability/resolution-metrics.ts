@@ -215,11 +215,15 @@ export interface SimilarityTrendEntry {
 export interface DriftResult {
   status: DriftStatus;
   reason: string;
+  // Total resolution count across the window; surfaced alongside the rates so
+  // consumers can show "n=..." next to the percentages, but kept OUT of the
+  // `rates` object since it's a raw count (not a fraction) — the other three
+  // fields are unit-fractions in [0, 1].
+  total: number;
   rates: {
     auto: number;
     disambig: number;
     new: number;
-    total: number;
   };
 }
 
@@ -426,20 +430,22 @@ export function detectThresholdDrift(
     return {
       status: "ok",
       reason: "No resolutions in window",
-      rates: { auto: 0, disambig: 0, new: 0, total: 0 },
+      total: 0,
+      rates: { auto: 0, disambig: 0, new: 0 },
     };
   }
 
   const autoRate = histogram.auto / total;
   const disambigRate = histogram.llm_disambig / total;
   const newRate = histogram.new / total;
-  const rates = { auto: autoRate, disambig: disambigRate, new: newRate, total };
+  const rates = { auto: autoRate, disambig: disambigRate, new: newRate };
 
   // Alert check first — alert wins over warn (ADR-053 §5)
   if (autoRate < DRIFT_AUTO_RATE_FLOOR) {
     return {
       status: "alert",
       reason: `auto-match rate ${autoRate.toFixed(2)} below alert floor ${DRIFT_AUTO_RATE_FLOOR}`,
+      total,
       rates,
     };
   }
@@ -447,6 +453,7 @@ export function detectThresholdDrift(
     return {
       status: "alert",
       reason: `llm_disambig rate ${disambigRate.toFixed(2)} above alert ceiling ${DRIFT_DISAMBIG_RATE_CEILING}`,
+      total,
       rates,
     };
   }
@@ -456,6 +463,7 @@ export function detectThresholdDrift(
     return {
       status: "warn",
       reason: `auto-match rate ${autoRate.toFixed(2)} below warn threshold ${DRIFT_AUTO_RATE_WARN}`,
+      total,
       rates,
     };
   }
@@ -463,6 +471,7 @@ export function detectThresholdDrift(
     return {
       status: "warn",
       reason: `llm_disambig rate ${disambigRate.toFixed(2)} above warn threshold ${DRIFT_DISAMBIG_RATE_WARN}`,
+      total,
       rates,
     };
   }
@@ -470,6 +479,7 @@ export function detectThresholdDrift(
   return {
     status: "ok",
     reason: "All metrics within healthy bounds",
+    total,
     rates,
   };
 }

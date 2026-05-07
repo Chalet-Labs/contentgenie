@@ -3,13 +3,14 @@ import { render, screen } from "@testing-library/react";
 import { DriftBanner } from "@/components/admin/observability/drift-banner";
 import type { DriftResult } from "@/lib/observability/resolution-metrics";
 
-const rates = { auto: 0.72, disambig: 0.18, new: 0.1, total: 500 };
+const rates = { auto: 0.72, disambig: 0.18, new: 0.1 };
+const total = 500;
 
 function makeResult(
   status: DriftResult["status"],
   reason = "test reason",
 ): DriftResult {
-  return { status, reason, rates };
+  return { status, reason, total, rates };
 }
 
 describe("DriftBanner", () => {
@@ -62,20 +63,25 @@ describe("DriftBanner", () => {
     );
   });
 
-  it("renders rate breakdown sub-line when rates.total > 0", () => {
+  it("renders rate breakdown sub-line when total > 0", () => {
     render(<DriftBanner result={makeResult("ok")} />);
-    // rates = { auto: 0.72, disambig: 0.18, new: 0.1, total: 500 }
+    // rates = { auto: 0.72, disambig: 0.18, new: 0.1 }, total = 500
     expect(screen.getByText(/auto 72%/)).toBeInTheDocument();
     expect(screen.getByText(/llm_disambig 18%/)).toBeInTheDocument();
     expect(screen.getByText(/new 10%/)).toBeInTheDocument();
     expect(screen.getByText(/n=500/)).toBeInTheDocument();
   });
 
-  it("hides rate breakdown sub-line when rates.total === 0", () => {
-    const zeroRates = { auto: 0, disambig: 0, new: 0, total: 0 };
+  it("hides rate breakdown sub-line when total === 0", () => {
+    const zeroRates = { auto: 0, disambig: 0, new: 0 };
     render(
       <DriftBanner
-        result={{ status: "ok", reason: "empty window", rates: zeroRates }}
+        result={{
+          status: "ok",
+          reason: "empty window",
+          total: 0,
+          rates: zeroRates,
+        }}
       />,
     );
     expect(screen.queryByText(/auto 0%/)).not.toBeInTheDocument();

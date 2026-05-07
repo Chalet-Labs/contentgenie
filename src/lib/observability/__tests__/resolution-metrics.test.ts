@@ -514,7 +514,7 @@ describe("detectThresholdDrift", () => {
     expect(result.status).toBe("ok");
     expect(result).toHaveProperty("reason");
     expect(result).toHaveProperty("rates");
-    expect(result.rates.total).toBe(100);
+    expect(result.total).toBe(100);
   });
 
   it("returns status=warn when auto rate is between floor and warn threshold", () => {
@@ -566,7 +566,7 @@ describe("detectThresholdDrift", () => {
   it("returns status=ok with total=0 when histogram is empty (divide-by-zero guard)", () => {
     const result = detectThresholdDrift({ auto: 0, llm_disambig: 0, new: 0 });
     expect(result.status).toBe("ok");
-    expect(result.rates.total).toBe(0);
+    expect(result.total).toBe(0);
     expect(result.rates.auto).toBe(0);
     expect(result.rates.disambig).toBe(0);
   });

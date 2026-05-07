@@ -95,7 +95,8 @@ function setupDefaultMocks() {
   mockDetectThresholdDrift.mockReturnValue({
     status: "ok",
     reason: "All metrics within healthy bounds",
-    rates: { auto: 0.5, disambig: 0.3, new: 0.2, total: 100 },
+    total: 100,
+    rates: { auto: 0.5, disambig: 0.3, new: 0.2 },
   });
   mockGetReconciliationAuditLog.mockResolvedValue([]);
 }
