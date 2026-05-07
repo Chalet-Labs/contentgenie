@@ -40,12 +40,14 @@ A branch behind main can pass local verification but fail CI after the PR opens 
 Run fresh:
 
 ```bash
-bun run build
+bun run build && bun run build-storybook
 ```
 
-Must exit 0. If it fails, fix the root cause (not a suppression, not a workaround) and re-run. Don't enter Phase 2 with a red build — reviewers waste cycles on broken code.
+Both must exit 0. If either fails, fix the root cause (not a suppression, not a workaround) and re-run. Don't enter Phase 2 with a red build — reviewers waste cycles on broken code.
 
-Build only — Husky pre-commit covers tsc/lint/test on new commits, leaving page-export errors as the gap. If Phase 0 rebased (history rewrote, `HEAD@{1}` ≠ `HEAD`), pre-commit didn't fire on those reapplied commits — also run `bun run lint` and `bun run test` here.
+`bun run build` catches Next.js page-export errors that tsc misses. `bun run build-storybook` catches Storybook-only failures: missing exports in `.storybook/mocks/*` (the Vite alias chain often fails when a story transitively imports a server action that lacks a stub) and stories that reference deleted components — these don't surface in `bun run test` (jsdom skips Storybook bundling) and CI's `quality` job runs them, so skipping here just defers the failure.
+
+Husky pre-commit covers tsc/lint/test on new commits. If Phase 0 rebased (history rewrote, `HEAD@{1}` ≠ `HEAD`), pre-commit didn't fire on the reapplied commits — also run `bun run lint` and `bun run test` here.
 
 ### Phase 2 — Multi-Tool Review
 
@@ -153,10 +155,10 @@ After Phase 4b, stage all changes (subagent + orchestrator), run `bun run format
 ### Phase 5 — Re-Verify
 
 ```bash
-bun run build
+bun run build && bun run build-storybook
 ```
 
-Must exit 0. Phase 4's commits already triggered the pre-commit hook (tsc + lint + test), so only the build gap needs re-checking here.
+Both must exit 0. Phase 4's commits already triggered the pre-commit hook (tsc + lint + test), so only the build gaps need re-checking here.
 
 If build fails, loop back to Phase 3 for the regressing finding (was it valid? is the fix correct?). Cap retries at 2. If still failing after 2 retries, stop and surface to the user with the specific failure — don't write the sentinel.
 
@@ -201,7 +203,7 @@ Title: `type: Description`, under 70 characters, same convention as commits. Use
 
 ## Non-obvious rules
 
-- **Verification is fresh-only.** Re-run `bun run build` in this session — previous runs don't count.
+- **Verification is fresh-only.** Re-run `bun run build && bun run build-storybook` in this session — previous runs don't count.
 - **Rubric propagation is hybrid.** Codex inlines the rubric in its `Task` prompt (background subagent has no shared context). The two slash commands rely on conversation salience. Smoke-test: look for `[checklist §N]` citations in Phase 3 — if absent, propagation regressed.
 
 ## Failure modes
