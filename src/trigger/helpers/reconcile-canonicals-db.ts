@@ -1,8 +1,13 @@
 /**
  * Repository-style SQL helpers for the nightly canonical-topic reconciliation
- * pipeline. Helpers accept a minimal `DbExecutor` (just `execute`) so fakes
- * type-check without `as unknown as` casts and the helpers don't depend on
- * the full Drizzle client surface or the orchestrator's `ReconcileDeps` bag.
+ * pipeline.
+ *
+ * Each helper accepts the minimal slice of the Drizzle client it actually
+ * needs — `DbExecutor` (`execute`) for raw-SQL helpers, `DbInserter`
+ * (`insert`) for query-builder writes such as `insertReconciliationAuditRows`.
+ * Narrowing the surface lets fakes type-check without `as unknown as` casts
+ * and keeps helpers independent of the full Drizzle client and the
+ * orchestrator's `ReconcileDeps` bag.
  */
 
 import { sql } from "drizzle-orm";

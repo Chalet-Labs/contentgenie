@@ -205,4 +205,29 @@ describe("ReconcileSummaryAccumulator", () => {
     accum.clusterSeen();
     expect(accum.freeze(0).clusterAudits).toEqual([]);
   });
+
+  it("freeze returns a defensive copy of clusterAudits — caller mutations don't leak back", () => {
+    const accum = new ReconcileSummaryAccumulator();
+    const audit: Parameters<typeof accum.recordClusterAudit>[0] = {
+      clusterIndex: 0,
+      clusterSize: 2,
+      winnerId: 1,
+      loserIds: [2],
+      verifiedLoserIds: [2],
+      rejectedLoserIds: [],
+      mergesExecuted: 1,
+      mergesRejected: 0,
+      pairwiseVerifyThrew: 0,
+      outcome: "merged",
+    };
+    accum.recordClusterAudit(audit);
+
+    const first = accum.freeze(0);
+    first.clusterAudits.push({ ...audit, clusterIndex: 99 });
+    first.clusterAudits.length = 0;
+
+    const second = accum.freeze(0);
+    expect(second.clusterAudits).toHaveLength(1);
+    expect(second.clusterAudits[0].clusterIndex).toBe(0);
+  });
 });

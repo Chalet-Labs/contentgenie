@@ -83,6 +83,12 @@ export class ReconcileSummaryAccumulator {
   }
 
   freeze(durationMs: number): ReconcileSummary {
-    return { ...this.state, durationMs };
+    // Shallow-copy clusterAudits so callers can iterate / sort the returned
+    // array without mutating accumulator state (and earlier freeze() returns).
+    return {
+      ...this.state,
+      clusterAudits: [...this.state.clusterAudits],
+      durationMs,
+    };
   }
 }

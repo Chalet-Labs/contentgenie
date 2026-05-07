@@ -362,9 +362,13 @@ describe("getMatchMethodTrend", () => {
   });
 
   it("aligns week buckets to Monday even when window.start is not a Monday (B1 regression)", async () => {
-    // 2026-04-05 is a Sunday. Postgres date_trunc('week') returns the preceding
-    // Monday 2026-04-06. Without the Monday-snap fix, generateBucketRange would
-    // produce Sunday keys that never match the DB's Monday keys → all-zero output.
+    // 2026-04-05 is a Sunday; date_trunc('week') uses ISO weeks (Mon–Sun) so
+    // the Monday for that week is 2026-03-30 and the next ISO-week boundary
+    // generateBucketRange should emit is 2026-04-06. Without the Monday-snap
+    // fix, generateBucketRange would emit Sunday keys that never match the
+    // DB's Monday keys → all-zero output. The mock below injects rows on the
+    // 2026-04-06 boundary so we can verify the counts land on the correct
+    // generated Monday key (and that no entry is a Sunday).
     const mondayKey = new Date("2026-04-06T00:00:00.000Z");
     mockSelect.mockReturnValue(
       makeChain([
