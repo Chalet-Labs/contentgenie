@@ -1,8 +1,8 @@
 # ADR-053: Extended Observability Dashboards — Trends, Drift Detection, Reconciliation Audit
 
-**Status:** Proposed
+**Status:** Accepted
 **Date:** 2026-05-05
-**Issue:** [#392](https://github.com/Chalet-Labs/canonical-topics/issues/392) (part of epic [#376](https://github.com/Chalet-Labs/contentgenie/issues/376))
+**Issue:** [#392](https://github.com/Chalet-Labs/contentgenie/issues/392) (part of epic [#376](https://github.com/Chalet-Labs/contentgenie/issues/376))
 **Spec:** `.dev/pm/specs/2026-04-25-canonical-topics-foundation.md` (Approved; B4 row in EPIC B)
 **Relates to:** [ADR-046](046-admin-canonical-merge.md), [ADR-047](047-resolution-observability-junction-as-source.md), [ADR-050](050-canonical-topics-reconciliation-clustering.md)
 
@@ -218,7 +218,7 @@ export const adminTopicsObservabilitySearchParams = {
 
 ## References
 
-- Issue: [#392](https://github.com/Chalet-Labs/canonical-topics/issues/392)
+- Issue: [#392](https://github.com/Chalet-Labs/contentgenie/issues/392)
 - Spec: `.dev/pm/specs/2026-04-25-canonical-topics-foundation.md` (B4 row in EPIC B)
 - [ADR-046](046-admin-canonical-merge.md) §6 — `canonical_topic_admin_log` table shape and CHECK-vs-pgEnum trade-off (replicated in §1 above)
 - [ADR-047](047-resolution-observability-junction-as-source.md) §"trade-offs accepted" — punted `updated_at` index decision (§3 above accepts the punt)

@@ -73,3 +73,29 @@ describe("loadAdminTopicsObservabilitySearchParams — granularity", () => {
     expect(result.granularity).toBe("day");
   });
 });
+
+describe("loadAdminTopicsObservabilitySearchParams — auditPage", () => {
+  it("defaults auditPage to 1 when not provided", () => {
+    const result = loadAdminTopicsObservabilitySearchParams({});
+    expect(result.auditPage).toBe(1);
+  });
+
+  it("accepts a valid integer auditPage", () => {
+    const result = loadAdminTopicsObservabilitySearchParams({ auditPage: "3" });
+    expect(result.auditPage).toBe(3);
+  });
+
+  it("falls back to default 1 for non-numeric auditPage values", () => {
+    const result = loadAdminTopicsObservabilitySearchParams({
+      auditPage: "abc",
+    });
+    expect(result.auditPage).toBe(1);
+  });
+
+  it("falls back to default 1 when auditPage is missing", () => {
+    const result = loadAdminTopicsObservabilitySearchParams({
+      window: "7d",
+    });
+    expect(result.auditPage).toBe(1);
+  });
+});
