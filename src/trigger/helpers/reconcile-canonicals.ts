@@ -339,7 +339,10 @@ async function runCluster(
         clusterIndex,
         clusterSize: cluster.length,
         winnerId: null,
-        loserIds: [],
+        // No winner was picked for this cluster; persist the full member list
+        // under loserIds so the durable audit row preserves cluster membership
+        // for debugging, instead of dropping it on the floor.
+        loserIds: cluster,
         verifiedLoserIds: [],
         rejectedLoserIds: [],
         mergesExecuted: 0,
@@ -356,7 +359,7 @@ async function runCluster(
         clusterIndex,
         clusterSize: cluster.length,
         winnerId: null,
-        loserIds: [],
+        loserIds: cluster,
         verifiedLoserIds: [],
         rejectedLoserIds: [],
         mergesExecuted: 0,
@@ -566,6 +569,23 @@ export async function runReconciliation(
     if (now().getTime() - startMs > RECONCILE_BUDGET_MS) {
       const remaining = clusters.length - i;
       accum.clusterDeferred(remaining);
+      // Persist a per-cluster audit row for each deferred cluster so the
+      // durable reconciliation_log keeps membership info for clusters the
+      // budget skipped — `clustersDeferred` only carries the count.
+      for (let j = i; j < clusters.length; j++) {
+        accum.recordClusterAudit({
+          clusterIndex: j,
+          clusterSize: clusters[j].length,
+          winnerId: null,
+          loserIds: clusters[j],
+          verifiedLoserIds: [],
+          rejectedLoserIds: [],
+          mergesExecuted: 0,
+          mergesRejected: 0,
+          pairwiseVerifyThrew: 0,
+          outcome: "skipped",
+        });
+      }
       logger.warn("reconcile_budget_exhausted", {
         processed: i,
         deferred: remaining,

@@ -1,10 +1,13 @@
 import { describe, it, expect } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { SimilarityTrendHeatmap } from "@/components/admin/observability/similarity-trend-heatmap";
-import type {
-  SimilarityTrendEntry,
-  SimilarityBucket,
-} from "@/lib/observability/resolution-metrics";
+import {
+  SIMILARITY_BUCKET_SIZE,
+  type SimilarityTrendEntry,
+  type SimilarityBucket,
+} from "@/lib/observability/similarity-buckets";
+
+const NUM_BUCKETS = Math.ceil(1 / SIMILARITY_BUCKET_SIZE);
 
 function makeDay(
   daysAgo: number,
@@ -13,10 +16,13 @@ function makeDay(
   const d = new Date();
   d.setUTCDate(d.getUTCDate() - daysAgo);
   d.setUTCHours(0, 0, 0, 0);
-  const buckets: SimilarityBucket[] = Array.from({ length: 20 }, (_, i) => ({
-    bucket: Math.round(i * 0.05 * 1e10) / 1e10,
-    count: countFn(i),
-  }));
+  const buckets: SimilarityBucket[] = Array.from(
+    { length: NUM_BUCKETS },
+    (_, i) => ({
+      bucket: Math.round(i * SIMILARITY_BUCKET_SIZE * 1e10) / 1e10,
+      count: countFn(i),
+    }),
+  );
   return { bucket: d, buckets };
 }
 
@@ -27,13 +33,12 @@ describe("SimilarityTrendHeatmap", () => {
     expect(screen.getAllByTestId("heatmap-row")).toHaveLength(3);
   });
 
-  it("renders 20 cells per row", () => {
+  it("renders one cell per similarity bucket", () => {
     render(<SimilarityTrendHeatmap entries={[makeDay(0)]} />);
     // Each cell gets data-testid="heatmap-cell-{isoDate}-{colIdx}"
     const row = screen.getByTestId("heatmap-row");
-    // 20 child divs with data-quartile
     const cells = row.querySelectorAll("[data-quartile]");
-    expect(cells).toHaveLength(20);
+    expect(cells).toHaveLength(NUM_BUCKETS);
   });
 
   it("assigns quartile=0 to empty cells", () => {
@@ -47,20 +52,21 @@ describe("SimilarityTrendHeatmap", () => {
   });
 
   it("assigns quartile=4 to the max-count cell", () => {
-    // One cell has max count, others zero
-    const entries = [makeDay(0, (i) => (i === 18 ? 100 : 0))];
+    // Pick a non-edge bucket near the high-similarity end so the test exercises
+    // an interior cell while staying robust to bucket-grid retuning.
+    const targetIdx = NUM_BUCKETS - 2;
+    const entries = [makeDay(0, (i) => (i === targetIdx ? 100 : 0))];
     render(<SimilarityTrendHeatmap entries={entries} />);
     const cells = screen
       .getByTestId("heatmap-row")
       .querySelectorAll("[data-quartile]");
-    // The 19th cell (index 18) should be quartile 4
-    expect(cells[18]?.getAttribute("data-quartile")).toBe("4");
-    // Others should be quartile 0
+    expect(cells[targetIdx]?.getAttribute("data-quartile")).toBe("4");
     expect(cells[0]?.getAttribute("data-quartile")).toBe("0");
   });
 
   it("applies bg-indigo-600 (full opacity) class to quartile-4 cell", () => {
-    const entries = [makeDay(0, (i) => (i === 19 ? 50 : 0))];
+    const targetIdx = NUM_BUCKETS - 1;
+    const entries = [makeDay(0, (i) => (i === targetIdx ? 50 : 0))];
     render(<SimilarityTrendHeatmap entries={entries} />);
     const maxCell = screen
       .getByTestId("heatmap-row")

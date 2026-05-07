@@ -1,9 +1,12 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
 import { SimilarityTrendHeatmap } from "@/components/admin/observability/similarity-trend-heatmap";
-import type {
-  SimilarityTrendEntry,
-  SimilarityBucket,
-} from "@/lib/observability/resolution-metrics";
+import {
+  SIMILARITY_BUCKET_SIZE,
+  type SimilarityTrendEntry,
+  type SimilarityBucket,
+} from "@/lib/observability/similarity-buckets";
+
+const NUM_BUCKETS = Math.ceil(1 / SIMILARITY_BUCKET_SIZE);
 
 function makeDay(
   daysAgo: number,
@@ -13,10 +16,13 @@ function makeDay(
   d.setUTCDate(d.getUTCDate() - daysAgo);
   d.setUTCHours(0, 0, 0, 0);
 
-  const buckets: SimilarityBucket[] = Array.from({ length: 20 }, (_, i) => ({
-    bucket: Math.round(i * 0.05 * 1e10) / 1e10,
-    count: countFn(i),
-  }));
+  const buckets: SimilarityBucket[] = Array.from(
+    { length: NUM_BUCKETS },
+    (_, i) => ({
+      bucket: Math.round(i * SIMILARITY_BUCKET_SIZE * 1e10) / 1e10,
+      count: countFn(i),
+    }),
+  );
 
   return { bucket: d, buckets };
 }

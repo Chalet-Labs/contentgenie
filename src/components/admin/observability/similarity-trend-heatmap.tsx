@@ -3,7 +3,7 @@ import { formatUtcShortDate } from "@/lib/admin/format-utils";
 import {
   SIMILARITY_BUCKET_SIZE,
   type SimilarityTrendEntry,
-} from "@/lib/observability/resolution-metrics";
+} from "@/lib/observability/similarity-buckets";
 
 interface SimilarityTrendHeatmapProps {
   entries: SimilarityTrendEntry[];

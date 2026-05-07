@@ -586,6 +586,20 @@ describe("runReconciliation", () => {
     expect(summary.episodeCountDrift).toBe(2);
     // Phase 7 ran (decay row counted).
     expect(summary.dormancyTransitions).toBe(1);
+
+    // Each deferred cluster gets an audit row with full membership so the
+    // durable reconciliation_log doesn't lose cluster-id context for skipped work.
+    const deferredAudits = summary.clusterAudits.filter(
+      (a) => a.outcome === "skipped" && a.winnerId === null,
+    );
+    expect(deferredAudits).toHaveLength(4);
+    expect(deferredAudits.map((a) => a.loserIds)).toEqual([
+      [3, 4],
+      [5, 6],
+      [7, 8],
+      [9, 10],
+    ]);
+    expect(deferredAudits.map((a) => a.clusterIndex)).toEqual([1, 2, 3, 4]);
   });
 
   // (k) cross-cluster overlap guard
@@ -760,6 +774,8 @@ describe("runReconciliation", () => {
     expect(summary.clusterAudits).toHaveLength(1);
     expect(summary.clusterAudits[0].outcome).toBe("skipped");
     expect(summary.clusterAudits[0].clusterSize).toBe(1);
+    // Cluster membership preserved on the audit row even when no winner is picked.
+    expect(summary.clusterAudits[0].loserIds).toEqual([1]);
   });
 
   // F12: pickWinner returns a winner id present in cluster but absent from

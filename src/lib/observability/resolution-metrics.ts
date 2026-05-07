@@ -18,6 +18,19 @@ import {
   DRIFT_DISAMBIG_RATE_WARN,
   type DriftStatus,
 } from "@/lib/observability/drift-thresholds";
+import {
+  SIMILARITY_BUCKET_SIZE,
+  type SimilarityBucket,
+  type SimilarityTrendEntry,
+} from "@/lib/observability/similarity-buckets";
+
+// Re-export so existing consumers (and `resolution-metrics` IDE references)
+// keep working after the constants moved to a browser-safe module.
+export {
+  SIMILARITY_BUCKET_SIZE,
+  type SimilarityBucket,
+  type SimilarityTrendEntry,
+};
 
 export interface ResolutionMetricRecord {
   matchMethod: MatchMethod;
@@ -27,11 +40,6 @@ export interface ResolutionMetricRecord {
 
 export type MatchMethodHistogram = Record<MatchMethod, number>;
 
-export interface SimilarityBucket {
-  bucket: number;
-  count: number;
-}
-
 export interface DisambigForcedCount {
   versionTokenForced: number;
   total: number;
@@ -39,7 +47,6 @@ export interface DisambigForcedCount {
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const MS_PER_WEEK = 7 * MS_PER_DAY;
-export const SIMILARITY_BUCKET_SIZE = 0.05;
 
 /**
  * No-op stub in v1. The canonical write path is the resolver's `insertJunction`,
@@ -210,11 +217,6 @@ export interface MatchMethodTrendEntry {
   llm_disambig: number;
   new: number;
   total: number;
-}
-
-export interface SimilarityTrendEntry {
-  bucket: Date;
-  buckets: SimilarityBucket[];
 }
 
 export interface DriftResult {
