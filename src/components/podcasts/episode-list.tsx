@@ -5,6 +5,7 @@ import { Search } from "lucide-react";
 import { EpisodeCard } from "./episode-card";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useCanonicalOverlapMap } from "@/hooks/use-canonical-overlap-map";
 import type { PodcastIndexEpisode } from "@/lib/podcastindex";
 import type { SummaryStatus } from "@/db/schema";
 import type { CanonicalTopicChip } from "@/db/library-columns";
@@ -12,6 +13,7 @@ import {
   asPodcastIndexEpisodeId,
   type PodcastIndexEpisodeId,
 } from "@/types/ids";
+import type { CanonicalOverlapResult } from "@/lib/topic-overlap";
 
 interface EpisodeListProps {
   episodes: PodcastIndexEpisode[];
@@ -40,6 +42,10 @@ interface EpisodeListProps {
     PodcastIndexEpisodeId,
     CanonicalTopicChip[]
   >;
+  canonicalOverlapByPodcastIndexId?: Record<
+    PodcastIndexEpisodeId,
+    CanonicalOverlapResult | null
+  >;
 }
 
 export function EpisodeList({
@@ -52,6 +58,7 @@ export function EpisodeList({
   knownIds,
   topicsByPodcastIndexId,
   canonicalTopicsByPodcastIndexId,
+  canonicalOverlapByPodcastIndexId,
 }: EpisodeListProps) {
   const [query, setQuery] = useState("");
   const trimmedQuery = query.trim();
@@ -67,6 +74,20 @@ export function EpisodeList({
     () => (knownIds ? new Set(knownIds) : undefined),
     [knownIds],
   );
+  // Server-rendered overlap snapshot is hydrated as `initialMap`; the hook then
+  // refetches on LISTEN_STATE_CHANGED_EVENT so canonical "new"/"repeat" labels
+  // update when a ListenedButton fires here, mirroring library/dashboard behavior.
+  const overlapIds = useMemo<PodcastIndexEpisodeId[]>(
+    () =>
+      Array.from(
+        new Set(episodes.map((e) => asPodcastIndexEpisodeId(String(e.id)))),
+      ).sort() as PodcastIndexEpisodeId[],
+    [episodes],
+  );
+  const liveOverlapMap = useCanonicalOverlapMap(overlapIds, {
+    enabled: !!canonicalOverlapByPodcastIndexId,
+    initialMap: canonicalOverlapByPodcastIndexId,
+  });
 
   if (isLoading) {
     return (
@@ -133,6 +154,7 @@ export function EpisodeList({
               canMarkListened={knownSet ? knownSet.has(piId) : true}
               topics={topicsByPodcastIndexId?.[piId]}
               canonicalTopics={canonicalTopicsByPodcastIndexId?.[piId]}
+              canonicalOverlap={liveOverlapMap[piId]}
             />
           );
         })

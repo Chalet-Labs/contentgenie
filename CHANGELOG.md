@@ -8,6 +8,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ### Added
 
+- Canonical-topic overlap indicator on episode cards, summary display, dashboard recommendations, and episode detail page. Shows `CanonicalOverlapIndicator` ("You've heard N episodes on <topic>" / "New: <topic>") with canonical precedence over the legacy category-level fallback; indicator is absent when no data is available. Hydrated server-side on the podcast detail page (RSC) and client-side on library and collection pages via `fetchCanonicalOverlapsBatched`. (#396)
 - Per-topic digest generation Trigger.dev task (`generate-topic-digest`) with two-tier staleness/rate gating, `triggerTopicDigestGeneration` server action, and structured LLM synthesis of consensus + disagreement points into `canonical_topic_digests` ([#398](https://github.com/Chalet-Labs/contentgenie/issues/398), ADR-051, ADR-052).
 - `getCanonicalTopicOverlap` server action and `getCanonicalTopicOverlaps` batch variant for canonical-topic-level overlap indicators (issue #395, complements ADR-034).
 - Admin canonical-topics polish: rich server-side filters (ongoing tri-state, episode-count min/max range), sequential bulk merge (up to 50 losers, serial to avoid junction races), per-alias remove panel with AlertDialog confirm, linked-episodes panel with per-episode full re-summarize button, and a merge-cleanup drift surface at `/admin/topics/drift` for inspecting merged canonicals with orphaned junction rows. Detail page gains a drift callout for merged topics with orphaned rows. (#391, ADR-049)

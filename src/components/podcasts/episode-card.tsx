@@ -12,6 +12,7 @@ import { AddToQueueButton } from "@/components/audio-player/add-to-queue-button"
 import { PlayEpisodeButton } from "@/components/audio-player/play-episode-button";
 import { ListenedButton } from "@/components/episodes/listened-button";
 import { EpisodeCard as EpisodeCardPrimitive } from "@/components/episodes/episode-card";
+import type { CanonicalOverlapResult } from "@/lib/topic-overlap";
 
 interface EpisodeCardProps {
   episode: PodcastIndexEpisode;
@@ -24,6 +25,7 @@ interface EpisodeCardProps {
   topics?: string[];
   /** Canonical topic chips forwarded to the primitive. */
   canonicalTopics?: CanonicalTopicChip[];
+  canonicalOverlap?: CanonicalOverlapResult | null;
 }
 
 export function EpisodeCard({
@@ -35,6 +37,7 @@ export function EpisodeCard({
   canMarkListened = true,
   topics,
   canonicalTopics,
+  canonicalOverlap,
 }: EpisodeCardProps) {
   // PodcastIndex API id (number|string) → branded string.
   const piId = asPodcastIndexEpisodeId(String(episode.id));
@@ -113,6 +116,7 @@ export function EpisodeCard({
       status={summaryStatus}
       topics={topics}
       canonicalTopics={canonicalTopics}
+      canonicalOverlap={canonicalOverlap}
       meta={meta}
       primaryAction={primaryAction}
       secondaryActions={secondaryActions}

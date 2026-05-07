@@ -45,6 +45,14 @@ export const getDashboardStats = async () => ({
   error: null,
 });
 export const getQueueEpisodeScores = async () => ({});
+export const getCanonicalTopicOverlaps = async () => ({
+  success: true as const,
+  data: {} as Record<string, unknown>,
+});
+export const getCanonicalTopicOverlap = async () => ({
+  success: true as const,
+  data: null,
+});
 export const getPinnedSubscriptions = async () => ({
   success: true as const,
   data: [

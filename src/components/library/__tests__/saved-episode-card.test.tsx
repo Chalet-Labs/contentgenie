@@ -3,6 +3,7 @@ import { render, screen } from "@testing-library/react";
 import { SavedEpisodeCard } from "@/components/library/saved-episode-card";
 import type { SavedItemDTO, CanonicalTopicChip } from "@/db/library-columns";
 import { asPodcastIndexEpisodeId } from "@/types/ids";
+import type { CanonicalOverlapResult } from "@/lib/topic-overlap";
 
 vi.mock("next/image", () => ({
   default: ({ src, alt }: { src: string; alt: string }) => (
@@ -153,5 +154,42 @@ describe("SavedEpisodeCard — canonical topics", () => {
     );
     const chips = screen.getAllByRole("link", { name: /^Topic:/i });
     expect(chips).toHaveLength(3);
+  });
+});
+
+describe("SavedEpisodeCard — overlap indicator", () => {
+  const repeatOverlap: CanonicalOverlapResult = {
+    kind: "repeat",
+    count: 2,
+    topicLabel: "gut health",
+    topicId: 20,
+  };
+  const newOverlap: CanonicalOverlapResult = {
+    kind: "new",
+    topicLabel: "longevity",
+    topicId: 21,
+  };
+
+  it("renders canonical repeat indicator when canonicalOverlap is set", () => {
+    render(
+      <SavedEpisodeCard item={baseItem} canonicalOverlap={repeatOverlap} />,
+    );
+    const indicator = screen.getByTestId("overlap-indicator");
+    expect(indicator).toHaveTextContent(
+      "You've heard 2 episodes on gut health",
+    );
+    expect(indicator).toHaveAttribute("data-canonical-overlap-kind", "repeat");
+  });
+
+  it("renders canonical new indicator when canonicalOverlap kind is new", () => {
+    render(<SavedEpisodeCard item={baseItem} canonicalOverlap={newOverlap} />);
+    const indicator = screen.getByTestId("overlap-indicator");
+    expect(indicator).toHaveTextContent("New: longevity");
+    expect(indicator).toHaveAttribute("data-canonical-overlap-kind", "new");
+  });
+
+  it("renders no indicator when canonicalOverlap is null", () => {
+    render(<SavedEpisodeCard item={baseItem} canonicalOverlap={null} />);
+    expect(screen.queryByTestId("overlap-indicator")).not.toBeInTheDocument();
   });
 });

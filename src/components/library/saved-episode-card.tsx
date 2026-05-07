@@ -33,6 +33,7 @@ import { BookmarksList } from "./bookmarks-list";
 import { RatingInput } from "@/components/episodes/rating-input";
 import { stripHtml, formatDate, formatDuration } from "@/lib/utils";
 import type { SavedItemDTO } from "@/db/library-columns";
+import type { CanonicalOverlapResult } from "@/lib/topic-overlap";
 
 interface SavedEpisodeCardProps {
   item: SavedItemDTO;
@@ -40,6 +41,7 @@ interface SavedEpisodeCardProps {
   onCollectionChanged?: () => void;
   isOffline?: boolean;
   isListened?: boolean;
+  canonicalOverlap?: CanonicalOverlapResult | null;
 }
 
 export function SavedEpisodeCard({
@@ -48,6 +50,7 @@ export function SavedEpisodeCard({
   onCollectionChanged,
   isOffline,
   isListened = false,
+  canonicalOverlap,
 }: SavedEpisodeCardProps) {
   const [isRemoving, setIsRemoving] = useState(false);
   const [isPending, startTransition] = useTransition();
@@ -182,6 +185,7 @@ export function SavedEpisodeCard({
         }
         score={episode.worthItScore}
         canonicalTopics={episode.canonicalTopics}
+        canonicalOverlap={canonicalOverlap}
         meta={meta}
         secondaryActions={secondaryActions}
         accent="none"

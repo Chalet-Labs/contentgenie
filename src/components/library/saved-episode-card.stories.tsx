@@ -71,3 +71,33 @@ export const WithRatingAndNotes: Story = {
     },
   },
 };
+
+export const WithCanonicalOverlapRepeat: Story = {
+  args: {
+    item: baseItem,
+    canonicalOverlap: {
+      kind: "repeat",
+      count: 5,
+      topicLabel: "creatine",
+      topicId: 1,
+    },
+  },
+};
+
+export const WithCanonicalOverlapNew: Story = {
+  args: {
+    item: baseItem,
+    canonicalOverlap: {
+      kind: "new",
+      topicLabel: "OpenAI o4 preview",
+      topicId: 2,
+    },
+  },
+};
+
+export const WithCanonicalNullEmptyState: Story = {
+  args: {
+    item: baseItem,
+    canonicalOverlap: null,
+  },
+};

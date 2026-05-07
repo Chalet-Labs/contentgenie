@@ -152,3 +152,33 @@ export const WithCanonicalTopics: Story = {
     ],
   },
 };
+
+export const WithCanonicalOverlapRepeat: Story = {
+  args: {
+    episode: baseEpisode,
+    canonicalOverlap: {
+      kind: "repeat",
+      count: 5,
+      topicLabel: "creatine",
+      topicId: 1,
+    },
+  },
+};
+
+export const WithCanonicalOverlapNew: Story = {
+  args: {
+    episode: baseEpisode,
+    canonicalOverlap: {
+      kind: "new",
+      topicLabel: "OpenAI o4 preview",
+      topicId: 2,
+    },
+  },
+};
+
+export const WithCanonicalNullEmptyState: Story = {
+  args: {
+    episode: baseEpisode,
+    canonicalOverlap: null,
+  },
+};

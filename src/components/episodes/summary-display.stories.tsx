@@ -114,3 +114,35 @@ export const WithLegacyDimensions: Story = {
     },
   },
 };
+
+export const WithCanonicalOverlapRepeat: Story = {
+  args: {
+    ...FullSummary.args,
+    canonicalOverlap: {
+      kind: "repeat",
+      count: 5,
+      topicLabel: "creatine",
+      topicId: 1,
+    },
+  },
+};
+
+export const WithCanonicalOverlapNew: Story = {
+  args: {
+    ...FullSummary.args,
+    canonicalOverlap: {
+      kind: "new",
+      topicLabel: "OpenAI o4 preview",
+      topicId: 2,
+    },
+  },
+};
+
+export const WithCategoryFallback: Story = {
+  args: {
+    ...FullSummary.args,
+    canonicalOverlap: null,
+    overlapLabel: "You've heard 5 similar episodes on AI",
+    overlapLabelKind: "high-overlap",
+  },
+};

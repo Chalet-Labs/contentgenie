@@ -18,6 +18,7 @@ const mocks = vi.hoisted(() => ({
   useOnlineStatus: vi.fn(() => true),
   isEpisodeSaved: vi.fn(),
   getEpisodeTopicOverlap: vi.fn(),
+  getCanonicalTopicOverlap: vi.fn(),
   cacheEpisode: vi.fn(),
   getCachedEpisode: vi.fn(),
 }));
@@ -43,6 +44,7 @@ vi.mock("@/app/actions/library", () => ({
 
 vi.mock("@/app/actions/dashboard", () => ({
   getEpisodeTopicOverlap: mocks.getEpisodeTopicOverlap,
+  getCanonicalTopicOverlap: mocks.getCanonicalTopicOverlap,
 }));
 
 vi.mock("@/lib/offline-cache", () => ({
@@ -76,13 +78,20 @@ vi.mock("@/components/episodes/summary-display", () => ({
   SummaryDisplay: ({
     onGenerateSummary,
     overlapLabel,
+    canonicalOverlap,
   }: {
     onGenerateSummary?: () => void;
     overlapLabel?: string | null;
+    canonicalOverlap?: { kind: string; topicLabel: string } | null;
   }) => (
     <div data-testid="summary-display">
       can-generate:{String(Boolean(onGenerateSummary))}
       {overlapLabel && <span data-testid="overlap-label">{overlapLabel}</span>}
+      {canonicalOverlap && (
+        <span data-testid="canonical-overlap-kind">
+          {canonicalOverlap.kind}
+        </span>
+      )}
     </div>
   ),
 }));
@@ -179,6 +188,10 @@ describe("AuthenticatedEpisodeDetail", () => {
     mocks.getEpisodeTopicOverlap.mockResolvedValue({
       success: true,
       data: { label: null, labelKind: null },
+    });
+    mocks.getCanonicalTopicOverlap.mockResolvedValue({
+      success: true,
+      data: null,
     });
     mocks.getCachedEpisode.mockResolvedValue(undefined);
     stubEpisodeFetch();
@@ -365,5 +378,80 @@ describe("AuthenticatedEpisodeDetail", () => {
       screen.getByRole("heading", { name: "About This Episode" }),
     ).toBeInTheDocument();
     expect(screen.getByText("Episode description")).toBeInTheDocument();
+  });
+
+  describe("canonical overlap fetch", () => {
+    it("passes canonical overlap to SummaryDisplay when getCanonicalTopicOverlap returns success with data", async () => {
+      mocks.getCanonicalTopicOverlap.mockResolvedValue({
+        success: true,
+        data: {
+          kind: "repeat",
+          count: 3,
+          topicLabel: "gut health",
+          topicId: 5,
+        },
+      });
+
+      render(
+        <AuthenticatedEpisodeDetail
+          episodeId="rss-abc"
+          userId="user-1"
+          isAdmin={false}
+        />,
+      );
+
+      await screen.findByRole("heading", { name: "RSS Episode" });
+      await waitFor(() =>
+        expect(screen.getByTestId("canonical-overlap-kind")).toHaveTextContent(
+          "repeat",
+        ),
+      );
+    });
+
+    it("passes null canonical overlap to SummaryDisplay when getCanonicalTopicOverlap returns success with null data", async () => {
+      mocks.getCanonicalTopicOverlap.mockResolvedValue({
+        success: true,
+        data: null,
+      });
+
+      render(
+        <AuthenticatedEpisodeDetail
+          episodeId="rss-abc"
+          userId="user-1"
+          isAdmin={false}
+        />,
+      );
+
+      await screen.findByRole("heading", { name: "RSS Episode" });
+      await waitFor(() =>
+        expect(mocks.getCanonicalTopicOverlap).toHaveBeenCalled(),
+      );
+      expect(
+        screen.queryByTestId("canonical-overlap-kind"),
+      ).not.toBeInTheDocument();
+    });
+
+    it("falls back silently when getCanonicalTopicOverlap returns { success: false }", async () => {
+      mocks.getCanonicalTopicOverlap.mockResolvedValue({
+        success: false,
+        error: "unauthorized",
+      });
+
+      render(
+        <AuthenticatedEpisodeDetail
+          episodeId="rss-abc"
+          userId="user-1"
+          isAdmin={false}
+        />,
+      );
+
+      await screen.findByRole("heading", { name: "RSS Episode" });
+      await waitFor(() =>
+        expect(mocks.getCanonicalTopicOverlap).toHaveBeenCalled(),
+      );
+      expect(
+        screen.queryByTestId("canonical-overlap-kind"),
+      ).not.toBeInTheDocument();
+    });
   });
 });

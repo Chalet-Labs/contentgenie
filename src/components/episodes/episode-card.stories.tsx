@@ -160,3 +160,34 @@ export const WithBothTopicLayers: Story = {
     ],
   },
 };
+
+export const WithCanonicalOverlapRepeat: Story = {
+  args: {
+    canonicalOverlap: {
+      kind: "repeat",
+      count: 3,
+      topicLabel: "creatine",
+      topicId: 1,
+    },
+  },
+};
+
+export const WithCanonicalOverlapNew: Story = {
+  args: {
+    canonicalOverlap: {
+      kind: "new",
+      topicLabel: "OpenAI o4 preview",
+      topicId: 2,
+    },
+  },
+};
+
+export const WithCategoryFallback: Story = {
+  args: {
+    canonicalOverlap: null,
+    categoryOverlap: {
+      label: "You've heard 5 similar episodes",
+      labelKind: "high-overlap",
+    },
+  },
+};

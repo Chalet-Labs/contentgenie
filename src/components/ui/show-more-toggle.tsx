@@ -9,6 +9,7 @@ interface ShowMoreToggleProps {
   hiddenCount: number;
   onToggle: () => void;
   className?: string;
+  ariaControls?: string;
 }
 
 export function ShowMoreToggle({
@@ -16,6 +17,7 @@ export function ShowMoreToggle({
   hiddenCount,
   onToggle,
   className,
+  ariaControls,
 }: ShowMoreToggleProps) {
   return (
     <Button
@@ -23,6 +25,7 @@ export function ShowMoreToggle({
       variant="ghost"
       className={cn("mt-2 w-full", className)}
       aria-expanded={expanded}
+      aria-controls={ariaControls}
       onClick={onToggle}
     >
       {expanded ? (
