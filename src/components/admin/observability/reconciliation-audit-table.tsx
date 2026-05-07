@@ -134,7 +134,18 @@ export function ReconciliationAuditTable({
                 </div>
               </TableCell>
               <TableCell className="text-sm">
-                {entry.mergesExecuted} / {entry.mergesRejected}
+                <div>
+                  {entry.mergesExecuted} / {entry.mergesRejected}
+                </div>
+                {entry.pairwiseVerifyThrew > 0 && (
+                  // mergesRejected counts model `same_entity=false` outcomes only;
+                  // pairwise-verify throws are an infra signal, tracked separately.
+                  // Surfacing the throw count makes the math reconcilable when
+                  // rejectedLoserIds.length > mergesRejected.
+                  <div className="text-xs text-amber-700">
+                    +{entry.pairwiseVerifyThrew} threw
+                  </div>
+                )}
               </TableCell>
               <TableCell>
                 <OutcomeBadge outcome={entry.outcome} />

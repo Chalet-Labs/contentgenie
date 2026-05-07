@@ -144,4 +144,30 @@ describe("ReconciliationAuditTable", () => {
     expect(screen.queryByText("verified:")).not.toBeInTheDocument();
     expect(screen.queryByText("rejected:")).not.toBeInTheDocument();
   });
+
+  it("surfaces pairwiseVerifyThrew in the Merges cell when > 0", () => {
+    // mergesRejected excludes verify-throws but rejectedLoserIds includes
+    // them — the inline 'threw' annotation lets operators reconcile the math.
+    render(
+      <ReconciliationAuditTable
+        entries={[
+          makeEntry({
+            mergesExecuted: 1,
+            mergesRejected: 1,
+            pairwiseVerifyThrew: 2,
+          }),
+        ]}
+      />,
+    );
+    expect(screen.getByText("+2 threw")).toBeInTheDocument();
+  });
+
+  it("hides the 'threw' annotation when pairwiseVerifyThrew is 0", () => {
+    render(
+      <ReconciliationAuditTable
+        entries={[makeEntry({ pairwiseVerifyThrew: 0 })]}
+      />,
+    );
+    expect(screen.queryByText(/threw/)).not.toBeInTheDocument();
+  });
 });
