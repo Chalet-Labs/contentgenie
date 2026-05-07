@@ -153,17 +153,19 @@ describe("reconcile-canonicals task", () => {
 
       const result = await taskConfig.run();
 
-      // The task returns the full summary (including clusterAudits) to the caller.
-      expect(result).toEqual(FULL_SUMMARY);
+      // clusterAudits is stripped from both the task return value AND the log
+      // payload — persisted to reconciliation_log instead, to avoid duplicating
+      // potentially thousands of audit rows into Trigger.dev's serialized output.
+      const { clusterAudits: _omitted, ...summaryFields } = FULL_SUMMARY;
+      expect(result).toEqual(summaryFields);
+      expect(result).not.toHaveProperty("clusterAudits");
 
       const summaryCall = (
         triggerSdk.logger.info as ReturnType<typeof vi.fn>
       ).mock.calls.find(([msg]) => msg === "reconcile_summary");
       expect(summaryCall).toBeDefined();
 
-      // clusterAudits is stripped from the log payload (written to DB instead).
       // runId is injected by the task shell.
-      const { clusterAudits: _omitted, ...summaryFields } = FULL_SUMMARY;
       expect(summaryCall![1]).toMatchObject({
         event: "reconcile_summary",
         runId: expect.any(String),

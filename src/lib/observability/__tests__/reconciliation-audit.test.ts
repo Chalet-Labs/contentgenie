@@ -28,6 +28,7 @@ vi.mock("@/db/schema", () => ({
 const mockAnd = vi.fn((...args) => ({ and: args }));
 const mockGte = vi.fn((col, val) => ({ gte: [col, val] }));
 const mockLte = vi.fn((col, val) => ({ lte: [col, val] }));
+const mockDesc = vi.fn((col) => ({ desc: col }));
 
 vi.mock("drizzle-orm", () => ({
   sql: Object.assign(
@@ -41,6 +42,7 @@ vi.mock("drizzle-orm", () => ({
   and: (...args: unknown[]) => mockAnd(...args),
   gte: (col: unknown, val: unknown) => mockGte(col, val),
   lte: (col: unknown, val: unknown) => mockLte(col, val),
+  desc: (col: unknown) => mockDesc(col),
 }));
 
 function makeChain(rows: unknown[]) {
