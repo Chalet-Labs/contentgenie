@@ -894,6 +894,14 @@ describe("runReconciliation", () => {
       "failed",
       "merged",
     ]);
+    // Failed audit row must preserve cluster membership even when the throw
+    // happens before a winner/loser split is computed.
+    const failedAudit = summary.clusterAudits.find(
+      (a) => a.outcome === "failed",
+    );
+    expect(failedAudit).toBeDefined();
+    expect(failedAudit!.winnerId).toBeNull();
+    expect(failedAudit!.loserIds).toEqual([1, 2]);
   });
 
   // F2: malformed embedding rows are dropped, malformedEmbeddingCount increments

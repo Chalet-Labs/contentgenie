@@ -402,27 +402,20 @@ export async function getSimilarityTrend(
   // Zero-fill every bucket in the window range so consumers always get the
   // full time-bucket grid. Mirrors `getMatchMethodTrend`'s behavior — without
   // this, the heatmap silently drops empty days/weeks and misaligns the X axis.
-  const emptyBuckets = (): SimilarityBucket[] => {
+  const buildSimilarityBuckets = (
+    counts?: Map<number, number>,
+  ): SimilarityBucket[] => {
     const arr: SimilarityBucket[] = [];
     for (let i = 0; i < numBuckets; i++) {
       const bucket = Math.round(i * bucketSize * 1e10) / 1e10;
-      arr.push({ bucket, count: 0 });
+      arr.push({ bucket, count: counts?.get(i) ?? 0 });
     }
     return arr;
   };
 
   return generateBucketRange(window, granularity).map((bucket) => {
     const key = bucket.toISOString();
-    const counts = byBucket.get(key);
-    if (!counts) {
-      return { bucket, buckets: emptyBuckets() };
-    }
-    const bucketArray: SimilarityBucket[] = [];
-    for (let i = 0; i < numBuckets; i++) {
-      const sim = Math.round(i * bucketSize * 1e10) / 1e10;
-      bucketArray.push({ bucket: sim, count: counts.get(i) ?? 0 });
-    }
-    return { bucket, buckets: bucketArray };
+    return { bucket, buckets: buildSimilarityBuckets(byBucket.get(key)) };
   });
 }
 

@@ -325,7 +325,10 @@ async function runCluster(
 ): Promise<void> {
   let currentPhase: "winner_pick" | "pairwise_verify" | "merge" = "winner_pick";
   let clusterWinnerId: number | null = null;
-  let perClusterLosers: number[] = [];
+  // Default to the full cluster so the catch path preserves membership when
+  // pickWinner throws before a winner/loser split has been computed. Narrowed
+  // to `cluster.filter(id => id !== winnerId)` once a winner is known.
+  let perClusterLosers: number[] = cluster;
   let perClusterVerifiedLosers: number[] = [];
   let perClusterRejectedLosers: number[] = [];
   let perClusterMergesExecuted = 0;
