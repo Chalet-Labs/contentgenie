@@ -230,4 +230,32 @@ describe("ReconcileSummaryAccumulator", () => {
     expect(second.clusterAudits).toHaveLength(1);
     expect(second.clusterAudits[0].clusterIndex).toBe(0);
   });
+
+  it("freeze deep-copies row fields + arrays — caller can't mutate row internals back into the accumulator", () => {
+    const accum = new ReconcileSummaryAccumulator();
+    accum.recordClusterAudit({
+      clusterIndex: 0,
+      clusterSize: 3,
+      winnerId: 1,
+      loserIds: [2, 3],
+      verifiedLoserIds: [2],
+      rejectedLoserIds: [3],
+      mergesExecuted: 1,
+      mergesRejected: 1,
+      pairwiseVerifyThrew: 0,
+      outcome: "partial",
+    });
+
+    const first = accum.freeze(0);
+    // Caller mutates a primitive field on the row…
+    first.clusterAudits[0].mergesExecuted = 999;
+    // …and pushes onto an inner integer array.
+    first.clusterAudits[0].loserIds.push(99);
+    first.clusterAudits[0].verifiedLoserIds.length = 0;
+
+    const second = accum.freeze(0);
+    expect(second.clusterAudits[0].mergesExecuted).toBe(1);
+    expect(second.clusterAudits[0].loserIds).toEqual([2, 3]);
+    expect(second.clusterAudits[0].verifiedLoserIds).toEqual([2]);
+  });
 });

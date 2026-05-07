@@ -83,11 +83,19 @@ export class ReconcileSummaryAccumulator {
   }
 
   freeze(durationMs: number): ReconcileSummary {
-    // Shallow-copy clusterAudits so callers can iterate / sort the returned
-    // array without mutating accumulator state (and earlier freeze() returns).
+    // Deep-copy clusterAudits so callers can iterate, sort, OR mutate row
+    // fields and arrays without leaking back into accumulator state (or into
+    // earlier freeze() returns). The row shape is flat — primitive fields
+    // plus three integer arrays — so a manual spread + array clone covers
+    // the full surface without the overhead of structuredClone.
     return {
       ...this.state,
-      clusterAudits: [...this.state.clusterAudits],
+      clusterAudits: this.state.clusterAudits.map((row) => ({
+        ...row,
+        loserIds: [...row.loserIds],
+        verifiedLoserIds: [...row.verifiedLoserIds],
+        rejectedLoserIds: [...row.rejectedLoserIds],
+      })),
       durationMs,
     };
   }
