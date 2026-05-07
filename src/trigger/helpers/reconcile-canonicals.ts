@@ -213,15 +213,21 @@ interface ClusterState {
   affectedWinners: Set<number>;
 }
 
-/** Phase 5 — merge each verified loser. Mutates the shared cross-cluster state + accumulator. */
+/**
+ * Phase 5 — merge each verified loser. Mutates the shared cross-cluster state +
+ * accumulator. Returns the number of losers newly merged in this call so the
+ * caller can derive the per-cluster `mergesExecuted` count without cloning the
+ * cross-run `mergedLoserIds` set.
+ */
 async function mergeVerifiedLosers(
   deps: Pick<ReconcileDeps, "db" | "mergeCanonicals" | "logger">,
   winnerId: number,
   verifiedLoserIds: readonly number[],
   state: ClusterState,
   accum: ReconcileSummaryAccumulator,
-): Promise<void> {
+): Promise<number> {
   const { mergedLoserIds, preMergeCounts, affectedWinners } = state;
+  let mergesExecuted = 0;
 
   for (const loserId of verifiedLoserIds) {
     if (mergedLoserIds.has(loserId)) {
@@ -244,6 +250,7 @@ async function mergeVerifiedLosers(
       mergedLoserIds.add(loserId);
       affectedWinners.add(winnerId);
       accum.mergeSucceeded();
+      mergesExecuted++;
     } catch (err) {
       accum.mergeFailed();
       deps.logger.warn("reconcile_merge_failed", {
@@ -253,6 +260,8 @@ async function mergeVerifiedLosers(
       });
     }
   }
+
+  return mergesExecuted;
 }
 
 /** Phase 6 — compute true episode-count delta (post − pre) across affected winners. */
@@ -447,17 +456,13 @@ async function runCluster(
     }
 
     currentPhase = "merge";
-    const mergedBefore = new Set(state.mergedLoserIds);
-    await mergeVerifiedLosers(
+    perClusterMergesExecuted = await mergeVerifiedLosers(
       deps,
       winnerId,
       verify.verifiedLoserIds,
       state,
       accum,
     );
-    perClusterMergesExecuted = perClusterVerifiedLosers.filter(
-      (id) => state.mergedLoserIds.has(id) && !mergedBefore.has(id),
-    ).length;
 
     // Derive per-cluster outcome (ADR-053 §1)
     let outcome: ClusterAuditRow["outcome"];

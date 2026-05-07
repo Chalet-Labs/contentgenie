@@ -48,24 +48,30 @@ export async function getReconciliationAuditLog(
   const safePageSize = Math.max(1, Math.floor(pageSize));
   const timeFilter = buildAuditTimeFilter(window);
 
-  const baseRows = db.select().from(reconciliationLog);
-  const filteredRows = timeFilter ? baseRows.where(timeFilter) : baseRows;
-  const rowsPromise = filteredRows
-    .orderBy(desc(reconciliationLog.createdAt), desc(reconciliationLog.id))
-    .limit(safePageSize)
-    .offset((safePage - 1) * safePageSize);
-
   const baseCount = db.select({ value: count() }).from(reconciliationLog);
   const filteredCount = timeFilter ? baseCount.where(timeFilter) : baseCount;
-
-  const [rows, countRows] = await Promise.all([rowsPromise, filteredCount]);
+  const countRows = await filteredCount;
   const total = Number(countRows[0]?.value ?? 0);
-  const hasMore = safePage * safePageSize < total;
+
+  // Clamp out-of-range pages (e.g. `?auditPage=999` or stale URLs after a
+  // filter change) to the last populated page so the table shows real rows
+  // instead of an empty "no activity" view.
+  const lastPage = Math.max(1, Math.ceil(total / safePageSize));
+  const clampedPage = Math.min(safePage, lastPage);
+
+  const baseRows = db.select().from(reconciliationLog);
+  const filteredRows = timeFilter ? baseRows.where(timeFilter) : baseRows;
+  const rows = await filteredRows
+    .orderBy(desc(reconciliationLog.createdAt), desc(reconciliationLog.id))
+    .limit(safePageSize)
+    .offset((clampedPage - 1) * safePageSize);
+
+  const hasMore = clampedPage * safePageSize < total;
 
   return {
     rows,
     total,
-    page: safePage,
+    page: clampedPage,
     pageSize: safePageSize,
     hasMore,
   };

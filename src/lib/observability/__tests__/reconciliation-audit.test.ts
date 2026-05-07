@@ -86,14 +86,15 @@ function makeEntry(overrides: Record<string, unknown> = {}) {
 }
 
 /**
- * `getReconciliationAuditLog` issues two queries (rows + count). Stub
- * mockSelect to return the rows chain on the first call and a count chain
- * resolving to `[{ value: total }]` on the second.
+ * `getReconciliationAuditLog` issues two queries — the count first (so the
+ * page can be clamped against the available result set) and the rows query
+ * second. Stub mockSelect to return the count chain on the first call and
+ * the rows chain on the second.
  */
 function stubRowsAndCount(rows: unknown[], total = rows.length) {
   const rowsChain = makeChain(rows);
   const countChain = makeChain([{ value: total }]);
-  mockSelect.mockReturnValueOnce(rowsChain).mockReturnValueOnce(countChain);
+  mockSelect.mockReturnValueOnce(countChain).mockReturnValueOnce(rowsChain);
   return { rowsChain, countChain };
 }
 
@@ -156,7 +157,12 @@ describe("getReconciliationAuditLog", () => {
   });
 
   it("offsets by (page-1) * pageSize for page > 1", async () => {
-    const { rowsChain } = stubRowsAndCount([], 0);
+    // Need total ≥ page*pageSize (75) so the new clamp does not pull page=3
+    // back to lastPage=1.
+    const { rowsChain } = stubRowsAndCount(
+      Array.from({ length: 25 }, (_, i) => makeEntry({ id: i })),
+      80,
+    );
     await getReconciliationAuditLog(undefined, 3, 25);
     expect(rowsChain["offset"]).toHaveBeenCalledWith(50);
   });
@@ -183,6 +189,27 @@ describe("getReconciliationAuditLog", () => {
     );
     const last = await getReconciliationAuditLog(undefined, 3, 50);
     expect(last.hasMore).toBe(false);
+  });
+
+  it("clamps an out-of-range page to the last populated page", async () => {
+    // total=137 rows / pageSize=50 → lastPage=3. Request page=999 should
+    // resolve to page=3 with offset=100, so the user never lands on an
+    // empty "no activity" view past the last populated page.
+    const { rowsChain } = stubRowsAndCount(
+      Array.from({ length: 37 }, (_, i) => makeEntry({ id: i })),
+      137,
+    );
+    const result = await getReconciliationAuditLog(undefined, 999, 50);
+    expect(result.page).toBe(3);
+    expect(rowsChain["offset"]).toHaveBeenCalledWith(100);
+    expect(result.hasMore).toBe(false);
+  });
+
+  it("clamps to page=1 when the result set is empty", async () => {
+    const { rowsChain } = stubRowsAndCount([], 0);
+    const result = await getReconciliationAuditLog(undefined, 5, 50);
+    expect(result.page).toBe(1);
+    expect(rowsChain["offset"]).toHaveBeenCalledWith(0);
   });
 
   it("returns an empty rows array with total=0 when no rows match the window", async () => {
