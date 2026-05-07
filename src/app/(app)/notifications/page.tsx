@@ -8,13 +8,11 @@ import {
 import { getListenedEpisodeIds } from "@/app/actions/listen-history";
 import { NotificationPageList } from "@/components/notifications/notification-page-list";
 import { NOTIFICATIONS_PAGE_SIZE } from "@/lib/notifications-constants";
+import { POSTGRES_MAX_INT as MAX_SERIAL_ID } from "@/lib/postgres-limits";
 
 export const metadata: Metadata = {
   title: "Notifications",
 };
-
-// Postgres `serial` upper bound — reject IDs that would overflow the DB column.
-const MAX_SERIAL_ID = 2_147_483_647;
 
 // Strict enough that "2026", "04/20/2026", or "Thu Apr 20 2026" (all accepted by
 // `new Date()`) don't slip past input validation. Requires the `YYYY-MM-DDTHH:MM:SS`

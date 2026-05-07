@@ -1,8 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { useQueryState, parseAsBoolean } from "nuqs";
+import { useQueryState } from "nuqs";
+import { topicDetailSearchParams } from "@/lib/search-params/topic-detail";
 import { Headphones, Bookmark } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -28,15 +28,16 @@ function buildEpisodeHref(episode: TopicEpisode): string {
 }
 
 export function TopicEpisodeList({ episodes }: TopicEpisodeListProps) {
-  const router = useRouter();
   const [unheard, setUnheard] = useQueryState(
     "unheard",
-    parseAsBoolean.withDefault(false),
+    topicDetailSearchParams.unheard.withOptions({
+      shallow: false,
+      history: "replace",
+    }),
   );
 
   const handleToggle = async (next: boolean) => {
     await setUnheard(next);
-    router.refresh();
   };
 
   return (

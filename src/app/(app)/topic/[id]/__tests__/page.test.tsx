@@ -81,6 +81,24 @@ vi.mock("nuqs", () => ({
   },
 }));
 
+// Stub the server-side search params loader.
+vi.mock("@/lib/search-params/topic-detail", () => ({
+  loadTopicDetailSearchParams: (
+    searchParams: Record<string, string | string[] | undefined>,
+  ) => ({ unheard: searchParams.unheard === "true" }),
+  topicDetailSearchParams: {
+    unheard: {
+      withDefault: () => ({ __brand: "parseAsBoolean", defaultValue: false }),
+      withOptions: () => ({ __brand: "parseAsBoolean", defaultValue: false }),
+    },
+  },
+}));
+
+// Stub next/headers — page calls headers() to check prefetch header.
+vi.mock("next/headers", () => ({
+  headers: vi.fn(() => ({ get: (_: string) => null })),
+}));
+
 import TopicPage from "@/app/(app)/topic/[id]/page";
 import { MAX_MERGE_DEPTH } from "@/app/(app)/topic/[id]/merge-walker";
 import { MIN_DERIVED_COUNT_FOR_DIGEST } from "@/lib/topic-digest-thresholds";
@@ -148,7 +166,6 @@ function makeDetailData(
       kind: "release",
       status: "active",
       summary: "Anthropic released Claude Opus 4.7 with extended thinking.",
-      ongoing: false,
       episodeCount: 12,
       completedSummaryCount: overrides.completedSummaryCount ?? 5,
       ...overrides.canonical,
@@ -199,7 +216,12 @@ describe("TopicPage", () => {
       searchParams: {},
     });
     render(jsx as React.ReactElement);
-    expect(screen.getByText("Claude Opus 4.7 release")).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", {
+        level: 1,
+        name: "Claude Opus 4.7 release",
+      }),
+    ).toBeInTheDocument();
     expect(screen.getByText("release")).toBeInTheDocument();
     expect(
       screen.getByText(
@@ -240,7 +262,9 @@ describe("TopicPage", () => {
       searchParams: {},
     });
     render(jsx as React.ReactElement);
-    expect(screen.getByText("Old topic")).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { level: 1, name: "Old topic" }),
+    ).toBeInTheDocument();
     expect(screen.getByText("Dormant")).toBeInTheDocument();
     expect(mockPermanentRedirect).not.toHaveBeenCalled();
   });
@@ -385,7 +409,6 @@ describe("TopicPage", () => {
           digestMarkdown: "# md",
           consensusPoints: ["Distinct consensus point"],
           disagreementPoints: [],
-          episodeIds: [1, 2, 3],
           episodeCountAtGeneration: 3,
           modelUsed: "gpt-x",
           generatedAt: new Date(),
@@ -428,6 +451,7 @@ describe("TopicPage", () => {
     expect(mockTriggerTopicDigestRefresh).toHaveBeenCalledWith({
       canonicalTopicId: 1,
     });
+    expect(mockTriggerTopicDigestRefresh).toHaveBeenCalledTimes(1);
     // Loading state visible because the panel mounted with the runId.
     expect(screen.getByText(/synthesizing/i)).toBeInTheDocument();
   });
@@ -464,6 +488,30 @@ describe("TopicPage", () => {
       canonicalTopicId: 1,
       showOnlyUnheard: true,
     });
+  });
+
+  it("renders TopicEmptyState (not digest panel) when episodeCount exceeds threshold but completedSummaryCount does not", async () => {
+    mockNextTopicRow.mockResolvedValueOnce(
+      makeTopic({ status: "active", mergedIntoId: null }),
+    );
+    mockGetTopicDetailData.mockResolvedValueOnce({
+      success: true,
+      data: makeDetailData({
+        completedSummaryCount: MIN_DERIVED_COUNT_FOR_DIGEST - 1,
+        canonical: {
+          episodeCount: 10,
+          completedSummaryCount: MIN_DERIVED_COUNT_FOR_DIGEST - 1,
+        },
+        digest: null,
+      }),
+    });
+    const jsx = await TopicPage({
+      params: { id: "1" },
+      searchParams: {},
+    });
+    render(jsx as React.ReactElement);
+    expect(screen.getByText(/more coverage needed/i)).toBeInTheDocument();
+    expect(mockTriggerTopicDigestRefresh).not.toHaveBeenCalled();
   });
 
   it("calls notFound() when getTopicDetailData returns not-found", async () => {

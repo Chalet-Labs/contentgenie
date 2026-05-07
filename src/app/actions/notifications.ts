@@ -10,10 +10,7 @@ import {
   users,
   episodeTopics,
 } from "@/db/schema";
-
-// Postgres `serial` upper bound — reject IDs that would overflow the DB column
-// before binding them into an `eq(podcasts.id, …)` predicate.
-const MAX_SERIAL_ID = 2_147_483_647;
+import { POSTGRES_MAX_INT as MAX_SERIAL_ID } from "@/lib/postgres-limits";
 
 export type NotificationGroup =
   | { kind: "episodes_since_last_seen"; count: number; sinceIso: string }

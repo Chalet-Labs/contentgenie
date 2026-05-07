@@ -4,11 +4,16 @@ import { MIN_DERIVED_COUNT_FOR_DIGEST } from "@/lib/topic-digest-thresholds";
 
 export interface TopicEmptyStateProps {
   label: string;
-  episodeCount: number;
+  summarizedCount: number;
+  totalEpisodeCount: number;
 }
 
-export function TopicEmptyState({ label, episodeCount }: TopicEmptyStateProps) {
-  const episodeWord = episodeCount === 1 ? "episode" : "episodes";
+export function TopicEmptyState({
+  label,
+  summarizedCount,
+  totalEpisodeCount,
+}: TopicEmptyStateProps) {
+  const threshold = MIN_DERIVED_COUNT_FOR_DIGEST;
   return (
     <Card>
       <CardContent className="flex flex-col items-center gap-3 py-10 text-center">
@@ -17,14 +22,13 @@ export function TopicEmptyState({ label, episodeCount }: TopicEmptyStateProps) {
           aria-hidden="true"
         />
         <h2 className="text-lg font-semibold">
-          More coverage needed — synthesize unlocks at{" "}
-          {MIN_DERIVED_COUNT_FOR_DIGEST} episodes
+          More coverage needed — synthesize unlocks at {threshold} episodes
         </h2>
         <p className="max-w-md text-sm text-muted-foreground">
-          We currently have {episodeCount} {episodeWord} for{" "}
-          <span className="font-medium text-foreground">{label}</span>. Once
-          more episodes mention this topic, an AI synthesis will appear here
-          summarizing what each show says.
+          We have summarized {summarizedCount} of {totalEpisodeCount}{" "}
+          {totalEpisodeCount === 1 ? "episode" : "episodes"} for{" "}
+          <span className="font-medium text-foreground">{label}</span>.
+          Synthesis unlocks at {threshold} summaries.
         </p>
       </CardContent>
     </Card>

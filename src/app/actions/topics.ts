@@ -50,7 +50,10 @@ import {
 import {
   MIN_DERIVED_COUNT_FOR_DIGEST,
   STALENESS_GROWTH_THRESHOLD,
+  RELATED_TOPICS_LIMIT,
 } from "@/lib/topic-digest-thresholds";
+import { formatVector } from "@/lib/entity-resolution";
+import { coerceEmbedding } from "@/trigger/helpers/coerce-embedding";
 
 // ---------------------------------------------------------------------------
 // Input schemas
@@ -612,9 +615,8 @@ export type TopicDetailCanonical = {
   id: number;
   label: string;
   kind: CanonicalTopicKind;
-  status: CanonicalTopicStatus;
+  status: Exclude<CanonicalTopicStatus, "merged">;
   summary: string;
-  ongoing: boolean;
   episodeCount: number;
   completedSummaryCount: number;
 };
@@ -626,7 +628,6 @@ export type TopicEpisode = {
   podcastTitle: string;
   podcastFeedId: string;
   coverageScore: number;
-  joinedAt: Date;
   isListened: boolean;
   isSaved: boolean;
 };
@@ -635,7 +636,6 @@ export type RelatedTopic = {
   id: number;
   label: string;
   kind: CanonicalTopicKind;
-  similarity: number;
 };
 
 export type TopicDigest = {
@@ -643,7 +643,6 @@ export type TopicDigest = {
   digestMarkdown: string;
   consensusPoints: string[];
   disagreementPoints: string[];
-  episodeIds: number[];
   episodeCountAtGeneration: number;
   modelUsed: string;
   generatedAt: Date;
@@ -662,34 +661,6 @@ const topicDetailDataSchema = z
     showOnlyUnheard: z.boolean().optional(),
   })
   .strict();
-
-// pgvector wants `'[v1,v2,...]'::vector`. Mirrors `entity-resolution.ts:formatVector`
-// for consistency with the existing raw `<=>` kNN idiom (single bound vector parameter).
-function formatVector(values: readonly number[]): string {
-  return `[${values.join(",")}]`;
-}
-
-// The drizzle `vector()` reader can return either a number[] or a stringified
-// `"[a,b,c]"` depending on driver path. Normalize defensively — if it round-
-// trips empty/zero we skip the kNN entirely so the page doesn't surface
-// nonsense neighbors.
-function coerceEmbedding(raw: unknown): readonly number[] | null {
-  if (Array.isArray(raw)) {
-    if (raw.length === 0) return null;
-    if (!raw.every((v) => typeof v === "number" && Number.isFinite(v))) {
-      return null;
-    }
-    return raw as number[];
-  }
-  if (typeof raw === "string") {
-    const stripped = raw.trim().replace(/^\[|\]$/g, "");
-    if (stripped.length === 0) return null;
-    const parts = stripped.split(",").map((s) => Number(s.trim()));
-    if (parts.length === 0 || !parts.every(Number.isFinite)) return null;
-    return parts;
-  }
-  return null;
-}
 
 export async function getTopicDetailData(input: {
   canonicalTopicId: number;
@@ -712,7 +683,6 @@ export async function getTopicDetailData(input: {
         kind: canonicalTopics.kind,
         status: canonicalTopics.status,
         summary: canonicalTopics.summary,
-        ongoing: canonicalTopics.ongoing,
         identityEmbedding: canonicalTopics.identityEmbedding,
         episodeCount: canonicalTopicEpisodeCount(),
         completedSummaryCount: canonicalTopicCompletedSummaryCount(),
@@ -740,7 +710,6 @@ export async function getTopicDetailData(input: {
           digestMarkdown: canonicalTopicDigests.digestMarkdown,
           consensusPoints: canonicalTopicDigests.consensusPoints,
           disagreementPoints: canonicalTopicDigests.disagreementPoints,
-          episodeIds: canonicalTopicDigests.episodeIds,
           episodeCountAtGeneration:
             canonicalTopicDigests.episodeCountAtGeneration,
           modelUsed: canonicalTopicDigests.modelUsed,
@@ -756,7 +725,6 @@ export async function getTopicDetailData(input: {
           podcastTitle: podcasts.title,
           podcastFeedId: podcasts.podcastIndexId,
           coverageScore: episodeCanonicalTopics.coverageScore,
-          joinedAt: episodeCanonicalTopics.createdAt,
           listenId: listenHistory.id,
           libraryId: userLibrary.id,
         })
@@ -789,20 +757,27 @@ export async function getTopicDetailData(input: {
       id: number;
       label: string;
       kind: string;
-      similarity: number;
     }[] = [];
     if (embedding) {
-      const vec = formatVector(embedding);
-      const result = await db.execute(
-        sql`SELECT id, label, kind, 1 - (identity_embedding <=> ${vec}::vector) AS similarity
-            FROM canonical_topics
-            WHERE id <> ${canonicalTopicId}
-              AND status = 'active'
-              AND identity_embedding IS NOT NULL
-            ORDER BY identity_embedding <=> ${vec}::vector
-            LIMIT 5`,
-      );
-      relatedRows = result.rows as typeof relatedRows;
+      try {
+        const vec = formatVector(embedding);
+        const result = await db.execute(
+          sql`SELECT id, label, kind, 1 - (identity_embedding <=> ${vec}::vector) AS similarity
+              FROM canonical_topics
+              WHERE id <> ${canonicalTopicId}
+                AND status = 'active'
+                AND identity_embedding IS NOT NULL
+              ORDER BY identity_embedding <=> ${vec}::vector
+              LIMIT ${RELATED_TOPICS_LIMIT}`,
+        );
+        relatedRows = result.rows as typeof relatedRows;
+      } catch (error) {
+        console.error("[getTopicDetailData] related-topics kNN failed", {
+          canonicalTopicId,
+          error,
+        });
+        relatedRows = [];
+      }
     }
 
     const { identityEmbedding: _ignored, ...canonicalOut } = canonical;
@@ -811,7 +786,7 @@ export async function getTopicDetailData(input: {
     return {
       success: true,
       data: {
-        canonical: canonicalOut,
+        canonical: canonicalOut as TopicDetailCanonical,
         digest: digestRow,
         episodes: episodeRows.map((row) => ({
           id: row.id,
@@ -820,7 +795,6 @@ export async function getTopicDetailData(input: {
           podcastTitle: row.podcastTitle,
           podcastFeedId: row.podcastFeedId,
           coverageScore: row.coverageScore,
-          joinedAt: row.joinedAt,
           isListened: row.listenId !== null,
           isSaved: row.libraryId !== null,
         })),
@@ -828,7 +802,6 @@ export async function getTopicDetailData(input: {
           id: row.id,
           label: row.label,
           kind: row.kind as CanonicalTopicKind,
-          similarity: row.similarity,
         })),
       },
     };

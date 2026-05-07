@@ -1,3 +1,4 @@
+import { headers } from "next/headers";
 import { notFound, permanentRedirect } from "next/navigation";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,14 +15,13 @@ import { TopicEpisodeList } from "@/components/topics/topic-episode-list";
 import { TopicRelatedList } from "@/components/topics/topic-related-list";
 import { TopicEmptyState } from "@/components/topics/topic-empty-state";
 import { MIN_DERIVED_COUNT_FOR_DIGEST } from "@/lib/topic-digest-thresholds";
+import { POSTGRES_MAX_INT } from "@/lib/postgres-limits";
+import { loadTopicDetailSearchParams } from "@/lib/search-params/topic-detail";
 
 interface TopicPageProps {
   params: { id: string };
   searchParams: { [key: string]: string | string[] | undefined };
 }
-
-// Postgres serial/integer max is 2^31-1; values above this would cause a DB range error.
-const POSTGRES_MAX_INT = 2_147_483_647;
 
 export default async function TopicPage({
   params,
@@ -49,39 +49,65 @@ export default async function TopicPage({
     permanentRedirect(`/topic/${result.terminal.id}`);
   }
 
-  const showOnlyUnheard = searchParams.unheard === "true";
+  const { unheard: showOnlyUnheard } =
+    loadTopicDetailSearchParams(searchParams);
   const detailResult = await getTopicDetailData({
     canonicalTopicId: topic.id,
     showOnlyUnheard,
   });
 
   if (!detailResult.success) {
-    notFound();
+    if (detailResult.error === "not-found") notFound();
+    console.error("[topic-detail-page] getTopicDetailData failed", {
+      id: parsed,
+      error: detailResult.error,
+    });
+    throw new Error(`Topic detail failed: ${detailResult.error}`);
   }
 
   const { canonical, digest, episodes, relatedTopics } = detailResult.data;
   const eligibleForDigest =
     canonical.completedSummaryCount >= MIN_DERIVED_COUNT_FOR_DIGEST;
 
+  const requestHeaders = headers();
+  const isPrefetch =
+    requestHeaders.get("Next-Router-Prefetch") === "1" ||
+    requestHeaders.get("next-router-prefetch") === "1";
+
   let initialRunId: string | null = null;
   let initialAccessToken: string | null = null;
-  if (digest === null && eligibleForDigest) {
+  let autoTriggerError: string | null = null;
+  if (
+    digest === null &&
+    eligibleForDigest &&
+    canonical.status === "active" &&
+    !isPrefetch
+  ) {
     const refresh = await triggerTopicDigestRefresh({
       canonicalTopicId: canonical.id,
     });
-    if (
-      refresh.success &&
-      refresh.data.status === "queued" &&
-      refresh.data.runId &&
-      refresh.data.publicAccessToken
-    ) {
-      initialRunId = refresh.data.runId;
-      initialAccessToken = refresh.data.publicAccessToken;
+    if (!refresh.success) {
+      console.error("[topic-detail-page] auto-trigger failed", {
+        canonicalTopicId: canonical.id,
+        error: refresh.error,
+      });
+      autoTriggerError = refresh.error;
+    } else if (refresh.data.status === "queued") {
+      if (refresh.data.runId && refresh.data.publicAccessToken) {
+        initialRunId = refresh.data.runId;
+        initialAccessToken = refresh.data.publicAccessToken;
+      } else {
+        console.error("[topic-detail-page] queued status missing runId/token", {
+          canonicalTopicId: canonical.id,
+          data: refresh.data,
+        });
+      }
     }
   }
 
   return (
     <div className="mx-auto max-w-3xl space-y-6 py-8">
+      <h1 className="sr-only">{canonical.label}</h1>
       <Card>
         <CardHeader>
           <div className="flex items-start gap-3">
@@ -116,11 +142,13 @@ export default async function TopicPage({
           initialRunId={initialRunId}
           initialAccessToken={initialAccessToken}
           canRefresh={canonical.status === "active"}
+          autoTriggerError={autoTriggerError}
         />
       ) : (
         <TopicEmptyState
           label={canonical.label}
-          episodeCount={canonical.completedSummaryCount}
+          summarizedCount={canonical.completedSummaryCount}
+          totalEpisodeCount={canonical.episodeCount}
         />
       )}
 

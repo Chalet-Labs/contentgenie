@@ -7,12 +7,17 @@ const mockRefresh = vi.fn();
 
 vi.mock("nuqs", () => ({
   useQueryState: (...args: unknown[]) => mockUseQueryState(...args),
-  parseAsBoolean: {
-    withDefault: (defaultValue: boolean) => ({
-      __brand: "parseAsBoolean",
-      defaultValue,
-    }),
+}));
+
+// Stub the search-params module so withOptions doesn't need a real nuqs parser.
+vi.mock("@/lib/search-params/topic-detail", () => ({
+  topicDetailSearchParams: {
+    unheard: {
+      withDefault: () => ({ __brand: "parseAsBoolean", defaultValue: false }),
+      withOptions: () => ({ __brand: "parseAsBoolean", defaultValue: false }),
+    },
   },
+  loadTopicDetailSearchParams: vi.fn(),
 }));
 
 vi.mock("next/navigation", () => ({
@@ -47,7 +52,6 @@ function makeEpisode(overrides: Partial<TopicEpisode> = {}): TopicEpisode {
     podcastTitle: "Podcast A",
     podcastFeedId: "feed-1",
     coverageScore: 0.8,
-    joinedAt: new Date("2026-04-01T00:00:00Z"),
     isListened: false,
     isSaved: false,
     ...overrides,
@@ -108,7 +112,7 @@ describe("TopicEpisodeList", () => {
     expect(toggle).toBeChecked();
   });
 
-  it("toggling fires the nuqs setter and router.refresh()", async () => {
+  it("toggling fires the nuqs setter (shallow:false handles refresh via nuqs)", async () => {
     const user = userEvent.setup();
     const setter = vi.fn().mockResolvedValue(undefined);
     mockUseQueryState.mockReturnValue([false, setter]);
@@ -118,7 +122,7 @@ describe("TopicEpisodeList", () => {
     });
     await user.click(toggle);
     expect(setter).toHaveBeenCalledWith(true);
-    expect(mockRefresh).toHaveBeenCalledTimes(1);
+    expect(mockRefresh).not.toHaveBeenCalled();
   });
 
   it("row link points to /podcast/<feedId>?episode=<podcastIndexEpisodeId>", () => {

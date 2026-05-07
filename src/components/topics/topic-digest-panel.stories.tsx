@@ -24,7 +24,6 @@ Key recurring threads include the new context window, latency improvements, and 
     "Hosts disagree about whether vision improvements are 'production ready'",
     "Some argue the cheaper tier is the better default; others prefer the flagship",
   ],
-  episodeIds: [101, 102, 103, 104, 105],
   episodeCountAtGeneration: 5,
   modelUsed: "openai/gpt-x",
   generatedAt: new Date(Date.now() - 1000 * 60 * 22),

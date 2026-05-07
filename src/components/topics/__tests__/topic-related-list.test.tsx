@@ -26,7 +26,6 @@ function makeItems(n: number): RelatedTopic[] {
     id: i + 1,
     label: `Related ${i + 1}`,
     kind: "concept" as const,
-    similarity: 0.9 - i * 0.05,
   }));
 }
 
@@ -54,10 +53,14 @@ describe("TopicRelatedList", () => {
     expect(links[2]).toHaveAttribute("href", "/topic/3");
   });
 
-  it("each chip renders an icon (kind glyph)", () => {
-    const { container } = render(<TopicRelatedList items={makeItems(2)} />);
-    const icons = container.querySelectorAll("svg[aria-hidden='true']");
-    expect(icons.length).toBeGreaterThanOrEqual(2);
+  it("all expected chip labels render as links", () => {
+    const items = makeItems(5);
+    render(<TopicRelatedList items={items} />);
+    for (const item of items) {
+      expect(
+        screen.getByRole("link", { name: new RegExp(item.label, "i") }),
+      ).toBeInTheDocument();
+    }
   });
 
   it("uses an aria-labelled section for the related-topics group", () => {

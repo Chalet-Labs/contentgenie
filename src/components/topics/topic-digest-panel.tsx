@@ -11,6 +11,7 @@ import {
   AlertCircle,
   CheckCircle2,
   XCircle,
+  type LucideIcon,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -24,6 +25,7 @@ export interface TopicDigestPanelProps {
   initialRunId: string | null;
   initialAccessToken: string | null;
   canRefresh: boolean;
+  autoTriggerError?: string | null;
 }
 
 type PanelState =
@@ -41,35 +43,90 @@ const TERMINAL_FAILURE_STATUSES = new Set([
   "EXPIRED",
 ]);
 
+const REFRESH_ERROR_COPY: Record<string, string> = {
+  "token-failed": "Couldn't authenticate the synthesis run. Please try again.",
+  "trigger-failed": "Couldn't start synthesis. Please try again in a moment.",
+  "not-found": "This topic is no longer available.",
+  Unauthorized: "Please sign in again to refresh.",
+};
+const DEFAULT_REFRESH_ERROR = "Couldn't refresh synthesis. Please retry.";
+
+function BulletSection({
+  icon: Icon,
+  iconClassName,
+  title,
+  items,
+}: {
+  icon: LucideIcon;
+  iconClassName: string;
+  title: string;
+  items: readonly string[];
+}) {
+  if (items.length === 0) return null;
+  return (
+    <section className="space-y-2">
+      <h3 className="flex items-center gap-2 text-sm font-medium">
+        <Icon className={iconClassName} aria-hidden="true" />
+        {title}
+      </h3>
+      <ul className="ml-7 list-disc space-y-1 text-sm text-muted-foreground">
+        {items.map((item) => (
+          <li key={item}>{item}</li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
 export function TopicDigestPanel({
   canonicalTopicId,
   initialDigest,
   initialRunId,
   initialAccessToken,
   canRefresh,
+  autoTriggerError,
 }: TopicDigestPanelProps) {
   const router = useRouter();
-  const [state, setState] = useState<PanelState>(() =>
-    initialRunId && initialAccessToken
-      ? {
-          kind: "loading",
-          runId: initialRunId,
-          accessToken: initialAccessToken,
-        }
-      : { kind: "idle" },
-  );
+  const [state, setState] = useState<PanelState>(() => {
+    if (initialRunId && initialAccessToken) {
+      return {
+        kind: "loading",
+        runId: initialRunId,
+        accessToken: initialAccessToken,
+      };
+    }
+    if (autoTriggerError && !initialDigest) {
+      const message =
+        REFRESH_ERROR_COPY[autoTriggerError] ?? DEFAULT_REFRESH_ERROR;
+      return { kind: "error", message };
+    }
+    return { kind: "idle" };
+  });
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const runId = state.kind === "loading" ? state.runId : "";
   const accessToken = state.kind === "loading" ? state.accessToken : "";
 
-  const { run } = useRealtimeRun(runId, {
+  const { run, error: realtimeError } = useRealtimeRun(runId, {
     accessToken,
     enabled: state.kind === "loading",
   });
 
   useEffect(() => {
-    if (state.kind !== "loading" || !run) return;
+    if (state.kind !== "loading") return;
+    if (realtimeError) {
+      console.error("[TopicDigestPanel] realtime subscription error", {
+        runId: state.runId,
+        error: realtimeError,
+      });
+      setState({
+        kind: "error",
+        message: "Lost connection to synthesis run. Please retry.",
+      });
+      toast.error("Lost connection to synthesis");
+      return;
+    }
+    if (!run) return;
     if (run.status === "COMPLETED") {
       router.refresh();
       setState({ kind: "idle" });
@@ -81,22 +138,25 @@ export function TopicDigestPanel({
       });
       toast.error("Topic synthesis failed");
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- only react to status transitions
-  }, [run?.status]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only react to status transitions and realtime errors
+  }, [run?.status, realtimeError]);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
     try {
       const result = await triggerTopicDigestRefresh({ canonicalTopicId });
       if (!result.success) {
-        toast.error(result.error);
-        setState({ kind: "error", message: result.error });
+        const message =
+          REFRESH_ERROR_COPY[result.error] ?? DEFAULT_REFRESH_ERROR;
+        toast.error(message);
+        setState({ kind: "error", message });
         return;
       }
       const data = result.data;
       if (data.status === "cached") {
         toast.success("Already up to date");
         setState({ kind: "idle" });
+        router.refresh();
       } else if (data.status === "ineligible") {
         setState({ kind: "ineligible" });
       } else if (
@@ -110,6 +170,15 @@ export function TopicDigestPanel({
           accessToken: data.publicAccessToken,
         });
       }
+    } catch (error) {
+      console.error("[TopicDigestPanel] refresh threw", {
+        canonicalTopicId,
+        error,
+      });
+      const message =
+        "Something went wrong while starting the refresh. Please retry.";
+      toast.error(message);
+      setState({ kind: "error", message });
     } finally {
       setIsRefreshing(false);
     }
@@ -186,39 +255,19 @@ export function TopicDigestPanel({
 
         {initialDigest && state.kind !== "loading" && (
           <>
-            {initialDigest.consensusPoints.length > 0 && (
-              <section className="space-y-2">
-                <h3 className="flex items-center gap-1.5 text-sm font-semibold">
-                  <CheckCircle2
-                    className="h-4 w-4 text-emerald-600"
-                    aria-hidden="true"
-                  />
-                  Consensus
-                </h3>
-                <ul className="list-disc space-y-1 pl-6 text-sm">
-                  {initialDigest.consensusPoints.map((point, i) => (
-                    <li key={i}>{point}</li>
-                  ))}
-                </ul>
-              </section>
-            )}
+            <BulletSection
+              icon={CheckCircle2}
+              iconClassName="h-4 w-4 text-emerald-600"
+              title="Consensus"
+              items={initialDigest.consensusPoints}
+            />
 
-            {initialDigest.disagreementPoints.length > 0 && (
-              <section className="space-y-2">
-                <h3 className="flex items-center gap-1.5 text-sm font-semibold">
-                  <XCircle
-                    className="h-4 w-4 text-amber-600"
-                    aria-hidden="true"
-                  />
-                  Disagreement
-                </h3>
-                <ul className="list-disc space-y-1 pl-6 text-sm">
-                  {initialDigest.disagreementPoints.map((point, i) => (
-                    <li key={i}>{point}</li>
-                  ))}
-                </ul>
-              </section>
-            )}
+            <BulletSection
+              icon={XCircle}
+              iconClassName="h-4 w-4 text-amber-600"
+              title="Disagreement"
+              items={initialDigest.disagreementPoints}
+            />
 
             <div className="whitespace-pre-line text-sm leading-relaxed text-muted-foreground">
               {initialDigest.digestMarkdown}

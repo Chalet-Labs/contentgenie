@@ -22,7 +22,6 @@ function makeEpisode(overrides: Partial<TopicEpisode> = {}): TopicEpisode {
     podcastTitle: "Demo Podcast",
     podcastFeedId: "demo-feed",
     coverageScore: 0.8,
-    joinedAt: new Date("2026-04-01T00:00:00Z"),
     isListened: false,
     isSaved: false,
     ...overrides,

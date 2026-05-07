@@ -26,7 +26,6 @@ vi.mock("@/db/schema", () => ({
     kind: "ct.kind",
     status: "ct.status",
     summary: "ct.summary",
-    ongoing: "ct.ongoing",
     identityEmbedding: "ct.identityEmbedding",
   },
   canonicalTopicDigests: {
@@ -35,7 +34,6 @@ vi.mock("@/db/schema", () => ({
     digestMarkdown: "ctd.digestMarkdown",
     consensusPoints: "ctd.consensusPoints",
     disagreementPoints: "ctd.disagreementPoints",
-    episodeIds: "ctd.episodeIds",
     episodeCountAtGeneration: "ctd.episodeCountAtGeneration",
     modelUsed: "ctd.modelUsed",
     generatedAt: "ctd.generatedAt",
@@ -162,7 +160,11 @@ import {
   getTopicDetailData,
   triggerTopicDigestRefresh,
 } from "@/app/actions/topics";
-import { MIN_DERIVED_COUNT_FOR_DIGEST } from "@/lib/topic-digest-thresholds";
+import {
+  MIN_DERIVED_COUNT_FOR_DIGEST,
+  STALENESS_GROWTH_THRESHOLD,
+  RELATED_TOPICS_LIMIT,
+} from "@/lib/topic-digest-thresholds";
 
 // ─── Auth helpers ─────────────────────────────────────────────────────────────
 
@@ -227,7 +229,6 @@ function makeCanonicalRow(overrides: Record<string, unknown> = {}) {
     kind: "concept",
     status: "active",
     summary: "S",
-    ongoing: false,
     episodeCount: 3,
     completedSummaryCount: 3,
     identityEmbedding: "[0.1,0.2]",
@@ -298,7 +299,6 @@ describe("getTopicDetailData", () => {
       kind: "concept",
       status: "active",
       summary: "Summary text",
-      ongoing: true,
       episodeCount: 6,
       completedSummaryCount: 4,
       identityEmbedding: "[0.1,0.2,0.3]",
@@ -308,14 +308,10 @@ describe("getTopicDetailData", () => {
       digestMarkdown: "# heading",
       consensusPoints: ["c1", "c2"],
       disagreementPoints: ["d1"],
-      episodeIds: [1, 2, 3],
       episodeCountAtGeneration: 4,
       modelUsed: "gpt-x",
       generatedAt: new Date("2026-05-01T00:00:00Z"),
     };
-    const ep1Joined = new Date("2026-04-30T00:00:00Z");
-    const ep2Joined = new Date("2026-04-29T00:00:00Z");
-    const ep3Joined = new Date("2026-04-28T00:00:00Z");
     const episodeRows = [
       {
         id: 101,
@@ -324,7 +320,6 @@ describe("getTopicDetailData", () => {
         podcastTitle: "Pod A",
         podcastFeedId: "7001",
         coverageScore: 0.92,
-        joinedAt: ep1Joined,
         listenId: 999,
         libraryId: null,
       },
@@ -335,7 +330,6 @@ describe("getTopicDetailData", () => {
         podcastTitle: "Pod A",
         podcastFeedId: "7001",
         coverageScore: 0.71,
-        joinedAt: ep2Joined,
         listenId: null,
         libraryId: 5555,
       },
@@ -346,7 +340,6 @@ describe("getTopicDetailData", () => {
         podcastTitle: "Pod B",
         podcastFeedId: "7002",
         coverageScore: 0.55,
-        joinedAt: ep3Joined,
         listenId: null,
         libraryId: null,
       },
@@ -359,8 +352,8 @@ describe("getTopicDetailData", () => {
     ]);
     mockDbExecute.mockResolvedValue({
       rows: [
-        { id: 8, label: "Related A", kind: "concept", similarity: 0.91 },
-        { id: 9, label: "Related B", kind: "work", similarity: 0.85 },
+        { id: 8, label: "Related A", kind: "concept" },
+        { id: 9, label: "Related B", kind: "work" },
       ],
     });
 
@@ -374,7 +367,6 @@ describe("getTopicDetailData", () => {
       kind: "concept",
       status: "active",
       summary: "Summary text",
-      ongoing: true,
       episodeCount: 6,
       completedSummaryCount: 4,
     });
@@ -384,7 +376,6 @@ describe("getTopicDetailData", () => {
       digestMarkdown: "# heading",
       consensusPoints: ["c1", "c2"],
       disagreementPoints: ["d1"],
-      episodeIds: [1, 2, 3],
       episodeCountAtGeneration: 4,
       modelUsed: "gpt-x",
     });
@@ -412,7 +403,6 @@ describe("getTopicDetailData", () => {
       id: 8,
       label: "Related A",
       kind: "concept",
-      similarity: 0.91,
     });
   });
 
@@ -471,7 +461,8 @@ describe("getTopicDetailData", () => {
       values: unknown[];
     };
     const fullText = sqlArg.strings.join(" ");
-    expect(fullText).toContain("LIMIT 5");
+    // LIMIT is passed as a bound value (RELATED_TOPICS_LIMIT), not inlined.
+    expect(sqlArg.values).toContain(RELATED_TOPICS_LIMIT);
     expect(fullText).toContain("status = 'active'");
     // Self-exclusion: the canonical id appears as a bound value in the SQL fragment.
     expect(sqlArg.values).toContain(42);
@@ -646,6 +637,36 @@ describe("triggerTopicDigestRefresh", () => {
     });
   });
 
+  it("returns success: false with the underlying error when tasks.trigger rejects", async () => {
+    setupSelectChains([
+      {
+        where: [
+          {
+            id: 5,
+            label: "T",
+            summary: "S",
+            status: "active",
+            completedSummaryCount: MIN_DERIVED_COUNT_FOR_DIGEST + 1,
+          },
+        ],
+      },
+      { where: [] },
+    ]);
+    mockTasksTrigger.mockRejectedValueOnce(new Error("trigger sdk down"));
+    const consoleErrorSpy = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
+
+    const result = await triggerTopicDigestRefresh({ canonicalTopicId: 1 });
+
+    expect(result).toMatchObject({ success: false });
+    if (result.success) throw new Error("expected failure");
+    // The underlying error message is propagated through triggerTopicDigestGeneration.
+    expect(result.error).toBe("trigger sdk down");
+    expect(mockCreatePublicToken).not.toHaveBeenCalled();
+    consoleErrorSpy.mockRestore();
+  });
+
   it("queued: returns token-failed error when createPublicToken throws", async () => {
     setupSelectChains([
       {
@@ -672,5 +693,65 @@ describe("triggerTopicDigestRefresh", () => {
     expect(result).toEqual({ success: false, error: "token-failed" });
     expect(consoleErrorSpy).toHaveBeenCalled();
     consoleErrorSpy.mockRestore();
+  });
+
+  it("returns cached just below staleness threshold (boundary - 1 is NOT stale)", async () => {
+    const existingCount = MIN_DERIVED_COUNT_FOR_DIGEST + 5;
+    // Growth is exactly STALENESS_GROWTH_THRESHOLD - 1 → should be cached
+    const currentCount = existingCount + (STALENESS_GROWTH_THRESHOLD - 1);
+    setupSelectChains([
+      {
+        where: [
+          {
+            id: 5,
+            label: "T",
+            summary: "S",
+            status: "active",
+            completedSummaryCount: currentCount,
+          },
+        ],
+      },
+      {
+        where: [{ id: 22, episodeCountAtGeneration: existingCount }],
+      },
+    ]);
+
+    const result = await triggerTopicDigestRefresh({ canonicalTopicId: 5 });
+    expect(result).toMatchObject({
+      success: true,
+      data: { status: "cached", digestId: 22 },
+    });
+    expect(mockTasksTrigger).not.toHaveBeenCalled();
+  });
+
+  it("queues at exactly staleness threshold (boundary = STALENESS_GROWTH_THRESHOLD)", async () => {
+    const existingCount = MIN_DERIVED_COUNT_FOR_DIGEST + 5;
+    // Growth is exactly STALENESS_GROWTH_THRESHOLD → should queue
+    const currentCount = existingCount + STALENESS_GROWTH_THRESHOLD;
+    setupSelectChains([
+      {
+        where: [
+          {
+            id: 5,
+            label: "T",
+            summary: "S",
+            status: "active",
+            completedSummaryCount: currentCount,
+          },
+        ],
+      },
+      {
+        where: [{ id: 22, episodeCountAtGeneration: existingCount }],
+      },
+    ]);
+    mockTasksTrigger.mockResolvedValue({ id: "run_stale" });
+    mockCreatePublicToken.mockResolvedValue("tok_stale");
+
+    const result = await triggerTopicDigestRefresh({ canonicalTopicId: 5 });
+    expect(result).toMatchObject({
+      success: true,
+      data: { status: "queued", runId: "run_stale" },
+    });
+    expect(mockTasksTrigger).toHaveBeenCalledOnce();
   });
 });

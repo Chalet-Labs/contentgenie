@@ -33,7 +33,6 @@ const sampleDigest: TopicDigest = {
   digestMarkdown: "## Body markdown\n\nSome body text.",
   consensusPoints: ["Consensus A", "Consensus B"],
   disagreementPoints: ["Disagreement A"],
-  episodeIds: [1, 2, 3, 4],
   episodeCountAtGeneration: 4,
   modelUsed: "gpt-x",
   generatedAt: new Date(),
