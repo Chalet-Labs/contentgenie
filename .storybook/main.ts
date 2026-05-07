@@ -59,6 +59,10 @@ const config: StorybookConfig = {
         replacement: path.resolve(__dirname, "mocks/actions.ts"),
       },
       {
+        find: "@/app/actions/topics",
+        replacement: path.resolve(__dirname, "mocks/actions-topics.ts"),
+      },
+      {
         find: "@trigger.dev/react-hooks",
         replacement: path.resolve(__dirname, "mocks/trigger-react-hooks.ts"),
       },

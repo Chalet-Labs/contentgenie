@@ -13,6 +13,7 @@ const mockPermanentRedirect = vi.fn((url: string) => {
 vi.mock("next/navigation", () => ({
   notFound: () => mockNotFound(),
   permanentRedirect: (url: string) => mockPermanentRedirect(url),
+  useRouter: () => ({ refresh: vi.fn() }),
 }));
 
 // Each `mockNextTopicRow.mockResolvedValueOnce(row)` feeds the next call's
@@ -50,8 +51,39 @@ vi.mock("drizzle-orm", async (importOriginal) => {
   };
 });
 
+// Mock the new server actions. Each test reseeds with `mockResolvedValueOnce`.
+const mockGetTopicDetailData = vi.fn();
+const mockTriggerTopicDigestRefresh = vi.fn();
+
+vi.mock("@/app/actions/topics", () => ({
+  getTopicDetailData: (...args: unknown[]) => mockGetTopicDetailData(...args),
+  triggerTopicDigestRefresh: (...args: unknown[]) =>
+    mockTriggerTopicDigestRefresh(...args),
+}));
+
+// Stub the realtime hook so the digest panel doesn't try to connect.
+vi.mock("@trigger.dev/react-hooks", () => ({
+  useRealtimeRun: vi.fn(() => ({ run: null })),
+}));
+
+vi.mock("sonner", () => ({
+  toast: { success: vi.fn(), error: vi.fn() },
+}));
+
+// nuqs needs an Adapter context — stub the hook directly.
+vi.mock("nuqs", () => ({
+  useQueryState: vi.fn(() => [false, vi.fn()]),
+  parseAsBoolean: {
+    withDefault: (defaultValue: boolean) => ({
+      __brand: "parseAsBoolean",
+      defaultValue,
+    }),
+  },
+}));
+
 import TopicPage from "@/app/(app)/topic/[id]/page";
 import { MAX_MERGE_DEPTH } from "@/app/(app)/topic/[id]/merge-walker";
+import { MIN_DERIVED_COUNT_FOR_DIGEST } from "@/lib/topic-digest-thresholds";
 
 type ActiveTopic = {
   id: number;
@@ -100,34 +132,72 @@ function makeTopic(
   } as CanonicalTopicRow;
 }
 
+function makeDetailData(
+  overrides: {
+    digest?: unknown;
+    completedSummaryCount?: number;
+    relatedTopics?: unknown[];
+    episodes?: unknown[];
+    canonical?: Record<string, unknown>;
+  } = {},
+) {
+  return {
+    canonical: {
+      id: 1,
+      label: "Claude Opus 4.7 release",
+      kind: "release",
+      status: "active",
+      summary: "Anthropic released Claude Opus 4.7 with extended thinking.",
+      ongoing: false,
+      episodeCount: 12,
+      completedSummaryCount: overrides.completedSummaryCount ?? 5,
+      ...overrides.canonical,
+    },
+    digest: overrides.digest ?? null,
+    episodes: overrides.episodes ?? [],
+    relatedTopics: overrides.relatedTopics ?? [],
+  };
+}
+
 describe("TopicPage", () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    mockGetTopicDetailData.mockResolvedValue({
+      success: true,
+      data: makeDetailData(),
+    });
+    mockTriggerTopicDigestRefresh.mockResolvedValue({
+      success: true,
+      data: { status: "ineligible" },
+    });
   });
 
   it.each(["abc", "-1", "0", "01", "1e2", "2147483648"])(
     "calls notFound() for invalid id %s",
     async (id) => {
-      await expect(TopicPage({ params: { id } })).rejects.toThrow(
-        "NEXT_NOT_FOUND",
-      );
+      await expect(
+        TopicPage({ params: { id }, searchParams: {} }),
+      ).rejects.toThrow("NEXT_NOT_FOUND");
       expect(mockNotFound).toHaveBeenCalledOnce();
     },
   );
 
   it("calls notFound() when DB returns null", async () => {
     mockNextTopicRow.mockResolvedValue(null);
-    await expect(TopicPage({ params: { id: "1" } })).rejects.toThrow(
-      "NEXT_NOT_FOUND",
-    );
+    await expect(
+      TopicPage({ params: { id: "1" }, searchParams: {} }),
+    ).rejects.toThrow("NEXT_NOT_FOUND");
     expect(mockNotFound).toHaveBeenCalledOnce();
   });
 
-  it("renders label, kind, summary, episodeCount, and 'Coming soon' for active topic", async () => {
+  it("renders label, kind, summary, and episode count for active topic", async () => {
     mockNextTopicRow.mockResolvedValueOnce(
       makeTopic({ status: "active", mergedIntoId: null }),
     );
-    const jsx = await TopicPage({ params: { id: "1" } });
+    const jsx = await TopicPage({
+      params: { id: "1" },
+      searchParams: {},
+    });
     render(jsx as React.ReactElement);
     expect(screen.getByText("Claude Opus 4.7 release")).toBeInTheDocument();
     expect(screen.getByText("release")).toBeInTheDocument();
@@ -137,14 +207,20 @@ describe("TopicPage", () => {
       ),
     ).toBeInTheDocument();
     expect(screen.getByText("12 episodes")).toBeInTheDocument();
-    expect(screen.getByText(/Coming soon/i)).toBeInTheDocument();
   });
 
   it("renders singular 'episode' when episodeCount === 1", async () => {
     mockNextTopicRow.mockResolvedValueOnce(
       makeTopic({ status: "active", mergedIntoId: null, episodeCount: 1 }),
     );
-    const jsx = await TopicPage({ params: { id: "1" } });
+    mockGetTopicDetailData.mockResolvedValueOnce({
+      success: true,
+      data: makeDetailData({ canonical: { episodeCount: 1 } }),
+    });
+    const jsx = await TopicPage({
+      params: { id: "1" },
+      searchParams: {},
+    });
     render(jsx as React.ReactElement);
     expect(screen.getByText("1 episode")).toBeInTheDocument();
   });
@@ -153,11 +229,19 @@ describe("TopicPage", () => {
     mockNextTopicRow.mockResolvedValueOnce(
       makeTopic({ status: "dormant", label: "Old topic", mergedIntoId: null }),
     );
-    const jsx = await TopicPage({ params: { id: "2" } });
+    mockGetTopicDetailData.mockResolvedValueOnce({
+      success: true,
+      data: makeDetailData({
+        canonical: { status: "dormant", label: "Old topic" },
+      }),
+    });
+    const jsx = await TopicPage({
+      params: { id: "2" },
+      searchParams: {},
+    });
     render(jsx as React.ReactElement);
     expect(screen.getByText("Old topic")).toBeInTheDocument();
     expect(screen.getByText("Dormant")).toBeInTheDocument();
-    expect(screen.getByText(/Coming soon/i)).toBeInTheDocument();
     expect(mockPermanentRedirect).not.toHaveBeenCalled();
   });
 
@@ -169,9 +253,9 @@ describe("TopicPage", () => {
       .mockResolvedValueOnce(
         makeTopic({ id: 20, status: "active", mergedIntoId: null }),
       );
-    await expect(TopicPage({ params: { id: "10" } })).rejects.toThrow(
-      "NEXT_REDIRECT:/topic/20",
-    );
+    await expect(
+      TopicPage({ params: { id: "10" }, searchParams: {} }),
+    ).rejects.toThrow("NEXT_REDIRECT:/topic/20");
     expect(mockPermanentRedirect).toHaveBeenCalledWith("/topic/20");
   });
 
@@ -189,25 +273,22 @@ describe("TopicPage", () => {
       .mockResolvedValueOnce(
         makeTopic({ id: 4, status: "active", mergedIntoId: null }),
       );
-    await expect(TopicPage({ params: { id: "1" } })).rejects.toThrow(
-      "NEXT_REDIRECT:/topic/4",
-    );
+    await expect(
+      TopicPage({ params: { id: "1" }, searchParams: {} }),
+    ).rejects.toThrow("NEXT_REDIRECT:/topic/4");
     expect(mockPermanentRedirect).toHaveBeenCalledWith("/topic/4");
   });
 
   it("calls notFound() when seen-set detects a true cycle (a→b→a)", async () => {
-    // Three mocks: page-level fetch, walker iter 1, walker iter 2 (re-enters a).
-    // Without the third mock the walker would exit via the broken-chain branch
-    // instead of hitting `seen.has(current.id)`.
     const a = makeTopic({ id: 5, status: "merged", mergedIntoId: 6 });
     const b = makeTopic({ id: 6, status: "merged", mergedIntoId: 5 });
     mockNextTopicRow
       .mockResolvedValueOnce(a)
       .mockResolvedValueOnce(b)
       .mockResolvedValueOnce(a);
-    await expect(TopicPage({ params: { id: "5" } })).rejects.toThrow(
-      "NEXT_NOT_FOUND",
-    );
+    await expect(
+      TopicPage({ params: { id: "5" }, searchParams: {} }),
+    ).rejects.toThrow("NEXT_NOT_FOUND");
     expect(mockNotFound).toHaveBeenCalledOnce();
   });
 
@@ -217,9 +298,9 @@ describe("TopicPage", () => {
         makeTopic({ id: 7, status: "merged", mergedIntoId: 8 }),
       )
       .mockResolvedValueOnce(undefined);
-    await expect(TopicPage({ params: { id: "7" } })).rejects.toThrow(
-      "NEXT_NOT_FOUND",
-    );
+    await expect(
+      TopicPage({ params: { id: "7" }, searchParams: {} }),
+    ).rejects.toThrow("NEXT_NOT_FOUND");
     expect(mockNotFound).toHaveBeenCalledOnce();
   });
 
@@ -231,14 +312,13 @@ describe("TopicPage", () => {
         mergedIntoId: null as unknown as number,
       } as Partial<MergedTopic>),
     );
-    await expect(TopicPage({ params: { id: "9" } })).rejects.toThrow(
-      "NEXT_NOT_FOUND",
-    );
+    await expect(
+      TopicPage({ params: { id: "9" }, searchParams: {} }),
+    ).rejects.toThrow("NEXT_NOT_FOUND");
     expect(mockNotFound).toHaveBeenCalledOnce();
   });
 
   it("succeeds at depth = MAX_MERGE_DEPTH - 1 (boundary just below threshold)", async () => {
-    // Page-level fetch (depth 0) + (MAX_MERGE_DEPTH - 1) merged hops + active terminal.
     const totalMergedHops = MAX_MERGE_DEPTH - 1;
     for (let i = 0; i < totalMergedHops; i++) {
       mockNextTopicRow.mockResolvedValueOnce(
@@ -252,26 +332,24 @@ describe("TopicPage", () => {
         mergedIntoId: null,
       }),
     );
-    await expect(TopicPage({ params: { id: "200" } })).rejects.toThrow(
-      `NEXT_REDIRECT:/topic/${200 + totalMergedHops}`,
-    );
+    await expect(
+      TopicPage({ params: { id: "200" }, searchParams: {} }),
+    ).rejects.toThrow(`NEXT_REDIRECT:/topic/${200 + totalMergedHops}`);
     expect(mockPermanentRedirect).toHaveBeenCalledWith(
       `/topic/${200 + totalMergedHops}`,
     );
   });
 
   it("calls notFound() when chain length exceeds MAX_MERGE_DEPTH", async () => {
-    // Page-level fetch + MAX_MERGE_DEPTH + 1 merged hops — the depth check
-    // trips at depth=MAX_MERGE_DEPTH at the start of the next loop iteration.
     const totalRows = MAX_MERGE_DEPTH + 1;
     for (let i = 0; i < totalRows; i++) {
       mockNextTopicRow.mockResolvedValueOnce(
         makeTopic({ id: 100 + i, status: "merged", mergedIntoId: 100 + i + 1 }),
       );
     }
-    await expect(TopicPage({ params: { id: "100" } })).rejects.toThrow(
-      "NEXT_NOT_FOUND",
-    );
+    await expect(
+      TopicPage({ params: { id: "100" }, searchParams: {} }),
+    ).rejects.toThrow("NEXT_NOT_FOUND");
     expect(mockNotFound).toHaveBeenCalledOnce();
   });
 
@@ -286,9 +364,118 @@ describe("TopicPage", () => {
       .mockResolvedValueOnce(
         makeTopic({ id: 32, status: "dormant", mergedIntoId: null }),
       );
-    await expect(TopicPage({ params: { id: "30" } })).rejects.toThrow(
-      "NEXT_REDIRECT:/topic/32",
-    );
+    await expect(
+      TopicPage({ params: { id: "30" }, searchParams: {} }),
+    ).rejects.toThrow("NEXT_REDIRECT:/topic/32");
     expect(mockPermanentRedirect).toHaveBeenCalledWith("/topic/32");
+  });
+
+  // ────── New integration cases (issue #399 page composition) ──────
+
+  it("renders the digest panel's consensus list when canonical has a digest", async () => {
+    mockNextTopicRow.mockResolvedValueOnce(
+      makeTopic({ status: "active", mergedIntoId: null }),
+    );
+    mockGetTopicDetailData.mockResolvedValueOnce({
+      success: true,
+      data: makeDetailData({
+        completedSummaryCount: MIN_DERIVED_COUNT_FOR_DIGEST + 2,
+        digest: {
+          id: 22,
+          digestMarkdown: "# md",
+          consensusPoints: ["Distinct consensus point"],
+          disagreementPoints: [],
+          episodeIds: [1, 2, 3],
+          episodeCountAtGeneration: 3,
+          modelUsed: "gpt-x",
+          generatedAt: new Date(),
+        },
+      }),
+    });
+    const jsx = await TopicPage({
+      params: { id: "1" },
+      searchParams: {},
+    });
+    render(jsx as React.ReactElement);
+    expect(screen.getByText("Distinct consensus point")).toBeInTheDocument();
+    expect(mockTriggerTopicDigestRefresh).not.toHaveBeenCalled();
+  });
+
+  it("auto-triggers digest refresh + bundles runId/token when digest is null & threshold met", async () => {
+    mockNextTopicRow.mockResolvedValueOnce(
+      makeTopic({ status: "active", mergedIntoId: null }),
+    );
+    mockGetTopicDetailData.mockResolvedValueOnce({
+      success: true,
+      data: makeDetailData({
+        completedSummaryCount: MIN_DERIVED_COUNT_FOR_DIGEST + 1,
+        digest: null,
+      }),
+    });
+    mockTriggerTopicDigestRefresh.mockResolvedValueOnce({
+      success: true,
+      data: {
+        status: "queued",
+        runId: "run_42",
+        publicAccessToken: "tok_42",
+      },
+    });
+    const jsx = await TopicPage({
+      params: { id: "1" },
+      searchParams: {},
+    });
+    render(jsx as React.ReactElement);
+    expect(mockTriggerTopicDigestRefresh).toHaveBeenCalledWith({
+      canonicalTopicId: 1,
+    });
+    // Loading state visible because the panel mounted with the runId.
+    expect(screen.getByText(/synthesizing/i)).toBeInTheDocument();
+  });
+
+  it("renders the empty state and skips auto-trigger when completedSummaryCount is below threshold", async () => {
+    mockNextTopicRow.mockResolvedValueOnce(
+      makeTopic({ status: "active", mergedIntoId: null }),
+    );
+    mockGetTopicDetailData.mockResolvedValueOnce({
+      success: true,
+      data: makeDetailData({
+        completedSummaryCount: MIN_DERIVED_COUNT_FOR_DIGEST - 1,
+        digest: null,
+      }),
+    });
+    const jsx = await TopicPage({
+      params: { id: "1" },
+      searchParams: {},
+    });
+    render(jsx as React.ReactElement);
+    expect(screen.getByText(/more coverage needed/i)).toBeInTheDocument();
+    expect(mockTriggerTopicDigestRefresh).not.toHaveBeenCalled();
+  });
+
+  it("forwards searchParams.unheard='true' as showOnlyUnheard to the action", async () => {
+    mockNextTopicRow.mockResolvedValueOnce(
+      makeTopic({ status: "active", mergedIntoId: null }),
+    );
+    await TopicPage({
+      params: { id: "1" },
+      searchParams: { unheard: "true" },
+    });
+    expect(mockGetTopicDetailData).toHaveBeenCalledWith({
+      canonicalTopicId: 1,
+      showOnlyUnheard: true,
+    });
+  });
+
+  it("calls notFound() when getTopicDetailData returns not-found", async () => {
+    mockNextTopicRow.mockResolvedValueOnce(
+      makeTopic({ status: "active", mergedIntoId: null }),
+    );
+    mockGetTopicDetailData.mockResolvedValueOnce({
+      success: false,
+      error: "not-found",
+    });
+    await expect(
+      TopicPage({ params: { id: "1" }, searchParams: {} }),
+    ).rejects.toThrow("NEXT_NOT_FOUND");
   });
 });
