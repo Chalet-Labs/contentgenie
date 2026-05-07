@@ -14,6 +14,17 @@ interface ReconciliationAuditTableProps {
   entries: ReconciliationAuditEntry[];
 }
 
+/**
+ * Per-cluster reconciliation audit list (issue #392 AC).
+ *
+ * The "Verified / Rejected" column doubles as a count chip and an ID list:
+ * the top line is the integer counts, and below it the actual loser IDs are
+ * stacked under "verified:" / "rejected:" labels so operators can correlate
+ * a `partial` or `rejected` outcome with the specific cluster members that
+ * caused it. The ID list collapses when both groups are empty (e.g.
+ * `skipped`, `failed`) so dormant rows stay compact.
+ */
+
 type Outcome = ReconciliationAuditEntry["outcome"];
 
 function OutcomeBadge({ outcome }: { outcome: Outcome }) {
