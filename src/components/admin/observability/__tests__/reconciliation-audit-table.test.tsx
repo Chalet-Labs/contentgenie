@@ -117,4 +117,31 @@ describe("ReconciliationAuditTable", () => {
     // rejected count
     expect(screen.getByText("1")).toBeInTheDocument();
   });
+
+  it("surfaces the verified and rejected loser IDs (issue #392 AC)", () => {
+    render(
+      <ReconciliationAuditTable
+        entries={[
+          makeEntry({
+            verifiedLoserIds: [101, 102],
+            rejectedLoserIds: [103],
+          }),
+        ]}
+      />,
+    );
+    expect(screen.getByText("verified:")).toBeInTheDocument();
+    expect(screen.getByText("101, 102")).toBeInTheDocument();
+    expect(screen.getByText("rejected:")).toBeInTheDocument();
+    expect(screen.getByText("103")).toBeInTheDocument();
+  });
+
+  it("omits ID lines when neither verified nor rejected losers exist", () => {
+    render(
+      <ReconciliationAuditTable
+        entries={[makeEntry({ verifiedLoserIds: [], rejectedLoserIds: [] })]}
+      />,
+    );
+    expect(screen.queryByText("verified:")).not.toBeInTheDocument();
+    expect(screen.queryByText("rejected:")).not.toBeInTheDocument();
+  });
 });

@@ -83,19 +83,44 @@ export function ReconciliationAuditTable({
                 {entry.winnerId !== null ? entry.winnerId : "—"}
               </TableCell>
               <TableCell className="text-sm">
-                <span className="text-emerald-700">
-                  {entry.verifiedLoserIds.length}
-                </span>
-                {" / "}
-                <span
-                  className={
-                    entry.rejectedLoserIds.length > 0
-                      ? "text-destructive"
-                      : "text-muted-foreground"
-                  }
-                >
-                  {entry.rejectedLoserIds.length}
-                </span>
+                <div className="space-y-1">
+                  <div>
+                    <span className="text-emerald-700">
+                      {entry.verifiedLoserIds.length}
+                    </span>
+                    {" / "}
+                    <span
+                      className={
+                        entry.rejectedLoserIds.length > 0
+                          ? "text-destructive"
+                          : "text-muted-foreground"
+                      }
+                    >
+                      {entry.rejectedLoserIds.length}
+                    </span>
+                  </div>
+                  {(entry.verifiedLoserIds.length > 0 ||
+                    entry.rejectedLoserIds.length > 0) && (
+                    <div className="font-mono text-xs leading-tight">
+                      {entry.verifiedLoserIds.length > 0 && (
+                        <div className="text-emerald-700/80">
+                          <span className="text-muted-foreground">
+                            verified:
+                          </span>{" "}
+                          {entry.verifiedLoserIds.join(", ")}
+                        </div>
+                      )}
+                      {entry.rejectedLoserIds.length > 0 && (
+                        <div className="text-destructive/80">
+                          <span className="text-muted-foreground">
+                            rejected:
+                          </span>{" "}
+                          {entry.rejectedLoserIds.join(", ")}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               </TableCell>
               <TableCell className="text-sm">
                 {entry.mergesExecuted} / {entry.mergesRejected}
