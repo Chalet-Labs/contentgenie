@@ -49,6 +49,7 @@ import { db } from "@/db";
 import { generateCompletion } from "@/lib/ai/generate";
 import { clusterByIdentityEmbedding } from "@/lib/reconcile-clustering";
 import { mergeCanonicals } from "@/trigger/helpers/database";
+import type { ClusterAuditRow } from "@/trigger/helpers/reconcile-summary-accumulator";
 
 type ScheduleConfig = {
   id: string;
@@ -214,7 +215,7 @@ describe("reconcile-canonicals task", () => {
     // ─── Audit insert ordering (B2 regression) ──────────────────────────────
 
     it("calls insertReconciliationAuditRows with runId + clusterAudits before emitting reconcile_summary", async () => {
-      const clusterAudits = [
+      const clusterAudits: ClusterAuditRow[] = [
         {
           clusterIndex: 0,
           clusterSize: 2,
@@ -222,7 +223,10 @@ describe("reconcile-canonicals task", () => {
           loserIds: [2],
           verifiedLoserIds: [2],
           rejectedLoserIds: [],
-          outcome: "merged" as const,
+          mergesExecuted: 1,
+          mergesRejected: 0,
+          pairwiseVerifyThrew: 0,
+          outcome: "merged",
         },
       ];
       runReconciliationMock.mockResolvedValueOnce({
