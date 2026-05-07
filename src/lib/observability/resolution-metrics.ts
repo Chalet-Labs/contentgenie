@@ -226,36 +226,40 @@ export interface DriftResult {
 // ─── Bucket range generator ───────────────────────────────────────────────────
 
 /**
- * Snap a date down to the start of the granularity bucket it falls in,
- * in UTC. Day → preceding UTC midnight. Week → preceding UTC Monday midnight
- * (matches Postgres `date_trunc('week', t AT TIME ZONE 'UTC')`).
- */
-function snapToBucketBoundary(d: Date, granularity: GranularityKey): Date {
-  let snapped = new Date(
-    Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()),
-  );
-  if (granularity === "week") {
-    // (dow + 6) % 7 maps Sun→6, Mon→0, Tue→1, ..., Sat→5 (days since Monday).
-    const daysFromMonday = (snapped.getUTCDay() + 6) % 7;
-    snapped = new Date(snapped.getTime() - daysFromMonday * MS_PER_DAY);
-  }
-  return snapped;
-}
-
-/**
- * Generate UTC-midnight (or week-Monday) bucket boundaries from `start` to `end`,
- * stepping by granularity. Caller is responsible for snapping `start` to a
- * bucket boundary first via `snapToBucketBoundary`.
+ * Generate UTC-midnight (or week-Monday) date boundaries spanning the given
+ * rolling window. `window.start` is snapped down to the preceding bucket
+ * boundary so the first bucket aligns with the DB-side `date_trunc` key.
+ *
+ * A rolling N-day window picked up mid-day legitimately spans N+1 calendar
+ * buckets — the first and last bucket each carry a partial day of data that
+ * together sum to one full day. Reducing this to "exactly N visible buckets"
+ * would require shifting away from rolling-window semantics (anchored end,
+ * truncated start) and is intentionally NOT done here so trend totals stay
+ * consistent with the histogram / drift cards on the same page.
  */
 function generateBucketRange(
-  start: Date,
-  end: Date,
+  window: { start: Date; end: Date },
   granularity: GranularityKey,
 ): Date[] {
+  let current = new Date(
+    Date.UTC(
+      window.start.getUTCFullYear(),
+      window.start.getUTCMonth(),
+      window.start.getUTCDate(),
+    ),
+  );
+  if (granularity === "week") {
+    // Postgres date_trunc('week', t) returns ISO-week Monday boundaries.
+    // Snap to the preceding Monday so generated keys align with DB keys.
+    // (dow + 6) % 7 maps Sun→6, Mon→0, Tue→1, ..., Sat→5 (days since Monday).
+    const daysFromMonday = (current.getUTCDay() + 6) % 7;
+    current = new Date(current.getTime() - daysFromMonday * MS_PER_DAY);
+  }
   const stepMs = granularity === "week" ? MS_PER_WEEK : MS_PER_DAY;
   const dates: Date[] = [];
-  for (let t = start.getTime(); t <= end.getTime(); t += stepMs) {
-    dates.push(new Date(t));
+  while (current.getTime() <= window.end.getTime()) {
+    dates.push(current);
+    current = new Date(current.getTime() + stepMs);
   }
   return dates;
 }
@@ -272,17 +276,10 @@ export async function getMatchMethodTrend(
   window: { start: Date; end: Date },
   granularity: GranularityKey,
 ): Promise<MatchMethodTrendEntry[]> {
-  // Align the query's lower bound to the bucket boundary so the first bucket
-  // is whole, not partial. With a rolling start (e.g. "now − 7×24h" at 12:50)
-  // the first bucket would otherwise begin mid-day and produce an extra
-  // partial bucket — 8 day buckets for "7d", 2 for "24h".
-  const snappedStart = snapToBucketBoundary(window.start, granularity);
-  const timeFilter = buildTimeFilter({ start: snappedStart, end: window.end });
+  const timeFilter = buildTimeFilter(window);
   const col = episodeCanonicalTopics.updatedAt;
 
-  // Pin `date_trunc` to UTC so DB-side bucket keys match the JS-side keys we
-  // generate, regardless of the DB session timezone (Postgres 14+ 3-arg form).
-  const bucketExpr = sql<Date>`date_trunc(${granularity}, ${col}, 'UTC')`;
+  const bucketExpr = sql<Date>`date_trunc(${granularity}, ${col})`;
 
   const query = db
     .select({
@@ -320,20 +317,18 @@ export async function getMatchMethodTrend(
   }
 
   // Zero-fill every bucket in the window range
-  return generateBucketRange(snappedStart, window.end, granularity).map(
-    (bucket) => {
-      const key = bucket.toISOString();
-      return (
-        byBucket.get(key) ?? {
-          bucket,
-          auto: 0,
-          llm_disambig: 0,
-          new: 0,
-          total: 0,
-        }
-      );
-    },
-  );
+  return generateBucketRange(window, granularity).map((bucket) => {
+    const key = bucket.toISOString();
+    return (
+      byBucket.get(key) ?? {
+        bucket,
+        auto: 0,
+        llm_disambig: 0,
+        new: 0,
+        total: 0,
+      }
+    );
+  });
 }
 
 /**
@@ -346,9 +341,7 @@ export async function getSimilarityTrend(
   window: { start: Date; end: Date },
   granularity: GranularityKey,
 ): Promise<SimilarityTrendEntry[]> {
-  // See getMatchMethodTrend for the rationale on snapping + UTC `date_trunc`.
-  const snappedStart = snapToBucketBoundary(window.start, granularity);
-  const timeFilter = buildTimeFilter({ start: snappedStart, end: window.end });
+  const timeFilter = buildTimeFilter(window);
   const col = episodeCanonicalTopics.updatedAt;
   const simCol = episodeCanonicalTopics.similarityToTopMatch;
 
@@ -356,7 +349,7 @@ export async function getSimilarityTrend(
   const numBuckets = Math.ceil(1 / bucketSize);
   const maxBucket = (numBuckets - 1) * bucketSize;
 
-  const bucketExpr = sql<Date>`date_trunc(${granularity}, ${col}, 'UTC')`;
+  const bucketExpr = sql<Date>`date_trunc(${granularity}, ${col})`;
   const simBucketExpr = sql<number>`least(floor(${simCol} / ${bucketSize}) * ${bucketSize}, ${maxBucket})`;
 
   const nullFilter = isNotNull(simCol);
@@ -399,21 +392,19 @@ export async function getSimilarityTrend(
     return arr;
   };
 
-  return generateBucketRange(snappedStart, window.end, granularity).map(
-    (bucket) => {
-      const key = bucket.toISOString();
-      const counts = byBucket.get(key);
-      if (!counts) {
-        return { bucket, buckets: emptyBuckets() };
-      }
-      const bucketArray: SimilarityBucket[] = [];
-      for (let i = 0; i < numBuckets; i++) {
-        const sim = Math.round(i * bucketSize * 1e10) / 1e10;
-        bucketArray.push({ bucket: sim, count: counts.get(i) ?? 0 });
-      }
-      return { bucket, buckets: bucketArray };
-    },
-  );
+  return generateBucketRange(window, granularity).map((bucket) => {
+    const key = bucket.toISOString();
+    const counts = byBucket.get(key);
+    if (!counts) {
+      return { bucket, buckets: emptyBuckets() };
+    }
+    const bucketArray: SimilarityBucket[] = [];
+    for (let i = 0; i < numBuckets; i++) {
+      const sim = Math.round(i * bucketSize * 1e10) / 1e10;
+      bucketArray.push({ bucket: sim, count: counts.get(i) ?? 0 });
+    }
+    return { bucket, buckets: bucketArray };
+  });
 }
 
 /**
