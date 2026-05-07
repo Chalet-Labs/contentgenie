@@ -392,14 +392,29 @@ describe("getMatchMethodTrend", () => {
     });
   });
 
-  it("passes gte + lte on updatedAt when window provided", async () => {
+  it("passes gte + lte on updatedAt when window provided (snapped to bucket boundary)", async () => {
     mockSelect.mockReturnValue(makeChain([]));
+    // 2026-01-01 is already at UTC midnight, so the snapped start equals start.
     const start = new Date("2026-01-01");
     const end = new Date("2026-01-07");
     await getMatchMethodTrend({ start, end }, "day");
     expect(mockGte).toHaveBeenCalledWith("updated_at", start);
     expect(mockLte).toHaveBeenCalledWith("updated_at", end);
     expect(mockAnd).toHaveBeenCalled();
+  });
+
+  it("snaps a mid-day rolling start down to UTC midnight before querying (B1 regression)", async () => {
+    // Rolling "7d" window picked up at 12:50 UTC: start is mid-day. The query
+    // filter must use the snapped midnight, not the raw mid-day timestamp,
+    // so the first bucket is whole and the trend doesn't overstate by an
+    // extra partial bucket.
+    mockSelect.mockReturnValue(makeChain([]));
+    const start = new Date("2026-04-30T12:50:00.000Z");
+    const end = new Date("2026-05-07T12:50:00.000Z");
+    const expectedSnappedStart = new Date("2026-04-30T00:00:00.000Z");
+    await getMatchMethodTrend({ start, end }, "day");
+    expect(mockGte).toHaveBeenCalledWith("updated_at", expectedSnappedStart);
+    expect(mockLte).toHaveBeenCalledWith("updated_at", end);
   });
 
   it("returns an array (possibly empty or zero-filled) when no data in window", async () => {
@@ -470,7 +485,7 @@ describe("getSimilarityTrend", () => {
     expect(Array.isArray(result)).toBe(true);
   });
 
-  it("passes gte + lte on updatedAt when window provided", async () => {
+  it("passes gte + lte on updatedAt when window provided (snapped to bucket boundary)", async () => {
     mockSelect.mockReturnValue(makeChain([]));
     const start = new Date("2026-01-01");
     const end = new Date("2026-01-07");
