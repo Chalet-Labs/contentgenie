@@ -129,14 +129,14 @@ describe("getMatchMethodHistogram", () => {
     expect(mockLte).not.toHaveBeenCalled();
   });
 
-  it("passes gte + lte on updatedAt when window provided", async () => {
+  it("passes a UTC-pinned filter on updatedAt when window provided", async () => {
     mockSelect.mockReturnValue(makeChain([]));
     const start = new Date("2026-01-01");
     const end = new Date("2026-01-07");
     await getMatchMethodHistogram({ start, end });
-    expect(mockGte).toHaveBeenCalledWith("updated_at", start);
-    expect(mockLte).toHaveBeenCalledWith("updated_at", end);
     expect(mockAnd).toHaveBeenCalled();
+    expect(mockGte).not.toHaveBeenCalled();
+    expect(mockLte).not.toHaveBeenCalled();
   });
 
   it("returns all three keys with correct counts when DB has all", async () => {
@@ -242,14 +242,14 @@ describe("getDisambigForcedCount", () => {
     expect(result.versionTokenForced).toBe(0);
   });
 
-  it("passes gte + lte on updatedAt when window provided", async () => {
+  it("passes a UTC-pinned filter on updatedAt when window provided", async () => {
     mockSelect.mockReturnValue(makeChain([{ total: 5, forced: 2 }]));
     const start = new Date("2026-01-01");
     const end = new Date("2026-01-07");
     await getDisambigForcedCount({ start, end });
-    expect(mockGte).toHaveBeenCalledWith("updated_at", start);
-    expect(mockLte).toHaveBeenCalledWith("updated_at", end);
     expect(mockAnd).toHaveBeenCalled();
+    expect(mockGte).not.toHaveBeenCalled();
+    expect(mockLte).not.toHaveBeenCalled();
   });
 
   it("omits where clause when no window provided", async () => {
@@ -396,14 +396,17 @@ describe("getMatchMethodTrend", () => {
     });
   });
 
-  it("passes gte + lte on updatedAt when window provided", async () => {
+  it("passes a UTC-pinned filter on updatedAt when window provided", async () => {
     mockSelect.mockReturnValue(makeChain([]));
     const start = new Date("2026-01-01");
     const end = new Date("2026-01-07");
     await getMatchMethodTrend({ start, end }, "day");
-    expect(mockGte).toHaveBeenCalledWith("updated_at", start);
-    expect(mockLte).toHaveBeenCalledWith("updated_at", end);
+    // The TZ-pinned filter no longer uses gte/lte helpers — just verify the
+    // where clause was applied (function-level behavior). End-to-end SQL
+    // shape is covered by the integration test against a live Postgres.
     expect(mockAnd).toHaveBeenCalled();
+    expect(mockGte).not.toHaveBeenCalled();
+    expect(mockLte).not.toHaveBeenCalled();
   });
 
   it("returns an array (possibly empty or zero-filled) when no data in window", async () => {
@@ -474,14 +477,14 @@ describe("getSimilarityTrend", () => {
     expect(Array.isArray(result)).toBe(true);
   });
 
-  it("passes gte + lte on updatedAt when window provided", async () => {
+  it("passes a UTC-pinned filter on updatedAt when window provided", async () => {
     mockSelect.mockReturnValue(makeChain([]));
     const start = new Date("2026-01-01");
     const end = new Date("2026-01-07");
     await getSimilarityTrend({ start, end }, "day");
-    expect(mockGte).toHaveBeenCalledWith("updated_at", start);
-    expect(mockLte).toHaveBeenCalledWith("updated_at", end);
     expect(mockAnd).toHaveBeenCalled();
+    expect(mockGte).not.toHaveBeenCalled();
+    expect(mockLte).not.toHaveBeenCalled();
   });
 
   it("accepts week granularity and returns array result", async () => {

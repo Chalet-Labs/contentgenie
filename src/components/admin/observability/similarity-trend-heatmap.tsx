@@ -1,13 +1,19 @@
 import { cn } from "@/lib/utils";
 import { formatUtcShortDate } from "@/lib/admin/format-utils";
-import type { SimilarityTrendEntry } from "@/lib/observability/resolution-metrics";
+import {
+  SIMILARITY_BUCKET_SIZE,
+  type SimilarityTrendEntry,
+} from "@/lib/observability/resolution-metrics";
 
 interface SimilarityTrendHeatmapProps {
   entries: SimilarityTrendEntry[];
 }
 
-const NUM_BUCKETS = 20;
-const BUCKET_STEP = 0.05;
+// Derive both the bucket count and step from the backend's source of truth
+// so the UI grid stays aligned with `getSimilarityTrend` if the bucket size
+// is ever retuned.
+const BUCKET_STEP = SIMILARITY_BUCKET_SIZE;
+const NUM_BUCKETS = Math.ceil(1 / BUCKET_STEP);
 // X-axis tick positions: render labels only at the start, midpoint, and end of
 // the bucket range so adjacent labels don't visually collide.
 const TICK_INDICES: readonly number[] = [

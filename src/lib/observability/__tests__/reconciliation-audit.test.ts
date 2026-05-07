@@ -26,28 +26,36 @@ vi.mock("@/db/schema", () => ({
 }));
 
 const mockAnd = vi.fn((...args) => ({ and: args }));
-const mockGte = vi.fn((col, val) => ({ gte: [col, val] }));
-const mockLte = vi.fn((col, val) => ({ lte: [col, val] }));
 const mockDesc = vi.fn((col) => ({ desc: col }));
+const mockCount = vi.fn(() => "COUNT(*)");
+
+// Capture every sql`...` invocation so tests can assert on the timezone-pinned
+// filter expression that replaced the old gte/lte helpers.
+const sqlCalls: Array<{
+  strings: readonly string[];
+  vals: unknown[];
+}> = [];
 
 vi.mock("drizzle-orm", () => ({
+  count: (...args: unknown[]) => mockCount(...(args as [])),
   sql: Object.assign(
-    (strings: TemplateStringsArray, ...vals: unknown[]) => ({
-      toString: () => strings.join("?"),
-      as: (alias: string) => ({ alias }),
-      vals,
-    }),
+    (strings: TemplateStringsArray, ...vals: unknown[]) => {
+      sqlCalls.push({ strings: [...strings], vals });
+      return {
+        toString: () => strings.join("?"),
+        as: (alias: string) => ({ alias }),
+        vals,
+      };
+    },
     { raw: (s: string) => s },
   ),
   and: (...args: unknown[]) => mockAnd(...args),
-  gte: (col: unknown, val: unknown) => mockGte(col, val),
-  lte: (col: unknown, val: unknown) => mockLte(col, val),
   desc: (col: unknown) => mockDesc(col),
 }));
 
 function makeChain(rows: unknown[]) {
   const chain: Record<string, unknown> = {};
-  const methods = ["from", "where", "orderBy", "limit"];
+  const methods = ["from", "where", "orderBy", "limit", "offset"];
   methods.forEach((m) => {
     chain[m] = vi.fn(() => chain);
   });
@@ -77,68 +85,115 @@ function makeEntry(overrides: Record<string, unknown> = {}) {
   };
 }
 
+/**
+ * `getReconciliationAuditLog` issues two queries (rows + count). Stub
+ * mockSelect to return the rows chain on the first call and a count chain
+ * resolving to `[{ value: total }]` on the second.
+ */
+function stubRowsAndCount(rows: unknown[], total = rows.length) {
+  const rowsChain = makeChain(rows);
+  const countChain = makeChain([{ value: total }]);
+  mockSelect.mockReturnValueOnce(rowsChain).mockReturnValueOnce(countChain);
+  return { rowsChain, countChain };
+}
+
 describe("getReconciliationAuditLog", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    sqlCalls.length = 0;
   });
 
-  it("returns rows in the shape returned by the DB query", async () => {
+  it("returns rows + total + pagination state", async () => {
     const entries = [
       makeEntry({ id: 2, createdAt: new Date("2026-01-05T14:00:00Z") }),
       makeEntry({ id: 1, createdAt: new Date("2026-01-05T12:00:00Z") }),
     ];
-    mockSelect.mockReturnValue(makeChain(entries));
+    stubRowsAndCount(entries, 2);
     const result = await getReconciliationAuditLog();
-    expect(result).toHaveLength(2);
-    expect(result[0].id).toBe(2);
-    expect(result[1].id).toBe(1);
+    expect(result.rows).toHaveLength(2);
+    expect(result.rows[0].id).toBe(2);
+    expect(result.total).toBe(2);
+    expect(result.page).toBe(1);
+    expect(result.pageSize).toBe(50);
+    expect(result.hasMore).toBe(false);
   });
 
-  it("applies gte + lte on createdAt when window is provided", async () => {
-    mockSelect.mockReturnValue(makeChain([]));
+  it("applies a UTC-pinned time filter when window is provided", async () => {
+    stubRowsAndCount([], 0);
     const start = new Date("2026-01-01");
     const end = new Date("2026-01-07");
     await getReconciliationAuditLog({ start, end });
-    expect(mockGte).toHaveBeenCalledWith("created_at", start);
-    expect(mockLte).toHaveBeenCalledWith("created_at", end);
+
+    // The new filter uses `(col AT TIME ZONE 'UTC') >= start` rather than
+    // gte/lte helpers. Confirm two raw-sql calls landed with the right values.
+    const tzFilters = sqlCalls.filter((c) =>
+      c.strings.some((s) => s.includes("AT TIME ZONE 'UTC'")),
+    );
+    expect(tzFilters).toHaveLength(2);
+    expect(tzFilters[0].vals).toContain(start);
+    expect(tzFilters[1].vals).toContain(end);
     expect(mockAnd).toHaveBeenCalled();
   });
 
-  it("omits where clause when no window is provided", async () => {
-    const chain = makeChain([]);
-    mockSelect.mockReturnValue(chain);
+  it("omits the where clause when no window is provided", async () => {
+    const { rowsChain, countChain } = stubRowsAndCount([], 0);
     await getReconciliationAuditLog();
-    // where() should not have been called
-    const whereSpy = chain["where"] as ReturnType<typeof vi.fn>;
-    expect(whereSpy).not.toHaveBeenCalled();
-    expect(mockGte).not.toHaveBeenCalled();
-    expect(mockLte).not.toHaveBeenCalled();
+    expect(rowsChain["where"]).not.toHaveBeenCalled();
+    expect(countChain["where"]).not.toHaveBeenCalled();
   });
 
-  it("respects the limit parameter", async () => {
-    const chain = makeChain([]);
-    mockSelect.mockReturnValue(chain);
-    await getReconciliationAuditLog(undefined, 10);
-    const limitSpy = chain["limit"] as ReturnType<typeof vi.fn>;
-    expect(limitSpy).toHaveBeenCalledWith(10);
+  it("respects an explicit pageSize", async () => {
+    const { rowsChain } = stubRowsAndCount([], 0);
+    await getReconciliationAuditLog(undefined, 1, 10);
+    expect(rowsChain["limit"]).toHaveBeenCalledWith(10);
+    expect(rowsChain["offset"]).toHaveBeenCalledWith(0);
   });
 
-  it("defaults to limit=50 when no limit is provided", async () => {
-    const chain = makeChain([]);
-    mockSelect.mockReturnValue(chain);
+  it("defaults to pageSize=50 when not provided", async () => {
+    const { rowsChain } = stubRowsAndCount([], 0);
     await getReconciliationAuditLog();
-    const limitSpy = chain["limit"] as ReturnType<typeof vi.fn>;
-    expect(limitSpy).toHaveBeenCalledWith(50);
+    expect(rowsChain["limit"]).toHaveBeenCalledWith(50);
   });
 
-  it("returns [] when no rows match the window filter", async () => {
-    mockSelect.mockReturnValue(makeChain([]));
+  it("offsets by (page-1) * pageSize for page > 1", async () => {
+    const { rowsChain } = stubRowsAndCount([], 0);
+    await getReconciliationAuditLog(undefined, 3, 25);
+    expect(rowsChain["offset"]).toHaveBeenCalledWith(50);
+  });
+
+  it("clamps page and pageSize to safe minimums", async () => {
+    const { rowsChain } = stubRowsAndCount([], 0);
+    await getReconciliationAuditLog(undefined, 0, 0);
+    expect(rowsChain["limit"]).toHaveBeenCalledWith(1);
+    expect(rowsChain["offset"]).toHaveBeenCalledWith(0);
+  });
+
+  it("computes hasMore from page * pageSize < total", async () => {
+    stubRowsAndCount(
+      Array.from({ length: 50 }, (_, i) => makeEntry({ id: i })),
+      137,
+    );
+    const result = await getReconciliationAuditLog(undefined, 2, 50);
+    expect(result.total).toBe(137);
+    expect(result.hasMore).toBe(true);
+
+    stubRowsAndCount(
+      Array.from({ length: 37 }, (_, i) => makeEntry({ id: i })),
+      137,
+    );
+    const last = await getReconciliationAuditLog(undefined, 3, 50);
+    expect(last.hasMore).toBe(false);
+  });
+
+  it("returns an empty rows array with total=0 when no rows match the window", async () => {
+    stubRowsAndCount([], 0);
     const window = {
       start: new Date("2026-01-01"),
       end: new Date("2026-01-01"),
     };
     const result = await getReconciliationAuditLog(window);
-    expect(result).toEqual([]);
+    expect(result.rows).toEqual([]);
+    expect(result.total).toBe(0);
   });
 
   it("returned entries carry all expected audit fields", async () => {
@@ -147,15 +202,16 @@ describe("getReconciliationAuditLog", () => {
       winnerId: 42,
       loserIds: [43],
     });
-    mockSelect.mockReturnValue(makeChain([entry]));
-    const [result] = await getReconciliationAuditLog();
-    expect(result.outcome).toBe("merged");
-    expect(result.winnerId).toBe(42);
-    expect(result.loserIds).toEqual([43]);
-    expect(result.clusterSize).toBe(3);
-    expect(result.mergesExecuted).toBeDefined();
-    expect(result.mergesRejected).toBeDefined();
-    expect(result.pairwiseVerifyThrew).toBeDefined();
-    expect(result.createdAt).toBeInstanceOf(Date);
+    stubRowsAndCount([entry], 1);
+    const { rows } = await getReconciliationAuditLog();
+    const [first] = rows;
+    expect(first.outcome).toBe("merged");
+    expect(first.winnerId).toBe(42);
+    expect(first.loserIds).toEqual([43]);
+    expect(first.clusterSize).toBe(3);
+    expect(first.mergesExecuted).toBeDefined();
+    expect(first.mergesRejected).toBeDefined();
+    expect(first.pairwiseVerifyThrew).toBeDefined();
+    expect(first.createdAt).toBeInstanceOf(Date);
   });
 });

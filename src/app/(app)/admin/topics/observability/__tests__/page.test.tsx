@@ -10,6 +10,7 @@ vi.mock("@/lib/observability/resolution-metrics", () => ({
   getSimilarityTrend: vi.fn(),
   detectThresholdDrift: vi.fn(),
   windowFromKey: vi.fn(),
+  SIMILARITY_BUCKET_SIZE: 0.05,
 }));
 
 vi.mock("@/lib/observability/reconciliation-audit", () => ({
@@ -73,7 +74,11 @@ const now = new Date("2026-04-30T12:00:00Z");
 const start7d = new Date("2026-04-23T12:00:00Z");
 
 function setupDefaultMocks() {
-  mockLoader.mockResolvedValue({ window: "7d", granularity: "day" });
+  mockLoader.mockResolvedValue({
+    window: "7d",
+    granularity: "day",
+    auditPage: 1,
+  });
   mockWindowFromKey.mockReturnValue({ start: start7d, end: now });
   mockGetMatchMethodHistogram.mockResolvedValue({
     auto: 50,
@@ -98,7 +103,13 @@ function setupDefaultMocks() {
     total: 100,
     rates: { auto: 0.5, disambig: 0.3, new: 0.2 },
   });
-  mockGetReconciliationAuditLog.mockResolvedValue([]);
+  mockGetReconciliationAuditLog.mockResolvedValue({
+    rows: [],
+    total: 0,
+    page: 1,
+    pageSize: 50,
+    hasMore: false,
+  });
 }
 
 async function renderPage(
@@ -145,14 +156,22 @@ describe("ObservabilityPage", () => {
   });
 
   it("active window link has aria-current='page'", async () => {
-    mockLoader.mockResolvedValue({ window: "7d", granularity: "day" });
+    mockLoader.mockResolvedValue({
+      window: "7d",
+      granularity: "day",
+      auditPage: 1,
+    });
     await renderPage({ window: "7d" });
     const link = screen.getByRole("link", { name: "7 days" });
     expect(link).toHaveAttribute("aria-current", "page");
   });
 
   it("inactive window links do not have aria-current", async () => {
-    mockLoader.mockResolvedValue({ window: "7d", granularity: "day" });
+    mockLoader.mockResolvedValue({
+      window: "7d",
+      granularity: "day",
+      auditPage: 1,
+    });
     await renderPage({ window: "7d" });
     const inactiveLink = screen.getByRole("link", { name: "24 hours" });
     expect(inactiveLink).not.toHaveAttribute("aria-current");
@@ -212,30 +231,59 @@ describe("ObservabilityPage", () => {
   });
 
   it("active granularity chip has aria-current='page'", async () => {
-    mockLoader.mockResolvedValue({ window: "7d", granularity: "day" });
+    mockLoader.mockResolvedValue({
+      window: "7d",
+      granularity: "day",
+      auditPage: 1,
+    });
     await renderPage({ window: "7d" });
     const dayLink = screen.getByRole("link", { name: "Day" });
     expect(dayLink).toHaveAttribute("aria-current", "page");
   });
 
   it("inactive granularity chip does not have aria-current", async () => {
-    mockLoader.mockResolvedValue({ window: "7d", granularity: "day" });
+    mockLoader.mockResolvedValue({
+      window: "7d",
+      granularity: "day",
+      auditPage: 1,
+    });
     await renderPage({ window: "7d" });
     const weekLink = screen.getByRole("link", { name: "Week" });
     expect(weekLink).not.toHaveAttribute("aria-current");
   });
 
   it("window links preserve granularity in href", async () => {
-    mockLoader.mockResolvedValue({ window: "7d", granularity: "week" });
+    mockLoader.mockResolvedValue({
+      window: "7d",
+      granularity: "week",
+      auditPage: 1,
+    });
     await renderPage({ window: "7d", granularity: "week" });
     const link24h = screen.getByRole("link", { name: "24 hours" });
     expect(link24h).toHaveAttribute("href", "?window=24h&granularity=week");
   });
 
   it("granularity links preserve window in href", async () => {
-    mockLoader.mockResolvedValue({ window: "30d", granularity: "day" });
+    mockLoader.mockResolvedValue({
+      window: "30d",
+      granularity: "day",
+      auditPage: 1,
+    });
     await renderPage({ window: "30d" });
     const weekLink = screen.getByRole("link", { name: "Week" });
     expect(weekLink).toHaveAttribute("href", "?window=30d&granularity=week");
+  });
+
+  it("forwards auditPage from search params to the audit-log query", async () => {
+    mockLoader.mockResolvedValue({
+      window: "7d",
+      granularity: "day",
+      auditPage: 3,
+    });
+    await renderPage({ window: "7d", auditPage: "3" });
+    expect(mockGetReconciliationAuditLog).toHaveBeenCalledWith(
+      { start: start7d, end: now },
+      3,
+    );
   });
 });

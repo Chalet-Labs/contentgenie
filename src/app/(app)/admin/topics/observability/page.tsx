@@ -50,8 +50,11 @@ export default async function ObservabilityPage({
 }: {
   searchParams: Record<string, string | string[] | undefined>;
 }) {
-  const { window: windowKey, granularity } =
-    await loadAdminTopicsObservabilitySearchParams(searchParams);
+  const {
+    window: windowKey,
+    granularity,
+    auditPage,
+  } = await loadAdminTopicsObservabilitySearchParams(searchParams);
   const window = windowFromKey(windowKey);
 
   const [
@@ -67,8 +70,11 @@ export default async function ObservabilityPage({
     getDisambigForcedCount(window),
     getMatchMethodTrend(window, granularity),
     getSimilarityTrend(window, granularity),
-    getReconciliationAuditLog(window),
+    getReconciliationAuditLog(window, auditPage),
   ]);
+
+  const buildAuditHref = (nextPage: number) =>
+    `?window=${windowKey}&granularity=${granularity}&auditPage=${nextPage}`;
 
   // Drift derives from the same match-method histogram already fetched above —
   // pass it in instead of issuing a duplicate query.
@@ -242,7 +248,14 @@ export default async function ObservabilityPage({
           <CardTitle>Reconciliation audit log</CardTitle>
         </CardHeader>
         <CardContent>
-          <ReconciliationAuditTable entries={auditLog} />
+          <ReconciliationAuditTable
+            entries={auditLog.rows}
+            page={auditLog.page}
+            pageSize={auditLog.pageSize}
+            total={auditLog.total}
+            hasMore={auditLog.hasMore}
+            pageHref={buildAuditHref}
+          />
         </CardContent>
       </Card>
     </div>

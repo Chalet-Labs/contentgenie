@@ -76,6 +76,13 @@ const allOutcomes: ReconciliationAuditEntry[] = [
   }),
 ];
 
+const defaultPaginationArgs = {
+  page: 1,
+  pageSize: 50,
+  hasMore: false,
+  pageHref: (p: number) => `?auditPage=${p}`,
+};
+
 const meta: Meta<typeof ReconciliationAuditTable> = {
   title: "Admin/Observability/ReconciliationAuditTable",
   component: ReconciliationAuditTable,
@@ -88,7 +95,11 @@ export default meta;
 type Story = StoryObj<typeof ReconciliationAuditTable>;
 
 export const AllOutcomes: Story = {
-  args: { entries: allOutcomes },
+  args: {
+    entries: allOutcomes,
+    total: allOutcomes.length,
+    ...defaultPaginationArgs,
+  },
 };
 
 export const SingleMerged: Story = {
@@ -102,9 +113,22 @@ export const SingleMerged: Story = {
         mergesRejected: 0,
       }),
     ],
+    total: 1,
+    ...defaultPaginationArgs,
   },
 };
 
 export const Empty: Story = {
-  args: { entries: [] },
+  args: { entries: [], total: 0, ...defaultPaginationArgs },
+};
+
+export const WithPagination: Story = {
+  args: {
+    entries: allOutcomes,
+    total: 137,
+    page: 2,
+    pageSize: 50,
+    hasMore: true,
+    pageHref: (p: number) => `?auditPage=${p}`,
+  },
 };
