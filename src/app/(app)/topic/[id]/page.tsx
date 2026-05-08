@@ -75,7 +75,12 @@ export default async function TopicPage({
     requestHeaders.get("Next-Router-Prefetch") === "1" ||
     requestHeaders.get("next-router-prefetch") === "1";
 
-  let showDigestPanel = digest !== null;
+  // Render the digest panel for any eligible+active topic, even on prefetch —
+  // otherwise the cached prefetch RSC payload renders <TopicEmptyState>
+  // ("More coverage needed") for a topic that actually qualifies, and the
+  // cached payload is reused on click within the App Router router-cache TTL.
+  let showDigestPanel =
+    digest !== null || (eligibleForDigest && canonical.status === "active");
   let initialRunId: string | null = null;
   let initialAccessToken: string | null = null;
   let autoTriggerError: string | null = null;

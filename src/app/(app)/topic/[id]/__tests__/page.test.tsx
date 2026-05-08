@@ -95,8 +95,11 @@ vi.mock("@/lib/search-params/topic-detail", () => ({
 }));
 
 // Stub next/headers — page calls headers() to check prefetch header.
+const mockHeadersGet = vi.hoisted(() =>
+  vi.fn((_: string) => null as string | null),
+);
 vi.mock("next/headers", () => ({
-  headers: vi.fn(() => ({ get: (_: string) => null })),
+  headers: () => ({ get: mockHeadersGet }),
 }));
 
 import TopicPage from "@/app/(app)/topic/[id]/page";
@@ -179,6 +182,7 @@ function makeDetailData(
 describe("TopicPage", () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    mockHeadersGet.mockImplementation((_: string) => null);
     mockGetTopicDetailData.mockResolvedValue({
       success: true,
       data: makeDetailData(),
@@ -533,6 +537,34 @@ describe("TopicPage", () => {
     render(jsx as React.ReactElement);
     // Dormant topics skip auto-trigger; showDigestPanel stays false → empty state
     expect(screen.getByText(/more coverage needed/i)).toBeInTheDocument();
+    expect(mockTriggerTopicDigestRefresh).not.toHaveBeenCalled();
+  });
+
+  it("renders digest panel (not empty state) on prefetch for eligible+active topic", async () => {
+    // App Router caches the prefetched RSC payload and reuses it on click.
+    // If the prefetch payload renders <TopicEmptyState>, the cached "More
+    // coverage needed" copy is served on click — misleading for an eligible
+    // topic. Panel must render even when the auto-trigger is gated off.
+    mockHeadersGet.mockImplementation((name: string) =>
+      name === "Next-Router-Prefetch" ? "1" : null,
+    );
+    mockNextTopicRow.mockResolvedValueOnce(
+      makeTopic({ status: "active", mergedIntoId: null }),
+    );
+    mockGetTopicDetailData.mockResolvedValueOnce({
+      success: true,
+      data: makeDetailData({
+        completedSummaryCount: MIN_DERIVED_COUNT_FOR_DIGEST + 2,
+        digest: null,
+      }),
+    });
+    const jsx = await TopicPage({
+      params: { id: "1" },
+      searchParams: {},
+    });
+    render(jsx as React.ReactElement);
+    expect(screen.getByText(/topic synthesis/i)).toBeInTheDocument();
+    expect(screen.queryByText(/more coverage needed/i)).not.toBeInTheDocument();
     expect(mockTriggerTopicDigestRefresh).not.toHaveBeenCalled();
   });
 
