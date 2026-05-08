@@ -18,6 +18,7 @@ import {
   DRIFT_DISAMBIG_RATE_WARN,
   type DriftStatus,
 } from "@/lib/observability/drift-thresholds";
+import { buildUtcWindowFilter } from "@/lib/observability/window-filter";
 import {
   SIMILARITY_BUCKET_SIZE,
   type SimilarityBucket,
@@ -86,21 +87,12 @@ export function windowFromKey(key: WindowKey): { start: Date; end: Date } {
   return { start, end: now };
 }
 
+// Filter on `updatedAt` (advances to now() on every ON CONFLICT DO UPDATE
+// in `insertJunction`) so retries and recovery-path re-resolutions land in the
+// window where they were observed, not the window of the first write — see
+// ADR-047 §"Schema" and entity-resolution.ts insertJunction.
 function buildTimeFilter(window?: { start: Date; end: Date }) {
-  if (!window) return undefined;
-  // Filter on `updatedAt` (advances to now() on every ON CONFLICT DO UPDATE
-  // in `insertJunction`) so retries and recovery-path re-resolutions land
-  // in the window where they were observed, not the window of the first
-  // write — see ADR-047 §"Schema" and entity-resolution.ts insertJunction.
-  //
-  // `updatedAt` is `timestamp without time zone`; reinterpret as UTC before
-  // comparing so the window math is independent of session TZ. JS `Date`
-  // bounds are sent by the driver with `+00`, matching the wrapped column.
-  const col = episodeCanonicalTopics.updatedAt;
-  return and(
-    sql`(${col} AT TIME ZONE 'UTC') >= ${window.start}`,
-    sql`(${col} AT TIME ZONE 'UTC') <= ${window.end}`,
-  );
+  return buildUtcWindowFilter(episodeCanonicalTopics.updatedAt, window);
 }
 
 /**

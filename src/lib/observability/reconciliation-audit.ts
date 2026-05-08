@@ -2,8 +2,9 @@ import "server-only";
 
 import { db } from "@/db";
 import { reconciliationLog } from "@/db/schema";
-import { desc, sql, and, count } from "drizzle-orm";
+import { desc, count } from "drizzle-orm";
 import type { ReconciliationLog } from "@/db/schema";
+import { buildUtcWindowFilter } from "@/lib/observability/window-filter";
 
 export type { WindowKey } from "@/lib/search-params/admin-topics-observability";
 
@@ -18,17 +19,6 @@ export interface ReconciliationAuditPage {
 }
 
 export const DEFAULT_AUDIT_PAGE_SIZE = 50;
-
-function buildAuditTimeFilter(window?: { start: Date; end: Date }) {
-  if (!window) return undefined;
-  // `createdAt` is `timestamp without time zone`; reinterpret as UTC before
-  // comparing so the window math is independent of session TZ.
-  const col = reconciliationLog.createdAt;
-  return and(
-    sql`(${col} AT TIME ZONE 'UTC') >= ${window.start}`,
-    sql`(${col} AT TIME ZONE 'UTC') <= ${window.end}`,
-  );
-}
 
 /**
  * Returns a page of per-cluster audit rows for the given time window, ordered
@@ -46,7 +36,7 @@ export async function getReconciliationAuditLog(
 ): Promise<ReconciliationAuditPage> {
   const safePage = Math.max(1, Math.floor(page));
   const safePageSize = Math.max(1, Math.floor(pageSize));
-  const timeFilter = buildAuditTimeFilter(window);
+  const timeFilter = buildUtcWindowFilter(reconciliationLog.createdAt, window);
 
   const baseCount = db.select({ value: count() }).from(reconciliationLog);
   const filteredCount = timeFilter ? baseCount.where(timeFilter) : baseCount;

@@ -675,7 +675,12 @@ export const reconciliationLog = pgTable(
   (table) => [
     index("rl_run_id_idx").on(table.runId),
     index("rl_winner_id_idx").on(table.winnerId),
-    index("rl_created_at_idx").on(sql`${table.createdAt} DESC`),
+    // Expression index matches `(created_at AT TIME ZONE 'UTC')` predicates
+    // built by `buildUtcWindowFilter` so window scans on the audit table stay
+    // index-eligible. Pinning to UTC keeps the index immutable.
+    index("rl_created_at_idx").on(
+      sql`(${table.createdAt} AT TIME ZONE 'UTC') DESC`,
+    ),
     check(
       "rl_outcome_enum",
       sql`${table.outcome} IN ('merged', 'partial', 'rejected', 'skipped', 'failed')`,
