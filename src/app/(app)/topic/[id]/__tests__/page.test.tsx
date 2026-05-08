@@ -659,4 +659,42 @@ describe("TopicPage", () => {
       TopicPage({ params: { id: "1" }, searchParams: {} }),
     ).rejects.toThrow("NEXT_NOT_FOUND");
   });
+
+  it("renders cached digest even when current count has fallen below threshold", async () => {
+    // Codex P2: a topic that previously qualified and has a stored digest
+    // should keep showing it even after an episode is unlinked or summary is
+    // reset. The eligibility gate must apply to the auto-trigger only, not to
+    // rendering an existing digest.
+    mockNextTopicRow.mockResolvedValueOnce(
+      makeTopic({ status: "active", mergedIntoId: null }),
+    );
+    mockGetTopicDetailData.mockResolvedValueOnce({
+      success: true,
+      data: makeDetailData({
+        completedSummaryCount: MIN_DERIVED_COUNT_FOR_DIGEST - 1,
+        canonical: {
+          completedSummaryCount: MIN_DERIVED_COUNT_FOR_DIGEST - 1,
+        },
+        digest: {
+          id: 9,
+          digestMarkdown: "# md",
+          consensusPoints: ["Stored consensus from past run"],
+          disagreementPoints: [],
+          episodeCountAtGeneration: MIN_DERIVED_COUNT_FOR_DIGEST + 2,
+          modelUsed: "gpt-x",
+          generatedAt: new Date(),
+        },
+      }),
+    });
+    const jsx = await TopicPage({
+      params: { id: "1" },
+      searchParams: {},
+    });
+    render(jsx as React.ReactElement);
+    expect(
+      screen.getByText("Stored consensus from past run"),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/more coverage needed/i)).not.toBeInTheDocument();
+    expect(mockTriggerTopicDigestRefresh).not.toHaveBeenCalled();
+  });
 });

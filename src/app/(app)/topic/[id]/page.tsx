@@ -156,7 +156,7 @@ export default async function TopicPage({
         </CardContent>
       </Card>
 
-      {eligibleForDigest && showDigestPanel ? (
+      {showDigestPanel ? (
         <TopicDigestPanel
           canonicalTopicId={canonical.id}
           initialDigest={digest}
