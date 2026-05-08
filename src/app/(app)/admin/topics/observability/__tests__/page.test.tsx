@@ -68,13 +68,25 @@ const mockGetSimilarityTrend = vi.mocked(getSimilarityTrend);
 const mockDetectThresholdDrift = vi.mocked(detectThresholdDrift);
 const mockGetReconciliationAuditLog = vi.mocked(getReconciliationAuditLog);
 const mockWindowFromKey = vi.mocked(windowFromKey);
-const mockLoader = vi.mocked(loadAdminTopicsObservabilitySearchParams);
+// Cast through `unknown` because nuqs' `createLoader` overloads `vi.mocked`
+// onto the async Promise-returning signature, but the page consumes the sync
+// overload (plain `Record` input → plain object output). The cast lets the
+// mock return the same sync shape the production code reads.
+const mockLoader = vi.mocked(
+  loadAdminTopicsObservabilitySearchParams,
+) as unknown as {
+  mockReturnValue: (v: {
+    window: "24h" | "7d" | "30d";
+    granularity: "day" | "week";
+    auditPage: number;
+  }) => void;
+};
 
 const now = new Date("2026-04-30T12:00:00Z");
 const start7d = new Date("2026-04-23T12:00:00Z");
 
 function setupDefaultMocks() {
-  mockLoader.mockResolvedValue({
+  mockLoader.mockReturnValue({
     window: "7d",
     granularity: "day",
     auditPage: 1,
@@ -156,7 +168,7 @@ describe("ObservabilityPage", () => {
   });
 
   it("active window link has aria-current='page'", async () => {
-    mockLoader.mockResolvedValue({
+    mockLoader.mockReturnValue({
       window: "7d",
       granularity: "day",
       auditPage: 1,
@@ -167,7 +179,7 @@ describe("ObservabilityPage", () => {
   });
 
   it("inactive window links do not have aria-current", async () => {
-    mockLoader.mockResolvedValue({
+    mockLoader.mockReturnValue({
       window: "7d",
       granularity: "day",
       auditPage: 1,
@@ -231,7 +243,7 @@ describe("ObservabilityPage", () => {
   });
 
   it("active granularity chip has aria-current='page'", async () => {
-    mockLoader.mockResolvedValue({
+    mockLoader.mockReturnValue({
       window: "7d",
       granularity: "day",
       auditPage: 1,
@@ -242,7 +254,7 @@ describe("ObservabilityPage", () => {
   });
 
   it("inactive granularity chip does not have aria-current", async () => {
-    mockLoader.mockResolvedValue({
+    mockLoader.mockReturnValue({
       window: "7d",
       granularity: "day",
       auditPage: 1,
@@ -253,7 +265,7 @@ describe("ObservabilityPage", () => {
   });
 
   it("window links preserve granularity in href", async () => {
-    mockLoader.mockResolvedValue({
+    mockLoader.mockReturnValue({
       window: "7d",
       granularity: "week",
       auditPage: 1,
@@ -264,7 +276,7 @@ describe("ObservabilityPage", () => {
   });
 
   it("granularity links preserve window in href", async () => {
-    mockLoader.mockResolvedValue({
+    mockLoader.mockReturnValue({
       window: "30d",
       granularity: "day",
       auditPage: 1,
@@ -275,7 +287,7 @@ describe("ObservabilityPage", () => {
   });
 
   it("forwards auditPage from search params to the audit-log query", async () => {
-    mockLoader.mockResolvedValue({
+    mockLoader.mockReturnValue({
       window: "7d",
       granularity: "day",
       auditPage: 3,

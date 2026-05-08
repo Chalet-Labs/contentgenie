@@ -54,7 +54,7 @@ export default async function ObservabilityPage({
     window: windowKey,
     granularity,
     auditPage,
-  } = await loadAdminTopicsObservabilitySearchParams(searchParams);
+  } = loadAdminTopicsObservabilitySearchParams(searchParams);
   const window = windowFromKey(windowKey);
 
   const [
