@@ -1,5 +1,23 @@
 import type { ReconcileSummary } from "@/trigger/helpers/reconcile-canonicals";
 
+/**
+ * Per-cluster audit data collected during reconciliation (ADR-053 §1).
+ * Matches `NewReconciliationLog` minus `id`, `runId`, and `createdAt`
+ * (those are added by the DB insertion layer in T3).
+ */
+export interface ClusterAuditRow {
+  clusterIndex: number;
+  clusterSize: number;
+  winnerId: number | null;
+  loserIds: number[];
+  verifiedLoserIds: number[];
+  rejectedLoserIds: number[];
+  mergesExecuted: number;
+  mergesRejected: number;
+  pairwiseVerifyThrew: number;
+  outcome: "merged" | "partial" | "rejected" | "skipped" | "failed";
+}
+
 type State = Omit<ReconcileSummary, "durationMs">;
 
 export class ReconcileSummaryAccumulator {
@@ -17,7 +35,12 @@ export class ReconcileSummaryAccumulator {
     pairwiseVerifyRejected: 0,
     dormancyTransitions: 0,
     episodeCountDrift: 0,
+    clusterAudits: [],
   };
+
+  recordClusterAudit(row: ClusterAuditRow): void {
+    this.state.clusterAudits.push(row);
+  }
 
   clusterSeen(): void {
     this.state.clustersSeen++;
@@ -60,6 +83,20 @@ export class ReconcileSummaryAccumulator {
   }
 
   freeze(durationMs: number): ReconcileSummary {
-    return { ...this.state, durationMs };
+    // Deep-copy clusterAudits so callers can iterate, sort, OR mutate row
+    // fields and arrays without leaking back into accumulator state (or into
+    // earlier freeze() returns). The row shape is flat — primitive fields
+    // plus three integer arrays — so a manual spread + array clone covers
+    // the full surface without the overhead of structuredClone.
+    return {
+      ...this.state,
+      clusterAudits: this.state.clusterAudits.map((row) => ({
+        ...row,
+        loserIds: [...row.loserIds],
+        verifiedLoserIds: [...row.verifiedLoserIds],
+        rejectedLoserIds: [...row.rejectedLoserIds],
+      })),
+      durationMs,
+    };
   }
 }

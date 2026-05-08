@@ -50,7 +50,10 @@ import {
   decayStaleCanonicals,
   fetchActiveCanonicals,
 } from "@/trigger/helpers/reconcile-canonicals-db";
-import { ReconcileSummaryAccumulator } from "@/trigger/helpers/reconcile-summary-accumulator";
+import {
+  ReconcileSummaryAccumulator,
+  type ClusterAuditRow,
+} from "@/trigger/helpers/reconcile-summary-accumulator";
 
 /** Minimal logger shape — compatible with `@trigger.dev/sdk`'s `logger` and a vi.fn() fake. */
 export interface ReconcileLogger {
@@ -91,8 +94,10 @@ export interface ReconcileSummary {
   mergesFailed: number;
   /**
    * Cluster-level: incremented at most once per cluster, and only when the
-   * cluster ended with ≥1 rejected pair AND zero verified losers (the
-   * cluster's grouping claim was rejected outright). ADR-050 §2.
+   * cluster ended with ≥1 verify signal (model `same_entity=false` OR an infra
+   * throw) AND zero verified losers (the cluster's grouping claim was rejected
+   * outright, even if rejection came from infra throws rather than the model).
+   * ADR-050 §2.
    */
   mergesRejectedByPairwise: number;
   mergesSkippedAlreadyMerged: number;
@@ -104,6 +109,8 @@ export interface ReconcileSummary {
   /** Sum of `(postCount - preCount)` across affected winners. ADR-050 §4. */
   episodeCountDrift: number;
   durationMs: number;
+  /** Per-cluster audit rows collected during this run (ADR-053 §1). */
+  clusterAudits: ClusterAuditRow[];
 }
 
 /**
@@ -206,15 +213,21 @@ interface ClusterState {
   affectedWinners: Set<number>;
 }
 
-/** Phase 5 — merge each verified loser. Mutates the shared cross-cluster state + accumulator. */
+/**
+ * Phase 5 — merge each verified loser. Mutates the shared cross-cluster state +
+ * accumulator. Returns the number of losers newly merged in this call so the
+ * caller can derive the per-cluster `mergesExecuted` count without cloning the
+ * cross-run `mergedLoserIds` set.
+ */
 async function mergeVerifiedLosers(
   deps: Pick<ReconcileDeps, "db" | "mergeCanonicals" | "logger">,
   winnerId: number,
   verifiedLoserIds: readonly number[],
   state: ClusterState,
   accum: ReconcileSummaryAccumulator,
-): Promise<void> {
+): Promise<number> {
   const { mergedLoserIds, preMergeCounts, affectedWinners } = state;
+  let mergesExecuted = 0;
 
   for (const loserId of verifiedLoserIds) {
     if (mergedLoserIds.has(loserId)) {
@@ -237,6 +250,7 @@ async function mergeVerifiedLosers(
       mergedLoserIds.add(loserId);
       affectedWinners.add(winnerId);
       accum.mergeSucceeded();
+      mergesExecuted++;
     } catch (err) {
       accum.mergeFailed();
       deps.logger.warn("reconcile_merge_failed", {
@@ -246,6 +260,8 @@ async function mergeVerifiedLosers(
       });
     }
   }
+
+  return mergesExecuted;
 }
 
 /** Phase 6 — compute true episode-count delta (post − pre) across affected winners. */
@@ -304,6 +320,9 @@ function membersOf(
  * Execute phases 3–5 for a single cluster. Contains the per-cluster try/catch
  * so a winner-pick or verify throw never aborts the entire pipeline.
  * `clusterSeen()` is called by the orchestrator before this function.
+ *
+ * Calls `accum.recordClusterAudit(...)` exactly once per invocation, including
+ * all early-return and catch paths (ADR-053 §1).
  */
 async function runCluster(
   deps: ReconcileDeps,
@@ -315,17 +334,69 @@ async function runCluster(
 ): Promise<void> {
   let currentPhase: "winner_pick" | "pairwise_verify" | "merge" = "winner_pick";
   let clusterWinnerId: number | null = null;
+  // Default to the full cluster so the catch path preserves membership when
+  // pickWinner throws before a winner/loser split has been computed. Narrowed
+  // to `cluster.filter(id => id !== winnerId)` once a winner is known.
+  let perClusterLosers: number[] = cluster;
+  let perClusterVerifiedLosers: number[] = [];
+  let perClusterRejectedLosers: number[] = [];
+  let perClusterMergesExecuted = 0;
+  let perClusterMergesRejected = 0;
+  let perClusterPairwiseThrew = 0;
 
   try {
     const members = membersOf(cluster, rowsById);
-    if (members.length < 2) return;
+    if (members.length < 2) {
+      accum.recordClusterAudit({
+        clusterIndex,
+        clusterSize: cluster.length,
+        winnerId: null,
+        // No winner was picked for this cluster; persist the full member list
+        // under loserIds so the durable audit row preserves cluster membership
+        // for debugging, instead of dropping it on the floor.
+        loserIds: cluster,
+        verifiedLoserIds: [],
+        rejectedLoserIds: [],
+        mergesExecuted: 0,
+        mergesRejected: 0,
+        pairwiseVerifyThrew: 0,
+        outcome: "skipped",
+      });
+      return;
+    }
 
     const pick = await pickWinner(deps, cluster, members);
-    if (pick.kind === "skip") return;
+    if (pick.kind === "skip") {
+      accum.recordClusterAudit({
+        clusterIndex,
+        clusterSize: cluster.length,
+        winnerId: null,
+        loserIds: cluster,
+        verifiedLoserIds: [],
+        rejectedLoserIds: [],
+        mergesExecuted: 0,
+        mergesRejected: 0,
+        pairwiseVerifyThrew: 0,
+        outcome: "skipped",
+      });
+      return;
+    }
     const { winnerId } = pick;
 
     if (state.mergedLoserIds.has(winnerId)) {
       accum.clusterSkippedWinnerAlreadyMerged();
+      accum.recordClusterAudit({
+        clusterIndex,
+        clusterSize: cluster.length,
+        winnerId,
+        loserIds: cluster.filter((id) => id !== winnerId),
+        verifiedLoserIds: [],
+        rejectedLoserIds: [],
+        mergesExecuted: 0,
+        mergesRejected: 0,
+        pairwiseVerifyThrew: 0,
+        outcome: "skipped",
+      });
       return;
     }
     clusterWinnerId = winnerId;
@@ -338,29 +409,87 @@ async function runCluster(
         winnerId,
         memberIds: cluster,
       });
+      accum.recordClusterAudit({
+        clusterIndex,
+        clusterSize: cluster.length,
+        winnerId,
+        loserIds: cluster.filter((id) => id !== winnerId),
+        verifiedLoserIds: [],
+        rejectedLoserIds: [],
+        mergesExecuted: 0,
+        mergesRejected: 0,
+        pairwiseVerifyThrew: 0,
+        outcome: "failed",
+      });
       return;
     }
 
     currentPhase = "pairwise_verify";
     const losers = cluster.filter((id) => id !== winnerId);
+    perClusterLosers = losers;
     const verify = await verifyLosers(deps, winner, losers, rowsById);
     accum.pairwiseVerifyThrew(verify.pairwiseVerifyThrew);
     accum.pairwiseVerifyRejected(verify.pairwiseVerifyRejected);
-    if (
-      verify.pairwiseVerifyRejected > 0 &&
-      verify.verifiedLoserIds.length === 0
-    ) {
+
+    perClusterVerifiedLosers = [...verify.verifiedLoserIds];
+    // perClusterRejectedLosers = losers \ verifiedLoserIds: includes both
+    // model-verdict rejections AND infra throws (a thrown loser never reaches
+    // verifiedLoserIds). perClusterMergesRejected = pairwiseVerifyRejected:
+    // only model-verdict rejections, not throws. So a loser that threw appears
+    // in rejectedLoserIds but NOT in mergesRejected (it surfaces in
+    // pairwiseVerifyThrew instead).
+    const verifiedSet = new Set(verify.verifiedLoserIds);
+    perClusterRejectedLosers = losers.filter((id) => !verifiedSet.has(id));
+    perClusterPairwiseThrew = verify.pairwiseVerifyThrew;
+    perClusterMergesRejected = verify.pairwiseVerifyRejected;
+
+    // ADR-050 §2 + ADR-053 §1: a cluster is "rejected" when at least one
+    // verify call gave a verdict (model `same_entity=false` OR an infra throw)
+    // AND none of the losers passed verify. Throws are an infra signal that
+    // still preserves the R3 over-merge guard, so they count toward rejection.
+    const wasRejectedByPairwise =
+      verify.pairwiseVerifyRejected + verify.pairwiseVerifyThrew > 0 &&
+      verify.verifiedLoserIds.length === 0;
+
+    if (wasRejectedByPairwise) {
       accum.clusterRejectedByPairwise();
     }
 
     currentPhase = "merge";
-    await mergeVerifiedLosers(
+    perClusterMergesExecuted = await mergeVerifiedLosers(
       deps,
       winnerId,
       verify.verifiedLoserIds,
       state,
       accum,
     );
+
+    // Derive per-cluster outcome (ADR-053 §1)
+    let outcome: ClusterAuditRow["outcome"];
+    if (wasRejectedByPairwise) {
+      outcome = "rejected";
+    } else if (
+      perClusterMergesExecuted === perClusterVerifiedLosers.length &&
+      perClusterRejectedLosers.length === 0 &&
+      perClusterPairwiseThrew === 0
+    ) {
+      outcome = "merged";
+    } else {
+      outcome = "partial";
+    }
+
+    accum.recordClusterAudit({
+      clusterIndex,
+      clusterSize: cluster.length,
+      winnerId,
+      loserIds: perClusterLosers,
+      verifiedLoserIds: perClusterVerifiedLosers,
+      rejectedLoserIds: perClusterRejectedLosers,
+      mergesExecuted: perClusterMergesExecuted,
+      mergesRejected: perClusterMergesRejected,
+      pairwiseVerifyThrew: perClusterPairwiseThrew,
+      outcome,
+    });
   } catch (err) {
     accum.clusterFailed();
     deps.logger.warn("reconcile_cluster_failed", {
@@ -369,6 +498,18 @@ async function runCluster(
       memberIds: cluster,
       winnerId: clusterWinnerId,
       error: err instanceof Error ? err.message : String(err),
+    });
+    accum.recordClusterAudit({
+      clusterIndex,
+      clusterSize: cluster.length,
+      winnerId: clusterWinnerId,
+      loserIds: perClusterLosers,
+      verifiedLoserIds: perClusterVerifiedLosers,
+      rejectedLoserIds: perClusterRejectedLosers,
+      mergesExecuted: perClusterMergesExecuted,
+      mergesRejected: perClusterMergesRejected,
+      pairwiseVerifyThrew: perClusterPairwiseThrew,
+      outcome: "failed",
     });
   }
 }
@@ -436,6 +577,23 @@ export async function runReconciliation(
     if (now().getTime() - startMs > RECONCILE_BUDGET_MS) {
       const remaining = clusters.length - i;
       accum.clusterDeferred(remaining);
+      // Persist a per-cluster audit row for each deferred cluster so the
+      // durable reconciliation_log keeps membership info for clusters the
+      // budget skipped — `clustersDeferred` only carries the count.
+      for (let j = i; j < clusters.length; j++) {
+        accum.recordClusterAudit({
+          clusterIndex: j,
+          clusterSize: clusters[j].length,
+          winnerId: null,
+          loserIds: clusters[j],
+          verifiedLoserIds: [],
+          rejectedLoserIds: [],
+          mergesExecuted: 0,
+          mergesRejected: 0,
+          pairwiseVerifyThrew: 0,
+          outcome: "skipped",
+        });
+      }
       logger.warn("reconcile_budget_exhausted", {
         processed: i,
         deferred: remaining,
