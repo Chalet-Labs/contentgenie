@@ -22,7 +22,7 @@ function formatCoverage(score: number): string {
 }
 
 function buildEpisodeHref(episode: TopicEpisode): string {
-  return `/episode/${episode.id}`;
+  return `/episode/${episode.podcastIndexEpisodeId}`;
 }
 
 export function TopicEpisodeList({ episodes }: TopicEpisodeListProps) {

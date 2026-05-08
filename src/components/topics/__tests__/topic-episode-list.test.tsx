@@ -125,7 +125,7 @@ describe("TopicEpisodeList", () => {
     expect(mockRefresh).not.toHaveBeenCalled();
   });
 
-  it("row link points to /episode/<id>", () => {
+  it("row link points to /episode/<podcastIndexEpisodeId>", () => {
     render(
       <TopicEpisodeList
         episodes={[
@@ -138,7 +138,7 @@ describe("TopicEpisodeList", () => {
       />,
     );
     const link = screen.getByRole("link", { name: /Episode title/ });
-    expect(link).toHaveAttribute("href", "/episode/42");
+    expect(link).toHaveAttribute("href", "/episode/pi-42");
   });
 
   it("renders 'All caught up' message when filter is on and result is empty", () => {
