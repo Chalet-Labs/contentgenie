@@ -170,6 +170,7 @@ export default async function TopicPage({
           label={canonical.label}
           summarizedCount={canonical.completedSummaryCount}
           totalEpisodeCount={canonical.episodeCount}
+          dormant={canonical.status === "dormant" && eligibleForDigest}
         />
       )}
 

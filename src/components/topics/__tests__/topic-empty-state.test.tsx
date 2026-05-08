@@ -62,4 +62,38 @@ describe("TopicEmptyState", () => {
       screen.getByRole("heading", { name: /more coverage needed/i }),
     ).toBeInTheDocument();
   });
+
+  it("renders dormant copy when dormant=true (above threshold)", () => {
+    render(
+      <TopicEmptyState
+        label="Old topic"
+        summarizedCount={5}
+        totalEpisodeCount={5}
+        dormant
+      />,
+    );
+    expect(
+      screen.getByRole("heading", { name: /topic dormant/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText(/synthesis unlocks at \d+ summaries\.?$/i),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByText(/no longer active so synthesis is paused/i),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/Old topic/)).toBeInTheDocument();
+  });
+
+  it("renders default 'more coverage needed' copy when dormant is omitted", () => {
+    render(
+      <TopicEmptyState
+        label="Topic"
+        summarizedCount={1}
+        totalEpisodeCount={3}
+      />,
+    );
+    expect(
+      screen.queryByRole("heading", { name: /topic dormant/i }),
+    ).not.toBeInTheDocument();
+  });
 });

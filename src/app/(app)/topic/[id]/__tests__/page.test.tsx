@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 
 // next/navigation's notFound() and permanentRedirect() throw internally —
 // replicate that here so control flow halts.
@@ -518,7 +518,7 @@ describe("TopicPage", () => {
     expect(mockTriggerTopicDigestRefresh).not.toHaveBeenCalled();
   });
 
-  it("renders empty state (not digest panel) for dormant topic that is eligible but has no cached digest", async () => {
+  it("renders dormant-paused copy (not threshold copy) for dormant topic that is eligible but has no cached digest", async () => {
     mockNextTopicRow.mockResolvedValueOnce(
       makeTopic({ status: "dormant", mergedIntoId: null }),
     );
@@ -535,16 +535,42 @@ describe("TopicPage", () => {
       searchParams: {},
     });
     render(jsx as React.ReactElement);
-    // Dormant topics skip auto-trigger; showDigestPanel stays false → empty state
+    // Eligible-but-dormant must NOT render threshold copy — that's misleading
+    // when summarizedCount already exceeds the threshold.
+    expect(
+      screen.getByRole("heading", { name: /topic dormant/i }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/more coverage needed/i)).not.toBeInTheDocument();
+    expect(mockTriggerTopicDigestRefresh).not.toHaveBeenCalled();
+  });
+
+  it("renders threshold copy when summarized count is below threshold (active topic)", async () => {
+    mockNextTopicRow.mockResolvedValueOnce(
+      makeTopic({ status: "active", mergedIntoId: null }),
+    );
+    mockGetTopicDetailData.mockResolvedValueOnce({
+      success: true,
+      data: makeDetailData({
+        completedSummaryCount: MIN_DERIVED_COUNT_FOR_DIGEST - 1,
+        canonical: {
+          completedSummaryCount: MIN_DERIVED_COUNT_FOR_DIGEST - 1,
+        },
+        digest: null,
+      }),
+    });
+    const jsx = await TopicPage({
+      params: { id: "1" },
+      searchParams: {},
+    });
+    render(jsx as React.ReactElement);
     expect(screen.getByText(/more coverage needed/i)).toBeInTheDocument();
     expect(mockTriggerTopicDigestRefresh).not.toHaveBeenCalled();
   });
 
-  it("renders digest panel (not empty state) on prefetch for eligible+active topic", async () => {
+  it("renders digest panel (not empty state) on prefetch for eligible+active topic; panel auto-triggers on hydration", async () => {
     // App Router caches the prefetched RSC payload and reuses it on click.
-    // If the prefetch payload renders <TopicEmptyState>, the cached "More
-    // coverage needed" copy is served on click — misleading for an eligible
-    // topic. Panel must render even when the auto-trigger is gated off.
+    // Server skips the trigger to avoid fan-out; the panel's mount-time
+    // useEffect fires the trigger when the cached payload hydrates.
     mockHeadersGet.mockImplementation((name: string) =>
       name === "Next-Router-Prefetch" ? "1" : null,
     );
@@ -558,6 +584,10 @@ describe("TopicPage", () => {
         digest: null,
       }),
     });
+    mockTriggerTopicDigestRefresh.mockResolvedValueOnce({
+      success: true,
+      data: { status: "ineligible" },
+    });
     const jsx = await TopicPage({
       params: { id: "1" },
       searchParams: {},
@@ -565,7 +595,13 @@ describe("TopicPage", () => {
     render(jsx as React.ReactElement);
     expect(screen.getByText(/topic synthesis/i)).toBeInTheDocument();
     expect(screen.queryByText(/more coverage needed/i)).not.toBeInTheDocument();
-    expect(mockTriggerTopicDigestRefresh).not.toHaveBeenCalled();
+    // Server-side trigger gated off; client-side useEffect fires it instead.
+    await waitFor(() =>
+      expect(mockTriggerTopicDigestRefresh).toHaveBeenCalledWith({
+        canonicalTopicId: 1,
+      }),
+    );
+    expect(mockTriggerTopicDigestRefresh).toHaveBeenCalledTimes(1);
   });
 
   it("renders digest panel with refetched digest after cached auto-trigger response", async () => {

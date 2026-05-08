@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useRealtimeRun } from "@trigger.dev/react-hooks";
 import { toast } from "sonner";
@@ -103,6 +103,7 @@ export function TopicDigestPanel({
     return { kind: "idle" };
   });
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const autoTriggeredRef = useRef(false);
 
   const runId = state.kind === "loading" ? state.runId : "";
   const accessToken = state.kind === "loading" ? state.accessToken : "";
@@ -184,6 +185,22 @@ export function TopicDigestPanel({
       setIsRefreshing(false);
     }
   };
+
+  // Auto-trigger on mount when the panel renders without a server-initiated
+  // run. Covers the prefetched-payload-reused-on-click path: server skipped
+  // the trigger to avoid fan-out, but the cached RSC payload is what the user
+  // actually sees, so kick the run client-side instead of stranding them on
+  // an empty synthesis card.
+  useEffect(() => {
+    if (autoTriggeredRef.current) return;
+    if (state.kind !== "idle") return;
+    if (!canRefresh) return;
+    if (initialDigest) return;
+    if (autoTriggerError) return;
+    autoTriggeredRef.current = true;
+    void handleRefresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only fire-once trigger
+  }, []);
 
   return (
     <Card>

@@ -205,4 +205,90 @@ describe("TopicDigestPanel", () => {
       ).toBeInTheDocument(),
     );
   });
+
+  it("auto-triggers synthesis on mount when idle without digest/run/error (cached prefetch payload)", async () => {
+    mocks.triggerTopicDigestRefresh.mockResolvedValue({
+      success: true,
+      data: {
+        status: "queued",
+        runId: "run_auto",
+        publicAccessToken: "tok_auto",
+      },
+    });
+    render(
+      <TopicDigestPanel
+        canonicalTopicId={1}
+        initialDigest={null}
+        initialRunId={null}
+        initialAccessToken={null}
+        canRefresh
+      />,
+    );
+    await waitFor(() =>
+      expect(mocks.triggerTopicDigestRefresh).toHaveBeenCalledWith({
+        canonicalTopicId: 1,
+      }),
+    );
+    expect(mocks.triggerTopicDigestRefresh).toHaveBeenCalledTimes(1);
+    await waitFor(() =>
+      expect(screen.getByText(/synthesizing/i)).toBeInTheDocument(),
+    );
+  });
+
+  it("does NOT auto-trigger when canRefresh=false (dormant topic)", async () => {
+    mocks.triggerTopicDigestRefresh.mockResolvedValue({
+      success: true,
+      data: { status: "ineligible" },
+    });
+    render(
+      <TopicDigestPanel
+        canonicalTopicId={1}
+        initialDigest={null}
+        initialRunId={null}
+        initialAccessToken={null}
+        canRefresh={false}
+      />,
+    );
+    // give any unwanted effects time to fire
+    await new Promise((r) => setTimeout(r, 0));
+    expect(mocks.triggerTopicDigestRefresh).not.toHaveBeenCalled();
+  });
+
+  it("does NOT auto-trigger when initialDigest is present (server already populated)", async () => {
+    mocks.triggerTopicDigestRefresh.mockResolvedValue({
+      success: true,
+      data: { status: "cached", digestId: 22 },
+    });
+    render(
+      <TopicDigestPanel
+        canonicalTopicId={1}
+        initialDigest={sampleDigest}
+        initialRunId={null}
+        initialAccessToken={null}
+        canRefresh
+      />,
+    );
+    await new Promise((r) => setTimeout(r, 0));
+    expect(mocks.triggerTopicDigestRefresh).not.toHaveBeenCalled();
+  });
+
+  it("does NOT auto-trigger when autoTriggerError is set (server attempt already failed)", async () => {
+    mocks.triggerTopicDigestRefresh.mockResolvedValue({
+      success: true,
+      data: { status: "ineligible" },
+    });
+    render(
+      <TopicDigestPanel
+        canonicalTopicId={1}
+        initialDigest={null}
+        initialRunId={null}
+        initialAccessToken={null}
+        canRefresh
+        autoTriggerError="trigger-failed"
+      />,
+    );
+    await new Promise((r) => setTimeout(r, 0));
+    expect(mocks.triggerTopicDigestRefresh).not.toHaveBeenCalled();
+    expect(screen.getByText(/Couldn't start synthesis/i)).toBeInTheDocument();
+  });
 });
