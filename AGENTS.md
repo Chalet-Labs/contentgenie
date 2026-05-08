@@ -55,7 +55,7 @@ bun run test:coverage  # Run tests with coverage (80% line threshold, see vitest
 bun run storybook      # Launch Storybook dev server (port 6006)
 bun run build-storybook # Build static Storybook
 bun run db:generate    # Generate Drizzle migrations
-bun run db:push        # Push schema to database
+bun run db:push        # Push schema to dev DB (uses default Doppler config)
 bun run db:studio      # Open Drizzle Studio (DB browser)
 bun run trigger:dev    # Start Trigger.dev dev server
 bun run trigger:deploy # Deploy tasks to Trigger.dev Cloud
@@ -69,6 +69,7 @@ bun run trigger:deploy # Deploy tasks to Trigger.dev Cloud
 - Unit tests live in `__tests__/` directories co-located with source. Stories live alongside components as `*.stories.tsx` files.
 - The pre-commit hook (Husky) automatically runs format:check, lint, and tests on commit.
 - ADRs live in `docs/adr/` — read the relevant ADR before modifying areas it covers.
+- **Drizzle migrations require a manual prod push.** Preview deploys auto-run `drizzle-kit push --force` via `vercel-build`; production does not. After merging a migration-bearing PR, run `doppler run --config prd -- bunx drizzle-kit push`. PRs that add a `drizzle/*.sql` file MUST include a "Production deploy note" in the PR body. See [ADR-002](docs/adr/002-preview-database-migrations.md).
 - **UI verification (agents):** Vitest/RTL runs in jsdom and can't catch real rendering, layout, or interaction bugs. For any UI work, **invoke the `agent-browser` skill** to test the web app in a real browser:
   - **App flows / pages:** start `bun run dev` (port 3000), then use `agent-browser` to navigate to `http://localhost:3000`, click through the flow, fill forms, and take screenshots.
   - **Isolated components:** start `bun run storybook` (port 6006), then use `agent-browser` to open `http://localhost:6006`, navigate to the relevant story, and screenshot it.
