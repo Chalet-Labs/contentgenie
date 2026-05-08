@@ -142,6 +142,7 @@ export function TopicDigestPanel({
   }, [run?.status, realtimeError]);
 
   const handleRefresh = async () => {
+    if (isRefreshing || state.kind === "loading") return;
     setIsRefreshing(true);
     try {
       const result = await triggerTopicDigestRefresh({ canonicalTopicId });
@@ -238,6 +239,7 @@ export function TopicDigestPanel({
                   variant="outline"
                   size="sm"
                   className="mt-2"
+                  disabled={isRefreshing}
                   onClick={() => void handleRefresh()}
                 >
                   Retry

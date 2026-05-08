@@ -125,12 +125,12 @@ describe("TopicEpisodeList", () => {
     expect(mockRefresh).not.toHaveBeenCalled();
   });
 
-  it("row link points to /podcast/<feedId>?episode=<podcastIndexEpisodeId>", () => {
+  it("row link points to /episode/<id>", () => {
     render(
       <TopicEpisodeList
         episodes={[
           makeEpisode({
-            id: 1,
+            id: 42,
             podcastFeedId: "feed-77",
             podcastIndexEpisodeId: asPodcastIndexEpisodeId("pi-42"),
           }),
@@ -138,7 +138,7 @@ describe("TopicEpisodeList", () => {
       />,
     );
     const link = screen.getByRole("link", { name: /Episode title/ });
-    expect(link).toHaveAttribute("href", "/podcast/feed-77?episode=pi-42");
+    expect(link).toHaveAttribute("href", "/episode/42");
   });
 
   it("renders 'All caught up' message when filter is on and result is empty", () => {

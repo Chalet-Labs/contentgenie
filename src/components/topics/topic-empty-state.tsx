@@ -22,7 +22,7 @@ export function TopicEmptyState({
           aria-hidden="true"
         />
         <h2 className="text-lg font-semibold">
-          More coverage needed — synthesize unlocks at {threshold} episodes
+          More coverage needed — synthesis unlocks at {threshold} summaries
         </h2>
         <p className="max-w-md text-sm text-muted-foreground">
           We have summarized {summarizedCount} of {totalEpisodeCount}{" "}

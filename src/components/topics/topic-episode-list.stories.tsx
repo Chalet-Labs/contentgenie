@@ -1,11 +1,9 @@
 import type { Meta, StoryObj } from "@storybook/nextjs-vite";
+import { NuqsTestingAdapter } from "nuqs/adapters/testing";
 import { TopicEpisodeList } from "@/components/topics/topic-episode-list";
 import type { TopicEpisode } from "@/app/actions/topics";
 import { asPodcastIndexEpisodeId } from "@/types/ids";
 
-// Row links currently target `/podcast/{feedId}?episode={podcastIndexEpisodeId}`
-// because no `/episode/[id]` route exists yet (#399). When that route lands, update
-// `buildEpisodeHref` in `topic-episode-list.tsx` to point there directly.
 const meta: Meta<typeof TopicEpisodeList> = {
   title: "Topics/TopicEpisodeList",
   component: TopicEpisodeList,
@@ -63,6 +61,13 @@ export const AllListened: Story = {
 
 export const EmptyAfterFilter: Story = {
   args: { episodes: [] },
+  decorators: [
+    (Story) => (
+      <NuqsTestingAdapter searchParams={{ unheard: "true" }}>
+        <Story />
+      </NuqsTestingAdapter>
+    ),
+  ],
 };
 
 export const EmptyNoEpisodes: Story = {

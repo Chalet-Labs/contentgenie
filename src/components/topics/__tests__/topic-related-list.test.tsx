@@ -58,7 +58,9 @@ describe("TopicRelatedList", () => {
     render(<TopicRelatedList items={items} />);
     for (const item of items) {
       expect(
-        screen.getByRole("link", { name: new RegExp(item.label, "i") }),
+        screen.getByRole("link", {
+          name: `Topic: ${item.label} — ${item.kind}`,
+        }),
       ).toBeInTheDocument();
     }
   });

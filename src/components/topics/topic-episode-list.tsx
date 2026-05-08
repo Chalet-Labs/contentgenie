@@ -22,9 +22,7 @@ function formatCoverage(score: number): string {
 }
 
 function buildEpisodeHref(episode: TopicEpisode): string {
-  return `/podcast/${encodeURIComponent(
-    episode.podcastFeedId,
-  )}?episode=${encodeURIComponent(episode.podcastIndexEpisodeId)}`;
+  return `/episode/${episode.id}`;
 }
 
 export function TopicEpisodeList({ episodes }: TopicEpisodeListProps) {

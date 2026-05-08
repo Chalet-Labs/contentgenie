@@ -514,6 +514,53 @@ describe("TopicPage", () => {
     expect(mockTriggerTopicDigestRefresh).not.toHaveBeenCalled();
   });
 
+  it("renders empty state (not digest panel) for dormant topic that is eligible but has no cached digest", async () => {
+    mockNextTopicRow.mockResolvedValueOnce(
+      makeTopic({ status: "dormant", mergedIntoId: null }),
+    );
+    mockGetTopicDetailData.mockResolvedValueOnce({
+      success: true,
+      data: makeDetailData({
+        completedSummaryCount: MIN_DERIVED_COUNT_FOR_DIGEST + 2,
+        digest: null,
+        canonical: { status: "dormant" },
+      }),
+    });
+    const jsx = await TopicPage({
+      params: { id: "1" },
+      searchParams: {},
+    });
+    render(jsx as React.ReactElement);
+    // Dormant topics skip auto-trigger; showDigestPanel stays false → empty state
+    expect(screen.getByText(/more coverage needed/i)).toBeInTheDocument();
+    expect(mockTriggerTopicDigestRefresh).not.toHaveBeenCalled();
+  });
+
+  it("renders digest panel (not empty state) after cached auto-trigger response", async () => {
+    mockNextTopicRow.mockResolvedValueOnce(
+      makeTopic({ status: "active", mergedIntoId: null }),
+    );
+    mockGetTopicDetailData.mockResolvedValueOnce({
+      success: true,
+      data: makeDetailData({
+        completedSummaryCount: MIN_DERIVED_COUNT_FOR_DIGEST + 1,
+        digest: null,
+      }),
+    });
+    mockTriggerTopicDigestRefresh.mockResolvedValueOnce({
+      success: true,
+      data: { status: "cached", digestId: 5 },
+    });
+    const jsx = await TopicPage({
+      params: { id: "1" },
+      searchParams: {},
+    });
+    render(jsx as React.ReactElement);
+    // "cached" sets showDigestPanel=true; panel mounts showing "Topic synthesis" title
+    expect(screen.getByText("Topic synthesis")).toBeInTheDocument();
+    expect(screen.queryByText(/more coverage needed/i)).not.toBeInTheDocument();
+  });
+
   it("calls notFound() when getTopicDetailData returns not-found", async () => {
     mockNextTopicRow.mockResolvedValueOnce(
       makeTopic({ status: "active", mergedIntoId: null }),

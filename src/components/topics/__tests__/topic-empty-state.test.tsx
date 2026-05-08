@@ -16,7 +16,7 @@ describe("TopicEmptyState", () => {
       screen.getByText(
         (_, node) =>
           node?.textContent ===
-          `More coverage needed — synthesize unlocks at ${MIN_DERIVED_COUNT_FOR_DIGEST} episodes`,
+          `More coverage needed — synthesis unlocks at ${MIN_DERIVED_COUNT_FOR_DIGEST} summaries`,
       ),
     ).toBeInTheDocument();
   });

@@ -74,6 +74,7 @@ export default async function TopicPage({
     requestHeaders.get("Next-Router-Prefetch") === "1" ||
     requestHeaders.get("next-router-prefetch") === "1";
 
+  let showDigestPanel = digest !== null;
   let initialRunId: string | null = null;
   let initialAccessToken: string | null = null;
   let autoTriggerError: string | null = null;
@@ -92,7 +93,11 @@ export default async function TopicPage({
         error: refresh.error,
       });
       autoTriggerError = refresh.error;
+      showDigestPanel = true;
+    } else if (refresh.data.status === "cached") {
+      showDigestPanel = true;
     } else if (refresh.data.status === "queued") {
+      showDigestPanel = true;
       if (refresh.data.runId && refresh.data.publicAccessToken) {
         initialRunId = refresh.data.runId;
         initialAccessToken = refresh.data.publicAccessToken;
@@ -135,7 +140,7 @@ export default async function TopicPage({
         </CardContent>
       </Card>
 
-      {eligibleForDigest ? (
+      {eligibleForDigest && showDigestPanel ? (
         <TopicDigestPanel
           canonicalTopicId={canonical.id}
           initialDigest={digest}
