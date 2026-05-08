@@ -2,8 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { and, eq, isNull } from "drizzle-orm";
-import { tasks } from "@trigger.dev/sdk";
+import { and, desc, eq, isNotNull, isNull, sql } from "drizzle-orm";
+import { tasks, auth as triggerAuth } from "@trigger.dev/sdk";
 
 import { withAdminAction } from "@/lib/auth-wrapper";
 import {
@@ -28,19 +28,32 @@ import {
   canonicalTopics,
   canonicalTopicDigests,
   episodes,
+  episodeCanonicalTopics,
+  podcasts,
+  listenHistory,
+  userLibrary,
   IN_PROGRESS_STATUSES,
+  type CanonicalTopicKind,
+  type CanonicalTopicStatus,
   type SummaryStatus,
 } from "@/db/schema";
 import { db } from "@/db";
 import type { ActionResult } from "@/types/action-result";
 import type { summarizeEpisode } from "@/trigger/summarize-episode";
 import type { generateTopicDigest } from "@/trigger/generate-topic-digest";
+import type { PodcastIndexEpisodeId } from "@/types/ids";
 import { withAuthAction } from "@/lib/auth-wrapper";
-import { canonicalTopicCompletedSummaryCount } from "@/lib/admin/canonical-topic-episode-count";
+import {
+  canonicalTopicEpisodeCount,
+  canonicalTopicCompletedSummaryCount,
+} from "@/lib/admin/canonical-topic-episode-count";
 import {
   MIN_DERIVED_COUNT_FOR_DIGEST,
   STALENESS_GROWTH_THRESHOLD,
+  RELATED_TOPICS_LIMIT,
 } from "@/lib/topic-digest-thresholds";
+import { formatVector } from "@/lib/entity-resolution";
+import { coerceEmbedding } from "@/trigger/helpers/coerce-embedding";
 
 // ---------------------------------------------------------------------------
 // Input schemas
@@ -585,6 +598,265 @@ export async function triggerTopicDigestGeneration(input: {
         success: false,
         error: e instanceof Error ? e.message : "trigger-failed",
       };
+    }
+  });
+}
+
+// ---------------------------------------------------------------------------
+// getTopicDetailData — public-facing topic detail page payload (#399)
+// ---------------------------------------------------------------------------
+//
+// Returns canonical row, digest (if any), episode list (joined with the
+// caller's listen-history + library), and 5 nearest related canonicals. Action
+// returns `not-found` for both missing rows and `status === "merged"` rows;
+// the page is responsible for following the merge chain before calling here.
+
+export type TopicDetailCanonical = {
+  id: number;
+  label: string;
+  kind: CanonicalTopicKind;
+  status: Exclude<CanonicalTopicStatus, "merged">;
+  summary: string;
+  episodeCount: number;
+  completedSummaryCount: number;
+};
+
+export type TopicEpisode = {
+  id: number;
+  podcastIndexEpisodeId: PodcastIndexEpisodeId;
+  title: string;
+  podcastTitle: string;
+  podcastFeedId: string;
+  coverageScore: number;
+  isListened: boolean;
+  isSaved: boolean;
+};
+
+export type RelatedTopic = {
+  id: number;
+  label: string;
+  kind: CanonicalTopicKind;
+};
+
+export type TopicDigest = {
+  id: number;
+  digestMarkdown: string;
+  consensusPoints: string[];
+  disagreementPoints: string[];
+  episodeCountAtGeneration: number;
+  modelUsed: string;
+  generatedAt: Date;
+};
+
+export type TopicDetailData = {
+  canonical: TopicDetailCanonical;
+  digest: TopicDigest | null;
+  episodes: TopicEpisode[];
+  relatedTopics: RelatedTopic[];
+};
+
+const topicDetailDataSchema = z
+  .object({
+    canonicalTopicId: z.number().int().positive(),
+    showOnlyUnheard: z.boolean().optional(),
+  })
+  .strict();
+
+export async function getTopicDetailData(input: {
+  canonicalTopicId: number;
+  showOnlyUnheard?: boolean;
+}): Promise<ActionResult<TopicDetailData>> {
+  return withAuthAction(async (userId) => {
+    const parsed = topicDetailDataSchema.safeParse(input);
+    if (!parsed.success) {
+      return {
+        success: false,
+        error: parsed.error.issues[0]?.message ?? "Invalid input",
+      };
+    }
+    const { canonicalTopicId, showOnlyUnheard = false } = parsed.data;
+
+    const canonicalRows = await db
+      .select({
+        id: canonicalTopics.id,
+        label: canonicalTopics.label,
+        kind: canonicalTopics.kind,
+        status: canonicalTopics.status,
+        summary: canonicalTopics.summary,
+        identityEmbedding: canonicalTopics.identityEmbedding,
+        episodeCount: canonicalTopicEpisodeCount(),
+        completedSummaryCount: canonicalTopicCompletedSummaryCount(),
+      })
+      .from(canonicalTopics)
+      .where(eq(canonicalTopics.id, canonicalTopicId));
+
+    const canonical = canonicalRows[0];
+    if (!canonical || canonical.status === "merged") {
+      // Page is responsible for the redirect — action treats merged as not-found.
+      return { success: false, error: "not-found" };
+    }
+
+    const episodeWhere = showOnlyUnheard
+      ? and(
+          eq(episodeCanonicalTopics.canonicalTopicId, canonicalTopicId),
+          isNull(listenHistory.id),
+        )
+      : eq(episodeCanonicalTopics.canonicalTopicId, canonicalTopicId);
+
+    const [digestRows, episodeRows] = await Promise.all([
+      db
+        .select({
+          id: canonicalTopicDigests.id,
+          digestMarkdown: canonicalTopicDigests.digestMarkdown,
+          consensusPoints: canonicalTopicDigests.consensusPoints,
+          disagreementPoints: canonicalTopicDigests.disagreementPoints,
+          episodeCountAtGeneration:
+            canonicalTopicDigests.episodeCountAtGeneration,
+          modelUsed: canonicalTopicDigests.modelUsed,
+          generatedAt: canonicalTopicDigests.generatedAt,
+        })
+        .from(canonicalTopicDigests)
+        .where(eq(canonicalTopicDigests.canonicalTopicId, canonicalTopicId)),
+      db
+        .select({
+          id: episodes.id,
+          podcastIndexEpisodeId: episodes.podcastIndexId,
+          title: episodes.title,
+          podcastTitle: podcasts.title,
+          podcastFeedId: podcasts.podcastIndexId,
+          coverageScore: episodeCanonicalTopics.coverageScore,
+          listenId: listenHistory.id,
+          libraryId: userLibrary.id,
+        })
+        .from(episodeCanonicalTopics)
+        .innerJoin(episodes, eq(episodeCanonicalTopics.episodeId, episodes.id))
+        .innerJoin(podcasts, eq(episodes.podcastId, podcasts.id))
+        .leftJoin(
+          listenHistory,
+          and(
+            eq(listenHistory.episodeId, episodes.id),
+            eq(listenHistory.userId, userId),
+            isNotNull(listenHistory.completedAt),
+          ),
+        )
+        .leftJoin(
+          userLibrary,
+          and(
+            eq(userLibrary.episodeId, episodes.id),
+            eq(userLibrary.userId, userId),
+          ),
+        )
+        .where(episodeWhere)
+        .orderBy(
+          desc(episodeCanonicalTopics.coverageScore),
+          desc(episodeCanonicalTopics.createdAt),
+        ),
+    ]);
+
+    const embedding = coerceEmbedding(canonical.identityEmbedding);
+    let relatedRows: {
+      id: number;
+      label: string;
+      kind: string;
+    }[] = [];
+    if (embedding) {
+      try {
+        const vec = formatVector(embedding);
+        const result = await db.execute(
+          sql`SELECT id, label, kind, 1 - (identity_embedding <=> ${vec}::vector) AS similarity
+              FROM canonical_topics
+              WHERE id <> ${canonicalTopicId}
+                AND status = 'active'
+                AND identity_embedding IS NOT NULL
+              ORDER BY identity_embedding <=> ${vec}::vector
+              LIMIT ${RELATED_TOPICS_LIMIT}`,
+        );
+        relatedRows = result.rows as typeof relatedRows;
+      } catch (error) {
+        console.error("[getTopicDetailData] related-topics kNN failed", {
+          canonicalTopicId,
+          error,
+        });
+        relatedRows = [];
+      }
+    }
+
+    const { identityEmbedding: _ignored, ...canonicalOut } = canonical;
+    const digestRow = digestRows[0] ?? null;
+
+    return {
+      success: true,
+      data: {
+        canonical: canonicalOut as TopicDetailCanonical,
+        digest: digestRow,
+        episodes: episodeRows.map((row) => ({
+          id: row.id,
+          podcastIndexEpisodeId: row.podcastIndexEpisodeId,
+          title: row.title,
+          podcastTitle: row.podcastTitle,
+          podcastFeedId: row.podcastFeedId,
+          coverageScore: row.coverageScore,
+          isListened: row.listenId !== null,
+          isSaved: row.libraryId !== null,
+        })),
+        relatedTopics: relatedRows.map((row) => ({
+          id: row.id,
+          label: row.label,
+          kind: row.kind as CanonicalTopicKind,
+        })),
+      },
+    };
+  });
+}
+
+// ---------------------------------------------------------------------------
+// triggerTopicDigestRefresh — gate-delegating wrapper that bundles a
+// publicAccessToken so the client can subscribe via useRealtimeRun without
+// a separate roundtrip (ADR-053).
+// ---------------------------------------------------------------------------
+
+export async function triggerTopicDigestRefresh(input: {
+  canonicalTopicId: number;
+}): Promise<
+  ActionResult<{
+    status: "queued" | "cached" | "ineligible";
+    digestId?: number;
+    runId?: string;
+    publicAccessToken?: string;
+  }>
+> {
+  return withAuthAction(async () => {
+    const parsed = topicDigestSchema.safeParse(input);
+    if (!parsed.success) {
+      return {
+        success: false,
+        error: parsed.error.issues[0]?.message ?? "Invalid input",
+      };
+    }
+
+    const gateResult = await triggerTopicDigestGeneration(parsed.data);
+    if (!gateResult.success) return gateResult;
+
+    const { status, digestId, runId } = gateResult.data;
+    if (status !== "queued" || !runId) {
+      return { success: true, data: { status, digestId } };
+    }
+
+    try {
+      const publicAccessToken = await triggerAuth.createPublicToken({
+        scopes: { read: { runs: [runId] } },
+        expirationTime: "15m",
+      });
+      return {
+        success: true,
+        data: { status, digestId, runId, publicAccessToken },
+      };
+    } catch (e) {
+      console.error("[triggerTopicDigestRefresh] token creation failed:", {
+        runId,
+        error: e,
+      });
+      return { success: false, error: "token-failed" };
     }
   });
 }
