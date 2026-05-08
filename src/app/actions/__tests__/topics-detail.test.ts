@@ -60,6 +60,7 @@ vi.mock("@/db/schema", () => ({
     id: "listen_history.id",
     userId: "listen_history.userId",
     episodeId: "listen_history.episodeId",
+    completedAt: "listen_history.completedAt",
   },
   userLibrary: {
     id: "user_library.id",
@@ -90,6 +91,7 @@ vi.mock("drizzle-orm", () => ({
   eq: vi.fn((col: unknown, val: unknown) => ({ type: "eq", col, val })),
   and: vi.fn((...args: unknown[]) => ({ type: "and", conditions: args })),
   isNull: vi.fn((col: unknown) => ({ type: "isNull", col })),
+  isNotNull: vi.fn((col: unknown) => ({ type: "isNotNull", col })),
   desc: vi.fn((col: unknown) => ({ type: "desc", col })),
   ne: vi.fn((col: unknown, val: unknown) => ({ type: "ne", col, val })),
   sql: Object.assign(
@@ -424,6 +426,25 @@ describe("getTopicDetailData", () => {
 
     // The episodes query passes `isNull(listenHistory.id)` to the WHERE clause.
     expect(isNullSpy).toHaveBeenCalledWith("listen_history.id");
+  });
+
+  // ── Case: only completed listens count — completedAt IS NOT NULL on the join ─
+
+  it("listenHistory join includes isNotNull(completedAt) so partial plays don't count as listened", async () => {
+    setupSelectChains([
+      { where: [makeCanonicalRow()] },
+      { where: [] },
+      { joinedWhereOrderBy: [] },
+    ]);
+    mockDbExecute.mockResolvedValue({ rows: [] });
+
+    const drizzle = await import("drizzle-orm");
+    const isNotNullSpy = vi.mocked(drizzle.isNotNull);
+    isNotNullSpy.mockClear();
+
+    await getTopicDetailData({ canonicalTopicId: 5 });
+
+    expect(isNotNullSpy).toHaveBeenCalledWith("listen_history.completedAt");
   });
 
   it("does not add the unheard predicate when showOnlyUnheard is false/undefined", async () => {

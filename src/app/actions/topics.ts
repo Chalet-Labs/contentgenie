@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { and, desc, eq, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, isNotNull, isNull, sql } from "drizzle-orm";
 import { tasks, auth as triggerAuth } from "@trigger.dev/sdk";
 
 import { withAdminAction } from "@/lib/auth-wrapper";
@@ -736,6 +736,7 @@ export async function getTopicDetailData(input: {
           and(
             eq(listenHistory.episodeId, episodes.id),
             eq(listenHistory.userId, userId),
+            isNotNull(listenHistory.completedAt),
           ),
         )
         .leftJoin(
