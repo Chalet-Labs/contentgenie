@@ -536,10 +536,11 @@ describe("TopicPage", () => {
     expect(mockTriggerTopicDigestRefresh).not.toHaveBeenCalled();
   });
 
-  it("renders digest panel (not empty state) after cached auto-trigger response", async () => {
+  it("renders digest panel with refetched digest after cached auto-trigger response", async () => {
     mockNextTopicRow.mockResolvedValueOnce(
       makeTopic({ status: "active", mergedIntoId: null }),
     );
+    // First call: no digest yet (race condition)
     mockGetTopicDetailData.mockResolvedValueOnce({
       success: true,
       data: makeDetailData({
@@ -551,13 +552,30 @@ describe("TopicPage", () => {
       success: true,
       data: { status: "cached", digestId: 5 },
     });
+    // Second call (refetch after "cached"): returns the now-existing digest
+    mockGetTopicDetailData.mockResolvedValueOnce({
+      success: true,
+      data: makeDetailData({
+        completedSummaryCount: MIN_DERIVED_COUNT_FOR_DIGEST + 1,
+        digest: {
+          id: 5,
+          digestMarkdown: "# md",
+          consensusPoints: ["Cached consensus point"],
+          disagreementPoints: [],
+          episodeCountAtGeneration: MIN_DERIVED_COUNT_FOR_DIGEST + 1,
+          modelUsed: "gpt-x",
+          generatedAt: new Date(),
+        },
+      }),
+    });
     const jsx = await TopicPage({
       params: { id: "1" },
       searchParams: {},
     });
     render(jsx as React.ReactElement);
-    // "cached" sets showDigestPanel=true; panel mounts showing "Topic synthesis" title
-    expect(screen.getByText("Topic synthesis")).toBeInTheDocument();
+    // Refetch hydrates initialDigest; panel renders digest content
+    expect(screen.getByText("Cached consensus point")).toBeInTheDocument();
+    expect(mockGetTopicDetailData).toHaveBeenCalledTimes(2);
     expect(screen.queryByText(/more coverage needed/i)).not.toBeInTheDocument();
   });
 

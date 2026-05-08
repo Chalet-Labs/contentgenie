@@ -65,7 +65,8 @@ export default async function TopicPage({
     throw new Error(`Topic detail failed: ${detailResult.error}`);
   }
 
-  const { canonical, digest, episodes, relatedTopics } = detailResult.data;
+  const { canonical, episodes, relatedTopics } = detailResult.data;
+  let digest = detailResult.data.digest;
   const eligibleForDigest =
     canonical.completedSummaryCount >= MIN_DERIVED_COUNT_FOR_DIGEST;
 
@@ -96,6 +97,16 @@ export default async function TopicPage({
       showDigestPanel = true;
     } else if (refresh.data.status === "cached") {
       showDigestPanel = true;
+      // Race: another request created the digest between our initial fetch and
+      // triggerTopicDigestRefresh. Re-fetch to hydrate initialDigest so the
+      // panel doesn't mount with a null digest and no loading state.
+      const refetch = await getTopicDetailData({
+        canonicalTopicId: canonical.id,
+        showOnlyUnheard,
+      });
+      if (refetch.success && refetch.data.digest) {
+        digest = refetch.data.digest;
+      }
     } else if (refresh.data.status === "queued") {
       showDigestPanel = true;
       if (refresh.data.runId && refresh.data.publicAccessToken) {
