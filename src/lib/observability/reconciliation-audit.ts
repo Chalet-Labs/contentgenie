@@ -34,8 +34,12 @@ export async function getReconciliationAuditLog(
   page = 1,
   pageSize = DEFAULT_AUDIT_PAGE_SIZE,
 ): Promise<ReconciliationAuditPage> {
-  const safePage = Math.max(1, Math.floor(page));
-  const safePageSize = Math.max(1, Math.floor(pageSize));
+  // Guard against non-finite inputs (NaN, Infinity) so callers from outside
+  // the nuqs loader can't poison limit/offset arithmetic downstream.
+  const safePage = Number.isFinite(page) ? Math.max(1, Math.floor(page)) : 1;
+  const safePageSize = Number.isFinite(pageSize)
+    ? Math.max(1, Math.floor(pageSize))
+    : DEFAULT_AUDIT_PAGE_SIZE;
   const timeFilter = buildUtcWindowFilter(reconciliationLog.createdAt, window);
 
   const baseCount = db.select({ value: count() }).from(reconciliationLog);
