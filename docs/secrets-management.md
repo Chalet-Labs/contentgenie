@@ -101,14 +101,14 @@ Because Neon owns `DATABASE_URL` in Vercel, this variable is **not** included in
 Preview Neon branches start as copies of the production schema but need any pending schema changes applied. The `vercel-build` script in `package.json` handles this automatically:
 
 ```bash
-"vercel-build": "if [ \"$VERCEL_ENV\" = \"preview\" ]; then npx drizzle-kit push --force; fi && next build"
+"vercel-build": "if [ \"$VERCEL_ENV\" = \"preview\" ]; then bun scripts/bootstrap-drizzle-migrations.ts && npx drizzle-kit migrate; fi && next build"
 ```
 
-- For **preview** deployments, `drizzle-kit push --force` runs against the Neon branch's `DATABASE_URL` before `next build`, ensuring the schema is up to date.
-- For **production** deployments, the migration step is skipped. Production schema changes are applied manually via `bun run db:push`.
-- `drizzle-kit push` is idempotent — safe to run on every build even if the schema hasn't changed.
+- For **preview** deployments, `bootstrap-drizzle-migrations.ts` ensures the `drizzle.__drizzle_migrations` tracking table exists and is populated (idempotent), then `drizzle-kit migrate` applies any pending migration files against the Neon branch's `DATABASE_URL` before `next build`.
+- For **production** deployments, the migration step is skipped. Production schema changes are applied manually via `doppler run --config prd -- bunx drizzle-kit migrate` after a one-time bootstrap.
+- Both the bootstrap script and `drizzle-kit migrate` are idempotent — safe to run on every build even if no schema has changed.
 
-See [ADR-002](adr/002-preview-database-migrations.md) for the full decision record.
+See [ADR-002](adr/002-preview-database-migrations.md) for the full decision record (including the 2026-05 update on switching from `push` to `migrate`).
 
 ## Trigger.dev Integration
 

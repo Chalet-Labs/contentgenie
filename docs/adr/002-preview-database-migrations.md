@@ -55,6 +55,8 @@ Remove the Vercel Neon integration and manage all branch creation, DATABASE_URL 
 
 ## Production deploy (manual, post-merge)
 
+> **Updated 2026-05-10 — see "2026-05 update" section below for the current workflow.** This block remains for historical context.
+
 Production schema is **not** auto-migrated. After a migration-bearing PR merges to `main`, run:
 
 ```bash
@@ -69,3 +71,39 @@ Note: `bun run db:push` is **not** equivalent — that script uses the default D
 - The `NEON_API_KEY` GitHub Actions secret and `NEON_PROJECT_ID` variable can be removed if no other workflows need them.
 - Orphaned `preview/pr-*` Neon branches from the old workflow will expire via their 14-day TTL or can be manually deleted.
 - Migration visibility moves from a GitHub Actions check to Vercel build logs.
+
+## 2026-05 update: prod migration workflow
+
+`drizzle-kit push` is non-convergent against populated databases for six expression-bearing indexes (HNSW with `vector_cosine_ops` + `WITH` parameters, `lower()`, partial `WHERE`, `DESC`, `AT TIME ZONE`). drizzle-kit's diff misnormalizes the schema-side serialized form vs. the DB-side form, so every push re-emits identical `DROP INDEX` + `CREATE INDEX` for those six indexes — including the HNSW indexes whose rebuilds are minutes-scale on populated tables. Real wasted prod work, and any _intentional_ schema change gets buried under the perpetual churn.
+
+`drizzle-kit migrate` executes `drizzle/*.sql` files literally and tracks applied migrations in `drizzle.__drizzle_migrations`. No diff → no false drift → guaranteed convergence.
+
+This update keeps the original ADR-002 decision (preview migrations via Vercel build) in spirit, evolving only the _command_ per the original "manual step or dedicated migration workflow" wording. Issue #456 / PR for the switch carries the full context.
+
+### One-time bootstrap (per environment)
+
+`migrate` requires `drizzle.__drizzle_migrations` to track which migration files have been applied. Existing environments (dev/prod) have all schema state applied via push but no tracking table. `scripts/bootstrap-drizzle-migrations.ts` populates the table by computing the SHA-256 hash of each migration file (matching drizzle-orm's internal hash format) and inserting a row per migration. Idempotent: re-running is a no-op.
+
+### Current canonical commands
+
+```bash
+# Local dev (unchanged): rapid prototyping
+bun run db:push
+
+# Preview (Vercel build, automatic): bootstrap + migrate
+"vercel-build": "if [ \"$VERCEL_ENV\" = \"preview\" ]; then bun scripts/bootstrap-drizzle-migrations.ts && npx drizzle-kit migrate; fi && next build"
+
+# Production (manual, post-merge): bootstrap one-time, then migrate per release
+doppler run --config prd -- bun scripts/bootstrap-drizzle-migrations.ts   # one-time + idempotent
+doppler run --config prd -- bunx drizzle-kit migrate                       # per migration-bearing PR
+```
+
+### Rationale for keeping prod manual
+
+Prod stays a deliberate human gate (not folded into Vercel's `production` branch of `vercel-build`) so operators see the migration step explicitly, can sequence it relative to code deploys, and can pause for cause. Convergence of `migrate` removes the _noise_ concern but doesn't change the case for keeping migrations intentional.
+
+### Rollback paths
+
+1. Bootstrap fails → `DROP SCHEMA drizzle CASCADE` removes only the tracking table; no data touched. Re-run the script.
+2. First post-bootstrap `migrate` misbehaves → same as #1; revert the PR; prod stays on push.
+3. Catastrophic → restore from a Neon branch taken from prod `main` immediately before bootstrap (recommended pre-flight: create a branch named `pre-migrate-bootstrap-YYYY-MM-DD`).

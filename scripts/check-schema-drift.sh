@@ -6,6 +6,12 @@ set -euo pipefail
 # Interactive mode shows pending SQL and prompts before executing.
 # With /dev/null as stdin, it receives EOF and exits without executing.
 #
+# NOTE: After ADR-002's 2026-05 update, prod is migrated via `drizzle-kit migrate`,
+# not `push`. This script keeps `push` purely as a drift DETECTOR — it never writes
+# (stdin is /dev/null). When drift IS detected, the fix is to regenerate a migration
+# file via `bun run db:generate`, commit it, and let the standard migrate workflow
+# apply it on deploy. Do NOT invoke `drizzle-kit push` against prod.
+#
 # SAFETY: DATABASE_URL should point to a read-only database role to prevent
 # drizzle-kit from accidentally applying changes. See docs/secrets-management.md.
 
@@ -28,7 +34,8 @@ fi
 if echo "$output" | grep -qiE 'ALTER (TABLE|TYPE|SEQUENCE)|CREATE (TABLE|INDEX|UNIQUE INDEX|TYPE|SEQUENCE|VIEW|MATERIALIZED VIEW)|DROP (TABLE|COLUMN|INDEX|CONSTRAINT|TYPE|SEQUENCE|VIEW)|ADD (COLUMN|CONSTRAINT)|RENAME (COLUMN|CONSTRAINT)'; then
   echo ""
   echo "::error::Schema drift detected! Production database has pending schema changes."
-  echo "To apply: doppler run --config prd -- bunx drizzle-kit push"
+  echo "To resolve: run 'bun run db:generate' to create a migration file, commit it,"
+  echo "then deploy via 'doppler run --config prd -- bunx drizzle-kit migrate'."
   exit 1
 fi
 
