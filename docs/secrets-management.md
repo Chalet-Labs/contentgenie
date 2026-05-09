@@ -98,17 +98,17 @@ Because Neon owns `DATABASE_URL` in Vercel, this variable is **not** included in
 
 ### Preview schema migrations
 
-Preview Neon branches start as copies of the production schema but need any pending schema changes applied. The `vercel-build` script in `package.json` handles this automatically:
+Preview Neon branches start as point-in-time copies of the production schema (including the `drizzle.__drizzle_migrations` tracking table that prod was bootstrapped with at the cutover) but need any pending schema changes applied. The `vercel-build` script in `package.json` handles this automatically:
 
 ```bash
-"vercel-build": "if [ \"$VERCEL_ENV\" = \"preview\" ]; then bun scripts/bootstrap-drizzle-migrations.ts && npx drizzle-kit migrate; fi && next build"
+"vercel-build": "if [ \"$VERCEL_ENV\" = \"preview\" ]; then npx drizzle-kit migrate; fi && next build"
 ```
 
-- For **preview** deployments, `bootstrap-drizzle-migrations.ts` ensures the `drizzle.__drizzle_migrations` tracking table exists and is populated (idempotent), then `drizzle-kit migrate` applies any pending migration files against the Neon branch's `DATABASE_URL` before `next build`.
-- For **production** deployments, the migration step is skipped. Production schema changes are applied manually via `doppler run --config prd -- bunx drizzle-kit migrate` after a one-time bootstrap.
-- Both the bootstrap script and `drizzle-kit migrate` are idempotent — safe to run on every build even if no schema has changed.
+- For **preview** deployments, `drizzle-kit migrate` applies any pending migration files against the Neon branch's `DATABASE_URL` before `next build`. The tracking table is inherited via the branch fork — no bootstrap step is needed in the build.
+- For **production** deployments, the migration step is skipped. Production schema changes are applied manually via `doppler run --config prd -- bunx drizzle-kit migrate` after the one-time cutover bootstrap.
+- `drizzle-kit migrate` is idempotent — safe to run on every build even if no migration is pending.
 
-See [ADR-002](adr/002-preview-database-migrations.md) for the full decision record (including the 2026-05 update on switching from `push` to `migrate`).
+See [ADR-002](adr/002-preview-database-migrations.md) for the full decision record (including the 2026-05 update on switching from `push` to `migrate` and the cutover bootstrap procedure).
 
 ## Trigger.dev Integration
 

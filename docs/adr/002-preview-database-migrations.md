@@ -80,9 +80,13 @@ Note: `bun run db:push` is **not** equivalent — that script uses the default D
 
 This update keeps the original ADR-002 decision (preview migrations via Vercel build) in spirit, evolving only the _command_ per the original "manual step or dedicated migration workflow" wording. Issue #456 / PR for the switch carries the full context.
 
-### One-time bootstrap (per environment)
+### One-time bootstrap (per environment, NOT per build)
 
-`migrate` requires `drizzle.__drizzle_migrations` to track which migration files have been applied. Existing environments (dev/prod) have all schema state applied via push but no tracking table. `scripts/bootstrap-drizzle-migrations.ts` populates the table by computing the SHA-256 hash of each migration file (matching drizzle-orm's internal hash format) and inserting a row per migration. Idempotent: re-running is a no-op.
+`migrate` requires `drizzle.__drizzle_migrations` to track which migration files have been applied. Existing environments (dev/prod) have all schema state applied via push but no tracking table.
+
+`scripts/bootstrap-drizzle-migrations.ts` populates the table from a **frozen baseline manifest** of the 33 migration tags that existed at the cutover. Hashes and timestamps are read from `_journal.json` for those tags only — new migrations added after the cutover are NEVER auto-marked applied (they go through `drizzle-kit migrate` normally). Without that guardrail, running bootstrap on a non-bootstrapped environment after a new migration was added would mark the new migration as applied without executing its SQL — the same failure-mode-class as the `worth_it_reason` incident (Feb 2026).
+
+The script is idempotent (re-running is a no-op) but should still be treated as a **one-time per environment** operation. It is NOT part of the Vercel preview build — preview Neon branches inherit the bootstrapped tracking table from `main` (the Vercel Neon integration creates branches as point-in-time forks).
 
 ### Current canonical commands
 
@@ -90,13 +94,24 @@ This update keeps the original ADR-002 decision (preview migrations via Vercel b
 # Local dev (unchanged): rapid prototyping
 bun run db:push
 
-# Preview (Vercel build, automatic): bootstrap + migrate
-"vercel-build": "if [ \"$VERCEL_ENV\" = \"preview\" ]; then bun scripts/bootstrap-drizzle-migrations.ts && npx drizzle-kit migrate; fi && next build"
+# Preview (Vercel build, automatic): migrate only — bootstrap inherited via branch fork
+"vercel-build": "if [ \"$VERCEL_ENV\" = \"preview\" ]; then npx drizzle-kit migrate; fi && next build"
 
-# Production (manual, post-merge): bootstrap one-time, then migrate per release
-doppler run --config prd -- bun scripts/bootstrap-drizzle-migrations.ts   # one-time + idempotent
+# Production (manual): bootstrap once at the cutover, then migrate per migration-bearing PR
+doppler run --config prd -- bun scripts/bootstrap-drizzle-migrations.ts   # ONE-TIME at cutover
 doppler run --config prd -- bunx drizzle-kit migrate                       # per migration-bearing PR
 ```
+
+### Bootstrap ordering (cutover sequence)
+
+The bootstrap MUST run on each environment BEFORE the first migration-bearing PR after the cutover. Order of operations on prod for the cutover PR (this one) and beyond:
+
+1. PR for #456 merges to `main`. (No new migration files in this PR.)
+2. **Cutover step (one-time):** operator runs `bun scripts/bootstrap-drizzle-migrations.ts` against prod. Tracking table populated with 33 baseline rows.
+3. Vercel preview branches forked from main after step 2 inherit the populated tracking table.
+4. Future migration-bearing PRs deploy via `doppler run --config prd -- bunx drizzle-kit migrate` (no bootstrap needed; baseline is already in place).
+
+Dev environment: same — operator runs the bootstrap once locally (or via CI seed) before relying on `db:migrate`.
 
 ### Rationale for keeping prod manual
 
