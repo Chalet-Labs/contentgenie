@@ -545,7 +545,7 @@ export const canonicalTopicAliases = pgTable(
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => [
-    // Explicit FK name; auto-generated name exceeded Postgres 63-char limit (#451).
+    // Explicit name avoids drizzle-kit FK-name truncation churn (see migration 0032).
     foreignKey({
       name: "cta_canonical_topic_id_fk",
       columns: [table.canonicalTopicId],
@@ -580,7 +580,7 @@ export const episodeCanonicalTopics = pgTable(
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
   (table) => [
-    // Explicit FK name; auto-generated name exceeded Postgres 63-char limit (#451).
+    // Explicit name avoids drizzle-kit FK-name truncation churn (see migration 0032).
     foreignKey({
       name: "ect_canonical_topic_id_fk",
       columns: [table.canonicalTopicId],
@@ -623,7 +623,7 @@ export const canonicalTopicDigests = pgTable(
     generatedAt: timestamp("generated_at").defaultNow().notNull(),
   },
   (table) => [
-    // Explicit FK name; auto-generated name exceeded Postgres 63-char limit (#451).
+    // Explicit name avoids drizzle-kit FK-name truncation churn (see migration 0032).
     foreignKey({
       name: "ctd_canonical_topic_id_fk",
       columns: [table.canonicalTopicId],
