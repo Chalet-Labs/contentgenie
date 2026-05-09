@@ -4,7 +4,7 @@
 // Run locally: doppler run -- bun run test src/db/__tests__/canonical-topics.schema.test.ts
 
 import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
-import { sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   canonicalTopics,
@@ -531,10 +531,11 @@ describe.skipIf(!process.env.DATABASE_URL)(
 
       await db.execute(sql`DELETE FROM canonical_topics WHERE id = ${tmp.id}`);
 
-      const remaining = await db.execute<{ count: number }>(
-        sql`SELECT COUNT(*)::int AS count FROM canonical_topic_aliases WHERE canonical_topic_id = ${tmp.id}`,
+      const remaining = await db.$count(
+        canonicalTopicAliases,
+        eq(canonicalTopicAliases.canonicalTopicId, tmp.id),
       );
-      expect(remaining.rows[0].count).toBe(0);
+      expect(remaining).toBe(0);
     });
 
     // 18. FK cascade: deleting a parent canonical_topic also deletes its junction rows.
@@ -557,10 +558,11 @@ describe.skipIf(!process.env.DATABASE_URL)(
 
       await db.execute(sql`DELETE FROM canonical_topics WHERE id = ${tmp.id}`);
 
-      const remaining = await db.execute<{ count: number }>(
-        sql`SELECT COUNT(*)::int AS count FROM episode_canonical_topics WHERE canonical_topic_id = ${tmp.id}`,
+      const remaining = await db.$count(
+        episodeCanonicalTopics,
+        eq(episodeCanonicalTopics.canonicalTopicId, tmp.id),
       );
-      expect(remaining.rows[0].count).toBe(0);
+      expect(remaining).toBe(0);
     });
   },
 );

@@ -39,7 +39,7 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
       "server-only": path.resolve(
         __dirname,
-        "./node_modules/server-only/empty.js",
+        "./src/test/__mocks__/server-only.js",
       ),
     },
   },
