@@ -45,7 +45,7 @@ Remove the Vercel Neon integration and manage all branch creation, DATABASE_URL 
 - **Idempotent.** `drizzle-kit push` is safe to run multiple times — it only applies changes that differ from the current schema. Multiple queued builds for the same PR won't conflict.
 - **No race conditions.** The migration runs synchronously before `next build`, so the schema is guaranteed to be ready before any server-side code executes.
 - **Vercel integration handles lifecycle.** Branch creation on PR open and cleanup on PR merge are already managed by the Neon Vercel integration — no custom GitHub Actions needed.
-- **`--force` is safe for preview.** Preview Neon branches are ephemeral and isolated. The `--force` flag prevents interactive prompts in the non-TTY Vercel build environment. Production deployments skip the migration entirely (manual control via `bun run db:push`).
+- **`--force` is safe for preview.** Preview Neon branches are ephemeral and isolated. The `--force` flag prevents interactive prompts in the non-TTY Vercel build environment. Production deployments skip the migration entirely — see the Production deploy section below.
 
 ## Implementation
 
@@ -53,9 +53,19 @@ Remove the Vercel Neon integration and manage all branch creation, DATABASE_URL 
 - Add a `vercel-build` script to `package.json` that conditionally runs `drizzle-kit push --force` for preview environments before `next build`.
 - Vercel auto-detects the `vercel-build` script when the dashboard build command is not overridden.
 
+## Production deploy (manual, post-merge)
+
+Production schema is **not** auto-migrated. After a migration-bearing PR merges to `main`, run:
+
+```bash
+doppler run --config prd -- bunx drizzle-kit push
+```
+
+Note: `bun run db:push` is **not** equivalent — that script uses the default Doppler config (typically dev). The explicit `--config prd` form is required for the production database.
+
 ## Consequences
 
-- Production schema migrations remain a manual step (`bun run db:push` locally or via a dedicated migration workflow).
+- Production schema migrations remain a manual post-merge step (canonical command above).
 - The `NEON_API_KEY` GitHub Actions secret and `NEON_PROJECT_ID` variable can be removed if no other workflows need them.
 - Orphaned `preview/pr-*` Neon branches from the old workflow will expire via their 14-day TTL or can be manually deleted.
 - Migration visibility moves from a GitHub Actions check to Vercel build logs.
