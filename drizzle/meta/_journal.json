@@ -225,6 +225,13 @@
       "when": 1778236429104,
       "tag": "0031_fat_thaddeus_ross",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1778341997148,
+      "tag": "0032_superb_bullseye",
+      "breakpoints": true
     }
   ]
 }

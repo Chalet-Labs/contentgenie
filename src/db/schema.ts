@@ -13,6 +13,7 @@ import {
   index,
   uniqueIndex,
   check,
+  foreignKey,
   varchar,
   bigint,
   vector,
@@ -539,13 +540,17 @@ export const canonicalTopicAliases = pgTable(
   "canonical_topic_aliases",
   {
     id: serial("id").primaryKey(),
-    canonicalTopicId: integer("canonical_topic_id")
-      .references(() => canonicalTopics.id, { onDelete: "cascade" })
-      .notNull(),
+    canonicalTopicId: integer("canonical_topic_id").notNull(),
     alias: text("alias").notNull(),
     createdAt: timestamp("created_at").defaultNow().notNull(),
   },
   (table) => [
+    // Explicit name avoids drizzle-kit FK-name truncation churn (see migration 0032).
+    foreignKey({
+      name: "cta_canonical_topic_id_fk",
+      columns: [table.canonicalTopicId],
+      foreignColumns: [canonicalTopics.id],
+    }).onDelete("cascade"),
     uniqueIndex("cta_topic_alias_lower_uidx").on(
       table.canonicalTopicId,
       sql`lower(${table.alias})`,
@@ -562,9 +567,7 @@ export const episodeCanonicalTopics = pgTable(
     episodeId: integer("episode_id")
       .references(() => episodes.id, { onDelete: "cascade" })
       .notNull(),
-    canonicalTopicId: integer("canonical_topic_id")
-      .references(() => canonicalTopics.id, { onDelete: "cascade" })
-      .notNull(),
+    canonicalTopicId: integer("canonical_topic_id").notNull(),
     matchMethod: text("match_method")
       .$type<"auto" | "llm_disambig" | "new">()
       .notNull(),
@@ -577,6 +580,12 @@ export const episodeCanonicalTopics = pgTable(
     updatedAt: timestamp("updated_at").defaultNow().notNull(),
   },
   (table) => [
+    // Explicit name avoids drizzle-kit FK-name truncation churn (see migration 0032).
+    foreignKey({
+      name: "ect_canonical_topic_id_fk",
+      columns: [table.canonicalTopicId],
+      foreignColumns: [canonicalTopics.id],
+    }).onDelete("cascade"),
     uniqueIndex("ect_episode_canonical_uidx").on(
       table.episodeId,
       table.canonicalTopicId,
@@ -602,9 +611,7 @@ export const canonicalTopicDigests = pgTable(
   "canonical_topic_digests",
   {
     id: serial("id").primaryKey(),
-    canonicalTopicId: integer("canonical_topic_id")
-      .references(() => canonicalTopics.id, { onDelete: "cascade" })
-      .notNull(),
+    canonicalTopicId: integer("canonical_topic_id").notNull(),
     digestMarkdown: text("digest_markdown").notNull(),
     consensusPoints: jsonb("consensus_points").$type<string[]>().notNull(),
     disagreementPoints: jsonb("disagreement_points")
@@ -616,6 +623,12 @@ export const canonicalTopicDigests = pgTable(
     generatedAt: timestamp("generated_at").defaultNow().notNull(),
   },
   (table) => [
+    // Explicit name avoids drizzle-kit FK-name truncation churn (see migration 0032).
+    foreignKey({
+      name: "ctd_canonical_topic_id_fk",
+      columns: [table.canonicalTopicId],
+      foreignColumns: [canonicalTopics.id],
+    }).onDelete("cascade"),
     uniqueIndex("ctd_canonical_topic_uidx").on(table.canonicalTopicId),
     check(
       "ctd_episode_count_gte_0",

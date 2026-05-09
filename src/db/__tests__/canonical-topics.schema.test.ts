@@ -4,7 +4,7 @@
 // Run locally: doppler run -- bun run test src/db/__tests__/canonical-topics.schema.test.ts
 
 import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
-import { sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   canonicalTopics,
@@ -511,6 +511,58 @@ describe.skipIf(!process.env.DATABASE_URL)(
         "23514",
         "cta_alias_not_blank",
       );
+    });
+
+    // 17. FK cascade: deleting a parent canonical_topic also deletes its aliases.
+    // Locks down the cta_canonical_topic_id_fk ON DELETE CASCADE contract — see
+    // migration 0032 for the rename rationale.
+    it("cascades alias deletion when the parent canonical_topic is deleted", async () => {
+      const [tmp] = await db
+        .insert(canonicalTopics)
+        .values({
+          ...validTopic,
+          label: "__schema_test_alias_cascade",
+          normalizedLabel: "__schema_test_alias_cascade",
+        })
+        .returning({ id: canonicalTopics.id });
+      await db
+        .insert(canonicalTopicAliases)
+        .values({ canonicalTopicId: tmp.id, alias: "__schema_test_alias" });
+
+      await db.execute(sql`DELETE FROM canonical_topics WHERE id = ${tmp.id}`);
+
+      const remaining = await db.$count(
+        canonicalTopicAliases,
+        eq(canonicalTopicAliases.canonicalTopicId, tmp.id),
+      );
+      expect(remaining).toBe(0);
+    });
+
+    // 18. FK cascade: deleting a parent canonical_topic also deletes its junction rows.
+    // Locks down the ect_canonical_topic_id_fk ON DELETE CASCADE contract.
+    it("cascades junction deletion when the parent canonical_topic is deleted", async () => {
+      const [tmp] = await db
+        .insert(canonicalTopics)
+        .values({
+          ...validTopic,
+          label: "__schema_test_junction_cascade",
+          normalizedLabel: "__schema_test_junction_cascade",
+        })
+        .returning({ id: canonicalTopics.id });
+      await db.insert(episodeCanonicalTopics).values({
+        episodeId: fixtureEpisodeId,
+        canonicalTopicId: tmp.id,
+        matchMethod: "auto",
+        coverageScore: 0.5,
+      });
+
+      await db.execute(sql`DELETE FROM canonical_topics WHERE id = ${tmp.id}`);
+
+      const remaining = await db.$count(
+        episodeCanonicalTopics,
+        eq(episodeCanonicalTopics.canonicalTopicId, tmp.id),
+      );
+      expect(remaining).toBe(0);
     });
   },
 );
