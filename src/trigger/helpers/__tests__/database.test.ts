@@ -67,6 +67,18 @@ function makeInsertChain(returningValue: unknown[] = [{ id: 42 }]) {
   return chain;
 }
 
+// Chainable insert builder for `.values().onConflictDoNothing()` (no .returning).
+// Used by trackEpisodeRun's insert path.
+function makeInsertOnConflictChain() {
+  const chain = {
+    values: vi.fn(),
+    onConflictDoNothing: vi.fn(),
+  };
+  chain.values.mockReturnValue(chain);
+  chain.onConflictDoNothing.mockResolvedValue(undefined);
+  return chain;
+}
+
 // Chainable delete builder
 function makeDeleteChain() {
   const chain = { where: vi.fn() };
@@ -124,6 +136,18 @@ describe("persistTranscript", () => {
     );
   });
 
+  it("accepts 'podcast-site' as transcriptSource (CHECK + TS contract)", async () => {
+    const chain = makeUpdateChain([{ id: 3 }]);
+    mockUpdate.mockReturnValue(chain);
+
+    const { persistTranscript } = await import("@/trigger/helpers/database");
+    await persistTranscript(123, "extracted text", "podcast-site");
+
+    expect(chain.set).toHaveBeenCalledWith(
+      expect.objectContaining({ transcriptSource: "podcast-site" }),
+    );
+  });
+
   it("throws when episode is not found", async () => {
     const chain = makeUpdateChain([]); // empty returning = not found
     mockUpdate.mockReturnValue(chain);
@@ -167,6 +191,7 @@ describe("persistEpisodeSummary", () => {
     enclosureUrl: "https://audio.example.com/ep.mp3",
     duration: 3600,
     datePublished: 1700000000,
+    link: "https://example.com/ep",
   };
 
   beforeEach(() => {
@@ -227,6 +252,7 @@ describe("persistEpisodeSummary", () => {
       expect.objectContaining({
         summary: "Summary text",
         summaryStatus: "completed",
+        episodeLink: "https://example.com/ep",
       }),
     );
     expect(episodesChain.returning).toHaveBeenCalled();
@@ -378,5 +404,68 @@ describe("persistEpisodeSummary", () => {
       // Delete ran before the insert failure — topics are cleared until next retry
       expect(mockDelete).toHaveBeenCalledTimes(1);
     });
+  });
+});
+
+describe("trackEpisodeRun", () => {
+  const baseEpisode = {
+    id: 42,
+    feedId: 100,
+    title: "Test Episode",
+    description: "desc",
+    enclosureUrl: "https://audio.example.com/ep.mp3",
+    duration: 3600,
+    datePublished: 1700000000,
+    link: "https://example.com/ep",
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("inserts episodeLink on the trackEpisodeRun insert path", async () => {
+    mockPodcastsFindFirst.mockResolvedValue({ id: 1 });
+    mockEpisodesFindFirst.mockResolvedValue(null);
+
+    const chain = makeInsertOnConflictChain();
+    mockInsert.mockReturnValue(chain);
+
+    const { trackEpisodeRun } = await import("@/trigger/helpers/database");
+    await trackEpisodeRun(baseEpisode as never, undefined, "run-id-123");
+
+    expect(chain.values).toHaveBeenCalledWith(
+      expect.objectContaining({ episodeLink: "https://example.com/ep" }),
+    );
+  });
+
+  it("normalizes missing or empty link to null on insert", async () => {
+    mockPodcastsFindFirst.mockResolvedValue({ id: 1 });
+    mockEpisodesFindFirst.mockResolvedValue(null);
+
+    const { trackEpisodeRun } = await import("@/trigger/helpers/database");
+
+    const chain1 = makeInsertOnConflictChain();
+    mockInsert.mockReturnValueOnce(chain1);
+    const { link: _omit, ...episodeNoLink } = baseEpisode;
+    void _omit;
+    await trackEpisodeRun(episodeNoLink as never, undefined, "run-id-1");
+    expect(chain1.values).toHaveBeenCalledWith(
+      expect.objectContaining({ episodeLink: null }),
+    );
+
+    const chain2 = makeInsertOnConflictChain();
+    mockInsert.mockReturnValueOnce(chain2);
+    await trackEpisodeRun(
+      { ...baseEpisode, link: "   " } as never,
+      undefined,
+      "run-id-2",
+    );
+    expect(chain2.values).toHaveBeenCalledWith(
+      expect.objectContaining({ episodeLink: null }),
+    );
   });
 });

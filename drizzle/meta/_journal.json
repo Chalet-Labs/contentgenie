@@ -232,6 +232,13 @@
       "when": 1778341997148,
       "tag": "0032_superb_bullseye",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1778415532009,
+      "tag": "0033_handy_jackpot",
+      "breakpoints": true
     }
   ]
 }

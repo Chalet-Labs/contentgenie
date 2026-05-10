@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@clerk/nextjs/server";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { episodes } from "@/db/schema";
+import { episodes, type TranscriptSource } from "@/db/schema";
 import { getEpisodeById, getPodcastById } from "@/lib/podcastindex";
 import { createRateLimitChecker } from "@/lib/rate-limit";
 import { parseScoreOrNull } from "@/lib/score-utils";
@@ -214,11 +214,7 @@ export async function GET(
 
     // Check if we have a cached summary in the database
     let summary = null;
-    let transcriptSource:
-      | "podcastindex"
-      | "assemblyai"
-      | "description-url"
-      | null = null;
+    let transcriptSource: TranscriptSource | null = null;
     let episodeDbId: number | null = null;
     let transcriptStatus: string | null = null;
     try {

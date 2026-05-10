@@ -1,7 +1,7 @@
 import { task, retry, logger, metadata, wait } from "@trigger.dev/sdk";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
-import { episodes } from "@/db/schema";
+import { episodes, type TranscriptSource } from "@/db/schema";
 import { asPodcastIndexEpisodeId } from "@/types/ids";
 import {
   fetchTranscript,
@@ -27,7 +27,7 @@ export type FetchTranscriptPayload = {
 
 export type FetchTranscriptResult = {
   transcript: string | undefined;
-  source: "podcastindex" | "assemblyai" | "description-url" | null | undefined;
+  source: TranscriptSource | null | undefined;
 };
 
 export const fetchTranscriptTask = task({
@@ -58,12 +58,7 @@ export const fetchTranscriptTask = task({
     logger.info("Checking for cached transcription");
 
     let transcript: string | undefined;
-    let transcriptSource:
-      | "cached"
-      | "podcastindex"
-      | "description-url"
-      | "assemblyai"
-      | "none" = "none";
+    let transcriptSource: TranscriptSource | "cached" | "none" = "none";
 
     // Step 1: Check cached transcription in database (cheapest source), unless force=true
     if (!force) {

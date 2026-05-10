@@ -1,10 +1,18 @@
 import { eq, sql } from "drizzle-orm";
 import type { NeonDatabase } from "drizzle-orm/neon-serverless";
 import { db } from "@/db";
-import { episodes, episodeTopics, podcasts } from "@/db/schema";
+import {
+  episodes,
+  episodeTopics,
+  podcasts,
+  type TranscriptSource,
+} from "@/db/schema";
 import type * as schema from "@/db/schema";
 import { upsertPodcast } from "@/db/helpers";
-import { asPodcastIndexEpisodeId } from "@/types/ids";
+import {
+  asPodcastIndexEpisodeId,
+  type PodcastIndexEpisodeId,
+} from "@/types/ids";
 import type { SummaryResult } from "@/lib/openrouter";
 import type {
   PodcastIndexPodcast,
@@ -66,6 +74,30 @@ async function ensurePodcast(
 }
 
 /**
+ * Common PodcastIndex-derived columns shared by every episode-insert path.
+ * Centralizes the `episode.link?.trim() || null` normalization so callers
+ * cannot persist empty-string links and cannot drift on which fields land.
+ */
+export function mapPodcastIndexEpisodeToInsertValues(
+  episode: PodcastIndexEpisode,
+  podcastId: number,
+  podcastIndexId: PodcastIndexEpisodeId,
+) {
+  return {
+    podcastId,
+    podcastIndexId,
+    title: episode.title,
+    description: episode.description,
+    audioUrl: episode.enclosureUrl,
+    episodeLink: episode.link?.trim() || null,
+    duration: episode.duration,
+    publishDate: episode.datePublished
+      ? new Date(episode.datePublished * 1000)
+      : null,
+  };
+}
+
+/**
  * Creates or updates an episode stub with run tracking info so the
  * GET endpoint can discover in-progress runs on page refresh.
  */
@@ -98,15 +130,7 @@ export async function trackEpisodeRun(
     await db
       .insert(episodes)
       .values({
-        podcastId,
-        podcastIndexId: piId,
-        title: episode.title,
-        description: episode.description,
-        audioUrl: episode.enclosureUrl,
-        duration: episode.duration,
-        publishDate: episode.datePublished
-          ? new Date(episode.datePublished * 1000)
-          : null,
+        ...mapPodcastIndexEpisodeToInsertValues(episode, podcastId, piId),
         summaryRunId: runId,
         summaryStatus: "running",
       })
@@ -142,7 +166,7 @@ export async function updateEpisodeStatus(
 export async function persistTranscript(
   episodeId: number,
   transcript: string,
-  source: "podcastindex" | "assemblyai" | "description-url",
+  source: TranscriptSource,
 ): Promise<void> {
   const now = new Date();
   // Trigger payload uses numeric form; brand for DB lookup.
@@ -342,15 +366,7 @@ export async function persistEpisodeSummary(
     const [inserted] = await db
       .insert(episodes)
       .values({
-        podcastId,
-        podcastIndexId: piId,
-        title: episode.title,
-        description: episode.description,
-        audioUrl: episode.enclosureUrl,
-        duration: episode.duration,
-        publishDate: episode.datePublished
-          ? new Date(episode.datePublished * 1000)
-          : null,
+        ...mapPodcastIndexEpisodeToInsertValues(episode, podcastId, piId),
         summary: summary.summary,
         keyTakeaways: summary.keyTakeaways,
         worthItScore: summary.worthItScore.toFixed(2),
