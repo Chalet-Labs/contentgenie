@@ -28,10 +28,10 @@ export function banklessSlug(title: string): string {
     .replace(/^-+|-+$/g, "");
 }
 
-const CONTAINER_RE = /<div\b[^>]*?\bid=["']?insideEpisode\b/i;
-const MARKER_RE = /<strong>\s*TRANSCRIPT\s*<\/strong>/i;
+const CONTAINER_RE = /<div\b[^>]*?\sid=["']?insideEpisode(?=["'\s>])/i;
+const MARKER_RE = /<strong\b[^>]*>\s*TRANSCRIPT\s*<\/strong>/i;
 const END_ANCHOR_RE =
-  /<\w+\s+[^>]*?class=["']?[^"'>]*?\b(?:postSidebar|rule)\b|<\/article>|<aside\b|<footer\b/i;
+  /<\w+\b[^>]*?\sclass=["']?[^"'>]*?(?<=\s|["'])(?:postSidebar|rule)(?=["'\s>])|<\/article>|<aside\b|<footer\b/i;
 
 /**
  * Bankless extractor — fetches the episode page, narrows to the transcript
