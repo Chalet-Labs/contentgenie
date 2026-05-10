@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 // ─── Mock next/navigation ─────────────────────────────────────────────────────
@@ -133,5 +133,8 @@ describe("SynthesizeButton", () => {
 
     // Resolve and let the finally-block run (router.push fires there).
     resolve({ success: true, data: { status: "queued" } });
+    await waitFor(() =>
+      expect(mockRouterPush).toHaveBeenCalledWith("/topic/42"),
+    );
   });
 });

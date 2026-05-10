@@ -34,35 +34,38 @@ export function TopicDigestListView({
           {digests.length} digest{digests.length === 1 ? "" : "s"} · last 7 days
         </CardDescription>
       </CardHeader>
-      <CardContent className="space-y-1">
-        {digests.map((d) => (
-          <Link
-            key={d.canonicalId}
-            href={`/topic/${d.canonicalId}`}
-            className="flex items-start gap-3 rounded-md p-3 transition-colors hover:bg-accent"
-          >
-            <div className="min-w-0 flex-1 space-y-0.5">
-              <div className="flex flex-wrap items-center gap-1.5">
-                <span className="font-medium leading-snug">{d.label}</span>
-                <Badge variant="outline">{d.kind}</Badge>
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {d.episodeCount} episode{d.episodeCount === 1 ? "" : "s"}
-              </p>
-              {d.consensusPreview && (
-                <p className="line-clamp-2 text-sm text-muted-foreground">
-                  {d.consensusPreview}
-                </p>
-              )}
-            </div>
-            <div className="flex shrink-0 items-center self-center">
-              <ChevronRight
-                className="h-4 w-4 text-muted-foreground"
-                aria-hidden="true"
-              />
-            </div>
-          </Link>
-        ))}
+      <CardContent>
+        <ul className="space-y-1">
+          {digests.map((d) => (
+            <li key={d.canonicalId}>
+              <Link
+                href={`/topic/${d.canonicalId}`}
+                className="flex items-start gap-3 rounded-md p-3 transition-colors hover:bg-accent"
+              >
+                <div className="min-w-0 flex-1 space-y-0.5">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className="font-medium leading-snug">{d.label}</span>
+                    <Badge variant="outline">{d.kind}</Badge>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {d.episodeCount} episode{d.episodeCount === 1 ? "" : "s"}
+                  </p>
+                  {d.consensusPreview && (
+                    <p className="line-clamp-2 text-sm text-muted-foreground">
+                      {d.consensusPreview}
+                    </p>
+                  )}
+                </div>
+                <div className="flex shrink-0 items-center self-center">
+                  <ChevronRight
+                    className="h-4 w-4 text-muted-foreground"
+                    aria-hidden="true"
+                  />
+                </div>
+              </Link>
+            </li>
+          ))}
+        </ul>
       </CardContent>
     </Card>
   );

@@ -1,4 +1,4 @@
-import { inArray } from "drizzle-orm";
+import { asc, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { canonicalTopics, canonicalTopicDigests } from "@/db/schema";
 import { canonicalTopicCompletedSummaryCount } from "@/lib/admin/canonical-topic-episode-count";
@@ -55,7 +55,8 @@ export async function fetchChipMetadata(
           canonicalTopicDigests.episodeCountAtGeneration,
       })
       .from(canonicalTopicDigests)
-      .where(inArray(canonicalTopicDigests.canonicalTopicId, canonicalIds)),
+      .where(inArray(canonicalTopicDigests.canonicalTopicId, canonicalIds))
+      .orderBy(asc(canonicalTopicDigests.generatedAt)),
   ]);
   const digestById = new Map(
     digestRows.map((r) => [r.canonicalTopicId, r.episodeCountAtGeneration]),

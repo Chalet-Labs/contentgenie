@@ -885,8 +885,9 @@ const getRecentTopicDigestsSchema = z
 
 function truncateConsensus(points: string[]): string {
   const first = points[0] ?? "";
-  if (first.length <= MAX_CONSENSUS_PREVIEW_CHARS) return first;
-  return first.slice(0, MAX_CONSENSUS_PREVIEW_CHARS) + "…";
+  const chars = Array.from(first);
+  if (chars.length <= MAX_CONSENSUS_PREVIEW_CHARS) return first;
+  return chars.slice(0, MAX_CONSENSUS_PREVIEW_CHARS).join("") + "…";
 }
 
 export type RecentTopicDigest = {
@@ -939,8 +940,17 @@ export async function getRecentTopicDigests(input?: {
         .orderBy(desc(canonicalTopicDigests.generatedAt))
         .limit(parsed.data.limit);
 
+      // Deduplicate: keep the most recent digest per topic (rows are already
+      // ordered by desc generatedAt, so the first occurrence per topic wins).
+      const seen = new Set<number>();
+      const uniqueDigestRows = digestRows.filter((r) => {
+        if (seen.has(r.canonicalId)) return false;
+        seen.add(r.canonicalId);
+        return true;
+      });
+
       // Pass 2: episode counts via the helper, single-table FROM only.
-      const canonicalIds = digestRows.map((r) => r.canonicalId);
+      const canonicalIds = uniqueDigestRows.map((r) => r.canonicalId);
       const episodeCountById = new Map<number, number>();
       if (canonicalIds.length > 0) {
         const countRows = await db
@@ -957,7 +967,7 @@ export async function getRecentTopicDigests(input?: {
 
       return {
         success: true,
-        data: digestRows.map((r) => ({
+        data: uniqueDigestRows.map((r) => ({
           canonicalId: r.canonicalId,
           label: r.label,
           kind: r.kind,

@@ -37,7 +37,10 @@ export function SynthesizeButton({
     try {
       await triggerTopicDigestGeneration({ canonicalTopicId });
     } catch (err) {
-      console.error("[SynthesizeButton] action failed", err);
+      console.error("[SynthesizeButton] action failed", {
+        canonicalTopicId,
+        err,
+      });
     } finally {
       router.push(`/topic/${canonicalTopicId}`);
       // Don't clear isPending — the navigation unmounts this component.
