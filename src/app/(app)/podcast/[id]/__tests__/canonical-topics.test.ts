@@ -7,10 +7,23 @@ const mockInnerWhere = vi.fn(() => ({ as: mockInnerAs }));
 const mockInnerJoin = vi.fn(() => ({ where: mockInnerWhere }));
 const mockInnerFrom = vi.fn(() => ({ innerJoin: mockInnerJoin }));
 
-// Outer chain: select → from → where → orderBy.
+// Outer chain: select → from → where → orderBy (window-rank result).
 const mockOuterOrderBy = vi.fn();
 const mockOuterWhere = vi.fn(() => ({ orderBy: mockOuterOrderBy }));
 const mockOuterFrom = vi.fn(() => ({ where: mockOuterWhere }));
+
+// Secondary chain (post-enrichment): TWO parallel single-table queries:
+//   - select → from(canonicalTopics) → where(inArray)  (episode-count rows)
+//   - select → from(canonicalTopicDigests) → where(inArray)  (digest rows)
+// Each `.where(inArray(...))` is awaited directly. We track them as a queue
+// drained in order; tests push results via `mockSecondaryQueryResults.push(...)`.
+const mockSecondaryQueryResults: unknown[] = [];
+const mockSecondaryWhere = vi.fn(() =>
+  mockSecondaryQueryResults.length > 0
+    ? Promise.resolve(mockSecondaryQueryResults.shift())
+    : Promise.resolve([]),
+);
+const mockSecondaryFrom = vi.fn(() => ({ where: mockSecondaryWhere }));
 
 const mockSelect = vi.fn();
 
@@ -30,6 +43,18 @@ vi.mock("@/db/schema", () => ({
     kind: "ct.kind",
     status: "ct.status",
   },
+  canonicalTopicDigests: {
+    canonicalTopicId: "ctd.canonicalTopicId",
+    episodeCountAtGeneration: "ctd.episodeCountAtGeneration",
+  },
+}));
+
+vi.mock("@/lib/admin/canonical-topic-episode-count", () => ({
+  canonicalTopicEpisodeCount: vi.fn(() => ({
+    type: "sql",
+    template: ["(SELECT count(*)...)"],
+    values: [],
+  })),
 }));
 
 vi.mock("drizzle-orm", async (importOriginal) => {
@@ -50,13 +75,37 @@ vi.mock("drizzle-orm", async (importOriginal) => {
 
 import { getCanonicalTopicsByPodcastIndexId } from "@/app/(app)/podcast/[id]/canonical-topics";
 import { CANONICAL_TOPICS_PER_EPISODE } from "@/lib/episodes/topic-display";
+import { STALENESS_GROWTH_THRESHOLD } from "@/lib/topic-digest-thresholds";
 
 describe("getCanonicalTopicsByPodcastIndexId", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
+    // Re-install chain factories (resetAllMocks wipes implementations).
+    mockInnerAs.mockImplementation(() => ({}));
+    mockInnerWhere.mockImplementation(() => ({ as: mockInnerAs }));
+    mockInnerJoin.mockImplementation(() => ({ where: mockInnerWhere }));
+    mockInnerFrom.mockImplementation(() => ({ innerJoin: mockInnerJoin }));
+    mockOuterWhere.mockImplementation(() => ({ orderBy: mockOuterOrderBy }));
+    mockOuterFrom.mockImplementation(() => ({ where: mockOuterWhere }));
+    mockSecondaryWhere.mockImplementation(() =>
+      mockSecondaryQueryResults.length > 0
+        ? Promise.resolve(mockSecondaryQueryResults.shift())
+        : Promise.resolve([]),
+    );
+    mockSecondaryFrom.mockImplementation(() => ({
+      where: mockSecondaryWhere,
+    }));
+    // Up to four select() calls: inner subquery, outer SELECT, then
+    // pass-A (canonical_topics counts), pass-B (canonical_topic_digests
+    // staleness). Pass A+B run in parallel (Promise.all) and only fire
+    // when outer returned >0 rows.
     mockSelect
       .mockReturnValueOnce({ from: mockInnerFrom })
-      .mockReturnValueOnce({ from: mockOuterFrom });
+      .mockReturnValueOnce({ from: mockOuterFrom })
+      .mockReturnValueOnce({ from: mockSecondaryFrom })
+      .mockReturnValueOnce({ from: mockSecondaryFrom });
+    // Default: secondary enrichment queue is empty → pass-A/B return [].
+    mockSecondaryQueryResults.length = 0;
   });
 
   it("short-circuits on empty input without hitting the DB", async () => {
@@ -73,7 +122,8 @@ describe("getCanonicalTopicsByPodcastIndexId", () => {
     expect(result).toEqual({});
   });
 
-  it("groups rows under PodcastIndex id and projects to chips", async () => {
+  it("groups rows under PodcastIndex id and projects to chips (no enrichment)", async () => {
+    // No secondary enrichment: chips emit base shape (no episodeCount/synthesizable).
     mockOuterOrderBy.mockResolvedValue([
       {
         episodeId: 1,
@@ -150,5 +200,88 @@ describe("getCanonicalTopicsByPodcastIndexId", () => {
     expect(mockOuterWhere).toHaveBeenCalledWith(
       expect.objectContaining({ val: CANONICAL_TOPICS_PER_EPISODE }),
     );
+  });
+
+  // ── Post-enrichment / synthesizable state tests ────────────────────────────
+
+  // Helper: row that the outer (window-rank) select returns for a given chip.
+  const outerRow = (topicId: number) => ({
+    episodeId: 1,
+    topicId,
+    label: "AI Ethics",
+    kind: "concept",
+    status: "active",
+  });
+
+  it("post-enrichment: episodeCount + synthesizable set on chips when secondary query returns metadata", async () => {
+    mockOuterOrderBy.mockResolvedValue([outerRow(100)]);
+    // Pass A: count rows; pass B: digest rows (empty → no digest).
+    mockSecondaryQueryResults.push([{ id: 100, episodeCount: 5 }], []);
+    const piKey = asPodcastIndexEpisodeId("PI-1");
+    const result = await getCanonicalTopicsByPodcastIndexId([
+      { id: 1, podcastIndexId: piKey },
+    ]);
+    expect(result[piKey]![0]!.episodeCount).toBe(5);
+    expect(result[piKey]![0]!.synthesizable).toBe(true);
+  });
+
+  it("post-enrichment: no digest (pass-B returns empty) → synthesizable=true", async () => {
+    mockOuterOrderBy.mockResolvedValue([outerRow(100)]);
+    mockSecondaryQueryResults.push([{ id: 100, episodeCount: 5 }], []);
+    const piKey = asPodcastIndexEpisodeId("PI-1");
+    const result = await getCanonicalTopicsByPodcastIndexId([
+      { id: 1, podcastIndexId: piKey },
+    ]);
+    expect(result[piKey]![0]!.synthesizable).toBe(true);
+  });
+
+  it("post-enrichment: fresh digest (growth < STALENESS_GROWTH_THRESHOLD) → synthesizable=false", async () => {
+    const episodeCountAtGeneration = 10;
+    const episodeCount =
+      episodeCountAtGeneration + STALENESS_GROWTH_THRESHOLD - 1;
+    mockOuterOrderBy.mockResolvedValue([outerRow(100)]);
+    mockSecondaryQueryResults.push(
+      [{ id: 100, episodeCount }],
+      [{ id: 100, episodeCountAtGeneration }],
+    );
+    const piKey = asPodcastIndexEpisodeId("PI-1");
+    const result = await getCanonicalTopicsByPodcastIndexId([
+      { id: 1, podcastIndexId: piKey },
+    ]);
+    expect(result[piKey]![0]!.synthesizable).toBe(false);
+  });
+
+  it("post-enrichment: stale digest (growth >= STALENESS_GROWTH_THRESHOLD) → synthesizable=true", async () => {
+    const episodeCountAtGeneration = 10;
+    const episodeCount = episodeCountAtGeneration + STALENESS_GROWTH_THRESHOLD;
+    mockOuterOrderBy.mockResolvedValue([outerRow(100)]);
+    mockSecondaryQueryResults.push(
+      [{ id: 100, episodeCount }],
+      [{ id: 100, episodeCountAtGeneration }],
+    );
+    const piKey = asPodcastIndexEpisodeId("PI-1");
+    const result = await getCanonicalTopicsByPodcastIndexId([
+      { id: 1, podcastIndexId: piKey },
+    ]);
+    expect(result[piKey]![0]!.synthesizable).toBe(true);
+  });
+
+  it("post-enrichment failure: chips emit without episodeCount/synthesizable; no error thrown", async () => {
+    mockOuterOrderBy.mockResolvedValue([outerRow(100)]);
+    // Push a rejecting thenable so Promise.all rejects → outer try/catch.
+    mockSecondaryQueryResults.push(Promise.reject(new Error("boom")));
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const piKey = asPodcastIndexEpisodeId("PI-1");
+    const result = await getCanonicalTopicsByPodcastIndexId([
+      { id: 1, podcastIndexId: piKey },
+    ]);
+    expect(result[piKey]![0]!.episodeCount).toBeUndefined();
+    expect(result[piKey]![0]!.synthesizable).toBeUndefined();
+    // Action returns chips successfully (degraded UX, not broken page).
+    expect(consoleSpy).toHaveBeenCalledWith(
+      "[podcast] chip metadata enrichment failed (chips render without synthesize CTA)",
+      expect.any(Error),
+    );
+    consoleSpy.mockRestore();
   });
 });

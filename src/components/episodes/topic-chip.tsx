@@ -13,6 +13,8 @@ import {
 import { cn } from "@/lib/utils";
 import { badgeVariants } from "@/components/ui/badge";
 import type { CanonicalTopicKind, CanonicalTopicStatus } from "@/db/schema";
+import { MIN_DERIVED_COUNT_FOR_DIGEST } from "@/lib/topic-digest-thresholds";
+import { SynthesizeButton } from "@/components/episodes/synthesize-button";
 
 export interface TopicChipProps {
   canonicalTopicId: number;
@@ -20,6 +22,8 @@ export interface TopicChipProps {
   kind: CanonicalTopicKind;
   status?: CanonicalTopicStatus;
   className?: string;
+  synthesizable?: boolean;
+  episodeCount?: number;
 }
 
 interface KindMeta {
@@ -45,10 +49,12 @@ export function TopicChip({
   kind,
   status,
   className,
+  synthesizable,
+  episodeCount,
 }: TopicChipProps) {
   const { Icon, iconClass } = kindMeta[kind];
 
-  return (
+  const chipLink = (
     <Link
       href={`/topic/${canonicalTopicId}`}
       className={cn(
@@ -64,4 +70,18 @@ export function TopicChip({
       <span className="min-w-0 truncate">{label}</span>
     </Link>
   );
+
+  if (
+    synthesizable === true &&
+    (episodeCount ?? 0) >= MIN_DERIVED_COUNT_FOR_DIGEST
+  ) {
+    return (
+      <span className="inline-flex items-center gap-0.5">
+        {chipLink}
+        <SynthesizeButton canonicalTopicId={canonicalTopicId} label={label} />
+      </span>
+    );
+  }
+
+  return chipLink;
 }

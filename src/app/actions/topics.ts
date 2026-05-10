@@ -2,7 +2,16 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { and, desc, eq, isNotNull, isNull, sql } from "drizzle-orm";
+import {
+  and,
+  desc,
+  eq,
+  gte,
+  inArray,
+  isNotNull,
+  isNull,
+  sql,
+} from "drizzle-orm";
 import { tasks, auth as triggerAuth } from "@trigger.dev/sdk";
 
 import { withAdminAction } from "@/lib/auth-wrapper";
@@ -52,6 +61,7 @@ import {
   STALENESS_GROWTH_THRESHOLD,
   RELATED_TOPICS_LIMIT,
 } from "@/lib/topic-digest-thresholds";
+import { MAX_CONSENSUS_PREVIEW_CHARS } from "@/lib/topic-digest-preview";
 import { formatVector } from "@/lib/entity-resolution";
 import { coerceEmbedding } from "@/trigger/helpers/coerce-embedding";
 
@@ -857,6 +867,116 @@ export async function triggerTopicDigestRefresh(input: {
         error: e,
       });
       return { success: false, error: "token-failed" };
+    }
+  });
+}
+
+// ---------------------------------------------------------------------------
+// getRecentTopicDigests — dashboard "this week's takes" section (#400)
+// ---------------------------------------------------------------------------
+
+const getRecentTopicDigestsSchema = z
+  .object({
+    limit: z.number().int().min(1).max(20).default(5),
+  })
+  .strict();
+
+function truncateConsensus(points: string[]): string {
+  const first = points[0] ?? "";
+  if (first.length <= MAX_CONSENSUS_PREVIEW_CHARS) return first;
+  return first.slice(0, MAX_CONSENSUS_PREVIEW_CHARS) + "…";
+}
+
+export type RecentTopicDigest = {
+  canonicalId: number;
+  label: string;
+  kind: CanonicalTopicKind;
+  episodeCount: number;
+  generatedAt: Date;
+  consensusPreview: string;
+};
+
+export async function getRecentTopicDigests(input?: {
+  limit?: number;
+}): Promise<ActionResult<RecentTopicDigest[]>> {
+  return withAuthAction(async (_userId) => {
+    const parsed = getRecentTopicDigestsSchema.safeParse(input ?? {});
+    if (!parsed.success) {
+      return {
+        success: false,
+        error: parsed.error.issues[0]?.message ?? "Invalid input",
+      };
+    }
+    try {
+      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+      // Two-pass: fetch the digest rows + canonical metadata first, then
+      // fetch episode counts in a separate single-table query. Avoids the
+      // `canonicalTopicEpisodeCount()` helper-in-JOIN-context bug (Drizzle
+      // emits double-qualified `"canonical_topics"."canonical_topics"."id"`
+      // when canonicalTopics is referenced from any multi-table query),
+      // which raises Postgres 42P01 errorMissingRTE. The helper is correct
+      // for single-table `from(canonicalTopics)` queries (its only existing
+      // production usage pattern) — we use it that way in pass 2.
+      const digestRows = await db
+        .select({
+          canonicalId: canonicalTopics.id,
+          label: canonicalTopics.label,
+          kind: canonicalTopics.kind,
+          generatedAt: canonicalTopicDigests.generatedAt,
+          consensusPoints: canonicalTopicDigests.consensusPoints,
+        })
+        .from(canonicalTopics)
+        .innerJoin(
+          canonicalTopicDigests,
+          eq(canonicalTopicDigests.canonicalTopicId, canonicalTopics.id),
+        )
+        .where(
+          and(
+            eq(canonicalTopics.status, "active"),
+            gte(canonicalTopicDigests.generatedAt, sevenDaysAgo),
+          ),
+        )
+        .orderBy(desc(canonicalTopicDigests.generatedAt))
+        .limit(parsed.data.limit);
+
+      // Pass 2: episode counts via the helper, single-table FROM only.
+      const canonicalIds = digestRows.map((r) => r.canonicalId);
+      const episodeCountById = new Map<number, number>();
+      if (canonicalIds.length > 0) {
+        const countRows = await db
+          .select({
+            id: canonicalTopics.id,
+            episodeCount: canonicalTopicEpisodeCount(),
+          })
+          .from(canonicalTopics)
+          .where(inArray(canonicalTopics.id, canonicalIds));
+        for (const r of countRows) {
+          episodeCountById.set(r.id, Number(r.episodeCount ?? 0));
+        }
+      }
+
+      return {
+        success: true,
+        data: digestRows.map((r) => ({
+          canonicalId: r.canonicalId,
+          label: r.label,
+          kind: r.kind,
+          episodeCount: episodeCountById.get(r.canonicalId) ?? 0,
+          generatedAt: r.generatedAt,
+          consensusPreview: truncateConsensus(
+            (r.consensusPoints as string[] | null) ?? [],
+          ),
+        })),
+      };
+    } catch (err) {
+      // Convert DB exceptions into a soft failure so the dashboard
+      // <Suspense> boundary doesn't escape the whole page. The component
+      // already handles `success: false` by returning null.
+      console.error("[getRecentTopicDigests] DB query failed:", err);
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : "db-query-failed",
+      };
     }
   });
 }

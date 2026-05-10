@@ -51,6 +51,8 @@ export interface CanonicalTopicChip {
   label: string;
   kind: CanonicalTopicKind;
   status?: CanonicalTopicStatus;
+  episodeCount?: number;
+  synthesizable?: boolean;
 }
 
 export interface EpisodeListDTO {

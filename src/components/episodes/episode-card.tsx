@@ -243,6 +243,8 @@ export function EpisodeCard({
                       label={chip.label}
                       kind={chip.kind}
                       status={chip.status}
+                      synthesizable={chip.synthesizable}
+                      episodeCount={chip.episodeCount}
                     />
                   ))}
               </div>

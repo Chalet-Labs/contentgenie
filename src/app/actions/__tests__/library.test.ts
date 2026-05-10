@@ -28,6 +28,13 @@ const mockInsertReturning = vi.fn();
 const mockSelect = vi.fn();
 const mockFrom = vi.fn();
 const mockInnerJoin = vi.fn();
+// Secondary post-enrichment now uses two parallel single-table queries
+// (canonical_topics episode counts + canonical_topic_digests staleness).
+// `mockSecondaryQueryResults` is a queue: each `.where(inArray(...))` call
+// in the secondary path drains one entry. Tests that need to populate
+// enrichment push to it; default empty drains as []s and yields no metadata.
+const mockSecondaryQueryResults: unknown[] = [];
+const mockSecondaryWhere = vi.fn();
 const mockSelectWhere = vi.fn();
 const mockLimit = vi.fn();
 
@@ -99,7 +106,21 @@ vi.mock("@/db", () => ({
             },
             where: (...wArgs: unknown[]) => {
               mockSelectWhere(...wArgs);
-              return { limit: (n: number) => mockLimit(n) };
+              mockSecondaryWhere(...wArgs);
+              // Secondary post-enrichment paths (`.from(canonicalTopics).where(inArray(...))`
+              // and `.from(canonicalTopicDigests).where(inArray(...))`) await
+              // the result directly. Drain a queued result if present.
+              const next =
+                mockSecondaryQueryResults.length > 0
+                  ? mockSecondaryQueryResults.shift()
+                  : undefined;
+              return {
+                limit: (n: number) => mockLimit(n),
+                then: (
+                  onFulfilled?: ((v: unknown) => unknown) | null,
+                  onRejected?: ((r: unknown) => unknown) | null,
+                ) => Promise.resolve(next ?? []).then(onFulfilled, onRejected),
+              };
             },
           };
         },
@@ -174,6 +195,16 @@ vi.mock("@/db/schema", () => ({
     timestamp: "timestamp",
     note: "note",
   },
+  canonicalTopics: {
+    id: "ct.id",
+    label: "ct.label",
+    kind: "ct.kind",
+    status: "ct.status",
+  },
+  canonicalTopicDigests: {
+    canonicalTopicId: "ctd.canonicalTopicId",
+    episodeCountAtGeneration: "ctd.episodeCountAtGeneration",
+  },
 }));
 
 // Mock @/db/library-columns (column constants are just shape stubs at runtime)
@@ -200,6 +231,17 @@ vi.mock("drizzle-orm", () => ({
   isNotNull: vi.fn((col: unknown) => ({ _isNotNull: col })),
   avg: vi.fn((col: unknown) => ({ _avg: col })),
   count: vi.fn((col: unknown) => ({ _count: col })),
+  inArray: vi.fn((col: unknown, vals: unknown) => ({
+    _inArray: { col, vals },
+  })),
+}));
+
+vi.mock("@/lib/admin/canonical-topic-episode-count", () => ({
+  canonicalTopicEpisodeCount: vi.fn(() => ({
+    type: "sql",
+    template: ["(SELECT count(*)...)"],
+    values: [],
+  })),
 }));
 
 const importLibrary = async () => import("@/app/actions/library");
@@ -507,6 +549,8 @@ describe("getUserLibrary", () => {
   beforeEach(happyPathSetup(mockAuth, mockEnsureUserExists));
   beforeEach(() => {
     mockUserLibraryFindMany.mockResolvedValue([itemA, itemB, itemC]);
+    // Reset secondary-query queue before each test (no metadata = no CTA).
+    mockSecondaryQueryResults.length = 0;
   });
   afterEach(() => vi.restoreAllMocks());
 
@@ -723,6 +767,117 @@ describe("getUserLibrary", () => {
     result.items.forEach((item) => {
       expect(item.episode.canonicalTopics).toBeUndefined();
     });
+  });
+
+  // ── Post-enrichment: chip metadata (episodeCount + synthesizable) ─────────
+
+  // Helper to build a fixture item with one canonical topic chip.
+  const itemWithTopic = (id: number) => ({
+    ...itemA,
+    episode: {
+      ...itemA.episode,
+      canonicalTopics: [
+        {
+          coverageScore: 0.9,
+          canonicalTopic: {
+            id,
+            label: "Topic A",
+            kind: "concept",
+            status: "active",
+          },
+        },
+      ],
+    },
+  });
+
+  it("post-enrichment: episodeCount is set on chips from secondary query", async () => {
+    mockUserLibraryFindMany.mockResolvedValue([itemWithTopic(10)]);
+    // Two parallel single-table queries: pass A = canonical_topics counts,
+    // pass B = canonical_topic_digests staleness.
+    mockSecondaryQueryResults.push(
+      [{ id: 10, episodeCount: 7 }], // pass A
+      [], // pass B (no digest)
+    );
+    const { getUserLibrary } = await importLibrary();
+    const result = await getUserLibrary();
+    expect(result.error).toBeNull();
+    expect(result.items[0]!.episode.canonicalTopics![0]!.episodeCount).toBe(7);
+  });
+
+  it("post-enrichment: synthesizable=true when no digest (digest pass returns empty)", async () => {
+    mockUserLibraryFindMany.mockResolvedValue([itemWithTopic(10)]);
+    mockSecondaryQueryResults.push(
+      [{ id: 10, episodeCount: 5 }],
+      [], // no digest row → digestEpisodeCountAtGeneration === null
+    );
+    const { getUserLibrary } = await importLibrary();
+    const result = await getUserLibrary();
+    expect(result.items[0]!.episode.canonicalTopics![0]!.synthesizable).toBe(
+      true,
+    );
+  });
+
+  it("post-enrichment: synthesizable=false when digest is fresh (growth < STALENESS_GROWTH_THRESHOLD)", async () => {
+    const { STALENESS_GROWTH_THRESHOLD } =
+      await import("@/lib/topic-digest-thresholds");
+    mockUserLibraryFindMany.mockResolvedValue([itemWithTopic(10)]);
+    const episodeCountAtGeneration = 10;
+    const episodeCount =
+      episodeCountAtGeneration + STALENESS_GROWTH_THRESHOLD - 1;
+    mockSecondaryQueryResults.push(
+      [{ id: 10, episodeCount }],
+      [{ id: 10, episodeCountAtGeneration }],
+    );
+    const { getUserLibrary } = await importLibrary();
+    const result = await getUserLibrary();
+    expect(result.items[0]!.episode.canonicalTopics![0]!.synthesizable).toBe(
+      false,
+    );
+  });
+
+  it("post-enrichment: synthesizable=true when digest is stale (growth >= STALENESS_GROWTH_THRESHOLD)", async () => {
+    const { STALENESS_GROWTH_THRESHOLD } =
+      await import("@/lib/topic-digest-thresholds");
+    mockUserLibraryFindMany.mockResolvedValue([itemWithTopic(10)]);
+    const episodeCountAtGeneration = 10;
+    const episodeCount = episodeCountAtGeneration + STALENESS_GROWTH_THRESHOLD;
+    mockSecondaryQueryResults.push(
+      [{ id: 10, episodeCount }],
+      [{ id: 10, episodeCountAtGeneration }],
+    );
+    const { getUserLibrary } = await importLibrary();
+    const result = await getUserLibrary();
+    expect(result.items[0]!.episode.canonicalTopics![0]!.synthesizable).toBe(
+      true,
+    );
+  });
+
+  it("post-enrichment: secondary query failure → chips emitted without synthesizable (no error thrown)", async () => {
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    mockUserLibraryFindMany.mockResolvedValue([itemWithTopic(10)]);
+    // Push a thenable that rejects so Promise.all rejects.
+    mockSecondaryQueryResults.push(Promise.reject(new Error("DB failure")));
+    const { getUserLibrary } = await importLibrary();
+    const result = await getUserLibrary();
+    // No error thrown, items returned, chip has no synthesizable
+    expect(result.error).toBeNull();
+    expect(
+      result.items[0]!.episode.canonicalTopics![0]!.synthesizable,
+    ).toBeUndefined();
+    expect(consoleSpy).toHaveBeenCalledWith(
+      "[getUserLibrary] chip metadata enrichment failed",
+      expect.any(Error),
+    );
+    consoleSpy.mockRestore();
+  });
+
+  it("post-enrichment: skips secondary query entirely when no chips (no extra DB call)", async () => {
+    // itemA/itemB/itemC have no canonicalTopics → ids.length === 0 → skip
+    const { getUserLibrary } = await importLibrary();
+    await getUserLibrary();
+    // No secondary-pass `where(inArray(...))` call should fire when there
+    // are no chips to enrich.
+    expect(mockSecondaryWhere).not.toHaveBeenCalled();
   });
 });
 

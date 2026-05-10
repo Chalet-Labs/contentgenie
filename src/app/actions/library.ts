@@ -2,9 +2,26 @@
 
 import { auth } from "@clerk/nextjs/server";
 import { revalidatePath } from "next/cache";
-import { eq, and, desc, asc, isNotNull, avg, count } from "drizzle-orm";
+import {
+  eq,
+  and,
+  desc,
+  asc,
+  isNotNull,
+  avg,
+  count,
+  inArray,
+} from "drizzle-orm";
 import { db } from "@/db";
-import { episodes, userLibrary, bookmarks } from "@/db/schema";
+import {
+  episodes,
+  userLibrary,
+  bookmarks,
+  canonicalTopics,
+  canonicalTopicDigests,
+} from "@/db/schema";
+import { canonicalTopicEpisodeCount } from "@/lib/admin/canonical-topic-episode-count";
+import { STALENESS_GROWTH_THRESHOLD } from "@/lib/topic-digest-thresholds";
 import { upsertPodcast, ensureUserExists } from "@/db/helpers";
 import {
   LIBRARY_ENTRY_COLUMNS,
@@ -280,7 +297,8 @@ export async function getUserLibrary(
       return sortDirection === "asc" ? -comparison : comparison;
     });
 
-    const mappedItems: SavedItemDTO[] = sortedItems.map((item) => {
+    // First pass: build chips from relational query results
+    const rawMappedItems = sortedItems.map((item) => {
       const chips: CanonicalTopicChip[] = (item.episode.canonicalTopics ?? [])
         .flatMap((j) => {
           const ct = j.canonicalTopic;
@@ -304,6 +322,79 @@ export async function getUserLibrary(
         },
       };
     });
+
+    // Second pass: post-enrichment of chip metadata (episodeCount + synthesizable).
+    // Drizzle's relational API can't inline correlated subqueries on nested
+    // canonical topics, so we run a secondary inArray query keyed on all unique
+    // canonical topic ids from the result set (bounded fan-out, typically tens).
+    const allChipIds = new Set<number>();
+    for (const item of rawMappedItems) {
+      for (const chip of item.episode.canonicalTopics ?? []) {
+        allChipIds.add(chip.id);
+      }
+    }
+
+    const chipMeta = new Map<
+      number,
+      { episodeCount: number; digestEpisodeCountAtGeneration: number | null }
+    >();
+
+    const ids = Array.from(allChipIds);
+    if (ids.length > 0) {
+      try {
+        // Two-pass to avoid the `canonicalTopicEpisodeCount()` helper's
+        // double-qualified-id bug when canonical_topics is referenced from a
+        // multi-table query (Drizzle emits `"canonical_topics"."canonical_topics"."id"`,
+        // raising Postgres 42P01). Pass 1 = single-table episode-count
+        // (helper-safe). Pass 2 = digest staleness via leftJoin.
+        const [countRows, digestRows] = await Promise.all([
+          db
+            .select({
+              id: canonicalTopics.id,
+              episodeCount: canonicalTopicEpisodeCount(),
+            })
+            .from(canonicalTopics)
+            .where(inArray(canonicalTopics.id, ids)),
+          db
+            .select({
+              id: canonicalTopicDigests.canonicalTopicId,
+              episodeCountAtGeneration:
+                canonicalTopicDigests.episodeCountAtGeneration,
+            })
+            .from(canonicalTopicDigests)
+            .where(inArray(canonicalTopicDigests.canonicalTopicId, ids)),
+        ]);
+        const digestById = new Map<number, number>();
+        for (const d of digestRows) {
+          digestById.set(d.id, d.episodeCountAtGeneration);
+        }
+        for (const r of countRows) {
+          chipMeta.set(r.id, {
+            episodeCount: Number(r.episodeCount ?? 0),
+            digestEpisodeCountAtGeneration: digestById.get(r.id) ?? null,
+          });
+        }
+      } catch (err) {
+        console.error("[getUserLibrary] chip metadata enrichment failed", err);
+        // Chips render without synthesizable CTA — degraded UX, not broken page.
+      }
+    }
+
+    const mappedItems: SavedItemDTO[] = rawMappedItems.map((item) => ({
+      ...item,
+      episode: {
+        ...item.episode,
+        canonicalTopics: item.episode.canonicalTopics?.map((chip) => {
+          const meta = chipMeta.get(chip.id);
+          if (!meta) return chip;
+          const synthesizable =
+            meta.digestEpisodeCountAtGeneration === null ||
+            meta.episodeCount - meta.digestEpisodeCountAtGeneration >=
+              STALENESS_GROWTH_THRESHOLD;
+          return { ...chip, episodeCount: meta.episodeCount, synthesizable };
+        }),
+      },
+    }));
 
     return { items: mappedItems, error: null };
   } catch (error) {

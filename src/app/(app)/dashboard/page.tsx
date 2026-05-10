@@ -14,6 +14,10 @@ import {
 import { QueueSection } from "@/components/dashboard/queue-section";
 import { TrendingTopicsLoading } from "@/components/dashboard/trending-topics";
 import { TrendingTopicsSection } from "@/app/(app)/dashboard/trending-topics-section";
+import {
+  TopicDigestList,
+  TopicDigestListLoading,
+} from "@/components/dashboard/topic-digest-list";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 
@@ -109,6 +113,10 @@ export default async function DashboardPage() {
       {/* Header + Trending topics — compact top section */}
       <div className="space-y-4">
         <DashboardHeader description="Welcome back! Here's what's new from your subscriptions." />
+
+        <Suspense fallback={<TopicDigestListLoading />}>
+          <TopicDigestList />
+        </Suspense>
 
         <Suspense fallback={<TrendingTopicsLoading />}>
           <TrendingTopicsSection />

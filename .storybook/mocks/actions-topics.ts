@@ -15,6 +15,21 @@ export const triggerTopicDigestGeneration = async () => ({
   data: { status: "cached" as const, digestId: 22 },
 });
 
+// Used by `<TopicDigestList>` (#400). Default returns empty so the component
+// renders null (its own empty-state behavior). Stories that need a populated
+// list mock this per-story.
+export const getRecentTopicDigests = async () => ({
+  success: true as const,
+  data: [] as Array<{
+    canonicalId: number;
+    label: string;
+    kind: string;
+    episodeCount: number;
+    generatedAt: Date;
+    consensusPreview: string;
+  }>,
+});
+
 export const getTopicDetailData = async () => ({
   success: true as const,
   data: {
