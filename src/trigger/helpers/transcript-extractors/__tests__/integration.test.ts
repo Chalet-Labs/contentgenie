@@ -3,10 +3,23 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 vi.mock("@/lib/security", () => ({ safeFetch: vi.fn() }));
 
 import { safeFetch } from "@/lib/security";
-import { runPodcastExtractor } from "@/trigger/helpers/transcript-extractors";
-import { BANKLESS_PODCAST_INDEX_ID } from "@/trigger/helpers/transcript-extractors/bankless";
-import { LEX_FRIDMAN_PODCAST_INDEX_ID } from "@/trigger/helpers/transcript-extractors/lex-fridman";
-import { LIMITLESS_PODCAST_INDEX_ID } from "@/trigger/helpers/transcript-extractors/limitless";
+import {
+  register,
+  runPodcastExtractor,
+  __resetRegistry,
+} from "@/trigger/helpers/transcript-extractors";
+import {
+  BANKLESS_PODCAST_INDEX_ID,
+  banklessExtractor,
+} from "@/trigger/helpers/transcript-extractors/bankless";
+import {
+  LEX_FRIDMAN_PODCAST_INDEX_ID,
+  lexFridmanExtractor,
+} from "@/trigger/helpers/transcript-extractors/lex-fridman";
+import {
+  LIMITLESS_PODCAST_INDEX_ID,
+  limitlessExtractor,
+} from "@/trigger/helpers/transcript-extractors/limitless";
 import type { ExtractorContext } from "@/trigger/helpers/transcript-extractors/types";
 
 const banklessHtml =
@@ -26,6 +39,10 @@ const makeCtx = (
 });
 
 beforeEach(() => {
+  __resetRegistry();
+  register(LEX_FRIDMAN_PODCAST_INDEX_ID, lexFridmanExtractor);
+  register(LIMITLESS_PODCAST_INDEX_ID, limitlessExtractor);
+  register(BANKLESS_PODCAST_INDEX_ID, banklessExtractor);
   vi.clearAllMocks();
   vi.mocked(safeFetch).mockResolvedValue(banklessHtml);
 });
