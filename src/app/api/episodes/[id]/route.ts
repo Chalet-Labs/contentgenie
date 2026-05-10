@@ -218,6 +218,7 @@ export async function GET(
       | "podcastindex"
       | "assemblyai"
       | "description-url"
+      | "podcast-site"
       | null = null;
     let episodeDbId: number | null = null;
     let transcriptStatus: string | null = null;

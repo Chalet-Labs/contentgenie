@@ -103,6 +103,7 @@ export async function trackEpisodeRun(
         title: episode.title,
         description: episode.description,
         audioUrl: episode.enclosureUrl,
+        episodeLink: episode.link ?? null,
         duration: episode.duration,
         publishDate: episode.datePublished
           ? new Date(episode.datePublished * 1000)
@@ -142,7 +143,7 @@ export async function updateEpisodeStatus(
 export async function persistTranscript(
   episodeId: number,
   transcript: string,
-  source: "podcastindex" | "assemblyai" | "description-url",
+  source: "podcastindex" | "assemblyai" | "description-url" | "podcast-site",
 ): Promise<void> {
   const now = new Date();
   // Trigger payload uses numeric form; brand for DB lookup.
@@ -347,6 +348,7 @@ export async function persistEpisodeSummary(
         title: episode.title,
         description: episode.description,
         audioUrl: episode.enclosureUrl,
+        episodeLink: episode.link ?? null,
         duration: episode.duration,
         publishDate: episode.datePublished
           ? new Date(episode.datePublished * 1000)

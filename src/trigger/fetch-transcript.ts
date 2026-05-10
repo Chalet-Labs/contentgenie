@@ -27,7 +27,13 @@ export type FetchTranscriptPayload = {
 
 export type FetchTranscriptResult = {
   transcript: string | undefined;
-  source: "podcastindex" | "assemblyai" | "description-url" | null | undefined;
+  source:
+    | "podcastindex"
+    | "assemblyai"
+    | "description-url"
+    | "podcast-site"
+    | null
+    | undefined;
 };
 
 export const fetchTranscriptTask = task({

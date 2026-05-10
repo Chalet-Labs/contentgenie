@@ -250,6 +250,7 @@ describe("poll-new-episodes", () => {
             id: 2001,
             title: "Episode A",
             enclosureUrl: "https://example.com/a.mp3",
+            link: "https://example.com/a",
             description: "Desc A",
             duration: 600,
             datePublished: 1700000000,
@@ -259,6 +260,7 @@ describe("poll-new-episodes", () => {
             id: 2002,
             title: "Episode B",
             enclosureUrl: "https://example.com/b.mp3",
+            link: "https://example.com/b",
             description: "Desc B",
             duration: 1200,
             datePublished: 0,
@@ -282,6 +284,7 @@ describe("poll-new-episodes", () => {
           podcastIndexId: "2001",
           title: "Episode A",
           audioUrl: "https://example.com/a.mp3",
+          episodeLink: "https://example.com/a",
           transcriptStatus: "fetching",
         }),
         expect.objectContaining({
@@ -289,6 +292,7 @@ describe("poll-new-episodes", () => {
           podcastIndexId: "2002",
           title: "Episode B",
           audioUrl: "https://example.com/b.mp3",
+          episodeLink: "https://example.com/b",
           transcriptStatus: "fetching",
         }),
       ]);

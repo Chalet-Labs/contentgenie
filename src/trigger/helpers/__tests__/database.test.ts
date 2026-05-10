@@ -67,6 +67,18 @@ function makeInsertChain(returningValue: unknown[] = [{ id: 42 }]) {
   return chain;
 }
 
+// Chainable insert builder for `.values().onConflictDoNothing()` (no .returning).
+// Used by trackEpisodeRun's insert path.
+function makeInsertOnConflictChain() {
+  const chain = {
+    values: vi.fn(),
+    onConflictDoNothing: vi.fn(),
+  };
+  chain.values.mockReturnValue(chain);
+  chain.onConflictDoNothing.mockResolvedValue(undefined);
+  return chain;
+}
+
 // Chainable delete builder
 function makeDeleteChain() {
   const chain = { where: vi.fn() };
@@ -167,6 +179,7 @@ describe("persistEpisodeSummary", () => {
     enclosureUrl: "https://audio.example.com/ep.mp3",
     duration: 3600,
     datePublished: 1700000000,
+    link: "https://example.com/ep",
   };
 
   beforeEach(() => {
@@ -227,6 +240,7 @@ describe("persistEpisodeSummary", () => {
       expect.objectContaining({
         summary: "Summary text",
         summaryStatus: "completed",
+        episodeLink: "https://example.com/ep",
       }),
     );
     expect(episodesChain.returning).toHaveBeenCalled();
@@ -378,5 +392,41 @@ describe("persistEpisodeSummary", () => {
       // Delete ran before the insert failure — topics are cleared until next retry
       expect(mockDelete).toHaveBeenCalledTimes(1);
     });
+  });
+});
+
+describe("trackEpisodeRun", () => {
+  const baseEpisode = {
+    id: 42,
+    feedId: 100,
+    title: "Test Episode",
+    description: "desc",
+    enclosureUrl: "https://audio.example.com/ep.mp3",
+    duration: 3600,
+    datePublished: 1700000000,
+    link: "https://example.com/ep",
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("inserts episodeLink on the trackEpisodeRun insert path", async () => {
+    mockPodcastsFindFirst.mockResolvedValue({ id: 1 });
+    mockEpisodesFindFirst.mockResolvedValue(null);
+
+    const chain = makeInsertOnConflictChain();
+    mockInsert.mockReturnValue(chain);
+
+    const { trackEpisodeRun } = await import("@/trigger/helpers/database");
+    await trackEpisodeRun(baseEpisode as never, undefined, "run-id-123");
+
+    expect(chain.values).toHaveBeenCalledWith(
+      expect.objectContaining({ episodeLink: "https://example.com/ep" }),
+    );
   });
 });

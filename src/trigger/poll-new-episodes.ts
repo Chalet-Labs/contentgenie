@@ -108,6 +108,7 @@ export async function pollSingleFeed(podcast: typeof podcasts.$inferSelect) {
           title: ep.title,
           description: ep.description,
           audioUrl: ep.enclosureUrl,
+          episodeLink: ep.link ?? null,
           duration: ep.duration,
           publishDate: ep.datePublished
             ? new Date(ep.datePublished * 1000)
