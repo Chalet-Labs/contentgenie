@@ -110,3 +110,5 @@ See [docs/secrets-management.md](docs/secrets-management.md) for the full variab
 - All non-public routes protected by Clerk middleware.
 - No `.env` files committed — Doppler handles secrets injection.
 - Server actions validate `auth()` before mutations. API routes verify authentication before processing.
+
+When picking up work in an unfamiliar area, run `rg -l "" .agentnotes/cdt/` to surface prior CDT session logs.
