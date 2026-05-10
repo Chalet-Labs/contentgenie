@@ -117,10 +117,14 @@ export async function pollSingleFeed(podcast: typeof podcasts.$inferSelect) {
         // Self-set on `podcastIndexId` keeps `.returning()` yielding rows for
         // already-existing episodes. The `episodeLink` COALESCE backfills
         // existing rows whose link was null when first inserted (pre-#426),
-        // while preserving any non-null value already on the row.
+        // while preserving any non-null value already on the row. `updatedAt`
+        // bumps only on the actual NULL→value backfill transition — bumping
+        // it unconditionally would churn every existing episode on every poll
+        // (the `podcastIndexId` self-set already touches every row).
         set: {
           podcastIndexId: sql`excluded.podcast_index_id`,
           episodeLink: sql`COALESCE(${episodes.episodeLink}, excluded.episode_link)`,
+          updatedAt: sql`CASE WHEN ${episodes.episodeLink} IS NULL AND excluded.episode_link IS NOT NULL THEN NOW() ELSE ${episodes.updatedAt} END`,
         },
       })
       .returning({ id: episodes.id, podcastIndexId: episodes.podcastIndexId });
