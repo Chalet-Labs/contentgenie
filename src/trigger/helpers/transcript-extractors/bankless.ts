@@ -21,7 +21,7 @@ export const BANKLESS_PODCAST_INDEX_ID = "357756";
 export function banklessSlug(title: string): string {
   return title
     .normalize("NFKD")
-    .replace(/[̀-ͯ]/g, "")
+    .replace(/[\u0300-\u036F]/g, "")
     .toLowerCase()
     .replace(/['‘’"“”]/g, "")
     .replace(/[^a-z0-9]+/g, "-")
@@ -31,7 +31,7 @@ export function banklessSlug(title: string): string {
 const CONTAINER_RE = /<div\b[^>]*?\bid=["']?insideEpisode\b/i;
 const MARKER_RE = /<strong>\s*TRANSCRIPT\s*<\/strong>/i;
 const END_ANCHOR_RE =
-  /<\w+\s+[^>]*?class=["']?(?:postSidebar|rule)\b|<\/article>|<aside\b|<footer\b/i;
+  /<\w+\s+[^>]*?class=["']?[^"'>]*?\b(?:postSidebar|rule)\b|<\/article>|<aside\b|<footer\b/i;
 
 /**
  * Bankless extractor — fetches the episode page, narrows to the transcript
