@@ -244,7 +244,6 @@ export function EpisodeCard({
                       kind={chip.kind}
                       status={chip.status}
                       synthesizable={chip.synthesizable}
-                      episodeCount={chip.episodeCount}
                     />
                   ))}
               </div>

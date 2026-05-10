@@ -1,6 +1,6 @@
 "use client";
 
-import { useTransition } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Sparkles, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -22,19 +22,27 @@ export function SynthesizeButton({
   label,
 }: SynthesizeButtonProps) {
   const router = useRouter();
-  const [isPending, startTransition] = useTransition();
+  // Explicit useState (NOT useTransition): React 18's `useTransition` does
+  // not track async work passed to `startTransition` — `isPending` flips off
+  // as soon as the synchronous portion of the callback returns, leaving a
+  // window where the user can double-click and fire two action invocations.
+  // A manual loading flag covers the entire awaited lifecycle.
+  const [isPending, setIsPending] = useState(false);
 
-  const handleClick = (e: React.MouseEvent) => {
+  const handleClick = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    startTransition(async () => {
-      try {
-        await triggerTopicDigestGeneration({ canonicalTopicId });
-      } catch (err) {
-        console.error("[SynthesizeButton] action failed", err);
-      }
+    if (isPending) return;
+    setIsPending(true);
+    try {
+      await triggerTopicDigestGeneration({ canonicalTopicId });
+    } catch (err) {
+      console.error("[SynthesizeButton] action failed", err);
+    } finally {
       router.push(`/topic/${canonicalTopicId}`);
-    });
+      // Don't clear isPending — the navigation unmounts this component.
+      // Clearing here would briefly re-enable the button mid-route-change.
+    }
   };
 
   return (

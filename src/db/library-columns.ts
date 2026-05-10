@@ -51,7 +51,12 @@ export interface CanonicalTopicChip {
   label: string;
   kind: CanonicalTopicKind;
   status?: CanonicalTopicStatus;
-  episodeCount?: number;
+  /**
+   * Pre-derived "is this canonical synthesizable right now?" flag (ADR-051),
+   * computed in the action layer via `isDigestSynthesizable(...)`. The chip
+   * render-time check is just `synthesizable === true` — the count threshold
+   * is already encoded inside the predicate.
+   */
   synthesizable?: boolean;
 }
 

@@ -20,7 +20,7 @@ vi.mock("next/link", () => ({
   ),
 }));
 
-// Mock SynthesizeButton to a sentinel so chip tests don't need navigation/action mocks
+// Mock SynthesizeButton to a sentinel so chip tests don't need navigation/action mocks.
 vi.mock("@/components/episodes/synthesize-button", () => ({
   SynthesizeButton: ({
     canonicalTopicId,
@@ -37,13 +37,6 @@ vi.mock("@/components/episodes/synthesize-button", () => ({
       Synthesize
     </button>
   ),
-}));
-
-// Mock MIN_DERIVED_COUNT_FOR_DIGEST via the thresholds module (real value = 3)
-vi.mock("@/lib/topic-digest-thresholds", () => ({
-  MIN_DERIVED_COUNT_FOR_DIGEST: 3,
-  STALENESS_GROWTH_THRESHOLD: 3,
-  RELATED_TOPICS_LIMIT: 5,
 }));
 
 describe("TopicChip", () => {
@@ -133,12 +126,11 @@ describe("TopicChip — synthesize variant", () => {
     kind: "release" as const,
   };
 
-  // ── Gate passes: synthesizable=true + episodeCount >= 3 ─────────────────
+  // The chip is dumb: it only checks `synthesizable === true`. Threshold and
+  // staleness logic live in `isDigestSynthesizable` at the action layer.
 
-  it("renders synthesize button when synthesizable=true and episodeCount=3", () => {
-    render(
-      <TopicChip {...defaultProps} synthesizable={true} episodeCount={3} />,
-    );
+  it("renders synthesize button when synthesizable=true", () => {
+    render(<TopicChip {...defaultProps} synthesizable={true} />);
     const button = screen.getByRole("button", {
       name: /synthesize digest for/i,
     });
@@ -149,50 +141,27 @@ describe("TopicChip — synthesize variant", () => {
     );
   });
 
-  it("renders synthesize button when synthesizable=true and episodeCount > 3", () => {
-    render(
-      <TopicChip {...defaultProps} synthesizable={true} episodeCount={10} />,
-    );
-    expect(
-      screen.getByRole("button", { name: /synthesize digest for/i }),
-    ).toBeInTheDocument();
-  });
-
-  // ── Gate fails: episodeCount < MIN_DERIVED_COUNT_FOR_DIGEST ─────────────
-
-  it("no button when synthesizable=true but episodeCount=2 (below threshold)", () => {
-    render(
-      <TopicChip {...defaultProps} synthesizable={true} episodeCount={2} />,
-    );
+  it("no button when synthesizable=false", () => {
+    render(<TopicChip {...defaultProps} synthesizable={false} />);
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
   });
 
-  // ── Gate fails: synthesizable=false ─────────────────────────────────────
-
-  it("no button when synthesizable=false even with high episodeCount", () => {
-    render(
-      <TopicChip {...defaultProps} synthesizable={false} episodeCount={10} />,
-    );
+  it("no button when synthesizable is undefined (default)", () => {
+    render(<TopicChip {...defaultProps} />);
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
   });
-
-  // ── Base case: no new props → original rendering unchanged ───────────────
 
   it("base case (no new props): renders single link, no wrapper span, no button", () => {
     const { container } = render(<TopicChip {...defaultProps} />);
-    // Link still rendered
     expect(screen.getByRole("link")).toBeInTheDocument();
-    // No button
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
     // No wrapper span (chip renders as Link directly)
     expect(container.querySelector("span.inline-flex")).not.toBeInTheDocument();
   });
 
-  // ── Wrapper span present when synthesize gate passes ─────────────────────
-
   it("wraps in inline-flex span when synthesize gate passes", () => {
     const { container } = render(
-      <TopicChip {...defaultProps} synthesizable={true} episodeCount={5} />,
+      <TopicChip {...defaultProps} synthesizable={true} />,
     );
     const wrapper = container.querySelector("span.inline-flex");
     expect(wrapper).toBeInTheDocument();

@@ -4,16 +4,16 @@
 // skipped in CI. Locally:
 //   doppler run -- bun run test src/app/actions/__tests__/topics-recent-digests.integration.test.ts
 //
-// Why this test exists: PR #400 originally shipped a query that did
-// `.from(canonicalTopicDigests).innerJoin(canonicalTopics, ...)`. The
-// `canonicalTopicEpisodeCount()` helper emits a correlated subquery that
-// references `canonical_topics.id` via fully-qualified `${canonicalTopics}`
-// interpolation. Postgres rejected the resulting SQL with 42P01 ("invalid
-// reference to FROM-clause entry for table 'canonical_topics'") because the
-// helper requires `canonicalTopics` to be the primary FROM. The pure-mock
-// unit tests didn't catch this — only a real DB round-trip does. See
-// MEMORY.md `lesson_vi_mock_real_db_fallthrough` and the project's
-// "QA must run doppler real-DB tests" feedback note.
+// Why this test exists: an early shape of `getRecentTopicDigests` placed
+// `canonicalTopicEpisodeCount()` in a multi-table SELECT (innerJoin chain).
+// Drizzle's table-symbol interpolation produced a double-qualified
+// `"canonical_topics"."canonical_topics"."id"` reference inside the
+// correlated subquery, which Postgres rejected with 42P01 ("invalid
+// reference to FROM-clause entry"). The pure-mock unit tests don't observe
+// the SQL string and didn't catch it — only a real DB round-trip does. The
+// shipped fix splits enrichment into two single-table passes; this test
+// pins the round-trip happy path. See MEMORY.md
+// `lesson_vi_mock_real_db_fallthrough` for the broader pattern.
 
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { sql } from "drizzle-orm";
@@ -26,11 +26,11 @@ vi.mock("@clerk/nextjs/server", () => ({
   auth: vi.fn().mockResolvedValue({ userId: "user_integration_test" }),
 }));
 
-const LABEL_PREFIX = "__integration_400_";
+const LABEL_PREFIX = "__integration_recent_digests_";
 let fixtureTopicId: number;
 
 describe.skipIf(!process.env.DATABASE_URL)(
-  "issue #400 regression: getRecentTopicDigests runs against real DB",
+  "getRecentTopicDigests — real DB regression (42P01 / FROM-clause)",
   () => {
     beforeAll(async () => {
       // Insert a single canonical topic with an associated digest in the
@@ -42,7 +42,7 @@ describe.skipIf(!process.env.DATABASE_URL)(
           normalizedLabel: `${LABEL_PREFIX}topic`,
           kind: "concept",
           status: "active",
-          summary: "Integration fixture for #400",
+          summary: "Integration fixture for getRecentTopicDigests",
           ongoing: false,
           relevance: 0.5,
           identityEmbedding: EMBEDDING,
@@ -53,7 +53,7 @@ describe.skipIf(!process.env.DATABASE_URL)(
 
       await db.insert(canonicalTopicDigests).values({
         canonicalTopicId: fixtureTopicId,
-        digestMarkdown: "__integration_400_digest_md",
+        digestMarkdown: "__integration_digest_md",
         consensusPoints: ["Integration test consensus point one."],
         disagreementPoints: ["Integration test disagreement."],
         episodeIds: [1, 2, 3],
@@ -76,10 +76,7 @@ describe.skipIf(!process.env.DATABASE_URL)(
 
       const result = await getRecentTopicDigests({ limit: 20 });
 
-      // Most important assertion: the action does NOT throw a NeonDbError
-      // and returns success:true. Bug #400 had the action throw 42P01
-      // because the correlated subquery couldn't resolve `canonical_topics`
-      // when it was on the JOIN side instead of the FROM side.
+      // Most important assertion: the action does NOT throw a NeonDbError.
       expect(result.success).toBe(true);
       if (!result.success) return; // narrow
 
@@ -91,8 +88,8 @@ describe.skipIf(!process.env.DATABASE_URL)(
       expect(fixtureRow!.label).toBe(`${LABEL_PREFIX}topic`);
       expect(fixtureRow!.kind).toBe("concept");
       expect(typeof fixtureRow!.episodeCount).toBe("number");
-      // The fixture has no junction rows yet — episodeCount should be 0
-      // (correlated subquery returns 0, NOT undefined or NaN).
+      // The fixture has no junction rows — pass-2 correlated subquery
+      // returns 0 (NOT undefined or NaN).
       expect(fixtureRow!.episodeCount).toBe(0);
       expect(fixtureRow!.consensusPreview).toBe(
         "Integration test consensus point one.",

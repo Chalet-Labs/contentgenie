@@ -70,23 +70,19 @@ describe("SynthesizeButton", () => {
     expect(mockRouterPush).toHaveBeenCalledWith("/topic/42");
   });
 
-  // ── Click: action called before router.push (order) ──────────────────────
+  // ── Click: action called before router.push (order via mock invocationCallOrder) ─
 
-  it("click: action is called before router.push", async () => {
-    const callOrder: string[] = [];
-    mockTriggerTopicDigestGeneration.mockImplementation(async () => {
-      callOrder.push("action");
-      return { success: true, data: { status: "queued" } };
-    });
-    mockRouterPush.mockImplementation(() => {
-      callOrder.push("push");
-    });
-
+  it("click: action is called before router.push (vi mock invocationCallOrder)", async () => {
     const user = userEvent.setup();
     render(<SynthesizeButton {...defaultProps} />);
     await user.click(screen.getByRole("button", { name: /synthesize/i }));
 
-    expect(callOrder).toEqual(["action", "push"]);
+    expect(mockTriggerTopicDigestGeneration).toHaveBeenCalled();
+    expect(mockRouterPush).toHaveBeenCalled();
+    const actionCallOrder =
+      mockTriggerTopicDigestGeneration.mock.invocationCallOrder[0]!;
+    const pushCallOrder = mockRouterPush.mock.invocationCallOrder[0]!;
+    expect(actionCallOrder).toBeLessThan(pushCallOrder);
   });
 
   // ── Action error: router.push still fires ────────────────────────────────
@@ -105,17 +101,37 @@ describe("SynthesizeButton", () => {
     consoleSpy.mockRestore();
   });
 
-  // ── Loading state: button has disabled prop while isPending ─────────────
+  // ── Double-click prevention: button is disabled mid-action; second click no-ops ─
 
-  it("loading state: disabled prop is set on button (based on isPending)", () => {
-    // The SynthesizeButton uses isPending from useTransition to set disabled.
-    // We verify the disabled attribute is correctly wired by rendering in
-    // pending state. Since jsdom's useTransition doesn't fully simulate async
-    // pending states, we verify the disabled prop binding is present in the
-    // component via a structural test.
+  it("disables button while the action is in flight; second click does NOT re-fire", async () => {
+    // Deferred-promise pattern: hold the action open, click twice, confirm
+    // only one invocation happened. This is the contract — the manual
+    // `useState` loading flag (NOT useTransition) tracks the full async
+    // lifecycle including the awaited portion.
+    let resolve!: (value: {
+      success: true;
+      data: { status: "queued" };
+    }) => void;
+    mockTriggerTopicDigestGeneration.mockImplementation(
+      () =>
+        new Promise<{ success: true; data: { status: "queued" } }>((r) => {
+          resolve = r;
+        }),
+    );
+
+    const user = userEvent.setup();
     render(<SynthesizeButton {...defaultProps} />);
-    const button = screen.getByRole("button", { name: /synthesize/i });
-    // Initially not pending → not disabled
-    expect(button).not.toBeDisabled();
+    const button = screen.getByRole("button", {
+      name: /synthesize digest for/i,
+    });
+
+    await user.click(button);
+    // Mid-flight: button must be disabled, second click should be a no-op.
+    expect(button).toBeDisabled();
+    await user.click(button);
+    expect(mockTriggerTopicDigestGeneration).toHaveBeenCalledTimes(1);
+
+    // Resolve and let the finally-block run (router.push fires there).
+    resolve({ success: true, data: { status: "queued" } });
   });
 });

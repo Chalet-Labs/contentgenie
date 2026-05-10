@@ -28,13 +28,6 @@ const mockInsertReturning = vi.fn();
 const mockSelect = vi.fn();
 const mockFrom = vi.fn();
 const mockInnerJoin = vi.fn();
-// Secondary post-enrichment now uses two parallel single-table queries
-// (canonical_topics episode counts + canonical_topic_digests staleness).
-// `mockSecondaryQueryResults` is a queue: each `.where(inArray(...))` call
-// in the secondary path drains one entry. Tests that need to populate
-// enrichment push to it; default empty drains as []s and yields no metadata.
-const mockSecondaryQueryResults: unknown[] = [];
-const mockSecondaryWhere = vi.fn();
 const mockSelectWhere = vi.fn();
 const mockLimit = vi.fn();
 
@@ -106,21 +99,7 @@ vi.mock("@/db", () => ({
             },
             where: (...wArgs: unknown[]) => {
               mockSelectWhere(...wArgs);
-              mockSecondaryWhere(...wArgs);
-              // Secondary post-enrichment paths (`.from(canonicalTopics).where(inArray(...))`
-              // and `.from(canonicalTopicDigests).where(inArray(...))`) await
-              // the result directly. Drain a queued result if present.
-              const next =
-                mockSecondaryQueryResults.length > 0
-                  ? mockSecondaryQueryResults.shift()
-                  : undefined;
-              return {
-                limit: (n: number) => mockLimit(n),
-                then: (
-                  onFulfilled?: ((v: unknown) => unknown) | null,
-                  onRejected?: ((r: unknown) => unknown) | null,
-                ) => Promise.resolve(next ?? []).then(onFulfilled, onRejected),
-              };
+              return { limit: (n: number) => mockLimit(n) };
             },
           };
         },
@@ -195,16 +174,6 @@ vi.mock("@/db/schema", () => ({
     timestamp: "timestamp",
     note: "note",
   },
-  canonicalTopics: {
-    id: "ct.id",
-    label: "ct.label",
-    kind: "ct.kind",
-    status: "ct.status",
-  },
-  canonicalTopicDigests: {
-    canonicalTopicId: "ctd.canonicalTopicId",
-    episodeCountAtGeneration: "ctd.episodeCountAtGeneration",
-  },
 }));
 
 // Mock @/db/library-columns (column constants are just shape stubs at runtime)
@@ -231,17 +200,13 @@ vi.mock("drizzle-orm", () => ({
   isNotNull: vi.fn((col: unknown) => ({ _isNotNull: col })),
   avg: vi.fn((col: unknown) => ({ _avg: col })),
   count: vi.fn((col: unknown) => ({ _count: col })),
-  inArray: vi.fn((col: unknown, vals: unknown) => ({
-    _inArray: { col, vals },
-  })),
 }));
 
-vi.mock("@/lib/admin/canonical-topic-episode-count", () => ({
-  canonicalTopicEpisodeCount: vi.fn(() => ({
-    type: "sql",
-    template: ["(SELECT count(*)...)"],
-    values: [],
-  })),
+// Chip-metadata helper is mocked directly so tests can drive the
+// post-enrichment path without re-stubbing the underlying DB chains.
+const mockFetchChipMetadata = vi.fn();
+vi.mock("@/lib/canonical-topic-chip-metadata", () => ({
+  fetchChipMetadata: (...args: unknown[]) => mockFetchChipMetadata(...args),
 }));
 
 const importLibrary = async () => import("@/app/actions/library");
@@ -549,8 +514,8 @@ describe("getUserLibrary", () => {
   beforeEach(happyPathSetup(mockAuth, mockEnsureUserExists));
   beforeEach(() => {
     mockUserLibraryFindMany.mockResolvedValue([itemA, itemB, itemC]);
-    // Reset secondary-query queue before each test (no metadata = no CTA).
-    mockSecondaryQueryResults.length = 0;
+    // Default: helper returns empty Map → no chip enrichment, no CTA.
+    mockFetchChipMetadata.mockResolvedValue(new Map());
   });
   afterEach(() => vi.restoreAllMocks());
 
@@ -790,25 +755,15 @@ describe("getUserLibrary", () => {
     },
   });
 
-  it("post-enrichment: episodeCount is set on chips from secondary query", async () => {
+  it("post-enrichment: synthesizable=true when no digest (digestEpisodeCountAtGeneration null)", async () => {
     mockUserLibraryFindMany.mockResolvedValue([itemWithTopic(10)]);
-    // Two parallel single-table queries: pass A = canonical_topics counts,
-    // pass B = canonical_topic_digests staleness.
-    mockSecondaryQueryResults.push(
-      [{ id: 10, episodeCount: 7 }], // pass A
-      [], // pass B (no digest)
-    );
-    const { getUserLibrary } = await importLibrary();
-    const result = await getUserLibrary();
-    expect(result.error).toBeNull();
-    expect(result.items[0]!.episode.canonicalTopics![0]!.episodeCount).toBe(7);
-  });
-
-  it("post-enrichment: synthesizable=true when no digest (digest pass returns empty)", async () => {
-    mockUserLibraryFindMany.mockResolvedValue([itemWithTopic(10)]);
-    mockSecondaryQueryResults.push(
-      [{ id: 10, episodeCount: 5 }],
-      [], // no digest row → digestEpisodeCountAtGeneration === null
+    mockFetchChipMetadata.mockResolvedValue(
+      new Map([
+        [
+          10,
+          { completedSummaryCount: 5, digestEpisodeCountAtGeneration: null },
+        ],
+      ]),
     );
     const { getUserLibrary } = await importLibrary();
     const result = await getUserLibrary();
@@ -817,16 +772,35 @@ describe("getUserLibrary", () => {
     );
   });
 
-  it("post-enrichment: synthesizable=false when digest is fresh (growth < STALENESS_GROWTH_THRESHOLD)", async () => {
+  it("post-enrichment: synthesizable=false when completedSummaryCount < MIN_DERIVED_COUNT_FOR_DIGEST", async () => {
+    mockUserLibraryFindMany.mockResolvedValue([itemWithTopic(10)]);
+    mockFetchChipMetadata.mockResolvedValue(
+      new Map([
+        // Below the minimum (3) — chip stays disabled even with no digest.
+        [
+          10,
+          { completedSummaryCount: 2, digestEpisodeCountAtGeneration: null },
+        ],
+      ]),
+    );
+    const { getUserLibrary } = await importLibrary();
+    const result = await getUserLibrary();
+    expect(result.items[0]!.episode.canonicalTopics![0]!.synthesizable).toBe(
+      false,
+    );
+  });
+
+  it("post-enrichment: synthesizable=false when digest is fresh (|growth| < STALENESS_GROWTH_THRESHOLD)", async () => {
     const { STALENESS_GROWTH_THRESHOLD } =
       await import("@/lib/topic-digest-thresholds");
     mockUserLibraryFindMany.mockResolvedValue([itemWithTopic(10)]);
-    const episodeCountAtGeneration = 10;
-    const episodeCount =
-      episodeCountAtGeneration + STALENESS_GROWTH_THRESHOLD - 1;
-    mockSecondaryQueryResults.push(
-      [{ id: 10, episodeCount }],
-      [{ id: 10, episodeCountAtGeneration }],
+    const digestEpisodeCountAtGeneration = 10;
+    const completedSummaryCount =
+      digestEpisodeCountAtGeneration + STALENESS_GROWTH_THRESHOLD - 1;
+    mockFetchChipMetadata.mockResolvedValue(
+      new Map([
+        [10, { completedSummaryCount, digestEpisodeCountAtGeneration }],
+      ]),
     );
     const { getUserLibrary } = await importLibrary();
     const result = await getUserLibrary();
@@ -839,11 +813,13 @@ describe("getUserLibrary", () => {
     const { STALENESS_GROWTH_THRESHOLD } =
       await import("@/lib/topic-digest-thresholds");
     mockUserLibraryFindMany.mockResolvedValue([itemWithTopic(10)]);
-    const episodeCountAtGeneration = 10;
-    const episodeCount = episodeCountAtGeneration + STALENESS_GROWTH_THRESHOLD;
-    mockSecondaryQueryResults.push(
-      [{ id: 10, episodeCount }],
-      [{ id: 10, episodeCountAtGeneration }],
+    const digestEpisodeCountAtGeneration = 10;
+    const completedSummaryCount =
+      digestEpisodeCountAtGeneration + STALENESS_GROWTH_THRESHOLD;
+    mockFetchChipMetadata.mockResolvedValue(
+      new Map([
+        [10, { completedSummaryCount, digestEpisodeCountAtGeneration }],
+      ]),
     );
     const { getUserLibrary } = await importLibrary();
     const result = await getUserLibrary();
@@ -852,14 +828,34 @@ describe("getUserLibrary", () => {
     );
   });
 
-  it("post-enrichment: secondary query failure → chips emitted without synthesizable (no error thrown)", async () => {
-    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+  it("post-enrichment: synthesizable=true when canonical SHRANK by ≥ STALENESS_GROWTH_THRESHOLD (Math.abs symmetry)", async () => {
+    const { STALENESS_GROWTH_THRESHOLD } =
+      await import("@/lib/topic-digest-thresholds");
     mockUserLibraryFindMany.mockResolvedValue([itemWithTopic(10)]);
-    // Push a thenable that rejects so Promise.all rejects.
-    mockSecondaryQueryResults.push(Promise.reject(new Error("DB failure")));
+    // Reconciliation merge dropped the count below the original generation
+    // baseline by ≥ STALENESS_GROWTH_THRESHOLD. Math.abs symmetry → stale.
+    const digestEpisodeCountAtGeneration = 10;
+    const completedSummaryCount =
+      digestEpisodeCountAtGeneration - STALENESS_GROWTH_THRESHOLD;
+    mockFetchChipMetadata.mockResolvedValue(
+      new Map([
+        [10, { completedSummaryCount, digestEpisodeCountAtGeneration }],
+      ]),
+    );
     const { getUserLibrary } = await importLibrary();
     const result = await getUserLibrary();
-    // No error thrown, items returned, chip has no synthesizable
+    expect(result.items[0]!.episode.canonicalTopics![0]!.synthesizable).toBe(
+      true,
+    );
+  });
+
+  it("post-enrichment: helper failure → chips emitted without synthesizable (no error thrown)", async () => {
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    mockUserLibraryFindMany.mockResolvedValue([itemWithTopic(10)]);
+    mockFetchChipMetadata.mockRejectedValue(new Error("DB failure"));
+    const { getUserLibrary } = await importLibrary();
+    const result = await getUserLibrary();
+    // No error thrown, items returned, chip has no synthesizable.
     expect(result.error).toBeNull();
     expect(
       result.items[0]!.episode.canonicalTopics![0]!.synthesizable,
@@ -871,13 +867,12 @@ describe("getUserLibrary", () => {
     consoleSpy.mockRestore();
   });
 
-  it("post-enrichment: skips secondary query entirely when no chips (no extra DB call)", async () => {
-    // itemA/itemB/itemC have no canonicalTopics → ids.length === 0 → skip
+  it("post-enrichment: helper called with empty array when library has no chips", async () => {
+    // itemA/itemB/itemC have no canonicalTopics → empty id set passed in.
     const { getUserLibrary } = await importLibrary();
     await getUserLibrary();
-    // No secondary-pass `where(inArray(...))` call should fire when there
-    // are no chips to enrich.
-    expect(mockSecondaryWhere).not.toHaveBeenCalled();
+    expect(mockFetchChipMetadata).toHaveBeenCalledOnce();
+    expect(mockFetchChipMetadata).toHaveBeenCalledWith([]);
   });
 });
 

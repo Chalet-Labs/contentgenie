@@ -58,8 +58,8 @@ import {
 } from "@/lib/admin/canonical-topic-episode-count";
 import {
   MIN_DERIVED_COUNT_FOR_DIGEST,
-  STALENESS_GROWTH_THRESHOLD,
   RELATED_TOPICS_LIMIT,
+  isDigestSynthesizable,
 } from "@/lib/topic-digest-thresholds";
 import { MAX_CONSENSUS_PREVIEW_CHARS } from "@/lib/topic-digest-preview";
 import { formatVector } from "@/lib/entity-resolution";
@@ -561,28 +561,30 @@ export async function triggerTopicDigestGeneration(input: {
     }
 
     // Both eligibility and staleness operate on completed-summary count to
-    // align with the task's `summaryStatus = 'completed'` predicate. Using the
-    // raw linked-episode count would let the action queue runs that the task
-    // then aborts (false-positive 'queued') and miss regenerations when new
-    // summaries complete without new links being added.
+    // align with the task's `summaryStatus = 'completed'` predicate (ADR-051).
+    // The `isDigestSynthesizable` predicate is the canonical implementation;
+    // the action just maps its boolean result back to our three-state
+    // {ineligible, cached, queued} response by inspecting the inputs once
+    // more to disambiguate which negative branch fired.
     const completedSummaryCount = canonical.completedSummaryCount;
     const existing = digestRows[0] ?? null;
+    const synthesizable = isDigestSynthesizable({
+      completedSummaryCount,
+      digestEpisodeCountAtGeneration:
+        existing?.episodeCountAtGeneration ?? null,
+    });
 
-    if (completedSummaryCount < MIN_DERIVED_COUNT_FOR_DIGEST) {
+    if (!synthesizable) {
+      if (completedSummaryCount < MIN_DERIVED_COUNT_FOR_DIGEST) {
+        return {
+          success: true,
+          data: { status: "ineligible", digestId: existing?.id },
+        };
+      }
+      // Above the minimum but not stale enough — serve the cached digest.
       return {
         success: true,
-        data: { status: "ineligible", digestId: existing?.id },
-      };
-    }
-
-    if (
-      existing &&
-      Math.abs(completedSummaryCount - existing.episodeCountAtGeneration) <
-        STALENESS_GROWTH_THRESHOLD
-    ) {
-      return {
-        success: true,
-        data: { status: "cached", digestId: existing.id },
+        data: { status: "cached", digestId: existing!.id },
       };
     }
 
@@ -613,7 +615,7 @@ export async function triggerTopicDigestGeneration(input: {
 }
 
 // ---------------------------------------------------------------------------
-// getTopicDetailData — public-facing topic detail page payload (#399)
+// getTopicDetailData — public-facing topic detail page payload
 // ---------------------------------------------------------------------------
 //
 // Returns canonical row, digest (if any), episode list (joined with the
@@ -872,7 +874,7 @@ export async function triggerTopicDigestRefresh(input: {
 }
 
 // ---------------------------------------------------------------------------
-// getRecentTopicDigests — dashboard "this week's takes" section (#400)
+// getRecentTopicDigests — dashboard "this week's takes" section
 // ---------------------------------------------------------------------------
 
 const getRecentTopicDigestsSchema = z
@@ -910,13 +912,11 @@ export async function getRecentTopicDigests(input?: {
     try {
       const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
       // Two-pass: fetch the digest rows + canonical metadata first, then
-      // fetch episode counts in a separate single-table query. Avoids the
-      // `canonicalTopicEpisodeCount()` helper-in-JOIN-context bug (Drizzle
-      // emits double-qualified `"canonical_topics"."canonical_topics"."id"`
-      // when canonicalTopics is referenced from any multi-table query),
-      // which raises Postgres 42P01 errorMissingRTE. The helper is correct
-      // for single-table `from(canonicalTopics)` queries (its only existing
-      // production usage pattern) — we use it that way in pass 2.
+      // fetch episode counts in a separate single-table query. The
+      // `canonicalTopicEpisodeCount()` helper is safe in single-table
+      // `from(canonicalTopics)` queries; in any multi-table query Drizzle
+      // emits a double-qualified `"canonical_topics"."canonical_topics"."id"`
+      // reference that Postgres rejects with 42P01 errorMissingRTE.
       const digestRows = await db
         .select({
           canonicalId: canonicalTopics.id,

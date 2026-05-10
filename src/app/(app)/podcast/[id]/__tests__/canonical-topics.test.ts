@@ -12,19 +12,6 @@ const mockOuterOrderBy = vi.fn();
 const mockOuterWhere = vi.fn(() => ({ orderBy: mockOuterOrderBy }));
 const mockOuterFrom = vi.fn(() => ({ where: mockOuterWhere }));
 
-// Secondary chain (post-enrichment): TWO parallel single-table queries:
-//   - select → from(canonicalTopics) → where(inArray)  (episode-count rows)
-//   - select → from(canonicalTopicDigests) → where(inArray)  (digest rows)
-// Each `.where(inArray(...))` is awaited directly. We track them as a queue
-// drained in order; tests push results via `mockSecondaryQueryResults.push(...)`.
-const mockSecondaryQueryResults: unknown[] = [];
-const mockSecondaryWhere = vi.fn(() =>
-  mockSecondaryQueryResults.length > 0
-    ? Promise.resolve(mockSecondaryQueryResults.shift())
-    : Promise.resolve([]),
-);
-const mockSecondaryFrom = vi.fn(() => ({ where: mockSecondaryWhere }));
-
 const mockSelect = vi.fn();
 
 vi.mock("@/db", () => ({
@@ -43,18 +30,13 @@ vi.mock("@/db/schema", () => ({
     kind: "ct.kind",
     status: "ct.status",
   },
-  canonicalTopicDigests: {
-    canonicalTopicId: "ctd.canonicalTopicId",
-    episodeCountAtGeneration: "ctd.episodeCountAtGeneration",
-  },
 }));
 
-vi.mock("@/lib/admin/canonical-topic-episode-count", () => ({
-  canonicalTopicEpisodeCount: vi.fn(() => ({
-    type: "sql",
-    template: ["(SELECT count(*)...)"],
-    values: [],
-  })),
+// Chip-metadata helper is mocked directly so tests can drive the
+// post-enrichment path without re-stubbing the underlying DB chains.
+const mockFetchChipMetadata = vi.fn();
+vi.mock("@/lib/canonical-topic-chip-metadata", () => ({
+  fetchChipMetadata: (...args: unknown[]) => mockFetchChipMetadata(...args),
 }));
 
 vi.mock("drizzle-orm", async (importOriginal) => {
@@ -87,25 +69,13 @@ describe("getCanonicalTopicsByPodcastIndexId", () => {
     mockInnerFrom.mockImplementation(() => ({ innerJoin: mockInnerJoin }));
     mockOuterWhere.mockImplementation(() => ({ orderBy: mockOuterOrderBy }));
     mockOuterFrom.mockImplementation(() => ({ where: mockOuterWhere }));
-    mockSecondaryWhere.mockImplementation(() =>
-      mockSecondaryQueryResults.length > 0
-        ? Promise.resolve(mockSecondaryQueryResults.shift())
-        : Promise.resolve([]),
-    );
-    mockSecondaryFrom.mockImplementation(() => ({
-      where: mockSecondaryWhere,
-    }));
-    // Up to four select() calls: inner subquery, outer SELECT, then
-    // pass-A (canonical_topics counts), pass-B (canonical_topic_digests
-    // staleness). Pass A+B run in parallel (Promise.all) and only fire
-    // when outer returned >0 rows.
+    // Two select() calls: inner subquery, outer SELECT. Chip metadata comes
+    // from `fetchChipMetadata` (mocked above), not from a third select.
     mockSelect
       .mockReturnValueOnce({ from: mockInnerFrom })
-      .mockReturnValueOnce({ from: mockOuterFrom })
-      .mockReturnValueOnce({ from: mockSecondaryFrom })
-      .mockReturnValueOnce({ from: mockSecondaryFrom });
-    // Default: secondary enrichment queue is empty → pass-A/B return [].
-    mockSecondaryQueryResults.length = 0;
+      .mockReturnValueOnce({ from: mockOuterFrom });
+    // Default: helper returns empty Map → chips render without CTA.
+    mockFetchChipMetadata.mockResolvedValue(new Map());
   });
 
   it("short-circuits on empty input without hitting the DB", async () => {
@@ -123,7 +93,6 @@ describe("getCanonicalTopicsByPodcastIndexId", () => {
   });
 
   it("groups rows under PodcastIndex id and projects to chips (no enrichment)", async () => {
-    // No secondary enrichment: chips emit base shape (no episodeCount/synthesizable).
     mockOuterOrderBy.mockResolvedValue([
       {
         episodeId: 1,
@@ -213,21 +182,16 @@ describe("getCanonicalTopicsByPodcastIndexId", () => {
     status: "active",
   });
 
-  it("post-enrichment: episodeCount + synthesizable set on chips when secondary query returns metadata", async () => {
+  it("post-enrichment: synthesizable=true when no digest", async () => {
     mockOuterOrderBy.mockResolvedValue([outerRow(100)]);
-    // Pass A: count rows; pass B: digest rows (empty → no digest).
-    mockSecondaryQueryResults.push([{ id: 100, episodeCount: 5 }], []);
-    const piKey = asPodcastIndexEpisodeId("PI-1");
-    const result = await getCanonicalTopicsByPodcastIndexId([
-      { id: 1, podcastIndexId: piKey },
-    ]);
-    expect(result[piKey]![0]!.episodeCount).toBe(5);
-    expect(result[piKey]![0]!.synthesizable).toBe(true);
-  });
-
-  it("post-enrichment: no digest (pass-B returns empty) → synthesizable=true", async () => {
-    mockOuterOrderBy.mockResolvedValue([outerRow(100)]);
-    mockSecondaryQueryResults.push([{ id: 100, episodeCount: 5 }], []);
+    mockFetchChipMetadata.mockResolvedValue(
+      new Map([
+        [
+          100,
+          { completedSummaryCount: 5, digestEpisodeCountAtGeneration: null },
+        ],
+      ]),
+    );
     const piKey = asPodcastIndexEpisodeId("PI-1");
     const result = await getCanonicalTopicsByPodcastIndexId([
       { id: 1, podcastIndexId: piKey },
@@ -235,14 +199,15 @@ describe("getCanonicalTopicsByPodcastIndexId", () => {
     expect(result[piKey]![0]!.synthesizable).toBe(true);
   });
 
-  it("post-enrichment: fresh digest (growth < STALENESS_GROWTH_THRESHOLD) → synthesizable=false", async () => {
-    const episodeCountAtGeneration = 10;
-    const episodeCount =
-      episodeCountAtGeneration + STALENESS_GROWTH_THRESHOLD - 1;
+  it("post-enrichment: synthesizable=false below MIN_DERIVED_COUNT_FOR_DIGEST", async () => {
     mockOuterOrderBy.mockResolvedValue([outerRow(100)]);
-    mockSecondaryQueryResults.push(
-      [{ id: 100, episodeCount }],
-      [{ id: 100, episodeCountAtGeneration }],
+    mockFetchChipMetadata.mockResolvedValue(
+      new Map([
+        [
+          100,
+          { completedSummaryCount: 2, digestEpisodeCountAtGeneration: null },
+        ],
+      ]),
     );
     const piKey = asPodcastIndexEpisodeId("PI-1");
     const result = await getCanonicalTopicsByPodcastIndexId([
@@ -251,13 +216,32 @@ describe("getCanonicalTopicsByPodcastIndexId", () => {
     expect(result[piKey]![0]!.synthesizable).toBe(false);
   });
 
-  it("post-enrichment: stale digest (growth >= STALENESS_GROWTH_THRESHOLD) → synthesizable=true", async () => {
-    const episodeCountAtGeneration = 10;
-    const episodeCount = episodeCountAtGeneration + STALENESS_GROWTH_THRESHOLD;
+  it("post-enrichment: synthesizable=false when fresh (|growth| < STALENESS_GROWTH_THRESHOLD)", async () => {
+    const digestEpisodeCountAtGeneration = 10;
+    const completedSummaryCount =
+      digestEpisodeCountAtGeneration + STALENESS_GROWTH_THRESHOLD - 1;
     mockOuterOrderBy.mockResolvedValue([outerRow(100)]);
-    mockSecondaryQueryResults.push(
-      [{ id: 100, episodeCount }],
-      [{ id: 100, episodeCountAtGeneration }],
+    mockFetchChipMetadata.mockResolvedValue(
+      new Map([
+        [100, { completedSummaryCount, digestEpisodeCountAtGeneration }],
+      ]),
+    );
+    const piKey = asPodcastIndexEpisodeId("PI-1");
+    const result = await getCanonicalTopicsByPodcastIndexId([
+      { id: 1, podcastIndexId: piKey },
+    ]);
+    expect(result[piKey]![0]!.synthesizable).toBe(false);
+  });
+
+  it("post-enrichment: synthesizable=true when stale (growth >= STALENESS_GROWTH_THRESHOLD)", async () => {
+    const digestEpisodeCountAtGeneration = 10;
+    const completedSummaryCount =
+      digestEpisodeCountAtGeneration + STALENESS_GROWTH_THRESHOLD;
+    mockOuterOrderBy.mockResolvedValue([outerRow(100)]);
+    mockFetchChipMetadata.mockResolvedValue(
+      new Map([
+        [100, { completedSummaryCount, digestEpisodeCountAtGeneration }],
+      ]),
     );
     const piKey = asPodcastIndexEpisodeId("PI-1");
     const result = await getCanonicalTopicsByPodcastIndexId([
@@ -266,18 +250,32 @@ describe("getCanonicalTopicsByPodcastIndexId", () => {
     expect(result[piKey]![0]!.synthesizable).toBe(true);
   });
 
-  it("post-enrichment failure: chips emit without episodeCount/synthesizable; no error thrown", async () => {
+  it("post-enrichment: synthesizable=true when canonical SHRANK by ≥ STALENESS_GROWTH_THRESHOLD (Math.abs)", async () => {
+    const digestEpisodeCountAtGeneration = 10;
+    const completedSummaryCount =
+      digestEpisodeCountAtGeneration - STALENESS_GROWTH_THRESHOLD;
     mockOuterOrderBy.mockResolvedValue([outerRow(100)]);
-    // Push a rejecting thenable so Promise.all rejects → outer try/catch.
-    mockSecondaryQueryResults.push(Promise.reject(new Error("boom")));
+    mockFetchChipMetadata.mockResolvedValue(
+      new Map([
+        [100, { completedSummaryCount, digestEpisodeCountAtGeneration }],
+      ]),
+    );
+    const piKey = asPodcastIndexEpisodeId("PI-1");
+    const result = await getCanonicalTopicsByPodcastIndexId([
+      { id: 1, podcastIndexId: piKey },
+    ]);
+    expect(result[piKey]![0]!.synthesizable).toBe(true);
+  });
+
+  it("post-enrichment failure: chips emit without synthesizable; no error thrown", async () => {
+    mockOuterOrderBy.mockResolvedValue([outerRow(100)]);
+    mockFetchChipMetadata.mockRejectedValue(new Error("boom"));
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const piKey = asPodcastIndexEpisodeId("PI-1");
     const result = await getCanonicalTopicsByPodcastIndexId([
       { id: 1, podcastIndexId: piKey },
     ]);
-    expect(result[piKey]![0]!.episodeCount).toBeUndefined();
     expect(result[piKey]![0]!.synthesizable).toBeUndefined();
-    // Action returns chips successfully (degraded UX, not broken page).
     expect(consoleSpy).toHaveBeenCalledWith(
       "[podcast] chip metadata enrichment failed (chips render without synthesize CTA)",
       expect.any(Error),

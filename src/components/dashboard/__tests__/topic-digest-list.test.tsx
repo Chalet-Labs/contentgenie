@@ -160,8 +160,11 @@ describe("TopicDigestList", () => {
 
   // ── Each row has chevron affordance ─────────────────────────────────────────
 
-  it("each row has an svg chevron icon", async () => {
-    const digests = [makeDigest()];
+  it("each row has exactly one chevron icon (the trailing affordance)", async () => {
+    const digests = [
+      makeDigest({ canonicalId: 1 }),
+      makeDigest({ canonicalId: 2 }),
+    ];
     mockGetRecentTopicDigests.mockResolvedValue({
       success: true,
       data: digests,
@@ -170,8 +173,27 @@ describe("TopicDigestList", () => {
     const element = await TopicDigestList();
     expect(element).not.toBeNull();
     const { container } = render(element!);
-    // ChevronRight SVG rendered as aria-hidden
-    const svgs = container.querySelectorAll("svg");
-    expect(svgs.length).toBeGreaterThan(0);
+    // The chevron lives in a `flex shrink-0 items-center self-center` wrapper
+    // inside each row. The header has its own Sparkles icon; we query the
+    // chevron specifically to avoid coupling to total SVG count.
+    const chevronWrappers = container.querySelectorAll(
+      "a[href^='/topic/'] > div.shrink-0 > svg",
+    );
+    expect(chevronWrappers).toHaveLength(2);
+  });
+
+  // ── Singular vs plural episode count rendering ────────────────────────────
+
+  it("singular: 1 episode (no trailing s)", async () => {
+    const digests = [makeDigest({ episodeCount: 1 })];
+    mockGetRecentTopicDigests.mockResolvedValue({
+      success: true,
+      data: digests,
+    });
+    const element = await TopicDigestList();
+    expect(element).not.toBeNull();
+    const { container } = render(element!);
+    // Match against trailing whitespace boundary so "1 episodes" doesn't pass.
+    expect(container.textContent).toMatch(/1 episode(?!s)/);
   });
 });

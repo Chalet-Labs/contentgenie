@@ -9,20 +9,20 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { getRecentTopicDigests } from "@/app/actions/topics";
+import {
+  getRecentTopicDigests,
+  type RecentTopicDigest,
+} from "@/app/actions/topics";
 
-export async function TopicDigestList() {
-  const result = await getRecentTopicDigests({ limit: 5 });
-
-  if (!result.success) {
-    console.error("[TopicDigestList]", result.error);
-    return null;
-  }
-
-  if (result.data.length === 0) return null;
-
-  const digests = result.data;
-
+/**
+ * Pure-presentational view, exported for Storybook + RTL tests that don't
+ * want to deal with the async server-component shell.
+ */
+export function TopicDigestListView({
+  digests,
+}: {
+  digests: RecentTopicDigest[];
+}) {
   return (
     <Card>
       <CardHeader>
@@ -47,7 +47,7 @@ export async function TopicDigestList() {
                 <Badge variant="outline">{d.kind}</Badge>
               </div>
               <p className="text-xs text-muted-foreground">
-                {d.episodeCount} episodes
+                {d.episodeCount} episode{d.episodeCount === 1 ? "" : "s"}
               </p>
               {d.consensusPreview && (
                 <p className="line-clamp-2 text-sm text-muted-foreground">
@@ -66,6 +66,19 @@ export async function TopicDigestList() {
       </CardContent>
     </Card>
   );
+}
+
+export async function TopicDigestList() {
+  const result = await getRecentTopicDigests({ limit: 5 });
+
+  if (!result.success) {
+    console.error("[TopicDigestList]", result.error);
+    return null;
+  }
+
+  if (result.data.length === 0) return null;
+
+  return <TopicDigestListView digests={result.data} />;
 }
 
 export function TopicDigestListLoading() {

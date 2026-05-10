@@ -13,7 +13,6 @@ import {
 import { cn } from "@/lib/utils";
 import { badgeVariants } from "@/components/ui/badge";
 import type { CanonicalTopicKind, CanonicalTopicStatus } from "@/db/schema";
-import { MIN_DERIVED_COUNT_FOR_DIGEST } from "@/lib/topic-digest-thresholds";
 import { SynthesizeButton } from "@/components/episodes/synthesize-button";
 
 export interface TopicChipProps {
@@ -22,8 +21,13 @@ export interface TopicChipProps {
   kind: CanonicalTopicKind;
   status?: CanonicalTopicStatus;
   className?: string;
+  /**
+   * Pre-derived "is this canonical synthesizable right now?" flag from the
+   * action layer (`isDigestSynthesizable`). The threshold/staleness logic
+   * lives at the data fetcher, NOT here — this component just toggles the
+   * sibling `<SynthesizeButton>` on/off.
+   */
   synthesizable?: boolean;
-  episodeCount?: number;
 }
 
 interface KindMeta {
@@ -50,7 +54,6 @@ export function TopicChip({
   status,
   className,
   synthesizable,
-  episodeCount,
 }: TopicChipProps) {
   const { Icon, iconClass } = kindMeta[kind];
 
@@ -71,10 +74,10 @@ export function TopicChip({
     </Link>
   );
 
-  if (
-    synthesizable === true &&
-    (episodeCount ?? 0) >= MIN_DERIVED_COUNT_FOR_DIGEST
-  ) {
+  if (synthesizable === true) {
+    // Sibling, not nested — <button> inside <a> is invalid HTML and breaks
+    // click semantics (iOS Safari treats the inner element as inert; React
+    // jsx-a11y/no-nested-interactive bans the pattern outright).
     return (
       <span className="inline-flex items-center gap-0.5">
         {chipLink}
