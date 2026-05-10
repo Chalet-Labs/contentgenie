@@ -427,6 +427,8 @@ describe("GET /api/episodes/[id]", () => {
 
     expect(response.status).toBe(200);
     expect(data.transcriptSource).toBe("podcast-site");
+    expect(data.transcriptStatus).toBe("available");
+    expect(data.episodeDbId).toBe(42);
   });
 
   it("PodcastIndex path: episodeDbId is null when no DB row exists", async () => {

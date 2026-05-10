@@ -70,7 +70,7 @@ describe("EpisodesTable", () => {
     expect(link).toHaveAttribute("href", ROUTES.episode(ep.podcastIndexId));
   });
 
-  it("renders podcast-site transcriptSource alongside assemblyai without truncation", () => {
+  it("renders distinct transcriptSource cells for assemblyai and podcast-site rows", () => {
     const assemblyaiEp = makeEpisode(1);
     const podcastSiteEp: EpisodeRow = {
       ...makeEpisode(2),
