@@ -1,16 +1,13 @@
-import { safeFetch } from "@/lib/security";
 import {
-  FETCH_TIMEOUT_MS,
-  MAX_TRANSCRIPT_LENGTH,
+  safeFetchWithTimeout,
   stripHtmlTranscript,
+  truncateTranscript,
 } from "@/trigger/helpers/transcript";
 import type {
   Extractor,
   ExtractorContext,
 } from "@/trigger/helpers/transcript-extractors/types";
 
-// Bankless Podcast — PodcastIndex feed:
-// https://podcastindex.org/podcast/357756
 export const BANKLESS_PODCAST_INDEX_ID = "357756";
 
 /**
@@ -20,13 +17,6 @@ export const BANKLESS_PODCAST_INDEX_ID = "357756";
  * are dropped (NOT hyphenated) — `Bitcoin's` → `bitcoins`, NOT `bitcoin-s`. This
  * differs from `src/lib/utils.ts` `slugify`, which is why we keep a site-specific
  * rule here rather than reusing the generic helper.
- *
- * Rule:
- *   1. NFKD normalize + strip combining marks.
- *   2. Lowercase.
- *   3. Strip apostrophes / curly quotes / straight double quotes.
- *   4. Replace runs of any non-`[a-z0-9]` characters with a single hyphen.
- *   5. Trim leading/trailing hyphens.
  */
 export function banklessSlug(title: string): string {
   return title
@@ -38,6 +28,11 @@ export function banklessSlug(title: string): string {
     .replace(/^-+|-+$/g, "");
 }
 
+const CONTAINER_RE = /<div\s+id=["']?insideEpisode\b["']?[^>]*>/i;
+const MARKER_RE = /<strong>\s*TRANSCRIPT\s*<\/strong>/i;
+const END_ANCHOR_RE =
+  /<\w+\s+[^>]*?class=["']?(?:postSidebar|rule)\b|<\/article>|<aside\b|<footer\b/i;
+
 /**
  * Bankless extractor — fetches the episode page, narrows to the transcript
  * section by the verified anchor pair, and returns clean text.
@@ -48,9 +43,16 @@ export function banklessSlug(title: string): string {
  *   - Marker:    `<strong>TRANSCRIPT</strong>`
  * Both must be present, in order. Either missing → returns undefined.
  *
+ * The body is sliced from immediately *after* the marker, so a heading-only
+ * section returns undefined rather than the literal word "TRANSCRIPT" (which
+ * would mask fallback to other transcript sources).
+ *
  * The end of the transcript is bounded by the next post-content sibling
  * (`postSidebar`, `rule`, `</article>`, `<aside`, `<footer`) to avoid bleeding
  * into "next episode" / sidebar markup.
+ *
+ * Fetch errors propagate; the registry (`runPodcastExtractor`) catches them
+ * and converts to `undefined` per the scaffolding contract from #459.
  */
 export const banklessExtractor: Extractor = {
   id: "bankless",
@@ -62,43 +64,22 @@ export const banklessExtractor: Extractor = {
     if (!slug) return undefined;
 
     const url = `https://www.bankless.com/podcast/${slug}`;
+    const html = await safeFetchWithTimeout(url);
 
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-    let html: string;
-    try {
-      html = await safeFetch(url, { signal: controller.signal });
-    } catch {
-      // safeFetch throws on non-2xx (security.ts:263–265) and on abort/network errors.
-      // Issue #428 requires undefined-on-error rather than throwing.
-      return undefined;
-    } finally {
-      clearTimeout(timeout);
-    }
-
-    const containerStart = html.search(
-      /<div\s+id=["']?insideEpisode["']?[^>]*>/i,
-    );
+    const containerStart = html.search(CONTAINER_RE);
     if (containerStart === -1) return undefined;
 
     const inside = html.slice(containerStart);
-    const markerStart = inside.search(/<strong>\s*TRANSCRIPT\s*<\/strong>/i);
-    if (markerStart === -1) return undefined;
+    const markerMatch = MARKER_RE.exec(inside);
+    if (!markerMatch) return undefined;
 
-    const fromMarker = inside.slice(markerStart);
-    const endIdx = fromMarker.search(
-      /class=["']?(?:postSidebar|rule)\b|<\/article>|<aside\b|<footer\b/i,
-    );
-    const scoped = endIdx === -1 ? fromMarker : fromMarker.slice(0, endIdx);
+    const fromBody = inside.slice(markerMatch.index + markerMatch[0].length);
+    const endIdx = fromBody.search(END_ANCHOR_RE);
+    const scoped = endIdx === -1 ? fromBody : fromBody.slice(0, endIdx);
 
     const text = stripHtmlTranscript(scoped).trim();
-    // Defensive: the <strong>TRANSCRIPT</strong> marker always contributes its
-    // text node, so `text` is never empty in practice with the current anchor
-    // design. Guard retained for future anchor changes.
     if (!text) return undefined;
 
-    return text.length > MAX_TRANSCRIPT_LENGTH
-      ? text.slice(0, MAX_TRANSCRIPT_LENGTH) + "\n\n[Transcript truncated...]"
-      : text;
+    return truncateTranscript(text);
   },
 };

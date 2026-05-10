@@ -4,6 +4,26 @@ import { safeFetch } from "@/lib/security";
 
 export const MAX_TRANSCRIPT_LENGTH = 50000;
 export const FETCH_TIMEOUT_MS = 30000;
+export const TRUNCATED_MARKER = "\n\n[Transcript truncated...]";
+
+export async function safeFetchWithTimeout(
+  url: string,
+  timeoutMs: number = FETCH_TIMEOUT_MS,
+): Promise<string> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await safeFetch(url, { signal: controller.signal });
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+export function truncateTranscript(text: string): string {
+  return text.length > MAX_TRANSCRIPT_LENGTH
+    ? text.slice(0, MAX_TRANSCRIPT_LENGTH) + TRUNCATED_MARKER
+    : text;
+}
 
 const SUPPORTED_TRANSCRIPT_TYPES = [
   "text/plain",
@@ -94,17 +114,7 @@ export async function fetchTranscript(
     return undefined;
   }
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-
-  let transcript: string;
-  try {
-    transcript = await safeFetch(transcriptEntry.url, {
-      signal: controller.signal,
-    });
-  } finally {
-    clearTimeout(timeout);
-  }
+  let transcript = await safeFetchWithTimeout(transcriptEntry.url);
 
   const rawLength = transcript.length;
   transcript = normalizeTranscriptContent(transcript, transcriptEntry.type);
@@ -119,13 +129,7 @@ export async function fetchTranscript(
     }
     return undefined;
   }
-  if (transcript.length > MAX_TRANSCRIPT_LENGTH) {
-    transcript =
-      transcript.slice(0, MAX_TRANSCRIPT_LENGTH) +
-      "\n\n[Transcript truncated...]";
-  }
-
-  return transcript;
+  return truncateTranscript(transcript);
 }
 
 /**
@@ -162,26 +166,14 @@ export function extractTranscriptUrl(description: string): string | null {
 export async function fetchTranscriptFromUrl(
   url: string,
 ): Promise<string | undefined> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-  try {
-    let content = await safeFetch(url, { signal: controller.signal });
+  let content = await safeFetchWithTimeout(url);
 
-    if (/<html[\s>]/i.test(content) || /<!doctype\s+html/i.test(content)) {
-      content = stripHtmlTranscript(content);
-    }
-
-    content = content.trim();
-    if (!content) return undefined;
-
-    if (content.length > MAX_TRANSCRIPT_LENGTH) {
-      content =
-        content.slice(0, MAX_TRANSCRIPT_LENGTH) +
-        "\n\n[Transcript truncated...]";
-    }
-
-    return content;
-  } finally {
-    clearTimeout(timeout);
+  if (/<html[\s>]/i.test(content) || /<!doctype\s+html/i.test(content)) {
+    content = stripHtmlTranscript(content);
   }
+
+  content = content.trim();
+  if (!content) return undefined;
+
+  return truncateTranscript(content);
 }

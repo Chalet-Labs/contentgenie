@@ -7,6 +7,10 @@ vi.mock("@/lib/security", () => ({ safeFetch: vi.fn() }));
 
 import { safeFetch } from "@/lib/security";
 import {
+  MAX_TRANSCRIPT_LENGTH,
+  TRUNCATED_MARKER,
+} from "@/trigger/helpers/transcript";
+import {
   banklessExtractor,
   banklessSlug,
 } from "@/trigger/helpers/transcript-extractors/bankless";
@@ -61,6 +65,10 @@ describe("banklessSlug", () => {
     expect(banklessSlug("   ")).toBe("");
   });
 
+  it("returns empty string for non-empty input that has no alphanumerics", () => {
+    expect(banklessSlug("---???---")).toBe("");
+  });
+
   it("strips apostrophes again to lock in the rule (Crypto's)", () => {
     expect(banklessSlug("Crypto's Nasdaq Problem")).toBe(
       "cryptos-nasdaq-problem",
@@ -95,12 +103,13 @@ describe("banklessExtractor.extract", () => {
     expect(result).not.toContain("Post sidebar content here");
   });
 
-  it("returns undefined when safeFetch throws (e.g. 404) (VERIFY 4)", async () => {
+  it("propagates safeFetch errors (registry is the throw-shield)", async () => {
     vi.mocked(safeFetch).mockRejectedValue(new Error("HTTP 404"));
-    const result = await banklessExtractor.extract(
-      makeCtx("MegaETH Token Launch with Co-founders Shuyao and Lei"),
-    );
-    expect(result).toBeUndefined();
+    await expect(
+      banklessExtractor.extract(
+        makeCtx("MegaETH Token Launch with Co-founders Shuyao and Lei"),
+      ),
+    ).rejects.toThrow("HTTP 404");
   });
 
   it("returns undefined when TRANSCRIPT marker is missing (VERIFY 4)", async () => {
@@ -125,6 +134,20 @@ describe("banklessExtractor.extract", () => {
     expect(vi.mocked(safeFetch)).not.toHaveBeenCalled();
   });
 
+  it("returns undefined without fetching when title slugifies to empty", async () => {
+    const result = await banklessExtractor.extract(makeCtx("---???---"));
+    expect(result).toBeUndefined();
+    expect(vi.mocked(safeFetch)).not.toHaveBeenCalled();
+  });
+
+  it("returns undefined when transcript marker has no body content (VERIFY 4)", async () => {
+    vi.mocked(safeFetch).mockResolvedValue(
+      '<div id="insideEpisode"><strong>TRANSCRIPT</strong><div class="rule"></div></div>',
+    );
+    const result = await banklessExtractor.extract(makeCtx("Some Episode"));
+    expect(result).toBeUndefined();
+  });
+
   it("ignores episode.link — derives URL from title regardless of link value", async () => {
     vi.mocked(safeFetch).mockResolvedValue(banklessFixture);
     const ctx = makeCtx(
@@ -143,13 +166,27 @@ describe("banklessExtractor.extract", () => {
   it("truncates text exceeding MAX_TRANSCRIPT_LENGTH and appends marker", async () => {
     const longContent =
       '<div id="insideEpisode"><strong>TRANSCRIPT</strong><p>' +
-      "x".repeat(60000) +
+      "x".repeat(MAX_TRANSCRIPT_LENGTH + 10000) +
       "</p></div>";
     vi.mocked(safeFetch).mockResolvedValue(longContent);
     const result = await banklessExtractor.extract(makeCtx("Some Episode"));
     expect(result).toBeDefined();
-    expect(result!.endsWith("[Transcript truncated...]")).toBe(true);
-    // 50000 chars + "\n\n[Transcript truncated...]" (26 chars) = 50026
-    expect(result!.length).toBe(50000 + "\n\n[Transcript truncated...]".length);
+    expect(result!.endsWith(TRUNCATED_MARKER.trim())).toBe(true);
+    expect(result!.length).toBe(
+      MAX_TRANSCRIPT_LENGTH + TRUNCATED_MARKER.length,
+    );
+  });
+
+  it("does not truncate text that fits exactly within MAX_TRANSCRIPT_LENGTH", async () => {
+    // Body has to land at exactly MAX after stripHtmlTranscript (which collapses
+    // whitespace and trims). Pad with `x` so the stripped body length equals MAX.
+    const body = "x".repeat(MAX_TRANSCRIPT_LENGTH);
+    vi.mocked(safeFetch).mockResolvedValue(
+      `<div id="insideEpisode"><strong>TRANSCRIPT</strong><p>${body}</p></div>`,
+    );
+    const result = await banklessExtractor.extract(makeCtx("Some Episode"));
+    expect(result).toBeDefined();
+    expect(result!.length).toBe(MAX_TRANSCRIPT_LENGTH);
+    expect(result!.endsWith(TRUNCATED_MARKER.trim())).toBe(false);
   });
 });

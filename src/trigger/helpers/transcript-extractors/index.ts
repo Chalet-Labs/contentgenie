@@ -1,4 +1,16 @@
 import { logger } from "@trigger.dev/sdk";
+import {
+  BANKLESS_PODCAST_INDEX_ID,
+  banklessExtractor,
+} from "@/trigger/helpers/transcript-extractors/bankless";
+import {
+  LEX_FRIDMAN_PODCAST_INDEX_ID,
+  lexFridmanExtractor,
+} from "@/trigger/helpers/transcript-extractors/lex-fridman";
+import {
+  LIMITLESS_PODCAST_INDEX_ID,
+  limitlessExtractor,
+} from "@/trigger/helpers/transcript-extractors/limitless";
 import type {
   Extractor,
   ExtractorContext,
@@ -48,22 +60,7 @@ export async function runPodcastExtractor(
   }
 }
 
-// Concrete extractor registrations (issue #428).
 // Order is irrelevant — the registry keys off podcastIndexId.
-import {
-  LEX_FRIDMAN_PODCAST_INDEX_ID,
-  lexFridmanExtractor,
-} from "@/trigger/helpers/transcript-extractors/lex-fridman";
 register(LEX_FRIDMAN_PODCAST_INDEX_ID, lexFridmanExtractor);
-
-import {
-  LIMITLESS_PODCAST_INDEX_ID,
-  limitlessExtractor,
-} from "@/trigger/helpers/transcript-extractors/limitless";
 register(LIMITLESS_PODCAST_INDEX_ID, limitlessExtractor);
-
-import {
-  BANKLESS_PODCAST_INDEX_ID,
-  banklessExtractor,
-} from "@/trigger/helpers/transcript-extractors/bankless";
 register(BANKLESS_PODCAST_INDEX_ID, banklessExtractor);

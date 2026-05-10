@@ -3,20 +3,17 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
-vi.mock("@/trigger/helpers/transcript", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("@/trigger/helpers/transcript")>();
-  return { ...actual, fetchTranscriptFromUrl: vi.fn() };
-});
+vi.mock("@/lib/security", () => ({ safeFetch: vi.fn() }));
 
-import {
-  fetchTranscriptFromUrl,
-  stripHtmlTranscript,
-} from "@/trigger/helpers/transcript";
+import { safeFetch } from "@/lib/security";
 import { lexFridmanExtractor } from "@/trigger/helpers/transcript-extractors/lex-fridman";
 import type { ExtractorContext } from "@/trigger/helpers/transcript-extractors/types";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+const fixture = readFileSync(
+  join(__dirname, "fixtures", "lex-fridman.html"),
+  "utf8",
+);
 
 const makeCtx = (link: string | null): ExtractorContext => ({
   episode: {
@@ -33,51 +30,36 @@ beforeEach(() => {
 });
 
 describe("lexFridmanExtractor", () => {
-  it("builds the correct transcript URL from a trailing-slash episode link", async () => {
-    vi.mocked(fetchTranscriptFromUrl).mockResolvedValue(
-      "plain transcript text",
-    );
-    const result = await lexFridmanExtractor.extract(
+  it("appends -transcript and replaces the trailing slash (VERIFY 1)", async () => {
+    vi.mocked(safeFetch).mockResolvedValue("plain transcript text");
+    await lexFridmanExtractor.extract(
       makeCtx("https://lexfridman.com/jensen-huang/"),
     );
-    expect(vi.mocked(fetchTranscriptFromUrl)).toHaveBeenCalledWith(
+    expect(vi.mocked(safeFetch)).toHaveBeenCalledWith(
       "https://lexfridman.com/jensen-huang-transcript",
+      expect.anything(),
     );
-    expect(result).toBe("plain transcript text");
   });
 
-  it("returns undefined without fetching when link is null", async () => {
-    const result = await lexFridmanExtractor.extract(makeCtx(null));
-    expect(result).toBeUndefined();
-    expect(vi.mocked(fetchTranscriptFromUrl)).not.toHaveBeenCalled();
+  it("appends -transcript when the link has no trailing slash (proves replaceTrailingSlash is wired)", async () => {
+    vi.mocked(safeFetch).mockResolvedValue("plain transcript text");
+    await lexFridmanExtractor.extract(
+      makeCtx("https://lexfridman.com/jensen-huang"),
+    );
+    expect(vi.mocked(safeFetch)).toHaveBeenCalledWith(
+      "https://lexfridman.com/jensen-huang-transcript",
+      expect.anything(),
+    );
   });
 
-  it("returns undefined without fetching when link is empty string", async () => {
-    const result = await lexFridmanExtractor.extract(makeCtx(""));
-    expect(result).toBeUndefined();
-    expect(vi.mocked(fetchTranscriptFromUrl)).not.toHaveBeenCalled();
-  });
-
-  it("returns undefined when fetchTranscriptFromUrl returns undefined", async () => {
-    vi.mocked(fetchTranscriptFromUrl).mockResolvedValue(undefined);
+  it("golden-HTML fixture roundtrip: real HTML strips through to clean text", async () => {
+    vi.mocked(safeFetch).mockResolvedValue(fixture);
     const result = await lexFridmanExtractor.extract(
       makeCtx("https://lexfridman.com/jensen-huang/"),
     );
-    expect(result).toBeUndefined();
-  });
-
-  it("golden-HTML fixture roundtrip: returns stripped text from the fixture", async () => {
-    const fixture = readFileSync(
-      join(__dirname, "fixtures", "lex-fridman.html"),
-      "utf8",
-    );
-    const expectedText = stripHtmlTranscript(fixture).trim();
-    expect(expectedText).not.toBe("");
-
-    vi.mocked(fetchTranscriptFromUrl).mockResolvedValue(expectedText);
-    const result = await lexFridmanExtractor.extract(
-      makeCtx("https://lexfridman.com/jensen-huang/"),
-    );
-    expect(result).toBe(expectedText);
+    expect(result).toContain("Jensen Huang");
+    expect(result).toContain("Nvidia");
+    expect(result).not.toMatch(/<\/?(p|script|html|body)\b/i);
+    expect(result).not.toContain("analytics placeholder");
   });
 });

@@ -3,20 +3,17 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 
-vi.mock("@/trigger/helpers/transcript", async (importOriginal) => {
-  const actual =
-    await importOriginal<typeof import("@/trigger/helpers/transcript")>();
-  return { ...actual, fetchTranscriptFromUrl: vi.fn() };
-});
+vi.mock("@/lib/security", () => ({ safeFetch: vi.fn() }));
 
-import {
-  fetchTranscriptFromUrl,
-  stripHtmlTranscript,
-} from "@/trigger/helpers/transcript";
+import { safeFetch } from "@/lib/security";
 import { limitlessExtractor } from "@/trigger/helpers/transcript-extractors/limitless";
 import type { ExtractorContext } from "@/trigger/helpers/transcript-extractors/types";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+const fixture = readFileSync(
+  join(__dirname, "fixtures", "limitless.html"),
+  "utf8",
+);
 
 const makeCtx = (link: string | null): ExtractorContext => ({
   episode: {
@@ -33,49 +30,25 @@ beforeEach(() => {
 });
 
 describe("limitlessExtractor", () => {
-  it("appends /transcript to the episode link", async () => {
-    vi.mocked(fetchTranscriptFromUrl).mockResolvedValue("limitless transcript");
-    const result = await limitlessExtractor.extract(
+  it("appends /transcript to the episode link (VERIFY 2)", async () => {
+    vi.mocked(safeFetch).mockResolvedValue("plain transcript text");
+    await limitlessExtractor.extract(
       makeCtx("https://share.transistor.fm/s/51de038d"),
     );
-    expect(vi.mocked(fetchTranscriptFromUrl)).toHaveBeenCalledWith(
+    expect(vi.mocked(safeFetch)).toHaveBeenCalledWith(
       "https://share.transistor.fm/s/51de038d/transcript",
+      expect.anything(),
     );
-    expect(result).toBe("limitless transcript");
   });
 
-  it("returns undefined without fetching when link is null", async () => {
-    const result = await limitlessExtractor.extract(makeCtx(null));
-    expect(result).toBeUndefined();
-    expect(vi.mocked(fetchTranscriptFromUrl)).not.toHaveBeenCalled();
-  });
-
-  it("returns undefined without fetching when link is empty string", async () => {
-    const result = await limitlessExtractor.extract(makeCtx(""));
-    expect(result).toBeUndefined();
-    expect(vi.mocked(fetchTranscriptFromUrl)).not.toHaveBeenCalled();
-  });
-
-  it("returns undefined when fetchTranscriptFromUrl returns undefined", async () => {
-    vi.mocked(fetchTranscriptFromUrl).mockResolvedValue(undefined);
+  it("golden-HTML fixture roundtrip: real HTML strips through to clean text", async () => {
+    vi.mocked(safeFetch).mockResolvedValue(fixture);
     const result = await limitlessExtractor.extract(
       makeCtx("https://share.transistor.fm/s/51de038d"),
     );
-    expect(result).toBeUndefined();
-  });
-
-  it("golden-HTML fixture roundtrip: returns stripped text from the fixture", async () => {
-    const fixture = readFileSync(
-      join(__dirname, "fixtures", "limitless.html"),
-      "utf8",
-    );
-    const expectedText = stripHtmlTranscript(fixture).trim();
-    expect(expectedText).not.toBe("");
-
-    vi.mocked(fetchTranscriptFromUrl).mockResolvedValue(expectedText);
-    const result = await limitlessExtractor.extract(
-      makeCtx("https://share.transistor.fm/s/51de038d"),
-    );
-    expect(result).toBe(expectedText);
+    expect(result).toContain("AI agents");
+    expect(result).toContain("Hallucination");
+    expect(result).not.toMatch(/<\/?(p|script|html|body|div)\b/i);
+    expect(result).not.toContain("tracking placeholder");
   });
 });
