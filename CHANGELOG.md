@@ -9,6 +9,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 ### Added
 
 - Bankless, Lex Fridman, and Limitless transcript extractors (`src/trigger/helpers/transcript-extractors/`). Each podcast's episode page is parsed (Bankless via bespoke HTML anchor pair; Lex Fridman + Limitless via the shared `linkSuffixExtractor`) to surface a transcript when PodcastIndex / RSS feeds don't carry one. Pipeline wiring in `fetch-transcript.ts` follows in #429. (#428)
+- Regression tests + Storybook story for podcast-site transcript source value (#430)
 - Internal `transcript-extractors` registry scaffolding (`src/trigger/helpers/transcript-extractors/`) with the shared `linkSuffixExtractor` factory. Empty registry — specific extractors and pipeline wiring follow in #428/#429. (#427)
 - `episode_link` and `transcript_extractor` columns on `episodes`, plus `'podcast-site'` accepted by `transcript_source_enum`. Persists PodcastIndex `link` on episode insert across poll/processing/summary paths. (#426)
 - Dashboard "this week's takes" digest list showing the 5 most recent canonical-topic digests from the last 7 days, positioned above the trending-topics card. Section is fully omitted when empty or unauthenticated. (#400)
