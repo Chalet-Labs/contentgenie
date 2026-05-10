@@ -98,17 +98,17 @@ Because Neon owns `DATABASE_URL` in Vercel, this variable is **not** included in
 
 ### Preview schema migrations
 
-Preview Neon branches start as copies of the production schema but need any pending schema changes applied. The `vercel-build` script in `package.json` handles this automatically:
+Preview Neon branches start as point-in-time copies of the production schema and need any pending schema changes applied. The `vercel-build` script in `package.json` handles this automatically:
 
 ```bash
-"vercel-build": "if [ \"$VERCEL_ENV\" = \"preview\" ]; then npx drizzle-kit push --force; fi && next build"
+"vercel-build": "if [ \"$VERCEL_ENV\" = \"preview\" ]; then bun scripts/bootstrap-drizzle-migrations.ts && npx drizzle-kit migrate; fi && next build"
 ```
 
-- For **preview** deployments, `drizzle-kit push --force` runs against the Neon branch's `DATABASE_URL` before `next build`, ensuring the schema is up to date.
-- For **production** deployments, the migration step is skipped. Production schema changes are applied manually via `bun run db:push`.
-- `drizzle-kit push` is idempotent — safe to run on every build even if the schema hasn't changed.
+- For **preview** deployments, the build first runs the idempotent `bootstrap-drizzle-migrations.ts` (populates `drizzle.__drizzle_migrations` from the frozen 33-tag baseline manifest if missing — a no-op once the table is inherited from a bootstrapped prod fork), then `drizzle-kit migrate` applies any pending migration files against the Neon branch's `DATABASE_URL` before `next build`.
+- For **production** deployments, the migration step is skipped. Production schema changes are applied manually via `doppler run --config prd -- bunx drizzle-kit migrate` after the one-time cutover bootstrap.
+- Both bootstrap and `drizzle-kit migrate` are idempotent — safe to run on every build even if no migration is pending.
 
-See [ADR-002](adr/002-preview-database-migrations.md) for the full decision record.
+See [ADR-002](adr/002-preview-database-migrations.md) for the full decision record (including the 2026-05 update on switching from `push` to `migrate` and the cutover bootstrap procedure).
 
 ## Trigger.dev Integration
 
