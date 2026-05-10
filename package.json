@@ -26,7 +26,7 @@
     "trigger:dev": "doppler run -- bunx trigger.dev@latest dev",
     "trigger:deploy": "doppler run -- bunx trigger.dev@latest deploy",
     "prepare": "husky",
-    "vercel-build": "if [ \"$VERCEL_ENV\" = \"preview\" ]; then npx drizzle-kit migrate; fi && next build"
+    "vercel-build": "if [ \"$VERCEL_ENV\" = \"preview\" ]; then bun scripts/bootstrap-drizzle-migrations.ts && npx drizzle-kit migrate; fi && next build"
   },
   "dependencies": {
     "@clerk/nextjs": "^6.37.0",
