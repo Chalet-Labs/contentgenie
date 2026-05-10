@@ -20,6 +20,25 @@ vi.mock("next/link", () => ({
   ),
 }));
 
+// Mock SynthesizeButton to a sentinel so chip tests don't need navigation/action mocks.
+vi.mock("@/components/episodes/synthesize-button", () => ({
+  SynthesizeButton: ({
+    canonicalTopicId,
+    label,
+  }: {
+    canonicalTopicId: number;
+    label: string;
+  }) => (
+    <button
+      type="button"
+      aria-label={`Synthesize digest for ${label}`}
+      data-testid={`synthesize-btn-${canonicalTopicId}`}
+    >
+      Synthesize
+    </button>
+  ),
+}));
+
 describe("TopicChip", () => {
   const defaultProps = {
     canonicalTopicId: 42,
@@ -97,5 +116,58 @@ describe("TopicChip", () => {
     );
     const icon = document.querySelector("svg[aria-hidden='true']");
     expect(icon?.getAttribute("class")).toContain("text-muted-foreground");
+  });
+});
+
+describe("TopicChip — synthesize variant", () => {
+  const defaultProps = {
+    canonicalTopicId: 42,
+    label: "Claude Opus 4.7 release",
+    kind: "release" as const,
+  };
+
+  // The chip is dumb: it only checks `synthesizable === true`. Threshold and
+  // staleness logic live in `isDigestSynthesizable` at the action layer.
+
+  it("renders synthesize button when synthesizable=true", () => {
+    render(<TopicChip {...defaultProps} synthesizable={true} />);
+    const button = screen.getByRole("button", {
+      name: /synthesize digest for/i,
+    });
+    expect(button).toBeInTheDocument();
+    expect(button).toHaveAttribute(
+      "aria-label",
+      "Synthesize digest for Claude Opus 4.7 release",
+    );
+  });
+
+  it("no button when synthesizable=false", () => {
+    render(<TopicChip {...defaultProps} synthesizable={false} />);
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+  });
+
+  it("no button when synthesizable is undefined (default)", () => {
+    render(<TopicChip {...defaultProps} />);
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+  });
+
+  it("base case (no new props): renders single link, no wrapper span, no button", () => {
+    const { container } = render(<TopicChip {...defaultProps} />);
+    expect(screen.getByRole("link")).toBeInTheDocument();
+    expect(screen.queryByRole("button")).not.toBeInTheDocument();
+    // No wrapper span (chip renders as Link directly)
+    expect(container.querySelector("span.inline-flex")).not.toBeInTheDocument();
+  });
+
+  it("wraps in inline-flex span when synthesize gate passes", () => {
+    const { container } = render(
+      <TopicChip {...defaultProps} synthesizable={true} />,
+    );
+    const wrapper = container.querySelector("span.inline-flex");
+    expect(wrapper).toBeInTheDocument();
+    expect(wrapper).toHaveClass("items-center", "gap-0.5");
+    // Both link and button inside wrapper
+    expect(wrapper?.querySelector("a")).toBeInTheDocument();
+    expect(wrapper?.querySelector("button")).toBeInTheDocument();
   });
 });

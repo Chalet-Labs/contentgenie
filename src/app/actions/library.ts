@@ -5,6 +5,8 @@ import { revalidatePath } from "next/cache";
 import { eq, and, desc, asc, isNotNull, avg, count } from "drizzle-orm";
 import { db } from "@/db";
 import { episodes, userLibrary, bookmarks } from "@/db/schema";
+import { fetchChipMetadata } from "@/lib/canonical-topic-chip-metadata";
+import { isDigestSynthesizable } from "@/lib/topic-digest-thresholds";
 import { upsertPodcast, ensureUserExists } from "@/db/helpers";
 import {
   LIBRARY_ENTRY_COLUMNS,
@@ -280,7 +282,8 @@ export async function getUserLibrary(
       return sortDirection === "asc" ? -comparison : comparison;
     });
 
-    const mappedItems: SavedItemDTO[] = sortedItems.map((item) => {
+    // First pass: build chips from relational query results
+    const rawMappedItems = sortedItems.map((item) => {
       const chips: CanonicalTopicChip[] = (item.episode.canonicalTopics ?? [])
         .flatMap((j) => {
           const ct = j.canonicalTopic;
@@ -304,6 +307,36 @@ export async function getUserLibrary(
         },
       };
     });
+
+    // Post-enrichment: per-chip "synthesizable" flag derived from completed-
+    // summary count + digest staleness. See `fetchChipMetadata` for the SQL
+    // shape rationale and `isDigestSynthesizable` for the predicate.
+    const allChipIds = new Set<number>();
+    for (const item of rawMappedItems) {
+      for (const chip of item.episode.canonicalTopics ?? []) {
+        allChipIds.add(chip.id);
+      }
+    }
+
+    let chipMeta: Awaited<ReturnType<typeof fetchChipMetadata>> = new Map();
+    try {
+      chipMeta = await fetchChipMetadata(Array.from(allChipIds));
+    } catch (err) {
+      console.error("[getUserLibrary] chip metadata enrichment failed", err);
+      // Degraded UX: chips render without the Synthesize CTA on failure.
+    }
+
+    const mappedItems: SavedItemDTO[] = rawMappedItems.map((item) => ({
+      ...item,
+      episode: {
+        ...item.episode,
+        canonicalTopics: item.episode.canonicalTopics?.map((chip) => {
+          const meta = chipMeta.get(chip.id);
+          if (!meta) return chip;
+          return { ...chip, synthesizable: isDigestSynthesizable(meta) };
+        }),
+      },
+    }));
 
     return { items: mappedItems, error: null };
   } catch (error) {

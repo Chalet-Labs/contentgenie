@@ -2,7 +2,16 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { and, desc, eq, isNotNull, isNull, sql } from "drizzle-orm";
+import {
+  and,
+  desc,
+  eq,
+  gte,
+  inArray,
+  isNotNull,
+  isNull,
+  sql,
+} from "drizzle-orm";
 import { tasks, auth as triggerAuth } from "@trigger.dev/sdk";
 
 import { withAdminAction } from "@/lib/auth-wrapper";
@@ -49,9 +58,10 @@ import {
 } from "@/lib/admin/canonical-topic-episode-count";
 import {
   MIN_DERIVED_COUNT_FOR_DIGEST,
-  STALENESS_GROWTH_THRESHOLD,
   RELATED_TOPICS_LIMIT,
+  isDigestSynthesizable,
 } from "@/lib/topic-digest-thresholds";
+import { MAX_CONSENSUS_PREVIEW_CHARS } from "@/lib/topic-digest-preview";
 import { formatVector } from "@/lib/entity-resolution";
 import { coerceEmbedding } from "@/trigger/helpers/coerce-embedding";
 
@@ -551,28 +561,30 @@ export async function triggerTopicDigestGeneration(input: {
     }
 
     // Both eligibility and staleness operate on completed-summary count to
-    // align with the task's `summaryStatus = 'completed'` predicate. Using the
-    // raw linked-episode count would let the action queue runs that the task
-    // then aborts (false-positive 'queued') and miss regenerations when new
-    // summaries complete without new links being added.
-    const completedSummaryCount = canonical.completedSummaryCount;
+    // align with the task's `summaryStatus = 'completed'` predicate (ADR-051).
+    // The `isDigestSynthesizable` predicate is the canonical implementation;
+    // the action just maps its boolean result back to our three-state
+    // {ineligible, cached, queued} response by inspecting the inputs once
+    // more to disambiguate which negative branch fired.
+    const completedSummaryCount = Number(canonical.completedSummaryCount ?? 0);
     const existing = digestRows[0] ?? null;
+    const synthesizable = isDigestSynthesizable({
+      completedSummaryCount,
+      digestEpisodeCountAtGeneration:
+        existing?.episodeCountAtGeneration ?? null,
+    });
 
-    if (completedSummaryCount < MIN_DERIVED_COUNT_FOR_DIGEST) {
+    if (!synthesizable) {
+      if (completedSummaryCount < MIN_DERIVED_COUNT_FOR_DIGEST) {
+        return {
+          success: true,
+          data: { status: "ineligible", digestId: existing?.id },
+        };
+      }
+      // Above the minimum but not stale enough — serve the cached digest.
       return {
         success: true,
-        data: { status: "ineligible", digestId: existing?.id },
-      };
-    }
-
-    if (
-      existing &&
-      Math.abs(completedSummaryCount - existing.episodeCountAtGeneration) <
-        STALENESS_GROWTH_THRESHOLD
-    ) {
-      return {
-        success: true,
-        data: { status: "cached", digestId: existing.id },
+        data: { status: "cached", digestId: existing!.id },
       };
     }
 
@@ -603,7 +615,7 @@ export async function triggerTopicDigestGeneration(input: {
 }
 
 // ---------------------------------------------------------------------------
-// getTopicDetailData — public-facing topic detail page payload (#399)
+// getTopicDetailData — public-facing topic detail page payload
 // ---------------------------------------------------------------------------
 //
 // Returns canonical row, digest (if any), episode list (joined with the
@@ -857,6 +869,124 @@ export async function triggerTopicDigestRefresh(input: {
         error: e,
       });
       return { success: false, error: "token-failed" };
+    }
+  });
+}
+
+// ---------------------------------------------------------------------------
+// getRecentTopicDigests — dashboard "this week's takes" section
+// ---------------------------------------------------------------------------
+
+const getRecentTopicDigestsSchema = z
+  .object({
+    limit: z.number().int().min(1).max(20).default(5),
+  })
+  .strict();
+
+function truncateConsensus(points: string[]): string {
+  const first = points[0] ?? "";
+  const chars = Array.from(first);
+  if (chars.length <= MAX_CONSENSUS_PREVIEW_CHARS) return first;
+  return chars.slice(0, MAX_CONSENSUS_PREVIEW_CHARS).join("") + "…";
+}
+
+export type RecentTopicDigest = {
+  canonicalId: number;
+  label: string;
+  kind: CanonicalTopicKind;
+  episodeCount: number;
+  generatedAt: Date;
+  consensusPreview: string;
+};
+
+export async function getRecentTopicDigests(input?: {
+  limit?: number;
+}): Promise<ActionResult<RecentTopicDigest[]>> {
+  return withAuthAction(async (_userId) => {
+    const parsed = getRecentTopicDigestsSchema.safeParse(input ?? {});
+    if (!parsed.success) {
+      return {
+        success: false,
+        error: parsed.error.issues[0]?.message ?? "Invalid input",
+      };
+    }
+    try {
+      const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+      // Two-pass: fetch the digest rows + canonical metadata first, then
+      // fetch episode counts in a separate single-table query. The
+      // `canonicalTopicEpisodeCount()` helper is safe in single-table
+      // `from(canonicalTopics)` queries; in any multi-table query Drizzle
+      // emits a double-qualified `"canonical_topics"."canonical_topics"."id"`
+      // reference that Postgres rejects with 42P01 errorMissingRTE.
+      const digestRows = await db
+        .select({
+          canonicalId: canonicalTopics.id,
+          label: canonicalTopics.label,
+          kind: canonicalTopics.kind,
+          generatedAt: canonicalTopicDigests.generatedAt,
+          consensusPoints: canonicalTopicDigests.consensusPoints,
+        })
+        .from(canonicalTopics)
+        .innerJoin(
+          canonicalTopicDigests,
+          eq(canonicalTopicDigests.canonicalTopicId, canonicalTopics.id),
+        )
+        .where(
+          and(
+            eq(canonicalTopics.status, "active"),
+            gte(canonicalTopicDigests.generatedAt, sevenDaysAgo),
+          ),
+        )
+        .orderBy(desc(canonicalTopicDigests.generatedAt))
+        .limit(parsed.data.limit);
+
+      // Deduplicate: keep the most recent digest per topic (rows are already
+      // ordered by desc generatedAt, so the first occurrence per topic wins).
+      const seen = new Set<number>();
+      const uniqueDigestRows = digestRows.filter((r) => {
+        if (seen.has(r.canonicalId)) return false;
+        seen.add(r.canonicalId);
+        return true;
+      });
+
+      // Pass 2: episode counts via the helper, single-table FROM only.
+      const canonicalIds = uniqueDigestRows.map((r) => r.canonicalId);
+      const episodeCountById = new Map<number, number>();
+      if (canonicalIds.length > 0) {
+        const countRows = await db
+          .select({
+            id: canonicalTopics.id,
+            episodeCount: canonicalTopicEpisodeCount(),
+          })
+          .from(canonicalTopics)
+          .where(inArray(canonicalTopics.id, canonicalIds));
+        for (const r of countRows) {
+          episodeCountById.set(r.id, Number(r.episodeCount ?? 0));
+        }
+      }
+
+      return {
+        success: true,
+        data: uniqueDigestRows.map((r) => ({
+          canonicalId: r.canonicalId,
+          label: r.label,
+          kind: r.kind,
+          episodeCount: episodeCountById.get(r.canonicalId) ?? 0,
+          generatedAt: r.generatedAt,
+          consensusPreview: truncateConsensus(
+            (r.consensusPoints as string[] | null) ?? [],
+          ),
+        })),
+      };
+    } catch (err) {
+      // Convert DB exceptions into a soft failure so the dashboard
+      // <Suspense> boundary doesn't escape the whole page. The component
+      // already handles `success: false` by returning null.
+      console.error("[getRecentTopicDigests] DB query failed:", err);
+      return {
+        success: false,
+        error: err instanceof Error ? err.message : "db-query-failed",
+      };
     }
   });
 }

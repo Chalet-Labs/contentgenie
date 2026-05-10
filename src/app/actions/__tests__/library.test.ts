@@ -202,6 +202,13 @@ vi.mock("drizzle-orm", () => ({
   count: vi.fn((col: unknown) => ({ _count: col })),
 }));
 
+// Chip-metadata helper is mocked directly so tests can drive the
+// post-enrichment path without re-stubbing the underlying DB chains.
+const mockFetchChipMetadata = vi.fn();
+vi.mock("@/lib/canonical-topic-chip-metadata", () => ({
+  fetchChipMetadata: (...args: unknown[]) => mockFetchChipMetadata(...args),
+}));
+
 const importLibrary = async () => import("@/app/actions/library");
 
 // File-level reset so queued .mockReturnValueOnce / .mockImplementation values
@@ -507,6 +514,8 @@ describe("getUserLibrary", () => {
   beforeEach(happyPathSetup(mockAuth, mockEnsureUserExists));
   beforeEach(() => {
     mockUserLibraryFindMany.mockResolvedValue([itemA, itemB, itemC]);
+    // Default: helper returns empty Map → no chip enrichment, no CTA.
+    mockFetchChipMetadata.mockResolvedValue(new Map());
   });
   afterEach(() => vi.restoreAllMocks());
 
@@ -723,6 +732,147 @@ describe("getUserLibrary", () => {
     result.items.forEach((item) => {
       expect(item.episode.canonicalTopics).toBeUndefined();
     });
+  });
+
+  // ── Post-enrichment: chip metadata (episodeCount + synthesizable) ─────────
+
+  // Helper to build a fixture item with one canonical topic chip.
+  const itemWithTopic = (id: number) => ({
+    ...itemA,
+    episode: {
+      ...itemA.episode,
+      canonicalTopics: [
+        {
+          coverageScore: 0.9,
+          canonicalTopic: {
+            id,
+            label: "Topic A",
+            kind: "concept",
+            status: "active",
+          },
+        },
+      ],
+    },
+  });
+
+  it("post-enrichment: synthesizable=true when no digest (digestEpisodeCountAtGeneration null)", async () => {
+    mockUserLibraryFindMany.mockResolvedValue([itemWithTopic(10)]);
+    mockFetchChipMetadata.mockResolvedValue(
+      new Map([
+        [
+          10,
+          { completedSummaryCount: 5, digestEpisodeCountAtGeneration: null },
+        ],
+      ]),
+    );
+    const { getUserLibrary } = await importLibrary();
+    const result = await getUserLibrary();
+    expect(result.items[0]!.episode.canonicalTopics![0]!.synthesizable).toBe(
+      true,
+    );
+  });
+
+  it("post-enrichment: synthesizable=false when completedSummaryCount < MIN_DERIVED_COUNT_FOR_DIGEST", async () => {
+    mockUserLibraryFindMany.mockResolvedValue([itemWithTopic(10)]);
+    mockFetchChipMetadata.mockResolvedValue(
+      new Map([
+        // Below the minimum (3) — chip stays disabled even with no digest.
+        [
+          10,
+          { completedSummaryCount: 2, digestEpisodeCountAtGeneration: null },
+        ],
+      ]),
+    );
+    const { getUserLibrary } = await importLibrary();
+    const result = await getUserLibrary();
+    expect(result.items[0]!.episode.canonicalTopics![0]!.synthesizable).toBe(
+      false,
+    );
+  });
+
+  it("post-enrichment: synthesizable=false when digest is fresh (|growth| < STALENESS_GROWTH_THRESHOLD)", async () => {
+    const { STALENESS_GROWTH_THRESHOLD } =
+      await import("@/lib/topic-digest-thresholds");
+    mockUserLibraryFindMany.mockResolvedValue([itemWithTopic(10)]);
+    const digestEpisodeCountAtGeneration = 10;
+    const completedSummaryCount =
+      digestEpisodeCountAtGeneration + STALENESS_GROWTH_THRESHOLD - 1;
+    mockFetchChipMetadata.mockResolvedValue(
+      new Map([
+        [10, { completedSummaryCount, digestEpisodeCountAtGeneration }],
+      ]),
+    );
+    const { getUserLibrary } = await importLibrary();
+    const result = await getUserLibrary();
+    expect(result.items[0]!.episode.canonicalTopics![0]!.synthesizable).toBe(
+      false,
+    );
+  });
+
+  it("post-enrichment: synthesizable=true when digest is stale (growth >= STALENESS_GROWTH_THRESHOLD)", async () => {
+    const { STALENESS_GROWTH_THRESHOLD } =
+      await import("@/lib/topic-digest-thresholds");
+    mockUserLibraryFindMany.mockResolvedValue([itemWithTopic(10)]);
+    const digestEpisodeCountAtGeneration = 10;
+    const completedSummaryCount =
+      digestEpisodeCountAtGeneration + STALENESS_GROWTH_THRESHOLD;
+    mockFetchChipMetadata.mockResolvedValue(
+      new Map([
+        [10, { completedSummaryCount, digestEpisodeCountAtGeneration }],
+      ]),
+    );
+    const { getUserLibrary } = await importLibrary();
+    const result = await getUserLibrary();
+    expect(result.items[0]!.episode.canonicalTopics![0]!.synthesizable).toBe(
+      true,
+    );
+  });
+
+  it("post-enrichment: synthesizable=true when canonical SHRANK by ≥ STALENESS_GROWTH_THRESHOLD (Math.abs symmetry)", async () => {
+    const { STALENESS_GROWTH_THRESHOLD } =
+      await import("@/lib/topic-digest-thresholds");
+    mockUserLibraryFindMany.mockResolvedValue([itemWithTopic(10)]);
+    // Reconciliation merge dropped the count below the original generation
+    // baseline by ≥ STALENESS_GROWTH_THRESHOLD. Math.abs symmetry → stale.
+    const digestEpisodeCountAtGeneration = 10;
+    const completedSummaryCount =
+      digestEpisodeCountAtGeneration - STALENESS_GROWTH_THRESHOLD;
+    mockFetchChipMetadata.mockResolvedValue(
+      new Map([
+        [10, { completedSummaryCount, digestEpisodeCountAtGeneration }],
+      ]),
+    );
+    const { getUserLibrary } = await importLibrary();
+    const result = await getUserLibrary();
+    expect(result.items[0]!.episode.canonicalTopics![0]!.synthesizable).toBe(
+      true,
+    );
+  });
+
+  it("post-enrichment: helper failure → chips emitted without synthesizable (no error thrown)", async () => {
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    mockUserLibraryFindMany.mockResolvedValue([itemWithTopic(10)]);
+    mockFetchChipMetadata.mockRejectedValue(new Error("DB failure"));
+    const { getUserLibrary } = await importLibrary();
+    const result = await getUserLibrary();
+    // No error thrown, items returned, chip has no synthesizable.
+    expect(result.error).toBeNull();
+    expect(
+      result.items[0]!.episode.canonicalTopics![0]!.synthesizable,
+    ).toBeUndefined();
+    expect(consoleSpy).toHaveBeenCalledWith(
+      "[getUserLibrary] chip metadata enrichment failed",
+      expect.any(Error),
+    );
+    consoleSpy.mockRestore();
+  });
+
+  it("post-enrichment: helper called with empty array when library has no chips", async () => {
+    // itemA/itemB/itemC have no canonicalTopics → empty id set passed in.
+    const { getUserLibrary } = await importLibrary();
+    await getUserLibrary();
+    expect(mockFetchChipMetadata).toHaveBeenCalledOnce();
+    expect(mockFetchChipMetadata).toHaveBeenCalledWith([]);
   });
 });
 

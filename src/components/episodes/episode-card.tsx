@@ -243,6 +243,7 @@ export function EpisodeCard({
                       label={chip.label}
                       kind={chip.kind}
                       status={chip.status}
+                      synthesizable={chip.synthesizable}
                     />
                   ))}
               </div>
