@@ -1,5 +1,8 @@
 import { fetchTranscriptFromUrl } from "@/trigger/helpers/transcript";
-import type { Extractor, ExtractorContext } from "./types";
+import type {
+  Extractor,
+  ExtractorContext,
+} from "@/trigger/helpers/transcript-extractors/types";
 
 interface LinkSuffixOptions {
   id: string;
@@ -13,11 +16,18 @@ export function linkSuffixExtractor(opts: LinkSuffixOptions): Extractor {
     extract: async (ctx: ExtractorContext) => {
       if (!ctx.episode.link) return undefined;
 
-      const base =
-        opts.replaceTrailingSlash && ctx.episode.link.endsWith("/")
-          ? ctx.episode.link.slice(0, -1)
-          : ctx.episode.link;
-      return fetchTranscriptFromUrl(base + opts.suffix);
+      const url = new URL(ctx.episode.link);
+      const rawPath = url.pathname;
+      const hasTrailingSlash = rawPath.endsWith("/") && rawPath.length > 1;
+      const basePath =
+        opts.replaceTrailingSlash && hasTrailingSlash
+          ? rawPath.slice(0, -1)
+          : rawPath;
+      url.pathname =
+        basePath === "/" && opts.suffix.startsWith("/")
+          ? opts.suffix
+          : basePath + opts.suffix;
+      return fetchTranscriptFromUrl(url.href);
     },
   };
 }

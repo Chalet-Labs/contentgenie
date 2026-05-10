@@ -62,6 +62,24 @@ describe("runPodcastExtractor", () => {
       expect.objectContaining({
         extractorId: "throws-extractor",
         podcastIndexId: "pod1",
+        error: expect.any(Error),
+      }),
+    );
+  });
+
+  it("logs warn with raw value and returns undefined when extractor throws a non-Error value", async () => {
+    const extractor: Extractor = {
+      id: "throws-string-extractor",
+      extract: vi.fn().mockRejectedValue("boom"),
+    };
+    register("pod1", extractor);
+    const result = await runPodcastExtractor(makeCtx());
+    expect(result).toBeUndefined();
+    expect(vi.mocked(logger.warn)).toHaveBeenCalledWith(
+      "[transcript-extractors] extractor threw",
+      expect.objectContaining({
+        extractorId: "throws-string-extractor",
+        podcastIndexId: "pod1",
         error: "boom",
       }),
     );
