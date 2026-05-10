@@ -325,6 +325,51 @@ describe("poll-new-episodes", () => {
       ]);
     });
 
+    it("normalizes missing or empty link to null on insert", async () => {
+      const podcast = makePodcast({ id: 1, podcastIndexId: "456" });
+
+      mockGetEpisodesByFeedId.mockResolvedValue({
+        status: "true",
+        items: [
+          {
+            id: 3001,
+            title: "Episode no link",
+            enclosureUrl: "https://example.com/c.mp3",
+            description: "Desc C",
+            duration: 100,
+            datePublished: 1700000000,
+            transcripts: [],
+          } as unknown as Parameters<typeof pollSingleFeed>[0],
+          {
+            id: 3002,
+            title: "Episode empty link",
+            enclosureUrl: "https://example.com/d.mp3",
+            link: "   ",
+            description: "Desc D",
+            duration: 200,
+            datePublished: 1700000000,
+            transcripts: [],
+          },
+        ],
+        count: 2,
+      });
+
+      mockWhere.mockResolvedValue([]);
+
+      await pollSingleFeed(podcast);
+
+      expect(mockInsertValues).toHaveBeenCalledWith([
+        expect.objectContaining({
+          podcastIndexId: "3001",
+          episodeLink: null,
+        }),
+        expect.objectContaining({
+          podcastIndexId: "3002",
+          episodeLink: null,
+        }),
+      ]);
+    });
+
     it("calls createEpisodeNotifications once with a batch of all fetched episodes", async () => {
       const podcast = makePodcast({
         id: 1,

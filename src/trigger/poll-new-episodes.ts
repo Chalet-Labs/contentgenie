@@ -6,6 +6,7 @@ import { asPodcastIndexEpisodeId } from "@/types/ids";
 import { getEpisodesByFeedId } from "@/trigger/helpers/podcastindex";
 import { fetchTranscriptTask } from "@/trigger/fetch-transcript";
 import { createEpisodeNotifications } from "@/trigger/helpers/notifications";
+import { mapPodcastIndexEpisodeToInsertValues } from "@/trigger/helpers/database";
 
 /**
  * Queries podcasts that have at least one active subscriber and are sourced
@@ -103,22 +104,24 @@ export async function pollSingleFeed(podcast: typeof podcasts.$inferSelect) {
       .insert(episodes)
       .values(
         fetchedEpisodes.map((ep, i) => ({
-          podcastId: podcast.id,
-          podcastIndexId: fetchedIds[i], // reuse pre-branded id
-          title: ep.title,
-          description: ep.description,
-          audioUrl: ep.enclosureUrl,
-          episodeLink: ep.link ?? null,
-          duration: ep.duration,
-          publishDate: ep.datePublished
-            ? new Date(ep.datePublished * 1000)
-            : null,
+          ...mapPodcastIndexEpisodeToInsertValues(
+            ep,
+            podcast.id,
+            fetchedIds[i],
+          ),
           transcriptStatus: "fetching" as const,
         })),
       )
       .onConflictDoUpdate({
         target: episodes.podcastIndexId,
-        set: { podcastIndexId: sql`excluded.podcast_index_id` },
+        // Self-set on `podcastIndexId` keeps `.returning()` yielding rows for
+        // already-existing episodes. The `episodeLink` COALESCE backfills
+        // existing rows whose link was null when first inserted (pre-#426),
+        // while preserving any non-null value already on the row.
+        set: {
+          podcastIndexId: sql`excluded.podcast_index_id`,
+          episodeLink: sql`COALESCE(${episodes.episodeLink}, excluded.episode_link)`,
+        },
       })
       .returning({ id: episodes.id, podcastIndexId: episodes.podcastIndexId });
 

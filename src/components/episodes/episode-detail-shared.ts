@@ -54,6 +54,8 @@ export function formatTranscriptSource(source: string | null): string {
       return "AI Transcribed";
     case "description-url":
       return "Episode Page";
+    case "podcast-site":
+      return "Podcast Site";
     default:
       return source ?? "Unknown";
   }

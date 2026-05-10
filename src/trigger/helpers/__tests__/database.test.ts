@@ -136,6 +136,18 @@ describe("persistTranscript", () => {
     );
   });
 
+  it("accepts 'podcast-site' as transcriptSource (CHECK + TS contract)", async () => {
+    const chain = makeUpdateChain([{ id: 3 }]);
+    mockUpdate.mockReturnValue(chain);
+
+    const { persistTranscript } = await import("@/trigger/helpers/database");
+    await persistTranscript(123, "extracted text", "podcast-site");
+
+    expect(chain.set).toHaveBeenCalledWith(
+      expect.objectContaining({ transcriptSource: "podcast-site" }),
+    );
+  });
+
   it("throws when episode is not found", async () => {
     const chain = makeUpdateChain([]); // empty returning = not found
     mockUpdate.mockReturnValue(chain);
@@ -427,6 +439,33 @@ describe("trackEpisodeRun", () => {
 
     expect(chain.values).toHaveBeenCalledWith(
       expect.objectContaining({ episodeLink: "https://example.com/ep" }),
+    );
+  });
+
+  it("normalizes missing or empty link to null on insert", async () => {
+    mockPodcastsFindFirst.mockResolvedValue({ id: 1 });
+    mockEpisodesFindFirst.mockResolvedValue(null);
+
+    const { trackEpisodeRun } = await import("@/trigger/helpers/database");
+
+    const chain1 = makeInsertOnConflictChain();
+    mockInsert.mockReturnValueOnce(chain1);
+    const { link: _omit, ...episodeNoLink } = baseEpisode;
+    void _omit;
+    await trackEpisodeRun(episodeNoLink as never, undefined, "run-id-1");
+    expect(chain1.values).toHaveBeenCalledWith(
+      expect.objectContaining({ episodeLink: null }),
+    );
+
+    const chain2 = makeInsertOnConflictChain();
+    mockInsert.mockReturnValueOnce(chain2);
+    await trackEpisodeRun(
+      { ...baseEpisode, link: "   " } as never,
+      undefined,
+      "run-id-2",
+    );
+    expect(chain2.values).toHaveBeenCalledWith(
+      expect.objectContaining({ episodeLink: null }),
     );
   });
 });

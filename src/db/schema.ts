@@ -109,6 +109,12 @@ export const podcasts = pgTable(
   ],
 );
 
+export type TranscriptSource =
+  | "podcastindex"
+  | "assemblyai"
+  | "description-url"
+  | "podcast-site";
+
 // Episodes table
 export const episodes = pgTable(
   "episodes",
@@ -151,9 +157,7 @@ export const episodes = pgTable(
     summaryStatus: text("summary_status").$type<
       "queued" | "running" | "summarizing" | "completed" | "failed"
     >(),
-    transcriptSource: text("transcript_source").$type<
-      "podcastindex" | "assemblyai" | "description-url" | "podcast-site"
-    >(),
+    transcriptSource: text("transcript_source").$type<TranscriptSource>(),
     transcriptStatus: text("transcript_status").$type<
       "missing" | "fetching" | "available" | "failed"
     >(),
