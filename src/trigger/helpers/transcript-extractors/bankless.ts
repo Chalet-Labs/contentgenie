@@ -28,7 +28,7 @@ export function banklessSlug(title: string): string {
     .replace(/^-+|-+$/g, "");
 }
 
-const CONTAINER_RE = /<div\s+id=["']?insideEpisode\b["']?[^>]*>/i;
+const CONTAINER_RE = /<div\b[^>]*?\bid=["']?insideEpisode\b/i;
 const MARKER_RE = /<strong>\s*TRANSCRIPT\s*<\/strong>/i;
 const END_ANCHOR_RE =
   /<\w+\s+[^>]*?class=["']?(?:postSidebar|rule)\b|<\/article>|<aside\b|<footer\b/i;
@@ -69,7 +69,10 @@ export const banklessExtractor: Extractor = {
     const containerStart = html.search(CONTAINER_RE);
     if (containerStart === -1) return undefined;
 
-    const inside = html.slice(containerStart);
+    const rawInside = html.slice(containerStart);
+    const containerEnd = rawInside.search(END_ANCHOR_RE);
+    const inside =
+      containerEnd === -1 ? rawInside : rawInside.slice(0, containerEnd);
     const markerMatch = MARKER_RE.exec(inside);
     if (!markerMatch) return undefined;
 

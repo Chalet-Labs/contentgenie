@@ -20,9 +20,12 @@ export async function safeFetchWithTimeout(
 }
 
 export function truncateTranscript(text: string): string {
-  return text.length > MAX_TRANSCRIPT_LENGTH
-    ? text.slice(0, MAX_TRANSCRIPT_LENGTH) + TRUNCATED_MARKER
-    : text;
+  if (text.length <= MAX_TRANSCRIPT_LENGTH) return text;
+  let truncated = text.slice(0, MAX_TRANSCRIPT_LENGTH);
+  if (/[\uD800-\uDBFF]$/.test(truncated)) {
+    truncated = truncated.slice(0, -1);
+  }
+  return truncated + TRUNCATED_MARKER;
 }
 
 const SUPPORTED_TRANSCRIPT_TYPES = [
@@ -161,7 +164,7 @@ export function extractTranscriptUrl(description: string): string | null {
 
 /**
  * Fetches transcript content from a URL using SSRF-safe fetching.
- * Returns undefined on any error (non-fatal fallback).
+ * Throws on fetch errors; returns undefined only for empty or whitespace-only content.
  */
 export async function fetchTranscriptFromUrl(
   url: string,
