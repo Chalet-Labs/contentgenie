@@ -566,7 +566,7 @@ export async function triggerTopicDigestGeneration(input: {
     // the action just maps its boolean result back to our three-state
     // {ineligible, cached, queued} response by inspecting the inputs once
     // more to disambiguate which negative branch fired.
-    const completedSummaryCount = canonical.completedSummaryCount;
+    const completedSummaryCount = Number(canonical.completedSummaryCount ?? 0);
     const existing = digestRows[0] ?? null;
     const synthesizable = isDigestSynthesizable({
       completedSummaryCount,
