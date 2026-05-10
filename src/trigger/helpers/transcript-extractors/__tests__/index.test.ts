@@ -1,8 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { createTriggerSdkMock } from "@/test/mocks/trigger-sdk";
 
-vi.mock("@trigger.dev/sdk", () => ({
-  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
-}));
+vi.mock("@trigger.dev/sdk", () => createTriggerSdkMock());
 
 import { logger } from "@trigger.dev/sdk";
 import {
@@ -59,8 +58,12 @@ describe("runPodcastExtractor", () => {
     const result = await runPodcastExtractor(makeCtx());
     expect(result).toBeUndefined();
     expect(vi.mocked(logger.warn)).toHaveBeenCalledWith(
-      expect.stringContaining("[transcript-extractors]"),
-      expect.objectContaining({ extractorId: "throws-extractor" }),
+      "[transcript-extractors] extractor threw",
+      expect.objectContaining({
+        extractorId: "throws-extractor",
+        podcastIndexId: "pod1",
+        error: "boom",
+      }),
     );
   });
 

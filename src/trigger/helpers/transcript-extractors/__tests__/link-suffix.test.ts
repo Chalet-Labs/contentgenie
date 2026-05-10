@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-vi.mock("@/lib/security", () => ({
-  safeFetch: vi.fn(),
+vi.mock("@/trigger/helpers/transcript", () => ({
+  fetchTranscriptFromUrl: vi.fn(),
 }));
 
-import { safeFetch } from "@/lib/security";
+import { fetchTranscriptFromUrl } from "@/trigger/helpers/transcript";
 import { linkSuffixExtractor } from "@/trigger/helpers/transcript-extractors/link-suffix";
 import type { ExtractorContext } from "@/trigger/helpers/transcript-extractors/types";
 
@@ -19,7 +19,9 @@ beforeEach(() => {
 
 describe("linkSuffixExtractor", () => {
   it("appends suffix to the episode link", async () => {
-    vi.mocked(safeFetch).mockResolvedValue("plain transcript text");
+    vi.mocked(fetchTranscriptFromUrl).mockResolvedValue(
+      "plain transcript text",
+    );
     const extractor = linkSuffixExtractor({
       id: "transistor",
       suffix: "/transcript",
@@ -27,15 +29,14 @@ describe("linkSuffixExtractor", () => {
     const result = await extractor.extract(
       makeCtx("https://share.transistor.fm/s/abc123"),
     );
-    expect(vi.mocked(safeFetch)).toHaveBeenCalledWith(
+    expect(vi.mocked(fetchTranscriptFromUrl)).toHaveBeenCalledWith(
       "https://share.transistor.fm/s/abc123/transcript",
-      expect.objectContaining({ signal: expect.any(AbortSignal) }),
     );
     expect(result).toBe("plain transcript text");
   });
 
   it("replaces trailing slash before appending suffix when replaceTrailingSlash is true", async () => {
-    vi.mocked(safeFetch).mockResolvedValue("lex transcript");
+    vi.mocked(fetchTranscriptFromUrl).mockResolvedValue("lex transcript");
     const extractor = linkSuffixExtractor({
       id: "lex-fridman",
       suffix: "-transcript",
@@ -44,15 +45,16 @@ describe("linkSuffixExtractor", () => {
     const result = await extractor.extract(
       makeCtx("https://lexfridman.com/jensen-huang/"),
     );
-    expect(vi.mocked(safeFetch)).toHaveBeenCalledWith(
+    expect(vi.mocked(fetchTranscriptFromUrl)).toHaveBeenCalledWith(
       "https://lexfridman.com/jensen-huang-transcript",
-      expect.objectContaining({ signal: expect.any(AbortSignal) }),
     );
     expect(result).toBe("lex transcript");
   });
 
   it("falls back to plain append when replaceTrailingSlash is true but link has no trailing slash", async () => {
-    vi.mocked(safeFetch).mockResolvedValue("lex transcript no slash");
+    vi.mocked(fetchTranscriptFromUrl).mockResolvedValue(
+      "lex transcript no slash",
+    );
     const extractor = linkSuffixExtractor({
       id: "lex-fridman",
       suffix: "-transcript",
@@ -61,9 +63,8 @@ describe("linkSuffixExtractor", () => {
     const result = await extractor.extract(
       makeCtx("https://lexfridman.com/jensen-huang"),
     );
-    expect(vi.mocked(safeFetch)).toHaveBeenCalledWith(
+    expect(vi.mocked(fetchTranscriptFromUrl)).toHaveBeenCalledWith(
       "https://lexfridman.com/jensen-huang-transcript",
-      expect.objectContaining({ signal: expect.any(AbortSignal) }),
     );
     expect(result).toBe("lex transcript no slash");
   });
@@ -75,7 +76,7 @@ describe("linkSuffixExtractor", () => {
     });
     const result = await extractor.extract(makeCtx(null));
     expect(result).toBeUndefined();
-    expect(vi.mocked(safeFetch)).not.toHaveBeenCalled();
+    expect(vi.mocked(fetchTranscriptFromUrl)).not.toHaveBeenCalled();
   });
 
   it("returns undefined without fetching when link is empty string", async () => {
@@ -85,39 +86,11 @@ describe("linkSuffixExtractor", () => {
     });
     const result = await extractor.extract(makeCtx(""));
     expect(result).toBeUndefined();
-    expect(vi.mocked(safeFetch)).not.toHaveBeenCalled();
+    expect(vi.mocked(fetchTranscriptFromUrl)).not.toHaveBeenCalled();
   });
 
-  it("strips HTML from the response before returning", async () => {
-    vi.mocked(safeFetch).mockResolvedValue(
-      "<html><body><p>hello world</p></body></html>",
-    );
-    const extractor = linkSuffixExtractor({
-      id: "transistor",
-      suffix: "/transcript",
-    });
-    const result = await extractor.extract(
-      makeCtx("https://share.transistor.fm/s/abc123"),
-    );
-    expect(result).toBe("hello world");
-    expect(result).not.toMatch(/<[^>]+>/);
-  });
-
-  it("truncates transcripts longer than MAX_TRANSCRIPT_LENGTH", async () => {
-    vi.mocked(safeFetch).mockResolvedValue("a".repeat(60000));
-    const extractor = linkSuffixExtractor({
-      id: "transistor",
-      suffix: "/transcript",
-    });
-    const result = await extractor.extract(
-      makeCtx("https://share.transistor.fm/s/abc123"),
-    );
-    expect(result).toBeDefined();
-    expect(result!.endsWith("[Transcript truncated...]")).toBe(true);
-  });
-
-  it("returns undefined when body is only whitespace after stripping", async () => {
-    vi.mocked(safeFetch).mockResolvedValue("   ");
+  it("returns undefined when fetchTranscriptFromUrl returns undefined", async () => {
+    vi.mocked(fetchTranscriptFromUrl).mockResolvedValue(undefined);
     const extractor = linkSuffixExtractor({
       id: "transistor",
       suffix: "/transcript",
@@ -128,8 +101,8 @@ describe("linkSuffixExtractor", () => {
     expect(result).toBeUndefined();
   });
 
-  it("propagates errors from safeFetch without swallowing them", async () => {
-    vi.mocked(safeFetch).mockRejectedValue(new Error("network"));
+  it("propagates errors from fetchTranscriptFromUrl without swallowing them", async () => {
+    vi.mocked(fetchTranscriptFromUrl).mockRejectedValue(new Error("network"));
     const extractor = linkSuffixExtractor({
       id: "transistor",
       suffix: "/transcript",

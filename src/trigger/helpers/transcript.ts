@@ -2,8 +2,8 @@ import he from "he";
 import type { PodcastIndexEpisode } from "@/lib/podcastindex";
 import { safeFetch } from "@/lib/security";
 
-export const MAX_TRANSCRIPT_LENGTH = 50000;
-export const FETCH_TIMEOUT_MS = 30000;
+const MAX_TRANSCRIPT_LENGTH = 50000;
+const FETCH_TIMEOUT_MS = 30000;
 
 const SUPPORTED_TRANSCRIPT_TYPES = [
   "text/plain",
