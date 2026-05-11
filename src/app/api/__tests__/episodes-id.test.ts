@@ -418,8 +418,12 @@ describe("GET /api/episodes/[id]", () => {
       transcriptStatus: "available",
       transcriptSource: "podcast-site",
       summary: null,
+      keyTakeaways: [],
+      worthItScore: null,
+      worthItReason: null,
+      worthItDimensions: null,
       processedAt: null,
-    } as never);
+    } as any);
 
     const request = new NextRequest("http://localhost:3000/api/episodes/123");
     const response = await GET(request, { params: { id: "123" } });
