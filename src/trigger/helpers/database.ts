@@ -167,6 +167,7 @@ export async function persistTranscript(
   episodeId: number,
   transcript: string,
   source: TranscriptSource,
+  extractorId?: string,
 ): Promise<void> {
   const now = new Date();
   // Trigger payload uses numeric form; brand for DB lookup.
@@ -181,6 +182,7 @@ export async function persistTranscript(
       transcriptError: null,
       transcriptRunId: null,
       updatedAt: now,
+      ...(extractorId !== undefined && { transcriptExtractor: extractorId }),
     })
     .where(eq(episodes.podcastIndexId, piId))
     .returning({ id: episodes.id });

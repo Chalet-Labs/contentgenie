@@ -13,7 +13,20 @@ vi.mock("@trigger.dev/sdk", () =>
   }),
 );
 
-const mockFindFirst = vi.fn().mockResolvedValue(null);
+// Branches on query shape: Step 1 uses columns:{transcription}, Step 3 uses with:{podcast}
+const mockFindFirst = vi
+  .fn()
+  .mockImplementation(
+    (opts: {
+      columns?: Record<string, unknown>;
+      with?: Record<string, unknown>;
+    }) => {
+      if (opts?.with?.podcast !== undefined) {
+        return Promise.resolve(null);
+      }
+      return Promise.resolve(null);
+    },
+  );
 
 vi.mock("@/db", () => ({
   db: {
@@ -32,10 +45,16 @@ vi.mock("@/db", () => ({
 
 vi.mock("@/db/schema", () => ({
   episodes: { podcastIndexId: "podcastIndexId" },
+  podcasts: { podcastIndexId: "podcastIndexId" },
 }));
 
 vi.mock("drizzle-orm", () => ({
   eq: vi.fn(),
+}));
+
+const mockRunPodcastExtractor = vi.fn();
+vi.mock("@/trigger/helpers/transcript-extractors", () => ({
+  runPodcastExtractor: (...args: unknown[]) => mockRunPodcastExtractor(...args),
 }));
 
 const mockFetchTranscript = vi.fn();
@@ -96,7 +115,18 @@ const mockTranscripts = [
 describe("fetch-transcript task", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockFindFirst.mockResolvedValue(null);
+    mockFindFirst.mockImplementation(
+      (opts: {
+        columns?: Record<string, unknown>;
+        with?: Record<string, unknown>;
+      }) => {
+        if (opts?.with?.podcast !== undefined) {
+          return Promise.resolve(null);
+        }
+        return Promise.resolve(null);
+      },
+    );
+    mockRunPodcastExtractor.mockResolvedValue(undefined);
     mockPersistTranscript.mockResolvedValue(undefined);
     mockSummarizeTrigger.mockResolvedValue({ id: "run_summarize" });
   });
@@ -148,6 +178,7 @@ describe("fetch-transcript task", () => {
       123,
       "PodcastIndex transcript",
       "podcastindex",
+      undefined,
     );
   });
 
@@ -167,6 +198,7 @@ describe("fetch-transcript task", () => {
       123,
       "PodcastIndex transcript text",
       "podcastindex",
+      undefined,
     );
   });
 
@@ -191,6 +223,7 @@ describe("fetch-transcript task", () => {
       123,
       "Description URL transcript",
       "description-url",
+      undefined,
     );
     expect(vi.mocked(submitTranscriptionAsync)).not.toHaveBeenCalled();
   });
@@ -229,6 +262,7 @@ describe("fetch-transcript task", () => {
       123,
       "AssemblyAI transcript",
       "assemblyai",
+      undefined,
     );
   });
 
@@ -395,12 +429,163 @@ describe("fetch-transcript task", () => {
     const result = await taskConfig.run({ episodeId: 123, transcripts: [] });
     expect(result).toEqual({ transcript: undefined, source: null });
   });
+
+  it("podcast-site extractor hit: returns transcript, skips description-URL and AssemblyAI", async () => {
+    mockFetchTranscript.mockResolvedValue(undefined);
+    mockFindFirst.mockImplementation(
+      (opts: {
+        columns?: Record<string, unknown>;
+        with?: Record<string, unknown>;
+      }) => {
+        if (opts?.with?.podcast !== undefined) {
+          return Promise.resolve({
+            podcastIndexId: "12345",
+            title: "Ep title",
+            episodeLink: "https://example.com/ep",
+            rssGuid: "guid-1",
+            podcast: { podcastIndexId: "357756", title: "Bankless" },
+          });
+        }
+        return Promise.resolve(null);
+      },
+    );
+    mockRunPodcastExtractor.mockResolvedValue({
+      transcript: "Site transcript",
+      extractorId: "bankless",
+    });
+
+    const result = await taskConfig.run({ episodeId: 123, transcripts: [] });
+
+    expect(result).toEqual({
+      transcript: "Site transcript",
+      source: "podcast-site",
+    });
+    expect(mockPersistTranscript).toHaveBeenCalledWith(
+      123,
+      "Site transcript",
+      "podcast-site",
+      "bankless",
+    );
+    expect(mockExtractTranscriptUrl).not.toHaveBeenCalled();
+    expect(vi.mocked(submitTranscriptionAsync)).not.toHaveBeenCalled();
+  });
+
+  it("podcast-site extractor miss: falls through to description-URL step", async () => {
+    mockFetchTranscript.mockResolvedValue(undefined);
+    mockFindFirst.mockImplementation(
+      (opts: {
+        columns?: Record<string, unknown>;
+        with?: Record<string, unknown>;
+      }) => {
+        if (opts?.with?.podcast !== undefined) {
+          return Promise.resolve({
+            podcastIndexId: "12345",
+            title: "Ep title",
+            episodeLink: "https://example.com/ep",
+            rssGuid: "guid-1",
+            podcast: { podcastIndexId: "357756", title: "Bankless" },
+          });
+        }
+        return Promise.resolve(null);
+      },
+    );
+    mockRunPodcastExtractor.mockResolvedValue(undefined);
+    mockExtractTranscriptUrl.mockReturnValue(
+      "https://example.com/transcript.txt",
+    );
+    mockFetchTranscriptFromUrl.mockResolvedValue("Description URL transcript");
+
+    const result = await taskConfig.run({
+      episodeId: 123,
+      transcripts: [],
+      description: "See transcript at https://example.com/transcript.txt",
+    });
+
+    expect(mockRunPodcastExtractor).toHaveBeenCalledOnce();
+    expect(result).toEqual({
+      transcript: "Description URL transcript",
+      source: "description-url",
+    });
+    expect(mockPersistTranscript).toHaveBeenCalledWith(
+      123,
+      "Description URL transcript",
+      "description-url",
+      undefined,
+    );
+  });
+
+  it("podcast-site extractor throws: pipeline continues non-fatally, falls through to AssemblyAI", async () => {
+    mockFetchTranscript.mockResolvedValue(undefined);
+    mockFindFirst.mockImplementation(
+      (opts: {
+        columns?: Record<string, unknown>;
+        with?: Record<string, unknown>;
+      }) => {
+        if (opts?.with?.podcast !== undefined) {
+          return Promise.resolve({
+            podcastIndexId: "12345",
+            title: "Ep title",
+            episodeLink: "https://example.com/ep",
+            rssGuid: "guid-1",
+            podcast: { podcastIndexId: "357756", title: "Bankless" },
+          });
+        }
+        return Promise.resolve(null);
+      },
+    );
+    mockRunPodcastExtractor.mockRejectedValue(new Error("registry exploded"));
+    mockExtractTranscriptUrl.mockReturnValue(null);
+    const mockToken = {
+      id: "token-1",
+      url: "https://hooks.trigger.dev/token/1",
+    };
+    mockCreateToken.mockResolvedValue(mockToken);
+    vi.mocked(submitTranscriptionAsync).mockResolvedValue("transcript-abc");
+    mockForToken.mockResolvedValue({
+      ok: true,
+      output: { transcript_id: "transcript-abc", status: "completed" },
+    });
+    vi.mocked(getTranscriptionStatus).mockResolvedValue({
+      id: "transcript-abc",
+      status: "completed",
+      text: "AssemblyAI transcript",
+      error: null,
+    });
+
+    const result = await taskConfig.run({
+      episodeId: 123,
+      transcripts: [],
+      enclosureUrl: "https://example.com/audio.mp3",
+    });
+
+    expect(result).toEqual({
+      transcript: "AssemblyAI transcript",
+      source: "assemblyai",
+    });
+    expect(mockPersistTranscript).toHaveBeenCalledWith(
+      123,
+      "AssemblyAI transcript",
+      "assemblyai",
+      undefined,
+    );
+  });
 });
 
 describe("fetch-transcript triggerSummarize chaining", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockFindFirst.mockResolvedValue(null);
+    mockFindFirst.mockImplementation(
+      (opts: {
+        columns?: Record<string, unknown>;
+        with?: Record<string, unknown>;
+      }) => {
+        if (opts?.with?.podcast !== undefined) {
+          return Promise.resolve(null);
+        }
+        return Promise.resolve(null);
+      },
+    );
+    mockRunPodcastExtractor.mockResolvedValue(undefined);
     mockPersistTranscript.mockResolvedValue(undefined);
     mockSummarizeTrigger.mockResolvedValue({ id: "run_summarize" });
   });
