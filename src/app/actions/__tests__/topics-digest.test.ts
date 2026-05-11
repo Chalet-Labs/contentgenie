@@ -146,6 +146,7 @@ describe("triggerTopicDigestGeneration", () => {
     expect(result).toEqual(expect.objectContaining({ success: false }));
     expect(mockDbSelect).not.toHaveBeenCalled();
     expect(mockTasksTrigger).not.toHaveBeenCalled();
+    expect(mockAuth).toHaveBeenCalledTimes(1);
   });
 
   // ── Case 2b: Unknown extra key (.strict) ────────────────────────────────────
@@ -160,6 +161,7 @@ describe("triggerTopicDigestGeneration", () => {
     expect(typeof (result as { error: string }).error).toBe("string");
     expect(mockDbSelect).not.toHaveBeenCalled();
     expect(mockTasksTrigger).not.toHaveBeenCalled();
+    expect(mockAuth).toHaveBeenCalledTimes(1);
   });
 
   // ── Case 3: Canonical not found ──────────────────────────────────────────────
@@ -169,6 +171,7 @@ describe("triggerTopicDigestGeneration", () => {
     const result = await triggerTopicDigestGeneration({ canonicalTopicId: 99 });
     expect(result).toEqual({ success: false, error: "not-found" });
     expect(mockTasksTrigger).not.toHaveBeenCalled();
+    expect(mockAuth).toHaveBeenCalledTimes(1);
   });
 
   // ── Case 4: Canonical non-active (status !== active) ─────────────────────────
@@ -189,6 +192,7 @@ describe("triggerTopicDigestGeneration", () => {
     const result = await triggerTopicDigestGeneration({ canonicalTopicId: 5 });
     expect(result).toEqual({ success: false, error: "not-found" });
     expect(mockTasksTrigger).not.toHaveBeenCalled();
+    expect(mockAuth).toHaveBeenCalledTimes(1);
   });
 
   // ── Case 5: Ineligible (episode count < MIN_DERIVED_COUNT_FOR_DIGEST) ───────
@@ -212,6 +216,7 @@ describe("triggerTopicDigestGeneration", () => {
       data: { status: "ineligible", digestId: undefined },
     });
     expect(mockTasksTrigger).not.toHaveBeenCalled();
+    expect(mockAuth).toHaveBeenCalledTimes(1);
   });
 
   // ── Case 6: Cached (existing fresh, growth < STALENESS_GROWTH_THRESHOLD) ────
@@ -236,6 +241,7 @@ describe("triggerTopicDigestGeneration", () => {
       data: { status: "cached", digestId: 22 },
     });
     expect(mockTasksTrigger).not.toHaveBeenCalled();
+    expect(mockAuth).toHaveBeenCalledTimes(1);
   });
 
   // ── Case 7: Queued first-time (no existing digest) ───────────────────────────

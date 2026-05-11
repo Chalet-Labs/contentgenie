@@ -562,6 +562,7 @@ describe("triggerTopicDigestRefresh", () => {
     expect(result).toEqual({ success: false, error: "Unauthorized" });
     expect(mockTasksTrigger).not.toHaveBeenCalled();
     expect(mockCreatePublicToken).not.toHaveBeenCalled();
+    expect(mockAuth).toHaveBeenCalledTimes(1);
   });
 
   it.each([0, -1, 1.5])("rejects invalid canonicalTopicId %s", async (id) => {
@@ -569,6 +570,7 @@ describe("triggerTopicDigestRefresh", () => {
     expect(result).toMatchObject({ success: false });
     expect(mockTasksTrigger).not.toHaveBeenCalled();
     expect(mockCreatePublicToken).not.toHaveBeenCalled();
+    expect(mockAuth).toHaveBeenCalledTimes(1);
   });
 
   it("ineligible: passes through without calling createPublicToken", async () => {
@@ -750,6 +752,7 @@ describe("triggerTopicDigestRefresh", () => {
       data: { status: "cached", digestId: 22 },
     });
     expect(mockTasksTrigger).not.toHaveBeenCalled();
+    expect(mockAuth).toHaveBeenCalledTimes(1);
   });
 
   it("queues at exactly staleness threshold (boundary = STALENESS_GROWTH_THRESHOLD)", async () => {
@@ -781,5 +784,6 @@ describe("triggerTopicDigestRefresh", () => {
       data: { status: "queued", runId: "run_stale" },
     });
     expect(mockTasksTrigger).toHaveBeenCalledOnce();
+    expect(mockAuth).toHaveBeenCalledTimes(1);
   });
 });
