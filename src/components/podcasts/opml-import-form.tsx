@@ -17,6 +17,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Upload, Loader2, CheckCircle2, XCircle } from "lucide-react";
 import { toast } from "sonner";
+import { TERMINAL_STATUSES } from "@/lib/trigger-status";
 import type { importOpml } from "@/trigger/import-opml";
 
 type ImportState = "idle" | "uploading" | "processing" | "done" | "error";
@@ -28,16 +29,6 @@ interface ImportProgress {
   skipped: number;
   completed: number;
 }
-
-const TERMINAL_STATUSES = [
-  "COMPLETED",
-  "FAILED",
-  "CANCELED",
-  "TIMED_OUT",
-  "SYSTEM_FAILURE",
-  "CRASHED",
-  "EXPIRED",
-] as const;
 
 const MAX_FILE_SIZE = 1 * 1024 * 1024; // 1MB
 const LARGE_IMPORT_THRESHOLD = 100;
@@ -69,11 +60,7 @@ export function OpmlImportForm() {
       setProgress(metadataProgress);
     }
 
-    if (
-      TERMINAL_STATUSES.includes(
-        run.status as (typeof TERMINAL_STATUSES)[number],
-      )
-    ) {
+    if (TERMINAL_STATUSES.has(run.status)) {
       if (run.status === "COMPLETED") {
         setState("done");
         toast.success("OPML import complete");

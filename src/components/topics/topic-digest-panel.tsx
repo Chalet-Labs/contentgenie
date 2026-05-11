@@ -16,6 +16,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { formatRelativeTime } from "@/lib/utils";
+import { TERMINAL_FAILURE_STATUSES } from "@/lib/trigger-status";
 import { triggerTopicDigestRefresh } from "@/app/actions/topics";
 import type { TopicDigest } from "@/app/actions/topics";
 
@@ -33,15 +34,6 @@ type PanelState =
   | { kind: "loading"; runId: string; accessToken: string }
   | { kind: "ineligible" }
   | { kind: "error"; message: string };
-
-const TERMINAL_FAILURE_STATUSES = new Set([
-  "FAILED",
-  "CANCELED",
-  "TIMED_OUT",
-  "SYSTEM_FAILURE",
-  "CRASHED",
-  "EXPIRED",
-]);
 
 const REFRESH_ERROR_COPY: Record<string, string> = {
   "token-failed": "Couldn't authenticate the synthesis run. Please try again.",

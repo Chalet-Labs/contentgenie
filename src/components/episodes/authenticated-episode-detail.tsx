@@ -28,6 +28,7 @@ import {
 import { EpisodeChaptersList } from "@/components/episodes/episode-chapters-list";
 import { useChapters } from "@/hooks/use-chapters";
 import { cn, stripHtml } from "@/lib/utils";
+import { TERMINAL_FAILURE_STATUSES } from "@/lib/trigger-status";
 import {
   useAudioPlayerState,
   useAudioPlayerAPI,
@@ -155,14 +156,7 @@ export function AuthenticatedEpisodeDetail({
       toast.success("Summary generated!", {
         description: "AI insights are now available for this episode",
       });
-    } else if (
-      run.status === "FAILED" ||
-      run.status === "CANCELED" ||
-      run.status === "TIMED_OUT" ||
-      run.status === "SYSTEM_FAILURE" ||
-      run.status === "CRASHED" ||
-      run.status === "EXPIRED"
-    ) {
+    } else if (TERMINAL_FAILURE_STATUSES.has(run.status)) {
       setSummaryError("Summary generation failed. Please try again.");
       setIsLoadingSummary(false);
       setRunId(null);

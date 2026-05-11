@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Sparkles, Loader2, CheckCircle2, XCircle } from "lucide-react";
 import { toast } from "sonner";
+import { TERMINAL_STATUSES } from "@/lib/trigger-status";
 import type { batchSummarizeEpisodes } from "@/trigger/batch-summarize-episodes";
 
 type BatchState = "idle" | "confirming" | "processing" | "done" | "error";
@@ -17,16 +18,6 @@ interface BatchProgress {
   skipped: number;
   completed: number;
 }
-
-const TERMINAL_STATUSES = [
-  "COMPLETED",
-  "FAILED",
-  "CANCELED",
-  "TIMED_OUT",
-  "SYSTEM_FAILURE",
-  "CRASHED",
-  "EXPIRED",
-] as const;
 
 interface BatchSummarizeButtonProps {
   episodeIds: (number | string)[];
@@ -59,11 +50,7 @@ export function BatchSummarizeButton({
     }
 
     // Check for terminal states
-    if (
-      TERMINAL_STATUSES.includes(
-        run.status as (typeof TERMINAL_STATUSES)[number],
-      )
-    ) {
+    if (TERMINAL_STATUSES.has(run.status)) {
       if (run.status === "COMPLETED") {
         setState("done");
         toast.success("Batch summarization complete");

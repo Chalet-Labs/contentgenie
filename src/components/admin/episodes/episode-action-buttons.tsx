@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/tooltip";
 import { FileText, Sparkles, Zap, Loader2 } from "lucide-react";
 import { getEpisodeStatus, getRunReconnectionData } from "@/app/actions/admin";
+import { TERMINAL_STATUSES } from "@/lib/trigger-status";
 import { IN_PROGRESS_STATUSES, type SummaryStatus } from "@/db/schema";
 import type { fetchTranscriptTask } from "@/trigger/fetch-transcript";
 import type { summarizeEpisode } from "@/trigger/summarize-episode";
@@ -23,16 +24,6 @@ interface EpisodeActionButtonsProps {
     podcastIndexId: string;
   };
 }
-
-const TERMINAL_STATUSES = [
-  "COMPLETED",
-  "FAILED",
-  "CANCELED",
-  "TIMED_OUT",
-  "SYSTEM_FAILURE",
-  "CRASHED",
-  "EXPIRED",
-] as const;
 
 /** Staleness timeout: if the realtime subscription doesn't resolve, give up */
 const TRANSCRIPT_STALE_MS = 20 * 60 * 1000; // 20 minutes
@@ -78,12 +69,7 @@ export function EpisodeActionButtons({ episode }: EpisodeActionButtonsProps) {
 
   useEffect(() => {
     if (!transcriptRun) return;
-    if (
-      !TERMINAL_STATUSES.includes(
-        transcriptRun.status as (typeof TERMINAL_STATUSES)[number],
-      )
-    )
-      return;
+    if (!TERMINAL_STATUSES.has(transcriptRun.status)) return;
 
     if (transcriptRun.status === "COMPLETED") {
       setLocalTranscriptStatus("available");
@@ -107,12 +93,7 @@ export function EpisodeActionButtons({ episode }: EpisodeActionButtonsProps) {
 
   useEffect(() => {
     if (!summaryRun) return;
-    if (
-      !TERMINAL_STATUSES.includes(
-        summaryRun.status as (typeof TERMINAL_STATUSES)[number],
-      )
-    )
-      return;
+    if (!TERMINAL_STATUSES.has(summaryRun.status)) return;
 
     if (summaryRun.status === "COMPLETED") {
       setLocalSummaryStatus("completed");
