@@ -164,10 +164,10 @@ export async function updateEpisodeStatus(
 // See ADR-026 for column ownership and ADR-027 for the refactor that removed
 // transcript writes from persistEpisodeSummary.
 //
-// extractorId is the registry id (e.g. "bankless") populated only when
-// source === "podcast-site". Other sources pass undefined and the conditional
-// spread leaves any existing transcript_extractor value in place — clearing
-// is the future "force re-fetch" UX's concern, not this function's.
+// transcript_extractor is the registry id (e.g. "bankless"), tied 1:1 to the
+// "podcast-site" source. Any other source clears it to null so the column
+// always reflects the current transcript's provenance — preventing a stale
+// extractor id from surviving a force=true re-fetch by a different source.
 export async function persistTranscript(
   episodeId: number,
   transcript: string,
@@ -187,7 +187,8 @@ export async function persistTranscript(
       transcriptError: null,
       transcriptRunId: null,
       updatedAt: now,
-      ...(extractorId !== undefined && { transcriptExtractor: extractorId }),
+      transcriptExtractor:
+        source === "podcast-site" ? (extractorId ?? null) : null,
     })
     .where(eq(episodes.podcastIndexId, piId))
     .returning({ id: episodes.id });
