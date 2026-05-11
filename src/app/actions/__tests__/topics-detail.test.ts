@@ -553,6 +553,9 @@ describe("getTopicDetailData", () => {
 // ============================================================================
 
 describe("triggerTopicDigestRefresh", () => {
+  // Auth-call-count assertions across these tests guard the single-`auth()`
+  // contract from issue #452 — refresh previously delegated through the
+  // public `triggerTopicDigestGeneration`, double-wrapping `withAuthAction`.
   it("returns Unauthorized without a session", async () => {
     mockAuth.mockResolvedValue(makeAnonAuth());
     const result = await triggerTopicDigestRefresh({ canonicalTopicId: 1 });
@@ -590,6 +593,7 @@ describe("triggerTopicDigestRefresh", () => {
       data: { status: "ineligible" },
     });
     expect(mockCreatePublicToken).not.toHaveBeenCalled();
+    expect(mockAuth).toHaveBeenCalledTimes(1);
   });
 
   it("cached: passes through without calling createPublicToken", async () => {
@@ -622,6 +626,7 @@ describe("triggerTopicDigestRefresh", () => {
     });
     expect(mockCreatePublicToken).not.toHaveBeenCalled();
     expect(mockTasksTrigger).not.toHaveBeenCalled();
+    expect(mockAuth).toHaveBeenCalledTimes(1);
   });
 
   it("queued: bundles publicAccessToken from auth.createPublicToken with 15m TTL", async () => {
@@ -656,6 +661,7 @@ describe("triggerTopicDigestRefresh", () => {
       scopes: { read: { runs: ["run_abc"] } },
       expirationTime: "15m",
     });
+    expect(mockAuth).toHaveBeenCalledTimes(1);
   });
 
   it("returns success: false with the underlying error when tasks.trigger rejects", async () => {
@@ -682,9 +688,9 @@ describe("triggerTopicDigestRefresh", () => {
 
     expect(result).toMatchObject({ success: false });
     if (result.success) throw new Error("expected failure");
-    // The underlying error message is propagated through triggerTopicDigestGeneration.
     expect(result.error).toBe("trigger sdk down");
     expect(mockCreatePublicToken).not.toHaveBeenCalled();
+    expect(mockAuth).toHaveBeenCalledTimes(1);
     consoleErrorSpy.mockRestore();
   });
 
@@ -713,6 +719,7 @@ describe("triggerTopicDigestRefresh", () => {
 
     expect(result).toEqual({ success: false, error: "token-failed" });
     expect(consoleErrorSpy).toHaveBeenCalled();
+    expect(mockAuth).toHaveBeenCalledTimes(1);
     consoleErrorSpy.mockRestore();
   });
 

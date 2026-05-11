@@ -134,6 +134,7 @@ describe("triggerTopicDigestGeneration", () => {
     expect(result).toEqual({ success: false, error: "Unauthorized" });
     expect(mockDbSelect).not.toHaveBeenCalled();
     expect(mockTasksTrigger).not.toHaveBeenCalled();
+    expect(mockAuth).toHaveBeenCalledTimes(1);
   });
 
   // ── Case 2: Invalid input (Zod rejection) ────────────────────────────────────
@@ -268,6 +269,7 @@ describe("triggerTopicDigestGeneration", () => {
         idempotencyKeyTTL: "10m",
       }),
     );
+    expect(mockAuth).toHaveBeenCalledTimes(1);
   });
 
   // ── Case 8: Queued stale (growth >= STALENESS_GROWTH_THRESHOLD) ─────────────
@@ -301,6 +303,7 @@ describe("triggerTopicDigestGeneration", () => {
         idempotencyKey: "generate-topic-digest-5",
       }),
     );
+    expect(mockAuth).toHaveBeenCalledTimes(1);
   });
 
   // ── Case 9: tasks.trigger outage ─────────────────────────────────────────────
@@ -328,5 +331,6 @@ describe("triggerTopicDigestGeneration", () => {
       error: "Trigger.dev unavailable",
     });
     expect(mockTasksTrigger).toHaveBeenCalledOnce();
+    expect(mockAuth).toHaveBeenCalledTimes(1);
   });
 });
