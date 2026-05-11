@@ -111,7 +111,7 @@ export const fetchTranscriptTask = task({
       }
     }
 
-    // Step 3: Podcast-site extractor (registered podcasts only — bankless, lex-fridman, limitless)
+    // Step 3: Podcast-site extractor (registry-gated, see helpers/transcript-extractors/index.ts)
     if (!transcript) {
       try {
         const episodeRow = await db.query.episodes.findFirst({

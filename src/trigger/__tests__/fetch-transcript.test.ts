@@ -13,20 +13,38 @@ vi.mock("@trigger.dev/sdk", () =>
   }),
 );
 
-// Branches on query shape: Step 1 uses columns:{transcription}, Step 3 uses with:{podcast}
-const mockFindFirst = vi
-  .fn()
-  .mockImplementation(
-    (opts: {
-      columns?: Record<string, unknown>;
-      with?: Record<string, unknown>;
-    }) => {
+const mockFindFirst = vi.fn().mockResolvedValue(null);
+
+type EpisodeWithPodcastRow = {
+  podcastIndexId: string;
+  title: string;
+  episodeLink: string | null;
+  rssGuid: string | null;
+  podcast: { podcastIndexId: string; title: string } | null;
+};
+
+const defaultStep3EpisodeRow: EpisodeWithPodcastRow = {
+  podcastIndexId: "12345",
+  title: "Ep title",
+  episodeLink: "https://example.com/ep",
+  rssGuid: "guid-1",
+  podcast: { podcastIndexId: "357756", title: "Bankless" },
+};
+
+// Step 1 uses columns:{transcription} (no `with`), Step 3 uses with:{podcast}.
+// Stubs the Step 3 lookup to return `row` and leaves the Step 1 lookup at the
+// caller-provided default (set on `mockFindFirst` via `.mockResolvedValue`).
+function stubStep3Lookup(row: EpisodeWithPodcastRow | null) {
+  const step1Default = mockFindFirst.getMockImplementation();
+  mockFindFirst.mockImplementation(
+    (opts: { with?: Record<string, unknown> }) => {
       if (opts?.with?.podcast !== undefined) {
-        return Promise.resolve(null);
+        return Promise.resolve(row);
       }
-      return Promise.resolve(null);
+      return step1Default ? step1Default(opts) : Promise.resolve(null);
     },
   );
+}
 
 vi.mock("@/db", () => ({
   db: {
@@ -115,17 +133,7 @@ const mockTranscripts = [
 describe("fetch-transcript task", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockFindFirst.mockImplementation(
-      (opts: {
-        columns?: Record<string, unknown>;
-        with?: Record<string, unknown>;
-      }) => {
-        if (opts?.with?.podcast !== undefined) {
-          return Promise.resolve(null);
-        }
-        return Promise.resolve(null);
-      },
-    );
+    mockFindFirst.mockResolvedValue(null);
     mockRunPodcastExtractor.mockResolvedValue(undefined);
     mockPersistTranscript.mockResolvedValue(undefined);
     mockSummarizeTrigger.mockResolvedValue({ id: "run_summarize" });
@@ -153,6 +161,7 @@ describe("fetch-transcript task", () => {
       source: undefined,
     });
     expect(mockFetchTranscript).not.toHaveBeenCalled();
+    expect(mockRunPodcastExtractor).not.toHaveBeenCalled();
     expect(vi.mocked(submitTranscriptionAsync)).not.toHaveBeenCalled();
     expect(mockPersistTranscript).not.toHaveBeenCalled();
   });
@@ -194,6 +203,7 @@ describe("fetch-transcript task", () => {
       transcript: "PodcastIndex transcript text",
       source: "podcastindex",
     });
+    expect(mockRunPodcastExtractor).not.toHaveBeenCalled();
     expect(mockPersistTranscript).toHaveBeenCalledWith(
       123,
       "PodcastIndex transcript text",
@@ -432,23 +442,7 @@ describe("fetch-transcript task", () => {
 
   it("podcast-site extractor hit: returns transcript, skips description-URL and AssemblyAI", async () => {
     mockFetchTranscript.mockResolvedValue(undefined);
-    mockFindFirst.mockImplementation(
-      (opts: {
-        columns?: Record<string, unknown>;
-        with?: Record<string, unknown>;
-      }) => {
-        if (opts?.with?.podcast !== undefined) {
-          return Promise.resolve({
-            podcastIndexId: "12345",
-            title: "Ep title",
-            episodeLink: "https://example.com/ep",
-            rssGuid: "guid-1",
-            podcast: { podcastIndexId: "357756", title: "Bankless" },
-          });
-        }
-        return Promise.resolve(null);
-      },
-    );
+    stubStep3Lookup(defaultStep3EpisodeRow);
     mockRunPodcastExtractor.mockResolvedValue({
       transcript: "Site transcript",
       extractorId: "bankless",
@@ -472,23 +466,7 @@ describe("fetch-transcript task", () => {
 
   it("podcast-site extractor miss: falls through to description-URL step", async () => {
     mockFetchTranscript.mockResolvedValue(undefined);
-    mockFindFirst.mockImplementation(
-      (opts: {
-        columns?: Record<string, unknown>;
-        with?: Record<string, unknown>;
-      }) => {
-        if (opts?.with?.podcast !== undefined) {
-          return Promise.resolve({
-            podcastIndexId: "12345",
-            title: "Ep title",
-            episodeLink: "https://example.com/ep",
-            rssGuid: "guid-1",
-            podcast: { podcastIndexId: "357756", title: "Bankless" },
-          });
-        }
-        return Promise.resolve(null);
-      },
-    );
+    stubStep3Lookup(defaultStep3EpisodeRow);
     mockRunPodcastExtractor.mockResolvedValue(undefined);
     mockExtractTranscriptUrl.mockReturnValue(
       "https://example.com/transcript.txt",
@@ -516,23 +494,7 @@ describe("fetch-transcript task", () => {
 
   it("podcast-site extractor throws: pipeline continues non-fatally, falls through to AssemblyAI", async () => {
     mockFetchTranscript.mockResolvedValue(undefined);
-    mockFindFirst.mockImplementation(
-      (opts: {
-        columns?: Record<string, unknown>;
-        with?: Record<string, unknown>;
-      }) => {
-        if (opts?.with?.podcast !== undefined) {
-          return Promise.resolve({
-            podcastIndexId: "12345",
-            title: "Ep title",
-            episodeLink: "https://example.com/ep",
-            rssGuid: "guid-1",
-            podcast: { podcastIndexId: "357756", title: "Bankless" },
-          });
-        }
-        return Promise.resolve(null);
-      },
-    );
+    stubStep3Lookup(defaultStep3EpisodeRow);
     mockRunPodcastExtractor.mockRejectedValue(new Error("registry exploded"));
     mockExtractTranscriptUrl.mockReturnValue(null);
     const mockToken = {
@@ -569,22 +531,33 @@ describe("fetch-transcript task", () => {
       undefined,
     );
   });
+
+  it("podcast-site skipped when episode row has no joined podcast (unregistered FK)", async () => {
+    mockFetchTranscript.mockResolvedValue(undefined);
+    stubStep3Lookup({ ...defaultStep3EpisodeRow, podcast: null });
+    mockExtractTranscriptUrl.mockReturnValue(
+      "https://example.com/transcript.txt",
+    );
+    mockFetchTranscriptFromUrl.mockResolvedValue("Description URL transcript");
+
+    const result = await taskConfig.run({
+      episodeId: 123,
+      transcripts: [],
+      description: "See transcript at https://example.com/transcript.txt",
+    });
+
+    expect(mockRunPodcastExtractor).not.toHaveBeenCalled();
+    expect(result).toEqual({
+      transcript: "Description URL transcript",
+      source: "description-url",
+    });
+  });
 });
 
 describe("fetch-transcript triggerSummarize chaining", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockFindFirst.mockImplementation(
-      (opts: {
-        columns?: Record<string, unknown>;
-        with?: Record<string, unknown>;
-      }) => {
-        if (opts?.with?.podcast !== undefined) {
-          return Promise.resolve(null);
-        }
-        return Promise.resolve(null);
-      },
-    );
+    mockFindFirst.mockResolvedValue(null);
     mockRunPodcastExtractor.mockResolvedValue(undefined);
     mockPersistTranscript.mockResolvedValue(undefined);
     mockSummarizeTrigger.mockResolvedValue({ id: "run_summarize" });

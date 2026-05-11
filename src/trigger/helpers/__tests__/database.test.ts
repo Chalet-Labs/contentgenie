@@ -157,6 +157,29 @@ describe("persistTranscript", () => {
       persistTranscript(999, "text", "description-url"),
     ).rejects.toThrow("Episode 999 not found for transcript persistence");
   });
+
+  it("writes transcriptExtractor when extractorId is provided", async () => {
+    const chain = makeUpdateChain([{ id: 4 }]);
+    mockUpdate.mockReturnValue(chain);
+
+    const { persistTranscript } = await import("@/trigger/helpers/database");
+    await persistTranscript(123, "Site transcript", "podcast-site", "bankless");
+
+    expect(chain.set).toHaveBeenCalledWith(
+      expect.objectContaining({ transcriptExtractor: "bankless" }),
+    );
+  });
+
+  it("omits transcriptExtractor from the set payload when extractorId is undefined", async () => {
+    const chain = makeUpdateChain([{ id: 5 }]);
+    mockUpdate.mockReturnValue(chain);
+
+    const { persistTranscript } = await import("@/trigger/helpers/database");
+    await persistTranscript(123, "transcript", "podcastindex");
+
+    const setArg = chain.set.mock.calls[0]?.[0];
+    expect(setArg).not.toHaveProperty("transcriptExtractor");
+  });
 });
 
 describe("persistEpisodeSummary", () => {

@@ -163,6 +163,11 @@ export async function updateEpisodeStatus(
 // from an external source (not on cache-hit paths where source is undefined).
 // See ADR-026 for column ownership and ADR-027 for the refactor that removed
 // transcript writes from persistEpisodeSummary.
+//
+// extractorId is the registry id (e.g. "bankless") populated only when
+// source === "podcast-site". Other sources pass undefined and the conditional
+// spread leaves any existing transcript_extractor value in place — clearing
+// is the future "force re-fetch" UX's concern, not this function's.
 export async function persistTranscript(
   episodeId: number,
   transcript: string,
