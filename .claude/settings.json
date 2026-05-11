@@ -32,7 +32,7 @@
       "Bash(tsc:*)",
       "Bash(vercel:*)",
       "Skill(dlc:*)",
-      "Skill(project-manager:*)",
+      "Skill(pm:*)",
       "Skill(cdt:*)",
       "Skill(council:*)"
     ],
@@ -54,7 +54,7 @@
     "frontend-design@claude-plugins-official": true,
     "security-guidance@claude-plugins-official": true,
     "claude-md-management@claude-plugins-official": true,
-    "project-manager@rube-cc-skills": true,
+    "pm@rube-cc-skills": true,
     "jules-review@rube-cc-skills": true,
     "council@rube-cc-skills": true,
     "dlc@rube-cc-skills": true,

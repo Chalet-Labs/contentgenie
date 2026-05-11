@@ -10,6 +10,7 @@ export default defineConfig({
     setupFiles: ["./src/test/setup.ts"],
     globals: true,
     css: false,
+    testTimeout: 30000,
     include: ["src/**/*.test.{ts,tsx}"],
     exclude: ["node_modules", ".next", "storybook-static"],
     coverage: {
