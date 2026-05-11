@@ -575,9 +575,12 @@ async function triggerTopicDigestGenerationCore(
       };
     }
     // Above the minimum but not stale enough — serve the cached digest.
+    if (!existing) {
+      throw new Error("invariant violated: cached status but no digest row");
+    }
     return {
       success: true,
-      data: { status: "cached", digestId: existing!.id },
+      data: { status: "cached", digestId: existing.id },
     };
   }
 
