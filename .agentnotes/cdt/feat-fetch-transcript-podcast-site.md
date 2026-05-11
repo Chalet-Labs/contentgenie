@@ -12,11 +12,11 @@
 
 ### What's Done
 
-PR #464 opened. Step 3 inserted in fetch-transcript.ts gated on Step 2 miss; lazy `db.query.episodes.findFirst({ with: { podcast: true } })` loads the `ExtractorContext` payload without widening `FetchTranscriptPayload`. `persistTranscript` gained optional 4th `extractorId?: string` with conditional spread. Tests: hit / miss / throw / orphaned-FK in fetch-transcript.test.ts plus two unit tests for the conditional spread in database.test.ts.
+PR #464 opened. Step 3 inserted in fetch-transcript.ts gated on Step 2 miss; lazy `db.query.episodes.findFirst({ with: { podcast: true } })` loads the `ExtractorContext` payload without widening `FetchTranscriptPayload`. `persistTranscript` gained optional 4th `extractorId?: string` and always writes `transcript_extractor` (set when `source === "podcast-site"`, cleared to `null` otherwise) so the column never carries stale provenance across a `force=true` re-fetch. Tests: hit / miss / throw / orphaned-FK in fetch-transcript.test.ts plus four unit tests in database.test.ts covering the always-clear behavior (podcast-site with/without extractorId, non-podcast-site source, and stale-clearing on re-fetch).
 
 ### Open Questions
 
-- Conditional spread vs unconditional `extractorId ?? null` write in `persistTranscript` was a deliberate plan-time choice (plan L32) — Codex and one internal reviewer both proposed flipping it. Mitigation: documented the rationale inline (`src/trigger/helpers/database.ts:161-165`) so future readers see the constraint before changing it. If a "force re-fetch UX" lands later that needs to clear the column on supersession, that's the moment to revisit.
+- Initial plan-time decision (plan L32) used a conditional spread to defer column clearing to a future "force re-fetch UX". Three reviewers (Codex P2, internal code-reviewer, then gemini-code-assist on PR) flagged the stale-provenance bug on `force=true` re-fetch by a different source. Reversed in commit 9c9a1d5 — now `transcript_extractor` always reflects the current source's provenance via an unconditional ternary.
 - Type-design reviewer suggested branding `extractorId` as `TranscriptExtractorId` (closed union derived from the registry). Deferred per checklist §7 — touches 5 files in `src/trigger/helpers/transcript-extractors/` (#428's scope) and the bug isn't introduced by this PR.
 
 ### Context for Next Session

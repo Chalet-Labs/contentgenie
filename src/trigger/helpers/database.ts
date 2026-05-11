@@ -174,6 +174,11 @@ export async function persistTranscript(
   source: TranscriptSource,
   extractorId?: string,
 ): Promise<void> {
+  if (source === "podcast-site" && !extractorId) {
+    throw new Error(
+      "persistTranscript: extractorId required when source is podcast-site",
+    );
+  }
   const now = new Date();
   // Trigger payload uses numeric form; brand for DB lookup.
   const piId = asPodcastIndexEpisodeId(String(episodeId));

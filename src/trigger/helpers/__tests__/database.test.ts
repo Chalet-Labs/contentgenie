@@ -141,7 +141,7 @@ describe("persistTranscript", () => {
     mockUpdate.mockReturnValue(chain);
 
     const { persistTranscript } = await import("@/trigger/helpers/database");
-    await persistTranscript(123, "extracted text", "podcast-site");
+    await persistTranscript(123, "extracted text", "podcast-site", "bankless");
 
     expect(chain.set).toHaveBeenCalledWith(
       expect.objectContaining({ transcriptSource: "podcast-site" }),
@@ -170,16 +170,17 @@ describe("persistTranscript", () => {
     );
   });
 
-  it("clears transcriptExtractor to null when source is podcast-site but extractorId is undefined", async () => {
+  it("throws when source is podcast-site but extractorId is undefined", async () => {
     const chain = makeUpdateChain([{ id: 5 }]);
     mockUpdate.mockReturnValue(chain);
 
     const { persistTranscript } = await import("@/trigger/helpers/database");
-    await persistTranscript(123, "Site transcript", "podcast-site");
-
-    expect(chain.set).toHaveBeenCalledWith(
-      expect.objectContaining({ transcriptExtractor: null }),
+    await expect(
+      persistTranscript(123, "Site transcript", "podcast-site"),
+    ).rejects.toThrow(
+      "persistTranscript: extractorId required when source is podcast-site",
     );
+    expect(chain.set).not.toHaveBeenCalled();
   });
 
   it("clears transcriptExtractor to null when source is not podcast-site", async () => {

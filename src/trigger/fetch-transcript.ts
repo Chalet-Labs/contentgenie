@@ -146,7 +146,9 @@ export const fetchTranscriptTask = task({
               length: transcript.length,
             });
           } else {
-            logger.info("No transcript from podcast-site extractor");
+            logger.debug("No transcript from podcast-site extractor", {
+              episodeId,
+            });
           }
         }
       } catch (error) {
