@@ -163,11 +163,22 @@ export async function updateEpisodeStatus(
 // from an external source (not on cache-hit paths where source is undefined).
 // See ADR-026 for column ownership and ADR-027 for the refactor that removed
 // transcript writes from persistEpisodeSummary.
+//
+// transcript_extractor is the registry id (e.g. "bankless"), tied 1:1 to the
+// "podcast-site" source. Any other source clears it to null so the column
+// always reflects the current transcript's provenance — preventing a stale
+// extractor id from surviving a force=true re-fetch by a different source.
 export async function persistTranscript(
   episodeId: number,
   transcript: string,
   source: TranscriptSource,
+  extractorId?: string,
 ): Promise<void> {
+  if (source === "podcast-site" && !extractorId) {
+    throw new Error(
+      "persistTranscript: extractorId required when source is podcast-site",
+    );
+  }
   const now = new Date();
   // Trigger payload uses numeric form; brand for DB lookup.
   const piId = asPodcastIndexEpisodeId(String(episodeId));
@@ -181,6 +192,8 @@ export async function persistTranscript(
       transcriptError: null,
       transcriptRunId: null,
       updatedAt: now,
+      transcriptExtractor:
+        source === "podcast-site" ? (extractorId ?? null) : null,
     })
     .where(eq(episodes.podcastIndexId, piId))
     .returning({ id: episodes.id });

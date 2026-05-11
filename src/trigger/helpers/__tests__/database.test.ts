@@ -141,7 +141,7 @@ describe("persistTranscript", () => {
     mockUpdate.mockReturnValue(chain);
 
     const { persistTranscript } = await import("@/trigger/helpers/database");
-    await persistTranscript(123, "extracted text", "podcast-site");
+    await persistTranscript(123, "extracted text", "podcast-site", "bankless");
 
     expect(chain.set).toHaveBeenCalledWith(
       expect.objectContaining({ transcriptSource: "podcast-site" }),
@@ -156,6 +156,55 @@ describe("persistTranscript", () => {
     await expect(
       persistTranscript(999, "text", "description-url"),
     ).rejects.toThrow("Episode 999 not found for transcript persistence");
+  });
+
+  it("writes transcriptExtractor when source is podcast-site and extractorId is provided", async () => {
+    const chain = makeUpdateChain([{ id: 4 }]);
+    mockUpdate.mockReturnValue(chain);
+
+    const { persistTranscript } = await import("@/trigger/helpers/database");
+    await persistTranscript(123, "Site transcript", "podcast-site", "bankless");
+
+    expect(chain.set).toHaveBeenCalledWith(
+      expect.objectContaining({ transcriptExtractor: "bankless" }),
+    );
+  });
+
+  it("throws when source is podcast-site but extractorId is undefined", async () => {
+    const chain = makeUpdateChain([{ id: 5 }]);
+    mockUpdate.mockReturnValue(chain);
+
+    const { persistTranscript } = await import("@/trigger/helpers/database");
+    await expect(
+      persistTranscript(123, "Site transcript", "podcast-site"),
+    ).rejects.toThrow(
+      "persistTranscript: extractorId required when source is podcast-site",
+    );
+    expect(chain.set).not.toHaveBeenCalled();
+  });
+
+  it("clears transcriptExtractor to null when source is not podcast-site", async () => {
+    const chain = makeUpdateChain([{ id: 6 }]);
+    mockUpdate.mockReturnValue(chain);
+
+    const { persistTranscript } = await import("@/trigger/helpers/database");
+    await persistTranscript(123, "transcript", "podcastindex");
+
+    expect(chain.set).toHaveBeenCalledWith(
+      expect.objectContaining({ transcriptExtractor: null }),
+    );
+  });
+
+  it("clears stale transcriptExtractor when re-fetched from a different source even if extractorId is passed", async () => {
+    const chain = makeUpdateChain([{ id: 7 }]);
+    mockUpdate.mockReturnValue(chain);
+
+    const { persistTranscript } = await import("@/trigger/helpers/database");
+    await persistTranscript(123, "AAI transcript", "assemblyai", "bankless");
+
+    expect(chain.set).toHaveBeenCalledWith(
+      expect.objectContaining({ transcriptExtractor: null }),
+    );
   });
 });
 

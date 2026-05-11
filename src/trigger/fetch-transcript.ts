@@ -13,6 +13,7 @@ import {
   getTranscriptionStatus,
 } from "@/lib/assemblyai";
 import { persistTranscript } from "@/trigger/helpers/database";
+import { runPodcastExtractor } from "@/trigger/helpers/transcript-extractors";
 import { summarizeEpisode } from "@/trigger/summarize-episode";
 
 export type FetchTranscriptPayload = {
@@ -59,6 +60,7 @@ export const fetchTranscriptTask = task({
 
     let transcript: string | undefined;
     let transcriptSource: TranscriptSource | "cached" | "none" = "none";
+    let transcriptExtractor: string | undefined;
 
     // Step 1: Check cached transcription in database (cheapest source), unless force=true
     if (!force) {
@@ -109,7 +111,58 @@ export const fetchTranscriptTask = task({
       }
     }
 
-    // Step 3: Extract transcript URL from description
+    // Step 3: Podcast-site extractor (registry-gated, see helpers/transcript-extractors/index.ts)
+    if (!transcript) {
+      try {
+        const episodeRow = await db.query.episodes.findFirst({
+          where: eq(episodes.podcastIndexId, piId),
+          columns: {
+            podcastIndexId: true,
+            title: true,
+            episodeLink: true,
+            rssGuid: true,
+          },
+          with: { podcast: { columns: { podcastIndexId: true, title: true } } },
+        });
+        if (episodeRow?.podcast) {
+          const extractorResult = await runPodcastExtractor({
+            episode: {
+              podcastIndexId: episodeRow.podcastIndexId,
+              title: episodeRow.title,
+              link: episodeRow.episodeLink,
+              rssGuid: episodeRow.rssGuid,
+            },
+            podcast: {
+              podcastIndexId: episodeRow.podcast.podcastIndexId,
+              title: episodeRow.podcast.title,
+            },
+          });
+          if (extractorResult) {
+            transcript = extractorResult.transcript;
+            transcriptSource = "podcast-site";
+            transcriptExtractor = extractorResult.extractorId;
+            logger.info("Transcript fetched from podcast-site extractor", {
+              extractorId: extractorResult.extractorId,
+              length: transcript.length,
+            });
+          } else {
+            logger.debug("No transcript from podcast-site extractor", {
+              episodeId,
+            });
+          }
+        }
+      } catch (error) {
+        logger.warn(
+          "Podcast-site extractor step failed, proceeding without it",
+          {
+            episodeId,
+            error: error instanceof Error ? error.message : String(error),
+          },
+        );
+      }
+    }
+
+    // Step 4: Extract transcript URL from description
     if (!transcript && description) {
       const transcriptUrl = extractTranscriptUrl(description);
       if (transcriptUrl) {
@@ -135,7 +188,7 @@ export const fetchTranscriptTask = task({
       }
     }
 
-    // Step 4: AssemblyAI async transcription via Trigger.dev token
+    // Step 5: AssemblyAI async transcription via Trigger.dev token
     if (!transcript && enclosureUrl) {
       metadata.set("step", "transcribing-audio");
 
@@ -238,6 +291,7 @@ export const fetchTranscriptTask = task({
       });
       transcript = undefined;
       transcriptSource = "none";
+      transcriptExtractor = undefined;
     }
 
     // Map internal sentinels to DB-safe values:
@@ -259,7 +313,12 @@ export const fetchTranscriptTask = task({
     // Only persist when we fetched from an external source (not cache — DB is already correct).
     // This is the sole writer of transcript columns (ADR-027).
     if (transcript && dbSource !== undefined && dbSource !== null) {
-      await persistTranscript(episodeId, transcript, dbSource);
+      await persistTranscript(
+        episodeId,
+        transcript,
+        dbSource,
+        transcriptExtractor,
+      );
     }
 
     // Clear run ID unconditionally — run has terminated (success or no-transcript).
