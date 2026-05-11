@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   buildSignUpHref,
+  formatTranscriptSource,
   supportsEpisodeProcessing,
 } from "@/components/episodes/episode-detail-shared";
 
@@ -20,5 +21,17 @@ describe("episode-detail-shared", () => {
   it("only allows numeric episode ids for processing actions", () => {
     expect(supportsEpisodeProcessing("123")).toBe(true);
     expect(supportsEpisodeProcessing("rss-abc")).toBe(false);
+  });
+
+  it("formats every TranscriptSource union value to its display label", () => {
+    expect(formatTranscriptSource("podcastindex")).toBe("PodcastIndex");
+    expect(formatTranscriptSource("assemblyai")).toBe("AI Transcribed");
+    expect(formatTranscriptSource("description-url")).toBe("Episode Page");
+    expect(formatTranscriptSource("podcast-site")).toBe("Podcast Site");
+  });
+
+  it("falls back to 'Unknown' for null and to the raw value for unknown sources", () => {
+    expect(formatTranscriptSource(null)).toBe("Unknown");
+    expect(formatTranscriptSource("future-extractor")).toBe("future-extractor");
   });
 });

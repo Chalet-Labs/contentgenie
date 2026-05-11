@@ -399,6 +399,42 @@ describe("GET /api/episodes/[id]", () => {
     expect(data.episodeDbId).toBe(42);
   });
 
+  it("PodcastIndex path: returns transcriptSource = 'podcast-site' from cached episode", async () => {
+    vi.mocked(auth).mockResolvedValue({ userId: "user-1" } as never);
+
+    const mockEpisode = { id: 123, title: "Ep", feedId: 456 };
+    vi.mocked(getEpisodeById).mockResolvedValue({
+      status: "true",
+      episode: mockEpisode as never,
+      description: "",
+    });
+    vi.mocked(getPodcastById).mockResolvedValue({
+      status: "true",
+      feed: null as never,
+      description: "",
+    });
+    vi.mocked(db.query.episodes.findFirst).mockResolvedValue({
+      id: 42,
+      transcriptStatus: "available",
+      transcriptSource: "podcast-site",
+      summary: null,
+      keyTakeaways: [],
+      worthItScore: null,
+      worthItReason: null,
+      worthItDimensions: null,
+      processedAt: null,
+    } as any);
+
+    const request = new NextRequest("http://localhost:3000/api/episodes/123");
+    const response = await GET(request, { params: { id: "123" } });
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.transcriptSource).toBe("podcast-site");
+    expect(data.transcriptStatus).toBe("available");
+    expect(data.episodeDbId).toBe(42);
+  });
+
   it("PodcastIndex path: episodeDbId is null when no DB row exists", async () => {
     vi.mocked(auth).mockResolvedValue({ userId: "user-1" } as never);
 

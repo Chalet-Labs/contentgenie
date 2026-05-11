@@ -69,4 +69,21 @@ describe("EpisodesTable", () => {
     const link = screen.getByRole("link", { name: ep.title });
     expect(link).toHaveAttribute("href", ROUTES.episode(ep.podcastIndexId));
   });
+
+  it("renders distinct transcriptSource cells for assemblyai and podcast-site rows", () => {
+    const assemblyaiEp = makeEpisode(1);
+    const podcastSiteEp: EpisodeRow = {
+      ...makeEpisode(2),
+      transcriptSource: "podcast-site",
+    };
+    render(
+      <EpisodesTable
+        episodes={[assemblyaiEp, podcastSiteEp]}
+        totalCount={2}
+        currentPage={1}
+      />,
+    );
+    expect(screen.getByText("assemblyai")).toBeInTheDocument();
+    expect(screen.getByText("podcast-site")).toBeInTheDocument();
+  });
 });
