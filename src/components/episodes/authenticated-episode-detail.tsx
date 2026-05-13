@@ -28,7 +28,6 @@ import {
 import { EpisodeChaptersList } from "@/components/episodes/episode-chapters-list";
 import { useChapters } from "@/hooks/use-chapters";
 import { cn, stripHtml } from "@/lib/utils";
-import { TERMINAL_FAILURE_STATUSES } from "@/lib/trigger-status";
 import {
   useAudioPlayerState,
   useAudioPlayerAPI,
@@ -131,7 +130,7 @@ export function AuthenticatedEpisodeDetail({
   useEffect(() => {
     if (!run) return;
 
-    if (run.status === "COMPLETED" && run.output) {
+    if (run.isSuccess && run.output) {
       const completedSummary = {
         summary: run.output.summary,
         keyTakeaways: run.output.keyTakeaways || [],
@@ -156,7 +155,7 @@ export function AuthenticatedEpisodeDetail({
       toast.success("Summary generated!", {
         description: "AI insights are now available for this episode",
       });
-    } else if (TERMINAL_FAILURE_STATUSES.has(run.status)) {
+    } else if (run.isFailed || run.isCancelled) {
       setSummaryError("Summary generation failed. Please try again.");
       setIsLoadingSummary(false);
       setRunId(null);

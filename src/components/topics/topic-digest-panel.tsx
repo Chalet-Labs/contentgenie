@@ -16,7 +16,6 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { formatRelativeTime } from "@/lib/utils";
-import { TERMINAL_FAILURE_STATUSES } from "@/lib/trigger-status";
 import { triggerTopicDigestRefresh } from "@/app/actions/topics";
 import type { TopicDigest } from "@/app/actions/topics";
 
@@ -120,11 +119,11 @@ export function TopicDigestPanel({
       return;
     }
     if (!run) return;
-    if (run.status === "COMPLETED") {
+    if (run.isSuccess) {
       router.refresh();
       setState({ kind: "idle" });
       toast.success("Topic synthesis updated");
-    } else if (TERMINAL_FAILURE_STATUSES.has(run.status)) {
+    } else if (run.isFailed || run.isCancelled) {
       setState({
         kind: "error",
         message: `Synthesis failed (${run.status.toLowerCase().replace(/_/g, " ")}). Please retry.`,

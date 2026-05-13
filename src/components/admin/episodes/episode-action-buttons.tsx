@@ -11,7 +11,6 @@ import {
 } from "@/components/ui/tooltip";
 import { FileText, Sparkles, Zap, Loader2 } from "lucide-react";
 import { getEpisodeStatus, getRunReconnectionData } from "@/app/actions/admin";
-import { TERMINAL_STATUSES } from "@/lib/trigger-status";
 import { IN_PROGRESS_STATUSES, type SummaryStatus } from "@/db/schema";
 import type { fetchTranscriptTask } from "@/trigger/fetch-transcript";
 import type { summarizeEpisode } from "@/trigger/summarize-episode";
@@ -69,9 +68,9 @@ export function EpisodeActionButtons({ episode }: EpisodeActionButtonsProps) {
 
   useEffect(() => {
     if (!transcriptRun) return;
-    if (!TERMINAL_STATUSES.has(transcriptRun.status)) return;
+    if (!transcriptRun.isCompleted && !transcriptRun.isCancelled) return;
 
-    if (transcriptRun.status === "COMPLETED") {
+    if (transcriptRun.isSuccess) {
       setLocalTranscriptStatus("available");
       setTranscriptMsg(null);
       setTranscriptRunId(null);
@@ -93,9 +92,9 @@ export function EpisodeActionButtons({ episode }: EpisodeActionButtonsProps) {
 
   useEffect(() => {
     if (!summaryRun) return;
-    if (!TERMINAL_STATUSES.has(summaryRun.status)) return;
+    if (!summaryRun.isCompleted && !summaryRun.isCancelled) return;
 
-    if (summaryRun.status === "COMPLETED") {
+    if (summaryRun.isSuccess) {
       setLocalSummaryStatus("completed");
       setSummaryMsg(null);
     } else {

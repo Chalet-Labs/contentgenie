@@ -7,6 +7,7 @@ import {
   act,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { realtimeRunFixture } from "@/test/realtime-run";
 
 const mockUseRealtimeRun = vi.fn().mockReturnValue({ run: null, error: null });
 vi.mock("@trigger.dev/react-hooks", () => ({
@@ -141,7 +142,8 @@ describe("EpisodeActionButtons", () => {
   it("transcript run COMPLETED → local status updates to 'available'", async () => {
     mockUseRealtimeRun.mockImplementation((...args: unknown[]) => {
       const opts = args[1] as { enabled?: boolean } | undefined;
-      if (opts?.enabled) return { run: { status: "COMPLETED" }, error: null };
+      if (opts?.enabled)
+        return { run: realtimeRunFixture("COMPLETED"), error: null };
       return { run: null, error: null };
     });
     render(
@@ -164,7 +166,8 @@ describe("EpisodeActionButtons", () => {
   it("transcript run FAILED → local status updates to 'failed', shows error", async () => {
     mockUseRealtimeRun.mockImplementation((...args: unknown[]) => {
       const opts = args[1] as { enabled?: boolean } | undefined;
-      if (opts?.enabled) return { run: { status: "FAILED" }, error: null };
+      if (opts?.enabled)
+        return { run: realtimeRunFixture("FAILED"), error: null };
       return { run: null, error: null };
     });
     render(
@@ -188,7 +191,8 @@ describe("EpisodeActionButtons", () => {
   it("transcript run CANCELED → shows error (terminal status handling)", async () => {
     mockUseRealtimeRun.mockImplementation((...args: unknown[]) => {
       const opts = args[1] as { enabled?: boolean } | undefined;
-      if (opts?.enabled) return { run: { status: "CANCELED" }, error: null };
+      if (opts?.enabled)
+        return { run: realtimeRunFixture("CANCELED"), error: null };
       return { run: null, error: null };
     });
     render(
@@ -294,7 +298,7 @@ describe("EpisodeActionButtons", () => {
     mockUseRealtimeRun.mockImplementation((...args: unknown[]) => {
       const opts = args[1] as { enabled?: boolean } | undefined;
       if (opts?.enabled && summarizeTriggered)
-        return { run: { status: "COMPLETED" }, error: null };
+        return { run: realtimeRunFixture("COMPLETED"), error: null };
       return { run: null, error: null };
     });
     render(<EpisodeActionButtons episode={baseEpisode} />);
@@ -312,7 +316,8 @@ describe("EpisodeActionButtons", () => {
   it("summary run FAILED → shows summarization error", async () => {
     mockUseRealtimeRun.mockImplementation((...args: unknown[]) => {
       const opts = args[1] as { enabled?: boolean } | undefined;
-      if (opts?.enabled) return { run: { status: "FAILED" }, error: null };
+      if (opts?.enabled)
+        return { run: realtimeRunFixture("FAILED"), error: null };
       return { run: null, error: null };
     });
     render(<EpisodeActionButtons episode={baseEpisode} />);
@@ -531,7 +536,7 @@ describe("EpisodeActionButtons", () => {
       const opts = args[1] as { enabled?: boolean } | undefined;
       // The first hook call with a real runId is the transcript hook
       if (opts?.enabled && id === "run_123" && transcriptRunEnabled) {
-        return { run: { status: "COMPLETED" }, error: null };
+        return { run: realtimeRunFixture("COMPLETED"), error: null };
       }
       return { run: null, error: null };
     });
@@ -562,7 +567,8 @@ describe("EpisodeActionButtons", () => {
   it("combined action: transcript run FAILED → does NOT trigger summarize", async () => {
     mockUseRealtimeRun.mockImplementation((...args: unknown[]) => {
       const opts = args[1] as { enabled?: boolean } | undefined;
-      if (opts?.enabled) return { run: { status: "FAILED" }, error: null };
+      if (opts?.enabled)
+        return { run: realtimeRunFixture("FAILED"), error: null };
       return { run: null, error: null };
     });
     render(
@@ -655,7 +661,8 @@ describe("EpisodeActionButtons", () => {
   it("standalone transcript fetch failure shows error message", async () => {
     mockUseRealtimeRun.mockImplementation((...args: unknown[]) => {
       const opts = args[1] as { enabled?: boolean } | undefined;
-      if (opts?.enabled) return { run: { status: "FAILED" }, error: null };
+      if (opts?.enabled)
+        return { run: realtimeRunFixture("FAILED"), error: null };
       return { run: null, error: null };
     });
     render(
@@ -979,7 +986,8 @@ describe("EpisodeActionButtons", () => {
     const user = userEvent.setup();
     mockUseRealtimeRun.mockImplementation((...args: unknown[]) => {
       const opts = args[1] as { enabled?: boolean } | undefined;
-      if (opts?.enabled) return { run: { status: "FAILED" }, error: null };
+      if (opts?.enabled)
+        return { run: realtimeRunFixture("FAILED"), error: null };
       return { run: null, error: null };
     });
     render(
