@@ -37,9 +37,11 @@ export function realtimeRunFixture(
 ) {
   const isFailed = FAILED_STATUSES.has(status);
   const isSuccess = status === "COMPLETED";
+  // Spread `extra` first so neither `status` nor any derived helper boolean can
+  // be overridden by callers — the fixture guarantees SDK-shape consistency.
   return {
+    ...extra,
     status,
-    ...extra, // spread first so derived booleans below always reflect `status`
     isQueued: status === "QUEUED" || status === "DELAYED",
     isExecuting: status === "DEQUEUED" || status === "EXECUTING",
     isWaiting: status === "WAITING",
