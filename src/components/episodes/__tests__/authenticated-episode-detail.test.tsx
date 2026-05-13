@@ -84,14 +84,17 @@ vi.mock("@/components/episodes/summary-display", () => ({
     overlapLabel,
     canonicalOverlap,
     error,
+    isLoading,
   }: {
     onGenerateSummary?: () => void;
     overlapLabel?: string | null;
     canonicalOverlap?: { kind: string; topicLabel: string } | null;
     error?: string | null;
+    isLoading?: boolean;
   }) => (
     <div data-testid="summary-display">
       can-generate:{String(Boolean(onGenerateSummary))}
+      <span data-testid="summary-loading">{String(Boolean(isLoading))}</span>
       {overlapLabel && <span data-testid="overlap-label">{overlapLabel}</span>}
       {canonicalOverlap && (
         <span data-testid="canonical-overlap-kind">
@@ -389,7 +392,7 @@ describe("AuthenticatedEpisodeDetail", () => {
   });
 
   describe("realtime run terminal states", () => {
-    it("fires success toast and clears loading when run completes with output", async () => {
+    it("fires success toast and keeps loading false when run completes with output", async () => {
       mocks.useRealtimeRun.mockReturnValue({
         run: realtimeRunFixture("COMPLETED", {
           output: {
@@ -416,6 +419,7 @@ describe("AuthenticatedEpisodeDetail", () => {
           expect.any(Object),
         ),
       );
+      expect(screen.getByTestId("summary-loading")).toHaveTextContent("false");
     });
 
     it("sets summary error and fires error toast when run fails", async () => {
