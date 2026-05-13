@@ -6,7 +6,24 @@
  * need to supply them or status-driven branches go untriggered.
  */
 
-const FAILED_STATUSES = new Set([
+// Mirrors RunStatus from @trigger.dev/core/v3 — local to avoid importing a
+// transitive package not listed in package.json.
+type RunStatus =
+  | "PENDING_VERSION"
+  | "QUEUED"
+  | "DELAYED"
+  | "DEQUEUED"
+  | "EXECUTING"
+  | "WAITING"
+  | "COMPLETED"
+  | "CANCELED"
+  | "FAILED"
+  | "CRASHED"
+  | "SYSTEM_FAILURE"
+  | "EXPIRED"
+  | "TIMED_OUT";
+
+const FAILED_STATUSES = new Set<RunStatus>([
   "FAILED",
   "CRASHED",
   "SYSTEM_FAILURE",
@@ -15,20 +32,23 @@ const FAILED_STATUSES = new Set([
 ]);
 
 export function realtimeRunFixture(
-  status: string,
+  status: RunStatus,
   extra: Record<string, unknown> = {},
 ) {
   const isFailed = FAILED_STATUSES.has(status);
   const isSuccess = status === "COMPLETED";
   return {
     status,
+    ...extra, // spread first so derived booleans below always reflect `status`
     isQueued: status === "QUEUED" || status === "DELAYED",
     isExecuting: status === "DEQUEUED" || status === "EXECUTING",
     isWaiting: status === "WAITING",
+    // isCompleted: "ran to completion" (success or failure), NOT "reached terminal
+    // state" — cancelled runs are terminal but not completed. Check
+    // isCompleted || isCancelled for the full terminal-state predicate.
     isCompleted: isSuccess || isFailed,
     isFailed,
     isSuccess,
     isCancelled: status === "CANCELED",
-    ...extra,
   };
 }

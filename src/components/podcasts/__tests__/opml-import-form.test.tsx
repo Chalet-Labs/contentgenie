@@ -1,21 +1,21 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { realtimeRunFixture } from "@/test/realtime-run";
 
-// Mock useRealtimeRun
-const mockUseRealtimeRun = vi.fn().mockReturnValue({ run: null });
+const mocks = vi.hoisted(() => ({
+  useRealtimeRun: vi.fn().mockReturnValue({ run: null }),
+  toast: { success: vi.fn(), error: vi.fn(), info: vi.fn() },
+}));
+
 vi.mock("@trigger.dev/react-hooks", () => ({
-  useRealtimeRun: (...args: unknown[]) => mockUseRealtimeRun(...args),
+  useRealtimeRun: (...args: unknown[]) => mocks.useRealtimeRun(...args),
 }));
 
-// Mock sonner toast
-vi.mock("sonner", () => ({
-  toast: {
-    success: vi.fn(),
-    error: vi.fn(),
-    info: vi.fn(),
-  },
-}));
+vi.mock("sonner", () => ({ toast: mocks.toast }));
+
+// Keep backward-compat alias used by existing tests
+const mockUseRealtimeRun = mocks.useRealtimeRun;
 
 // Mock fetch
 const mockFetch = vi.fn();
@@ -31,7 +31,7 @@ describe("OpmlImportForm", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.stubGlobal("fetch", mockFetch);
-    mockUseRealtimeRun.mockReturnValue({ run: null });
+    mocks.useRealtimeRun.mockReturnValue({ run: null });
   });
 
   afterEach(() => {
@@ -203,6 +203,55 @@ describe("OpmlImportForm", () => {
       expect(screen.getByText("Server error")).toBeInTheDocument();
     });
 
+    expect(screen.getByRole("button", { name: "Retry" })).toBeInTheDocument();
+  });
+
+  it("transitions to done state and fires success toast when run completes", async () => {
+    mocks.useRealtimeRun.mockReturnValue({
+      run: realtimeRunFixture("COMPLETED", {
+        metadata: {
+          progress: {
+            total: 5,
+            succeeded: 5,
+            failed: 0,
+            skipped: 0,
+            completed: 5,
+          },
+        },
+      }),
+    });
+
+    render(<OpmlImportForm />);
+
+    await waitFor(() =>
+      expect(mocks.toast.success).toHaveBeenCalledWith("OPML import complete"),
+    );
+    expect(screen.getByText(/5 subscribed/)).toBeInTheDocument();
+  });
+
+  it("transitions to error state and fires error toast when run fails", async () => {
+    mocks.useRealtimeRun.mockReturnValue({
+      run: realtimeRunFixture("FAILED"),
+    });
+
+    render(<OpmlImportForm />);
+
+    await waitFor(() =>
+      expect(mocks.toast.error).toHaveBeenCalledWith("OPML import failed"),
+    );
+    expect(screen.getByRole("button", { name: "Retry" })).toBeInTheDocument();
+  });
+
+  it("transitions to error state and fires error toast when run is cancelled", async () => {
+    mocks.useRealtimeRun.mockReturnValue({
+      run: realtimeRunFixture("CANCELED"),
+    });
+
+    render(<OpmlImportForm />);
+
+    await waitFor(() =>
+      expect(mocks.toast.error).toHaveBeenCalledWith("OPML import failed"),
+    );
     expect(screen.getByRole("button", { name: "Retry" })).toBeInTheDocument();
   });
 
