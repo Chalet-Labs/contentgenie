@@ -92,7 +92,10 @@ vi.mock("@/components/episodes/summary-display", () => ({
     error?: string | null;
     isLoading?: boolean;
   }) => (
-    <div data-testid="summary-display">
+    <div
+      data-testid="summary-display"
+      data-loading={String(Boolean(isLoading))}
+    >
       can-generate:{String(Boolean(onGenerateSummary))}
       <span data-testid="summary-loading">{String(Boolean(isLoading))}</span>
       {overlapLabel && <span data-testid="overlap-label">{overlapLabel}</span>}
@@ -112,6 +115,7 @@ type EpisodeOverrides = {
   chaptersUrl?: string | null;
   description?: string;
   id?: string;
+  inProgressSummary?: { runId: string; publicAccessToken: string };
 };
 
 function makeEpisodeResponse(overrides: EpisodeOverrides = {}) {
@@ -183,6 +187,19 @@ function stubEpisodeFetch(overrides: EpisodeOverrides = {}) {
               { startTime: 900, title: "Q&A" },
             ],
           }),
+        });
+      }
+
+      if (
+        parsed.pathname === "/api/episodes/summarize" &&
+        parsed.searchParams.get("episodeId") === id
+      ) {
+        return Promise.resolve({
+          ok: true,
+          json: async () =>
+            overrides.inProgressSummary
+              ? { status: "running", ...overrides.inProgressSummary }
+              : { status: "idle" },
         });
       }
 
@@ -392,34 +409,61 @@ describe("AuthenticatedEpisodeDetail", () => {
   });
 
   describe("realtime run terminal states", () => {
-    it("fires success toast and keeps loading false when run completes with output", async () => {
-      mocks.useRealtimeRun.mockReturnValue({
-        run: realtimeRunFixture("COMPLETED", {
-          output: {
-            summary: "Episode summary",
-            keyTakeaways: ["Key point"],
-            worthItScore: 4,
-            worthItReason: "Great episode",
-            worthItDimensions: null,
-          },
-        }),
+    it("fires success toast and clears loading when run completes with output", async () => {
+      stubEpisodeFetch({
+        id: "123",
+        inProgressSummary: {
+          runId: "run_in_flight",
+          publicAccessToken: "tok_in_flight",
+        },
       });
+      // Branch on `enabled` so the loading spinner is set true by the in-progress
+      // fetch BEFORE the realtime hook starts returning a terminal run — this
+      // exercises the true→false transition the success branch is responsible for.
+      mocks.useRealtimeRun.mockImplementation(
+        (_runId: string, opts: { accessToken?: string; enabled?: boolean }) => {
+          if (!opts.enabled) return { run: null };
+          return {
+            run: realtimeRunFixture("COMPLETED", {
+              output: {
+                summary: "Episode summary",
+                keyTakeaways: ["Key point"],
+                worthItScore: 4,
+                worthItReason: "Great episode",
+                worthItDimensions: null,
+              },
+            }),
+          };
+        },
+      );
 
       render(
         <AuthenticatedEpisodeDetail
-          episodeId="rss-abc"
+          episodeId="123"
           userId="user-1"
           isAdmin={false}
         />,
       );
 
+      // The in-progress fetch sets isLoadingSummary(true) before the run resolves.
+      await waitFor(() =>
+        expect(screen.getByTestId("summary-display")).toHaveAttribute(
+          "data-loading",
+          "true",
+        ),
+      );
       await waitFor(() =>
         expect(mocks.toast.success).toHaveBeenCalledWith(
           "Summary generated!",
           expect.any(Object),
         ),
       );
-      expect(screen.getByTestId("summary-loading")).toHaveTextContent("false");
+      await waitFor(() =>
+        expect(screen.getByTestId("summary-display")).toHaveAttribute(
+          "data-loading",
+          "false",
+        ),
+      );
     });
 
     it("sets summary error and fires error toast when run fails", async () => {
