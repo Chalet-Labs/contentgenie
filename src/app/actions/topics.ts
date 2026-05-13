@@ -517,15 +517,101 @@ const topicDigestSchema = z
   .object({ canonicalTopicId: z.number().int().positive() })
   .strict();
 
+type TopicDigestGenerationResult = ActionResult<{
+  status: "queued" | "cached" | "ineligible";
+  digestId?: number;
+  runId?: string;
+}>;
+
+// Unwrapped helper (no `withAuthAction`) so callers run the Clerk lookup
+// exactly once per public action invocation — see issue #452.
+async function triggerTopicDigestGenerationCore(
+  input: z.infer<typeof topicDigestSchema>,
+): Promise<TopicDigestGenerationResult> {
+  const { canonicalTopicId } = input;
+
+  const [canonicalRows, digestRows] = await Promise.all([
+    db
+      .select({
+        id: canonicalTopics.id,
+        status: canonicalTopics.status,
+        completedSummaryCount: canonicalTopicCompletedSummaryCount(),
+      })
+      .from(canonicalTopics)
+      .where(eq(canonicalTopics.id, canonicalTopicId)),
+    db
+      .select({
+        id: canonicalTopicDigests.id,
+        episodeCountAtGeneration:
+          canonicalTopicDigests.episodeCountAtGeneration,
+      })
+      .from(canonicalTopicDigests)
+      .where(eq(canonicalTopicDigests.canonicalTopicId, canonicalTopicId)),
+  ]);
+
+  const canonical = canonicalRows[0];
+  if (!canonical || canonical.status !== "active") {
+    return { success: false, error: "not-found" };
+  }
+
+  // Both eligibility and staleness operate on completed-summary count to
+  // align with the task's `summaryStatus = 'completed'` predicate (ADR-051).
+  // The `isDigestSynthesizable` predicate is the canonical implementation;
+  // the action just maps its boolean result back to our three-state
+  // {ineligible, cached, queued} response by inspecting the inputs once
+  // more to disambiguate which negative branch fired.
+  const completedSummaryCount = Number(canonical.completedSummaryCount ?? 0);
+  const existing = digestRows[0] ?? null;
+  const synthesizable = isDigestSynthesizable({
+    completedSummaryCount,
+    digestEpisodeCountAtGeneration: existing?.episodeCountAtGeneration ?? null,
+  });
+
+  if (!synthesizable) {
+    if (completedSummaryCount < MIN_DERIVED_COUNT_FOR_DIGEST) {
+      return {
+        success: true,
+        data: { status: "ineligible", digestId: existing?.id },
+      };
+    }
+    // Above the minimum but not stale enough — serve the cached digest.
+    if (!existing) {
+      throw new Error("invariant violated: cached status but no digest row");
+    }
+    return {
+      success: true,
+      data: { status: "cached", digestId: existing.id },
+    };
+  }
+
+  try {
+    const handle = await tasks.trigger<typeof generateTopicDigest>(
+      "generate-topic-digest",
+      { canonicalTopicId },
+      {
+        idempotencyKey: `generate-topic-digest-${canonicalTopicId}`,
+        idempotencyKeyTTL: "10m",
+      },
+    );
+    return {
+      success: true,
+      data: { status: "queued", digestId: existing?.id, runId: handle.id },
+    };
+  } catch (e) {
+    console.error("[triggerTopicDigestGenerationCore] trigger failed:", {
+      canonicalTopicId,
+      error: e,
+    });
+    return {
+      success: false,
+      error: e instanceof Error ? e.message : "trigger-failed",
+    };
+  }
+}
+
 export async function triggerTopicDigestGeneration(input: {
   canonicalTopicId: number;
-}): Promise<
-  ActionResult<{
-    status: "queued" | "cached" | "ineligible";
-    digestId?: number;
-    runId?: string;
-  }>
-> {
+}): Promise<TopicDigestGenerationResult> {
   return withAuthAction(async () => {
     const parsed = topicDigestSchema.safeParse(input);
     if (!parsed.success) {
@@ -534,83 +620,7 @@ export async function triggerTopicDigestGeneration(input: {
         error: parsed.error.issues[0]?.message ?? "Invalid input",
       };
     }
-    const { canonicalTopicId } = parsed.data;
-
-    const [canonicalRows, digestRows] = await Promise.all([
-      db
-        .select({
-          id: canonicalTopics.id,
-          status: canonicalTopics.status,
-          completedSummaryCount: canonicalTopicCompletedSummaryCount(),
-        })
-        .from(canonicalTopics)
-        .where(eq(canonicalTopics.id, canonicalTopicId)),
-      db
-        .select({
-          id: canonicalTopicDigests.id,
-          episodeCountAtGeneration:
-            canonicalTopicDigests.episodeCountAtGeneration,
-        })
-        .from(canonicalTopicDigests)
-        .where(eq(canonicalTopicDigests.canonicalTopicId, canonicalTopicId)),
-    ]);
-
-    const canonical = canonicalRows[0];
-    if (!canonical || canonical.status !== "active") {
-      return { success: false, error: "not-found" };
-    }
-
-    // Both eligibility and staleness operate on completed-summary count to
-    // align with the task's `summaryStatus = 'completed'` predicate (ADR-051).
-    // The `isDigestSynthesizable` predicate is the canonical implementation;
-    // the action just maps its boolean result back to our three-state
-    // {ineligible, cached, queued} response by inspecting the inputs once
-    // more to disambiguate which negative branch fired.
-    const completedSummaryCount = Number(canonical.completedSummaryCount ?? 0);
-    const existing = digestRows[0] ?? null;
-    const synthesizable = isDigestSynthesizable({
-      completedSummaryCount,
-      digestEpisodeCountAtGeneration:
-        existing?.episodeCountAtGeneration ?? null,
-    });
-
-    if (!synthesizable) {
-      if (completedSummaryCount < MIN_DERIVED_COUNT_FOR_DIGEST) {
-        return {
-          success: true,
-          data: { status: "ineligible", digestId: existing?.id },
-        };
-      }
-      // Above the minimum but not stale enough — serve the cached digest.
-      return {
-        success: true,
-        data: { status: "cached", digestId: existing!.id },
-      };
-    }
-
-    try {
-      const handle = await tasks.trigger<typeof generateTopicDigest>(
-        "generate-topic-digest",
-        { canonicalTopicId },
-        {
-          idempotencyKey: `generate-topic-digest-${canonicalTopicId}`,
-          idempotencyKeyTTL: "10m",
-        },
-      );
-      return {
-        success: true,
-        data: { status: "queued", digestId: existing?.id, runId: handle.id },
-      };
-    } catch (e) {
-      console.error("[triggerTopicDigestGeneration] trigger failed:", {
-        canonicalTopicId,
-        error: e,
-      });
-      return {
-        success: false,
-        error: e instanceof Error ? e.message : "trigger-failed",
-      };
-    }
+    return triggerTopicDigestGenerationCore(parsed.data);
   });
 }
 
@@ -846,7 +856,7 @@ export async function triggerTopicDigestRefresh(input: {
       };
     }
 
-    const gateResult = await triggerTopicDigestGeneration(parsed.data);
+    const gateResult = await triggerTopicDigestGenerationCore(parsed.data);
     if (!gateResult.success) return gateResult;
 
     const { status, digestId, runId } = gateResult.data;
