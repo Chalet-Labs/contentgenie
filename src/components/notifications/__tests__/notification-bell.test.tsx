@@ -644,13 +644,12 @@ describe("NotificationBell", () => {
     consoleError.mockRestore();
   });
 
-  it("(T5b) does NOT dispatch NOTIFICATIONS_CHANGED_EVENT when bell opens on a zero-unread badge", async () => {
-    // Avoid the no-op cascade: opening the bell on an empty inbox still
-    // calls markAllNotificationsRead (returns success), but nothing changed,
-    // so the sidebar listener shouldn't re-run three getDashboardStats counts.
-    // The just-fetched summary must also confirm zero unread — a stale-zero
-    // cached badge paired with a non-zero summary IS expected to dispatch
-    // (see the "(T5b) dispatches when cached badge is stale 0" test below).
+  it("(T5b) dispatches NOTIFICATIONS_CHANGED_EVENT even when bell and summary both report zero unread", async () => {
+    // The cost of one extra getDashboardStats call per bell-open is worth the
+    // recovery property: a stale-positive sidebar badge (e.g. after a prior
+    // counts-fetch failure or a mark-all triggered in another tab) will
+    // converge on the server's truth on the next bell-open, instead of
+    // staying stuck until a different mutation event fires.
     mockGetUnreadCount.mockResolvedValue(0);
     mockGetNotificationSummary.mockResolvedValue({
       totalUnread: 0,
@@ -673,7 +672,12 @@ describe("NotificationBell", () => {
         event instanceof CustomEvent &&
         event.type === NOTIFICATIONS_CHANGED_EVENT,
     );
-    expect(notificationsChangedCalls).toHaveLength(0);
+    expect(notificationsChangedCalls).toHaveLength(1);
+    const dispatched = notificationsChangedCalls[0]![0] as CustomEvent;
+    expect(dispatched.detail).toEqual({
+      episodeDbIds: [],
+      action: "mark-all",
+    });
 
     dispatchSpy.mockRestore();
   });

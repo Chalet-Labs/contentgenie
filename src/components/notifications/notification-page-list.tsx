@@ -212,12 +212,16 @@ export function NotificationPageList({
         setItems((prev) => prev.filter((n) => n.id !== id));
         // Keep the sidebar inbox badge in sync — without this dispatch the
         // badge would stay stale until route change or the next bell open.
-        // Carries the episodeDbId so any same-document listener (the sidebar
-        // badge, or a second NotificationPageList mounted in this tab) drops
-        // the matching row; safe because the product emits at most one
-        // notification per episode (summary_completed only). Cross-tab sync
-        // is intentionally not implemented — `window.dispatchEvent` does not
-        // cross documents, so a second browser tab won't see this event.
+        // The sidebar listener re-fetches aggregate counts via
+        // `getDashboardStats`; this page's own listener (see the effect
+        // above) is the only consumer that filters visible rows by
+        // `episodeDbId`. Carrying the dismissed row's episodeDbId is safe
+        // because the partial unique index on `notifications`
+        // (`drizzle/0019`, `(user_id, episode_id) WHERE episode_id IS NOT
+        // NULL AND type = 'new_episode'`) enforces one row per
+        // (user, episode_id) for the single-row model, so at most one row
+        // matches the filter. Cross-tab sync is not implemented —
+        // `window.dispatchEvent` does not cross documents.
         dispatchNotificationsChanged(
           dismissed?.episodeDbId ? [dismissed.episodeDbId] : [],
         );

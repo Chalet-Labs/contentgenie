@@ -114,12 +114,13 @@ export function NotificationBell() {
       if (!result.success) {
         console.error("markAllNotificationsRead failed:", result.error);
         revertIfStillZero();
-      } else if (prev === null || prev > 0 || fetchedSummary.totalUnread > 0) {
-        // Skip dispatch only when both the cached count AND the just-fetched
-        // summary agree there's nothing to mark. A stale-zero cached count
-        // alongside server-side unread rows must still dispatch, otherwise
-        // the sidebar badge stays stuck at the stale value until the next
-        // route change or bell open.
+      } else {
+        // Always dispatch on mark-all success. Skipping on a "both zero"
+        // happy path saves a single `getDashboardStats` call but leaves no
+        // recovery path for a stale-positive sidebar badge (e.g. after a
+        // prior counts-fetch failure or a mark-all triggered in another
+        // tab). The cost is one cheap server roundtrip per bell-open; the
+        // benefit is the sidebar always converges on the server's truth.
         // The `mark-all` action tells the inbox page (if open) to flip its
         // visible rows to read so the UI matches the server state without
         // requiring a reload.

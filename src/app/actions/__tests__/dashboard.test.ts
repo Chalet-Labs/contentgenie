@@ -292,7 +292,7 @@ describe("getDashboardStats", () => {
     expect(result.error).toMatch(/failed to load/i);
   });
 
-  it("isolates a unread-counter failure without poisoning the other counts", async () => {
+  it("isolates an unread-counter failure without poisoning the other counts", async () => {
     // The unread-notifications counter is wrapped in `.catch(() => 0)` so a
     // notifications-table outage cannot fail the whole dashboard. Pin that
     // behavior: subscriptions and library counts still come back populated

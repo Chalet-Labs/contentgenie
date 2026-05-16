@@ -88,7 +88,8 @@ export function SidebarCountsProvider({ children }: { children: ReactNode }) {
       window.removeEventListener("sync-queue-drained", handleDrained);
   }, [refreshCounts]);
 
-  // Foreground notification mutations (bell mark-all-read, in-page dismiss)
+  // Foreground notification mutations (bell mark-all-read, in-page
+  // mark-all-read, in-page dismiss, in-page single-row `markNotificationRead`)
   // don't flow through the offline sync queue, so the `sync-queue-drained`
   // listener above can't clear the inbox badge. Subscribe separately to
   // NOTIFICATIONS_CHANGED_EVENT to refresh counts immediately after those
