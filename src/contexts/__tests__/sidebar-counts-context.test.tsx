@@ -6,6 +6,7 @@ import {
   useSidebarCountsOptional,
   getBadgeCount,
 } from "@/contexts/sidebar-counts-context";
+import { NOTIFICATIONS_CHANGED_EVENT } from "@/lib/events";
 
 const mockGetDashboardStats = vi.fn();
 vi.mock("@/app/actions/dashboard", () => ({
@@ -13,12 +14,18 @@ vi.mock("@/app/actions/dashboard", () => ({
 }));
 
 function TestConsumer() {
-  const { subscriptionCount, savedCount, isLoading, refreshCounts } =
-    useSidebarCounts();
+  const {
+    subscriptionCount,
+    savedCount,
+    unreadNotificationCount,
+    isLoading,
+    refreshCounts,
+  } = useSidebarCounts();
   return (
     <div>
       <span data-testid="sub-count">{subscriptionCount}</span>
       <span data-testid="saved-count">{savedCount}</span>
+      <span data-testid="unread-count">{unreadNotificationCount}</span>
       <span data-testid="loading">{isLoading ? "loading" : "done"}</span>
       <button data-testid="refresh" onClick={refreshCounts}>
         refresh
@@ -32,6 +39,7 @@ describe("SidebarCountsProvider", () => {
     mockGetDashboardStats.mockResolvedValue({
       subscriptionCount: 3,
       savedCount: 7,
+      unreadNotificationCount: 0,
       error: null,
     });
   });
@@ -95,6 +103,7 @@ describe("SidebarCountsProvider", () => {
     mockGetDashboardStats.mockResolvedValue({
       subscriptionCount: 5,
       savedCount: 10,
+      unreadNotificationCount: 0,
       error: null,
     });
 
@@ -136,6 +145,7 @@ describe("SidebarCountsProvider", () => {
     mockGetDashboardStats.mockResolvedValue({
       subscriptionCount: 0,
       savedCount: 0,
+      unreadNotificationCount: 0,
       error: "You must be signed in",
     });
 
@@ -205,6 +215,7 @@ describe("getBadgeCount", () => {
       getBadgeCount("/subscriptions", {
         subscriptionCount: 5,
         savedCount: 0,
+        unreadNotificationCount: 0,
         isLoading: false,
       }),
     ).toBe(5);
@@ -215,6 +226,7 @@ describe("getBadgeCount", () => {
       getBadgeCount("/library", {
         subscriptionCount: 0,
         savedCount: 3,
+        unreadNotificationCount: 0,
         isLoading: false,
       }),
     ).toBe(3);
@@ -225,6 +237,7 @@ describe("getBadgeCount", () => {
       getBadgeCount("/subscriptions", {
         subscriptionCount: 5,
         savedCount: 3,
+        unreadNotificationCount: 2,
         isLoading: true,
       }),
     ).toBeNull();
@@ -235,6 +248,7 @@ describe("getBadgeCount", () => {
       getBadgeCount("/dashboard", {
         subscriptionCount: 5,
         savedCount: 3,
+        unreadNotificationCount: 2,
         isLoading: false,
       }),
     ).toBeNull();
@@ -245,6 +259,7 @@ describe("getBadgeCount", () => {
       getBadgeCount("/subscriptions", {
         subscriptionCount: 0,
         savedCount: 0,
+        unreadNotificationCount: 0,
         isLoading: false,
       }),
     ).toBeNull();
@@ -252,8 +267,148 @@ describe("getBadgeCount", () => {
       getBadgeCount("/library", {
         subscriptionCount: 0,
         savedCount: 0,
+        unreadNotificationCount: 0,
         isLoading: false,
       }),
     ).toBeNull();
+  });
+
+  it("returns unreadNotificationCount for /inbox when > 0", () => {
+    expect(
+      getBadgeCount("/inbox", {
+        subscriptionCount: 0,
+        savedCount: 0,
+        unreadNotificationCount: 5,
+        isLoading: false,
+      }),
+    ).toBe(5);
+  });
+
+  it("returns null for /inbox when count is 0", () => {
+    expect(
+      getBadgeCount("/inbox", {
+        subscriptionCount: 0,
+        savedCount: 0,
+        unreadNotificationCount: 0,
+        isLoading: false,
+      }),
+    ).toBeNull();
+  });
+
+  it("returns null for /inbox when loading", () => {
+    expect(
+      getBadgeCount("/inbox", {
+        subscriptionCount: 0,
+        savedCount: 0,
+        unreadNotificationCount: 5,
+        isLoading: true,
+      }),
+    ).toBeNull();
+  });
+});
+
+describe("SidebarCountsProvider — unreadNotificationCount", () => {
+  beforeEach(() => {
+    mockGetDashboardStats.mockResolvedValue({
+      subscriptionCount: 0,
+      savedCount: 0,
+      unreadNotificationCount: 4,
+      error: null,
+    });
+  });
+
+  it("exposes unreadNotificationCount from getDashboardStats", async () => {
+    render(
+      <SidebarCountsProvider>
+        <TestConsumer />
+      </SidebarCountsProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("loading").textContent).toBe("done");
+    });
+
+    expect(screen.getByTestId("unread-count").textContent).toBe("4");
+  });
+
+  it("NOTIFICATIONS_CHANGED_EVENT triggers refreshCounts", async () => {
+    mockGetDashboardStats.mockResolvedValue({
+      subscriptionCount: 0,
+      savedCount: 0,
+      unreadNotificationCount: 3,
+      error: null,
+    });
+
+    render(
+      <SidebarCountsProvider>
+        <TestConsumer />
+      </SidebarCountsProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("loading").textContent).toBe("done");
+    });
+
+    const callsAfterMount = mockGetDashboardStats.mock.calls.length;
+
+    mockGetDashboardStats.mockResolvedValue({
+      subscriptionCount: 0,
+      savedCount: 0,
+      unreadNotificationCount: 0,
+      error: null,
+    });
+
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent(NOTIFICATIONS_CHANGED_EVENT));
+    });
+
+    await waitFor(() => {
+      expect(mockGetDashboardStats.mock.calls.length).toBe(callsAfterMount + 1);
+    });
+
+    expect(screen.getByTestId("unread-count").textContent).toBe("0");
+  });
+
+  it("preserves the previous unreadNotificationCount when getDashboardStats signals partial failure with null", async () => {
+    // A transient `countUnreadNotifications` failure surfaces as
+    // `unreadNotificationCount: null` (the dashboard's partial-failure
+    // signal). The sidebar must keep showing the previous badge — clearing
+    // it to 0 would be a false-negative for a real inbox backlog.
+    mockGetDashboardStats.mockResolvedValue({
+      subscriptionCount: 0,
+      savedCount: 0,
+      unreadNotificationCount: 7,
+      error: null,
+    });
+
+    render(
+      <SidebarCountsProvider>
+        <TestConsumer />
+      </SidebarCountsProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("loading").textContent).toBe("done");
+    });
+    expect(screen.getByTestId("unread-count").textContent).toBe("7");
+
+    const callsAfterMount = mockGetDashboardStats.mock.calls.length;
+
+    mockGetDashboardStats.mockResolvedValue({
+      subscriptionCount: 0,
+      savedCount: 0,
+      unreadNotificationCount: null,
+      error: null,
+    });
+
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent(NOTIFICATIONS_CHANGED_EVENT));
+    });
+
+    await waitFor(() => {
+      expect(mockGetDashboardStats.mock.calls.length).toBe(callsAfterMount + 1);
+    });
+
+    expect(screen.getByTestId("unread-count").textContent).toBe("7");
   });
 });

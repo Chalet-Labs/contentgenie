@@ -101,6 +101,11 @@ vi.mock("@/db", () => ({
 vi.mock("@/db/schema", () => ({
   userSubscriptions: { userId: "user_id", podcastId: "podcast_id" },
   userLibrary: { userId: "user_id", episodeId: "episode_id" },
+  notifications: {
+    userId: "user_id",
+    isRead: "is_read",
+    isDismissed: "is_dismissed",
+  },
   listenHistory: { userId: "user_id", episodeId: "episode_id" },
   episodes: {
     id: "id",
@@ -214,6 +219,7 @@ describe("getDashboardStats", () => {
 
     expect(result.subscriptionCount).toBe(0);
     expect(result.savedCount).toBe(0);
+    expect(result.unreadNotificationCount).toBe(0);
     expect(result.error).toMatch(/signed in/i);
   });
 
@@ -223,24 +229,37 @@ describe("getDashboardStats", () => {
     const { db } = await import("@/db");
     (db.$count as any)
       .mockResolvedValueOnce(5) // for subscriptions
-      .mockResolvedValueOnce(3); // for library
+      .mockResolvedValueOnce(3) // for library
+      .mockResolvedValueOnce(7); // for unread notifications
 
     const { getDashboardStats } = await import("@/app/actions/dashboard");
     const { eq } = await import("drizzle-orm");
-    const { userSubscriptions, userLibrary } = await import("@/db/schema");
+    const { userSubscriptions, userLibrary, notifications } =
+      await import("@/db/schema");
     const result = await getDashboardStats();
 
     expect(result.subscriptionCount).toBe(5);
     expect(result.savedCount).toBe(3);
+    expect(result.unreadNotificationCount).toBe(7);
     expect(result.error).toBeNull();
 
-    expect(db.$count).toHaveBeenCalledTimes(2);
+    expect(db.$count).toHaveBeenCalledTimes(3);
     expect(db.$count).toHaveBeenCalledWith(
       userSubscriptions,
       expect.anything(),
     );
     expect(db.$count).toHaveBeenCalledWith(userLibrary, expect.anything());
+    // Pin the unread predicate to (userId AND isRead=false AND isDismissed=false).
+    // The plan's cycle-1 NEEDS_REVISION fix was a schema mismatch (readAt/isNull
+    // vs. isRead/isDismissed); expect.anything() here would silently accept the
+    // exact bug PM caught. Assert the eq calls so a regression fails the test.
+    expect(db.$count).toHaveBeenCalledWith(
+      notifications,
+      expect.objectContaining({ _op: "and" }),
+    );
     expect(eq).toHaveBeenCalledWith("user_id", "user_123");
+    expect(eq).toHaveBeenCalledWith("is_read", false);
+    expect(eq).toHaveBeenCalledWith("is_dismissed", false);
   });
 
   it("handles zero counts correctly", async () => {
@@ -254,6 +273,7 @@ describe("getDashboardStats", () => {
 
     expect(result.subscriptionCount).toBe(0);
     expect(result.savedCount).toBe(0);
+    expect(result.unreadNotificationCount).toBe(0);
     expect(result.error).toBeNull();
   });
 
@@ -268,7 +288,32 @@ describe("getDashboardStats", () => {
 
     expect(result.subscriptionCount).toBe(0);
     expect(result.savedCount).toBe(0);
+    expect(result.unreadNotificationCount).toBe(0);
     expect(result.error).toMatch(/failed to load/i);
+  });
+
+  it("isolates an unread-counter failure and signals it via null without poisoning the other counts", async () => {
+    // The unread-notifications counter is wrapped in `.catch(() => null)` so
+    // a notifications-table outage cannot fail the whole dashboard, AND the
+    // sidebar can preserve its previous badge value instead of falsely
+    // clearing it. Pin both contracts: the other counts come back populated,
+    // `error` stays null, and `unreadNotificationCount` is null (the
+    // partial-failure signal that the sidebar treats as "preserve previous").
+    mockAuth.mockResolvedValue({ userId: "user_123" });
+
+    const { db } = await import("@/db");
+    (db.$count as any)
+      .mockResolvedValueOnce(4) // subscriptions
+      .mockResolvedValueOnce(2) // library
+      .mockRejectedValueOnce(new Error("notifications table unavailable"));
+
+    const { getDashboardStats } = await import("@/app/actions/dashboard");
+    const result = await getDashboardStats();
+
+    expect(result.subscriptionCount).toBe(4);
+    expect(result.savedCount).toBe(2);
+    expect(result.unreadNotificationCount).toBeNull();
+    expect(result.error).toBeNull();
   });
 });
 

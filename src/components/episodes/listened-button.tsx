@@ -13,8 +13,7 @@ import {
 import { recordListenEvent } from "@/app/actions/listen-history";
 import {
   LISTEN_STATE_CHANGED_EVENT,
-  NOTIFICATIONS_CHANGED_EVENT,
-  type NotificationsChangedEventDetail,
+  dispatchNotificationsChanged,
 } from "@/lib/events";
 import type { PodcastIndexEpisodeId } from "@/types/ids";
 
@@ -73,12 +72,7 @@ export function ListenedButton({
         window.dispatchEvent(new CustomEvent(LISTEN_STATE_CHANGED_EVENT));
         const dismissedIds = result.data?.dismissedEpisodeDbIds ?? [];
         if (dismissedIds.length > 0) {
-          window.dispatchEvent(
-            new CustomEvent<NotificationsChangedEventDetail>(
-              NOTIFICATIONS_CHANGED_EVENT,
-              { detail: { episodeDbIds: dismissedIds } },
-            ),
-          );
+          dispatchNotificationsChanged(dismissedIds);
         }
       } catch (e) {
         console.error("[ListenedButton] recordListenEvent threw", {

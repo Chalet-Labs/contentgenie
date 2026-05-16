@@ -12,10 +12,12 @@ import {
 } from "react";
 import { getDashboardStats } from "@/app/actions/dashboard";
 import { ROUTES } from "@/lib/routes";
+import { NOTIFICATIONS_CHANGED_EVENT } from "@/lib/events";
 
 interface SidebarCountsState {
   subscriptionCount: number;
   savedCount: number;
+  unreadNotificationCount: number;
   isLoading: boolean;
 }
 
@@ -30,6 +32,7 @@ const SidebarCountsContext = createContext<SidebarCountsContextValue | null>(
 const DEFAULT_COUNTS: SidebarCountsContextValue = {
   subscriptionCount: 0,
   savedCount: 0,
+  unreadNotificationCount: 0,
   isLoading: false,
   refreshCounts: () => {},
 };
@@ -38,6 +41,7 @@ export function SidebarCountsProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<SidebarCountsState>({
     subscriptionCount: 0,
     savedCount: 0,
+    unreadNotificationCount: 0,
     isLoading: true,
   });
 
@@ -55,11 +59,16 @@ export function SidebarCountsProvider({ children }: { children: ReactNode }) {
           setState((prev) => ({ ...prev, isLoading: false }));
           return;
         }
-        setState({
+        setState((prev) => ({
           subscriptionCount: stats.subscriptionCount,
           savedCount: stats.savedCount,
+          // `null` is the dashboard's partial-failure signal — preserve the
+          // previous badge value so a transient notifications-count error
+          // doesn't falsely clear a real Inbox badge.
+          unreadNotificationCount:
+            stats.unreadNotificationCount ?? prev.unreadNotificationCount,
           isLoading: false,
-        });
+        }));
       })
       .catch((error: unknown) => {
         if (serial !== refreshSerial.current) return;
@@ -81,6 +90,25 @@ export function SidebarCountsProvider({ children }: { children: ReactNode }) {
     window.addEventListener("sync-queue-drained", handleDrained);
     return () =>
       window.removeEventListener("sync-queue-drained", handleDrained);
+  }, [refreshCounts]);
+
+  // Foreground notification mutations (bell mark-all-read, in-page
+  // mark-all-read, in-page dismiss, in-page single-row `markNotificationRead`)
+  // don't flow through the offline sync queue, so the `sync-queue-drained`
+  // listener above can't clear the inbox badge. Subscribe separately to
+  // NOTIFICATIONS_CHANGED_EVENT to refresh counts immediately after those
+  // in-tab mutations.
+  useEffect(() => {
+    const handleNotificationsChanged = () => refreshCounts();
+    window.addEventListener(
+      NOTIFICATIONS_CHANGED_EVENT,
+      handleNotificationsChanged,
+    );
+    return () =>
+      window.removeEventListener(
+        NOTIFICATIONS_CHANGED_EVENT,
+        handleNotificationsChanged,
+      );
   }, [refreshCounts]);
 
   const value = useMemo<SidebarCountsContextValue>(
@@ -121,6 +149,8 @@ export function getBadgeCount(
     return counts.subscriptionCount;
   if (href === ROUTES.LIBRARY && counts.savedCount > 0)
     return counts.savedCount;
+  if (href === ROUTES.INBOX && counts.unreadNotificationCount > 0)
+    return counts.unreadNotificationCount;
   return null;
 }
 

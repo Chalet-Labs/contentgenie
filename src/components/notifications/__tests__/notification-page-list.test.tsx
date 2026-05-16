@@ -109,8 +109,8 @@ function makeItem(overrides: MakeItemOverrides = {}): NotificationItem {
 
 const defaultProps = {
   initialItems: [
-    makeItem({ id: 1, isRead: false }),
-    makeItem({ id: 2, isRead: true }),
+    makeItem({ id: 1, episodeDbId: 10, isRead: false }),
+    makeItem({ id: 2, episodeDbId: 11, isRead: true }),
   ],
   initialHasMore: false,
   initialTopicsByEpisode: { 10: ["AI", "Tech", "Future"] },
@@ -149,6 +149,15 @@ describe("NotificationPageList", () => {
   it("does not render empty state when items exist", () => {
     render(<NotificationPageList {...defaultProps} />);
     expect(screen.queryByText(/you're all caught up/i)).not.toBeInTheDocument();
+  });
+
+  // Pin the visible H1 to "Inbox" — the rename PR flipped it from
+  // "Notifications" and the assertion guards against a silent revert.
+  it("renders the page heading as 'Inbox'", () => {
+    render(<NotificationPageList {...defaultProps} />);
+    expect(
+      screen.getByRole("heading", { level: 1, name: /^inbox$/i }),
+    ).toBeInTheDocument();
   });
 
   // AC-4: Tabs filter — All shows everything
@@ -422,7 +431,7 @@ describe("NotificationPageList", () => {
     // A full first page (50 items) mirrors the real server-component hydration
     // and sets offsetRef to 50, matching the expected next-offset assertion.
     const fullPage = Array.from({ length: 50 }, (_, i) =>
-      makeItem({ id: i + 1 }),
+      makeItem({ id: i + 1, episodeDbId: 100 + i }),
     );
     render(
       <NotificationPageList
@@ -447,7 +456,7 @@ describe("NotificationPageList", () => {
     mockGetEpisodeTopics.mockResolvedValue({});
     const user = userEvent.setup();
     const fullPage = Array.from({ length: 50 }, (_, i) =>
-      makeItem({ id: i + 1 }),
+      makeItem({ id: i + 1, episodeDbId: 100 + i }),
     );
     const since = new Date("2026-04-20T00:00:00.000Z");
     render(
@@ -477,7 +486,7 @@ describe("NotificationPageList", () => {
     });
     const user = userEvent.setup();
     const fullPage = Array.from({ length: 50 }, (_, i) =>
-      makeItem({ id: i + 1 }),
+      makeItem({ id: i + 1, episodeDbId: 100 + i }),
     );
     render(
       <NotificationPageList
@@ -1034,5 +1043,134 @@ describe("NotificationPageList", () => {
     expect(mockGetNotifications).not.toHaveBeenCalled();
     expect(screen.getAllByRole("article")).toHaveLength(2);
     expect(mockRefresh).not.toHaveBeenCalled();
+  });
+
+  // The bell's mark-all path dispatches with `action: "mark-all"` to tell the
+  // inbox page (when open) to flip every visible row to read without forcing
+  // a route refresh.
+  it("NOTIFICATIONS_CHANGED_EVENT with action='mark-all' flips visible unread rows to read", async () => {
+    const item1 = makeItem({ id: 1, episodeDbId: 10, isRead: false });
+    const item2 = makeItem({ id: 2, episodeDbId: 20, isRead: true });
+    const item3 = makeItem({ id: 3, episodeDbId: 30, isRead: false });
+
+    render(
+      <NotificationPageList
+        initialItems={[item1, item2, item3]}
+        initialHasMore={false}
+        initialTopicsByEpisode={{}}
+      />,
+    );
+    const articles = screen.getAllByRole("article");
+    expect(articles).toHaveLength(3);
+    expect(articles[0]).toHaveAttribute("data-read", "false");
+    expect(articles[1]).toHaveAttribute("data-read", "true");
+    expect(articles[2]).toHaveAttribute("data-read", "false");
+
+    await act(async () => {
+      window.dispatchEvent(
+        new CustomEvent(NOTIFICATIONS_CHANGED_EVENT, {
+          detail: { episodeDbIds: [], action: "mark-all" },
+        }),
+      );
+    });
+
+    const updated = screen.getAllByRole("article");
+    expect(updated).toHaveLength(3);
+    expect(updated[0]).toHaveAttribute("data-read", "true");
+    expect(updated[1]).toHaveAttribute("data-read", "true");
+    expect(updated[2]).toHaveAttribute("data-read", "true");
+    // mark-all is a state mutation, not a server reconcile — no Load more
+    // re-fetch and no router.refresh().
+    expect(mockGetNotifications).not.toHaveBeenCalled();
+    expect(mockRefresh).not.toHaveBeenCalled();
+  });
+
+  it("dismiss success dispatches a counts-only NOTIFICATIONS_CHANGED_EVENT (empty payload)", async () => {
+    // The dismiss handler removed the row locally by id; feeding the
+    // dismissed row's episodeDbId back into this same page's listener
+    // would trigger a redundant `router.refresh` for an already-removed
+    // row. Empty payload = "aggregate counts may have changed, no
+    // row-level reconcile" — exactly what the sidebar needs.
+    const user = userEvent.setup();
+    const dispatchSpy = vi.spyOn(window, "dispatchEvent");
+
+    render(<NotificationPageList {...defaultProps} />);
+
+    const dismissBtns = screen.getAllByRole("button", { name: /dismiss/i });
+    await user.click(dismissBtns[0]!); // row id=1, episodeDbId=10
+
+    await waitFor(() => {
+      expect(mockDismissNotification).toHaveBeenCalledWith(1);
+    });
+
+    const dispatchedEvents = dispatchSpy.mock.calls.filter(
+      ([event]) =>
+        event instanceof CustomEvent &&
+        event.type === NOTIFICATIONS_CHANGED_EVENT,
+    );
+    expect(dispatchedEvents).toHaveLength(1);
+    const dispatched = dispatchedEvents[0]![0] as CustomEvent;
+    expect(dispatched.detail).toEqual({ episodeDbIds: [] });
+    // router.refresh() must NOT be called — empty-payload listener is a no-op
+    // and would skip the refresh; non-empty would call it unconditionally.
+    expect(mockRefresh).not.toHaveBeenCalled();
+
+    dispatchSpy.mockRestore();
+  });
+
+  it("Mark all as read dispatches NOTIFICATIONS_CHANGED_EVENT with action='mark-all'", async () => {
+    // Removing this dispatch would skip the sidebar badge refresh and leave
+    // the Inbox badge counting rows the user just marked read.
+    const user = userEvent.setup();
+    const dispatchSpy = vi.spyOn(window, "dispatchEvent");
+
+    render(<NotificationPageList {...defaultProps} />);
+
+    await user.click(screen.getByRole("button", { name: /mark all as read/i }));
+
+    await waitFor(() => {
+      expect(mockMarkAllNotificationsRead).toHaveBeenCalled();
+    });
+
+    const dispatchedEvents = dispatchSpy.mock.calls.filter(
+      ([event]) =>
+        event instanceof CustomEvent &&
+        event.type === NOTIFICATIONS_CHANGED_EVENT,
+    );
+    expect(dispatchedEvents).toHaveLength(1);
+    const dispatched = dispatchedEvents[0]![0] as CustomEvent;
+    expect(dispatched.detail).toEqual({ episodeDbIds: [], action: "mark-all" });
+
+    dispatchSpy.mockRestore();
+  });
+
+  it("single-row markNotificationRead success dispatches an empty-payload NOTIFICATIONS_CHANGED_EVENT", async () => {
+    // The empty payload signals "counts changed, no row-level reconcile" —
+    // the sidebar refreshes aggregate counts; this page's own listener
+    // treats it as a no-op (the row was already flipped optimistically).
+    const user = userEvent.setup();
+    const dispatchSpy = vi.spyOn(window, "dispatchEvent");
+
+    render(<NotificationPageList {...defaultProps} />);
+
+    // Click the title link on the unread row (id=1). The handler runs
+    // markReadOptimistic, which calls markNotificationRead on success.
+    const titleLinks = screen.getAllByRole("link", { name: /test episode/i });
+    await user.click(titleLinks[0]!);
+
+    await waitFor(() => {
+      expect(mockMarkNotificationRead).toHaveBeenCalledWith(1);
+    });
+
+    const dispatchedEvents = dispatchSpy.mock.calls.filter(
+      ([event]) =>
+        event instanceof CustomEvent &&
+        event.type === NOTIFICATIONS_CHANGED_EVENT,
+    );
+    expect(dispatchedEvents).toHaveLength(1);
+    const dispatched = dispatchedEvents[0]![0] as CustomEvent;
+    expect(dispatched.detail).toEqual({ episodeDbIds: [] });
+
+    dispatchSpy.mockRestore();
   });
 });

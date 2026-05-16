@@ -61,11 +61,13 @@ vi.mock("@/db/schema", () => ({
 const mockSelect = vi.fn();
 const mockUpdate = vi.fn();
 const mockFindFirst = vi.fn();
+const mockCount = vi.fn();
 
 vi.mock("@/db", () => ({
   db: {
     select: (...args: unknown[]) => mockSelect(...args),
     update: (...args: unknown[]) => mockUpdate(...args),
+    $count: (...args: unknown[]) => mockCount(...args),
     query: {
       users: {
         findFirst: (...args: unknown[]) => mockFindFirst(...args),
@@ -89,10 +91,7 @@ describe("notification server actions", () => {
     });
 
     it("returns unread count for authenticated user", async () => {
-      const mockFrom = vi.fn().mockReturnValue({
-        where: vi.fn().mockResolvedValue([{ value: 5 }]),
-      });
-      mockSelect.mockReturnValue({ from: mockFrom });
+      mockCount.mockResolvedValue(5);
 
       const { getUnreadCount } = await import("@/app/actions/notifications");
       const count = await getUnreadCount();
@@ -101,10 +100,7 @@ describe("notification server actions", () => {
 
     it("lets DB errors propagate so the caller can keep the last good count", async () => {
       const dbError = new Error("connection refused");
-      const mockFrom = vi.fn().mockReturnValue({
-        where: vi.fn().mockRejectedValue(dbError),
-      });
-      mockSelect.mockReturnValue({ from: mockFrom });
+      mockCount.mockRejectedValue(dbError);
 
       const { getUnreadCount } = await import("@/app/actions/notifications");
       await expect(getUnreadCount()).rejects.toThrow("connection refused");
@@ -362,10 +358,7 @@ describe("notification server actions", () => {
 
   describe("getUnreadCount — excludes dismissed", () => {
     it("includes isDismissed=false in WHERE", async () => {
-      const mockFrom = vi.fn().mockReturnValue({
-        where: vi.fn().mockResolvedValue([{ value: 3 }]),
-      });
-      mockSelect.mockReturnValue({ from: mockFrom });
+      mockCount.mockResolvedValue(3);
       const { eq: mockEq } = await import("drizzle-orm");
       const { getUnreadCount } = await import("@/app/actions/notifications");
       await getUnreadCount();
@@ -576,12 +569,13 @@ describe("notification server actions", () => {
   describe("getNotificationSummary", () => {
     beforeEach(() => {
       mockSelect.mockReset();
+      mockCount.mockReset();
     });
 
-    // Wires up three sequential select() calls the producer makes:
-    // 1. totalUnread (all unread types) → returns [{ value: number }]
-    // 2. lastSeenAt   → returns [{ lastSeen: Date | null }]
-    // 3. grouped rows → returns per-podcast rows
+    // Wires up the queries getNotificationSummary makes via Promise.all:
+    // 1. totalUnread  → db.$count (countUnreadNotifications) — mockCount
+    // 2. lastSeenAt   → db.select() — first mockSelect call
+    // 3. grouped rows → db.select().leftJoin()... — second mockSelect call
     function buildSummaryChain(
       totalUnread: number,
       lastSeenRow: Array<{ lastSeen: Date | string | null }>,
@@ -591,25 +585,23 @@ describe("notification server actions", () => {
         count: string;
       }>,
     ) {
-      const firstWhere = vi.fn().mockResolvedValue([{ value: totalUnread }]);
+      mockCount.mockResolvedValueOnce(totalUnread);
+
+      const firstWhere = vi.fn().mockResolvedValue(lastSeenRow);
       const firstFrom = vi.fn().mockReturnValue({ where: firstWhere });
 
-      const secondWhere = vi.fn().mockResolvedValue(lastSeenRow);
-      const secondFrom = vi.fn().mockReturnValue({ where: secondWhere });
-
-      const thirdOrderBy = vi.fn().mockResolvedValue(groupRows);
-      const thirdGroupBy = vi.fn().mockReturnValue({ orderBy: thirdOrderBy });
-      const thirdWhere = vi.fn().mockReturnValue({ groupBy: thirdGroupBy });
-      const thirdLeftJoin2 = vi.fn().mockReturnValue({ where: thirdWhere });
-      const thirdLeftJoin1 = vi
+      const secondOrderBy = vi.fn().mockResolvedValue(groupRows);
+      const secondGroupBy = vi.fn().mockReturnValue({ orderBy: secondOrderBy });
+      const secondWhere = vi.fn().mockReturnValue({ groupBy: secondGroupBy });
+      const secondLeftJoin2 = vi.fn().mockReturnValue({ where: secondWhere });
+      const secondLeftJoin1 = vi
         .fn()
-        .mockReturnValue({ leftJoin: thirdLeftJoin2 });
-      const thirdFrom = vi.fn().mockReturnValue({ leftJoin: thirdLeftJoin1 });
+        .mockReturnValue({ leftJoin: secondLeftJoin2 });
+      const secondFrom = vi.fn().mockReturnValue({ leftJoin: secondLeftJoin1 });
 
       mockSelect
         .mockReturnValueOnce({ from: firstFrom })
-        .mockReturnValueOnce({ from: secondFrom })
-        .mockReturnValueOnce({ from: thirdFrom });
+        .mockReturnValueOnce({ from: secondFrom });
     }
 
     it("(a) returns zero summary when signed out", async () => {
@@ -801,10 +793,10 @@ describe("notification server actions", () => {
     it("(l) logs and rethrows on DB failure so server has a trail", async () => {
       const dbError = new Error("connection refused");
       const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-      // Queries run concurrently via Promise.all — reject the first, stub
-      // the other two so their chains don't TypeError on undefined.
-      const rejectingWhere = vi.fn().mockRejectedValue(dbError);
-      const rejectingFrom = vi.fn().mockReturnValue({ where: rejectingWhere });
+      // Queries run concurrently via Promise.all — reject the first (db.$count
+      // via countUnreadNotifications), stub the other two so their chains don't
+      // TypeError on undefined.
+      mockCount.mockRejectedValueOnce(dbError);
 
       const stubWhere = vi.fn().mockResolvedValue([]);
       const stubFrom = vi.fn().mockReturnValue({ where: stubWhere });
@@ -825,7 +817,6 @@ describe("notification server actions", () => {
         .mockReturnValue({ leftJoin: stubLeftJoin1 });
 
       mockSelect
-        .mockReturnValueOnce({ from: rejectingFrom })
         .mockReturnValueOnce({ from: stubFrom })
         .mockReturnValueOnce({ from: stubGroupedFrom });
 

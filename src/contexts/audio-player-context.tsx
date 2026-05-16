@@ -51,10 +51,7 @@ import {
   savePlayerSession as savePlayerSessionAction,
   clearPlayerSession as clearPlayerSessionAction,
 } from "@/app/actions/player-session";
-import {
-  NOTIFICATIONS_CHANGED_EVENT,
-  type NotificationsChangedEventDetail,
-} from "@/lib/events";
+import { dispatchNotificationsChanged } from "@/lib/events";
 
 // ---------------------------------------------------------------------------
 // Server-sync helpers (fire-and-forget; best-effort with warn-on-failure)
@@ -712,17 +709,13 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
         if (result.success) {
           lastAckedQueueRef.current = snapshot;
           // Only dispatch when the server actually dismissed something.
-          // Empty array means "queue saved, nothing to reconcile" — firing
-          // the event would force every notifications-page subscriber to
-          // treat it as the optimistic-empty-payload sentinel and re-fetch.
+          // Per the events.ts contract, an empty `episodeDbIds` (no
+          // action) still triggers a sidebar `getDashboardStats` refresh;
+          // skipping that aggregate refresh here is intentional because a
+          // queue-save with zero dismissals is a no-op for badge counts.
           const dismissedIds = result.data?.dismissedEpisodeDbIds ?? [];
           if (dismissedIds.length > 0) {
-            window.dispatchEvent(
-              new CustomEvent<NotificationsChangedEventDetail>(
-                NOTIFICATIONS_CHANGED_EVENT,
-                { detail: { episodeDbIds: dismissedIds } },
-              ),
-            );
+            dispatchNotificationsChanged(dismissedIds);
           }
         } else {
           toast.error("Couldn't sync queue", {
@@ -1110,8 +1103,8 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
         // No optimistic NOTIFICATIONS_CHANGED_EVENT dispatch here — the
         // debounced setQueue path (above) fires the reconciling event with
         // server-resolved episode ids ~1.5s later. Optimistic dispatch with
-        // an empty payload forced /notifications into a topic-losing
-        // re-fetch (see ADR-041 history).
+        // an empty payload forced the inbox page (formerly /notifications,
+        // now /inbox) into a topic-losing re-fetch (see ADR-041 history).
       },
 
       removeFromQueue: (episodeId: string) => {
@@ -1373,12 +1366,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
               ? (result.data?.dismissedEpisodeDbIds ?? [])
               : [];
             if (dismissedIds.length > 0) {
-              window.dispatchEvent(
-                new CustomEvent<NotificationsChangedEventDetail>(
-                  NOTIFICATIONS_CHANGED_EVENT,
-                  { detail: { episodeDbIds: dismissedIds } },
-                ),
-              );
+              dispatchNotificationsChanged(dismissedIds);
             }
           })
           .catch(() => {

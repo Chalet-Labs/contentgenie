@@ -12,7 +12,10 @@ import {
 import type { NotificationSummary } from "@/app/actions/notifications";
 import { NotificationPopover } from "@/components/notifications/notification-popover";
 import { formatRelativeTime } from "@/lib/utils";
-import { NOTIFICATIONS_CHANGED_EVENT } from "@/lib/events";
+import {
+  NOTIFICATIONS_CHANGED_EVENT,
+  dispatchNotificationsChanged,
+} from "@/lib/events";
 
 const POLL_INTERVAL_MS = 60_000;
 
@@ -66,22 +69,23 @@ export function NotificationBell() {
 
   // Race guard: ignore stale resolutions from prior opens.
   const fetchIdRef = useRef(0);
-  const fetchSummary = useCallback(async (): Promise<boolean> => {
-    const fetchId = ++fetchIdRef.current;
-    setSummary(null);
-    setSummaryError(false);
-    try {
-      const result = await getNotificationSummary();
-      if (fetchId !== fetchIdRef.current) return false;
-      setSummary(result);
-      return true;
-    } catch (error) {
-      console.error("Failed to fetch notification summary:", error);
-      if (fetchId !== fetchIdRef.current) return false;
-      setSummaryError(true);
-      return false;
-    }
-  }, []);
+  const fetchSummary =
+    useCallback(async (): Promise<NotificationSummary | null> => {
+      const fetchId = ++fetchIdRef.current;
+      setSummary(null);
+      setSummaryError(false);
+      try {
+        const result = await getNotificationSummary();
+        if (fetchId !== fetchIdRef.current) return null;
+        setSummary(result);
+        return result;
+      } catch (error) {
+        console.error("Failed to fetch notification summary:", error);
+        if (fetchId !== fetchIdRef.current) return null;
+        setSummaryError(true);
+        return null;
+      }
+    }, []);
 
   // Parallel race guard for mark-all: also bumped on close so a fetch that
   // resolves after the user closed the popover short-circuits before mark.
@@ -92,8 +96,8 @@ export function NotificationBell() {
   // for the next open. Also the Retry path — after a transient fetch
   // failure the user still sees the list, so mark-read must still run.
   const openAndMarkRead = useCallback(async () => {
-    const fetchOk = await fetchSummary();
-    if (!fetchOk) return;
+    const fetchedSummary = await fetchSummary();
+    if (!fetchedSummary) return;
 
     const markId = ++markAllIdRef.current;
     const prev = unreadCountRef.current;
@@ -106,10 +110,27 @@ export function NotificationBell() {
     };
     try {
       const result = await markAllNotificationsRead();
-      if (markId !== markAllIdRef.current) return;
       if (!result.success) {
+        // Failure path: gate the local UI revert on the race-guard so a
+        // close-then-fail sequence can't clobber a state another cycle
+        // already overwrote. No dispatch — nothing changed on the server.
+        if (markId !== markAllIdRef.current) return;
         console.error("markAllNotificationsRead failed:", result.error);
         revertIfStillZero();
+      } else {
+        // Success path: the server marked rows read, so the sidebar/inbox
+        // listeners MUST be told — even if the user closed the popover
+        // before the mutation resolved (the close-bump on `markAllIdRef`
+        // exists to gate the failure-revert, not the success-dispatch).
+        // Skipping on a "both zero" happy path saves a single
+        // `getDashboardStats` call but leaves no recovery path for a
+        // stale-positive sidebar badge (e.g. after a prior counts-fetch
+        // failure or a mark-all triggered in another tab). The cost is one
+        // cheap server roundtrip per bell-open; the benefit is the sidebar
+        // always converges on the server's truth. The `mark-all` action
+        // tells the inbox page (if open) to flip its visible rows to read
+        // so the UI matches the server state without requiring a reload.
+        dispatchNotificationsChanged([], "mark-all");
       }
     } catch (error) {
       if (markId !== markAllIdRef.current) return;

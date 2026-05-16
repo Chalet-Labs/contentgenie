@@ -240,7 +240,9 @@ describe("NotificationBell", () => {
   });
 
   it("(g4) badge drops to 0 and stays there on successful mark-read", async () => {
-    mockGetUnreadCount.mockResolvedValue(5);
+    // Initial fetch returns 5; after mark-all-read the event triggers fetchUnreadCount
+    // which returns 0 (server reflects the mark-read).
+    mockGetUnreadCount.mockResolvedValueOnce(5).mockResolvedValue(0);
     mockGetNotificationSummary.mockResolvedValue(defaultSummary);
     mockMarkAllNotificationsRead.mockResolvedValue({ success: true });
 
@@ -257,10 +259,13 @@ describe("NotificationBell", () => {
     expect(screen.queryByText(/^\d+$/)).not.toBeInTheDocument();
   });
 
-  it("(g5) badge reverts when markAllNotificationsRead throws", async () => {
+  it("(g5) badge reverts when markAllNotificationsRead throws, and event is NOT dispatched", async () => {
     const consoleError = vi
       .spyOn(console, "error")
       .mockImplementation(() => {});
+    // Spy on dispatchEvent BEFORE render so any dispatch from the
+    // throw-path's catch branch is captured.
+    const dispatchSpy = vi.spyOn(window, "dispatchEvent");
     mockGetUnreadCount.mockResolvedValue(4);
     mockGetNotificationSummary.mockResolvedValue(defaultSummary);
     mockMarkAllNotificationsRead.mockRejectedValue(new Error("boom"));
@@ -278,6 +283,13 @@ describe("NotificationBell", () => {
       "Failed to mark all notifications as read:",
       expect.any(Error),
     );
+    const notificationsChangedDispatches = dispatchSpy.mock.calls.filter(
+      ([event]) =>
+        event instanceof CustomEvent &&
+        event.type === NOTIFICATIONS_CHANGED_EVENT,
+    );
+    expect(notificationsChangedDispatches).toHaveLength(0);
+    dispatchSpy.mockRestore();
     consoleError.mockRestore();
   });
 
@@ -285,7 +297,9 @@ describe("NotificationBell", () => {
     const consoleError = vi
       .spyOn(console, "error")
       .mockImplementation(() => {});
-    mockGetUnreadCount.mockResolvedValue(5);
+    // Initial fetch returns 5; after the successful second mark-all-read, the
+    // event triggers fetchUnreadCount which returns 0 (server reflects mark-read).
+    mockGetUnreadCount.mockResolvedValueOnce(5).mockResolvedValue(0);
     mockGetNotificationSummary.mockResolvedValue(defaultSummary);
 
     // First open: slow mark-read that we'll reject *after* a second open succeeds.
@@ -365,7 +379,9 @@ describe("NotificationBell", () => {
     const consoleError = vi
       .spyOn(console, "error")
       .mockImplementation(() => {});
-    mockGetUnreadCount.mockResolvedValue(3);
+    // Initial fetch returns 3; after retry's successful mark-all-read, the event
+    // triggers fetchUnreadCount which returns 0 (server reflects mark-read).
+    mockGetUnreadCount.mockResolvedValueOnce(3).mockResolvedValue(0);
     // First fetch fails, retry succeeds.
     mockGetNotificationSummary
       .mockRejectedValueOnce(new Error("transient"))
@@ -567,5 +583,189 @@ describe("NotificationBell", () => {
     expect(
       screen.queryByRole("link", { name: /from stale pod/i }),
     ).not.toBeInTheDocument();
+  });
+
+  it("(T5b) dispatches NOTIFICATIONS_CHANGED_EVENT on successful markAllNotificationsRead", async () => {
+    mockGetUnreadCount.mockResolvedValue(3);
+    mockGetNotificationSummary.mockResolvedValue(defaultSummary);
+    mockMarkAllNotificationsRead.mockResolvedValue({ success: true });
+
+    const dispatchSpy = vi.spyOn(window, "dispatchEvent");
+
+    render(<NotificationBell />);
+    await flushMicrotasks();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /notifications/i }));
+    });
+    await flushMicrotasks();
+
+    const notificationsChangedCalls = dispatchSpy.mock.calls.filter(
+      ([event]) =>
+        event instanceof CustomEvent &&
+        event.type === NOTIFICATIONS_CHANGED_EVENT,
+    );
+    expect(notificationsChangedCalls).toHaveLength(1);
+    const dispatched = notificationsChangedCalls[0][0] as CustomEvent;
+    expect(dispatched.detail).toEqual({ episodeDbIds: [], action: "mark-all" });
+
+    dispatchSpy.mockRestore();
+  });
+
+  it("(T5b) does NOT dispatch NOTIFICATIONS_CHANGED_EVENT when markAllNotificationsRead returns success: false", async () => {
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
+    mockGetUnreadCount.mockResolvedValue(3);
+    mockGetNotificationSummary.mockResolvedValue(defaultSummary);
+    mockMarkAllNotificationsRead.mockResolvedValue({
+      success: false,
+      error: "DB error",
+    });
+
+    const dispatchSpy = vi.spyOn(window, "dispatchEvent");
+
+    render(<NotificationBell />);
+    await flushMicrotasks();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /notifications/i }));
+    });
+    await flushMicrotasks();
+
+    const notificationsChangedCalls = dispatchSpy.mock.calls.filter(
+      ([event]) =>
+        event instanceof CustomEvent &&
+        event.type === NOTIFICATIONS_CHANGED_EVENT,
+    );
+    expect(notificationsChangedCalls).toHaveLength(0);
+
+    dispatchSpy.mockRestore();
+    consoleError.mockRestore();
+  });
+
+  it("(T5b) dispatches NOTIFICATIONS_CHANGED_EVENT when popover closes before markAllNotificationsRead resolves", async () => {
+    // The race guard on `markAllIdRef.current` exists to gate the local UI
+    // revert in the failure branch, not the success dispatch. The server
+    // really did mark rows read; the sidebar/inbox listeners must still
+    // hear about it even if the user closed the popover before the mutation
+    // resolved — otherwise their badges/visible rows go stale.
+    mockGetUnreadCount.mockResolvedValue(3);
+    mockGetNotificationSummary.mockResolvedValue(defaultSummary);
+
+    let resolveMarkAll: (value: { success: true }) => void = () => {};
+    const slowMarkAll = new Promise<{ success: true }>((resolve) => {
+      resolveMarkAll = resolve;
+    });
+    mockMarkAllNotificationsRead.mockReturnValueOnce(slowMarkAll);
+
+    const dispatchSpy = vi.spyOn(window, "dispatchEvent");
+
+    render(<NotificationBell />);
+    await flushMicrotasks();
+    const btn = screen.getByRole("button", { name: /notifications/i });
+
+    // Open → close before the mark-all mutation resolves.
+    await act(async () => {
+      fireEvent.click(btn);
+    });
+    await flushMicrotasks();
+    await act(async () => {
+      fireEvent.keyDown(document.activeElement ?? document.body, {
+        key: "Escape",
+      });
+    });
+
+    // Now resolve the slow mark-all. Despite the close, the dispatch must fire.
+    await act(async () => {
+      resolveMarkAll({ success: true });
+    });
+    await flushMicrotasks();
+
+    const notificationsChangedCalls = dispatchSpy.mock.calls.filter(
+      ([event]) =>
+        event instanceof CustomEvent &&
+        event.type === NOTIFICATIONS_CHANGED_EVENT,
+    );
+    expect(notificationsChangedCalls).toHaveLength(1);
+    const dispatched = notificationsChangedCalls[0]![0] as CustomEvent;
+    expect(dispatched.detail).toEqual({
+      episodeDbIds: [],
+      action: "mark-all",
+    });
+
+    dispatchSpy.mockRestore();
+  });
+
+  it("(T5b) dispatches NOTIFICATIONS_CHANGED_EVENT even when bell and summary both report zero unread", async () => {
+    // The cost of one extra getDashboardStats call per bell-open is worth the
+    // recovery property: a stale-positive sidebar badge (e.g. after a prior
+    // counts-fetch failure or a mark-all triggered in another tab) will
+    // converge on the server's truth on the next bell-open, instead of
+    // staying stuck until a different mutation event fires.
+    mockGetUnreadCount.mockResolvedValue(0);
+    mockGetNotificationSummary.mockResolvedValue({
+      totalUnread: 0,
+      groups: [],
+    });
+    mockMarkAllNotificationsRead.mockResolvedValue({ success: true });
+
+    const dispatchSpy = vi.spyOn(window, "dispatchEvent");
+
+    render(<NotificationBell />);
+    await flushMicrotasks();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /notifications/i }));
+    });
+    await flushMicrotasks();
+
+    const notificationsChangedCalls = dispatchSpy.mock.calls.filter(
+      ([event]) =>
+        event instanceof CustomEvent &&
+        event.type === NOTIFICATIONS_CHANGED_EVENT,
+    );
+    expect(notificationsChangedCalls).toHaveLength(1);
+    const dispatched = notificationsChangedCalls[0]![0] as CustomEvent;
+    expect(dispatched.detail).toEqual({
+      episodeDbIds: [],
+      action: "mark-all",
+    });
+
+    dispatchSpy.mockRestore();
+  });
+
+  it("(T5b) dispatches when cached badge is stale 0 but summary has unread rows", async () => {
+    // Edge case: bell's cached count is 0 (e.g. ate a transient fetch error
+    // or hasn't caught up after a server-side notification arrived) but the
+    // just-fetched summary confirms unread rows still exist. The guard must
+    // dispatch so the sidebar badge converges on the truth.
+    mockGetUnreadCount.mockResolvedValue(0);
+    mockGetNotificationSummary.mockResolvedValue(defaultSummary);
+    mockMarkAllNotificationsRead.mockResolvedValue({ success: true });
+
+    const dispatchSpy = vi.spyOn(window, "dispatchEvent");
+
+    render(<NotificationBell />);
+    await flushMicrotasks();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /notifications/i }));
+    });
+    await flushMicrotasks();
+
+    const notificationsChangedCalls = dispatchSpy.mock.calls.filter(
+      ([event]) =>
+        event instanceof CustomEvent &&
+        event.type === NOTIFICATIONS_CHANGED_EVENT,
+    );
+    expect(notificationsChangedCalls).toHaveLength(1);
+    const dispatched = notificationsChangedCalls[0]![0] as CustomEvent;
+    expect(dispatched.detail).toEqual({
+      episodeDbIds: [],
+      action: "mark-all",
+    });
+
+    dispatchSpy.mockRestore();
   });
 });

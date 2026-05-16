@@ -129,7 +129,7 @@ describe("NotificationPopover", () => {
     ).toBeInTheDocument();
   });
 
-  it("(f) See all footer link renders with href=/notifications in populated state", () => {
+  it("(f) See all footer link renders with href=/inbox in populated state", () => {
     render(
       <NotificationPopover
         open={true}
@@ -142,7 +142,7 @@ describe("NotificationPopover", () => {
     );
     expect(screen.getByRole("link", { name: /see all/i })).toHaveAttribute(
       "href",
-      "/notifications",
+      "/inbox",
     );
   });
 
@@ -159,7 +159,7 @@ describe("NotificationPopover", () => {
     );
     expect(screen.getByRole("link", { name: /see all/i })).toHaveAttribute(
       "href",
-      "/notifications",
+      "/inbox",
     );
   });
 
@@ -176,7 +176,7 @@ describe("NotificationPopover", () => {
     );
     expect(screen.getByRole("link", { name: /see all/i })).toHaveAttribute(
       "href",
-      "/notifications",
+      "/inbox",
     );
   });
 
@@ -193,7 +193,7 @@ describe("NotificationPopover", () => {
     );
     expect(screen.getByRole("link", { name: /see all/i })).toHaveAttribute(
       "href",
-      "/notifications",
+      "/inbox",
     );
   });
 

@@ -94,7 +94,7 @@ describe("NotificationSummaryList", () => {
     expect(link).toBeInTheDocument();
     expect(link).toHaveAttribute(
       "href",
-      `/notifications?since=${encodeURIComponent(lastSeenAt.toISOString())}`,
+      `/inbox?since=${encodeURIComponent(lastSeenAt.toISOString())}`,
     );
   });
 
@@ -104,7 +104,7 @@ describe("NotificationSummaryList", () => {
       name: /3 new episodes from the daily/i,
     });
     expect(link).toBeInTheDocument();
-    expect(link).toHaveAttribute("href", "/notifications?podcast=42");
+    expect(link).toHaveAttribute("href", "/inbox?podcast=42");
   });
 
   it("(d) singular label when count === 1", () => {
@@ -154,7 +154,7 @@ describe("NotificationSummaryList", () => {
     const link = screen.getByRole("link", {
       name: /2 unread notifications/i,
     });
-    expect(link).toHaveAttribute("href", "/notifications");
+    expect(link).toHaveAttribute("href", "/inbox");
   });
 
   it("(i) onItemClick fires with `podcast-<id>` when a podcast row is clicked", () => {

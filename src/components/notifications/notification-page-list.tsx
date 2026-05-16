@@ -30,6 +30,7 @@ import { ROUTES } from "@/lib/routes";
 import {
   LISTEN_STATE_CHANGED_EVENT,
   NOTIFICATIONS_CHANGED_EVENT,
+  dispatchNotificationsChanged,
   type NotificationsChangedEventDetail,
 } from "@/lib/events";
 import { NOTIFICATIONS_PAGE_SIZE } from "@/lib/notifications-constants";
@@ -141,9 +142,19 @@ export function NotificationPageList({
   useEffect(() => {
     const handler = (e: Event) => {
       const detail = (e as CustomEvent<NotificationsChangedEventDetail>).detail;
+      // `mark-all` action signals a sibling surface (typically the bell)
+      // marked every notification read. Flip all locally-visible rows so the
+      // inbox UI matches server state without waiting for a route change.
+      if (detail?.action === "mark-all") {
+        setItems((prev) =>
+          prev.map((n) => (n.isRead ? n : { ...n, isRead: true })),
+        );
+        return;
+      }
       const ids = new Set(detail?.episodeDbIds ?? []);
-      // All production dispatch sites only fire on confirmed dismisses with
-      // populated ids — an empty payload is a no-op event we don't act on.
+      // Remaining empty-payload dispatches (single-item read on this page,
+      // sidebar-only count refresh) are intentional no-ops here — local row
+      // state was already updated optimistically by the originating handler.
       if (ids.size === 0) return;
       let removed = 0;
       setItems((prev) => {
@@ -194,6 +205,16 @@ export function NotificationPageList({
       }
       if (result.success) {
         setItems((prev) => prev.filter((n) => n.id !== id));
+        // Counts-only dispatch (empty array): this page already removed the
+        // row locally by id above, so feeding its own episodeDbId back into
+        // the by-episode listener would trip an unnecessary `router.refresh`
+        // and `setItems` no-op. The sidebar still needs to refresh its
+        // aggregate badge counts though — the empty-array no-action payload
+        // is exactly that signal per the `events.ts` contract. External
+        // dismiss sources (audio-player queue auto-dismiss, listened-to
+        // auto-dismiss) still pass non-empty `episodeDbIds` so they can
+        // reach this listener and remove rows visible here.
+        dispatchNotificationsChanged([]);
       } else {
         console.error("[notifications] dismiss failed", {
           id,
@@ -218,6 +239,8 @@ export function NotificationPageList({
             prev.map((n) => (n.id === item.id ? { ...n, isRead: false } : n)),
           );
           toast.error(result.error ?? "Couldn't mark as read");
+        } else {
+          dispatchNotificationsChanged([]);
         }
       })
       .catch(() => {
@@ -244,6 +267,10 @@ export function NotificationPageList({
       const result = await markAllNotificationsRead();
       if (result.success) {
         setItems((prev) => prev.map((n) => ({ ...n, isRead: true })));
+        // Sync the sidebar inbox badge with the bell's behavior — both
+        // mark-all paths must dispatch so the badge clears in real time.
+        // The `mark-all` action also keeps other inbox instances in sync.
+        dispatchNotificationsChanged([], "mark-all");
       } else {
         toastErrorWithRetry(
           result.error ?? "Failed to mark all as read",
@@ -383,7 +410,7 @@ export function NotificationPageList({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Notifications</h1>
+        <h1 className="text-2xl font-semibold">Inbox</h1>
         {items.length > 0 && (
           <Button variant="ghost" size="sm" onClick={handleMarkAllRead}>
             Mark all as read

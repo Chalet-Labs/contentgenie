@@ -6,6 +6,7 @@ import type { PodcastIndexEpisodeId } from "@/types/ids";
  */
 export const ROUTES = {
   DASHBOARD: "/dashboard",
+  INBOX: "/inbox",
   DISCOVER: "/discover",
   SUBSCRIPTIONS: "/subscriptions",
   LIBRARY: "/library",

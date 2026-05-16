@@ -10,6 +10,7 @@ import {
   users,
   episodeTopics,
 } from "@/db/schema";
+import { countUnreadNotifications } from "@/lib/notifications-query";
 import { POSTGRES_MAX_INT as MAX_SERIAL_ID } from "@/lib/postgres-limits";
 
 export type NotificationGroup =
@@ -40,17 +41,8 @@ export async function getNotificationSummary(): Promise<NotificationSummary> {
   }
 
   try {
-    const [totalRow, lastSeenRow, groupRows] = await Promise.all([
-      db
-        .select({ value: count() })
-        .from(notifications)
-        .where(
-          and(
-            eq(notifications.userId, userId),
-            eq(notifications.isRead, false),
-            eq(notifications.isDismissed, false),
-          ),
-        ),
+    const [totalUnread, lastSeenRow, groupRows] = await Promise.all([
+      countUnreadNotifications(userId),
       db
         .select({
           lastSeen: sql<Date | string | null>`MAX(${notifications.createdAt})`,
@@ -86,7 +78,6 @@ export async function getNotificationSummary(): Promise<NotificationSummary> {
         .orderBy(desc(count()), podcasts.title),
     ]);
 
-    const totalUnread = totalRow[0]?.value ?? 0;
     // Neon's HTTP driver returns raw Postgres strings for `sql<...>` aggregates
     // (no column-level mapFromDriverValue runs). Rehydrate to a real Date so
     // downstream Drizzle comparisons and `.toISOString()` calls are safe.
@@ -244,18 +235,7 @@ export async function getUnreadCount(): Promise<number> {
 
   // Let DB errors propagate so the caller can keep the last good count
   // instead of showing a false "0 unread" after a transient failure.
-  const [result] = await db
-    .select({ value: count() })
-    .from(notifications)
-    .where(
-      and(
-        eq(notifications.userId, userId),
-        eq(notifications.isRead, false),
-        eq(notifications.isDismissed, false),
-      ),
-    );
-
-  return result?.value ?? 0;
+  return countUnreadNotifications(userId);
 }
 
 export async function markNotificationRead(notificationId: number) {

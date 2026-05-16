@@ -17,6 +17,7 @@ import {
   sql,
 } from "drizzle-orm";
 import { db } from "@/db";
+import { countUnreadNotifications } from "@/lib/notifications-query";
 import {
   userSubscriptions,
   userLibrary,
@@ -624,19 +625,29 @@ export async function getDashboardStats() {
     return {
       subscriptionCount: 0,
       savedCount: 0,
+      unreadNotificationCount: 0,
       error: "You must be signed in",
     };
   }
 
   try {
-    const [subscriptionCount, savedCount] = await Promise.all([
-      db.$count(userSubscriptions, eq(userSubscriptions.userId, userId)),
-      db.$count(userLibrary, eq(userLibrary.userId, userId)),
-    ]);
+    // `unreadNotificationCount` is intentionally narrower-failed than the
+    // other two: a notifications-table outage shouldn't fail the entire
+    // dashboard, but the prior `.catch(() => 0)` silently overwrote a real
+    // sidebar badge with 0 on transient errors. `null` is now the
+    // partial-failure signal; the sidebar preserves the previous count when
+    // it sees null instead of clearing it.
+    const [subscriptionCount, savedCount, unreadNotificationCount] =
+      await Promise.all([
+        db.$count(userSubscriptions, eq(userSubscriptions.userId, userId)),
+        db.$count(userLibrary, eq(userLibrary.userId, userId)),
+        countUnreadNotifications(userId).catch(() => null as number | null),
+      ]);
 
     return {
       subscriptionCount,
       savedCount,
+      unreadNotificationCount,
       error: null,
     };
   } catch (error) {
@@ -644,6 +655,7 @@ export async function getDashboardStats() {
     return {
       subscriptionCount: 0,
       savedCount: 0,
+      unreadNotificationCount: 0,
       error: "Failed to load stats",
     };
   }

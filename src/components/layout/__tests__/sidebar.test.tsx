@@ -34,6 +34,7 @@ vi.mock("@/contexts/sidebar-counts-context", () => ({
     counts: {
       subscriptionCount: number;
       savedCount: number;
+      unreadNotificationCount: number;
       isLoading: boolean;
     },
   ): number | null => {
@@ -41,6 +42,8 @@ vi.mock("@/contexts/sidebar-counts-context", () => ({
     if (href === "/subscriptions" && counts.subscriptionCount > 0)
       return counts.subscriptionCount;
     if (href === "/library" && counts.savedCount > 0) return counts.savedCount;
+    if (href === "/inbox" && counts.unreadNotificationCount > 0)
+      return counts.unreadNotificationCount;
     return null;
   },
   NavBadge: ({ count }: { count: number }) => (
@@ -77,6 +80,7 @@ beforeEach(() => {
   mockUseSidebarCounts.mockReturnValue({
     subscriptionCount: 0,
     savedCount: 0,
+    unreadNotificationCount: 0,
     isLoading: false,
   });
   mockUsePinnedSubscriptionsOptional.mockReturnValue({
@@ -92,6 +96,7 @@ describe("Sidebar — inline aside mode", () => {
     mockUseSidebarCounts.mockReturnValue({
       subscriptionCount: 5,
       savedCount: 0,
+      unreadNotificationCount: 0,
       isLoading: false,
     });
 
@@ -107,6 +112,7 @@ describe("Sidebar — inline aside mode", () => {
     mockUseSidebarCounts.mockReturnValue({
       subscriptionCount: 0,
       savedCount: 12,
+      unreadNotificationCount: 0,
       isLoading: false,
     });
 
@@ -132,6 +138,7 @@ describe("Sidebar — inline aside mode", () => {
     mockUseSidebarCounts.mockReturnValue({
       subscriptionCount: 10,
       savedCount: 20,
+      unreadNotificationCount: 5,
       isLoading: true,
     });
 
@@ -161,6 +168,54 @@ describe("Sidebar — inline aside mode", () => {
   it("renders OrganizationSwitcher in inline mode", () => {
     render(<Sidebar isAdmin={false} />);
     expect(screen.getByTestId("org-switcher")).toBeInTheDocument();
+  });
+
+  it("renders Inbox link between Dashboard and Discover", () => {
+    render(<Sidebar isAdmin={false} />);
+    const links = screen.getAllByRole("link");
+    const dashboardIndex = links.findIndex((l) =>
+      l.textContent?.toLowerCase().includes("dashboard"),
+    );
+    const inboxIndex = links.findIndex((l) =>
+      l.textContent?.toLowerCase().includes("inbox"),
+    );
+    const discoverIndex = links.findIndex((l) =>
+      l.textContent?.toLowerCase().includes("discover"),
+    );
+    expect(inboxIndex).toBeGreaterThan(dashboardIndex);
+    expect(inboxIndex).toBeLessThan(discoverIndex);
+  });
+
+  it("shows badge on Inbox link when unreadNotificationCount > 0", () => {
+    mockUseSidebarCounts.mockReturnValue({
+      subscriptionCount: 0,
+      savedCount: 0,
+      unreadNotificationCount: 8,
+      isLoading: false,
+    });
+
+    render(<Sidebar isAdmin={false} />);
+
+    const inboxLink = screen.getByRole("link", { name: /inbox/i });
+    expect(inboxLink).toHaveTextContent("8");
+  });
+
+  it("does not show Inbox badge when unreadNotificationCount === 0", () => {
+    render(<Sidebar isAdmin={false} />);
+
+    const inboxLink = screen.getByRole("link", { name: /inbox/i });
+    expect(inboxLink.querySelector("span")).toBeNull();
+  });
+
+  it("marks Inbox link as the current page on /inbox pathname", () => {
+    mockUsePathname.mockReturnValue("/inbox");
+    render(<Sidebar isAdmin={false} />);
+
+    // Query by the accessible "current page" signal so the test survives
+    // theme-token refactors that change which Tailwind class signals active.
+    expect(
+      screen.getByRole("link", { name: /inbox/i, current: "page" }),
+    ).toBeInTheDocument();
   });
 });
 
@@ -233,10 +288,26 @@ describe("Sidebar — inSheet mode", () => {
     expect(libraryLink.className).toContain("text-accent-foreground");
   });
 
+  it("active link in the in-sheet sidebar is marked with aria-current=page (theme-refactor-safe)", () => {
+    // Mirrors the inline-sidebar aria-current test so the mobile/sidebar-sheet
+    // accessibility contract survives a Tailwind class refactor. Without this,
+    // dropping `bg-accent` (or renaming it) would silently regress screen-reader
+    // active-state on the in-sheet variant only.
+    mockUsePathname.mockReturnValue("/inbox");
+    renderSidebarInOpenSheet();
+    expect(
+      within(screen.getByTestId("sheet-content")).getByRole("link", {
+        name: /inbox/i,
+        current: "page",
+      }),
+    ).toBeInTheDocument();
+  });
+
   it("renders badges on Subscriptions/Library when counts are provided in inSheet mode", () => {
     mockUseSidebarCounts.mockReturnValue({
       subscriptionCount: 7,
       savedCount: 42,
+      unreadNotificationCount: 0,
       isLoading: false,
     });
     renderSidebarInOpenSheet();

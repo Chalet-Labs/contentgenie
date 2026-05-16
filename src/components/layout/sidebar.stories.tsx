@@ -81,7 +81,7 @@ export const WithBadges: Story = {
     docs: {
       description: {
         story:
-          "Same render as Default — documented separately to visualize non-zero subscription/library badge counts from the mocked getDashboardStats.",
+          "Same render as Default — documented separately to visualize non-zero subscription, library, and inbox unread badge counts from the mocked getDashboardStats.",
       },
     },
   },

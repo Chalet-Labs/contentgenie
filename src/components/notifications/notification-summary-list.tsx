@@ -68,7 +68,7 @@ export function NotificationSummaryList({
   if (summary.groups.length === 0) {
     return (
       <ul className="divide-y">
-        <SummaryRow href="/notifications">
+        <SummaryRow href="/inbox">
           {pluralNotification(summary.totalUnread)}
         </SummaryRow>
       </ul>
@@ -102,7 +102,7 @@ export function NotificationSummaryList({
             return (
               <SummaryRow
                 key={key}
-                href={`/notifications?since=${encodeURIComponent(group.sinceIso)}`}
+                href={`/inbox?since=${encodeURIComponent(group.sinceIso)}`}
                 onClick={handleClick}
               >
                 {pluralEpisode(group.count)} since last visit
@@ -112,7 +112,7 @@ export function NotificationSummaryList({
             return (
               <SummaryRow
                 key={key}
-                href={`/notifications?podcast=${group.podcastId}`}
+                href={`/inbox?podcast=${group.podcastId}`}
                 onClick={handleClick}
               >
                 {pluralEpisode(group.count)} from {group.podcastTitle}
