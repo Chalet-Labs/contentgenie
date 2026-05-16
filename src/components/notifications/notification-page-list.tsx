@@ -204,28 +204,17 @@ export function NotificationPageList({
         return;
       }
       if (result.success) {
-        // Capture the dismissed episodeDbId before filtering it out of
-        // items so the dispatch payload below carries it for same-document
-        // listeners. Cross-tab reconciliation is intentionally out of scope
-        // (see the comment on the dispatch call below). Reading from
-        // itemsRef avoids putting `items` in the callback dependencies.
-        const dismissed = itemsRef.current.find((n) => n.id === id);
         setItems((prev) => prev.filter((n) => n.id !== id));
-        // Keep the sidebar inbox badge in sync — without this dispatch the
-        // badge would stay stale until route change or the next bell open.
-        // The sidebar listener re-fetches aggregate counts via
-        // `getDashboardStats`; this page's own listener (see the effect
-        // above) is the only consumer that filters visible rows by
-        // `episodeDbId`. Carrying the dismissed row's episodeDbId is safe
-        // because the partial unique index on `notifications`
-        // (`drizzle/0019`, `(user_id, episode_id) WHERE episode_id IS NOT
-        // NULL AND type = 'new_episode'`) enforces one row per
-        // (user, episode_id) for the single-row model, so at most one row
-        // matches the filter. Cross-tab sync is not implemented —
-        // `window.dispatchEvent` does not cross documents.
-        dispatchNotificationsChanged(
-          dismissed?.episodeDbId ? [dismissed.episodeDbId] : [],
-        );
+        // Counts-only dispatch (empty array): this page already removed the
+        // row locally by id above, so feeding its own episodeDbId back into
+        // the by-episode listener would trip an unnecessary `router.refresh`
+        // and `setItems` no-op. The sidebar still needs to refresh its
+        // aggregate badge counts though — the empty-array no-action payload
+        // is exactly that signal per the `events.ts` contract. External
+        // dismiss sources (audio-player queue auto-dismiss, listened-to
+        // auto-dismiss) still pass non-empty `episodeDbIds` so they can
+        // reach this listener and remove rows visible here.
+        dispatchNotificationsChanged([]);
       } else {
         console.error("[notifications] dismiss failed", {
           id,

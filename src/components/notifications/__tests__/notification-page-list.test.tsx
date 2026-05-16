@@ -1085,10 +1085,12 @@ describe("NotificationPageList", () => {
     expect(mockRefresh).not.toHaveBeenCalled();
   });
 
-  it("dismiss success dispatches NOTIFICATIONS_CHANGED_EVENT carrying the dismissed episodeDbId", async () => {
-    // Removing this dispatch would silently leave the sidebar Inbox badge
-    // stale after an in-page dismiss — without an end-to-end dispatch
-    // assertion the bug would not surface in this test file at all.
+  it("dismiss success dispatches a counts-only NOTIFICATIONS_CHANGED_EVENT (empty payload)", async () => {
+    // The dismiss handler removed the row locally by id; feeding the
+    // dismissed row's episodeDbId back into this same page's listener
+    // would trigger a redundant `router.refresh` for an already-removed
+    // row. Empty payload = "aggregate counts may have changed, no
+    // row-level reconcile" — exactly what the sidebar needs.
     const user = userEvent.setup();
     const dispatchSpy = vi.spyOn(window, "dispatchEvent");
 
@@ -1108,7 +1110,10 @@ describe("NotificationPageList", () => {
     );
     expect(dispatchedEvents).toHaveLength(1);
     const dispatched = dispatchedEvents[0]![0] as CustomEvent;
-    expect(dispatched.detail).toEqual({ episodeDbIds: [10] });
+    expect(dispatched.detail).toEqual({ episodeDbIds: [] });
+    // router.refresh() must NOT be called — empty-payload listener is a no-op
+    // and would skip the refresh; non-empty would call it unconditionally.
+    expect(mockRefresh).not.toHaveBeenCalled();
 
     dispatchSpy.mockRestore();
   });
