@@ -631,11 +631,17 @@ export async function getDashboardStats() {
   }
 
   try {
+    // `unreadNotificationCount` is intentionally narrower-failed than the
+    // other two: a notifications-table outage shouldn't fail the entire
+    // dashboard, but the prior `.catch(() => 0)` silently overwrote a real
+    // sidebar badge with 0 on transient errors. `null` is now the
+    // partial-failure signal; the sidebar preserves the previous count when
+    // it sees null instead of clearing it.
     const [subscriptionCount, savedCount, unreadNotificationCount] =
       await Promise.all([
         db.$count(userSubscriptions, eq(userSubscriptions.userId, userId)),
         db.$count(userLibrary, eq(userLibrary.userId, userId)),
-        countUnreadNotifications(userId).catch(() => 0),
+        countUnreadNotifications(userId).catch(() => null as number | null),
       ]);
 
     return {

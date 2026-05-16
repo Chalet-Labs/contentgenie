@@ -292,11 +292,13 @@ describe("getDashboardStats", () => {
     expect(result.error).toMatch(/failed to load/i);
   });
 
-  it("isolates an unread-counter failure without poisoning the other counts", async () => {
-    // The unread-notifications counter is wrapped in `.catch(() => 0)` so a
-    // notifications-table outage cannot fail the whole dashboard. Pin that
-    // behavior: subscriptions and library counts still come back populated
-    // and `error` stays null.
+  it("isolates an unread-counter failure and signals it via null without poisoning the other counts", async () => {
+    // The unread-notifications counter is wrapped in `.catch(() => null)` so
+    // a notifications-table outage cannot fail the whole dashboard, AND the
+    // sidebar can preserve its previous badge value instead of falsely
+    // clearing it. Pin both contracts: the other counts come back populated,
+    // `error` stays null, and `unreadNotificationCount` is null (the
+    // partial-failure signal that the sidebar treats as "preserve previous").
     mockAuth.mockResolvedValue({ userId: "user_123" });
 
     const { db } = await import("@/db");
@@ -310,7 +312,7 @@ describe("getDashboardStats", () => {
 
     expect(result.subscriptionCount).toBe(4);
     expect(result.savedCount).toBe(2);
-    expect(result.unreadNotificationCount).toBe(0);
+    expect(result.unreadNotificationCount).toBeNull();
     expect(result.error).toBeNull();
   });
 });

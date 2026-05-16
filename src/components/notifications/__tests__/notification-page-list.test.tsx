@@ -1084,4 +1084,88 @@ describe("NotificationPageList", () => {
     expect(mockGetNotifications).not.toHaveBeenCalled();
     expect(mockRefresh).not.toHaveBeenCalled();
   });
+
+  it("dismiss success dispatches NOTIFICATIONS_CHANGED_EVENT carrying the dismissed episodeDbId", async () => {
+    // Removing this dispatch would silently leave the sidebar Inbox badge
+    // stale after an in-page dismiss — without an end-to-end dispatch
+    // assertion the bug would not surface in this test file at all.
+    const user = userEvent.setup();
+    const dispatchSpy = vi.spyOn(window, "dispatchEvent");
+
+    render(<NotificationPageList {...defaultProps} />);
+
+    const dismissBtns = screen.getAllByRole("button", { name: /dismiss/i });
+    await user.click(dismissBtns[0]!); // row id=1, episodeDbId=10
+
+    await waitFor(() => {
+      expect(mockDismissNotification).toHaveBeenCalledWith(1);
+    });
+
+    const dispatchedEvents = dispatchSpy.mock.calls.filter(
+      ([event]) =>
+        event instanceof CustomEvent &&
+        event.type === NOTIFICATIONS_CHANGED_EVENT,
+    );
+    expect(dispatchedEvents).toHaveLength(1);
+    const dispatched = dispatchedEvents[0]![0] as CustomEvent;
+    expect(dispatched.detail).toEqual({ episodeDbIds: [10] });
+
+    dispatchSpy.mockRestore();
+  });
+
+  it("Mark all as read dispatches NOTIFICATIONS_CHANGED_EVENT with action='mark-all'", async () => {
+    // Removing this dispatch would skip the sidebar badge refresh and leave
+    // the Inbox badge counting rows the user just marked read.
+    const user = userEvent.setup();
+    const dispatchSpy = vi.spyOn(window, "dispatchEvent");
+
+    render(<NotificationPageList {...defaultProps} />);
+
+    await user.click(screen.getByRole("button", { name: /mark all as read/i }));
+
+    await waitFor(() => {
+      expect(mockMarkAllNotificationsRead).toHaveBeenCalled();
+    });
+
+    const dispatchedEvents = dispatchSpy.mock.calls.filter(
+      ([event]) =>
+        event instanceof CustomEvent &&
+        event.type === NOTIFICATIONS_CHANGED_EVENT,
+    );
+    expect(dispatchedEvents).toHaveLength(1);
+    const dispatched = dispatchedEvents[0]![0] as CustomEvent;
+    expect(dispatched.detail).toEqual({ episodeDbIds: [], action: "mark-all" });
+
+    dispatchSpy.mockRestore();
+  });
+
+  it("single-row markNotificationRead success dispatches an empty-payload NOTIFICATIONS_CHANGED_EVENT", async () => {
+    // The empty payload signals "counts changed, no row-level reconcile" —
+    // the sidebar refreshes aggregate counts; this page's own listener
+    // treats it as a no-op (the row was already flipped optimistically).
+    const user = userEvent.setup();
+    const dispatchSpy = vi.spyOn(window, "dispatchEvent");
+
+    render(<NotificationPageList {...defaultProps} />);
+
+    // Click the title link on the unread row (id=1). The handler runs
+    // markReadOptimistic, which calls markNotificationRead on success.
+    const titleLinks = screen.getAllByRole("link", { name: /test episode/i });
+    await user.click(titleLinks[0]!);
+
+    await waitFor(() => {
+      expect(mockMarkNotificationRead).toHaveBeenCalledWith(1);
+    });
+
+    const dispatchedEvents = dispatchSpy.mock.calls.filter(
+      ([event]) =>
+        event instanceof CustomEvent &&
+        event.type === NOTIFICATIONS_CHANGED_EVENT,
+    );
+    expect(dispatchedEvents).toHaveLength(1);
+    const dispatched = dispatchedEvents[0]![0] as CustomEvent;
+    expect(dispatched.detail).toEqual({ episodeDbIds: [] });
+
+    dispatchSpy.mockRestore();
+  });
 });

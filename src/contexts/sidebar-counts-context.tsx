@@ -59,12 +59,16 @@ export function SidebarCountsProvider({ children }: { children: ReactNode }) {
           setState((prev) => ({ ...prev, isLoading: false }));
           return;
         }
-        setState({
+        setState((prev) => ({
           subscriptionCount: stats.subscriptionCount,
           savedCount: stats.savedCount,
-          unreadNotificationCount: stats.unreadNotificationCount,
+          // `null` is the dashboard's partial-failure signal — preserve the
+          // previous badge value so a transient notifications-count error
+          // doesn't falsely clear a real Inbox badge.
+          unreadNotificationCount:
+            stats.unreadNotificationCount ?? prev.unreadNotificationCount,
           isLoading: false,
-        });
+        }));
       })
       .catch((error: unknown) => {
         if (serial !== refreshSerial.current) return;

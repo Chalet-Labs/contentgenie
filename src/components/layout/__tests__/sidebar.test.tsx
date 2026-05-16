@@ -288,6 +288,21 @@ describe("Sidebar — inSheet mode", () => {
     expect(libraryLink.className).toContain("text-accent-foreground");
   });
 
+  it("active link in the in-sheet sidebar is marked with aria-current=page (theme-refactor-safe)", () => {
+    // Mirrors the inline-sidebar aria-current test so the mobile/sidebar-sheet
+    // accessibility contract survives a Tailwind class refactor. Without this,
+    // dropping `bg-accent` (or renaming it) would silently regress screen-reader
+    // active-state on the in-sheet variant only.
+    mockUsePathname.mockReturnValue("/inbox");
+    renderSidebarInOpenSheet();
+    expect(
+      within(screen.getByTestId("sheet-content")).getByRole("link", {
+        name: /inbox/i,
+        current: "page",
+      }),
+    ).toBeInTheDocument();
+  });
+
   it("renders badges on Subscriptions/Library when counts are provided in inSheet mode", () => {
     mockUseSidebarCounts.mockReturnValue({
       subscriptionCount: 7,
