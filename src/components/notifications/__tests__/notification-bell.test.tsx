@@ -644,6 +644,59 @@ describe("NotificationBell", () => {
     consoleError.mockRestore();
   });
 
+  it("(T5b) dispatches NOTIFICATIONS_CHANGED_EVENT when popover closes before markAllNotificationsRead resolves", async () => {
+    // The race guard on `markAllIdRef.current` exists to gate the local UI
+    // revert in the failure branch, not the success dispatch. The server
+    // really did mark rows read; the sidebar/inbox listeners must still
+    // hear about it even if the user closed the popover before the mutation
+    // resolved — otherwise their badges/visible rows go stale.
+    mockGetUnreadCount.mockResolvedValue(3);
+    mockGetNotificationSummary.mockResolvedValue(defaultSummary);
+
+    let resolveMarkAll: (value: { success: true }) => void = () => {};
+    const slowMarkAll = new Promise<{ success: true }>((resolve) => {
+      resolveMarkAll = resolve;
+    });
+    mockMarkAllNotificationsRead.mockReturnValueOnce(slowMarkAll);
+
+    const dispatchSpy = vi.spyOn(window, "dispatchEvent");
+
+    render(<NotificationBell />);
+    await flushMicrotasks();
+    const btn = screen.getByRole("button", { name: /notifications/i });
+
+    // Open → close before the mark-all mutation resolves.
+    await act(async () => {
+      fireEvent.click(btn);
+    });
+    await flushMicrotasks();
+    await act(async () => {
+      fireEvent.keyDown(document.activeElement ?? document.body, {
+        key: "Escape",
+      });
+    });
+
+    // Now resolve the slow mark-all. Despite the close, the dispatch must fire.
+    await act(async () => {
+      resolveMarkAll({ success: true });
+    });
+    await flushMicrotasks();
+
+    const notificationsChangedCalls = dispatchSpy.mock.calls.filter(
+      ([event]) =>
+        event instanceof CustomEvent &&
+        event.type === NOTIFICATIONS_CHANGED_EVENT,
+    );
+    expect(notificationsChangedCalls).toHaveLength(1);
+    const dispatched = notificationsChangedCalls[0]![0] as CustomEvent;
+    expect(dispatched.detail).toEqual({
+      episodeDbIds: [],
+      action: "mark-all",
+    });
+
+    dispatchSpy.mockRestore();
+  });
+
   it("(T5b) dispatches NOTIFICATIONS_CHANGED_EVENT even when bell and summary both report zero unread", async () => {
     // The cost of one extra getDashboardStats call per bell-open is worth the
     // recovery property: a stale-positive sidebar badge (e.g. after a prior

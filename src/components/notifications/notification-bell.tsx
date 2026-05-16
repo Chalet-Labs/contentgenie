@@ -110,20 +110,26 @@ export function NotificationBell() {
     };
     try {
       const result = await markAllNotificationsRead();
-      if (markId !== markAllIdRef.current) return;
       if (!result.success) {
+        // Failure path: gate the local UI revert on the race-guard so a
+        // close-then-fail sequence can't clobber a state another cycle
+        // already overwrote. No dispatch — nothing changed on the server.
+        if (markId !== markAllIdRef.current) return;
         console.error("markAllNotificationsRead failed:", result.error);
         revertIfStillZero();
       } else {
-        // Always dispatch on mark-all success. Skipping on a "both zero"
-        // happy path saves a single `getDashboardStats` call but leaves no
-        // recovery path for a stale-positive sidebar badge (e.g. after a
-        // prior counts-fetch failure or a mark-all triggered in another
-        // tab). The cost is one cheap server roundtrip per bell-open; the
-        // benefit is the sidebar always converges on the server's truth.
-        // The `mark-all` action tells the inbox page (if open) to flip its
-        // visible rows to read so the UI matches the server state without
-        // requiring a reload.
+        // Success path: the server marked rows read, so the sidebar/inbox
+        // listeners MUST be told — even if the user closed the popover
+        // before the mutation resolved (the close-bump on `markAllIdRef`
+        // exists to gate the failure-revert, not the success-dispatch).
+        // Skipping on a "both zero" happy path saves a single
+        // `getDashboardStats` call but leaves no recovery path for a
+        // stale-positive sidebar badge (e.g. after a prior counts-fetch
+        // failure or a mark-all triggered in another tab). The cost is one
+        // cheap server roundtrip per bell-open; the benefit is the sidebar
+        // always converges on the server's truth. The `mark-all` action
+        // tells the inbox page (if open) to flip its visible rows to read
+        // so the UI matches the server state without requiring a reload.
         dispatchNotificationsChanged([], "mark-all");
       }
     } catch (error) {
