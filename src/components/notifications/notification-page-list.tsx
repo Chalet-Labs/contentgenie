@@ -204,10 +204,11 @@ export function NotificationPageList({
         return;
       }
       if (result.success) {
-        // Capture the dismissed episodeDbId before filtering it out of items
-        // so other inbox instances (e.g. a second tab) can remove the same
-        // row from their visible list. Reading from itemsRef avoids putting
-        // `items` in the callback dependencies.
+        // Capture the dismissed episodeDbId before filtering it out of
+        // items so the dispatch payload below carries it for same-document
+        // listeners. Cross-tab reconciliation is intentionally out of scope
+        // (see the comment on the dispatch call below). Reading from
+        // itemsRef avoids putting `items` in the callback dependencies.
         const dismissed = itemsRef.current.find((n) => n.id === id);
         setItems((prev) => prev.filter((n) => n.id !== id));
         // Keep the sidebar inbox badge in sync — without this dispatch the

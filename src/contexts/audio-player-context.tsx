@@ -709,9 +709,10 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
         if (result.success) {
           lastAckedQueueRef.current = snapshot;
           // Only dispatch when the server actually dismissed something.
-          // Empty array means "queue saved, nothing to reconcile" — firing
-          // the event would force every notifications-page subscriber to
-          // treat it as the optimistic-empty-payload sentinel and re-fetch.
+          // Per the events.ts contract, an empty `episodeDbIds` (no
+          // action) still triggers a sidebar `getDashboardStats` refresh;
+          // skipping that aggregate refresh here is intentional because a
+          // queue-save with zero dismissals is a no-op for badge counts.
           const dismissedIds = result.data?.dismissedEpisodeDbIds ?? [];
           if (dismissedIds.length > 0) {
             dispatchNotificationsChanged(dismissedIds);
