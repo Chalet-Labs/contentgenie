@@ -41,17 +41,8 @@ export async function getNotificationSummary(): Promise<NotificationSummary> {
   }
 
   try {
-    const [totalRow, lastSeenRow, groupRows] = await Promise.all([
-      db
-        .select({ value: count() })
-        .from(notifications)
-        .where(
-          and(
-            eq(notifications.userId, userId),
-            eq(notifications.isRead, false),
-            eq(notifications.isDismissed, false),
-          ),
-        ),
+    const [totalUnread, lastSeenRow, groupRows] = await Promise.all([
+      countUnreadNotifications(userId),
       db
         .select({
           lastSeen: sql<Date | string | null>`MAX(${notifications.createdAt})`,
@@ -87,7 +78,6 @@ export async function getNotificationSummary(): Promise<NotificationSummary> {
         .orderBy(desc(count()), podcasts.title),
     ]);
 
-    const totalUnread = totalRow[0]?.value ?? 0;
     // Neon's HTTP driver returns raw Postgres strings for `sql<...>` aggregates
     // (no column-level mapFromDriverValue runs). Rehydrate to a real Date so
     // downstream Drizzle comparisons and `.toISOString()` calls are safe.

@@ -185,6 +185,7 @@ function SidebarNav({
               <MaybeSheetClose key={link.href} inSheet={inSheet}>
                 <Link
                   href={link.href}
+                  aria-current={isActive ? "page" : undefined}
                   className={cn(
                     "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
                     isActive
@@ -202,6 +203,11 @@ function SidebarNav({
             <MaybeSheetClose inSheet={inSheet}>
               <Link
                 href="/admin"
+                aria-current={
+                  pathname === "/admin" || pathname?.startsWith("/admin/")
+                    ? "page"
+                    : undefined
+                }
                 className={cn(
                   "flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
                   pathname === "/admin" || pathname?.startsWith("/admin/")

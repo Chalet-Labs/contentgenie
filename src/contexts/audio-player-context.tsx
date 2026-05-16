@@ -51,10 +51,7 @@ import {
   savePlayerSession as savePlayerSessionAction,
   clearPlayerSession as clearPlayerSessionAction,
 } from "@/app/actions/player-session";
-import {
-  NOTIFICATIONS_CHANGED_EVENT,
-  type NotificationsChangedEventDetail,
-} from "@/lib/events";
+import { dispatchNotificationsChanged } from "@/lib/events";
 
 // ---------------------------------------------------------------------------
 // Server-sync helpers (fire-and-forget; best-effort with warn-on-failure)
@@ -717,12 +714,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
           // treat it as the optimistic-empty-payload sentinel and re-fetch.
           const dismissedIds = result.data?.dismissedEpisodeDbIds ?? [];
           if (dismissedIds.length > 0) {
-            window.dispatchEvent(
-              new CustomEvent<NotificationsChangedEventDetail>(
-                NOTIFICATIONS_CHANGED_EVENT,
-                { detail: { episodeDbIds: dismissedIds } },
-              ),
-            );
+            dispatchNotificationsChanged(dismissedIds);
           }
         } else {
           toast.error("Couldn't sync queue", {
@@ -1373,12 +1365,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
               ? (result.data?.dismissedEpisodeDbIds ?? [])
               : [];
             if (dismissedIds.length > 0) {
-              window.dispatchEvent(
-                new CustomEvent<NotificationsChangedEventDetail>(
-                  NOTIFICATIONS_CHANGED_EVENT,
-                  { detail: { episodeDbIds: dismissedIds } },
-                ),
-              );
+              dispatchNotificationsChanged(dismissedIds);
             }
           })
           .catch(() => {

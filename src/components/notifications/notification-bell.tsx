@@ -113,11 +113,10 @@ export function NotificationBell() {
       if (!result.success) {
         console.error("markAllNotificationsRead failed:", result.error);
         revertIfStillZero();
-      } else if (prev !== null && prev > 0) {
-        // Skip the dispatch when nothing actually changed (popover opened on
-        // an already-zero badge): the sidebar listener would re-run all three
-        // getDashboardStats counts for no benefit. Dispatch only when our
-        // mark-all-read flipped real rows from unread to read.
+      } else if (prev === null || prev > 0) {
+        // Skip dispatch only when prev is a confirmed zero (nothing to mark).
+        // When prev is null (initial fetch pending) or positive, dispatch so
+        // the sidebar badge refreshes even if the bell's cached count is stale.
         dispatchNotificationsChanged([]);
       }
     } catch (error) {

@@ -222,6 +222,8 @@ export function NotificationPageList({
             prev.map((n) => (n.id === item.id ? { ...n, isRead: false } : n)),
           );
           toast.error(result.error ?? "Couldn't mark as read");
+        } else {
+          dispatchNotificationsChanged([]);
         }
       })
       .catch(() => {

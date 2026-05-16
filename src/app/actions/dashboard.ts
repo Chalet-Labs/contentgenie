@@ -635,7 +635,7 @@ export async function getDashboardStats() {
       await Promise.all([
         db.$count(userSubscriptions, eq(userSubscriptions.userId, userId)),
         db.$count(userLibrary, eq(userLibrary.userId, userId)),
-        countUnreadNotifications(userId),
+        countUnreadNotifications(userId).catch(() => 0),
       ]);
 
     return {
