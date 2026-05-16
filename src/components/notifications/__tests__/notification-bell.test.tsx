@@ -607,7 +607,7 @@ describe("NotificationBell", () => {
     );
     expect(notificationsChangedCalls).toHaveLength(1);
     const dispatched = notificationsChangedCalls[0][0] as CustomEvent;
-    expect(dispatched.detail).toEqual({ episodeDbIds: [] });
+    expect(dispatched.detail).toEqual({ episodeDbIds: [], action: "mark-all" });
 
     dispatchSpy.mockRestore();
   });

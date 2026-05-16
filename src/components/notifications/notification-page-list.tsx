@@ -142,9 +142,19 @@ export function NotificationPageList({
   useEffect(() => {
     const handler = (e: Event) => {
       const detail = (e as CustomEvent<NotificationsChangedEventDetail>).detail;
+      // `mark-all` action signals a sibling surface (typically the bell)
+      // marked every notification read. Flip all locally-visible rows so the
+      // inbox UI matches server state without waiting for a route change.
+      if (detail?.action === "mark-all") {
+        setItems((prev) =>
+          prev.map((n) => (n.isRead ? n : { ...n, isRead: true })),
+        );
+        return;
+      }
       const ids = new Set(detail?.episodeDbIds ?? []);
-      // All production dispatch sites only fire on confirmed dismisses with
-      // populated ids — an empty payload is a no-op event we don't act on.
+      // Remaining empty-payload dispatches (single-item read on this page,
+      // sidebar-only count refresh) are intentional no-ops here — local row
+      // state was already updated optimistically by the originating handler.
       if (ids.size === 0) return;
       let removed = 0;
       setItems((prev) => {
@@ -194,10 +204,20 @@ export function NotificationPageList({
         return;
       }
       if (result.success) {
+        // Capture the dismissed episodeDbId before filtering it out of items
+        // so other inbox instances (e.g. a second tab) can remove the same
+        // row from their visible list. Reading from itemsRef avoids putting
+        // `items` in the callback dependencies.
+        const dismissed = itemsRef.current.find((n) => n.id === id);
         setItems((prev) => prev.filter((n) => n.id !== id));
         // Keep the sidebar inbox badge in sync — without this dispatch the
         // badge would stay stale until route change or the next bell open.
-        dispatchNotificationsChanged([]);
+        // Carries the episodeDbId so cross-tab inbox instances drop the
+        // same row; safe because the product emits at most one notification
+        // per episode (summary_completed only).
+        dispatchNotificationsChanged(
+          dismissed?.episodeDbId ? [dismissed.episodeDbId] : [],
+        );
       } else {
         console.error("[notifications] dismiss failed", {
           id,
@@ -252,7 +272,8 @@ export function NotificationPageList({
         setItems((prev) => prev.map((n) => ({ ...n, isRead: true })));
         // Sync the sidebar inbox badge with the bell's behavior — both
         // mark-all paths must dispatch so the badge clears in real time.
-        dispatchNotificationsChanged([]);
+        // The `mark-all` action also keeps other inbox instances in sync.
+        dispatchNotificationsChanged([], "mark-all");
       } else {
         toastErrorWithRetry(
           result.error ?? "Failed to mark all as read",

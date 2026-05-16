@@ -109,8 +109,8 @@ function makeItem(overrides: MakeItemOverrides = {}): NotificationItem {
 
 const defaultProps = {
   initialItems: [
-    makeItem({ id: 1, isRead: false }),
-    makeItem({ id: 2, isRead: true }),
+    makeItem({ id: 1, episodeDbId: 10, isRead: false }),
+    makeItem({ id: 2, episodeDbId: 11, isRead: true }),
   ],
   initialHasMore: false,
   initialTopicsByEpisode: { 10: ["AI", "Tech", "Future"] },
@@ -431,7 +431,7 @@ describe("NotificationPageList", () => {
     // A full first page (50 items) mirrors the real server-component hydration
     // and sets offsetRef to 50, matching the expected next-offset assertion.
     const fullPage = Array.from({ length: 50 }, (_, i) =>
-      makeItem({ id: i + 1 }),
+      makeItem({ id: i + 1, episodeDbId: 100 + i }),
     );
     render(
       <NotificationPageList
@@ -456,7 +456,7 @@ describe("NotificationPageList", () => {
     mockGetEpisodeTopics.mockResolvedValue({});
     const user = userEvent.setup();
     const fullPage = Array.from({ length: 50 }, (_, i) =>
-      makeItem({ id: i + 1 }),
+      makeItem({ id: i + 1, episodeDbId: 100 + i }),
     );
     const since = new Date("2026-04-20T00:00:00.000Z");
     render(
@@ -486,7 +486,7 @@ describe("NotificationPageList", () => {
     });
     const user = userEvent.setup();
     const fullPage = Array.from({ length: 50 }, (_, i) =>
-      makeItem({ id: i + 1 }),
+      makeItem({ id: i + 1, episodeDbId: 100 + i }),
     );
     render(
       <NotificationPageList
@@ -1042,6 +1042,46 @@ describe("NotificationPageList", () => {
 
     expect(mockGetNotifications).not.toHaveBeenCalled();
     expect(screen.getAllByRole("article")).toHaveLength(2);
+    expect(mockRefresh).not.toHaveBeenCalled();
+  });
+
+  // The bell's mark-all path dispatches with `action: "mark-all"` to tell the
+  // inbox page (when open) to flip every visible row to read without forcing
+  // a route refresh.
+  it("NOTIFICATIONS_CHANGED_EVENT with action='mark-all' flips visible unread rows to read", async () => {
+    const item1 = makeItem({ id: 1, episodeDbId: 10, isRead: false });
+    const item2 = makeItem({ id: 2, episodeDbId: 20, isRead: true });
+    const item3 = makeItem({ id: 3, episodeDbId: 30, isRead: false });
+
+    render(
+      <NotificationPageList
+        initialItems={[item1, item2, item3]}
+        initialHasMore={false}
+        initialTopicsByEpisode={{}}
+      />,
+    );
+    const articles = screen.getAllByRole("article");
+    expect(articles).toHaveLength(3);
+    expect(articles[0]).toHaveAttribute("data-read", "false");
+    expect(articles[1]).toHaveAttribute("data-read", "true");
+    expect(articles[2]).toHaveAttribute("data-read", "false");
+
+    await act(async () => {
+      window.dispatchEvent(
+        new CustomEvent(NOTIFICATIONS_CHANGED_EVENT, {
+          detail: { episodeDbIds: [], action: "mark-all" },
+        }),
+      );
+    });
+
+    const updated = screen.getAllByRole("article");
+    expect(updated).toHaveLength(3);
+    expect(updated[0]).toHaveAttribute("data-read", "true");
+    expect(updated[1]).toHaveAttribute("data-read", "true");
+    expect(updated[2]).toHaveAttribute("data-read", "true");
+    // mark-all is a state mutation, not a server reconcile — no Load more
+    // re-fetch and no router.refresh().
+    expect(mockGetNotifications).not.toHaveBeenCalled();
     expect(mockRefresh).not.toHaveBeenCalled();
   });
 });

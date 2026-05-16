@@ -117,7 +117,10 @@ export function NotificationBell() {
         // Skip dispatch only when prev is a confirmed zero (nothing to mark).
         // When prev is null (initial fetch pending) or positive, dispatch so
         // the sidebar badge refreshes even if the bell's cached count is stale.
-        dispatchNotificationsChanged([]);
+        // The `mark-all` action tells the inbox page (if open) to flip its
+        // visible rows to read so the UI matches the server state without
+        // requiring a reload.
+        dispatchNotificationsChanged([], "mark-all");
       }
     } catch (error) {
       if (markId !== markAllIdRef.current) return;
