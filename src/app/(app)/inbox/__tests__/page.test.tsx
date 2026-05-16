@@ -32,9 +32,9 @@ vi.mock("@/components/notifications/notification-page-list", () => ({
   },
 }));
 
-import NotificationsPage from "@/app/(app)/notifications/page";
+import InboxPage from "@/app/(app)/inbox/page";
 
-describe("NotificationsPage", () => {
+describe("InboxPage", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockAuth.mockResolvedValue({ userId: "user-1" });
@@ -62,9 +62,7 @@ describe("NotificationsPage", () => {
     });
     mockGetEpisodeTopics.mockResolvedValue({ 10: ["AI", "Tech"] });
 
-    render(
-      (await NotificationsPage({ searchParams: {} })) as React.ReactElement,
-    );
+    render((await InboxPage({ searchParams: {} })) as React.ReactElement);
 
     expect(screen.getByTestId("notification-page-list")).toHaveTextContent(
       "items:2:hasMore:true:topics:1",
@@ -79,9 +77,7 @@ describe("NotificationsPage", () => {
       error: null,
     });
 
-    render(
-      (await NotificationsPage({ searchParams: {} })) as React.ReactElement,
-    );
+    render((await InboxPage({ searchParams: {} })) as React.ReactElement);
 
     expect(mockGetEpisodeTopics).not.toHaveBeenCalled();
     expect(screen.getByTestId("notification-page-list")).toHaveTextContent(
@@ -96,9 +92,7 @@ describe("NotificationsPage", () => {
       error: "Failed to load notifications",
     });
 
-    render(
-      (await NotificationsPage({ searchParams: {} })) as React.ReactElement,
-    );
+    render((await InboxPage({ searchParams: {} })) as React.ReactElement);
 
     expect(screen.getByRole("alert")).toBeInTheDocument();
     expect(
@@ -118,9 +112,7 @@ describe("NotificationsPage", () => {
       error: null,
     });
 
-    render(
-      (await NotificationsPage({ searchParams: {} })) as React.ReactElement,
-    );
+    render((await InboxPage({ searchParams: {} })) as React.ReactElement);
 
     expect(screen.getByTestId("notification-page-list")).toHaveTextContent(
       "items:0:hasMore:false:topics:0",
@@ -130,25 +122,25 @@ describe("NotificationsPage", () => {
 
   it("(a) no search params: getNotifications called with (50, 0, undefined)", async () => {
     mockSuccess();
-    await NotificationsPage({ searchParams: {} });
+    await InboxPage({ searchParams: {} });
     expect(mockGetNotifications).toHaveBeenCalledWith(50, 0, undefined);
   });
 
   it("(b) ?podcast=42: getNotifications called with podcastId filter", async () => {
     mockSuccess();
-    await NotificationsPage({ searchParams: { podcast: "42" } });
+    await InboxPage({ searchParams: { podcast: "42" } });
     expect(mockGetNotifications).toHaveBeenCalledWith(50, 0, { podcastId: 42 });
   });
 
   it("(c) ?podcast=abc (invalid): getNotifications called without filter", async () => {
     mockSuccess();
-    await NotificationsPage({ searchParams: { podcast: "abc" } });
+    await InboxPage({ searchParams: { podcast: "abc" } });
     expect(mockGetNotifications).toHaveBeenCalledWith(50, 0, undefined);
   });
 
   it("(d) ?since=2026-04-20T00:00:00Z: getNotifications called with since filter", async () => {
     mockSuccess();
-    await NotificationsPage({
+    await InboxPage({
       searchParams: { since: "2026-04-20T00:00:00.000Z" },
     });
     expect(mockGetNotifications).toHaveBeenCalledWith(50, 0, {
@@ -158,13 +150,13 @@ describe("NotificationsPage", () => {
 
   it("(e) ?since=not-a-date: getNotifications called without filter", async () => {
     mockSuccess();
-    await NotificationsPage({ searchParams: { since: "not-a-date" } });
+    await InboxPage({ searchParams: { since: "not-a-date" } });
     expect(mockGetNotifications).toHaveBeenCalledWith(50, 0, undefined);
   });
 
   it("(f) combined ?podcast=42&since=2026-04-20: getNotifications called with both filters", async () => {
     mockSuccess();
-    await NotificationsPage({
+    await InboxPage({
       searchParams: {
         podcast: "42",
         since: "2026-04-20T00:00:00.000Z",
@@ -181,7 +173,7 @@ describe("NotificationsPage", () => {
   it("(g) ?podcast=42abc (trailing garbage) is rejected AND warns", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     mockSuccess();
-    await NotificationsPage({ searchParams: { podcast: "42abc" } });
+    await InboxPage({ searchParams: { podcast: "42abc" } });
     expect(mockGetNotifications).toHaveBeenCalledWith(50, 0, undefined);
     expect(warn).toHaveBeenCalledWith(
       expect.stringContaining("Invalid 'podcast' searchParam"),
@@ -192,7 +184,7 @@ describe("NotificationsPage", () => {
   it("(h) ?podcast=42.5 (non-integer) is rejected", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     mockSuccess();
-    await NotificationsPage({ searchParams: { podcast: "42.5" } });
+    await InboxPage({ searchParams: { podcast: "42.5" } });
     expect(mockGetNotifications).toHaveBeenCalledWith(50, 0, undefined);
     warn.mockRestore();
   });
@@ -200,7 +192,7 @@ describe("NotificationsPage", () => {
   it("(i) ?podcast=-5 (negative) is rejected", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     mockSuccess();
-    await NotificationsPage({ searchParams: { podcast: "-5" } });
+    await InboxPage({ searchParams: { podcast: "-5" } });
     expect(mockGetNotifications).toHaveBeenCalledWith(50, 0, undefined);
     warn.mockRestore();
   });
@@ -208,7 +200,7 @@ describe("NotificationsPage", () => {
   it("(j) ?podcast=0 is rejected", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     mockSuccess();
-    await NotificationsPage({ searchParams: { podcast: "0" } });
+    await InboxPage({ searchParams: { podcast: "0" } });
     expect(mockGetNotifications).toHaveBeenCalledWith(50, 0, undefined);
     warn.mockRestore();
   });
@@ -216,7 +208,7 @@ describe("NotificationsPage", () => {
   it("(k) invalid ?since warns", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     mockSuccess();
-    await NotificationsPage({ searchParams: { since: "not-a-date" } });
+    await InboxPage({ searchParams: { since: "not-a-date" } });
     expect(warn).toHaveBeenCalledWith(
       expect.stringContaining("Invalid 'since' searchParam"),
     );
@@ -229,7 +221,7 @@ describe("NotificationsPage", () => {
     mockSuccess();
     mockPageListProps.mockClear();
     render(
-      (await NotificationsPage({
+      (await InboxPage({
         searchParams: {
           podcast: "42",
           since: "2026-04-20T00:00:00.000Z",
@@ -250,7 +242,7 @@ describe("NotificationsPage", () => {
     mockSuccess();
     mockPageListProps.mockClear();
     render(
-      (await NotificationsPage({
+      (await InboxPage({
         searchParams: {},
       })) as React.ReactElement,
     );

@@ -7,6 +7,7 @@ import { OrganizationSwitcher } from "@clerk/nextjs";
 import { cn } from "@/lib/utils";
 import {
   LayoutDashboard,
+  Inbox,
   Search,
   Rss,
   Library,
@@ -26,6 +27,7 @@ import { MaybeSheetClose } from "@/components/layout/maybe-sheet-close";
 
 const sidebarLinks = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/inbox", label: "Inbox", icon: Inbox },
   { href: "/discover", label: "Discover", icon: Search },
   { href: "/subscriptions", label: "Subscriptions", icon: Rss },
   { href: "/library", label: "Library", icon: Library },

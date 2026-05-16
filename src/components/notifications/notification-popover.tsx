@@ -80,10 +80,7 @@ function PopoverBody({
         )}
       </div>
       <div className="flex items-center justify-between border-t px-3 py-2">
-        <Link
-          href="/notifications"
-          className="px-1 py-1 text-sm hover:underline"
-        >
+        <Link href="/inbox" className="px-1 py-1 text-sm hover:underline">
           See all
         </Link>
         {hasItems && (

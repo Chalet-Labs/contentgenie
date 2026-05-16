@@ -11,7 +11,7 @@ import { NOTIFICATIONS_PAGE_SIZE } from "@/lib/notifications-constants";
 import { POSTGRES_MAX_INT as MAX_SERIAL_ID } from "@/lib/postgres-limits";
 
 export const metadata: Metadata = {
-  title: "Notifications",
+  title: "Inbox",
 };
 
 // Strict enough that "2026", "04/20/2026", or "Thu Apr 20 2026" (all accepted by
@@ -26,7 +26,7 @@ const ISO_INSTANT_RE =
 function parsePositiveInt(raw: string, name: string): number | undefined {
   const n = /^\d+$/.test(raw) ? Number(raw) : NaN;
   if (Number.isSafeInteger(n) && n > 0 && n <= MAX_SERIAL_ID) return n;
-  console.warn(`Invalid '${name}' searchParam on /notifications: ${raw}`);
+  console.warn(`Invalid '${name}' searchParam on /inbox: ${raw}`);
   return undefined;
 }
 
@@ -35,11 +35,11 @@ function parseIsoDate(raw: string, name: string): Date | undefined {
     const d = new Date(raw);
     if (!isNaN(d.getTime())) return d;
   }
-  console.warn(`Invalid '${name}' searchParam on /notifications: ${raw}`);
+  console.warn(`Invalid '${name}' searchParam on /inbox: ${raw}`);
   return undefined;
 }
 
-export default async function NotificationsPage({
+export default async function InboxPage({
   searchParams,
 }: {
   searchParams?: { podcast?: string; since?: string };
@@ -69,7 +69,7 @@ export default async function NotificationsPage({
   if (result.error) {
     return (
       <div className="py-8">
-        <h1 className="mb-4 text-2xl font-semibold">Notifications</h1>
+        <h1 className="mb-4 text-2xl font-semibold">Inbox</h1>
         <div
           role="alert"
           className="flex flex-col items-center justify-center py-24 text-muted-foreground"

@@ -42,6 +42,7 @@ export const getLibraryEntryByEpisodeId = async (
 export const getDashboardStats = async () => ({
   subscriptionCount: 3,
   savedCount: 5,
+  unreadNotificationCount: 5,
   error: null,
 });
 export const getQueueEpisodeScores = async () => ({});

@@ -383,7 +383,7 @@ export function NotificationPageList({
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Notifications</h1>
+        <h1 className="text-2xl font-semibold">Inbox</h1>
         {items.length > 0 && (
           <Button variant="ghost" size="sm" onClick={handleMarkAllRead}>
             Mark all as read

@@ -142,7 +142,7 @@ describe("NotificationPopover", () => {
     );
     expect(screen.getByRole("link", { name: /see all/i })).toHaveAttribute(
       "href",
-      "/notifications",
+      "/inbox",
     );
   });
 
@@ -159,7 +159,7 @@ describe("NotificationPopover", () => {
     );
     expect(screen.getByRole("link", { name: /see all/i })).toHaveAttribute(
       "href",
-      "/notifications",
+      "/inbox",
     );
   });
 
@@ -176,7 +176,7 @@ describe("NotificationPopover", () => {
     );
     expect(screen.getByRole("link", { name: /see all/i })).toHaveAttribute(
       "href",
-      "/notifications",
+      "/inbox",
     );
   });
 
@@ -193,7 +193,7 @@ describe("NotificationPopover", () => {
     );
     expect(screen.getByRole("link", { name: /see all/i })).toHaveAttribute(
       "href",
-      "/notifications",
+      "/inbox",
     );
   });
 

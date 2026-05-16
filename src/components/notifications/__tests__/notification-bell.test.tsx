@@ -240,7 +240,9 @@ describe("NotificationBell", () => {
   });
 
   it("(g4) badge drops to 0 and stays there on successful mark-read", async () => {
-    mockGetUnreadCount.mockResolvedValue(5);
+    // Initial fetch returns 5; after mark-all-read the event triggers fetchUnreadCount
+    // which returns 0 (server reflects the mark-read).
+    mockGetUnreadCount.mockResolvedValueOnce(5).mockResolvedValue(0);
     mockGetNotificationSummary.mockResolvedValue(defaultSummary);
     mockMarkAllNotificationsRead.mockResolvedValue({ success: true });
 
@@ -285,7 +287,9 @@ describe("NotificationBell", () => {
     const consoleError = vi
       .spyOn(console, "error")
       .mockImplementation(() => {});
-    mockGetUnreadCount.mockResolvedValue(5);
+    // Initial fetch returns 5; after the successful second mark-all-read, the
+    // event triggers fetchUnreadCount which returns 0 (server reflects mark-read).
+    mockGetUnreadCount.mockResolvedValueOnce(5).mockResolvedValue(0);
     mockGetNotificationSummary.mockResolvedValue(defaultSummary);
 
     // First open: slow mark-read that we'll reject *after* a second open succeeds.
@@ -365,7 +369,9 @@ describe("NotificationBell", () => {
     const consoleError = vi
       .spyOn(console, "error")
       .mockImplementation(() => {});
-    mockGetUnreadCount.mockResolvedValue(3);
+    // Initial fetch returns 3; after retry's successful mark-all-read, the event
+    // triggers fetchUnreadCount which returns 0 (server reflects mark-read).
+    mockGetUnreadCount.mockResolvedValueOnce(3).mockResolvedValue(0);
     // First fetch fails, retry succeeds.
     mockGetNotificationSummary
       .mockRejectedValueOnce(new Error("transient"))
@@ -567,5 +573,64 @@ describe("NotificationBell", () => {
     expect(
       screen.queryByRole("link", { name: /from stale pod/i }),
     ).not.toBeInTheDocument();
+  });
+
+  it("(T5b) dispatches NOTIFICATIONS_CHANGED_EVENT on successful markAllNotificationsRead", async () => {
+    mockGetUnreadCount.mockResolvedValue(3);
+    mockGetNotificationSummary.mockResolvedValue(defaultSummary);
+    mockMarkAllNotificationsRead.mockResolvedValue({ success: true });
+
+    const dispatchSpy = vi.spyOn(window, "dispatchEvent");
+
+    render(<NotificationBell />);
+    await flushMicrotasks();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /notifications/i }));
+    });
+    await flushMicrotasks();
+
+    const notificationsChangedCalls = dispatchSpy.mock.calls.filter(
+      ([event]) =>
+        event instanceof CustomEvent &&
+        event.type === NOTIFICATIONS_CHANGED_EVENT,
+    );
+    expect(notificationsChangedCalls).toHaveLength(1);
+    const dispatched = notificationsChangedCalls[0][0] as CustomEvent;
+    expect(dispatched.detail).toEqual({ episodeDbIds: [] });
+
+    dispatchSpy.mockRestore();
+  });
+
+  it("(T5b) does NOT dispatch NOTIFICATIONS_CHANGED_EVENT when markAllNotificationsRead returns success: false", async () => {
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
+    mockGetUnreadCount.mockResolvedValue(3);
+    mockGetNotificationSummary.mockResolvedValue(defaultSummary);
+    mockMarkAllNotificationsRead.mockResolvedValue({
+      success: false,
+      error: "DB error",
+    });
+
+    const dispatchSpy = vi.spyOn(window, "dispatchEvent");
+
+    render(<NotificationBell />);
+    await flushMicrotasks();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /notifications/i }));
+    });
+    await flushMicrotasks();
+
+    const notificationsChangedCalls = dispatchSpy.mock.calls.filter(
+      ([event]) =>
+        event instanceof CustomEvent &&
+        event.type === NOTIFICATIONS_CHANGED_EVENT,
+    );
+    expect(notificationsChangedCalls).toHaveLength(0);
+
+    dispatchSpy.mockRestore();
+    consoleError.mockRestore();
   });
 });

@@ -27,6 +27,7 @@ import {
   episodeTopics,
   canonicalTopics,
   episodeCanonicalTopics,
+  notifications,
   type TrendingTopic,
 } from "@/db/schema";
 import { type RecommendedEpisodeDTO } from "@/db/library-columns";
@@ -624,19 +625,30 @@ export async function getDashboardStats() {
     return {
       subscriptionCount: 0,
       savedCount: 0,
+      unreadNotificationCount: 0,
       error: "You must be signed in",
     };
   }
 
   try {
-    const [subscriptionCount, savedCount] = await Promise.all([
-      db.$count(userSubscriptions, eq(userSubscriptions.userId, userId)),
-      db.$count(userLibrary, eq(userLibrary.userId, userId)),
-    ]);
+    const [subscriptionCount, savedCount, unreadNotificationCount] =
+      await Promise.all([
+        db.$count(userSubscriptions, eq(userSubscriptions.userId, userId)),
+        db.$count(userLibrary, eq(userLibrary.userId, userId)),
+        db.$count(
+          notifications,
+          and(
+            eq(notifications.userId, userId),
+            eq(notifications.isRead, false),
+            eq(notifications.isDismissed, false),
+          ),
+        ),
+      ]);
 
     return {
       subscriptionCount,
       savedCount,
+      unreadNotificationCount,
       error: null,
     };
   } catch (error) {
@@ -644,6 +656,7 @@ export async function getDashboardStats() {
     return {
       subscriptionCount: 0,
       savedCount: 0,
+      unreadNotificationCount: 0,
       error: "Failed to load stats",
     };
   }

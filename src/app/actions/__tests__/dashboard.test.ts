@@ -101,6 +101,11 @@ vi.mock("@/db", () => ({
 vi.mock("@/db/schema", () => ({
   userSubscriptions: { userId: "user_id", podcastId: "podcast_id" },
   userLibrary: { userId: "user_id", episodeId: "episode_id" },
+  notifications: {
+    userId: "user_id",
+    isRead: "is_read",
+    isDismissed: "is_dismissed",
+  },
   listenHistory: { userId: "user_id", episodeId: "episode_id" },
   episodes: {
     id: "id",
@@ -214,6 +219,7 @@ describe("getDashboardStats", () => {
 
     expect(result.subscriptionCount).toBe(0);
     expect(result.savedCount).toBe(0);
+    expect(result.unreadNotificationCount).toBe(0);
     expect(result.error).toMatch(/signed in/i);
   });
 
@@ -223,23 +229,27 @@ describe("getDashboardStats", () => {
     const { db } = await import("@/db");
     (db.$count as any)
       .mockResolvedValueOnce(5) // for subscriptions
-      .mockResolvedValueOnce(3); // for library
+      .mockResolvedValueOnce(3) // for library
+      .mockResolvedValueOnce(7); // for unread notifications
 
     const { getDashboardStats } = await import("@/app/actions/dashboard");
     const { eq } = await import("drizzle-orm");
-    const { userSubscriptions, userLibrary } = await import("@/db/schema");
+    const { userSubscriptions, userLibrary, notifications } =
+      await import("@/db/schema");
     const result = await getDashboardStats();
 
     expect(result.subscriptionCount).toBe(5);
     expect(result.savedCount).toBe(3);
+    expect(result.unreadNotificationCount).toBe(7);
     expect(result.error).toBeNull();
 
-    expect(db.$count).toHaveBeenCalledTimes(2);
+    expect(db.$count).toHaveBeenCalledTimes(3);
     expect(db.$count).toHaveBeenCalledWith(
       userSubscriptions,
       expect.anything(),
     );
     expect(db.$count).toHaveBeenCalledWith(userLibrary, expect.anything());
+    expect(db.$count).toHaveBeenCalledWith(notifications, expect.anything());
     expect(eq).toHaveBeenCalledWith("user_id", "user_123");
   });
 
@@ -254,6 +264,7 @@ describe("getDashboardStats", () => {
 
     expect(result.subscriptionCount).toBe(0);
     expect(result.savedCount).toBe(0);
+    expect(result.unreadNotificationCount).toBe(0);
     expect(result.error).toBeNull();
   });
 
@@ -268,6 +279,7 @@ describe("getDashboardStats", () => {
 
     expect(result.subscriptionCount).toBe(0);
     expect(result.savedCount).toBe(0);
+    expect(result.unreadNotificationCount).toBe(0);
     expect(result.error).toMatch(/failed to load/i);
   });
 });

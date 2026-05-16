@@ -110,6 +110,12 @@ export function NotificationBell() {
       if (!result.success) {
         console.error("markAllNotificationsRead failed:", result.error);
         revertIfStillZero();
+      } else {
+        window.dispatchEvent(
+          new CustomEvent(NOTIFICATIONS_CHANGED_EVENT, {
+            detail: { episodeDbIds: [] },
+          }),
+        );
       }
     } catch (error) {
       if (markId !== markAllIdRef.current) return;
