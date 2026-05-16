@@ -18,16 +18,6 @@ interface BatchProgress {
   completed: number;
 }
 
-const TERMINAL_STATUSES = [
-  "COMPLETED",
-  "FAILED",
-  "CANCELED",
-  "TIMED_OUT",
-  "SYSTEM_FAILURE",
-  "CRASHED",
-  "EXPIRED",
-] as const;
-
 interface BatchSummarizeButtonProps {
   episodeIds: (number | string)[];
 }
@@ -59,12 +49,8 @@ export function BatchSummarizeButton({
     }
 
     // Check for terminal states
-    if (
-      TERMINAL_STATUSES.includes(
-        run.status as (typeof TERMINAL_STATUSES)[number],
-      )
-    ) {
-      if (run.status === "COMPLETED") {
+    if (run.isCompleted || run.isCancelled) {
+      if (run.isSuccess) {
         setState("done");
         toast.success("Batch summarization complete");
       } else {

@@ -34,15 +34,6 @@ type PanelState =
   | { kind: "ineligible" }
   | { kind: "error"; message: string };
 
-const TERMINAL_FAILURE_STATUSES = new Set([
-  "FAILED",
-  "CANCELED",
-  "TIMED_OUT",
-  "SYSTEM_FAILURE",
-  "CRASHED",
-  "EXPIRED",
-]);
-
 const REFRESH_ERROR_COPY: Record<string, string> = {
   "token-failed": "Couldn't authenticate the synthesis run. Please try again.",
   "trigger-failed": "Couldn't start synthesis. Please try again in a moment.",
@@ -128,11 +119,11 @@ export function TopicDigestPanel({
       return;
     }
     if (!run) return;
-    if (run.status === "COMPLETED") {
+    if (run.isSuccess) {
       router.refresh();
       setState({ kind: "idle" });
       toast.success("Topic synthesis updated");
-    } else if (TERMINAL_FAILURE_STATUSES.has(run.status)) {
+    } else if (run.isFailed || run.isCancelled) {
       setState({
         kind: "error",
         message: `Synthesis failed (${run.status.toLowerCase().replace(/_/g, " ")}). Please retry.`,

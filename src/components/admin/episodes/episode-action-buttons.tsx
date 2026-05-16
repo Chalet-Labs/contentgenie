@@ -24,16 +24,6 @@ interface EpisodeActionButtonsProps {
   };
 }
 
-const TERMINAL_STATUSES = [
-  "COMPLETED",
-  "FAILED",
-  "CANCELED",
-  "TIMED_OUT",
-  "SYSTEM_FAILURE",
-  "CRASHED",
-  "EXPIRED",
-] as const;
-
 /** Staleness timeout: if the realtime subscription doesn't resolve, give up */
 const TRANSCRIPT_STALE_MS = 20 * 60 * 1000; // 20 minutes
 const SUMMARY_STALE_MS = 10 * 60 * 1000; // 10 minutes
@@ -78,14 +68,9 @@ export function EpisodeActionButtons({ episode }: EpisodeActionButtonsProps) {
 
   useEffect(() => {
     if (!transcriptRun) return;
-    if (
-      !TERMINAL_STATUSES.includes(
-        transcriptRun.status as (typeof TERMINAL_STATUSES)[number],
-      )
-    )
-      return;
+    if (!transcriptRun.isCompleted && !transcriptRun.isCancelled) return;
 
-    if (transcriptRun.status === "COMPLETED") {
+    if (transcriptRun.isSuccess) {
       setLocalTranscriptStatus("available");
       setTranscriptMsg(null);
       setTranscriptRunId(null);
@@ -107,14 +92,9 @@ export function EpisodeActionButtons({ episode }: EpisodeActionButtonsProps) {
 
   useEffect(() => {
     if (!summaryRun) return;
-    if (
-      !TERMINAL_STATUSES.includes(
-        summaryRun.status as (typeof TERMINAL_STATUSES)[number],
-      )
-    )
-      return;
+    if (!summaryRun.isCompleted && !summaryRun.isCancelled) return;
 
-    if (summaryRun.status === "COMPLETED") {
+    if (summaryRun.isSuccess) {
       setLocalSummaryStatus("completed");
       setSummaryMsg(null);
     } else {

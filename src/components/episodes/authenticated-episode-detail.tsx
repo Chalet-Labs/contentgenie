@@ -130,7 +130,7 @@ export function AuthenticatedEpisodeDetail({
   useEffect(() => {
     if (!run) return;
 
-    if (run.status === "COMPLETED" && run.output) {
+    if (run.isSuccess && run.output) {
       const completedSummary = {
         summary: run.output.summary,
         keyTakeaways: run.output.keyTakeaways || [],
@@ -155,14 +155,7 @@ export function AuthenticatedEpisodeDetail({
       toast.success("Summary generated!", {
         description: "AI insights are now available for this episode",
       });
-    } else if (
-      run.status === "FAILED" ||
-      run.status === "CANCELED" ||
-      run.status === "TIMED_OUT" ||
-      run.status === "SYSTEM_FAILURE" ||
-      run.status === "CRASHED" ||
-      run.status === "EXPIRED"
-    ) {
+    } else if (run.isFailed || run.isCancelled) {
       setSummaryError("Summary generation failed. Please try again.");
       setIsLoadingSummary(false);
       setRunId(null);

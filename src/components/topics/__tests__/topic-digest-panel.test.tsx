@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { realtimeRunFixture } from "@/test/realtime-run";
 
 const mocks = vi.hoisted(() => ({
   useRealtimeRun: vi.fn(),
@@ -156,7 +157,9 @@ describe("TopicDigestPanel", () => {
   });
 
   it("calls router.refresh() when run.status transitions to COMPLETED", async () => {
-    mocks.useRealtimeRun.mockReturnValue({ run: { status: "COMPLETED" } });
+    mocks.useRealtimeRun.mockReturnValue({
+      run: realtimeRunFixture("COMPLETED"),
+    });
     render(
       <TopicDigestPanel
         canonicalTopicId={1}
@@ -170,7 +173,7 @@ describe("TopicDigestPanel", () => {
   });
 
   it("surfaces a non-blocking error when run.status is FAILED, with a Retry button", async () => {
-    mocks.useRealtimeRun.mockReturnValue({ run: { status: "FAILED" } });
+    mocks.useRealtimeRun.mockReturnValue({ run: realtimeRunFixture("FAILED") });
     render(
       <TopicDigestPanel
         canonicalTopicId={1}
@@ -189,7 +192,9 @@ describe("TopicDigestPanel", () => {
   });
 
   it("surfaces a non-blocking error when run.status is CANCELED", async () => {
-    mocks.useRealtimeRun.mockReturnValue({ run: { status: "CANCELED" } });
+    mocks.useRealtimeRun.mockReturnValue({
+      run: realtimeRunFixture("CANCELED"),
+    });
     render(
       <TopicDigestPanel
         canonicalTopicId={1}

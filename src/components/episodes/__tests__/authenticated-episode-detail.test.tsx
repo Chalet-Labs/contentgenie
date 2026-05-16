@@ -2,6 +2,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AuthenticatedEpisodeDetail } from "@/components/episodes/authenticated-episode-detail";
+import { realtimeRunFixture } from "@/test/realtime-run";
 
 const mocks = vi.hoisted(() => ({
   useAudioPlayerState: vi.fn(() => ({
@@ -14,13 +15,14 @@ const mocks = vi.hoisted(() => ({
     playEpisode: vi.fn(),
     seek: vi.fn(),
   })),
-  useRealtimeRun: vi.fn(() => ({ run: null })),
+  useRealtimeRun: vi.fn(),
   useOnlineStatus: vi.fn(() => true),
   isEpisodeSaved: vi.fn(),
   getEpisodeTopicOverlap: vi.fn(),
   getCanonicalTopicOverlap: vi.fn(),
   cacheEpisode: vi.fn(),
   getCachedEpisode: vi.fn(),
+  toast: { success: vi.fn(), error: vi.fn(), info: vi.fn() },
 }));
 
 vi.mock("@/contexts/audio-player-context", () => ({
@@ -32,6 +34,8 @@ vi.mock("@/contexts/audio-player-context", () => ({
 vi.mock("@trigger.dev/react-hooks", () => ({
   useRealtimeRun: mocks.useRealtimeRun,
 }));
+
+vi.mock("sonner", () => ({ toast: mocks.toast }));
 
 vi.mock("@/hooks/use-online-status", () => ({
   useOnlineStatus: mocks.useOnlineStatus,
@@ -79,19 +83,28 @@ vi.mock("@/components/episodes/summary-display", () => ({
     onGenerateSummary,
     overlapLabel,
     canonicalOverlap,
+    error,
+    isLoading,
   }: {
     onGenerateSummary?: () => void;
     overlapLabel?: string | null;
     canonicalOverlap?: { kind: string; topicLabel: string } | null;
+    error?: string | null;
+    isLoading?: boolean;
   }) => (
-    <div data-testid="summary-display">
+    <div
+      data-testid="summary-display"
+      data-loading={String(Boolean(isLoading))}
+    >
       can-generate:{String(Boolean(onGenerateSummary))}
+      <span data-testid="summary-loading">{String(Boolean(isLoading))}</span>
       {overlapLabel && <span data-testid="overlap-label">{overlapLabel}</span>}
       {canonicalOverlap && (
         <span data-testid="canonical-overlap-kind">
           {canonicalOverlap.kind}
         </span>
       )}
+      {error && <span data-testid="summary-error">{error}</span>}
     </div>
   ),
 }));
@@ -102,6 +115,7 @@ type EpisodeOverrides = {
   chaptersUrl?: string | null;
   description?: string;
   id?: string;
+  inProgressSummary?: { runId: string; publicAccessToken: string };
 };
 
 function makeEpisodeResponse(overrides: EpisodeOverrides = {}) {
@@ -176,6 +190,19 @@ function stubEpisodeFetch(overrides: EpisodeOverrides = {}) {
         });
       }
 
+      if (
+        parsed.pathname === "/api/episodes/summarize" &&
+        parsed.searchParams.get("episodeId") === id
+      ) {
+        return Promise.resolve({
+          ok: true,
+          json: async () =>
+            overrides.inProgressSummary
+              ? { status: "running", ...overrides.inProgressSummary }
+              : { status: "idle" },
+        });
+      }
+
       return Promise.reject(new Error(`Unexpected fetch call: ${rawUrl}`));
     }),
   );
@@ -184,6 +211,7 @@ function stubEpisodeFetch(overrides: EpisodeOverrides = {}) {
 describe("AuthenticatedEpisodeDetail", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mocks.useRealtimeRun.mockReturnValue({ run: null });
     mocks.isEpisodeSaved.mockResolvedValue(false);
     mocks.getEpisodeTopicOverlap.mockResolvedValue({
       success: true,
@@ -378,6 +406,115 @@ describe("AuthenticatedEpisodeDetail", () => {
       screen.getByRole("heading", { name: "About This Episode" }),
     ).toBeInTheDocument();
     expect(screen.getByText("Episode description")).toBeInTheDocument();
+  });
+
+  describe("realtime run terminal states", () => {
+    it("fires success toast and clears loading when run completes with output", async () => {
+      stubEpisodeFetch({
+        id: "123",
+        inProgressSummary: {
+          runId: "run_in_flight",
+          publicAccessToken: "tok_in_flight",
+        },
+      });
+      // Branch on `enabled` so the loading spinner is set true by the in-progress
+      // fetch BEFORE the realtime hook starts returning a terminal run — this
+      // exercises the true→false transition the success branch is responsible for.
+      mocks.useRealtimeRun.mockImplementation(
+        (_runId: string, opts: { accessToken?: string; enabled?: boolean }) => {
+          if (!opts.enabled) return { run: null };
+          return {
+            run: realtimeRunFixture("COMPLETED", {
+              output: {
+                summary: "Episode summary",
+                keyTakeaways: ["Key point"],
+                worthItScore: 4,
+                worthItReason: "Great episode",
+                worthItDimensions: null,
+              },
+            }),
+          };
+        },
+      );
+
+      render(
+        <AuthenticatedEpisodeDetail
+          episodeId="123"
+          userId="user-1"
+          isAdmin={false}
+        />,
+      );
+
+      // The in-progress fetch sets isLoadingSummary(true) before the run resolves.
+      await waitFor(() =>
+        expect(screen.getByTestId("summary-display")).toHaveAttribute(
+          "data-loading",
+          "true",
+        ),
+      );
+      await waitFor(() =>
+        expect(mocks.toast.success).toHaveBeenCalledWith(
+          "Summary generated!",
+          expect.any(Object),
+        ),
+      );
+      await waitFor(() =>
+        expect(screen.getByTestId("summary-display")).toHaveAttribute(
+          "data-loading",
+          "false",
+        ),
+      );
+    });
+
+    it("sets summary error and fires error toast when run fails", async () => {
+      mocks.useRealtimeRun.mockReturnValue({
+        run: realtimeRunFixture("FAILED"),
+      });
+
+      render(
+        <AuthenticatedEpisodeDetail
+          episodeId="rss-abc"
+          userId="user-1"
+          isAdmin={false}
+        />,
+      );
+
+      await waitFor(() =>
+        expect(mocks.toast.error).toHaveBeenCalledWith(
+          "Failed to generate summary",
+        ),
+      );
+      await waitFor(() =>
+        expect(screen.getByTestId("summary-error")).toHaveTextContent(
+          "Summary generation failed",
+        ),
+      );
+    });
+
+    it("sets summary error and fires error toast when run is cancelled", async () => {
+      mocks.useRealtimeRun.mockReturnValue({
+        run: realtimeRunFixture("CANCELED"),
+      });
+
+      render(
+        <AuthenticatedEpisodeDetail
+          episodeId="rss-abc"
+          userId="user-1"
+          isAdmin={false}
+        />,
+      );
+
+      await waitFor(() =>
+        expect(mocks.toast.error).toHaveBeenCalledWith(
+          "Failed to generate summary",
+        ),
+      );
+      await waitFor(() =>
+        expect(screen.getByTestId("summary-error")).toHaveTextContent(
+          "Summary generation failed",
+        ),
+      );
+    });
   });
 
   describe("canonical overlap fetch", () => {

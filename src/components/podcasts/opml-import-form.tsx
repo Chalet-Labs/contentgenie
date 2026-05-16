@@ -29,16 +29,6 @@ interface ImportProgress {
   completed: number;
 }
 
-const TERMINAL_STATUSES = [
-  "COMPLETED",
-  "FAILED",
-  "CANCELED",
-  "TIMED_OUT",
-  "SYSTEM_FAILURE",
-  "CRASHED",
-  "EXPIRED",
-] as const;
-
 const MAX_FILE_SIZE = 1 * 1024 * 1024; // 1MB
 const LARGE_IMPORT_THRESHOLD = 100;
 
@@ -69,12 +59,8 @@ export function OpmlImportForm() {
       setProgress(metadataProgress);
     }
 
-    if (
-      TERMINAL_STATUSES.includes(
-        run.status as (typeof TERMINAL_STATUSES)[number],
-      )
-    ) {
-      if (run.status === "COMPLETED") {
+    if (run.isCompleted || run.isCancelled) {
+      if (run.isSuccess) {
         setState("done");
         toast.success("OPML import complete");
       } else {
