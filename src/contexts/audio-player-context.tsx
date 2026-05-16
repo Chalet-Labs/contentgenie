@@ -1110,8 +1110,8 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
         // No optimistic NOTIFICATIONS_CHANGED_EVENT dispatch here — the
         // debounced setQueue path (above) fires the reconciling event with
         // server-resolved episode ids ~1.5s later. Optimistic dispatch with
-        // an empty payload forced /notifications into a topic-losing
-        // re-fetch (see ADR-041 history).
+        // an empty payload forced the inbox page (formerly /notifications,
+        // now /inbox) into a topic-losing re-fetch (see ADR-041 history).
       },
 
       removeFromQueue: (episodeId: string) => {

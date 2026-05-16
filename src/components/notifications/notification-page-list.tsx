@@ -30,6 +30,7 @@ import { ROUTES } from "@/lib/routes";
 import {
   LISTEN_STATE_CHANGED_EVENT,
   NOTIFICATIONS_CHANGED_EVENT,
+  dispatchNotificationsChanged,
   type NotificationsChangedEventDetail,
 } from "@/lib/events";
 import { NOTIFICATIONS_PAGE_SIZE } from "@/lib/notifications-constants";
@@ -194,6 +195,9 @@ export function NotificationPageList({
       }
       if (result.success) {
         setItems((prev) => prev.filter((n) => n.id !== id));
+        // Keep the sidebar inbox badge in sync — without this dispatch the
+        // badge would stay stale until route change or the next bell open.
+        dispatchNotificationsChanged([]);
       } else {
         console.error("[notifications] dismiss failed", {
           id,
@@ -244,6 +248,9 @@ export function NotificationPageList({
       const result = await markAllNotificationsRead();
       if (result.success) {
         setItems((prev) => prev.map((n) => ({ ...n, isRead: true })));
+        // Sync the sidebar inbox badge with the bell's behavior — both
+        // mark-all paths must dispatch so the badge clears in real time.
+        dispatchNotificationsChanged([]);
       } else {
         toastErrorWithRetry(
           result.error ?? "Failed to mark all as read",

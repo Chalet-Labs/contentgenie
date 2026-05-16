@@ -151,6 +151,15 @@ describe("NotificationPageList", () => {
     expect(screen.queryByText(/you're all caught up/i)).not.toBeInTheDocument();
   });
 
+  // Pin the visible H1 to "Inbox" — the rename PR flipped it from
+  // "Notifications" and the assertion guards against a silent revert.
+  it("renders the page heading as 'Inbox'", () => {
+    render(<NotificationPageList {...defaultProps} />);
+    expect(
+      screen.getByRole("heading", { level: 1, name: /^inbox$/i }),
+    ).toBeInTheDocument();
+  });
+
   // AC-4: Tabs filter — All shows everything
   it("All tab shows all items", () => {
     render(<NotificationPageList {...defaultProps} />);

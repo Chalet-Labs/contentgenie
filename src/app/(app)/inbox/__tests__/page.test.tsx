@@ -95,6 +95,14 @@ describe("InboxPage", () => {
     render((await InboxPage({ searchParams: {} })) as React.ReactElement);
 
     expect(screen.getByRole("alert")).toBeInTheDocument();
+    // Pin the error-state H1 to "Inbox" so a silent revert to "Notifications"
+    // fails the test rather than slipping through after the rename.
+    expect(
+      screen.getByRole("heading", { level: 1, name: /^inbox$/i }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { level: 1, name: /^notifications$/i }),
+    ).not.toBeInTheDocument();
     expect(
       screen.getByText(/couldn't load notifications/i),
     ).toBeInTheDocument();

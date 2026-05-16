@@ -12,7 +12,10 @@ import {
 import type { NotificationSummary } from "@/app/actions/notifications";
 import { NotificationPopover } from "@/components/notifications/notification-popover";
 import { formatRelativeTime } from "@/lib/utils";
-import { NOTIFICATIONS_CHANGED_EVENT } from "@/lib/events";
+import {
+  NOTIFICATIONS_CHANGED_EVENT,
+  dispatchNotificationsChanged,
+} from "@/lib/events";
 
 const POLL_INTERVAL_MS = 60_000;
 
@@ -110,12 +113,12 @@ export function NotificationBell() {
       if (!result.success) {
         console.error("markAllNotificationsRead failed:", result.error);
         revertIfStillZero();
-      } else {
-        window.dispatchEvent(
-          new CustomEvent(NOTIFICATIONS_CHANGED_EVENT, {
-            detail: { episodeDbIds: [] },
-          }),
-        );
+      } else if (prev !== null && prev > 0) {
+        // Skip the dispatch when nothing actually changed (popover opened on
+        // an already-zero badge): the sidebar listener would re-run all three
+        // getDashboardStats counts for no benefit. Dispatch only when our
+        // mark-all-read flipped real rows from unread to read.
+        dispatchNotificationsChanged([]);
       }
     } catch (error) {
       if (markId !== markAllIdRef.current) return;

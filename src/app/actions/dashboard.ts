@@ -17,6 +17,7 @@ import {
   sql,
 } from "drizzle-orm";
 import { db } from "@/db";
+import { countUnreadNotifications } from "@/lib/notifications-query";
 import {
   userSubscriptions,
   userLibrary,
@@ -27,7 +28,6 @@ import {
   episodeTopics,
   canonicalTopics,
   episodeCanonicalTopics,
-  notifications,
   type TrendingTopic,
 } from "@/db/schema";
 import { type RecommendedEpisodeDTO } from "@/db/library-columns";
@@ -635,14 +635,7 @@ export async function getDashboardStats() {
       await Promise.all([
         db.$count(userSubscriptions, eq(userSubscriptions.userId, userId)),
         db.$count(userLibrary, eq(userLibrary.userId, userId)),
-        db.$count(
-          notifications,
-          and(
-            eq(notifications.userId, userId),
-            eq(notifications.isRead, false),
-            eq(notifications.isDismissed, false),
-          ),
-        ),
+        countUnreadNotifications(userId),
       ]);
 
     return {

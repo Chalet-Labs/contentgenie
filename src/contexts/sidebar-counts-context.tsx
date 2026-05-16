@@ -88,8 +88,11 @@ export function SidebarCountsProvider({ children }: { children: ReactNode }) {
       window.removeEventListener("sync-queue-drained", handleDrained);
   }, [refreshCounts]);
 
-  // Refresh badge counts when notifications are marked read or dismissed so
-  // the inbox badge clears without requiring a route change.
+  // Foreground notification mutations (bell mark-all-read, in-page dismiss)
+  // don't flow through the offline sync queue, so the `sync-queue-drained`
+  // listener above can't clear the inbox badge. Subscribe separately to
+  // NOTIFICATIONS_CHANGED_EVENT to refresh counts immediately after those
+  // in-tab mutations.
   useEffect(() => {
     const handleNotificationsChanged = () => refreshCounts();
     window.addEventListener(

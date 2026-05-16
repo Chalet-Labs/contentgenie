@@ -129,7 +129,7 @@ describe("NotificationPopover", () => {
     ).toBeInTheDocument();
   });
 
-  it("(f) See all footer link renders with href=/notifications in populated state", () => {
+  it("(f) See all footer link renders with href=/inbox in populated state", () => {
     render(
       <NotificationPopover
         open={true}

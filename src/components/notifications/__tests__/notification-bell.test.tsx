@@ -259,10 +259,13 @@ describe("NotificationBell", () => {
     expect(screen.queryByText(/^\d+$/)).not.toBeInTheDocument();
   });
 
-  it("(g5) badge reverts when markAllNotificationsRead throws", async () => {
+  it("(g5) badge reverts when markAllNotificationsRead throws, and event is NOT dispatched", async () => {
     const consoleError = vi
       .spyOn(console, "error")
       .mockImplementation(() => {});
+    // Spy on dispatchEvent BEFORE render so any dispatch from the
+    // throw-path's catch branch is captured.
+    const dispatchSpy = vi.spyOn(window, "dispatchEvent");
     mockGetUnreadCount.mockResolvedValue(4);
     mockGetNotificationSummary.mockResolvedValue(defaultSummary);
     mockMarkAllNotificationsRead.mockRejectedValue(new Error("boom"));
@@ -280,6 +283,13 @@ describe("NotificationBell", () => {
       "Failed to mark all notifications as read:",
       expect.any(Error),
     );
+    const notificationsChangedDispatches = dispatchSpy.mock.calls.filter(
+      ([event]) =>
+        event instanceof CustomEvent &&
+        event.type === NOTIFICATIONS_CHANGED_EVENT,
+    );
+    expect(notificationsChangedDispatches).toHaveLength(0);
+    dispatchSpy.mockRestore();
     consoleError.mockRestore();
   });
 
@@ -632,5 +642,33 @@ describe("NotificationBell", () => {
 
     dispatchSpy.mockRestore();
     consoleError.mockRestore();
+  });
+
+  it("(T5b) does NOT dispatch NOTIFICATIONS_CHANGED_EVENT when bell opens on a zero-unread badge", async () => {
+    // Avoid the no-op cascade: opening the bell on an empty inbox still
+    // calls markAllNotificationsRead (returns success), but nothing changed,
+    // so the sidebar listener shouldn't re-run three getDashboardStats counts.
+    mockGetUnreadCount.mockResolvedValue(0);
+    mockGetNotificationSummary.mockResolvedValue(defaultSummary);
+    mockMarkAllNotificationsRead.mockResolvedValue({ success: true });
+
+    const dispatchSpy = vi.spyOn(window, "dispatchEvent");
+
+    render(<NotificationBell />);
+    await flushMicrotasks();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /notifications/i }));
+    });
+    await flushMicrotasks();
+
+    const notificationsChangedCalls = dispatchSpy.mock.calls.filter(
+      ([event]) =>
+        event instanceof CustomEvent &&
+        event.type === NOTIFICATIONS_CHANGED_EVENT,
+    );
+    expect(notificationsChangedCalls).toHaveLength(0);
+
+    dispatchSpy.mockRestore();
   });
 });

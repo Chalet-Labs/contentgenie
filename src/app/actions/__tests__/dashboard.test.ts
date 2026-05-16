@@ -249,8 +249,17 @@ describe("getDashboardStats", () => {
       expect.anything(),
     );
     expect(db.$count).toHaveBeenCalledWith(userLibrary, expect.anything());
-    expect(db.$count).toHaveBeenCalledWith(notifications, expect.anything());
+    // Pin the unread predicate to (userId AND isRead=false AND isDismissed=false).
+    // The plan's cycle-1 NEEDS_REVISION fix was a schema mismatch (readAt/isNull
+    // vs. isRead/isDismissed); expect.anything() here would silently accept the
+    // exact bug PM caught. Assert the eq calls so a regression fails the test.
+    expect(db.$count).toHaveBeenCalledWith(
+      notifications,
+      expect.objectContaining({ _op: "and" }),
+    );
     expect(eq).toHaveBeenCalledWith("user_id", "user_123");
+    expect(eq).toHaveBeenCalledWith("is_read", false);
+    expect(eq).toHaveBeenCalledWith("is_dismissed", false);
   });
 
   it("handles zero counts correctly", async () => {

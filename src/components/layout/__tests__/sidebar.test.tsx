@@ -207,12 +207,15 @@ describe("Sidebar — inline aside mode", () => {
     expect(inboxLink.querySelector("span")).toBeNull();
   });
 
-  it("active link styling applies on /inbox pathname", () => {
+  it("marks Inbox link as the current page on /inbox pathname", () => {
     mockUsePathname.mockReturnValue("/inbox");
     render(<Sidebar isAdmin={false} />);
 
-    const inboxLink = screen.getByRole("link", { name: /inbox/i });
-    expect(inboxLink.className).toContain("bg-accent");
+    // Query by the accessible "current page" signal so the test survives
+    // theme-token refactors that change which Tailwind class signals active.
+    expect(
+      screen.getByRole("link", { name: /inbox/i, current: "page" }),
+    ).toBeInTheDocument();
   });
 });
 

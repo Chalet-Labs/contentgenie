@@ -61,11 +61,13 @@ vi.mock("@/db/schema", () => ({
 const mockSelect = vi.fn();
 const mockUpdate = vi.fn();
 const mockFindFirst = vi.fn();
+const mockCount = vi.fn();
 
 vi.mock("@/db", () => ({
   db: {
     select: (...args: unknown[]) => mockSelect(...args),
     update: (...args: unknown[]) => mockUpdate(...args),
+    $count: (...args: unknown[]) => mockCount(...args),
     query: {
       users: {
         findFirst: (...args: unknown[]) => mockFindFirst(...args),
@@ -89,10 +91,7 @@ describe("notification server actions", () => {
     });
 
     it("returns unread count for authenticated user", async () => {
-      const mockFrom = vi.fn().mockReturnValue({
-        where: vi.fn().mockResolvedValue([{ value: 5 }]),
-      });
-      mockSelect.mockReturnValue({ from: mockFrom });
+      mockCount.mockResolvedValue(5);
 
       const { getUnreadCount } = await import("@/app/actions/notifications");
       const count = await getUnreadCount();
@@ -101,10 +100,7 @@ describe("notification server actions", () => {
 
     it("lets DB errors propagate so the caller can keep the last good count", async () => {
       const dbError = new Error("connection refused");
-      const mockFrom = vi.fn().mockReturnValue({
-        where: vi.fn().mockRejectedValue(dbError),
-      });
-      mockSelect.mockReturnValue({ from: mockFrom });
+      mockCount.mockRejectedValue(dbError);
 
       const { getUnreadCount } = await import("@/app/actions/notifications");
       await expect(getUnreadCount()).rejects.toThrow("connection refused");
@@ -362,10 +358,7 @@ describe("notification server actions", () => {
 
   describe("getUnreadCount — excludes dismissed", () => {
     it("includes isDismissed=false in WHERE", async () => {
-      const mockFrom = vi.fn().mockReturnValue({
-        where: vi.fn().mockResolvedValue([{ value: 3 }]),
-      });
-      mockSelect.mockReturnValue({ from: mockFrom });
+      mockCount.mockResolvedValue(3);
       const { eq: mockEq } = await import("drizzle-orm");
       const { getUnreadCount } = await import("@/app/actions/notifications");
       await getUnreadCount();
