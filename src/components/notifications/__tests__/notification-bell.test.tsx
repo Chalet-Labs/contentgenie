@@ -648,6 +648,41 @@ describe("NotificationBell", () => {
     // Avoid the no-op cascade: opening the bell on an empty inbox still
     // calls markAllNotificationsRead (returns success), but nothing changed,
     // so the sidebar listener shouldn't re-run three getDashboardStats counts.
+    // The just-fetched summary must also confirm zero unread — a stale-zero
+    // cached badge paired with a non-zero summary IS expected to dispatch
+    // (see the "(T5b) dispatches when cached badge is stale 0" test below).
+    mockGetUnreadCount.mockResolvedValue(0);
+    mockGetNotificationSummary.mockResolvedValue({
+      totalUnread: 0,
+      groups: [],
+    });
+    mockMarkAllNotificationsRead.mockResolvedValue({ success: true });
+
+    const dispatchSpy = vi.spyOn(window, "dispatchEvent");
+
+    render(<NotificationBell />);
+    await flushMicrotasks();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /notifications/i }));
+    });
+    await flushMicrotasks();
+
+    const notificationsChangedCalls = dispatchSpy.mock.calls.filter(
+      ([event]) =>
+        event instanceof CustomEvent &&
+        event.type === NOTIFICATIONS_CHANGED_EVENT,
+    );
+    expect(notificationsChangedCalls).toHaveLength(0);
+
+    dispatchSpy.mockRestore();
+  });
+
+  it("(T5b) dispatches when cached badge is stale 0 but summary has unread rows", async () => {
+    // Edge case: bell's cached count is 0 (e.g. ate a transient fetch error
+    // or hasn't caught up after a server-side notification arrived) but the
+    // just-fetched summary confirms unread rows still exist. The guard must
+    // dispatch so the sidebar badge converges on the truth.
     mockGetUnreadCount.mockResolvedValue(0);
     mockGetNotificationSummary.mockResolvedValue(defaultSummary);
     mockMarkAllNotificationsRead.mockResolvedValue({ success: true });
@@ -667,7 +702,12 @@ describe("NotificationBell", () => {
         event instanceof CustomEvent &&
         event.type === NOTIFICATIONS_CHANGED_EVENT,
     );
-    expect(notificationsChangedCalls).toHaveLength(0);
+    expect(notificationsChangedCalls).toHaveLength(1);
+    const dispatched = notificationsChangedCalls[0]![0] as CustomEvent;
+    expect(dispatched.detail).toEqual({
+      episodeDbIds: [],
+      action: "mark-all",
+    });
 
     dispatchSpy.mockRestore();
   });

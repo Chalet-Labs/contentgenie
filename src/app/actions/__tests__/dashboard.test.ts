@@ -291,6 +291,28 @@ describe("getDashboardStats", () => {
     expect(result.unreadNotificationCount).toBe(0);
     expect(result.error).toMatch(/failed to load/i);
   });
+
+  it("isolates a unread-counter failure without poisoning the other counts", async () => {
+    // The unread-notifications counter is wrapped in `.catch(() => 0)` so a
+    // notifications-table outage cannot fail the whole dashboard. Pin that
+    // behavior: subscriptions and library counts still come back populated
+    // and `error` stays null.
+    mockAuth.mockResolvedValue({ userId: "user_123" });
+
+    const { db } = await import("@/db");
+    (db.$count as any)
+      .mockResolvedValueOnce(4) // subscriptions
+      .mockResolvedValueOnce(2) // library
+      .mockRejectedValueOnce(new Error("notifications table unavailable"));
+
+    const { getDashboardStats } = await import("@/app/actions/dashboard");
+    const result = await getDashboardStats();
+
+    expect(result.subscriptionCount).toBe(4);
+    expect(result.savedCount).toBe(2);
+    expect(result.unreadNotificationCount).toBe(0);
+    expect(result.error).toBeNull();
+  });
 });
 
 describe("getTrendingTopics", () => {

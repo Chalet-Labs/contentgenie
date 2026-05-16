@@ -69,22 +69,23 @@ export function NotificationBell() {
 
   // Race guard: ignore stale resolutions from prior opens.
   const fetchIdRef = useRef(0);
-  const fetchSummary = useCallback(async (): Promise<boolean> => {
-    const fetchId = ++fetchIdRef.current;
-    setSummary(null);
-    setSummaryError(false);
-    try {
-      const result = await getNotificationSummary();
-      if (fetchId !== fetchIdRef.current) return false;
-      setSummary(result);
-      return true;
-    } catch (error) {
-      console.error("Failed to fetch notification summary:", error);
-      if (fetchId !== fetchIdRef.current) return false;
-      setSummaryError(true);
-      return false;
-    }
-  }, []);
+  const fetchSummary =
+    useCallback(async (): Promise<NotificationSummary | null> => {
+      const fetchId = ++fetchIdRef.current;
+      setSummary(null);
+      setSummaryError(false);
+      try {
+        const result = await getNotificationSummary();
+        if (fetchId !== fetchIdRef.current) return null;
+        setSummary(result);
+        return result;
+      } catch (error) {
+        console.error("Failed to fetch notification summary:", error);
+        if (fetchId !== fetchIdRef.current) return null;
+        setSummaryError(true);
+        return null;
+      }
+    }, []);
 
   // Parallel race guard for mark-all: also bumped on close so a fetch that
   // resolves after the user closed the popover short-circuits before mark.
@@ -95,8 +96,8 @@ export function NotificationBell() {
   // for the next open. Also the Retry path — after a transient fetch
   // failure the user still sees the list, so mark-read must still run.
   const openAndMarkRead = useCallback(async () => {
-    const fetchOk = await fetchSummary();
-    if (!fetchOk) return;
+    const fetchedSummary = await fetchSummary();
+    if (!fetchedSummary) return;
 
     const markId = ++markAllIdRef.current;
     const prev = unreadCountRef.current;
@@ -113,10 +114,12 @@ export function NotificationBell() {
       if (!result.success) {
         console.error("markAllNotificationsRead failed:", result.error);
         revertIfStillZero();
-      } else if (prev === null || prev > 0) {
-        // Skip dispatch only when prev is a confirmed zero (nothing to mark).
-        // When prev is null (initial fetch pending) or positive, dispatch so
-        // the sidebar badge refreshes even if the bell's cached count is stale.
+      } else if (prev === null || prev > 0 || fetchedSummary.totalUnread > 0) {
+        // Skip dispatch only when both the cached count AND the just-fetched
+        // summary agree there's nothing to mark. A stale-zero cached count
+        // alongside server-side unread rows must still dispatch, otherwise
+        // the sidebar badge stays stuck at the stale value until the next
+        // route change or bell open.
         // The `mark-all` action tells the inbox page (if open) to flip its
         // visible rows to read so the UI matches the server state without
         // requiring a reload.

@@ -212,9 +212,12 @@ export function NotificationPageList({
         setItems((prev) => prev.filter((n) => n.id !== id));
         // Keep the sidebar inbox badge in sync — without this dispatch the
         // badge would stay stale until route change or the next bell open.
-        // Carries the episodeDbId so cross-tab inbox instances drop the
-        // same row; safe because the product emits at most one notification
-        // per episode (summary_completed only).
+        // Carries the episodeDbId so any same-document listener (the sidebar
+        // badge, or a second NotificationPageList mounted in this tab) drops
+        // the matching row; safe because the product emits at most one
+        // notification per episode (summary_completed only). Cross-tab sync
+        // is intentionally not implemented — `window.dispatchEvent` does not
+        // cross documents, so a second browser tab won't see this event.
         dispatchNotificationsChanged(
           dismissed?.episodeDbId ? [dismissed.episodeDbId] : [],
         );
