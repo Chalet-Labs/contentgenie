@@ -20,8 +20,13 @@ export type NotificationsChangedEventDetail = {
 //   no row-level reconcile." `notification-page-list` treats it as a no-op
 //   for visible rows; the sidebar badge still re-fetches counts.
 // - Non-empty `episodeDbIds`, no `action` → "the listed episode rows were
-//   removed/read on the server." `notification-page-list` drops matching
-//   rows; the sidebar badge re-fetches counts.
+//   **dismissed** on the server (manual dismiss, queue auto-dismiss, or
+//   listened-to auto-dismiss)." `notification-page-list` drops matching
+//   rows from the visible list; the sidebar badge re-fetches counts. This
+//   payload shape is only valid for dismiss-shaped mutations — a read-only
+//   `markNotificationRead` MUST use the empty-`episodeDbIds` no-action
+//   payload instead so the row stays visible (re-styled as read) on the
+//   inbox page.
 // - `action: 'mark-all'` (with empty `episodeDbIds`) → every visible row
 //   should flip to read; page-level consumers use it to reconcile state
 //   when a sibling surface (e.g. the bell popover) marks everything read
