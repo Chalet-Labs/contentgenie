@@ -1,7 +1,7 @@
 ---
 applyTo: '**/*.java,**/*.js,**/*.jsx,**/*.kt,**/*.kts,**/*.m,**/*.mjs,**/*.pl,**/*.pm,**/*.swift,**/*.wsdl,**/*.xml,**/*.xsd,**/*.xslt'
 description: 'Mobile app security (iOS/Android): storage, transport, code integrity, biometrics, permissions'
-version: 1.3.0
+version: 1.3.1
 ---
 
 rule_id: codeguard-0-mobile-apps
@@ -48,7 +48,7 @@ Protect sensitive data at rest and in transit:
 Assume all network communication is insecure:
 - Use HTTPS for all network communication
 - Do not override SSL certificate validation for self-signed certificates
-- Use strong, industry-standard cipher suites with appropriate key lengths
+- Use strong, industry standard cipher suites with appropriate key lengths
 - Use certificates signed by trusted CA providers
 - Consider certificate pinning for additional security
 - Encrypt data even if sent over SSL
