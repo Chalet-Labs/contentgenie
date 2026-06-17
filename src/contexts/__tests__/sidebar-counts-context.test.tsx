@@ -411,4 +411,58 @@ describe("SidebarCountsProvider — unreadNotificationCount", () => {
 
     expect(screen.getByTestId("unread-count").textContent).toBe("7");
   });
+
+  it("ignores stale refresh responses when a newer notification refresh resolves first", async () => {
+    let resolveInitial: ((value: unknown) => void) | undefined;
+    let resolveRefresh: ((value: unknown) => void) | undefined;
+
+    mockGetDashboardStats
+      .mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolveInitial = resolve;
+        }),
+      )
+      .mockReturnValueOnce(
+        new Promise((resolve) => {
+          resolveRefresh = resolve;
+        }),
+      );
+
+    render(
+      <SidebarCountsProvider>
+        <TestConsumer />
+      </SidebarCountsProvider>,
+    );
+
+    expect(screen.getByTestId("loading").textContent).toBe("loading");
+
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent(NOTIFICATIONS_CHANGED_EVENT));
+    });
+
+    await act(async () => {
+      resolveRefresh!({
+        subscriptionCount: 0,
+        savedCount: 0,
+        unreadNotificationCount: 9,
+        error: null,
+      });
+    });
+
+    await waitFor(() => {
+      expect(screen.getByTestId("unread-count").textContent).toBe("9");
+      expect(screen.getByTestId("loading").textContent).toBe("done");
+    });
+
+    await act(async () => {
+      resolveInitial!({
+        subscriptionCount: 0,
+        savedCount: 0,
+        unreadNotificationCount: 2,
+        error: null,
+      });
+    });
+
+    expect(screen.getByTestId("unread-count").textContent).toBe("9");
+  });
 });
