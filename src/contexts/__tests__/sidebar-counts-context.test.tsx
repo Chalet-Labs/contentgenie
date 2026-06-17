@@ -441,7 +441,7 @@ describe("SidebarCountsProvider — unreadNotificationCount", () => {
     });
 
     await act(async () => {
-      resolveRefresh?.({
+      resolveRefresh!({
         subscriptionCount: 0,
         savedCount: 0,
         unreadNotificationCount: 9,
@@ -455,7 +455,7 @@ describe("SidebarCountsProvider — unreadNotificationCount", () => {
     });
 
     await act(async () => {
-      resolveInitial?.({
+      resolveInitial!({
         subscriptionCount: 0,
         savedCount: 0,
         unreadNotificationCount: 2,
