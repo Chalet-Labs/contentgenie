@@ -1,4 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { countUnreadNotifications } from "@/lib/notifications-query";
+import { notifications } from "@/db/schema";
+import {
+  dispatchNotificationsChanged,
+  NOTIFICATIONS_CHANGED_EVENT,
+} from "@/lib/events";
 
 const mockCount = vi.fn();
 vi.mock("@/db", () => ({
@@ -30,10 +36,6 @@ describe("countUnreadNotifications", () => {
   it("counts only unread and non-dismissed notifications for the user", async () => {
     mockCount.mockResolvedValue(7);
 
-    const { countUnreadNotifications } =
-      await import("@/lib/notifications-query");
-    const { notifications } = await import("@/db/schema");
-
     await expect(countUnreadNotifications("user_123")).resolves.toBe(7);
 
     expect(mockEq).toHaveBeenCalledWith(notifications.userId, "user_123");
@@ -57,12 +59,10 @@ describe("dispatchNotificationsChanged", () => {
     vi.restoreAllMocks();
   });
 
-  it("dispatches the default payload shape without an action", async () => {
-    const dispatchEvent = vi.fn();
-    vi.stubGlobal("window", { dispatchEvent } as unknown as Window);
-
-    const { dispatchNotificationsChanged, NOTIFICATIONS_CHANGED_EVENT } =
-      await import("@/lib/events");
+  it("dispatches the default payload shape without an action", () => {
+    const dispatchEvent = vi
+      .spyOn(window, "dispatchEvent")
+      .mockReturnValue(true);
 
     dispatchNotificationsChanged([10, 20]);
 
@@ -75,11 +75,10 @@ describe("dispatchNotificationsChanged", () => {
     expect(event.detail).toEqual({ episodeDbIds: [10, 20] });
   });
 
-  it("dispatches the mark-all payload shape when an action is provided", async () => {
-    const dispatchEvent = vi.fn();
-    vi.stubGlobal("window", { dispatchEvent } as unknown as Window);
-
-    const { dispatchNotificationsChanged } = await import("@/lib/events");
+  it("dispatches the mark-all payload shape when an action is provided", () => {
+    const dispatchEvent = vi
+      .spyOn(window, "dispatchEvent")
+      .mockReturnValue(true);
 
     dispatchNotificationsChanged([], "mark-all");
 
@@ -90,10 +89,8 @@ describe("dispatchNotificationsChanged", () => {
     expect(event.detail).toEqual({ episodeDbIds: [], action: "mark-all" });
   });
 
-  it("is a no-op when called without a window", async () => {
+  it("is a no-op when called without a window", () => {
     vi.stubGlobal("window", undefined);
-
-    const { dispatchNotificationsChanged } = await import("@/lib/events");
 
     expect(() => dispatchNotificationsChanged([10])).not.toThrow();
   });
