@@ -103,7 +103,10 @@ vi.mock("@/trigger/summarize-episode", () => ({
   },
 }));
 
-import { fetchTranscriptTask } from "@/trigger/fetch-transcript";
+import {
+  fetchTranscriptTask,
+  normalizeTranscriptSourceForPersistence,
+} from "@/trigger/fetch-transcript";
 import {
   submitTranscriptionAsync,
   getTranscriptionStatus,
@@ -129,6 +132,19 @@ const taskConfig = fetchTranscriptTask as unknown as {
 const mockTranscripts = [
   { url: "https://example.com/transcript.txt", type: "text/plain" },
 ];
+
+describe("normalizeTranscriptSourceForPersistence", () => {
+  it.each([
+    ["cached", undefined],
+    ["none", null],
+    ["podcastindex", "podcastindex"],
+    ["podcast-site", "podcast-site"],
+    ["description-url", "description-url"],
+    ["assemblyai", "assemblyai"],
+  ] as const)("maps %s to %s", (source, expected) => {
+    expect(normalizeTranscriptSourceForPersistence(source)).toBe(expected);
+  });
+});
 
 describe("fetch-transcript task", () => {
   beforeEach(() => {

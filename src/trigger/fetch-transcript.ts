@@ -31,6 +31,16 @@ export type FetchTranscriptResult = {
   source: TranscriptSource | null | undefined;
 };
 
+type InternalTranscriptSource = TranscriptSource | "cached" | "none";
+
+export function normalizeTranscriptSourceForPersistence(
+  source: InternalTranscriptSource,
+): FetchTranscriptResult["source"] {
+  if (source === "cached") return undefined;
+  if (source === "none") return null;
+  return source;
+}
+
 export const fetchTranscriptTask = task({
   id: "fetch-transcript",
   retry: {
@@ -59,7 +69,7 @@ export const fetchTranscriptTask = task({
     logger.info("Checking for cached transcription");
 
     let transcript: string | undefined;
-    let transcriptSource: TranscriptSource | "cached" | "none" = "none";
+    let transcriptSource: InternalTranscriptSource = "none";
     let transcriptExtractor: string | undefined;
 
     // Step 1: Check cached transcription in database (cheapest source), unless force=true
@@ -294,14 +304,7 @@ export const fetchTranscriptTask = task({
       transcriptExtractor = undefined;
     }
 
-    // Map internal sentinels to DB-safe values:
-    // "cached" → undefined (preserve existing DB value), "none" → null
-    const dbSource: FetchTranscriptResult["source"] =
-      transcriptSource === "cached"
-        ? undefined
-        : transcriptSource === "none"
-          ? null
-          : transcriptSource;
+    const dbSource = normalizeTranscriptSourceForPersistence(transcriptSource);
 
     logger.info("Transcript acquisition complete", {
       source: transcriptSource,
