@@ -369,6 +369,67 @@ describe("SidebarCountsProvider — unreadNotificationCount", () => {
     expect(screen.getByTestId("unread-count").textContent).toBe("0");
   });
 
+  it("sync-queue-drained triggers refreshCounts", async () => {
+    mockGetDashboardStats.mockResolvedValue({
+      subscriptionCount: 2,
+      savedCount: 1,
+      unreadNotificationCount: 3,
+      error: null,
+    });
+
+    render(
+      <SidebarCountsProvider>
+        <TestConsumer />
+      </SidebarCountsProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("loading").textContent).toBe("done");
+    });
+
+    const callsAfterMount = mockGetDashboardStats.mock.calls.length;
+
+    mockGetDashboardStats.mockResolvedValue({
+      subscriptionCount: 4,
+      savedCount: 5,
+      unreadNotificationCount: 6,
+      error: null,
+    });
+
+    await act(async () => {
+      window.dispatchEvent(new CustomEvent("sync-queue-drained"));
+    });
+
+    await waitFor(() => {
+      expect(mockGetDashboardStats.mock.calls.length).toBe(callsAfterMount + 1);
+    });
+
+    expect(screen.getByTestId("sub-count").textContent).toBe("4");
+    expect(screen.getByTestId("saved-count").textContent).toBe("5");
+    expect(screen.getByTestId("unread-count").textContent).toBe("6");
+  });
+
+  it("removes the sync-queue-drained listener on unmount", async () => {
+    const removeEventListenerSpy = vi.spyOn(window, "removeEventListener");
+
+    const { unmount } = render(
+      <SidebarCountsProvider>
+        <TestConsumer />
+      </SidebarCountsProvider>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByTestId("loading").textContent).toBe("done");
+    });
+
+    unmount();
+
+    expect(removeEventListenerSpy).toHaveBeenCalledWith(
+      "sync-queue-drained",
+      expect.any(Function),
+    );
+  });
+
   it("preserves the previous unreadNotificationCount when getDashboardStats signals partial failure with null", async () => {
     // A transient `countUnreadNotifications` failure surfaces as
     // `unreadNotificationCount: null` (the dashboard's partial-failure
