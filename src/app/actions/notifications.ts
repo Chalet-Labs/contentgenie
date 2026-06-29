@@ -12,6 +12,7 @@ import {
 } from "@/db/schema";
 import { countUnreadNotifications } from "@/lib/notifications-query";
 import { POSTGRES_MAX_INT as MAX_SERIAL_ID } from "@/lib/postgres-limits";
+import { uniquePositiveIntegerIds } from "@/lib/positive-integer-ids";
 
 export type NotificationGroup =
   | { kind: "episodes_since_last_seen"; count: number; sinceIso: string }
@@ -330,9 +331,7 @@ export async function getEpisodeTopics(
   episodeIds: number[],
 ): Promise<Record<number, string[]>> {
   const { userId } = await auth();
-  const safeEpisodeIds = Array.from(new Set(episodeIds))
-    .filter((id) => Number.isInteger(id) && id > 0)
-    .slice(0, 100);
+  const safeEpisodeIds = uniquePositiveIntegerIds(episodeIds, { maxIds: 100 });
   if (!userId || safeEpisodeIds.length === 0) return {};
 
   try {

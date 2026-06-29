@@ -6,6 +6,7 @@ import { ensureUserExists } from "@/db/helpers";
 import { episodes, listenHistory } from "@/db/schema";
 import { auth } from "@clerk/nextjs/server";
 import { withAuthAction } from "@/lib/auth-wrapper";
+import { uniquePositiveIntegerIds } from "@/lib/positive-integer-ids";
 import { dismissNotificationsForEpisodes } from "@/app/actions/_internal/dismiss-notifications";
 import type { ActionResult } from "@/types/action-result";
 import {
@@ -130,9 +131,9 @@ export async function getListenedEpisodeIds(
   const { userId } = await auth();
   if (!userId || !Array.isArray(episodeInternalIds)) return [];
 
-  const sanitizedIds = Array.from(
-    new Set(episodeInternalIds.filter((id) => Number.isInteger(id) && id > 0)),
-  ).slice(0, MAX_LISTENED_LOOKUP_IDS);
+  const sanitizedIds = uniquePositiveIntegerIds(episodeInternalIds, {
+    maxIds: MAX_LISTENED_LOOKUP_IDS,
+  });
 
   if (sanitizedIds.length === 0) return [];
 
