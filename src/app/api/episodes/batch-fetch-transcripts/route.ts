@@ -5,6 +5,10 @@ import { tasks } from "@trigger.dev/sdk";
 import { db } from "@/db";
 import { episodes } from "@/db/schema";
 import { ADMIN_ROLE } from "@/lib/auth-roles";
+import {
+  isPositiveIntegerId,
+  uniquePositiveIntegerIds,
+} from "@/lib/positive-integer-ids";
 import type { fetchTranscriptTask } from "@/trigger/fetch-transcript";
 
 export async function POST(request: NextRequest) {
@@ -37,15 +41,7 @@ export async function POST(request: NextRequest) {
         { status: 400 },
       );
     }
-    if (
-      !episodeIds.every(
-        (id: unknown) =>
-          typeof id === "number" &&
-          Number.isFinite(id) &&
-          id > 0 &&
-          Number.isInteger(id),
-      )
-    ) {
+    if (!episodeIds.every((id: unknown) => isPositiveIntegerId(id))) {
       return NextResponse.json(
         { error: "All episode IDs must be positive integers" },
         { status: 400 },
@@ -53,7 +49,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Deduplicate IDs so inArray + length comparison works correctly
-    const uniqueIds = Array.from(new Set(episodeIds as number[]));
+    const uniqueIds = uniquePositiveIntegerIds(episodeIds);
     if (uniqueIds.length > 20) {
       return NextResponse.json(
         { error: "Maximum 20 unique episodes per batch" },

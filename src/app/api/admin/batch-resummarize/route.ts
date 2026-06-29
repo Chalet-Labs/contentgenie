@@ -4,6 +4,7 @@ import { inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { episodes } from "@/db/schema";
 import { ADMIN_ROLE } from "@/lib/auth-roles";
+import { isPositiveIntegerId } from "@/lib/positive-integer-ids";
 import type { summarizeEpisode } from "@/trigger/summarize-episode";
 
 export async function POST(request: Request) {
@@ -47,11 +48,7 @@ export async function POST(request: Request) {
     );
   }
 
-  if (
-    !episodeIds.every(
-      (id) => typeof id === "number" && Number.isInteger(id) && id > 0,
-    )
-  ) {
+  if (!episodeIds.every((id) => isPositiveIntegerId(id))) {
     return new Response(
       JSON.stringify({ error: "All episodeIds must be positive integers" }),
       {

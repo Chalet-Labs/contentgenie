@@ -1,14 +1,13 @@
 import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { notifications } from "@/db/schema";
+import { uniquePositiveIntegerIds } from "@/lib/positive-integer-ids";
 
 export async function dismissNotificationsForEpisodes(
   userId: string,
   episodeIds: number[],
 ): Promise<number[]> {
-  const safeIds = Array.from(
-    new Set(episodeIds.filter((id) => Number.isInteger(id) && id > 0)),
-  );
+  const safeIds = uniquePositiveIntegerIds(episodeIds);
   if (safeIds.length === 0) return [];
   try {
     const flipped = await db
