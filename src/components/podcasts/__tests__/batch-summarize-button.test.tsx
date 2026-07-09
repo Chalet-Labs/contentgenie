@@ -14,14 +14,15 @@ vi.mock("@trigger.dev/react-hooks", () => ({
 
 vi.mock("sonner", () => ({ toast: mocks.toast }));
 
-const mockFetch = vi.fn();
-
 import { BatchSummarizeButton } from "@/components/podcasts/batch-summarize-button";
 
 describe("BatchSummarizeButton", () => {
+  let mockFetch: ReturnType<typeof vi.fn>;
+
   beforeEach(() => {
-    vi.clearAllMocks();
+    mockFetch = vi.fn();
     vi.stubGlobal("fetch", mockFetch);
+    vi.clearAllMocks();
     mocks.useRealtimeRun.mockReturnValue({ run: null });
   });
 
