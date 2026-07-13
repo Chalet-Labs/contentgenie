@@ -113,8 +113,10 @@ describe("notification server actions", () => {
       const { markNotificationRead } =
         await import("@/app/actions/notifications");
       const result = await markNotificationRead(1);
-      expect(result.success).toBe(false);
-      expect(result.error).toBe("You must be signed in");
+      expect(result).toEqual({
+        success: false,
+        error: "You must be signed in",
+      });
     });
 
     it("marks notification as read for the owning user", async () => {
@@ -138,8 +140,10 @@ describe("notification server actions", () => {
       const { markNotificationRead } =
         await import("@/app/actions/notifications");
       const result = await markNotificationRead(999);
-      expect(result.success).toBe(false);
-      expect(result.error).toBe("Notification not found");
+      expect(result).toEqual({
+        success: false,
+        error: "Notification not found",
+      });
     });
   });
 
@@ -372,24 +376,30 @@ describe("notification server actions", () => {
       const { dismissNotification } =
         await import("@/app/actions/notifications");
       const result = await dismissNotification(1);
-      expect(result.success).toBe(false);
-      expect(result.error).toBe("You must be signed in");
+      expect(result).toEqual({
+        success: false,
+        error: "You must be signed in",
+      });
     });
 
     it("returns error for non-integer id", async () => {
       const { dismissNotification } =
         await import("@/app/actions/notifications");
       const result = await dismissNotification(1.5);
-      expect(result.success).toBe(false);
-      expect(result.error).toBe("Invalid notification id");
+      expect(result).toEqual({
+        success: false,
+        error: "Invalid notification id",
+      });
     });
 
     it("returns error for id <= 0", async () => {
       const { dismissNotification } =
         await import("@/app/actions/notifications");
       const result = await dismissNotification(0);
-      expect(result.success).toBe(false);
-      expect(result.error).toBe("Invalid notification id");
+      expect(result).toEqual({
+        success: false,
+        error: "Invalid notification id",
+      });
     });
 
     it("dismisses notification and returns success", async () => {
@@ -414,8 +424,10 @@ describe("notification server actions", () => {
       const { dismissNotification } =
         await import("@/app/actions/notifications");
       const result = await dismissNotification(999);
-      expect(result.success).toBe(false);
-      expect(result.error).toBe("Notification not found");
+      expect(result).toEqual({
+        success: false,
+        error: "Notification not found",
+      });
     });
 
     it("scopes update to userId (and() called with userId condition)", async () => {

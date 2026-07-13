@@ -12,6 +12,7 @@ import {
 } from "@/db/schema";
 import { countUnreadNotifications } from "@/lib/notifications-query";
 import { POSTGRES_MAX_INT as MAX_SERIAL_ID } from "@/lib/postgres-limits";
+import type { ActionResult } from "@/types/action-result";
 
 export type NotificationGroup =
   | { kind: "episodes_since_last_seen"; count: number; sinceIso: string }
@@ -33,6 +34,27 @@ type PodcastGroupRow = {
   podcastTitle: string;
   count: number;
 };
+
+type NotificationStateUpdate = { isRead: true } | { isDismissed: true };
+
+async function updateOwnedNotification(
+  userId: string,
+  notificationId: number,
+  update: NotificationStateUpdate,
+): Promise<boolean> {
+  const result = await db
+    .update(notifications)
+    .set(update)
+    .where(
+      and(
+        eq(notifications.id, notificationId),
+        eq(notifications.userId, userId),
+      ),
+    )
+    .returning({ id: notifications.id });
+
+  return result.length > 0;
+}
 
 export async function getNotificationSummary(): Promise<NotificationSummary> {
   const { userId } = await auth();
@@ -238,7 +260,9 @@ export async function getUnreadCount(): Promise<number> {
   return countUnreadNotifications(userId);
 }
 
-export async function markNotificationRead(notificationId: number) {
+export async function markNotificationRead(
+  notificationId: number,
+): Promise<ActionResult> {
   const { userId } = await auth();
   if (!userId) {
     return { success: false, error: "You must be signed in" };
@@ -248,18 +272,10 @@ export async function markNotificationRead(notificationId: number) {
   }
 
   try {
-    const result = await db
-      .update(notifications)
-      .set({ isRead: true })
-      .where(
-        and(
-          eq(notifications.id, notificationId),
-          eq(notifications.userId, userId),
-        ),
-      )
-      .returning({ id: notifications.id });
-
-    if (result.length === 0) {
+    const wasUpdated = await updateOwnedNotification(userId, notificationId, {
+      isRead: true,
+    });
+    if (!wasUpdated) {
       return { success: false, error: "Notification not found" };
     }
 
@@ -270,7 +286,7 @@ export async function markNotificationRead(notificationId: number) {
   }
 }
 
-export async function markAllNotificationsRead() {
+export async function markAllNotificationsRead(): Promise<ActionResult> {
   const { userId } = await auth();
   if (!userId) {
     return { success: false, error: "You must be signed in" };
@@ -294,7 +310,9 @@ export async function markAllNotificationsRead() {
   }
 }
 
-export async function dismissNotification(notificationId: number) {
+export async function dismissNotification(
+  notificationId: number,
+): Promise<ActionResult> {
   const { userId } = await auth();
   if (!userId) {
     return { success: false, error: "You must be signed in" };
@@ -304,18 +322,10 @@ export async function dismissNotification(notificationId: number) {
   }
 
   try {
-    const result = await db
-      .update(notifications)
-      .set({ isDismissed: true })
-      .where(
-        and(
-          eq(notifications.id, notificationId),
-          eq(notifications.userId, userId),
-        ),
-      )
-      .returning({ id: notifications.id });
-
-    if (result.length === 0) {
+    const wasUpdated = await updateOwnedNotification(userId, notificationId, {
+      isDismissed: true,
+    });
+    if (!wasUpdated) {
       return { success: false, error: "Notification not found" };
     }
 
@@ -391,7 +401,7 @@ export async function getEpisodeTopics(
 export async function updateNotificationPreferences(prefs: {
   digestFrequency?: "realtime" | "daily" | "weekly";
   pushEnabled?: boolean;
-}) {
+}): Promise<ActionResult> {
   const { userId } = await auth();
   if (!userId) {
     return { success: false, error: "You must be signed in" };
