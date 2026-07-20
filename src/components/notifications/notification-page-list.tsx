@@ -30,7 +30,8 @@ import { ROUTES } from "@/lib/routes";
 import {
   LISTEN_STATE_CHANGED_EVENT,
   NOTIFICATIONS_CHANGED_EVENT,
-  dispatchNotificationsChanged,
+  dispatchAllNotificationsRead,
+  dispatchNotificationCountsChanged,
   type NotificationsChangedEventDetail,
 } from "@/lib/events";
 import { NOTIFICATIONS_PAGE_SIZE } from "@/lib/notifications-constants";
@@ -214,7 +215,7 @@ export function NotificationPageList({
         // dismiss sources (audio-player queue auto-dismiss, listened-to
         // auto-dismiss) still pass non-empty `episodeDbIds` so they can
         // reach this listener and remove rows visible here.
-        dispatchNotificationsChanged([]);
+        dispatchNotificationCountsChanged();
       } else {
         console.error("[notifications] dismiss failed", {
           id,
@@ -240,7 +241,7 @@ export function NotificationPageList({
           );
           toast.error(result.error ?? "Couldn't mark as read");
         } else {
-          dispatchNotificationsChanged([]);
+          dispatchNotificationCountsChanged();
         }
       })
       .catch(() => {
@@ -270,7 +271,7 @@ export function NotificationPageList({
         // Sync the sidebar inbox badge with the bell's behavior — both
         // mark-all paths must dispatch so the badge clears in real time.
         // The `mark-all` action also keeps other inbox instances in sync.
-        dispatchNotificationsChanged([], "mark-all");
+        dispatchAllNotificationsRead();
       } else {
         toastErrorWithRetry(
           result.error ?? "Failed to mark all as read",
