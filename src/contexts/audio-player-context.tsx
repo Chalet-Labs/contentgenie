@@ -51,7 +51,7 @@ import {
   savePlayerSession as savePlayerSessionAction,
   clearPlayerSession as clearPlayerSessionAction,
 } from "@/app/actions/player-session";
-import { dispatchNotificationsChanged } from "@/lib/events";
+import { dispatchNotificationsDismissed } from "@/lib/events";
 
 // ---------------------------------------------------------------------------
 // Server-sync helpers (fire-and-forget; best-effort with warn-on-failure)
@@ -715,7 +715,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
           // queue-save with zero dismissals is a no-op for badge counts.
           const dismissedIds = result.data?.dismissedEpisodeDbIds ?? [];
           if (dismissedIds.length > 0) {
-            dispatchNotificationsChanged(dismissedIds);
+            dispatchNotificationsDismissed(dismissedIds);
           }
         } else {
           toast.error("Couldn't sync queue", {
@@ -1366,7 +1366,7 @@ export function AudioPlayerProvider({ children }: { children: ReactNode }) {
               ? (result.data?.dismissedEpisodeDbIds ?? [])
               : [];
             if (dismissedIds.length > 0) {
-              dispatchNotificationsChanged(dismissedIds);
+              dispatchNotificationsDismissed(dismissedIds);
             }
           })
           .catch(() => {

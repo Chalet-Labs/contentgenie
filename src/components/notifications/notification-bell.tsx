@@ -14,7 +14,7 @@ import { NotificationPopover } from "@/components/notifications/notification-pop
 import { formatRelativeTime } from "@/lib/utils";
 import {
   NOTIFICATIONS_CHANGED_EVENT,
-  dispatchNotificationsChanged,
+  dispatchAllNotificationsRead,
 } from "@/lib/events";
 
 const POLL_INTERVAL_MS = 60_000;
@@ -130,7 +130,7 @@ export function NotificationBell() {
         // always converges on the server's truth. The `mark-all` action
         // tells the inbox page (if open) to flip its visible rows to read
         // so the UI matches the server state without requiring a reload.
-        dispatchNotificationsChanged([], "mark-all");
+        dispatchAllNotificationsRead();
       }
     } catch (error) {
       if (markId !== markAllIdRef.current) return;
